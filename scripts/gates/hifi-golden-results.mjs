@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 export function profileGrep(profile) {
   if (!Array.isArray(profile.tests) || !profile.tests.length) throw new Error('empty profile');
@@ -32,6 +33,18 @@ export function auditHifiReport(profile, report, { collection = false, repeat = 
             if (test.status !== 'expected' || test.results?.length !== 1
                 || test.results[0].status !== 'passed' || test.results[0].retry !== 0) {
               throw new Error(`failed/skipped/retried/incomplete result: ${row.id}`);
+            }
+            for (const required of row.requiredEvidence ?? []) {
+              const attachments = (test.results[0].attachments ?? []).filter(item => item.name === required.name);
+              if (attachments.length !== 1 || attachments[0].contentType !== 'application/json') {
+                throw new Error(`missing or duplicate mandatory evidence: ${row.id} :: ${required.name}`);
+              }
+              const attachment = attachments[0];
+              const evidence = JSON.parse(attachment.body
+                ? Buffer.from(attachment.body, 'base64').toString('utf8') : fs.readFileSync(attachment.path, 'utf8'));
+              for (const [key, value] of Object.entries(required.fields)) {
+                if (!isDeepStrictEqual(evidence[key], value)) throw new Error(`mandatory evidence mismatch: ${row.id} :: ${key}`);
+              }
             }
             executed++;
           }

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { verifyModelNotifications } from '../../helpers/open-platform-notifications';
 
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
 const PUBLICATION_VIEWPORT = process.env.AURA_OPEN_PLATFORM_PUBLICATION_VIEWPORT || 'desktop';
@@ -892,7 +893,7 @@ test.describe('Dynamic installation authority journey', () => {
     // Model/publication/app/token setup are fixtures; all tested installation policy writes and revocations below use the UI.
     const resource = { code: resourceCode, modelCode, schemaVersion: 1, operations, scopes: Object.fromEntries(operations.map((operation, index) => [operation, scopes[index]])), dataPolicy: 'installation_filter',
       fields: { pid: { ...field('pid'), type: 'pid', nullable: false }, name: field('dop_g_name', true, true), zone: { ...field('dop_g_zone', true, true), operators: ['EQ'] }, secret: field('dop_g_secret') },
-      maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: [] };
+      maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: ['created'] };
     await human('PUT', `/api/open-platform/publications/${resourceCode}/draft`, { expectedRevision: 0, definition: resource });
     await human('POST', `/api/open-platform/publications/${resourceCode}/publish`, { expectedRevision: 1 });
     const named = await human('POST', '/api/meta/named-queries', { code: namedCode, title: `授权查询 ${suffix}`, resourceCode: modelCode, actionCode: 'read',
@@ -1080,6 +1081,8 @@ test.describe('Dynamic installation authority journey', () => {
     const updated = await page.request.patch(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-update-${suffix}`, 'If-Match': created.headers().etag }, data: { name: 'Updated A' } }); expect(updated.status()).toBe(200); expect(await updated.json()).toMatchObject({ pid: row.pid, name: 'Updated A' });
     const removed = await page.request.delete(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-delete-${suffix}`, 'If-Match': updated.headers().etag } }); expect(removed.status()).toBe(204);
     expect((await page.request.get(`${resourcePath}/${row.pid}`, { headers: machineHeaders })).status()).toBe(404);
+    await verifyModelNotifications({ page, card: installationCard, installationPid: installation.pid, resourceCode, resourcePath, machineHeaders,
+      locale: installationLocale, evidenceRoot: screenshotRoot, testInfo, revoke: async () => {
     await editor.getByRole('button', { name: installationText('撤销安装授权'), exact: true }).click(); await snapshot('grant-revoke-dialog');
     await editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true }).getByRole('button', { name: installationText('确认'), exact: true }).click(); await expect(editor.getByRole('status').filter({ hasText: installationText('授权已撤销') })).toBeVisible();
     expect((await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } })).status()).toBe(403); await snapshot('grant-query-revoked');
@@ -1087,6 +1090,7 @@ test.describe('Dynamic installation authority journey', () => {
     await editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true }).getByRole('button', { name: installationText('确认'), exact: true }).click(); await expect(editor.getByRole('status').filter({ hasText: installationText('授权已撤销') })).toBeVisible();
     expect((await page.request.get(resourcePath, { headers: machineHeaders })).status()).toBe(403); await snapshot('grant-resource-revoked');
     const persisted = await human('GET', `/api/open-platform/installations/${installation.pid}/resources`); expect(persisted.find((view: { code: string }) => view.code === resourceCode).policy).toBeNull();
+    } });
   });
 });
 
@@ -1668,10 +1672,21 @@ test.describe('Open Platform golden journey', () => {
       headers: { Authorization: `Bearer ${token.access_token}` },
     });
     expect(publicCatalog.status()).toBe(200);
+    const publishedResourcesResponse = await page.request.get(
+      `${WEB_BASE_URL}/api/open-platform/installations/${principal.installationPid}/resources`,
+    );
+    expect(publishedResourcesResponse.status()).toBe(200);
+    const publishedResources = await publishedResourcesResponse.json();
+    expect(String(publishedResources.code)).toBe('0');
+    const modelEvents = publishedResources.data
+      .filter((view: { status: string }) => view.status === 'published')
+      .flatMap((view: { code: string; contract: { events: string[] } }) =>
+        view.contract.events.map(operation => `open.resource.${view.code}.${operation}`));
     expect((await publicCatalog.json()).map((item: { type: string }) => item.type).sort()).toEqual([
       'assets.assignment.changed',
       'inventory.stock-in.confirmed',
-    ]);
+      ...modelEvents,
+    ].sort());
 
     const internalResourceProbe = await page.request.get(
       `${BACKEND_URL}/api/open/v1/resources/tasset_asset/${assetPid}`,

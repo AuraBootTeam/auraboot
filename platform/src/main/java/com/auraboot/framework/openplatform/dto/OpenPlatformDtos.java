@@ -37,7 +37,8 @@ public final class OpenPlatformDtos {
                                   List<InstallationView> installations) {
     }
 
-    public record OpenPlatformAccessView(boolean platformAdmin, boolean canCreateApplications) { }
+    public record OpenPlatformAccessView(boolean platformAdmin, boolean canCreateApplications,
+                                        boolean canManageModelNotifications) { }
 
     public record ApplicationPermissions(boolean manageMembers, boolean disableApplication,
                                          boolean manageRuntime, boolean readOperations) { }

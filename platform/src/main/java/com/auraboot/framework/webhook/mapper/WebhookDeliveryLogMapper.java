@@ -94,7 +94,7 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
             SELECT d.pid, d.subscription_pid, s.name AS subscription_name,
                    d.event_id, d.request_id, d.delivery_status, d.retry_count, d.max_retries,
                    d.response_status, d.next_retry_at, d.last_attempt_at, d.delivered_at,
-                   d.replay_count, d.last_replayed_at, d.created_at
+                   d.replay_count, d.last_replayed_at, d.created_at, d.error_message
             FROM ab_webhook_delivery_log d
             LEFT JOIN ab_webhook_subscription s
               ON s.tenant_id = d.tenant_id AND s.pid = d.subscription_pid
@@ -135,5 +135,5 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                               String eventId, String requestId, String deliveryStatus, Integer retryCount,
                               Integer maxRetries, Integer responseStatus, Instant nextRetryAt,
                               Instant lastAttemptAt, Instant deliveredAt,
-                              Integer replayCount, Instant lastReplayedAt, Instant createdAt) { }
+                              Integer replayCount, Instant lastReplayedAt, Instant createdAt, String errorMessage) { }
 }

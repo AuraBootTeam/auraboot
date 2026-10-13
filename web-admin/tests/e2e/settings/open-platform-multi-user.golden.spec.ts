@@ -139,6 +139,10 @@ const readField = (source: string, type: string) => ({ source, type, readable: t
 
 async function verifyPublicationDenied(page: Page, session: Session, screenshotPrefix: string) {
   await expect(page.getByTestId('open-platform-publications-link')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '模型通知', exact: true })).toHaveCount(0);
+  const access = await page.request.get(`${BACKEND_URL}/api/open-platform/access`, { headers: bearer(session) });
+  expect(access.status()).toBe(200);
+  expect((await access.json()).data).toMatchObject({ canManageModelNotifications: false });
   const adminContext = await pwRequest.newContext();
   try {
     const admin = await apiLogin(adminContext, ACCOUNTS.admin.email, ACCOUNTS.admin.password);

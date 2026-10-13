@@ -273,6 +273,7 @@ export default function OpenPlatformOperationsPanel({
                   {deliveries.map((delivery) => (
                     <div
                       key={delivery.pid}
+                      data-testid={`webhook-delivery-${delivery.pid}`}
                       className="rounded-md bg-gray-50 p-2 text-xs dark:bg-gray-950"
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -292,7 +293,11 @@ export default function OpenPlatformOperationsPanel({
                       </div>
                       <div className="mt-1 text-gray-400">{formatTime(delivery.createdAt, locale)}</div>
                       {delivery.failureReason && (
-                        <p className="mt-1 line-clamp-2 text-red-600">{delivery.failureReason}</p>
+                        <p className="mt-1 text-red-600">{delivery.failureReason === 'authority_revoked'
+                          ? t('openPlatform.deliveryAuthorityRevoked', undefined, locale.startsWith('zh')
+                            ? '当前合同或安装数据授权已撤销或不可用，通知未发送。恢复授权后再重放。'
+                            : 'The current contract or installation authority is revoked or unavailable. No notification was sent. Restore authority before replaying.')
+                          : delivery.failureReason}</p>
                       )}
                       {delivery.replayable && (
                         <button
@@ -410,11 +415,14 @@ export default function OpenPlatformOperationsPanel({
               <p className="font-medium">
                 {t('openPlatform.replayConfirmTitle', undefined, 'Replay this delivery?')}
               </p>
+              <p className="mt-1 break-words">{pendingReplay.subscriptionName} · {formatTime(pendingReplay.createdAt, locale)}</p>
               <p className="mt-1 text-xs">
                 {t(
-                  'openPlatform.replayConfirmBody',
+                  'openPlatform.replayCurrentAuthorityBody',
                   undefined,
-                  'The original signed payload will be delivered again and may repeat downstream side effects.',
+                  locale.startsWith('zh')
+                    ? '原事件将重新处理。动态模型通知仅在当前合同、安装授权与行范围允许时发送，可能重复触发下游副作用。'
+                    : 'The same event will be processed again. Model notifications send only when the current contract, installation authority and row policy allow it, and may repeat downstream side effects.',
                 )}
               </p>
               <div className="mt-3 flex gap-2">

@@ -54,6 +54,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenApiEventPublisher eventPublisher;
     @Autowired private OpenPlatformRetentionWorker retentionWorker;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSessionTemplate;
     @Autowired private WebhookService webhookService;
     @Autowired private WebhookDispatcher webhookDispatcher;
     @Autowired private UserService userService;
@@ -593,6 +594,14 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertEquals("HTTP 503", deliveries.getFirst().failureReason());
         assertFalse(deliveries.getFirst().toString().contains("must-not-leak"));
         assertFalse(deliveries.getFirst().toString().contains("secret.example.invalid"));
+        jdbcTemplate.update("""
+                UPDATE ab_webhook_delivery_log SET response_status = NULL, error_message = ?
+                WHERE tenant_id = ? AND pid = ?
+                """, "Published model event authority revoked or unavailable", tenantId, "delivery-ops-1");
+        // Fixture JDBC writes bypass MyBatis; production attempts and reads use separate requests.
+        sqlSessionTemplate.clearCache();
+        assertEquals("authority_revoked", managementService.listWebhookDeliveries(
+                installation.pid(), "dead_letter", 50).getFirst().failureReason());
 
         var otherInstallation = managementService.install(application.pid(),
                 new InstallApplicationRequest("staging", Set.of("assets.read"), 600));

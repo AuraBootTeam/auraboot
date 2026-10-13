@@ -245,6 +245,7 @@ echo "=============================================================="
 # Backend-side contract set BEFORE the stack starts: exported here so it is plain
 # that the backend booted with it, not asserted after the fact.
 export AGENT_LLM_STUB_MODE=true
+export AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1
 if [[ "$REUSE_RUNTIME" == 1 ]]; then
   log "1/4 verified caller-provisioned runtime: $NAME slot=$SLOT"
 else

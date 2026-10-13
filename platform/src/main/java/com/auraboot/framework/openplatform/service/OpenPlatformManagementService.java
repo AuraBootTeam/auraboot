@@ -71,7 +71,10 @@ public class OpenPlatformManagementService {
 
     public OpenPlatformAccessView getAccess() {
         boolean platformAdmin = isPlatformAdmin();
-        return new OpenPlatformAccessView(platformAdmin, platformAdmin);
+        Long userId = MetaContext.getCurrentUserId();
+        boolean canManageNotifications = platformAdmin && userId != null
+                && userPermissionService.hasPermission(userId, MetaPermission.SYS_WEBHOOK_MANAGE);
+        return new OpenPlatformAccessView(platformAdmin, platformAdmin, canManageNotifications);
     }
 
     public List<ApplicationView> listApplications() {
@@ -273,7 +276,7 @@ public class OpenPlatformManagementService {
                         Math.max(1, Math.min(limit, 200))).stream()
                 .map(item -> new WebhookDeliveryView(item.pid(), item.subscriptionName(), item.eventId(), item.requestId(),
                         item.deliveryStatus(), item.retryCount(), item.maxRetries(), item.responseStatus(),
-                        safeFailureReason(item.deliveryStatus(), item.responseStatus()),
+                        safeFailureReason(item.deliveryStatus(), item.responseStatus(), item.errorMessage()),
                         item.nextRetryAt(), item.lastAttemptAt(), item.deliveredAt(),
                         item.replayCount(), item.lastReplayedAt(), item.createdAt(),
                         "dead_letter".equals(item.deliveryStatus()) || "failed".equals(item.deliveryStatus())))
@@ -314,7 +317,10 @@ public class OpenPlatformManagementService {
                 Boolean.TRUE.equals(subscription.getEnabled()));
     }
 
-    private String safeFailureReason(String status, Integer responseStatus) {
+    private String safeFailureReason(String status, Integer responseStatus, String errorMessage) {
+        if ("Published model event authority revoked or unavailable".equals(errorMessage)) {
+            return "authority_revoked";
+        }
         if (responseStatus != null && responseStatus >= 400) {
             return "HTTP " + responseStatus;
         }

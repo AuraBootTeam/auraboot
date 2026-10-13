@@ -63,13 +63,16 @@ PW_FIXTURE_COLLECTION=0
 [[ " $* " != *' --list '* ]] || PW_FIXTURE_COLLECTION=1
 export PW_FIXTURE_COLLECTION
 python3 - <<'REPORT_FIXTURE'
-import json,os
+import json,os,base64
 from pathlib import Path
 profile=json.loads(Path('../scripts/gates/oss-e2e-gate-profile.json').read_text())
 collection=os.environ['PW_FIXTURE_COLLECTION']=='1'
 n=len(profile['tests']) if collection else int(os.environ.get('REPORT_COUNT',str(len(profile['tests']))))
 rows=profile['tests'][:n]
 tests=[{'file':row['file'],'title':row['title'],'tests':[{'projectName':row['project'],'expectedStatus':'passed','status':'expected','results':[] if collection else [{'status':'passed','retry':int(os.environ.get('REPORT_RETRY','0'))}]}]} for row in rows]
+if not collection and os.environ.get('REPORT_MISSING_EVIDENCE') != '1':
+ for row,spec in zip(rows,tests):
+  spec['tests'][0]['results'][0]['attachments']=[{'name':evidence['name'],'contentType':'application/json','body':base64.b64encode(json.dumps(evidence['fields']).encode()).decode()} for evidence in row.get('requiredEvidence',[])]
 report={'stats':{'expected':n,'unexpected':0,'skipped':int(os.environ.get('REPORT_SKIPPED','0')),'flaky':0},'errors':[],'config':{'projects':[{'name':'oss','retries':0}]},'suites':[{'specs':tests}]}
 if collection:
  if os.environ.get('PLAYWRIGHT_JSON_OUTPUT_FILE'):
@@ -182,6 +185,12 @@ esac
                 self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
                 self.assertNotIn('playwright', self.calls())
                 self.assertNotIn('up ', self.calls())
+
+    def test_missing_notification_evidence_rejects_otherwise_complete_browser_report(self):
+        rejected = self.run_gate(REPORT_MISSING_EVIDENCE='1')
+        self.assertEqual(rejected.returncode, 1, rejected.stdout + rejected.stderr)
+        self.assertIn('missing or duplicate mandatory evidence', rejected.stderr)
+        self.assertEqual(self.run_gate().returncode, 0)
 
     def test_existing_evidence_is_not_overwritten(self):
         p = self.root / '.workspace/golden/owned-new'

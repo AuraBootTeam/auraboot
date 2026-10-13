@@ -55,7 +55,8 @@ if(!collection && process.env.MODE==='test-failure')process.exit(1);
 if(!collection && process.env.MODE==='signal'){process.kill(process.ppid,'SIGTERM');process.exit(0);}
 const profile=JSON.parse(fs.readFileSync('../scripts/gates/oss-e2e-gate-profile.json','utf8'));
 const report={errors:[],stats:{expected:profile.tests.length,unexpected:0,skipped:0,flaky:0},config:{projects:[{name:"oss",retries:0}]},suites:[{specs:profile.tests.map(t=>({file:t.file,title:t.title,tests:[{
-projectName:t.project,expectedStatus:'passed',status:'expected',results:collection?[]:[{status:'passed',retry:0}]}]}))}]};
+projectName:t.project,expectedStatus:'passed',status:'expected',results:collection?[]:[{status:'passed',retry:0,
+attachments:(t.requiredEvidence??[]).map(evidence=>({name:evidence.name,contentType:'application/json',body:Buffer.from(JSON.stringify(evidence.fields)).toString('base64')}))}]}]}))}]};
 if(process.env.MODE==='zero-tests')report.suites[0].specs=[];
 if(!collection && process.env.MODE==='missing-result')report.suites[0].specs.pop();
 if(!collection && process.env.MODE==='skipped-result')report.suites[0].specs[0].tests[0].results[0].status='skipped';

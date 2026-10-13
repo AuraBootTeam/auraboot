@@ -17,6 +17,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import OpenPlatformOperationsPanel from './OpenPlatformOperationsPanel';
 import { OpenApiInstallationGrantEditor } from '~/ui/smart/admin/OpenApiInstallationGrantEditor';
+import { OpenApiInstallationNotificationEditor } from '~/ui/smart/admin/OpenApiInstallationNotificationEditor';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
 
@@ -68,6 +69,7 @@ interface ApplicationMember {
 interface OpenPlatformAccess {
   platformAdmin: boolean;
   canCreateApplications: boolean;
+  canManageModelNotifications: boolean;
 }
 
 interface Credential {
@@ -95,6 +97,7 @@ export default function OpenPlatformPage() {
   const [access, setAccess] = useState<OpenPlatformAccess>({
     platformAdmin: false,
     canCreateApplications: false,
+    canManageModelNotifications: false,
   });
   const [credentials, setCredentials] = useState<Record<string, Credential[]>>({});
   const [loading, setLoading] = useState(true);
@@ -110,6 +113,7 @@ export default function OpenPlatformPage() {
   const [secret, setSecret] = useState<CredentialSecret | null>(null);
   const [operationsInstallation, setOperationsInstallation] = useState<string | null>(null);
   const [grantInstallation, setGrantInstallation] = useState<string | null>(null);
+  const [notificationInstallation, setNotificationInstallation] = useState<string | null>(null);
   const [pendingRotate, setPendingRotate] = useState<{
     installationPid: string;
     credential: Credential;
@@ -664,6 +668,17 @@ export default function OpenPlatformPage() {
                               )}
                             </button>
                           )}
+                          {access.canManageModelNotifications && application.permissions.manageRuntime && (
+                            <button
+                              type="button"
+                              onClick={() => setNotificationInstallation(installation.pid)}
+                              disabled={notificationInstallation !== null}
+                              aria-expanded={notificationInstallation === installation.pid}
+                              className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"
+                            >
+                              {t('openPlatform.notifications.open', undefined, locale.startsWith('zh') ? '模型通知' : 'Model notifications')}
+                            </button>
+                          )}
                           {application.permissions.manageRuntime && (
                             <button
                               type="button"
@@ -764,6 +779,15 @@ export default function OpenPlatformPage() {
                             active={installation.status === 'active'}
                             scopes={installation.scopes}
                             onClose={() => setGrantInstallation(null)}
+                          />
+                        )}
+                      {access.canManageModelNotifications && application.permissions.manageRuntime &&
+                        notificationInstallation === installation.pid && (
+                          <OpenApiInstallationNotificationEditor
+                            installationPid={installation.pid}
+                            active={application.status === 'active' && installation.status === 'active'}
+                            scopes={installation.scopes}
+                            onClose={() => setNotificationInstallation(null)}
                           />
                         )}
                     </div>

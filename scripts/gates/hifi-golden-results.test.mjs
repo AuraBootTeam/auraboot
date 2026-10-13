@@ -47,7 +47,9 @@ test('profile selection matches literal complete titles', () => {
 const ossProfile = JSON.parse(fs.readFileSync(new URL('./oss-e2e-gate-profile.json', import.meta.url)));
 const makeOssReport = () => ({ errors: [], suites: [{ specs: ossProfile.tests.map(row => ({
   file: row.file, title: row.title, tests: [{ projectName: row.project, expectedStatus: 'passed',
-    status: 'expected', results: [{ status: 'passed', retry: 0 }] }],
+    status: 'expected', results: [{ status: 'passed', retry: 0, attachments: (row.requiredEvidence ?? []).map(evidence => ({
+      name: evidence.name, contentType: 'application/json', body: Buffer.from(JSON.stringify(evidence.fields)).toString('base64'),
+    })) }] }],
 })) }] });
 for (const row of ossProfile.tests.filter(row => row.id.startsWith('DOP-BROWSER-'))) {
   for (const fault of ['omitted', 'duplicated', 'skipped', 'retried']) {
@@ -65,3 +67,21 @@ for (const row of ossProfile.tests.filter(row => row.id.startsWith('DOP-BROWSER-
     });
   }
 }
+
+test('mandatory dynamic notification evidence cannot be omitted, duplicated or reduced to static fixture green', () => {
+  for (const fault of ['missing', 'duplicate', 'mocked', 'incomplete']) {
+    const report = makeOssReport();
+    const spec = report.suites[0].specs.find(item => item.title === ossProfile.tests.find(row => row.id === 'DOP-BROWSER-03').title);
+    const result = spec.tests[0].results[0];
+    if (fault === 'missing') result.attachments = [];
+    else if (fault === 'duplicate') result.attachments.push(result.attachments[0]);
+    else {
+      const value = JSON.parse(Buffer.from(result.attachments[0].body, 'base64'));
+      if (fault === 'mocked') value.routeMocks = true;
+      else value.cases.pop();
+      result.attachments[0].body = Buffer.from(JSON.stringify(value)).toString('base64');
+    }
+    assert.throws(() => auditHifiReport(ossProfile, report));
+    assert.equal(auditHifiReport(ossProfile, makeOssReport()).passed, ossProfile.tests.length);
+  }
+});
