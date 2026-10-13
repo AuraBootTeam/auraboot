@@ -334,3 +334,8 @@ For proprietary enterprise capabilities, official support, or AuraBoot trademark
 ---
 
 <p align="center">Built with care by the <a href="https://github.com/AuraBootTeam">AuraBoot Team</a></p>
+
+
+### Proposed future commercial licensing
+
+A new-version Community License v3 proposal is available in [LICENSE-COMMUNITY-3.0-DRAFT.txt](LICENSE-COMMUNITY-3.0-DRAFT.txt). It proposes attributed business use, paid UI white-label permission, separate Internal / ISV / Vertical OEM scopes, and restrictions on competing development platforms. It is a custom source-available proposal and does not replace the current LICENSE.txt. Formal adoption requires an identified licensor and covered release.
