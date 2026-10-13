@@ -100,6 +100,8 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -335,6 +337,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public PluginResource importModel(ModelDefinitionDTO dto, String pluginPid, String importId,
                                        Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                        Boolean autoPublish) {
+        registerModelCacheRollbackEviction(dto.getCode());
         boolean exists = checkModelExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
@@ -436,6 +439,30 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     created.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),
                     ResourceAction.CREATE, null, extension);
         }
+    }
+
+    /**
+     * The meta definition cache is a read-through Spring cache: an entry loaded
+     * while the import transaction is still open survives that transaction's
+     * rollback, leaving a phantom definition for a model the database no longer
+     * has (misleading retries, and any runtime reader between rollback and the
+     * next eviction). Evict on rollback so the cache converges with the
+     * database; commits keep the entry, which is then accurate.
+     */
+    void registerModelCacheRollbackEviction(String modelCode) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    log.warn("Import rolled back; evicting cached definitions of model {}",
+                            logSafe(modelCode));
+                    metaModelService.clearAllCache();
+                }
+            }
+        });
     }
 
     @Override
