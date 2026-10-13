@@ -1985,11 +1985,16 @@ test.describe('Open Platform golden journey', () => {
     await operations.getByRole('button', { name: '确认重放' }).click();
     await expect(operations).toContainText(/没有.*筛选条件的投递/);
     await operations.getByLabel('投递状态').selectOption('');
-    await expect(operations).toContainText('evt-golden');
-    await capture(page, 'OP-OPS-09');
+    const replayedDelivery = operations.getByTestId('webhook-delivery-delivery-golden');
+    await expect(replayedDelivery).toContainText('evt-golden');
+    await expect(replayedDelivery).toContainText('待投递');
+    await expect(replayedDelivery).toContainText('0/5');
+    await expect(replayedDelivery).not.toContainText('HTTP 503');
+    await replayedDelivery.scrollIntoViewIfNeeded();
+    await captureLocator(replayedDelivery, 'OP-OPS-09');
     await dismissToasts(page);
     await expect(operations.getByRole('button', { name: '重放' })).toHaveCount(0);
-    await capture(page, 'OP-OPS-10');
+    await captureLocator(replayedDelivery, 'OP-OPS-10');
     await page.unroute('**/api/open-platform/installations/*/webhook-deliveries*');
     await page.unroute('**/api/open-platform/installations/*/webhook-deliveries/*/replay');
 
