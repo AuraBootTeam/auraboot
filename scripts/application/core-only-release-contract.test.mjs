@@ -33,7 +33,7 @@ test('image verification creates a private per-attempt encryption key and refuse
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const fn = productImageGate.match(/create_verification_crypto_env\(\) \{[\s\S]*?\n\}/)?.[0];
   assert.ok(fn);
-  const create = file => spawnSync('bash', ['-c', `${fn}\ncreate_verification_crypto_env "$1"`, 'crypto-env', file], { encoding: 'utf8' });
+  const create = file => spawnSync('bash', ['-c', `umask 022\n${fn}\ncreate_verification_crypto_env "$1"`, 'crypto-env', file], { encoding: 'utf8' });
   const files = [join(directory, 'publication-and-runtime.env'), join(directory, 'next-attempt.env')];
   for (const file of files) {
     const result = create(file); assert.equal(result.status, 0, result.stderr);
