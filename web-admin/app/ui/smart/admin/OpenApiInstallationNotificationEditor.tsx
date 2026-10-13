@@ -64,7 +64,7 @@ export function OpenApiInstallationNotificationEditor({ installationPid, active,
     eventVersion: row.eventVersion, secret: '', maxRetries: row.maxRetries, timeoutMs: row.timeoutMs } : empty()); setDirty(false); setError(''); setNotice(''); };
   const contract = events.find(event => event.type === form.eventType);
   const editable = active && ready && !busy && !denied && !!contract && contract.supportedVersions.includes(form.eventVersion);
-  const save = async (event: FormEvent) => { event.preventDefault(); if (!editable) return; setBusy(true); setError('');
+  const save = async (event: FormEvent) => { event.preventDefault(); if (!editable) return; setBusy(true); setError(''); setNotice('');
     try {
       const row = await publicationRequest<Subscription>(selected ? `/api/webhooks/${encodeURIComponent(selected.pid)}` : '/api/webhooks', {
         method: selected ? 'PUT' : 'POST', body: JSON.stringify({ ...form, installationPid, secret: form.secret || selected?.secret,
@@ -73,7 +73,7 @@ export function OpenApiInstallationNotificationEditor({ installationPid, active,
       edit(row); await load(); setNotice(label('saved', '订阅已保存。实际通知按发送时的合同、安装授权及行范围裁决；在运维面板查看投递。', 'Subscription saved. Each send rechecks the contract, installation authority and row policy. View deliveries in Operations.'));
     } catch (cause) { fail(cause); } finally { setBusy(false); }
   };
-  const enable = async (row: Subscription) => { setBusy(true); setError('');
+  const enable = async (row: Subscription) => { setBusy(true); setError(''); setNotice('');
     try { await publicationRequest(`/api/webhooks/${encodeURIComponent(row.pid)}/${row.enabled ? 'disable' : 'enable'}`, { method: 'PUT' });
       setConfirm(null); edit(null); await load(); setNotice(row.enabled ? label('disabled', '订阅已停用，后续不再发送。', 'Subscription disabled. Subsequent deliveries will not be sent.') : label('enabled', '订阅已启用，发送时仍复核当前授权。', 'Subscription enabled. Sends still recheck current authority.'));
     } catch (cause) { fail(cause); } finally { setBusy(false); }
@@ -83,11 +83,12 @@ export function OpenApiInstallationNotificationEditor({ installationPid, active,
     ({ created: 'Record created', updated: 'Record updated', deleted: 'Record deleted' } as Record<string, string>)[event.type.split('.').at(-1)!] ?? 'Model event')}`;
   return <section data-testid="installation-notification-editor" className="mt-4 min-w-0 space-y-4 rounded-card border border-border bg-panel p-4 text-text">
     <div data-testid="notification-header" className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{label('title', '动态模型通知', 'Dynamic model notifications')}</h3>
-      <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} disabled={busy || loading || dirty} onClick={() => void load()}>{label('reload', '刷新通知', 'Reload notifications')}</button>
+      <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} disabled={busy || loading || (dirty && ready && !denied)} onClick={() => void load()}>{label('reload', '刷新通知', 'Reload notifications')}</button>
         <button type="button" className={BUTTON} disabled={busy} onClick={() => dirty ? setConfirm('discard') : onClose()}>{label('close', '关闭通知编辑', 'Close notification editor')}</button></div></div>
     <p className="text-sm text-text-secondary">{label('help', '订阅自动关联当前安装。只可选择已发布且此安装有读取授权与 Scope 的动态模型事件。接收方需校验原始请求签名，并按事件标识去重。', 'Subscriptions inherit this installation. Choose published model events with current read authority and scopes. Receivers must verify the raw request signature and deduplicate by event identity.')}</p>
     {loading && <p role="status">{label('loading', '正在读取事件合同与订阅…', 'Loading event contracts and subscriptions…')}</p>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
+    {denied && dirty && <p data-testid="notification-recovery-guidance" role="status">{label('recovery', '未保存修改已保留。恢复权限后刷新通知，再继续保存。', 'Unsaved changes are retained. Restore permission, reload notifications, then continue saving.')}</p>}
     {!active && <p role="status">{label('inactive', '安装或应用已停用；通知配置只读。', 'The installation or application is inactive. Notification configuration is read-only.')}</p>}
     {ready && !denied && <>
       <div data-testid="notification-subscriptions" role="group" className="space-y-3" aria-label={label('subscriptions', '当前安装订阅', 'Installation subscriptions')}>

@@ -1,15 +1,17 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OpenPlatformPage from '../api-docs';
+import { MemoryRouter } from 'react-router';
 
 const showToast = vi.fn();
 const translate = vi.hoisted(
   () => (_key: string, _params?: Record<string, unknown>, fallback?: string) => fallback,
 );
 
+const i18nState = vi.hoisted(() => ({ current: undefined as undefined | typeof translate }));
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ t: translate }),
+  useI18n: () => ({ t: i18nState.current ?? translate, locale: 'en-US' }),
 }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showToast }) }));
 vi.mock('~/ui/smart/picker/MemberPicker', () => ({
@@ -36,6 +38,7 @@ function response(data: unknown) {
 describe('OpenPlatformPage', () => {
   beforeEach(() => {
     showToast.mockReset();
+    i18nState.current = undefined;
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
@@ -51,7 +54,7 @@ describe('OpenPlatformPage', () => {
 
   it('renders an actionable empty state and creates an application', async () => {
     const user = userEvent.setup();
-    render(<OpenPlatformPage />);
+    render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     expect(await screen.findByTestId('open-platform-empty')).toBeVisible();
 
     await user.click(screen.getByTestId('open-platform-create-app'));
@@ -79,14 +82,18 @@ describe('OpenPlatformPage', () => {
       rateLimitPerMinute: 600,
       installedAt: '2026-09-14T00:00:00Z',
     };
+    let holdApplicationRead = false; let finishApplicationRead: (() => void) | undefined;
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         if (url.endsWith('/capabilities')) return response([capability]);
         if (url.endsWith('/access'))
-          return response({ platformAdmin: true, canCreateApplications: true });
-        if (url.endsWith('/applications'))
-          return response([
+          return response({ platformAdmin: true, canCreateApplications: true, canManageModelNotifications: true });
+        if (url.endsWith('/event-catalog')) return response([{ type: 'open.resource.parts.created', currentVersion: 1, supportedVersions: [1], subjectResourceCode: 'parts' }]);
+        if (url.endsWith('/resources')) return response([{ code: 'parts', status: 'published', policy: { operations: ['get'] }, contract: { scopes: { get: 'openapi.profile.read' } } }]);
+        if (url === '/api/webhooks') return response([]);
+        if (url.endsWith('/applications')) {
+          const applications = [
             {
               pid: 'app-1',
               name: 'ERP Bridge',
@@ -102,7 +109,10 @@ describe('OpenPlatformPage', () => {
               members: [],
               installations: [installation],
             },
-          ]);
+          ];
+          if (holdApplicationRead) return new Promise(resolve => { finishApplicationRead = () => resolve({ ok: true, status: 200, json: async () => ({ code: '0', data: applications }) }); });
+          return response(applications);
+        }
         if (url.endsWith('/credentials') && init?.method === 'POST')
           return response({
             credentialPid: 'cred-1',
@@ -115,11 +125,19 @@ describe('OpenPlatformPage', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<OpenPlatformPage />);
+    const view = render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     expect(await screen.findByText('ERP Bridge')).toBeVisible();
     expect(screen.getByText('Rate limit: 600/min')).toBeVisible();
     expect(screen.queryByText('app-1')).not.toBeInTheDocument();
     expect(screen.queryByText('inst-1')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Model notifications', exact: true }));
+    const draft = await screen.findByLabelText('Subscription name'); await user.type(draft, 'Retained notification draft');
+    holdApplicationRead = true; i18nState.current = (...args) => translate(...args); view.rerender(<OpenPlatformPage />, { wrapper: MemoryRouter });
+    await waitFor(() => expect(finishApplicationRead).toBeDefined());
+    expect(screen.getByLabelText('Subscription name')).toHaveValue('Retained notification draft');
+    await act(async () => { holdApplicationRead = false; finishApplicationRead!(); });
+    expect(screen.getByLabelText('Subscription name')).toHaveValue('Retained notification draft');
 
     await user.click(screen.getByRole('button', { name: 'New credential' }));
     expect(await screen.findByText('Save this credential now')).toBeVisible();
@@ -163,7 +181,7 @@ describe('OpenPlatformPage', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<OpenPlatformPage />);
+    render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     expect(await screen.findByText('Warehouse Connector')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Add installation' }));
@@ -277,7 +295,7 @@ describe('OpenPlatformPage', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<OpenPlatformPage />);
+    render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     expect(await screen.findByText('ERP Ops')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Operations' }));
@@ -347,7 +365,7 @@ describe('OpenPlatformPage', () => {
       }),
     );
 
-    render(<OpenPlatformPage />);
+    render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     expect(await screen.findByText('Shared ERP Bridge')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Operations' })).toBeVisible();
     expect(screen.queryByTestId('open-platform-create-app')).not.toBeInTheDocument();
@@ -393,7 +411,7 @@ describe('OpenPlatformPage', () => {
     );
     const user = userEvent.setup();
 
-    render(<OpenPlatformPage />);
+    render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     await user.click(await screen.findByRole('button', { name: 'Manage members' }));
     await user.click(screen.getByRole('button', { name: 'Select collaborator' }));
     await user.selectOptions(screen.getByRole('combobox', { name: 'Role' }), 'maintainer');

@@ -133,6 +133,29 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toEqual([]);
     await image('publication-notification-server-save-rejected', editor.getByTestId('notification-contract-fields')); await image('publication-notification-server-save-error', editor.getByRole('alert'));
     await editor.getByLabel(text('订阅名称'), { exact: true }).fill(name);
+    const recoverDraft = async (capture: string, draftName: string) => {
+      await expect(editor.getByRole('button', { name: text('刷新通知'), exact: true })).toBeEnabled();
+      const response = page.waitForResponse(reply => reply.url().endsWith('/api/webhooks') && reply.request().method() === 'GET');
+      await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click(); expect((await response).status()).toBe(200);
+      await expect(editor.getByRole('alert')).toHaveCount(0); await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toHaveValue(draftName);
+      await image(capture, editor.getByTestId('notification-contract-fields'));
+    };
+    await withDeniedSession(async () => {
+      const deniedSave = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'POST');
+      await saveButton.press('Enter'); expect((await deniedSave).status()).toBe(403); await expect(editor.getByRole('alert')).toHaveText(deniedText);
+      await expect(editor.locator('form')).toHaveCount(0); await expect(editor.getByRole('button', { name: text('刷新通知'), exact: true })).toBeEnabled();
+      await expect(editor.getByTestId('notification-recovery-guidance')).toHaveText(locale.startsWith('zh') ? '未保存修改已保留。恢复权限后刷新通知，再继续保存。' : 'Unsaved changes are retained. Restore permission, reload notifications, then continue saving.');
+      await image('publication-notification-recovery-guidance', editor.getByTestId('notification-recovery-guidance'));
+      await image('publication-notification-create-denied', editor);
+    });
+    expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toEqual([]);
+    try {
+      await page.context().setOffline(true); await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click();
+      await expect(editor.getByRole('alert')).toHaveText(failedText); await expect(editor.locator('form')).toHaveCount(0);
+      await expect(editor.getByRole('button', { name: text('刷新通知'), exact: true })).toBeEnabled(); await image('publication-notification-recovery-offline', editor);
+    } finally { await page.context().setOffline(false); }
+    await recoverDraft('publication-notification-create-draft-restored', name);
+    expect(await editor.getByLabel(text('签名密钥'), { exact: true }).evaluate((input: HTMLInputElement, expected) => input.value === expected, secret)).toBe(true);
     const savedResponse = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'POST');
     await saveButton.press('Enter');
     const saved = await savedResponse; expect(saved.status()).toBe(200);
@@ -161,6 +184,20 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     const updateRestoredResponse = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}`) && response.request().method() === 'PUT');
     await saveButton.press('Enter'); expect((await updateRestoredResponse).status()).toBe(200); await expect(editor.getByRole('alert')).toHaveCount(0);
     expect((await human(`/api/webhooks/${subscription.pid}`)).name).toBe(name);
+    const beforeDeniedUpdate = await human(`/api/webhooks/${subscription.pid}`); const deniedDraftName = name + ' denied edit';
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(deniedDraftName);
+    await withDeniedSession(async () => {
+      const deniedUpdate = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}`) && response.request().method() === 'PUT');
+      await saveButton.press('Enter'); expect((await deniedUpdate).status()).toBe(403); await expect(editor.getByRole('alert')).toHaveText(deniedText);
+      await expect(editor.locator('form')).toHaveCount(0); await expect(editor.getByRole('button', { name: text('刷新通知'), exact: true })).toBeEnabled();
+      await image('publication-notification-update-denied', editor);
+    });
+    expect(await human(`/api/webhooks/${subscription.pid}`)).toEqual(beforeDeniedUpdate);
+    await recoverDraft('publication-notification-update-draft-restored', deniedDraftName);
+    await expect(editor.getByLabel(text('签名密钥'), { exact: true })).toHaveValue('');
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(name);
+    const authorityRestoredSave = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}`) && response.request().method() === 'PUT');
+    await saveButton.press('Enter'); expect((await authorityRestoredSave).status()).toBe(200); expect((await human(`/api/webhooks/${subscription.pid}`)).name).toBe(name);
     const reload = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'GET');
     await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click(); expect((await reload).status()).toBe(200);
     await expect(row).toContainText(name); await image('publication-subscribe-explicit-reload');
@@ -343,7 +380,7 @@ export async function verifyModelNotifications({ page, card, installationPid, re
       cases: ['ui-subscription-persisted', 'signed-real-delivery', 'real-dead-letter', 'confirmed-same-event-replay', 'revoked-authority-no-send', 'ui-subscription-disabled'],
       deliveryProofs: [successProof, deadProof, replayProof, beforeRevocation], revokedReplay: { ...denied, acceptingReceiverAttempts: 0 },
       fixture: 'original-installation-ui-authored-grant', routeMocks: false };
-    Object.assign(receipt, { keyboardSave: ['native-tab-submit-validation', 'real-create-400-no-write-corrected', 'real-update-400-unchanged-corrected-signed', 'escape-cancel-focus-return'], editorStates: ['real-latency-loading', 'offline-no-false-empty-restored', 'real-principal-403-restored', 'ui-inactive-read-only-reopened'], eventVariants: ['second-ui-subscription', 'updated-signed-delivery', 'edited-deleted-signed-delivery', 'second-ui-disabled'], variantProofs: [updatedProof, deletedProof], editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
+    Object.assign(receipt, { saveAuthority: ['real-create403-zero-write-retained-recovered', 'real-update403-unchanged-retained-recovered-signed'], keyboardSave: ['native-tab-submit-validation', 'real-create-400-no-write-corrected', 'real-update-400-unchanged-corrected-signed', 'escape-cancel-focus-return'], editorStates: ['real-latency-loading', 'offline-no-false-empty-restored', 'real-principal-403-restored', 'ui-inactive-read-only-reopened'], eventVariants: ['second-ui-subscription', 'updated-signed-delivery', 'edited-deleted-signed-delivery', 'second-ui-disabled'], variantProofs: [updatedProof, deletedProof], editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
     const receiptPath = path.join(directory, 'receipt.json'); await writeFile(receiptPath, JSON.stringify(receipt, null, 2));
     await testInfo.attach('dynamic-model-notifications', { path: receiptPath, contentType: 'application/json' });
   } finally {

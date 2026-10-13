@@ -146,6 +146,10 @@
               "real-create-400-no-write-corrected",
               "real-update-400-unchanged-corrected-signed",
               "escape-cancel-focus-return"
+            ],
+            "saveAuthority": [
+              "real-create403-zero-write-retained-recovered",
+              "real-update403-unchanged-retained-recovered-signed"
             ]
           }
         }

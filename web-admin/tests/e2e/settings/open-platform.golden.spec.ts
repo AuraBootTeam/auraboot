@@ -1081,11 +1081,12 @@ test.describe('Dynamic installation authority journey', () => {
     const updated = await page.request.patch(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-update-${suffix}`, 'If-Match': created.headers().etag }, data: { name: 'Updated A' } }); expect(updated.status()).toBe(200); expect(await updated.json()).toMatchObject({ pid: row.pid, name: 'Updated A' });
     const removed = await page.request.delete(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-delete-${suffix}`, 'If-Match': updated.headers().etag } }); expect(removed.status()).toBe(204);
     expect((await page.request.get(`${resourcePath}/${row.pid}`, { headers: machineHeaders })).status()).toBe(404);
+    let deniedAccountCreated = false;
     await verifyModelNotifications({ page, card: installationCard, installationPid: installation.pid, resourceCode, resourcePath, machineHeaders,
       locale: installationLocale, evidenceRoot: screenshotRoot, testInfo, withDeniedSession: async action => {
         const adminCookies = await page.context().cookies(WEB_BASE_URL);
         const account = { email: `dop-notify-denied-${suffix}@op-closure.test`, password: 'Closure2026x!' };
-        await human('POST', '/api/meta/commands/execute/admin:create_member', { payload: { name: `Notification denied ${suffix}`, ...account } });
+        if (!deniedAccountCreated) { await human('POST', '/api/meta/commands/execute/admin:create_member', { payload: { name: `Notification denied ${suffix}`, ...account } }); deniedAccountCreated = true; }
         try { await authenticate(page, installationLocale, account); await action(); }
         finally { await page.context().addCookies(adminCookies); }
       }, revoke: async () => {
