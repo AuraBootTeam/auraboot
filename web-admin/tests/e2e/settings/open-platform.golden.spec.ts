@@ -120,7 +120,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -1158,8 +1158,59 @@ async function capture(page: import('@playwright/test').Page, id: string, fullPa
   });
 }
 
+const protocolVisibleLeak = /\b(?:openPlatform|common)\.[A-Za-z][A-Za-z0-9_.-]*|\bBearer\s+\S+|https?:\/\/\S+|super-secret|\bhook-(?:healthy|due|overdue|missing|incompatible)\b|\bmobile-overdue\b|\{\s*"(?:data|pid|tenantId|secret|token|tokenPid|remoteAddress|installationId|credentialPid)"\s*:/;
+const protocolCaptureChecks: string[] = [];
+
+async function assertProtocolRegionSafe(locator: import('@playwright/test').Locator, id: string) {
+  expect(await locator.innerText(), `OP-PROTO-12 visible leak guard: ${id}`).not.toMatch(protocolVisibleLeak);
+}
+
 async function captureLocator(locator: import('@playwright/test').Locator, id: string) {
   await locator.scrollIntoViewIfNeeded();
+  if (/^OP-PROTO-\d+$/.test(id)) {
+    await assertProtocolRegionSafe(locator, id);
+    if (id === 'OP-PROTO-01') {
+      const counterexamples = [
+        ['i18n', 'openPlatform.rotation.overdue'],
+        ['token', 'Bearer protocol-fixture-token'],
+        ['url', 'https://protocol-fixture.invalid/hook'],
+        ['payload', '{"data":{"privateFixture":"leak"}}'],
+        ['internal-field', '{"tokenPid":"protocol-fixture-internal"}'],
+        ['internal-id', 'hook-healthy'],
+      ];
+      for (const [kind, text] of counterexamples) {
+        await locator.evaluate((element, value) => {
+          const probe = document.createElement('span');
+          probe.dataset.protocolLeakProbe = 'true';
+          probe.textContent = value;
+          element.append(probe);
+        }, text);
+        try {
+          await expect(assertProtocolRegionSafe(locator, `${id}:${kind}`)).rejects.toThrow();
+        } finally {
+          await locator.locator('[data-protocol-leak-probe]').evaluateAll(elements => elements.forEach(element => element.remove()));
+        }
+        await assertProtocolRegionSafe(locator, `${id}:restored`);
+      }
+      await writeFile(path.join(EVIDENCE_DIR, 'protocol-leak-counterexamples.json'), JSON.stringify({
+        surface: 'browser DOM acceptance guard', persisted: false,
+        cases: counterexamples.map(([kind]) => ({ kind, rejected: true })),
+      }, null, 2));
+      if (UI_MUTATION === 'protocol-visible-leak') {
+        await locator.evaluate(element => {
+          const probe = document.createElement('span');
+          probe.textContent = 'Bearer protocol-fixture-token';
+          element.append(probe);
+        });
+      }
+    }
+    await assertProtocolRegionSafe(locator, id);
+    protocolCaptureChecks.push(id);
+    await writeFile(path.join(EVIDENCE_DIR, 'protocol-capture-checks.json'), JSON.stringify({
+      authority: 'per-capture visible DOM assertion; visual review remains separate',
+      ids: protocolCaptureChecks,
+    }, null, 2));
+  }
   await locator.screenshot({ path: path.join(EVIDENCE_DIR, `${id}.png`), timeout: 30_000 });
 }
 
