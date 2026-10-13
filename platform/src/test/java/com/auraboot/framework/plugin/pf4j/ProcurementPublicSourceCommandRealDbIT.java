@@ -62,13 +62,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @ActiveProfiles("integration-test")
 @Import(ProcurementPublicSourceCommandRealDbIT.IsolatedScheduling.class)
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_PUBLIC_SOURCE_IT",matches="true")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ProcurementPublicSourceCommandRealDbIT {
     private static final String SYNC="qo_procurement_task_common:sync_sources";
     private static final String PASSWORD="public-source-local-fixture-123";
     // The target command permit is s2p-only. Related reads still require actual Rule Center permissions.
     private static final List<String> RELATED_READ_PERMISSIONS=List.of(
         "model.customer_pcba_int_kingdee_connection.read","model.customer_pcba_int_external_ref.read",
-        "model.prod_product.read","model.pr_purchase_request.read","model.s2p_bid.read",
+        "model.s2p_sourcing_event.read","model.prod_product.read","model.pr_purchase_request.read","model.s2p_bid.read",
         "model.qo_procurement_allocation_common.read","model.qo_procurement_quote_line_common.read");
     @Autowired WebApplicationContext application;
     @Autowired FilterChainProxy springSecurityFilterChain;
@@ -96,6 +98,11 @@ class ProcurementPublicSourceCommandRealDbIT {
     private String actor,provider,token,deniedToken,task,connection,procurementDirectory;
     private HttpServer server;
     private Path caseEvidence;
+    private Long baselineTenant, isolationTenant;
+    private String baselineTargetTask;
+    private Map<String,Object> baselineBootstrap, isolationBootstrap;
+    private Map<String,Object> priorCaseFacts;
+    private int publicRequestSequence;
     private Map<String,Object> retainedBootstrapPrincipal;
     private final List<Map<String,Object>> retainedActors=new ArrayList<>();
     private final List<String> retainedTaskPids=new ArrayList<>();
@@ -132,6 +139,9 @@ class ProcurementPublicSourceCommandRealDbIT {
     }
 
     @BeforeEach void prepare(TestInfo test) throws Exception {
+        retainedActors.clear();retainedTaskPids.clear();retainedBootstrapPrincipal=null;priorCaseFacts=null;
+        caseEvidence=null;tenant=null;userId=null;memberId=null;actor=null;provider=null;token=null;deniedToken=null;
+        loginCount.set(0);queryCount.set(0);publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;
         prepareEvidence(test);
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
         try(var sql=postgres.getConnection()){assertEquals("enterprise_22",sql.getCatalog());}
@@ -139,29 +149,41 @@ class ProcurementPublicSourceCommandRealDbIT {
         provider="ps_"+UUID.randomUUID().toString().replace("-","").substring(0,24);
         var owner=users.signUp(provider+"@example.invalid",PASSWORD,"Public source local fixture",provider);
         userId=owner.getId();actor=owner.getPid();
-        var organization=new Tenant();organization.setName(provider);organization.setDisplayName(provider);organization.setStatus("active");
-        organization.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
-        tenant=tenants.createTenant(organization).getId();
-        assertNotEquals(Long.valueOf(System.getenv("TEST_TENANT_ID")),tenant,"Never alter the existing public tenant");
-        memberId=members.addMember(userId,tenant,"active").getId();context();
-        // The formal cold-tenant permission template belongs to a separate bootstrap principal.
-        // Its canonical tenant_admin role is never used by the public positive or denial requests.
-        var bootstrap=users.signUp(provider+"-bootstrap@example.invalid",PASSWORD,"Local bootstrap principal",provider+"_bootstrap");
-        var bootstrapMember=members.addMember(bootstrap.getId(),tenant,"active");
-        assertNotEquals(actor,bootstrap.getPid());assertNotEquals(memberId,bootstrapMember.getId());
-        retainedBootstrapPrincipal=Map.of("tenantId",tenant.toString(),"userPid",bootstrap.getPid(),"memberPid",bootstrapMember.getPid(),
-            "purpose","Formal TenantBootstrapService initialization only","usedForTestedPublicRequest",false,"authenticatedForPublicRequest",false);
-        assertTrue(tenantBootstrap.bootstrapTenant(tenant,bootstrap.getId()).isSuccess());context();
-        assertNotNull(permissions.findByCode("report.definition.view"),"Canonical default bootstrap permission must exist before core-meta menu import");
-        db=new DynamicDataAccessorImpl(data);
-        var directories=json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES"));
-        assertTrue(directories.isArray() && !directories.isEmpty(),"Explicit frozen ordered DSL directories required");
-        for(var directory:directories) {
-            Path path=Path.of(directory.asText()).toRealPath();assertTrue(Files.isDirectory(path));
-            if(Files.isRegularFile(path.resolve("config/commands/procurement.json"))) procurementDirectory=path.toString();
-            importDirectory(path);
+        boolean isolated=test.getTestMethod().orElseThrow().getName().equals("publicRoleAndPayloadCannotGrantIntegrationOrSecretCapabilities");
+        tenant=isolated?isolationTenant:baselineTenant;
+        boolean initialize=tenant==null;
+        if(initialize) {
+            var organization=new Tenant();organization.setName(provider+"_baseline");organization.setDisplayName(provider);organization.setStatus("active");
+            organization.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+            tenant=tenants.createTenant(organization).getId();
+            assertNotEquals(Long.valueOf(System.getenv("TEST_TENANT_ID")),tenant,"Never alter the existing public tenant");
+            if(isolated) isolationTenant=tenant;else baselineTenant=tenant;
         }
-        assertNotNull(procurementDirectory,"Actual quote-procurement directory required");
+        memberId=members.addMember(userId,tenant,"active").getId();context();
+        db=new DynamicDataAccessorImpl(data);
+        if(initialize) {
+            // This principal initializes the complete formal baseline; it never authenticates a public request.
+            var bootstrap=users.signUp(provider+"-bootstrap@example.invalid",PASSWORD,"Local bootstrap principal",provider+"_bootstrap");
+            var bootstrapMember=members.addMember(bootstrap.getId(),tenant,"active");
+            assertNotEquals(actor,bootstrap.getPid());assertNotEquals(memberId,bootstrapMember.getId());
+            retainedBootstrapPrincipal=Map.of("tenantId",tenant.toString(),"userPid",bootstrap.getPid(),"memberPid",bootstrapMember.getPid(),
+                "purpose","Formal TenantBootstrapService initialization only","usedForTestedPublicRequest",false,"authenticatedForPublicRequest",false);
+            assertTrue(tenantBootstrap.bootstrapTenant(tenant,bootstrap.getId()).isSuccess());context();
+            assertNotNull(permissions.findByCode("report.definition.view"));
+            var directories=json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES"));
+            assertTrue(directories.isArray() && directories.size()==23,"Complete frozen ordered DSL profile required");
+            for(var directory:directories) {
+                Path path=Path.of(directory.asText()).toRealPath();assertTrue(Files.isDirectory(path));
+                if(Files.isRegularFile(path.resolve("config/commands/procurement.json"))) procurementDirectory=path.toString();
+                importDirectory(path);
+            }
+            if(isolated) isolationBootstrap=retainedBootstrapPrincipal;else baselineBootstrap=retainedBootstrapPrincipal;
+        } else {
+            retainedBootstrapPrincipal=baselineBootstrap;
+            // Reset via the same formal importer, never an SQL update of shared command metadata.
+            importDirectory(Path.of(procurementDirectory));
+        }
+        assertNotNull(procurementDirectory);
         imports.verifyImportReferenceIntegrity();
         var definition=commands.findByCode(SYNC);assertEquals(tenant,definition.getTenantId());
         var execution=json.readTree(definition.getExecutionConfig());
@@ -169,6 +191,10 @@ class ProcurementPublicSourceCommandRealDbIT {
         assertEquals("qo.procurement.integrate",execution.path("permissions").get(0).asText());
         assertTrue(execution.path("handlerParams").path("procurementSourceEligibilityPolicies").isArray());
         assertEquals(0,execution.path("handlerParams").path("procurementSourceEligibilityPolicies").size());
+        priorCaseFacts=snapshot();
+        writeArtifact("baseline-reuse.json",Map.of("tenantId",tenant.toString(),"completeProfileDirectoryCount",23,
+            "initializedThisCase",initialize,"independentIsolationTenant",isolated,"productionDefaultPolicies",List.of(),
+            "priorBusinessFacts",priorCaseFacts));
         token=actorToken(owner.getId(),owner.getPid(),memberId,provider+"@example.invalid",sourceActorPermissions(true));
         context();var denied=users.signUp(provider+"-denied@example.invalid",PASSWORD,"No integration authority",provider+"_denied");
         var deniedMember=members.addMember(denied.getId(),tenant,"active");
@@ -195,6 +221,7 @@ class ProcurementPublicSourceCommandRealDbIT {
         });
         task=fixture("qo_procurement_task_common:create",()->pid((Map<?,?>)service("ProcurementTaskService",new Class<?>[]{DataAccessor.class},new Object[]{db},"create",new Class<?>[]{Object.class,String.class,Map.class},tenant,actor,Map.of("title",provider,"connectionPid",connection))));
         retainedTaskPids.add(task);
+        if(!isolated && baselineTargetTask==null) baselineTargetTask=task;
     }
     @AfterEach void close() throws Exception {
         try {
@@ -206,6 +233,10 @@ class ProcurementPublicSourceCommandRealDbIT {
                 identities.put("taskPids",retainedTaskPids);identities.put("bootstrapPrincipal",retainedBootstrapPrincipal);identities.put("actors",retainedActors);identities.put("connectionPid",connection);identities.put("accountId",provider);identities.put("targetTaskPid",task);
                 identities.put("externalErpSynthetic",true);identities.put("customer003AdmissionVerified",false);
                 writeArtifact("retained-identities.json",identities);
+                if(priorCaseFacts!=null) {
+                    var after=snapshot();assertPriorFactsUnchanged(priorCaseFacts,after);
+                    writeArtifact("prior-case-facts-after.json",after);
+                }
             }
         } finally {observed.tenant=null;if(server!=null)server.stop(0);MetaContext.clear();}
     }
@@ -253,7 +284,9 @@ class ProcurementPublicSourceCommandRealDbIT {
                 assertEquals(file.path("sha256").asText(),sha(actual));
             }
         }
-        caseEvidence=Files.createDirectory(attempt.resolve(test.getTestMethod().orElseThrow().getName()+"-"+UUID.randomUUID()));
+        caseEvidence=Files.createDirectory(attempt.resolve("c-"+UUID.randomUUID()));
+        assertTrue(caseEvidence.resolve("configured-dsl").toString().length()<=256,"Formal import history source_name must remain bounded");
+        writeArtifact("case-identity.json",Map.of("method",test.getTestMethod().orElseThrow().getName(),"directory",caseEvidence.toString()));
         var readiness=new LinkedHashMap<String,Object>();readiness.put("runtime",runtime);readiness.put("workspaceRoot",workspace.toString());
         readiness.put("runtimeManifestSha256",sha(runtimeManifest));readiness.put("sourceManifestSha256",sha(sourceManifest));
         readiness.put("sourceManifestHash",published.path("sourceManifestHash").asText());
@@ -321,34 +354,43 @@ class ProcurementPublicSourceCommandRealDbIT {
         assertEquals(connection,json.readTree(commands.findByCode(SYNC).getExecutionConfig()).path("handlerParams").path("procurementSourceEligibilityPolicies").get(0).path("connectionPid").asText());
         // Keep the temporary test manifest as evidence; it contains only synthetic fixture configuration.
     }
-    @Test void publicConfiguredReadCreatesThenReplaysWithoutDuplicatePgFacts() throws Exception {
+    @Test @Order(1) void publicConfiguredReadCreatesThenReplaysWithoutDuplicatePgFacts() throws Exception {
         configurePolicy();var first=call(token,selected("11"));assertEquals(200,first.status());assertEquals("added",first.body().path("data").path("data").path("items").get(0).path("status").asText());
         var before=snapshot();assertEquals(1,sources().size());assertEquals(2,references().size());
         var replay=call(token,selected("11"));assertEquals(200,replay.status());assertEquals(before,snapshot());assertTrue(loginCount.get()>0 && queryCount.get()>0);
     }
-    @Test void publicRoleAndPayloadCannotGrantIntegrationOrSecretCapabilities() throws Exception {
+    @Test @Order(5) void publicRoleAndPayloadCannotGrantIntegrationOrSecretCapabilities() throws Exception {
+        assertNotNull(baselineTenant);assertNotEquals(baselineTenant,tenant);assertNotNull(baselineTargetTask);
+        var primaryBefore=snapshotTenant(baselineTenant);var isolatedBefore=snapshot();
+        String ownTask=task;task=baselineTargetTask;
+        try {assertEquals(404,call(token,selected("11")).status(),"Ordinary target missing from this tenant retains not-found semantics");}
+        finally {task=ownTask;}
+        assertEquals(primaryBefore,snapshotTenant(baselineTenant));assertEquals(isolatedBefore,snapshot());
+        assertEquals(0,loginCount.get());assertEquals(0,queryCount.get());
+        writeArtifact("cross-tenant-denial.json",Map.of("foreignTenantId",baselineTenant.toString(),"actorTenantId",tenant.toString(),
+            "foreignTaskPid",baselineTargetTask,"httpStatus",404,"bothTenantBusinessSnapshotsUnchanged",true));
         configurePolicy();assertEquals(403,call(deniedToken,selected("11")).status());assertEquals(0,loginCount.get());assertEquals(0,queryCount.get());
         var forged=new LinkedHashMap<>(selected("11"));forged.put("eligible",true);forged.put("tenantSecretRead",true);forged.put("appSecret","client-secret");
         assertEquals(400,call(token,forged).status());assertEquals(0,loginCount.get());assertTrue(sources().isEmpty());assertEquals(1,references().size());
     }
-    @Test void publicMissingPolicyAndLaterUnknownCodeRejectWholeReadWithoutWrites() throws Exception {
+    @Test @Order(2) void publicMissingPolicyAndLaterUnknownCodeRejectWholeReadWithoutWrites() throws Exception {
         assertEquals(400,call(token,selected("11")).status());assertEquals(0,loginCount.get());assertTrue(sources().isEmpty());
         configurePolicy();response=combine(row("11",1000,"C"),row("12",1000,"UNKNOWN"));
         var before=snapshot();assertEquals(400,call(token,selected("11","12")).status());assertEquals(before,snapshot());assertTrue(queryCount.get()>0);
     }
 
-    @Test void publicCriticalChangeInvalidatesWithPersistedSystemHistoryAndRetainsFormalOffer() throws Exception {
+    @Test @Order(3) void publicCriticalChangeInvalidatesWithPersistedSystemHistoryAndRetainsFormalOffer() throws Exception {
         configurePolicy();assertEquals(200,call(token,selected("11")).status());
-        var quote=prepareSubmittedQuote();var formal=formalSnapshot();
+        var quote=prepareSubmittedQuote();var formal=formalSnapshot(quote.submission());
         response=row("11",900,"C");assertEquals(200,call(token,selected("11")).status());
         fixture(SYNC,()->{assertEquals("invalidated",db.getById("s2p_bid",quote.quote()).get("s2p_bid_status"));
             assertEquals("SOURCE_CHANGED",db.getById("s2p_bid",quote.quote()).get("qo_pr_quote_return_reason"));
-            assertEquals(formal,formalSnapshot(),"Both formal headers and complete formal lines remain immutable");
+            assertEquals(formal,formalSnapshot(quote.submission()),"Both formal headers and complete formal lines remain immutable");
             var history=db.query("qo_procurement_history_common",Map.of("qo_pr_history_target_pid",quote.quote()));
             assertTrue(history.stream().anyMatch(event->"SOURCE_CHANGED".equals(event.get("qo_pr_history_reason")) && "system".equals(event.get("qo_pr_history_actor_pid"))));return null;});
         var changed=snapshot();assertEquals(200,call(token,selected("11")).status());assertEquals(changed,snapshot());
     }
-    @Test void publicBatchRollsBackAnActuallyWrittenFirstSourceWhenLaterAllocatedSourceChanges() throws Exception {
+    @Test @Order(4) void publicBatchRollsBackAnActuallyWrittenFirstSourceWhenLaterAllocatedSourceChanges() throws Exception {
         configurePolicy();assertEquals(200,call(token,selected("11")).status());var quote=prepareSubmittedQuote();
         fixture("qo_procurement_task_common:allocate",()->new TransactionTemplate(transactions).execute(status->service("ProcurementAllocationService",new Class<?>[]{DataAccessor.class},new Object[]{db},"allocate",new Class<?>[]{String.class,Map.class},task,
             Map.of("sourceDemands",List.of(Map.of("sourcePid",quote.source(),"sourceRevision",0,"quantity","300")),
@@ -388,7 +430,20 @@ class ProcurementPublicSourceCommandRealDbIT {
     private Result call(String bearer,Map<String,Object> payload) throws Exception {
         MetaContext.clear();var result=mvc.perform(post("/api/meta/commands/execute/"+SYNC).header("Authorization","Bearer "+bearer)
             .header("X-Locale","en-US").contentType("application/json").content(json.writeValueAsBytes(Map.of("targetRecordPid",task,"payload",payload)))).andReturn();
-        context();return new Result(result.getResponse().getStatus(),json.readTree(result.getResponse().getContentAsByteArray()));
+        context();var body=json.readTree(result.getResponse().getContentAsByteArray());
+        var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("commandCode",SYNC);diagnostic.put("targetRecordPid",task);
+        diagnostic.put("tenantId",tenant.toString());diagnostic.put("httpStatus",result.getResponse().getStatus());
+        diagnostic.put("businessCode",body.path("code").isIntegralNumber()?body.path("code").longValue():null);
+        diagnostic.put("contextBusinessCode",body.path("context").path("code").isIntegralNumber()?body.path("context").path("code").longValue():null);
+        diagnostic.put("responseShape",body.isObject()?"object":body.getNodeType().name());
+        String internalResponse=body.toString();
+        diagnostic.put("targetBoundaryReadDeniedObserved",internalResponse.contains("Access denied: you do not have permission to view this record"));
+        diagnostic.put("unknownTargetObserved",internalResponse.contains("Record not found") || internalResponse.contains("RECORD_NOT_FOUND"));
+        diagnostic.put("messageOrDetailPersisted",false);
+        diagnostic.put("targetReadPermissionVerified",userPermissions.hasPermission(tenant,userId,memberId,"model.s2p_sourcing_event.read"));
+        diagnostic.put("rawResponsePersisted",false);diagnostic.put("credentialsOrHeadersPersisted",false);
+        writeArtifact("public-request-"+(++publicRequestSequence)+".json",diagnostic);
+        return new Result(result.getResponse().getStatus(),body);
     }
     private static List<String> sourceActorPermissions(boolean integration) {
         var codes=new ArrayList<String>();codes.add("meta.command.execute");codes.addAll(RELATED_READ_PERMISSIONS);
@@ -428,7 +483,20 @@ class ProcurementPublicSourceCommandRealDbIT {
     }
     private List<Map<String,Object>> sources(){return fixture(SYNC,()->db.query("pr_purchase_request",Map.of("qo_pr_source_task_pid",task)));}
     private List<Map<String,Object>> references(){return fixture(SYNC,()->db.query("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_instance_key",connection)));}
-    private Map<String,Object> formalSnapshot(){return fixture(SYNC,()->Map.of("submission",db.query(domainModel("submission"),Map.of()),"submission_line",db.query(domainModel("submission_line"),Map.of())));}
+    private Map<String,Object> formalSnapshot(String submissionPid){return fixture(SYNC,()->Map.of(
+        "submission",db.getById(domainModel("submission"),submissionPid),
+        "submission_line",db.query(domainModel("submission_line"),Map.of("qo_pr_submission_line_submission_pid",submissionPid))));}
+    private Map<String,Object> snapshotTenant(Long requestedTenant) {
+        Long current=tenant;tenant=requestedTenant;
+        try{return snapshot();}finally{tenant=current;context();}
+    }
+    @SuppressWarnings("unchecked")
+    private static void assertPriorFactsUnchanged(Map<String,Object> before,Map<String,Object> after) {
+        for(var entity:before.entrySet()) {
+            var rows=(List<Map<String,Object>>)entity.getValue();var current=(List<Map<String,Object>>)after.get(entity.getKey());
+            for(var row:rows) assertTrue(current.contains(row),"Prior case business fact must remain unchanged: "+entity.getKey()+"/"+row.get("pid"));
+        }
+    }
     private Map<String,Object> snapshot(){return fixture(SYNC,()->{
         var result=new LinkedHashMap<String,Object>();
         for(String entity:List.of("task","source","quote","quote_line","history","submission","submission_line","allocation","execution","order","order_line"))
