@@ -194,12 +194,20 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     @Override
     public boolean checkModelExists(Long tenantId, String code) {
-        return metaModelService.isModelExists(code);
+        // Deliberately a DB-current probe, not the runtime definition lookup: the
+        // definition cache and the application-release catalog can both report a
+        // model this import cannot see or load (a draft row cached by a
+        // rolled-back import attempt, a catalog-only model), which deadlocked
+        // importModel into "Model exists but cannot be loaded for update" on the
+        // retry. The probe must resolve exactly what the update branch resolves.
+        return metaModelMapper.findCurrentByCodeForTenant(tenantId, code) != null;
     }
 
     @Override
     public boolean checkFieldExists(Long tenantId, String code) {
-        return metaFieldService.isFieldExists(code);
+        // Same DB-current contract as checkModelExists; updateFieldForReimport
+        // resolves the existing row through this very query.
+        return metaFieldMapper.findCurrentByCode(code) != null;
     }
 
     @Override
