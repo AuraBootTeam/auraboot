@@ -121,6 +121,8 @@ export interface JsonEditorProps extends TextareaProps {
 
 // SmartSelect 属性
 export interface SelectProps extends FormFieldProps {
+  /** Explicit typed static boolean choices; omission keeps legacy string semantics. */
+  valueType?: 'boolean';
   options?: OptionItem[];
   dataSource?: DataSourceConfig;
   /** Rendered as disabled (a <select> has no native read-only state). */

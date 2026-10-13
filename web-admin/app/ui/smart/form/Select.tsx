@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useMemo, useState } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { SelectProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { SelectProps, OptionItem } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
@@ -34,6 +34,25 @@ const baseStyles = `${fieldControlBase} focus:ring-offset-2 disabled:opacity-50 
 const variantStyles = fieldVariantStyles;
 
 const EMPTY_OPTIONS: SelectProps['options'] = [];
+
+/** Static boolean choices must not acquire authority from string coercion. */
+export function decodeBooleanChoice(value: string, options: OptionItem[]): boolean {
+  const matches = options.filter((option) => typeof option.value === 'boolean' && String(option.value) === value);
+  if (matches.length !== 1 || matches[0].disabled === true)
+    throw new Error('Invalid boolean selection');
+  return matches[0].value;
+}
+
+function validateBooleanChoices(options: OptionItem[], current: unknown) {
+  if (!Array.isArray(options) || !options.length || options.length > 2
+    || options.some((option) => !option || typeof option.value !== 'boolean'
+      || (option.disabled !== undefined && typeof option.disabled !== 'boolean'))
+    || new Set(options.map((option) => option.value)).size !== options.length)
+    throw new Error('Boolean Select requires unique typed static options');
+  if (current !== undefined && current !== null
+    && (typeof current !== 'boolean' || !options.some((option) => option.value === current)))
+    throw new Error('Invalid current boolean selection');
+}
 
 export const CREATE_NEW_VALUE = '__aura_create_new__';
 
@@ -78,6 +97,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       size = 'medium',
       variant = 'default',
       multiple = false,
+      valueType,
       clearable = false,
       inline = false,
       options: staticOptions = EMPTY_OPTIONS,
@@ -149,7 +169,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     const [searchQuery, setSearchQuery] = useState('');
 
     // 批量翻译 options 的 label 字段
-    const options = translateArray(rawOptions || [], ['label'], locale, t);
+    if (valueType !== undefined && valueType !== 'boolean')
+      throw new Error('Unsupported Select value type');
+    if (valueType === 'boolean') {
+      if (multiple || dataSource || canCreateNew)
+        throw new Error('Boolean Select supports static single choices only');
+      validateBooleanChoices(staticOptions, field.value);
+    }
+    const options = translateArray(valueType === 'boolean' ? staticOptions : (rawOptions || []), ['label'], locale, t);
     const dataSourceDependenciesMet = areDataSourceDependenciesMet(dataSource, context);
     const filteredOptions = useMemo(() => {
       const query = searchQuery.trim().toLowerCase();
@@ -181,11 +208,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         ? Array.from(event.target.selectedOptions, (option) => option.value)
         : event.target.value;
 
-      field.setValue(newValue);
+      field.setValue(valueType === 'boolean' ? decodeBooleanChoice(String(newValue), options) : newValue);
     };
 
     // Radix Select value change handler (single-select mode)
     const handleRadixValueChange = (newValue: string) => {
+      if (valueType === 'boolean') {
+        const selected = decodeBooleanChoice(newValue, options);
+        setSearchQuery('');
+        field.setValue(selected);
+        return;
+      }
       if (newValue === CREATE_NEW_VALUE) {
         onCreateNew?.();
         return;
@@ -222,7 +255,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     // 处理清除
     const handleClearClick = () => {
-      const clearedValue = multiple ? [] : '';
+      // Keep typed unset controlled: undefined can reactivate the field's old internal value.
+      const clearedValue = valueType === 'boolean' ? null : multiple ? [] : '';
       field.setValue(clearedValue);
       onClear?.();
     };

@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Select } from '../Select';
+import { Select, decodeBooleanChoice } from '../Select';
 
 let mockOptions: Array<{ label: string; value: string }> = [];
 let mockLoading = false;
@@ -231,5 +231,43 @@ describe('Smart Select', () => {
 
     expect(mockRefetch).not.toHaveBeenCalled();
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+});
+
+describe('Explicit boolean Select (no business default)', () => {
+  const booleanOptions = [{value:true,label:'Yes'},{value:false,label:'No'}];
+  it('keeps unset distinct from explicit false and clears back to unset', () => {
+    mockOptions=booleanOptions as any;const onChange=vi.fn();
+    const {rerender}=render(<Select name="tax" label="Tax" valueType="boolean" placeholder="Unset" options={booleanOptions} clearable onChange={onChange}/>);
+    expect(screen.getByRole('combobox',{name:'Tax'})).toHaveTextContent('Unset');
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('combobox',{name:'Tax'}));
+    fireEvent.click(screen.getByRole('option',{name:'No'}));
+    expect(onChange).toHaveBeenLastCalledWith(false);
+    rerender(<Select name="tax" label="Tax" valueType="boolean" value={false} options={booleanOptions} clearable onChange={onChange}/>);
+    expect(screen.getByRole('combobox',{name:'Tax'})).toHaveTextContent('No');
+    fireEvent.click(screen.getByRole('button',{name:/Tax/}));
+    expect(onChange).toHaveBeenLastCalledWith(null);
+  });
+  it.each([
+    {options:[{value:'false',label:'No'}]}, {options:[{value:true,label:'A'},{value:true,label:'B'}]},
+    {options:[{value:null,label:'Unset'}]},
+  ])('rejects ambiguous or string boolean declarations', ({options}) => {
+    expect(()=>render(<Select name="bad" valueType="boolean" options={options as any}/>)).toThrow();
+  });
+  it('rejects unmatched current values, multiple and dynamic choices without widening ordinary select behavior', () => {
+    expect(()=>render(<Select name="bad" valueType="boolean" value="false" options={booleanOptions}/>)).toThrow();
+    expect(()=>render(<Select name="bad" valueType="boolean" value={true} options={[{value:false,label:'No'}]}/>)).toThrow();
+    expect(()=>render(<Select name="bad" valueType="boolean" multiple options={booleanOptions}/>)).toThrow();
+    expect(()=>render(<Select name="bad" valueType="boolean" dataSource={{type:'static',data:booleanOptions}} options={booleanOptions}/>)).toThrow();
+  });
+});
+
+describe('Typed boolean choice transport guard', () => {
+  it('refuses disabled/unmatched choices and never interprets string false options as boolean', () => {
+    expect(()=>decodeBooleanChoice('false',[{value:false,label:'No',disabled:true}])).toThrow();
+    expect(()=>decodeBooleanChoice('false',[{value:'false',label:'No'}])).toThrow();
+    expect(()=>decodeBooleanChoice('missing',[{value:false,label:'No'}])).toThrow();
+    expect(decodeBooleanChoice('false',[{value:false,label:'No'}])).toBe(false);
   });
 });
