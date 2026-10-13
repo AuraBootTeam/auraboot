@@ -371,6 +371,21 @@ class RegisteredSourceBindingPostgresIT {
         worker = new RegisteredSourceWorker(resolver, selectedReader, host, manager);
     }
 
+    private RegisteredSourcePollingAdapter nativePollingAdapter() {
+        var properties = new HostSourceBindingProperties();
+        properties.setEnabled(true);
+        properties.setBindings(List.of(approved));
+        properties.getWorker().setEnabled(true);
+        properties.getWorker().setPollIntervalMs(1000L);
+        properties.getWorker().setMaxBindings(1);
+        properties.getWorker().setMaxSourcesPerBinding(1);
+        var adapter = new RegisteredSourcePollingAdapter(properties, resolver, worker, () -> {
+            throw new IllegalStateException("Native test must not start autonomous polling resources");
+        });
+        adapter.initialize();
+        return adapter;
+    }
+
     private NotificationRuleRequest ruleRequest(String recipients) {
         NotificationRuleRequest request = new NotificationRuleRequest();
         request.setCode(namespace + "_rule"); request.setName("Native explicit recipient proof"); request.setEnabled(true);
@@ -453,19 +468,32 @@ class RegisteredSourceBindingPostgresIT {
     @Test
     void actualImportedMetadataExplicitRecipientsReplayAndConsumePersistExactlyOnce() {
         startBusiness();
+        RegisteredSourcePollingAdapter adapter = nativePollingAdapter();
+        Map<String, Object> expiryBefore = businessSnapshot();
         clock.now = TARGET_DEADLINE;
-        rejectWithoutEffects();
+        var expired = adapter.tick();
+        assertThat(expired.status()).isEqualTo(RegisteredSourcePollingAdapter.Status.FAILED);
+        assertThat(expired.selectedSources()).isEqualTo(1);
+        assertThat(expired.failures()).hasSize(1);
+        assertThat(expired.failures().getFirst().sourcePid()).isEqualTo(sourcePid);
+        assertThat(businessSnapshot()).isEqualTo(expiryBefore);
         assertThat(counts()).isEqualTo(Map.of("outbox", 0, "receipt", 0, "inbox", 0));
         proved("approved physical DATETIME cutoff equal to host now rejects enqueue before any outbox/inbox/receipt");
         clock.now = BEFORE_DEADLINE;
         Map<String, Object> before = businessSnapshot();
-        assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
+        var selected = adapter.tick();
+        assertThat(selected.status()).isEqualTo(RegisteredSourcePollingAdapter.Status.SUCCEEDED);
+        assertThat(selected.processedPlans()).isEqualTo(2);
+        assertThat(selected.matchedSources()).isEqualTo(1);
+        assertThat(selected.selectedSources()).isEqualTo(1);
         assertThat(counts()).isEqualTo(Map.of("outbox", 2, "receipt", 0, "inbox", 0));
         List<IntegrationEventEnvelope> original = events();
         assertThat(original).hasSize(2);
         assertThat(original).extracting(IntegrationEventEnvelope::occurredAt)
                 .containsOnly(Instant.parse("2026-10-13T03:00:00.123456Z"));
-        assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
+        var replay = adapter.tick();
+        assertThat(replay.status()).isEqualTo(RegisteredSourcePollingAdapter.Status.SUCCEEDED);
+        assertThat(replay.processedPlans()).isEqualTo(2);
         assertThat(events()).isEqualTo(original);
         for (IntegrationEventEnvelope event : original) {
             executor.deliver(event, host, UniqueIdGenerator.generate());
@@ -481,7 +509,7 @@ class RegisteredSourceBindingPostgresIT {
         original.forEach(event -> executor.deliver(event, host, UniqueIdGenerator.generate()));
         assertThat(jdbc.queryForList("SELECT id,user_id,source_id,title,content,created_at FROM ab_notification WHERE tenant_id=? ORDER BY user_id", tenant.getId())).isEqualTo(inbox);
         assertThat(businessSnapshot()).isEqualTo(before);
-        proved("actual raw metadata approved; two explicit recipients; stable queue replay; receipt/inbox duplicate consume suppressed; immutable source");
+        proved("actual host adapter selected bounded source from approved registry; raw metadata approved; two explicit recipients; stable queue replay; receipt/inbox duplicate consume suppressed; immutable source");
     }
 
     @Test
