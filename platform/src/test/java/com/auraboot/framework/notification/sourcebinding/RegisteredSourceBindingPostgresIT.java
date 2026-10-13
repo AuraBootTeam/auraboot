@@ -150,6 +150,7 @@ class RegisteredSourceBindingPostgresIT {
     private static final Instant BEFORE_DEADLINE = Instant.parse("2026-10-13T03:00:00Z");
     private static final Instant TARGET_DEADLINE = Instant.parse("2026-10-13T04:00:00Z");
     private final NativeDeadlineClock clock = new NativeDeadlineClock();
+    private boolean softTargetFixture;
     private Tenant tenant, foreignTenant;
     private User first, second, foreign;
     private TenantMember secondMember;
@@ -172,6 +173,15 @@ class RegisteredSourceBindingPostgresIT {
         assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
         assertThat(System.getenv("S06_NATIVE_SOURCE_EVIDENCE")).isNotBlank();
         evidence = Path.of(System.getenv("S06_NATIVE_SOURCE_EVIDENCE")).toRealPath();
+        var defaultProperties = context.getBean(HostSourceBindingProperties.class);
+        var defaultAdapter = context.getBean(RegisteredSourcePollingAdapter.class);
+        assertThat(defaultProperties.getWorker().isEnabled()).isFalse();
+        assertThat(ReflectionTestUtils.getField(defaultAdapter, "scheduler")).isNull();
+        assertThat(ReflectionTestUtils.getField(defaultAdapter, "settings")).isNull();
+        trace.put("defaultPollingResourceAdmission", Map.of("workerEnabled", false,
+                "schedulerCreated", false, "settingsAdmitted", false));
+        softTargetFixture = info.getTestMethod().orElseThrow().getName()
+                .equals("actualBindingMutationCannotBeAuthorizedByCachedMetadataOrOldApproval");
         try (var connection = dataSource.getConnection()) {
             assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
             assertThat(connection.getCatalog()).isEqualTo("enterprise_22");
@@ -307,8 +317,10 @@ class RegisteredSourceBindingPostgresIT {
         List<Map<String, Object>> fields = new ArrayList<>(), models = new ArrayList<>(), bindings = new ArrayList<>();
         types.forEach((name, type) -> fields.add(Map.of("code", field(name), "displayName", name, "dataType", type)));
         for (String kind : kinds) {
-            models.add(Map.of("code", model(kind), "displayName", kind, "modelType", "entity",
-                    "tableName", SystemFieldConstants.generateTableName(model(kind))));
+            Map<String, Object> declaredModel = new LinkedHashMap<>(Map.of("code", model(kind),
+                    "displayName", kind, "modelType", "entity", "tableName", SystemFieldConstants.generateTableName(model(kind))));
+            if (softTargetFixture && kind.equals("target")) declaredModel.put("extension", Map.of("softDelete", true));
+            models.add(declaredModel);
             for (String name : bound.get(kind)) {
                 bindings.add(Map.of("modelCode", model(kind), "fieldCode", field(name), "sequence", bindings.size() + 1));
             }
@@ -618,6 +630,21 @@ class RegisteredSourceBindingPostgresIT {
     @Test
     void actualBindingMutationCannotBeAuthorizedByCachedMetadataOrOldApproval() {
         startBusiness();
+        assertThat(softTargetFixture).isTrue();
+        serializable(() -> {
+            Map<String, Object> live = reader.record(approved, model("target"), target);
+            assertThat(live).isInstanceOf(SourceBindingReader.LiveRecord.class).containsEntry("deleted_flag", false);
+            return null;
+        });
+        MetaContext.runWithCommandPermitScope("ALL", () -> data.delete(model("target"), target));
+        assertThat(jdbc.queryForObject("SELECT deleted_flag FROM \"" + tables.get("target")
+                + "\" WHERE tenant_id=? AND pid=?", Boolean.class, tenant.getId(), target)).isTrue();
+        assertThatThrownBy(() -> serializable(() -> reader.record(approved, model("target"), target)))
+                .isInstanceOf(IllegalArgumentException.class);
+        rejectWithoutEffects();
+        target = create("target", Map.of(field("state"), "ready", field("owner"), ownOwner, field("cutoff"), TARGET_DEADLINE));
+        update("source", sourcePid, Map.of(field("targets"), List.of(target)));
+        proved("official softDelete=true target: physical flag false eligible; native delete retains true row and typed reader rejects without queue; remaining models retain hard-delete defaults");
         String fieldPid = jdbc.queryForObject("SELECT pid FROM ab_meta_field WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", String.class, tenant.getId(), field("state"));
         bindings.updateFieldConfig(modelPids.get("source"), fieldPid, true, false, true);
         rejectWithoutEffects();
