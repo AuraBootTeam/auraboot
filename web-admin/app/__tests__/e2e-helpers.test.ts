@@ -57,7 +57,8 @@ describe('fixture cleanup evidence', () => {
       f.journal.track({ model: 'bom_match_result', pid: 'child' });
       expect(JSON.parse(readFileSync(f.file, 'utf8')).pending).toBe(2);
       const request = { delete: vi.fn().mockResolvedValue(response(0, true)),
-        get: vi.fn().mockResolvedValue(response(0, { records: [] })) };
+        get: vi.fn().mockResolvedValue(response(0, { records: [] })),
+        post: vi.fn().mockResolvedValue(response(0, { data: { success: true } })) };
       await f.journal.cleanup(request as unknown as APIRequestContext);
       expect(request.delete.mock.calls.map(call => call[0])).toEqual([
         'http://127.0.0.1:5168/api/dynamic/bom_match_result/child',
@@ -65,6 +66,8 @@ describe('fixture cleanup evidence', () => {
       ]);
       const state = JSON.parse(readFileSync(f.file, 'utf8'));
       expect(state.pending).toBe(0);
+      expect(state.snapshotPending).toBe(false);
+      expect(request.post).toHaveBeenCalledTimes(1);
       expect(state.entries.map((entry: { status: string }) => entry.status)).toEqual(['removed', 'removed']);
     } finally { f.dispose(); }
   });
@@ -75,7 +78,8 @@ describe('fixture cleanup evidence', () => {
       f.journal.track({ model: 'bom_material_master', pid: 'owned' });
       const request = { delete: vi.fn().mockResolvedValue(response(failure === 'denied' ? 403 : 0, true)),
         get: vi.fn().mockResolvedValue(response(failure === 'query-denied' ? 403 : 0,
-          { records: failure === 'residue' ? [{ pid: 'owned' }] : [] })) };
+          { records: failure === 'residue' ? [{ pid: 'owned' }] : [] })),
+        post: vi.fn().mockResolvedValue(response(0, { data: { success: true } })) };
       if (failure === 'transport') request.delete.mockRejectedValue(new Error('sensitive-transport-detail'));
       await expect(f.journal.cleanup(request as unknown as APIRequestContext)).rejects.toThrow('Fixture cleanup failed');
       const text = readFileSync(f.file, 'utf8');
@@ -89,7 +93,8 @@ describe('fixture cleanup evidence', () => {
     const f = fixture();
     try {
       const request = { delete: vi.fn().mockResolvedValue(response(0, true)),
-        get: vi.fn().mockResolvedValue(response(0, { records: [] })) };
+        get: vi.fn().mockResolvedValue(response(0, { records: [] })),
+        post: vi.fn().mockResolvedValue(response(0, { data: { success: true } })) };
       await expect(f.journal.cleanup(request as unknown as APIRequestContext,
         [{ model: 'bom_material_master', pid: 'foreign' }])).rejects.toThrow('unregistered');
       expect(request.delete).not.toHaveBeenCalled();
@@ -107,7 +112,8 @@ describe('fixture cleanup evidence', () => {
       expect(() => FixtureCleanupJournal.resume(f.file, 'http://127.0.0.1:5169')).toThrow('target/schema');
       const resumed = FixtureCleanupJournal.resume(f.file, f.journal.origin);
       const request = { delete: vi.fn().mockResolvedValue(response(0, true)),
-        get: vi.fn().mockResolvedValue(response(0, { records: [] })) };
+        get: vi.fn().mockResolvedValue(response(0, { records: [] })),
+        post: vi.fn().mockResolvedValue(response(0, { data: { success: true } })) };
       await resumed.cleanup(request as unknown as APIRequestContext);
       expect(JSON.parse(readFileSync(f.file, 'utf8')).pending).toBe(0);
       expect(request.delete).toHaveBeenCalledTimes(1);
@@ -116,5 +122,23 @@ describe('fixture cleanup evidence', () => {
 
   it.each(['https://bootnap.com', 'http://bootnap.com', 'http://10.attacker.example', 'http://user:password@127.0.0.1:5168'])('rejects unsafe target %s before tracking data', (origin) => {
     expect(() => new FixtureCleanupJournal('/tmp/unused-fixture-journal.json', origin)).toThrow('nonproduction');
+  });
+
+  it('retains a failed snapshot refresh after deletion and resumes it without deleting twice', async () => {
+    const f = fixture();
+    try {
+      f.journal.track({ model: 'bom_material_master', pid: 'owned' });
+      const request = { delete: vi.fn().mockResolvedValue(response(0, true)),
+        get: vi.fn().mockResolvedValue(response(0, { records: [] })),
+        post: vi.fn().mockResolvedValue(response(403, null)) };
+      await expect(f.journal.cleanup(request as unknown as APIRequestContext)).rejects.toThrow('material-snapshot');
+      const state = JSON.parse(readFileSync(f.file, 'utf8'));
+      expect(state.pending).toBe(0);
+      expect(state.snapshotPending).toBe(true);
+      request.post.mockResolvedValue(response(0, { data: { success: true } }));
+      await FixtureCleanupJournal.resume(f.file, f.journal.origin).cleanup(request as unknown as APIRequestContext);
+      expect(request.delete).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(readFileSync(f.file, 'utf8')).snapshotPending).toBe(false);
+    } finally { f.dispose(); }
   });
 });

@@ -14,6 +14,7 @@ function validateRow(row: FixtureRow): void {
 
 export class FixtureCleanupJournal {
   private entries: Entry[] = [];
+  private snapshotPending = false;
   readonly origin: string;
 
   constructor(private readonly file: string, origin: string) {
@@ -42,7 +43,7 @@ export class FixtureCleanupJournal {
       throw new Error('Fixture journal must be a regular evidence file');
     }
     const data = JSON.parse(readFileSync(file, 'utf8'));
-    if (data.schemaVersion !== 1 || data.origin !== journal.origin || !Array.isArray(data.entries)) {
+    if (![1, 2].includes(data.schemaVersion) || data.origin !== journal.origin || !Array.isArray(data.entries)) {
       throw new Error('Fixture journal target/schema mismatch');
     }
     const identities = new Set<string>();
@@ -58,13 +59,19 @@ export class FixtureCleanupJournal {
     if (data.pending !== journal.entries.filter(row => row.status !== 'removed').length) {
       throw new Error('Fixture journal pending count mismatch');
     }
+    if (data.schemaVersion === 2 && typeof data.snapshotPending !== 'boolean') {
+      throw new Error('Fixture journal snapshot state missing');
+    }
+    journal.snapshotPending = data.schemaVersion === 2 ? data.snapshotPending
+      : journal.entries.some(row => row.model === 'bom_material_master' && row.status === 'removed');
     return journal;
   }
 
   private persist(): void {
     mkdirSync(path.dirname(this.file), { recursive: true });
     const temporary = `${this.file}.${process.pid}.tmp`;
-    writeFileSync(temporary, JSON.stringify({ schemaVersion: 1, origin: this.origin,
+    writeFileSync(temporary, JSON.stringify({ schemaVersion: 2, origin: this.origin,
+      snapshotPending: this.snapshotPending,
       pending: this.entries.filter(entry => entry.status !== 'removed').length,
       entries: this.entries }, null, 2) + '\n', { mode: 0o600 });
     renameSync(temporary, this.file);
@@ -78,9 +85,15 @@ export class FixtureCleanupJournal {
     const failures: string[] = [];
     for (const entry of [...this.entries].reverse()) {
       if (entry.status === 'removed' || (selected && !selected.has(`${entry.model}:${entry.pid}`))) continue;
+      if (entry.model === 'bom_material_master') {
+        this.snapshotPending = true;
+        this.persist();
+      }
       try {
         const prefix = `${this.origin}/api/dynamic/${entry.model}`;
-        const deletion = await request.delete(`${prefix}/${entry.pid}`, { timeout: 15_000 });
+        const deletion = await request.delete(`${prefix}/${entry.pid}`, {
+          timeout: 15_000, headers: { Origin: this.origin },
+        });
         const deleted = await deletion.json();
         if (!deletion.ok() || String(deleted.code) !== '0') {
           throw new Error(`Delete rejected: HTTP ${deletion.status()}, code=${deleted.code}`);
@@ -100,6 +113,22 @@ export class FixtureCleanupJournal {
         // Keep only the failure class; request errors may include sensitive URLs.
         entry.error = error instanceof Error && error.message.startsWith('Fixture') ? error.message : 'Fixture deletion failed';
         failures.push(`${entry.model}:${entry.pid}`);
+      }
+      this.persist();
+    }
+    if (this.snapshotPending) {
+      try {
+        const response = await request.post(`${this.origin}/api/meta/commands/execute/bom:refresh_material_snapshot`, {
+          data: { payload: {}, operationType: 'update' }, headers: { Origin: this.origin }, timeout: 60_000,
+        });
+        const body = await response.json();
+        const result = body?.data?.data ?? body?.data;
+        if (!response.ok() || String(body.code) !== '0' || result?.success !== true) {
+          throw new Error('Material snapshot refresh rejected');
+        }
+        this.snapshotPending = false;
+      } catch {
+        failures.push('material-snapshot');
       }
       this.persist();
     }
