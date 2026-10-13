@@ -1,6 +1,7 @@
 """Hermetic gate-verifier tests; these do not qualify a Linux release image."""
 import base64
 import copy
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
@@ -45,12 +46,12 @@ def passed():
             "receiverAttemptsBefore": 0, "receiverAttemptsAfter": 0, "restoredStatus": "success", "restoredReplayCount": 2}}
 
 
-def load_passed():
+def load_passed(count=32):
     measurement = {"profile": "burst-32x4", "authority": "recorded", "sloVerdict": "unqualified", "status": "complete",
-        "planned": 32, "concurrency": 4, "startedAt": 1700000000.0, "producedAt": 1700000000.1,
+        "planned": count, "concurrency": 4, "startedAt": 1700000000.0, "producedAt": 1700000000.1,
         "finishedAt": 1700000000.5, "rows": [], "queueSamples": []}
     pending, final = [], []
-    for index in range(32):
+    for index in range(count):
         proof = copy.deepcopy(passed()["deliveryProofs"][2])
         proof.update(deliveryPid="load_delivery_" + str(index), eventId="load_event_" + str(index), subjectPid="load_pid_" + str(index))
         row = proof["rawEvidence"][0]
@@ -73,6 +74,33 @@ def load_passed():
     measurement["queueSamples"] = [{"observedAt": 1700000000.11, "rows": pending}, {"observedAt": 1700000000.2, "rows": final}]
     measurement["metrics"] = load_metrics(measurement)
     return measurement
+
+
+def sustained_passed():
+    m = load_passed(300)
+    m.update(profile='paced-60s-5rps', durationSeconds=60, ratePerSecond=5,
+             producedAt=m['startedAt']+60, finishedAt=m['startedAt']+60.5)
+    for row in m['rows']:
+        slot = m['startedAt'] + row['index']/5
+        row.update(scheduledAt=slot, createStartedAt=slot+.001, createCompletedAt=slot+.01)
+        raw = row['proof']['rawEvidence'][0]
+        payload = json.loads(base64.b64decode(raw['rawBodyBase64']))
+        origin = 'release-model-sustained-' + str(row['index'])
+        payload.update(correlationId=origin, occurredAt=datetime.fromtimestamp(slot+.002, timezone.utc).isoformat())
+        body = json.dumps(payload).encode()
+        received, timestamp = slot+.125, str(int(slot))
+        raw.update(requestId=origin, occurredAt=payload['occurredAt'], receivedAt=received, timestamp=timestamp,
+            eventAgeAtReceiptMs=round((received-datetime.fromisoformat(payload['occurredAt']).timestamp())*1000,3),
+            rawBodyBase64=base64.b64encode(body).decode(), bodySha256=hashlib.sha256(body).hexdigest(),
+            signature='sha256='+hmac.new(SECRET,timestamp.encode()+b'.'+body,hashlib.sha256).hexdigest())
+    states = m['queueSamples'][-1]['rows']
+    m['queueSamples'] = [{'observedAt':m['startedAt']+.11, 'subjects':[states[0]['subject']],
+                         'rows':[dict(states[0],status='pending',receipts=0,deliveries=0,deliveryPid=None,
+                                      deliveryStatus=None,retryCount=None,responseStatus=None)]},
+        {'observedAt':m['startedAt']+30.5,'subjects':[x['subject'] for x in states[:151]],'rows':states[:151]},
+        {'observedAt':m['startedAt']+60.2,'subjects':[x['subject'] for x in states],'rows':states}]
+    m['metrics'] = load_metrics(m)
+    return m
 
 
 class ModelEventTests(unittest.TestCase):
@@ -152,6 +180,22 @@ class ModelEventTests(unittest.TestCase):
         for change in changes:
             with self.subTest(change=changes.index(change)):
                 altered = passed(); altered["loadMeasurement"] = load_passed(); change(altered["loadMeasurement"])
+                with self.assertRaises(ProtocolError): verify_report(altered, secret=SECRET)
+
+        report = passed(); report['sustainedMeasurement'] = sustained_passed()
+        self.assertEqual(verify_report(report, secret=SECRET)['sustainedMeasurement']['metrics']['accepted'], 300)
+        sustained_changes = [lambda m:m.update(durationSeconds=1), lambda m:m.update(ratePerSecond=True),
+            lambda m:m.update(producedAt=m['startedAt']+1), lambda m:m['rows'][0].update(scheduledAt=0),
+            lambda m:m['rows'][0].update(createStartedAt=m['startedAt']-1),
+            lambda m:m['queueSamples'].__delitem__(slice(0,2)),
+            lambda m:m['queueSamples'][1].update(subjects=[]),
+            lambda m:m['queueSamples'][-1]['rows'].pop(),
+            lambda m:m['rows'][0]['proof']['rawEvidence'][0].update(eventAgeAtReceiptMs=0),
+            lambda m:m['metrics'].update(successfulReceiptRatePerSecond=999),
+            lambda m:m.update(sloVerdict='passed')]
+        for change in sustained_changes:
+            with self.subTest(sustained_fault=sustained_changes.index(change)):
+                altered = passed(); altered['sustainedMeasurement'] = sustained_passed(); change(altered['sustainedMeasurement'])
                 with self.assertRaises(ProtocolError): verify_report(altered, secret=SECRET)
 
     def test_denominator_omission_duplication_order_and_expansion(self):

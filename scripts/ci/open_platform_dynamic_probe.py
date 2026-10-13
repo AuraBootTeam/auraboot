@@ -1182,6 +1182,8 @@ def verify_release_report(report, *, model_event_secret=None):
     verify_model_event_report(report.get("modelEvents"), secret=model_event_secret)
     if "loadMeasurement" not in report["modelEvents"]:
         raise ProtocolError("release notification burst measurement missing")
+    if "sustainedMeasurement" not in report["modelEvents"]:
+        raise ProtocolError("fixed sustained notification measurement missing")
     verify_command_audits(report.get("commandAudits"))
     return report
 

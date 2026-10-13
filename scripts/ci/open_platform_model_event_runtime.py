@@ -141,11 +141,12 @@ class DockerInfrastructure:
         require(isinstance(result, dict) and "lastRun" in result, "model source poll marker missing")
         return result["lastRun"]
 
-    def load_state(self, tenant, event_type, subjects, subscription_pid):
+    def load_state(self, tenant, event_type, subjects, subscription_pid, *, expected_count=32):
         tenant, event_type = self.tenant_id(tenant), self.identifier(event_type)
         subscription_pid = self.identifier(subscription_pid)
-        require(isinstance(subjects, list) and len(subjects) == 32
-                and all(isinstance(subject, str) for subject in subjects) and len(set(subjects)) == 32,
+        require(type(expected_count) is int and 1 <= expected_count <= 300
+                and isinstance(subjects, list) and len(subjects) == expected_count
+                and all(isinstance(subject, str) for subject in subjects) and len(set(subjects)) == expected_count,
                 'model load observation denominator invalid')
         subjects = [self.identifier(subject) for subject in subjects]
         selected = ','.join("'" + subject + "'" for subject in subjects)
