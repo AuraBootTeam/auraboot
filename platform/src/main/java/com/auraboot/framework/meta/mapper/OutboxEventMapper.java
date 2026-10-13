@@ -135,15 +135,15 @@ public interface OutboxEventMapper {
                             @Param("nextRetryAt") Instant nextRetryAt,
                             @Param("lastError") String lastError);
 
-    /** The trusted posted-fact consumer must still own the current outbox delivery lease. */
+    /** Wall-clock lease expiry must be rechecked even inside a long-running delivery transaction. */
     @Select("SELECT COUNT(*) FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
-            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > NOW()")
+            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > clock_timestamp()")
     int countActiveDeliveryLease(@Param("tenantId") Long tenantId, @Param("eventId") String eventId,
                                  @Param("leaseToken") String leaseToken);
 
     /** Trusted counter holds this exact lease row until its effect and receipt transaction commits. */
     @Select("SELECT id FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
-            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > NOW() FOR UPDATE")
+            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > clock_timestamp() FOR UPDATE")
     Long lockActiveDeliveryLease(@Param("tenantId") Long tenantId, @Param("eventId") String eventId,
                                   @Param("leaseToken") String leaseToken);
 

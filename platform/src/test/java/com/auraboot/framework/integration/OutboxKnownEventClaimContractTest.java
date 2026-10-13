@@ -51,9 +51,18 @@ class OutboxKnownEventClaimContractTest {
     @Test void trustedCounterLockBindsExactActiveLeaseAndRetainsItForTransaction() {
         Configuration configuration=new Configuration();configuration.addMapper(OutboxEventMapper.class);
         BoundSql lock=configuration.getMappedStatement(OutboxEventMapper.class.getName()+".lockActiveDeliveryLease").getBoundSql(parameters());
-        assertThat(lock.getSql()).contains("tenant_id = ? AND event_id = ?", "status = 'processing' AND lease_token = ? AND lease_until > NOW() FOR UPDATE");
+        assertThat(lock.getSql()).contains("tenant_id = ? AND event_id = ?", "status = 'processing' AND lease_token = ? AND lease_until > clock_timestamp() FOR UPDATE");
         assertThat(lock.getParameterMappings().stream().map(p->p.getProperty()).toList()).containsExactly("tenantId","eventId","leaseToken");
         assertThat(lock.getSql()).doesNotContain("SKIP LOCKED", "UPDATE ab_outbox", "headers =", "payload =");
+    }
+    @Test void currentLeasePostCheckUsesWallClockAfterTheTransactionStart() {
+        Configuration configuration=new Configuration();configuration.addMapper(OutboxEventMapper.class);
+        BoundSql count=configuration.getMappedStatement(OutboxEventMapper.class.getName()+".countActiveDeliveryLease").getBoundSql(parameters());
+        assertThat(count.getSql()).contains("tenant_id = ? AND event_id = ?", "status = 'processing' AND lease_token = ? AND lease_until > clock_timestamp()");
+        assertThat(count.getSql()).doesNotContain("NOW()", "CURRENT_TIMESTAMP", "statement_timestamp()", "FOR UPDATE", "UPDATE ab_outbox");
+        assertThat(count.getParameterMappings().stream().map(p->p.getProperty()).toList()).containsExactly("tenantId","eventId","leaseToken");
+        var hostile=new java.util.HashMap<>(parameters());hostile.put("leaseToken","x' OR TRUE --");
+        assertThat(configuration.getMappedStatement(OutboxEventMapper.class.getName()+".countActiveDeliveryLease").getBoundSql(hostile).getSql()).isEqualTo(count.getSql()).doesNotContain("x' OR TRUE --");
     }
     @Test void globalClaimContractIsUnchangedAndExactClaimDoesNotFallBackToIt() {
         Configuration configuration=new Configuration();configuration.addMapper(OutboxEventMapper.class);
