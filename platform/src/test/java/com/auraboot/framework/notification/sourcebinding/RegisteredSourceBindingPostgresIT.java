@@ -615,6 +615,10 @@ class RegisteredSourceBindingPostgresIT {
     private final class FailingAfterPersist implements ReliableEventConsumerExtension, HostSerializableEventConsumer {
         @Override public String consumerCode() { return host.consumerCode(); }
         @Override public Set<String> subscribedEventTypes() { return host.subscribedEventTypes(); }
+        @Override
+        public boolean requiresSerializableTransaction(IntegrationEventEnvelope envelope) {
+            return host.requiresSerializableTransaction(envelope);
+        }
         @Override public void consume(IntegrationEventEnvelope event) {
             host.consume(event);
             assertThat(counts().get("inbox")).isEqualTo(1);
