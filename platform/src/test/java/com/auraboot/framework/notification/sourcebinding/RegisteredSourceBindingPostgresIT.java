@@ -311,11 +311,11 @@ class RegisteredSourceBindingPostgresIT {
     }
 
     private String create(String kind, Map<String, Object> values) {
-        return MetaContext.runWithCommandPermitScope("ALL", () -> (String) data.create(model(kind), values).get("pid"));
+        return MetaContext.runWithCommandPermitScope("ALL", () -> (String) data.create(model(kind), new LinkedHashMap<>(values)).get("pid"));
     }
 
     private void update(String kind, String pid, Map<String, Object> values) {
-        MetaContext.runWithCommandPermitScope("ALL", () -> data.update(model(kind), pid, values));
+        MetaContext.runWithCommandPermitScope("ALL", () -> data.update(model(kind), pid, new LinkedHashMap<>(values)));
     }
 
     private String principal(User user, String owner, String verification) {
