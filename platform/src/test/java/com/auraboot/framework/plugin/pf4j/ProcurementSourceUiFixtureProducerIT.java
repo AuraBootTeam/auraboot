@@ -327,6 +327,7 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         var member = members.addMember(user.getId(), tenant, "active");
         String jwt = actorToken(user.getId(), user.getPid(), member.getId(), email, permissions, password);
         var identity = retainedActors.getLast();
+        identity.put("userId", user.getId().toString());
         identity.put("credentialEnvironment", "PROCUREMENT_SOURCE_UI_FIXTURE_PASSWORD");
         identity.put("dataScopeAuthority", "synthetic tenant only");
         return jwt;
