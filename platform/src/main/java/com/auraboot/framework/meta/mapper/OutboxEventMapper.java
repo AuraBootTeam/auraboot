@@ -90,6 +90,25 @@ public interface OutboxEventMapper {
                                       @Param("leaseToken") String leaseToken,
                                       @Param("leaseUntil") Instant leaseUntil);
 
+    /** Internal exact-event lease claim; never polls or claims another tenant's queue. */
+    @Select("<script>WITH candidate AS (" +
+            "SELECT o.id FROM ab_outbox o WHERE o.tenant_id = #{tenantId} AND o.event_id = #{eventId} " +
+            "AND ((o.status = 'pending' AND o.next_retry_at &lt;= NOW()) " +
+            "OR (o.status = 'processing' AND o.lease_until &lt; NOW())) " +
+            "AND (o.ordering_key IS NULL OR NOT EXISTS (SELECT 1 FROM ab_outbox earlier " +
+            "WHERE earlier.tenant_id = o.tenant_id AND earlier.ordering_key = o.ordering_key " +
+            "AND earlier.event_sequence &lt; o.event_sequence " +
+            "AND earlier.status IN ('pending', 'processing'))) " +
+            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT 1) " +
+            "UPDATE ab_outbox o SET status = 'processing', lease_owner = #{leaseOwner}, " +
+            "lease_token = #{leaseToken}, lease_until = #{leaseUntil}, claimed_at = NOW() " +
+            "FROM candidate c WHERE o.id = c.id AND o.tenant_id = #{tenantId} AND o.event_id = #{eventId} RETURNING o.*</script>")
+    List<OutboxEvent> claimKnownEvent(@Param("tenantId") Long tenantId,
+                                     @Param("eventId") String eventId,
+                                     @Param("leaseOwner") String leaseOwner,
+                                     @Param("leaseToken") String leaseToken,
+                                     @Param("leaseUntil") Instant leaseUntil);
+
     @Update("UPDATE ab_outbox SET status = 'processing' WHERE id = #{id} AND status IN ('pending', 'processing')")
     int claimEvent(@Param("id") Long id);
 

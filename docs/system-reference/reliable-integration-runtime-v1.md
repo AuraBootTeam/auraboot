@@ -112,3 +112,12 @@ and managed-record writer checks still execute. The consumer must independently 
 original immutable Procurement request and full line lineage before computing the quantity;
 this scope does not replace those business checks. Ordinary non-collaboration PR initialization
 and its received-quantity default remain unchanged.
+
+`OutboxEventMapper.claimKnownEvent` is an internal exact tenant/event lease claim for controlled
+owned-event delivery. It retains the global claim's due-pending/expired-processing conditions,
+tenant-local ordering predecessor check and `FOR UPDATE SKIP LOCKED`, with a fixed one-row cap.
+Both selection and update bind the two identity parameters. It never changes event content,
+producer headers or command authority, and does not replace the global dispatcher. The lease
+claim must commit independently before a consumer's `REQUIRES_NEW` effect transaction starts;
+holding that same outbox row lock in an outer transaction would self-block the inner delivery.
+The annotation/BoundSql contract tests are not PostgreSQL lease or ordering acceptance.
