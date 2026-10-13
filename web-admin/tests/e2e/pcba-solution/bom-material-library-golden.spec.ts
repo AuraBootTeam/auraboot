@@ -14,11 +14,15 @@
  * every row queried alongside it.
  */
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 
 import type { Page } from '@playwright/test';
 
 import { test, expect } from '../../fixtures';
 import { cleanupTrackedFixtureRows, fixtureJournal, queryDynamicRecords } from './quote-e2e-helpers';
+import { FixtureCleanupJournal } from './fixture-cleanup';
 
 const LIST = '/p/bom_material_master';
 
@@ -99,6 +103,68 @@ test.describe('BOM material library page @smoke', () => {
 
   test.afterEach(async ({ page }) => {
     await cleanupTrackedFixtureRows(page);
+  });
+
+  test('a terminated fixture creator resumes cleanup from its persisted journal', async ({ page }) => {
+    const origin = process.env.PLAYWRIGHT_BASE_URL!;
+    const file = test.info().outputPath('interrupted-material-fixture.json');
+    const code = `PIPEINT-${uid}`;
+    const beforeResponse = await page.request.get('/api/dynamic/bom_material_master/list?pageNum=1&pageSize=1');
+    const before = await beforeResponse.json();
+    expect(beforeResponse.ok()).toBe(true);
+    expect(String(before.code)).toBe('0');
+    expect(typeof before.data.total).toBe('number');
+    const creator = `
+import { readFileSync } from 'node:fs';
+import { request } from '@playwright/test';
+const input = JSON.parse(readFileSync(0, 'utf8'));
+const { FixtureCleanupJournal } = await import(input.journalModule);
+const client = await request.newContext({ baseURL: input.origin, storageState: input.storageState });
+const created = await client.post('/api/meta/commands/execute/bom:create_material', {
+  data: { operationType: 'create', payload: { bom_mm_material_code: input.code,
+    bom_mm_material_name: 'Pipeline interruption resistor', bom_mm_spec_model: '10kΩ ±1% 0603',
+    bom_mm_unit: 'PCS', bom_mm_category: 'resistor', bom_mm_package: '0603', bom_mm_enabled: true } },
+  timeout: 60000,
+});
+if (!created.ok() || String((await created.json()).code) !== '0') throw new Error('Fixture creation rejected');
+const response = await client.get('/api/dynamic/bom_material_master/list?pageNum=1&pageSize=200&keyword=' + encodeURIComponent(input.code));
+const body = await response.json();
+if (!response.ok() || String(body.code) !== '0') throw new Error('Fixture ownership query rejected');
+const rows = body.data.records.filter(row => row.bom_mm_material_code === input.code);
+if (rows.length !== 1) throw new Error('One exact created fixture required');
+const journal = new FixtureCleanupJournal(input.file, input.origin);
+journal.track({ model: 'bom_material_master', pid: String(rows[0].pid) });
+await client.dispose();
+process.exit(23);
+`;
+    try {
+      const require = createRequire(import.meta.url);
+      const result = spawnSync(process.execPath,
+        ['--import', require.resolve('tsx'), '--input-type=module', '-e', creator], {
+          cwd: path.resolve(import.meta.dirname, '../../..'), encoding: 'utf8', timeout: 90_000,
+          input: JSON.stringify({ origin, file, code, storageState: await page.context().storageState(),
+            journalModule: new URL('./fixture-cleanup.ts', import.meta.url).href }),
+        });
+      expect(result.error, 'creator exits through the controlled interruption').toBeUndefined();
+      expect(result.status, 'creator terminated before cleanup').toBe(23);
+      const pending = JSON.parse(readFileSync(file, 'utf8'));
+      expect(pending.pending).toBe(1);
+      expect(await materialByCode(page, code)).toBeTruthy();
+      await FixtureCleanupJournal.resume(file, origin).cleanup(page.request);
+      const completed = JSON.parse(readFileSync(file, 'utf8'));
+      expect(completed.pending).toBe(0);
+      expect(completed.snapshotPending).toBe(false);
+      expect(completed.entries).toHaveLength(1);
+      expect(completed.entries[0].status).toBe('removed');
+      expect(await materialByCode(page, code)).toBeUndefined();
+      const afterResponse = await page.request.get('/api/dynamic/bom_material_master/list?pageNum=1&pageSize=1');
+      const after = await afterResponse.json();
+      expect(afterResponse.ok()).toBe(true);
+      expect(String(after.code)).toBe('0');
+      expect(after.data.total, 'interruption recovery preserves the original material population').toBe(before.data.total);
+    } finally {
+      if (existsSync(file)) await FixtureCleanupJournal.resume(file, origin).cleanup(page.request);
+    }
   });
 
   test('the library page lists materials and offers the row actions the DSL declares', async ({
