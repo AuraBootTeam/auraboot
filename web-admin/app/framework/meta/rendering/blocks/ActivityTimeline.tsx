@@ -291,7 +291,8 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                     const activityType = normalizeActivityType(activity.activityType);
                     const actorType = normalizeActorType(activity.actorType);
                     const actorLabel = resolveActorLabel(activity, locale);
-                    const subject = sanitizeVisibleText(activity.subject);
+                    const sanitizedSubject = sanitizeVisibleText(activity.subject);
+                    const subject = compact ? sanitizedSubject.replace(/^(Created|Updated)\s+/, '') : sanitizedSubject;
                     const content = sanitizeVisibleText(activity.content);
                     const config =
                       ACTIVITY_TYPE_CONFIG[activityType] || ACTIVITY_TYPE_CONFIG.SYSTEM;

@@ -8,7 +8,8 @@
       "tpm.project.read",
       "tpm.milestone.read",
       "model.tpm_project.read",
-      "model.tpm_milestone.read"
+      "model.tpm_milestone.read",
+      "data.datasource.read"
     ]
   },
   {
@@ -27,7 +28,8 @@
       "model.tpm_project.update",
       "model.tpm_milestone.read",
       "model.tpm_milestone.create",
-      "model.tpm_milestone.update"
+      "model.tpm_milestone.update",
+      "data.datasource.read"
     ]
   }
 ]

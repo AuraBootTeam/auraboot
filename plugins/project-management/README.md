@@ -1,6 +1,6 @@
 # Project Management Template
 
-Simple project and task tracking for teams. One-click install to get project, task, and milestone management.
+Customer delivery planning and milestone tracking, built with shared DSL pages and commands.
 
 ## What's Included
 
@@ -14,13 +14,13 @@ Simple project and task tracking for teams. One-click install to get project, ta
 
 - **Project Lifecycle**: PLANNING → ACTIVE ↔ ON_HOLD → COMPLETED / CANCELLED
 - **Task Flow**: TODO → IN_PROGRESS → IN_REVIEW → DONE
-- **Project 360**: View tasks and milestones linked to each project
+- **Delivery workspace**: Inspect project agreements, linked milestones and persisted completion activity
 - **Named Query**: Task summary by project for dashboards
 
 ## Installation
 
 ```bash
-aura plugin import plugins/project-management
+aura plugin publish plugins/project-management --target http://localhost:YOUR_BACKEND_PORT --yes
 ```
 
 ## Namespace
@@ -48,7 +48,7 @@ Primary actions: create project, edit plan, complete a pending milestone with co
 
 ### Local acceptance
 
-Use the public OSS host-first launcher with `--plugin project-management` in an owned runtime. Reset only that runtime database when a new controlled fixture is needed. After import and identity verification, run `scripts/seed-delivery.py` with `DELIVERY_BACKEND_URL`, `DELIVERY_EVIDENCE_ROOT`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. The fixture tool accepts loopback only and refuses an already populated project table. It provisions three fictional team members without sending email and creates eight fictional projects through commands.
+Use the public OSS host-first launcher with `--plugin project-management` in an owned runtime. Reset only that runtime database when a new controlled fixture is needed. After import and identity verification, run `scripts/seed-delivery.py` with `DELIVERY_BACKEND_URL`, `DELIVERY_EVIDENCE_ROOT`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. The fixture tool accepts loopback only and refuses an already populated project table. It provisions three fictional team members and one read-only observer without sending email and creates eight fictional projects through commands.
 
 Run the browser journey with `DELIVERY_WEB_URL` and the same evidence directory:
 
@@ -56,6 +56,8 @@ Run the browser journey with `DELIVERY_WEB_URL` and the same evidence directory:
 pnpm --dir web-admin exec playwright test -c playwright.delivery.config.ts
 ```
 
-Create the screenshot matrix in the evidence round before running the journey (P01-P09). The completion test expects the first controlled project to begin with two of four milestones reached. It retains the completed milestone and requires a fresh controlled fixture for another full run; it does not silently revert business state.
+Copy `scripts/acceptance-matrix.json` into the evidence round before running the journey (P01-P12). The completion test expects the first controlled project to begin with two of four milestones reached. It retains the completed milestone and requires a fresh controlled fixture for another full run; it does not silently revert business state.
 
 `detailAsideBlockIds` is an opt-in shared detail layout: the configured blocks move into a responsive aside, other blocks retain their DSL order. Child mutations reload declared page data sources and remount activity blocks so unchanged parent snapshots cannot leave derived progress or activities stale. Completion time is assigned by the command, not supplied by the browser. Historical milestones without a recorded completion timestamp are excluded from completion facts; they are not backfilled into fictitious history.
+
+`formWidth: "comfortable"` opts a form into a narrower reading width; the default and existing sub-table layouts retain their current width. `activity-timeline.extension.density: "compact"` removes the CRM-specific header and filter controls for an object sidebar while retaining real activity entries and explicit load/permission failures. The delivery roles include datasource read permission and model read grants; the viewer receives no command execution or manage grant.
