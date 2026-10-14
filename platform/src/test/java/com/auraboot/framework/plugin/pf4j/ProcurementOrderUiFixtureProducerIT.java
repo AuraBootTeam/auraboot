@@ -588,7 +588,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
 
     static List<String> preparationPermissionCodes() {
         var codes=new ArrayList<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
-        codes.add("model.qo_procurement_category_supplier_common.read");assertEquals(20,codes.size());assertEquals(20,new java.util.HashSet<>(codes).size());return List.copyOf(codes);
+        assertEquals(20,codes.size());assertEquals(20,new java.util.HashSet<>(codes).size());return List.copyOf(codes);
     }
 
     static void requireCompletedPublicResponse(JsonNode body) {

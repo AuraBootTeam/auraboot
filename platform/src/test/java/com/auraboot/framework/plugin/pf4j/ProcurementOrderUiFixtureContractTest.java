@@ -20,7 +20,7 @@ class ProcurementOrderUiFixtureContractTest {
     }
     @Test void preparationMakerReadsCategoryMembershipWithoutExpandingBrowserActor() {
         var expected=new HashSet<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
-        expected.add("model.qo_procurement_category_supplier_common.read");
+        assertThat(expected).contains("model.qo_procurement_category_supplier_common.read").hasSize(20);
         assertThat(ProcurementOrderUiFixtureProducerIT.preparationPermissionCodes()).hasSize(20).containsExactlyInAnyOrderElementsOf(expected);
         assertThat(expected).noneMatch(code->code.equals("*") || code.endsWith(".write") || code.contains("admin"));
     }
