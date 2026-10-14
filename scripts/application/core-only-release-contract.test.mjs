@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -13,6 +15,40 @@ const deploy = readFileSync(resolve(root, 'scripts/application/auraboot-core-env
 const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-schema.sh'), 'utf8');
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
+
+test('product runtime argument guard accepts role lists and rejects shell syntax', () => {
+  const guard = productImageGate.split('\n').find(line => line.includes('[[ "$runtime_arg" =~'));
+  assert.ok(guard);
+  const expression = guard.trim().replace(/\\$/, '').trim();
+  const check = argument => spawnSync('bash', ['-c', `runtime_arg="$1"\n${expression}`, 'argument-guard', argument]).status;
+  assert.equal(check('--aura.tenant.creator-roles=xy_school_admin,xy_teacher'), 0);
+  assert.equal(check('--aura.application.bundle-root=/opt/auraboot'), 0);
+  for (const argument of ['--x=a b', '--x=$(id)', '--x=`id`', '--x=a;b', '--x=a\nb', '--x=', '-x=a']) {
+    assert.equal(check(argument), 1, argument);
+  }
+});
+
+test('image verification creates a private per-attempt encryption key and refuses overwrite', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'release-image-crypto-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const fn = productImageGate.match(/create_verification_crypto_env\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(fn);
+  const create = file => spawnSync('bash', ['-c', `umask 022\n${fn}\ncreate_verification_crypto_env "$1"`, 'crypto-env', file], { encoding: 'utf8' });
+  const files = [join(directory, 'publication-and-runtime.env'), join(directory, 'next-attempt.env')];
+  for (const file of files) {
+    const result = create(file); assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, '', 'the generated key is never printed');
+    assert.equal(statSync(file).mode & 0o777, 0o600);
+    const value = readFileSync(file, 'utf8').trim().split('=');
+    assert.equal(value[0], 'FIELD_ENCRYPTION_KEY');
+    assert.equal(Buffer.from(value.slice(1).join('='), 'base64').length, 32);
+  }
+  assert.notEqual(readFileSync(files[0], 'utf8'), readFileSync(files[1], 'utf8'));
+  const original = readFileSync(files[0]); assert.notEqual(create(files[0]).status, 0);
+  assert.deepEqual(readFileSync(files[0]), original);
+  assert.notEqual(create('relative').status, 0);
+  assert.match(productImageGate, /--env-file "\$RUNTIME_CRYPTO_ENV_FILE"/);
+});
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
   assert.match(stage, /platform\/gradlew/);
@@ -150,4 +186,43 @@ test('release OCI is built on a pinned Linux JRE and requires a real image build
   assert.match(oci, /'--platform', 'linux\/amd64'/);
   assert.match(oci, /mkdtempSync\(resolve\(dirname\(output\), '\.auraboot-image-'\)\)/);
   assert.doesNotMatch(oci, /application payload layer/);
+});
+
+test('acceptance migration paths stay under the declared fixture namespace', () => {
+  const line = productImageGate.split('\n').find(l => l.includes('[[ -n "$FIXTURE_REL" && "$ACCEPTANCE_MIGRATIONS_REL"'));
+  assert.ok(line);
+  const guard = line.trim().replace(/\\$/, '').trim();
+  const check = (fixture, path) => spawnSync('bash', ['-c',
+    `FIXTURE_REL="$1"; ACCEPTANCE_MIGRATIONS_REL="$2"; ${guard}`, 'fixture-scope', fixture, path]).status;
+  assert.equal(check('test-fixtures/workflow-demo', 'test-fixtures/workflow-demo/migrations'), 0);
+  for (const [fixture, path] of [['', '/tmp/migrations'], ['test-fixtures/workflow-demo', '/tmp/migrations'],
+    ['test-fixtures/workflow-demo', 'test-fixtures/other/migrations'],
+    ['test-fixtures/workflow-demo', 'test-fixtures/workflow-demo/../migrations']]) {
+    assert.equal(check(fixture, path), 1);
+  }
+});
+
+test('corpus preflight rejects retries, missing results and fabricated summary counts', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'corpus-preflight-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const script = productImageGate.match(/node - "\$ARTIFACTS\/corpus\/preflight-results.json"[^\n]* <<'NODE'\n([\s\S]*?)\nNODE/)?.[1];
+  assert.ok(script);
+  const passed = () => ({ status: 'expected', results: [{ status: 'passed', retry: 0 }] });
+  const report = () => ({ stats: { expected: 2, unexpected: 0, skipped: 0, flaky: 0 },
+    suites: [{ specs: [{ tests: [passed(), passed()] }] }] });
+  const check = value => spawnSync(process.execPath, ['-e', script.replace(
+    "JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))", 'JSON.parse(process.argv[1])').replaceAll('process.argv[3]', 'process.argv[2]'),
+    JSON.stringify(value), '2'], { encoding: 'utf8' }).status;
+  assert.equal(check(report()), 0);
+  const mutations = [
+    value => { value.suites = []; },
+    value => { value.errors = [{ message: 'runner failed' }]; },
+    value => { value.suites[0].specs[0].tests[0].results = []; },
+    value => { value.suites[0].specs[0].tests[0].results[0].retry = 1; },
+    value => { value.suites[0].specs[0].tests[0].results.push({ status: 'passed', retry: 1 }); },
+    value => { value.stats.expected = 1; },
+  ];
+  for (const mutate of mutations) {
+    const value = report(); mutate(value); assert.notEqual(check(value), 0);
+  }
 });
