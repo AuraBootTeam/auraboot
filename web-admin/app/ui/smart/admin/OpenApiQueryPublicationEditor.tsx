@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, publicValueType, queryOutput, readOnlyQueryOutput, queryParameterItem,
   type PublicQuery, type QueryPublicationView, type QuerySource, type QuerySourceChoice, type PublicField, type PublicType } from '~/services/open-api-publications';
-import { PublicationField, type LabeledControl } from './PublicationControls';
+import { usePublicationConfirmation, PublicationField, type LabeledControl } from './PublicationControls';
 import { PublicValueSchemaEditor } from './PublicValueSchemaEditor';
 
 const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
@@ -52,7 +52,7 @@ export function OpenApiQueryPublicationEditor() {
   useEffect(() => { const listener = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', listener); return () => window.removeEventListener('beforeunload', listener);
   }, [dirty]);
-  useEffect(() => { if (confirm) { confirmationRef.current?.scrollIntoView({ block: 'nearest' }); confirmationRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [confirm]);
+  const confirmationKeyDown = usePublicationConfirmation(confirm, confirmationRef, () => setConfirm(null), busy);
   const change = (next: PublicQuery) => { setDraft(next); setDirty(true); setError(''); setNotice(''); };
   const chooseSource = async (code: string, reset = true) => { const id = ++sourceRequest.current; setSource(undefined); setSourceLoading(true); setError('');
     try { const next = await publicationRequest<QuerySource>(`/api/open-platform/query-sources/${encodeURIComponent(code)}`);
@@ -168,7 +168,7 @@ export function OpenApiQueryPublicationEditor() {
         <button type="button" className={BUTTON.replace('text-text', 'text-danger')} disabled={view?.status !== 'published' || dirty} onClick={() => setConfirm('withdraw')}>{label('withdraw', '停用查询', 'Withdraw query')}</button>
         <button type="button" className={BUTTON} onClick={() => dirty ? setConfirm('discard') : setEditing(false)}>{label('close', '关闭编辑', 'Close editor')}</button></div></div>
     </fieldset>
-    {confirm && <div ref={confirmationRef} role="group" aria-label={label('confirmation', '查询操作确认', 'Confirm query operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4">
+    {confirm && <div ref={confirmationRef} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '查询操作确认', 'Confirm query operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4">
       <p className="text-sm text-text">{confirm === 'discard' ? label('discardConfirm', '放弃未保存的修改并重新读取查询目录？', 'Discard unsaved edits and reload the query catalog?')
         : confirm === 'withdraw' ? label('withdrawConfirm', '停用会立即关闭此公共查询的外部执行和合同下载。确认停用？', 'Withdrawal immediately closes external execution and contract downloads. Withdraw?')
           : label('publishConfirm', '发布将校验来源与兼容性并固定不可变快照。确认发布查询？', 'Publishing validates source semantics and compatibility and pins an immutable snapshot. Publish?')}</p>

@@ -1,4 +1,25 @@
-import { cloneElement, useEffect, useId, useState, type ReactElement, type ChangeEventHandler, type FormEventHandler } from 'react';
+import { cloneElement, useEffect, useId, useRef, useState, type ReactElement, type ChangeEventHandler, type FormEventHandler, type RefObject, type KeyboardEvent } from 'react';
+
+export function usePublicationConfirmation(state: string | null, container: RefObject<HTMLDivElement | null>, cancel: () => void, busy: boolean) {
+  const trigger = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (state) {
+      trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      container.current?.scrollIntoView({ block: 'nearest' });
+      container.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    } else {
+      if (trigger.current?.isConnected && !trigger.current.matches(':disabled')) trigger.current.focus();
+      trigger.current = null;
+    }
+  }, [state, container]);
+  return (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape' && !busy) {
+      event.preventDefault();
+      event.stopPropagation();
+      cancel();
+    }
+  };
+}
 import { useI18n } from '~/contexts/I18nContext';
 
 type Control = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;

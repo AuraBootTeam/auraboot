@@ -110,6 +110,19 @@
               "accessible-description"
             ]
           }
+        },
+        {
+          "name": "draft-cancel-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "enter-cancel-focus-return",
+              "escape-cancel-focus-return",
+              "draft-retained-no-write"
+            ]
+          }
         }
       ]
     },
@@ -137,6 +150,19 @@
             ],
             "forwardTransitions": 4,
             "reverseTransitions": 4
+          }
+        },
+        {
+          "name": "draft-cancel-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "enter-cancel-focus-return",
+              "escape-cancel-focus-return",
+              "draft-retained-no-write"
+            ]
           }
         }
       ]
@@ -196,6 +222,19 @@
             "saveAuthority": [
               "real-create403-zero-write-retained-recovered",
               "real-update403-unchanged-retained-recovered-signed"
+            ]
+          }
+        },
+        {
+          "name": "draft-cancel-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "enter-cancel-focus-return",
+              "escape-cancel-focus-return",
+              "draft-retained-no-write"
             ]
           }
         }

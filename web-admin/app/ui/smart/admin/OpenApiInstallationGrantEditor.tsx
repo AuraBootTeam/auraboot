@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, type ResourceGrantView, type QueryGrantView,
   type InstallationResourcePolicy, type InstallationQueryPolicy, type PublicOperation } from '~/services/open-api-publications';
-import { PublicationField } from './PublicationControls';
+import { usePublicationConfirmation, PublicationField } from './PublicationControls';
 
 const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
 const BUTTON = 'rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text hover:bg-hover focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
@@ -42,7 +42,7 @@ export function OpenApiInstallationGrantEditor({ installationPid, active, scopes
   useEffect(() => { const listener = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', listener); return () => window.removeEventListener('beforeunload', listener);
   }, [dirty]);
-  useEffect(() => { if (confirmation) { confirmationRef.current?.scrollIntoView({ block: 'nearest' }); confirmationRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [confirmation]);
+  const confirmationKeyDown = usePublicationConfirmation(confirmation, confirmationRef, () => setConfirmation(null), busy);
   const select = (key: string) => { setSelection(key); setDirty(false); setError(''); setNotice(''); setConfirmation(null);
     if (key.startsWith('query:')) setQueryPolicy(structuredClone(queries.find(view => view.code === key.slice(6))?.policy ?? { readableFields: [] }));
     else setResourcePolicy(structuredClone(resources.find(view => view.code === key.slice(9))?.policy ?? emptyResource()));
@@ -104,7 +104,7 @@ export function OpenApiInstallationGrantEditor({ installationPid, active, scopes
       </div>
     </form>}
     {(!selected || denied) && error && <p role="alert">{error}</p>}
-    {confirmation && <div ref={confirmationRef} role="group" aria-label={label('confirmation', '安装授权操作确认', 'Installation authority confirmation')} className="space-y-3 rounded-control border border-border bg-canvas p-3">
+    {confirmation && <div ref={confirmationRef} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '安装授权操作确认', 'Installation authority confirmation')} className="space-y-3 rounded-control border border-border bg-canvas p-3">
       <p>{confirmation === 'revoke' ? label('revokeHelp', '确认撤销此安装的合同授权？后续调用及通知将按撤销后的权限处理。', 'Revoke this installation grant? Subsequent calls and notifications will use the revoked authority.') : label('discardHelp', '放弃未保存的授权修改并关闭？', 'Discard unsaved authority changes and close?')}</p>
       <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => confirmation === 'revoke' ? void revoke() : onClose()}>{label('confirm', '确认', 'Confirm')}</button><button type="button" className={BUTTON} disabled={busy} onClick={() => setConfirmation(null)}>{label('cancel', '取消', 'Cancel')}</button></div>
     </div>}

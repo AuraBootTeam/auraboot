@@ -53,6 +53,7 @@ const publicationEnglish: Record<string, string> = {
   "关闭编辑": "Close editor",
   "操作确认": "Confirm operation",
   "确认": "Confirm",
+  "取消": "Cancel",
   "原对象属性": "Source property",
   "对外属性名称": "Public property name",
   "草稿已保存并通过来源校验": "Draft saved and source validation passed",
@@ -98,6 +99,7 @@ const queryEnglish: Record<string, string> = {
   "下载查询类型声明": "Download query types",
   "停用查询": "Withdraw query",
   "查询操作确认": "Confirm query operation",
+  "取消": "Cancel",
   "原对象属性": "Source property",
   "对外属性名称": "Public property name",
   "执行预算": "Execution budgets",
@@ -277,6 +279,10 @@ test.describe('Dynamic resource publication journey', () => {
     await detailsField.getByLabel(publicationText("原对象属性"), { exact: true }).fill('contact_name');
     await detailsField.getByLabel(publicationText("对外属性名称"), { exact: true }).fill('contactName');
     await page.getByLabel(publicationText("创建通知"), { exact: true }).check();
+    await verifyDraftCancel(page, page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }),
+      page.getByRole('group', { name: publicationText("操作确认"), exact: true }),
+      nameField.getByLabel(publicationText("对外字段名称"), { exact: true }), 'name',
+      publicationText("确认"), publicationText("取消"), 'publication-discard-confirm', `/api/open-platform/publications/${resourceCode}`);
     await snapshot('publication-fields');
     await nameField.scrollIntoViewIfNeeded();
     await nameField.screenshot({ path: path.join(screenshotRoot, 'publication-name-field-region.png') });
@@ -766,6 +772,10 @@ test.describe('Dynamic query publication journey', () => {
       await output.screenshot({ path: path.join(screenshotRoot, `${image}.png`) });
     }
     const budgets = { maxPageSize: 7, maxRows: 35, timeoutMs: 1200, maxConcurrent: 3 };
+    await verifyDraftCancel(page, editor.getByRole('button', { name: queryText("关闭编辑"), exact: true }),
+      editor.getByRole('group', { name: queryText("查询操作确认"), exact: true }),
+      editor.getByLabel(queryText("查询执行权限"), { exact: true }), 'dop.q:execute',
+      queryText("确认"), queryText("取消"), 'query-discard-confirm', `/api/open-platform/query-publications/${publicCode}`);
     const budgetInputs = [
       ['maxPageSize', "单页上限"], ['maxRows', "结果总量上限"],
       ['timeoutMs', "查询超时（毫秒）"], ['maxConcurrent', "同时执行上限"],
@@ -918,7 +928,7 @@ const installationEnglish: Record<string, string> = {
   '添加行约束': 'Add row constraint', '约束公共字段': 'Constraint public field', '允许值（每行一个）': 'Allowed values (one per line)',
   '保存安装授权': 'Save installation authority', '授权已保存': 'Authority saved', '已有列表授权': 'List granted',
   '撤销安装授权': 'Revoke installation authority', '安装授权操作确认': 'Installation authority confirmation',
-  '确认': 'Confirm', '授权已撤销': 'Authority revoked',
+  '确认': 'Confirm', '取消': 'Cancel', '关闭授权编辑': 'Close authority editor', '授权已撤销': 'Authority revoked',
 };
 const installationText = (cn: string) => {
   if (installationLocale === 'zh-CN') return cn;
@@ -1006,6 +1016,10 @@ test.describe('Dynamic installation authority journey', () => {
     await expect(editor.getByLabel(`${installationText('读取')} secret`, { exact: true })).not.toBeChecked();
     await editor.getByRole('button', { name: installationText('添加行约束'), exact: true }).click();
     const constraint = editor.getByTestId('grant-constraint-0'); await constraint.getByLabel(installationText('约束公共字段'), { exact: true }).selectOption('zone'); await constraint.getByLabel(installationText('允许值（每行一个）'), { exact: true }).fill('A');
+    await verifyDraftCancel(page, editor.getByRole('button', { name: installationText('关闭授权编辑'), exact: true }),
+      editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true }),
+      constraint.getByLabel(installationText('允许值（每行一个）'), { exact: true }), 'A',
+      installationText('确认'), installationText('取消'), 'grant-discard-confirm', `/api/open-platform/installations/${installation.pid}`);
     await expect(editor.getByLabel(installationText('授权合同'), { exact: true })).toBeDisabled(); await snapshot('grant-resource');
     const granted = page.waitForResponse(response => response.url().endsWith(`/installations/${installation.pid}/resources/${resourceCode}`) && response.request().method() === 'PUT');
     await editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).click(); expect((await granted).status()).toBe(200);
@@ -1199,6 +1213,39 @@ async function authenticate(page: import('@playwright/test').Page, locale = 'zh-
   ]);
   await page.addInitScript(value => localStorage.setItem('locale', value), locale);
 
+}
+
+async function verifyDraftCancel(page: import('@playwright/test').Page,
+  trigger: import('@playwright/test').Locator, group: import('@playwright/test').Locator,
+  retained: import('@playwright/test').Locator, value: string, confirmName: string, cancelName: string,
+  id: string, writePrefix: string) {
+  let writes = 0;
+  const observe = (request: import('@playwright/test').Request) => {
+    if (!['GET', 'HEAD'].includes(request.method()) && new URL(request.url()).pathname.startsWith(writePrefix)) writes++;
+  };
+  page.on('request', observe);
+  await activateWithEnter(trigger);
+  await expect(group).toBeVisible();
+  await expect(group.getByRole('button', { name: confirmName, exact: true })).toBeFocused();
+  const root = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
+  await mkdir(root, { recursive: true });
+  await group.screenshot({ path: path.join(root, `${id}.png`) });
+  await activateWithEnter(group.getByRole('button', { name: cancelName, exact: true }));
+  await expect(group).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(retained).toHaveValue(value);
+  await activateWithEnter(trigger);
+  await expect(group.getByRole('button', { name: confirmName, exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(group).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(retained).toHaveValue(value);
+  expect(writes).toBe(0);
+  page.off('request', observe);
+  await test.info().attach('draft-cancel-recovery', { contentType: 'application/json', body: JSON.stringify({
+    schemaVersion: 1, driver: 'native-keyboard', writes: 0,
+    cases: ['enter-cancel-focus-return', 'escape-cancel-focus-return', 'draft-retained-no-write'],
+  }) });
 }
 
 async function verifyEditorTabOrder(page: import('@playwright/test').Page,

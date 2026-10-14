@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PublicationField, type LabeledControl } from './PublicationControls';
+import { usePublicationConfirmation, PublicationField, type LabeledControl } from './PublicationControls';
 import { Link } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, identityField, sourceField, publicValueType, type PublicationView,
@@ -39,7 +39,7 @@ export function OpenApiPublicationEditor() {
   const [denied, setDenied] = useState(false);
   const [confirm, setConfirm] = useState<'publish' | 'withdraw' | 'discard' | null>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (confirm) { confirmationRef.current?.scrollIntoView({ block: 'nearest' }); confirmationRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [confirm]);
+  const confirmationKeyDown = usePublicationConfirmation(confirm, confirmationRef, () => setConfirm(null), busy);
   useEffect(() => {
     if (sourceValidationAttempts > 0) sourceForm.current?.querySelector<HTMLElement>('input:invalid, select:invalid, textarea:invalid')?.focus();
   }, [sourceValidationAttempts]);
@@ -225,7 +225,7 @@ export function OpenApiPublicationEditor() {
           <button type="button" className={BUTTON.replace('text-text', 'text-danger')} disabled={view?.status !== 'published' || dirty} onClick={() => setConfirm('withdraw')}>{label('withdraw', '停用资源', 'Withdraw resource')}</button>
           <button type="button" className={BUTTON} onClick={() => dirty ? setConfirm('discard') : setEditing(false)}>{label('close', '关闭编辑', 'Close editor')}</button></div></div>
       </fieldset>
-      {confirm && <div ref={confirmationRef} role="group" aria-label={label('confirmation', '操作确认', 'Confirm operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4"><p className="text-sm text-text">{confirm === 'withdraw'
+      {confirm && <div ref={confirmationRef} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '操作确认', 'Confirm operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4"><p className="text-sm text-text">{confirm === 'withdraw'
         ? label('withdrawConfirm', '停用将立即关闭此资源的外部访问、通知授权和合同下载。确认停用？', 'Withdrawal closes external access, event authority and downloads. Withdraw this resource?')
         : confirm === 'discard' ? label('discardConfirm', '放弃尚未保存的修改并关闭编辑？', 'Discard unsaved edits and close the editor?')
           : label('publishConfirm', '发布会创建不可变快照；服务端将检查来源和与当前版本的兼容性。确认发布？', 'Publishing creates an immutable snapshot. The server checks source validity and compatibility. Publish?')}</p>
