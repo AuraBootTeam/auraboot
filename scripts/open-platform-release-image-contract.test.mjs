@@ -165,6 +165,31 @@ assert.match(sampler, /pg_blocking_pids/);
 assert.doesNotMatch(sampler, /SELECT \*|usename|query,|query AS|client_addr/);
 console.log('open-platform release-image contract: PASS');
 
+// Run the actual freeze entry with only immutable references available. A lost
+// mutable alias must not break the default profile, and a tag override must fail.
+const pinDirectory=fs.mkdtempSync(path.join(os.tmpdir(),'open-platform-pins-'));
+try {
+  fs.writeFileSync(path.join(pinDirectory,'docker'),`#!/usr/bin/env python3
+import json,sys
+ref=sys.argv[-1]
+if '@sha256:' not in ref: sys.exit(9)
+print(json.dumps([{'Id':'sha256:'+'a'*64,'RepoDigests':[ref]}]))
+`,{mode:0o755});
+  const defaults=gate.slice(gate.indexOf('# Exact amd64 identities'),gate.indexOf('PULL_TIMEOUT='));
+  const freeze=gate.slice(gate.indexOf('python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py"'),gate.indexOf('base_ref() {'));
+  for(const override of ['', 'flyway/flyway:12.8.1']) {
+    const output=path.join(pinDirectory,override?'wrong.json':'pins.json');
+    const result=spawnSync('bash',['-c',`set -Eeuo pipefail\nfatal() { exit 2; }\n${defaults}\n${freeze}`],{encoding:'utf8',env:{...process.env,PATH:`${pinDirectory}:${process.env.PATH}`,SCRIPT_DIR:new URL('.',import.meta.url).pathname,BASE_IMAGE_MANIFEST:output,AURA_CI_RELEASE_FLYWAY_IMAGE:override,AURA_CI_K6_IMAGE:'',AURA_CI_NODE_IMAGE:'',AURA_CI_RELEASE_BASE_IMAGE_TRANSPORTS:'{}'}});
+    assert.equal(result.status,override?2:0,result.stderr);
+    if(!override) {
+      const images=JSON.parse(fs.readFileSync(output,'utf8')).images;
+      assert.equal(images.length,8);
+      for(const image of images)assert.match(image.reference,/^docker\.io\/.+@sha256:[0-9a-f]{64}$/);
+    }
+  }
+} finally {fs.rmSync(pinDirectory,{recursive:true,force:true});}
+console.log('open-platform default digest pins without mutable aliases: 2 hermetic cases PASS');
+
 // Execute the production expected-red receipt block without a Docker lifecycle.
 const basePull = gate.slice(gate.indexOf("while IFS=$'\\t' read -r base_image expected_image_id; do"),
   gate.indexOf('PGVECTOR_IMAGE="$(base_ref'));

@@ -58,13 +58,17 @@ PG="open-platform-$SAFE_JOB-pg"
 REDIS="open-platform-$SAFE_JOB-redis"
 APP="open-platform-$SAFE_JOB-app"
 IMAGE="auraboot-platform-open-api:ci-${REF_SHA:0:12}"
-FLYWAY_IMAGE="${AURA_CI_RELEASE_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
-K6_IMAGE="${AURA_CI_K6_IMAGE:-grafana/k6:1.3.0}"
-SDK_NODE_IMAGE="${AURA_CI_NODE_IMAGE:-node:22-alpine}"
+# Exact amd64 identities from the admitted qualification baseline. Prewarmed
+# mutable aliases can disappear independently of the retained digest references.
+PGVECTOR_SOURCE="docker.io/pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a"
+REDIS_SOURCE="docker.io/library/redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+FLYWAY_IMAGE="${AURA_CI_RELEASE_FLYWAY_IMAGE:-docker.io/flyway/flyway@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb}"
+K6_IMAGE="${AURA_CI_K6_IMAGE:-docker.io/grafana/k6@sha256:3ddc8b1a33a2c3d8edc6e99b6a762ae36cba08788463458f5e6a7703e14eb77d}"
+SDK_NODE_IMAGE="${AURA_CI_NODE_IMAGE:-docker.io/library/node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402}"
 # Dockerfile frontend 1.20.0; digest verified against Docker Hub official tag metadata.
 DOCKERFILE_FRONTEND_SOURCE="docker.io/docker/dockerfile@sha256:26147acbda4f14c5add9946e2fd2ed543fc402884fd75146bd342a7f6271dc1d"
-BUILD_JDK_IMAGE="eclipse-temurin:21-jdk"
-RUNTIME_JRE_IMAGE="eclipse-temurin:21-jre-alpine"
+BUILD_JDK_IMAGE="docker.io/library/eclipse-temurin@sha256:3e3c176ffed168beb42c607be9bc1639b466cf00261a0fb04425562c9d0c5c2b"
+RUNTIME_JRE_IMAGE="docker.io/library/eclipse-temurin@sha256:51ab5e3302e7141ce665ca3ea85e8b5cd648eafbc3c0c90dd79d6537684e4555"
 PULL_TIMEOUT="${AURA_CI_RELEASE_PULL_TIMEOUT:-300}"
 GRADLE_VERSION="8.14.5"
 GRADLE_DISTRIBUTION_SHA256="6f74b601422d6d6fc4e1f9a1ab6522f642c2fdcbc15ae33ebd30ba3d7198e854"
@@ -114,7 +118,7 @@ BASE_IMAGE_MANIFEST="$ARTIFACTS/base-images.json"
 # configured source repository; public mirror aliases are never source authority.
 # Explicit transport mappings retain that source digest and are recorded in the manifest.
 python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py" "$BASE_IMAGE_MANIFEST" \
-  pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$SDK_NODE_IMAGE" \
+  "$PGVECTOR_SOURCE" "$REDIS_SOURCE" "$FLYWAY_IMAGE" "$K6_IMAGE" "$SDK_NODE_IMAGE" \
   "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" "$DOCKERFILE_FRONTEND_SOURCE" \
   || fatal "unable to freeze prewarmed base image identities"
 base_ref() {
@@ -129,8 +133,8 @@ while IFS=$'\t' read -r base_image expected_image_id; do
   [[ "$(docker image inspect "$base_image" --format '{{.Id}}')" == "$expected_image_id" ]] \
     || fatal "pulled image identity differs from frozen manifest: $base_image"
 done <<< "$PINNED_BASES"
-PGVECTOR_IMAGE="$(base_ref pgvector/pgvector:pg16)"
-REDIS_IMAGE="$(base_ref redis:7.4-alpine)"
+PGVECTOR_IMAGE="$(base_ref "$PGVECTOR_SOURCE")"
+REDIS_IMAGE="$(base_ref "$REDIS_SOURCE")"
 FLYWAY_IMAGE="$(base_ref "$FLYWAY_IMAGE")"
 K6_IMAGE="$(base_ref "$K6_IMAGE")"
 SDK_NODE_IMAGE="$(base_ref "$SDK_NODE_IMAGE")"
