@@ -15,6 +15,7 @@
 
 import dayjs from 'dayjs';
 import { projectRows } from './row-projection';
+import { selectRows } from './row-selection';
 
 // Decimal strings retain precision beyond JavaScript's safe integer range.
 type ExactDecimal = { units: bigint; scale: number };
@@ -570,6 +571,7 @@ export const businessFunctions = {
   SUMIF,
   PLUCK,
   PROJECT_ROWS: projectRows,
+  SELECT_ROWS: selectRows,
   UNIQUE,
   FIRST,
   LAST,

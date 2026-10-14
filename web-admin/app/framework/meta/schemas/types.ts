@@ -1,3 +1,4 @@
+import type { CardRowSelection } from '../runtime/expression/row-selection';
 import type { RowProjection } from '../runtime/expression/row-projection';
 /**
  * 统一 DSL Schema 类型定义
@@ -49,6 +50,8 @@ export interface BlockConfig {
   fields?: FieldConfig[];
   /** Optional card-grid inner field layout; existing cards retain stacked fields. */
   fieldsLayout?: LayoutConfig;
+  /** Explicit card-row selection; eligibility derives from current exact positive facts. */
+  rowSelection?: CardRowSelection;
   /** Fit card-grid tracks to the available width, collapsing unused tracks. */
   autoFitColumns?: boolean;
   buttons?: ButtonConfig[];

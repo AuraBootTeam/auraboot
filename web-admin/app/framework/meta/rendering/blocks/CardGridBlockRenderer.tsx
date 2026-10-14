@@ -22,6 +22,8 @@
  * }
  */
 
+import { initializeSelectedRows, indexSelectionRows, positiveRowValue, type RowSelectionRule } from '../../runtime/expression/row-selection';
+import { readOwnPath } from '../../runtime/expression/row-projection';
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import type { BlockConfig, CardImageViewport, FieldConfig, LayoutConfig } from '~/framework/meta/schemas/types';
@@ -99,6 +101,9 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     : undefined;
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
+  const rowSelection = cfg.rowSelection;
+  if (rowSelection && !formField) throw new Error('Card row selection requires a form array');
+  const selectionRule: RowSelectionRule | undefined = rowSelection ? {identityField:readOwnPath(rowSelection,'identityField') as string,selectedField:readOwnPath(rowSelection,'selectedField') as string,positiveField:readOwnPath(rowSelection,'positiveField') as string} : undefined;
   const cardFields: FieldConfig[] = Array.isArray(cfg.fields) ? cfg.fields : [];
   const fieldsLayout: LayoutConfig | undefined = cfg.fieldsLayout?.type === 'grid' ? cfg.fieldsLayout : undefined;
   let nextColumn = 0;
@@ -171,13 +176,21 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       })()
     : undefined;
   const formRows = formField ? stateManager?.getFieldValue(scopeId, formField) : undefined;
-  const rows = Array.isArray(formRows) ? formRows : normalizeRows(rawData);
+  const freshRows = normalizeRows(rawData);
+  const initialRows = rowSelection ? initializeSelectedRows(freshRows,rowSelection) : freshRows;
+  const rows = Array.isArray(formRows) ? formRows : initialRows;
+  const currentSelectionRows = selectionRule ? indexSelectionRows(freshRows,selectionRule) : undefined;
+  if (selectionRule) {
+    for (const row of indexSelectionRows(rows,selectionRule).values()) {
+      if (typeof readOwnPath(row,selectionRule.selectedField)!=='boolean') throw new Error('Expected explicit boolean row selection');
+    }
+  }
   useEffect(() => {
     if (formField && formRows === undefined && dataSourceState?.data !== undefined
         && !dataSourceState.loading && !dataSourceState.error) {
-      stateManager.updateField(scopeId, formField, normalizeRows(rawData));
+      stateManager.updateField(scopeId, formField, rowSelection ? initializeSelectedRows(normalizeRows(rawData),rowSelection) : normalizeRows(rawData));
     }
-  }, [formField, formRows, dataSourceState, rawData, scopeId, stateManager]);
+  }, [formField, formRows, dataSourceState, rawData, scopeId, stateManager, rowSelection]);
 
   // ── Error state ────────────────────────────────────────────────────────────
   if (dataSourceState?.error) {
@@ -231,8 +244,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     );
   }
 
+  const selectionHint = selectionRule && rowSelection.emptyText && !rows.some(row=>readOwnPath(row,selectionRule.selectedField)===true)
+    ? <p role="status" className="text-text-2 col-span-full text-sm">{getLocalizedText(rowSelection.emptyText,locale,t)}</p> : null;
   const renderCard = (row: any, idx: number) => {
-        const rowKey = row.pid || String(idx);
+        const rowKey = selectionRule ? readOwnPath(row,selectionRule.identityField) as string : row.pid || String(idx);
         const title = getLocalizedText(row[titleField], locale, t);
         const description = descriptionField ? getLocalizedText(row[descriptionField], locale, t) : undefined;
         const imageUrl = imageField && row[imageField] ? String(row[imageField]) : undefined;
@@ -248,17 +263,20 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 : undefined
               : getLocalizedText(rawBadge, locale, t);
 
+        const currentSelectionRow = selectionRule ? currentSelectionRows?.get(readOwnPath(row,selectionRule.identityField) as string) : undefined;
+        const rowSelectable = !selectionRule || Boolean(currentSelectionRow && positiveRowValue(readOwnPath(currentSelectionRow,selectionRule.positiveField)));
+        const rowSelected = selectionRule ? readOwnPath(row,selectionRule.selectedField) === true : false;
         const renderField = (field: FieldConfig) => (
           <FieldRenderer
             key={field.field}
             runtime={runtime}
             field={{ ...field,
               field: `${formField || block.id}.${idx}.${field.field}`,
-              readOnly: !formField || Boolean(field.valueWhen) || field.readOnly,
+              readOnly: !formField || !rowSelectable || field.field===selectionRule?.positiveField || Boolean(field.valueWhen) || field.readOnly,
             }}
-            value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, { ...runtime.getContext(), row } as any) : row[field.field]}
+            value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, { ...runtime.getContext(), row } as any) : (currentSelectionRow && (field.readOnly || field.field===selectionRule?.positiveField) ? readOwnPath(currentSelectionRow,field.field) : row[field.field])}
             onChange={(value) => {
-              if (!formField || field.readOnly || field.valueWhen) return;
+              if (!formField || !rowSelectable || field.field===selectionRule?.positiveField || field.readOnly || field.valueWhen) return;
               stateManager.updateField(scopeId, formField,
                 rows.map((current, index) => index === idx ? { ...current, [field.field]: value } : current));
             }}
@@ -270,6 +288,17 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             data-testid="card-grid-card"
             className="rounded-card border-border bg-panel flex flex-col border p-4 shadow-sm"
           >
+            {selectionRule && (
+              <label className="mb-3 flex items-center gap-2 text-sm">
+                <input type="checkbox" aria-label={`${getLocalizedText(rowSelection.label || 'Select',locale,t)} ${title}`}
+                  checked={rowSelected} disabled={!rowSelectable && !rowSelected}
+                  onChange={event=>{
+                    if (!formField || (event.target.checked && !rowSelectable)) return;
+                    stateManager.updateField(scopeId,formField,rows.map((current,index)=>index===idx ? {...current,[selectionRule.selectedField]:event.target.checked} : current));
+                  }}/>
+                {getLocalizedText(rowSelection.label || 'Select',locale,t)}
+              </label>
+            )}
             {/* Category tag */}
             {category && (
               <span className="text-text-2 mb-2 text-xs font-medium">{category}</span>
@@ -386,6 +415,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     });
     return (
       <div data-testid="card-grid-block" className="space-y-6">
+        {selectionHint}
         {Array.from(groups.entries()).map(([key, group], index) => (
           <section key={key} data-testid="card-grid-group"
             aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
@@ -400,6 +430,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     );
   }
   return <div data-testid="card-grid-block" className={`grid gap-4 ${columnsClass}`} style={columnsStyle}>
+    {selectionHint}
     {rows.map(renderCard)}
   </div>;
 };
