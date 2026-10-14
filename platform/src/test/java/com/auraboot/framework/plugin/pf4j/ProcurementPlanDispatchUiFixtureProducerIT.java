@@ -206,7 +206,7 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
                 }
                 stage.put("categories", categories);
                 var suppliers = new ArrayList<Map<String, String>>();
-                int supplierCount = name.equals("draftPlan") ? 2 : 1;
+                int supplierCount = stageSupplierCount(name);
                 for (int supplierIndex = 1; supplierIndex <= supplierCount; supplierIndex++) {
                     String supplier = initialize("pr_supplier_common", Map.of("pr_supplier_code", stage.get("namespace") + "_" + supplierIndex,
                             "pr_supplier_name", "Synthetic " + name + " supplier " + supplierIndex,
@@ -310,6 +310,11 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
             writeArtifact("plan-dispatch-ui-producer-stage.json", Map.of("stage", activeStage, "completed", activeStage.equals("native-fixture-completed"), "browserExecuted", 0,
                     "receiptExists", Files.exists(caseEvidence.resolve("plan-dispatch-ui-fixture-receipt.json")), "publicActionCount", publicActions.size()));
         }
+    }
+
+    static int stageSupplierCount(String stage) {
+        assertTrue(STAGES.contains(stage));
+        return List.of("draftPlan", "classificationHappy").contains(stage) ? 2 : 1;
     }
 
     static List<Object> stageRow(String stage, String head, String entry) {

@@ -26,6 +26,8 @@ class ProcurementPlanDispatchUiFixtureContractTest {
         for (String stage : stages) {
             var row = ProcurementPlanDispatchUiFixtureProducerIT.stageRow(stage, "202", "11");
             assertEquals(18, row.size()); assertEquals("202", row.get(0)); assertEquals("11", row.get(2));
+            assertEquals(List.of("draftPlan", "classificationHappy").contains(stage) ? 2 : 1,
+                    ProcurementPlanDispatchUiFixtureProducerIT.stageSupplierCount(stage));
             boolean large = List.of("allocatedFacts", "draftPlan").contains(stage);
             assertEquals(large ? "1500" : "100", row.get(7)); assertEquals(large ? "1000" : "100", row.get(11));
             assertEquals(row.get(1), ProcurementPlanDispatchUiFixtureProducerIT.stageRow(stage, "202", "12").get(1));
