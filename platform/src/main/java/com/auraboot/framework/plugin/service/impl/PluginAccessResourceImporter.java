@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.entity.PluginResource;
+import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -69,6 +70,13 @@ final class PluginAccessResourceImporter {
         if (manifest.getRoles() == null || manifest.getRoles().isEmpty()) {
             return;
         }
+        // Strict fail-closed: after model publication every declared role permission must
+        // resolve and bind. Every role is still attempted so one broken declaration does
+        // not hide the others, then the import fails with the full list (the caller's
+        // import transaction rolls the plugin back). The previous per-role warn+skip here
+        // mirrored updateRolePermissions' lenience and let bad compositions silently
+        // degrade roles until they surfaced as missing-access findings rounds later.
+        List<String> failures = new ArrayList<>();
         for (RoleDefinitionDTO role : manifest.getRoles()) {
             if (role == null || !role.isValid()) {
                 continue;
@@ -76,11 +84,14 @@ final class PluginAccessResourceImporter {
             try {
                 resourceImporter.reconcileRolePermissions(role, tenantId);
             } catch (Exception e) {
-                // Per-role best-effort, mirroring updateRolePermissions: one broken role
-                // must not abort the import; the warning keeps the gap visible in logs.
-                log.warn("Role permission reconciliation failed for role {}: {}",
-                        logSafe(role.getCode()), logSafe(e.getMessage()), e);
+                failures.add("role '" + role.getCode() + "': " + e.getMessage());
             }
+        }
+        if (!failures.isEmpty()) {
+            throw new PluginException("Plugin '" + manifest.getPluginId()
+                    + "' declared role permissions failed post-publication reconciliation; the import "
+                    + "was rolled back (" + failures.size() + " role(s)):\n - "
+                    + String.join("\n - ", failures));
         }
     }
 
@@ -233,6 +244,15 @@ final class PluginAccessResourceImporter {
                     result.addCreatedResource(ResourceType.MENU, resource.getResourcePid());
                 }
             }
+        }
+
+        // menus.json is the plugin's complete menu surface: rows this plugin family
+        // previously imported but no longer declares (renamed/slimmed) are pruned so
+        // they cannot linger as dead sidebar links.
+        int prunedStaleMenus = resourceImporter.pruneStaleMenus(pluginPid, importId, tenantId,
+                sorted.stream().filter(MenuDefinitionDTO::isValid).map(MenuDefinitionDTO::getCode).toList());
+        for (int i = 0; i < prunedStaleMenus; i++) {
+            result.incrementResourceCount(ResourceType.MENU, ResourceAction.DELETE);
         }
 
         // Auto-generate menu i18n records from name:zh-CN / name:en fields

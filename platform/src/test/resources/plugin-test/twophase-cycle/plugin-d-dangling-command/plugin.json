@@ -1,0 +1,44 @@
+{
+  "pluginId": "com.test.twophase.plugin-d-dangling-command",
+  "namespace": "tpd",
+  "version": "1.0.0",
+  "displayName": "Two-Phase Cycle Plugin D (dangling command)",
+  "description": "Fixture: command referencing tp_nonexistent_model which NO plugin provides. Deferral still lets it import; the closing sweep must flag it (command->model is not governed by role-permission fail-closed).",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "fields": [
+    {
+      "code": "tpd_name",
+      "displayName": "Name",
+      "dataType": "string"
+    }
+  ],
+  "models": [
+    {
+      "code": "tp_d_model",
+      "displayName": "TP D Model",
+      "modelType": "entity"
+    }
+  ],
+  "modelFieldBindings": [
+    {
+      "modelCode": "tp_d_model",
+      "fieldCode": "tpd_name",
+      "sequence": 10
+    }
+  ],
+  "commands": [
+    {
+      "code": "tpd:create",
+      "displayName": "Create D",
+      "modelCode": "tp_d_model",
+      "type": "custom"
+    },
+    {
+      "code": "tpd:dangling",
+      "displayName": "Dangling D",
+      "modelCode": "tp_nonexistent_model",
+      "type": "custom"
+    }
+  ]
+}

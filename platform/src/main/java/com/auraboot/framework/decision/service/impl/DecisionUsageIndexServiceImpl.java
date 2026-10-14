@@ -35,7 +35,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -68,15 +73,64 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
     // Product-owned usage sources (SLA_RULE, WORKFLOW_PROCESS, ...) live behind
     // plugin boundaries; the registry is absent in core-only runtimes.
     private final ObjectProvider<com.auraboot.framework.plugin.pf4j.DecisionUsageSourceRegistry>
             usageSources;
 
     @Override
-    @Transactional
     public DecisionUsageIndexRebuildDTO rebuild() {
         Long tenantId = requireTenant();
+        // The projection swap runs in its own transaction, isolated from the
+        // caller's: rebuild() is invoked inside larger transactions (model-publish
+        // governance during a plugin import), and its statements must not depend
+        // on — or be visible prematurely to — that caller.
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        DecisionUsageIndexRebuildDTO summary = requiresNew.execute(status -> rebuildInTransaction(tenantId));
+
+        var registry = usageSources.getIfAvailable();
+        if (registry != null) {
+            pullProductSourcesAfterCallerCommits(registry);
+        }
+        return summary;
+    }
+
+    /**
+     * The pull executes raw product SQL and must never touch the caller's
+     * transaction: on PostgreSQL any SQL error there aborts every subsequent
+     * statement of it, which used to kill unrelated plugin imports whenever a
+     * product module's tables were absent. Running it after commit is not enough
+     * on its own either — at that point the caller's connection is still bound to
+     * the thread, so its statements would either ride that un-committable
+     * connection (writes lost at pool return) or collide with the bound resource
+     * on a new transaction. A separate thread owns neither, and the projection is
+     * additionally maintained push-side by the products themselves.
+     */
+    private void pullProductSourcesAfterCallerCommits(
+            com.auraboot.framework.plugin.pf4j.DecisionUsageSourceRegistry registry) {
+        MetaContext.Snapshot snapshot = MetaContext.snapshot();
+        Runnable pull = () -> MetaContext.runWithSnapshot(snapshot, () -> {
+            try {
+                registry.republishAll();
+            } catch (RuntimeException error) {
+                log.warn("Product usage-source pull failed: {}", error.getMessage(), error);
+            }
+        });
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    Thread.startVirtualThread(pull);
+                }
+            });
+        } else {
+            pull.run();
+        }
+    }
+
+    private DecisionUsageIndexRebuildDTO rebuildInTransaction(Long tenantId) {
         usageRefMapper.deleteByTenant(tenantId);
 
         List<DecisionUsageRefEntity> refs = new ArrayList<>();
@@ -85,15 +139,7 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         refs.addAll(scanEventPolicies(tenantId));
         refs.addAll(scanNamedQueries(tenantId));
         refs.addAll(scanPermissionPolicies(tenantId));
-        DecisionUsageIndexRebuildDTO summary = insertRefs(tenantId, refs);
-
-        // Product-owned sources re-publish themselves through the accessor port;
-        // without this pull a rebuild would drop every product-side reference.
-        var registry = usageSources.getIfAvailable();
-        if (registry != null) {
-            registry.republishAll();
-        }
-        return summary;
+        return insertRefs(tenantId, refs);
     }
 
     @Override

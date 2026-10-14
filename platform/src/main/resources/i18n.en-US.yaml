@@ -1038,6 +1038,13 @@ common:
   modified_this_week: Modified This Week
   preset_views: Preset Views
   view_saved: Saved to current view
+  saved_view_default: Default
+  saved_view_default_view: Default View
+  saved_view_action_set_default: Set as default
+  saved_view_action_default: Default View
+  saved_view_scope_personal: Mine
+  saved_view_scope_team: Team
+  saved_view_scope_global: Everyone
   saved_view_overlay_rebased_title: Personal view adapted to the new page
   saved_view_overlay_rebased_description: Field and action identities remain compatible; your settings were replayed automatically.
   saved_view_overlay_stale_title: Personal view safely degraded

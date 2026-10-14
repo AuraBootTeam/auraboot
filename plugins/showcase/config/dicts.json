@@ -26,7 +26,8 @@
         "status": "enabled",
         "extension": {
           "color": "green"
-        }
+        },
+        "label:en": "Active"
       },
       {
         "value": "review",
@@ -37,7 +38,8 @@
         "status": "enabled",
         "extension": {
           "color": "blue"
-        }
+        },
+        "label:en": "Under Review"
       },
       {
         "value": "archived",
@@ -48,7 +50,8 @@
         "status": "enabled",
         "extension": {
           "color": "gray"
-        }
+        },
+        "label:en": "Archived"
       }
     ]
   },
@@ -67,7 +70,8 @@
         "status": "enabled",
         "extension": {
           "color": "blue"
-        }
+        },
+        "label:en": "Low"
       },
       {
         "value": "medium",
@@ -78,7 +82,8 @@
         "status": "enabled",
         "extension": {
           "color": "amber"
-        }
+        },
+        "label:en": "Medium"
       },
       {
         "value": "high",
@@ -89,7 +94,8 @@
         "status": "enabled",
         "extension": {
           "color": "red"
-        }
+        },
+        "label:en": "High"
       },
       {
         "value": "critical",
@@ -100,7 +106,8 @@
         "status": "enabled",
         "extension": {
           "color": "red"
-        }
+        },
+        "label:en": "Urgent"
       }
     ]
   },
@@ -115,35 +122,40 @@
         "label": "Electronics",
         "label:zh-CN": "电子",
         "sortNo": 10,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Electronics"
       },
       {
         "value": "software",
         "label": "Software",
         "label:zh-CN": "软件",
         "sortNo": 20,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Software"
       },
       {
         "value": "hardware",
         "label": "Hardware",
         "label:zh-CN": "硬件",
         "sortNo": 30,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Hardware"
       },
       {
         "value": "service",
         "label": "Service",
         "label:zh-CN": "服务",
         "sortNo": 40,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Services"
       },
       {
         "value": "other",
         "label": "Other",
         "label:zh-CN": "其他",
         "sortNo": 50,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Other"
       }
     ]
   },
@@ -158,7 +170,8 @@
         "label": "Electronics",
         "label:zh-CN": "电子产品",
         "sortNo": 10,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Electronics"
       },
       {
         "value": "electronics_phone",
@@ -166,7 +179,8 @@
         "label:zh-CN": "手机",
         "parentValue": "electronics",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Mobile Phones"
       },
       {
         "value": "electronics_phone_smart",
@@ -174,7 +188,8 @@
         "label:zh-CN": "智能手机",
         "parentValue": "electronics_phone",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Smartphones"
       },
       {
         "value": "electronics_phone_feature",
@@ -182,7 +197,8 @@
         "label:zh-CN": "功能机",
         "parentValue": "electronics_phone",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Feature Phones"
       },
       {
         "value": "electronics_computer",
@@ -190,7 +206,8 @@
         "label:zh-CN": "电脑",
         "parentValue": "electronics",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Computers"
       },
       {
         "value": "electronics_computer_laptop",
@@ -198,7 +215,8 @@
         "label:zh-CN": "笔记本",
         "parentValue": "electronics_computer",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Laptops"
       },
       {
         "value": "electronics_computer_desktop",
@@ -206,7 +224,8 @@
         "label:zh-CN": "台式机",
         "parentValue": "electronics_computer",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Desktops"
       },
       {
         "value": "electronics_tablet",
@@ -214,7 +233,8 @@
         "label:zh-CN": "平板",
         "parentValue": "electronics",
         "sortNo": 3,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Tablets"
       },
       {
         "value": "electronics_tablet_ipad",
@@ -222,7 +242,8 @@
         "label:zh-CN": "iPad",
         "parentValue": "electronics_tablet",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "iPad"
       },
       {
         "value": "electronics_tablet_android",
@@ -230,14 +251,16 @@
         "label:zh-CN": "安卓平板",
         "parentValue": "electronics_tablet",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Android Tablets"
       },
       {
         "value": "software",
         "label": "Software",
         "label:zh-CN": "软件",
         "sortNo": 20,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Software"
       },
       {
         "value": "software_saas",
@@ -245,7 +268,8 @@
         "label:zh-CN": "SaaS",
         "parentValue": "software",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "SaaS"
       },
       {
         "value": "software_saas_crm",
@@ -253,7 +277,8 @@
         "label:zh-CN": "CRM",
         "parentValue": "software_saas",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "CRM"
       },
       {
         "value": "software_saas_erp",
@@ -261,7 +286,8 @@
         "label:zh-CN": "ERP",
         "parentValue": "software_saas",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "ERP"
       },
       {
         "value": "software_onprem",
@@ -269,7 +295,8 @@
         "label:zh-CN": "本地部署",
         "parentValue": "software",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "On-premise"
       },
       {
         "value": "software_onprem_db",
@@ -277,7 +304,8 @@
         "label:zh-CN": "数据库",
         "parentValue": "software_onprem",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Database"
       },
       {
         "value": "software_onprem_middleware",
@@ -285,7 +313,8 @@
         "label:zh-CN": "中间件",
         "parentValue": "software_onprem",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Middleware"
       },
       {
         "value": "software_opensource",
@@ -293,7 +322,8 @@
         "label:zh-CN": "开源",
         "parentValue": "software",
         "sortNo": 3,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Open Source"
       },
       {
         "value": "software_opensource_framework",
@@ -301,7 +331,8 @@
         "label:zh-CN": "框架",
         "parentValue": "software_opensource",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Framework"
       },
       {
         "value": "software_opensource_tool",
@@ -309,14 +340,16 @@
         "label:zh-CN": "工具",
         "parentValue": "software_opensource",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Tools"
       },
       {
         "value": "service",
         "label": "Service",
         "label:zh-CN": "服务",
         "sortNo": 30,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Services"
       },
       {
         "value": "service_consulting",
@@ -324,7 +357,8 @@
         "label:zh-CN": "咨询",
         "parentValue": "service",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Consulting"
       },
       {
         "value": "service_consulting_strategy",
@@ -332,7 +366,8 @@
         "label:zh-CN": "战略咨询",
         "parentValue": "service_consulting",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Strategy Consulting"
       },
       {
         "value": "service_consulting_tech",
@@ -340,7 +375,8 @@
         "label:zh-CN": "技术咨询",
         "parentValue": "service_consulting",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Technical Consulting"
       },
       {
         "value": "service_ops",
@@ -348,7 +384,8 @@
         "label:zh-CN": "运维",
         "parentValue": "service",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Operations"
       },
       {
         "value": "service_ops_cloud",
@@ -356,7 +393,8 @@
         "label:zh-CN": "云运维",
         "parentValue": "service_ops",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Cloud Operations"
       },
       {
         "value": "service_ops_infra",
@@ -364,7 +402,8 @@
         "label:zh-CN": "基础设施",
         "parentValue": "service_ops",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Infrastructure"
       },
       {
         "value": "service_training",
@@ -372,7 +411,8 @@
         "label:zh-CN": "培训",
         "parentValue": "service",
         "sortNo": 3,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Training"
       },
       {
         "value": "service_training_online",
@@ -380,7 +420,8 @@
         "label:zh-CN": "线上培训",
         "parentValue": "service_training",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Online Training"
       },
       {
         "value": "service_training_offline",
@@ -388,7 +429,8 @@
         "label:zh-CN": "线下培训",
         "parentValue": "service_training",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "On-site Training"
       }
     ]
   },
@@ -403,7 +445,8 @@
         "label": "Technology",
         "label:zh-CN": "技术部",
         "sortNo": 10,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Engineering"
       },
       {
         "value": "tech_frontend",
@@ -411,7 +454,8 @@
         "label:zh-CN": "前端组",
         "parentValue": "tech",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Frontend Team"
       },
       {
         "value": "tech_backend",
@@ -419,7 +463,8 @@
         "label:zh-CN": "后端组",
         "parentValue": "tech",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Backend Team"
       },
       {
         "value": "tech_qa",
@@ -427,14 +472,16 @@
         "label:zh-CN": "测试组",
         "parentValue": "tech",
         "sortNo": 3,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "QA Team"
       },
       {
         "value": "product",
         "label": "Product",
         "label:zh-CN": "产品部",
         "sortNo": 20,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Product Team"
       },
       {
         "value": "product_design",
@@ -442,7 +489,8 @@
         "label:zh-CN": "设计组",
         "parentValue": "product",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Design Team"
       },
       {
         "value": "product_pm",
@@ -450,14 +498,16 @@
         "label:zh-CN": "产品组",
         "parentValue": "product",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Product Team"
       },
       {
         "value": "ops",
         "label": "Operations",
         "label:zh-CN": "运营部",
         "sortNo": 30,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Operations Team"
       },
       {
         "value": "ops_marketing",
@@ -465,7 +515,8 @@
         "label:zh-CN": "市场组",
         "parentValue": "ops",
         "sortNo": 1,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Marketing Team"
       },
       {
         "value": "ops_cs",
@@ -473,7 +524,8 @@
         "label:zh-CN": "客服组",
         "parentValue": "ops",
         "sortNo": 2,
-        "status": "enabled"
+        "status": "enabled",
+        "label:en": "Customer Service Team"
       }
     ]
   }

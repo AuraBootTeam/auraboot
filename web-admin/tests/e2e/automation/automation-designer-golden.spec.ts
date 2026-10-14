@@ -31,7 +31,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { Client } from 'pg';
-import { uniqueId } from '../helpers';
+import { executeCommandViaApi, uniqueId } from '../helpers';
 import { BACKEND_URL, BASE_URL, PG_CONN } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
@@ -651,7 +651,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // The errored node is auto-selected and its required field renders a
     // field-level error in the property panel — NOT just a generic toast.
     const panel = page.locator(`[data-testid="prop-field-modelCode"]`);
-    await expect(panel.getByText('This field is required')).toBeVisible({ timeout: 5_000 });
+    await expect(panel.getByText(/This field is required|此字段必填/)).toBeVisible({ timeout: 5_000 });
     // The toolbar surfaces a structured error count (not a transient toast).
     await expect(page.getByText(/存在错误|Errors/).first()).toBeVisible();
 
@@ -1332,6 +1332,23 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const processKey = 'e2et_payment_approval';
     const businessKey = `NBE-${tag}`;
     const itemName = `NBE-item-${tag}`;
+    // The create_record action links the new item to a real order: e2et_order_id
+    // is a reference to mt_e2et_order and the BPM instance id is not one.
+    const seedCustomer = await executeCommandViaApi(page, 'e2et:create_customer', {
+      e2et_cust_code: `NBE-CUST-${tag}`.slice(0, 50),
+      e2et_cust_name: `NBE Customer ${tag}`,
+      e2et_cust_region: 'north',
+      e2et_cust_active: true,
+    }, undefined, 'create');
+    expect(seedCustomer.code).toBe('0');
+    const seedOrder = await executeCommandViaApi(page, 'e2et:create_order', {
+      e2et_order_title: `NBE order ${tag}`,
+      e2et_order_type: 'normal',
+      e2et_order_customer: `NBE Customer ${tag}`,
+      e2et_order_urgent: false,
+    }, undefined, 'create');
+    expect(seedOrder.code).toBe('0');
+    const seedOrderPid = seedOrder.recordId;
     await openNewDesigner(page);
     await setAutomationName(page, `N-TRIGGER-BPM-EVENT ${tag}`);
 
@@ -1346,7 +1363,9 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await fillNodeConfig(page, action, {
       modelCode: '订单明细',
       fields:
-        '{"e2et_order_id":"${instanceId}","e2et_item_name":"' +
+        '{"e2et_order_id":"' +
+        seedOrderPid +
+        '","e2et_item_name":"' +
         itemName +
         '","e2et_item_spec":"bpm-event","e2et_item_qty":1,"e2et_item_price":10}',
     });

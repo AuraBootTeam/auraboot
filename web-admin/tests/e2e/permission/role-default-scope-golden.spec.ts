@@ -63,7 +63,7 @@ for (const scope of ['dept', 'team']) {
     );
 
     // Grant a complete declared business capability through the primary editor.
-    const capabilityCode = 'qo.cap.quote_view';
+    const capabilityCode = 'org.cap.member_offboarding';
     const checkbox = page.getByTestId(`capability-checkbox-${capabilityCode}`);
     await expect(checkbox).not.toBeChecked();
     await checkbox.click();
@@ -81,35 +81,26 @@ for (const scope of ['dept', 'team']) {
     await expect(page.getByTestId('capability-save')).toBeDisabled();
     await page.getByTestId(`capability-scope-configure-${capabilityCode}`).click();
     await expect(page.getByTestId('capability-scope-dialog')).toBeVisible();
-    const scopeSelect = page.getByTestId('capability-scope-model.qo_quote_common.read');
-    await expect(scopeSelect).toHaveValue(scope);
     const dialog = page.getByTestId('capability-scope-dialog');
-    const scopedActions = [
-      'qo.quote.read',
-      'sys.file.read',
-      'model.qo_quote_common.read',
-      'model.qo_quote_line_common.read',
-      'model.crm_customer_request_common.read',
-      'model.crm_customer_request_pcba_rfq.read',
-      'model.qo_supplier_request_line_common.read',
-    ];
-    await expect(dialog.getByRole('combobox')).toHaveCount(scopedActions.length);
-    for (const action of scopedActions)
-      await expect(dialog.getByTestId(`capability-scope-${action}`)).toHaveValue(scope);
-    // Tab visibility is still granted, but has no record resource/action scope mapping.
-    await expect(dialog.getByTestId('capability-scope-qo.quote.material.read')).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    // member_offboarding resolves to two record-scoped model operations; both
+    // selects must carry the inherited role default scope.
+    for (const op of ['model.tenant_member.read', 'model.tenant_member.leave']) {
+      await expect(dialog.getByTestId(`capability-scope-${op}`)).toHaveValue(scope, { timeout: 10_000 });
+    }
     await expect(dialog).not.toContainText('范围配置无效');
-    await expect(dialog).not.toContainText('Qo_supplier_request_line_common');
     const matrixResponse = await page.request.get(`${BASE}/api/permissions/matrix/${role.pid}`);
     expect(matrixResponse.ok()).toBeTruthy();
     const actions = (await matrixResponse.json()).data.modules
       .flatMap((module: any) => module.resources)
       .flatMap((resource: any) => resource.actions);
-    expect(
-      actions.find((action: any) => action.code === 'model.qo_quote_common.read').scopeType,
-    ).toBe(scope);
-    expect(actions.find((action: any) => action.code === 'qo.quote.material.read')).toMatchObject({
-      granted: true,
+    for (const op of ['model.tenant_member.read', 'model.tenant_member.leave']) {
+      expect(actions.find((action: any) => action.code === op).scopeType).toBe(scope);
+    }
+    // Sibling operations outside the granted capability must stay ungranted and
+    // scope-free — inheritance applies to granted actions only.
+    expect(actions.find((action: any) => action.code === 'model.tenant_member.create')).toMatchObject({
+      granted: false,
       scopeType: null,
     });
     await expect(page.getByTestId('data-scope-current')).toContainText(
@@ -142,13 +133,13 @@ test('actual mixed record scopes remain separate from the stored role default', 
   await page.getByTestId('data-scope-option-team').click();
   await page.getByTestId('data-scope-apply').click();
   await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0);
-  await page.getByTestId('capability-checkbox-qo.cap.quote_view').check();
+  await page.getByTestId('capability-checkbox-org.cap.member_offboarding').check();
   await page.getByTestId('capability-save').click();
   await page.getByTestId('confirm-ok').click();
   await expect(page.getByTestId('capability-save')).toBeDisabled();
   await expect(page.getByTestId('data-scope-current')).toContainText(/团队|My teams/);
-  await page.getByTestId('capability-scope-configure-qo.cap.quote_view').click();
-  await page.getByTestId('capability-scope-model.qo_quote_common.read').selectOption('self');
+  await page.getByTestId('capability-scope-configure-org.cap.member_offboarding').click();
+  await page.getByTestId('capability-scope-model.tenant_member.read').selectOption('self');
   const write = page.waitForResponse(response => response.request().method() === 'PUT' &&
     response.url().includes(`/api/permissions/matrix/${role.pid}/scope`));
   await page.getByTestId('capability-scope-apply').click();
@@ -160,8 +151,8 @@ test('actual mixed record scopes remain separate from the stored role default', 
   expect(response.status()).toBe(200);
   const actions = (await response.json()).data.modules.flatMap((module: any) => module.resources)
     .flatMap((resource: any) => resource.actions);
-  expect(actions.find((action: any) => action.code === 'model.qo_quote_common.read').scopeType).toBe('self');
-  expect(actions.find((action: any) => action.code === 'model.qo_quote_line_common.read').scopeType).toBe('team');
+  expect(actions.find((action: any) => action.code === 'model.tenant_member.read').scopeType).toBe('self');
+  expect(actions.find((action: any) => action.code === 'model.tenant_member.leave').scopeType).toBe('team');
   await page.getByTestId('data-scope-current').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('data-scope-current')).toBeInViewport();
   await expect(page.getByTestId('data-scope-default')).toBeInViewport();

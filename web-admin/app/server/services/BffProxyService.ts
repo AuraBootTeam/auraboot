@@ -192,7 +192,7 @@ export class BffProxyService {
   }
 
   async handleApiRequest(req: Request, res: Response): Promise<void> {
-    const requestId = this.generateRequestId();
+    const requestId = this.generateRequestId(req.headers.traceparent);
     const startTime = Date.now();
 
     try {
@@ -812,7 +812,12 @@ export class BffProxyService {
   /**
    * 生成请求ID
    */
-  private generateRequestId(): string {
+  private generateRequestId(traceparent?: string | string[]): string {
+    // Keep the legacy log field as an alias of the propagated trace, not a second ID.
+    if (typeof traceparent === 'string') {
+      const match = /^00-([a-f0-9]{32})-([a-f0-9]{16})-0[01]$/.exec(traceparent);
+      if (match && !/^0+$/.test(match[1]) && !/^0+$/.test(match[2])) return match[1];
+    }
     return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 

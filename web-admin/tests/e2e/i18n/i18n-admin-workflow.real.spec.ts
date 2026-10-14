@@ -142,6 +142,19 @@ test.describe('i18n admin real workflow', () => {
     const admin = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
     const clients: APIRequestContext[] = [];
     const prefix = `e2e.ios-handover.${Date.now()}.${info.workerIndex}.tenant.`;
+    // The isolation journey creates tenants: it requires the multi-tenant
+    // posture (system.mode multi + tenant self-provisioning). Single-mode
+    // deployments answer the create with 403 — skip rather than run red.
+    const postureProbe = await admin.page.request.post('/api/tenant-selection/process', {
+      data: { action: 'create', tenantName: `${prefix}posture-probe`.replaceAll('.', '-'), displayName: 'Posture probe' },
+      failOnStatusCode: false,
+      // Tenant provisioning takes ~10 s per create (member/role/permission
+      // seeding) — the request default of 5 s reads as a timeout before the
+      // posture answer arrives. Same budget as the real creates below.
+      timeout: 60_000,
+    });
+    test.skip(postureProbe.status() === 403, 'requires the multi-tenant posture (tenant self-provisioning enabled)');
+    expect(postureProbe.status(), `unexpected tenant create failure: ${postureProbe.status()}`).toBeLessThan(400);
     const identities: Array<{ tenantId: string; userId: string; roleCodes: string[] }> = [];
     const fixtures: Resource[] = [];
     const outcomes: Array<{ tenantId: string; foreignPid: string; method: string; code: string }> = [];
@@ -255,6 +268,22 @@ test.describe('i18n admin real workflow', () => {
     const suffix = `${Date.now()}-${info.workerIndex}`;
     const user = makeRoleUser(`ios-i18n-member-${suffix}`, ['tenant_member']);
     let member: Awaited<ReturnType<typeof openAsRole>> | undefined;
+    // Declared out here on purpose: the finally below cleans the provisioned
+    // menu up, and a try-scoped binding would throw a ReferenceError there —
+    // swallowed by the cleanup catch — so the menu row survived every run and
+    // tripped OrphanMenuCheckRunner at the next backend restart.
+    const memberMenuPid = `m${Date.now()}${info.workerIndex}membermenu`.padEnd(26, '0').slice(0, 26);
+    // Snowflake ids exceed Number.MAX_SAFE_INTEGER, so every JSON.parse rounds
+    // them and a delete by the parsed number hits no row (HTTP 200, data:false,
+    // silently). The row id is therefore kept as the exact digit string lifted
+    // from the raw payload, anchored on the fixture pid that serialization
+    // echoes verbatim.
+    let memberMenuRowId: string | null = null;
+    const rowIdByPid = async (response: { text(): Promise<string> }): Promise<string | null> => {
+      const match = (await response.text().catch(() => '')).match(
+          new RegExp('"id":(\\d+),"tenantId":[^,}]*,"pid":"' + memberMenuPid + '"'));
+      return match ? match[1] : null;
+    };
     try {
       await ensureRoleUser(admin.page, user);
       // A fresh runtime seeds no menu for the member's L1 read codes, which renders no
@@ -265,8 +294,7 @@ test.describe('i18n admin real workflow', () => {
       const memberMenuPath = '/meta/models';
       // ab_menu.pid is NOT NULL UNIQUE with no generator on the create path, so the
       // fixture supplies its own 26-character identifier; the create envelope echoes it.
-      const memberMenuPid = `m${Date.now()}${info.workerIndex}membermenu`.padEnd(26, '0').slice(0, 26);
-      const memberMenu = await accepted<{ pid: string }>(await admin.page.request.post('/api/menu/create', { data: {
+      const memberMenuPost = await admin.page.request.post('/api/menu/create', { data: {
         pid: memberMenuPid,
         code: `e2e.ios-handover.${suffix}.member-models`,
         name: 'Member Baseline Models',
@@ -275,8 +303,10 @@ test.describe('i18n admin real workflow', () => {
         permissionCode: 'meta.model.read',
         visible: true,
         orderNo: 900,
-      } }));
+      } });
+      const memberMenu = await accepted<{ pid: string }>(memberMenuPost);
       expect(memberMenu.pid).toBeTruthy();
+      memberMenuRowId = await rowIdByPid(memberMenuPost);
       const resource = await accepted<Resource>(await admin.page.request.post('/api/admin/i18n/resources', { data: {
         key: `e2e.ios-handover.${suffix}.permission`, lang: 'zh-CN', value: 'Permission fixture',
       } }));
@@ -339,7 +369,33 @@ test.describe('i18n admin real workflow', () => {
         params: { key: `${resource.i18nKey}.forbidden`, lang: 'zh-CN' },
       }))).toBeNull();
       await info.attach('authenticated-member-denials', { body: Buffer.from(JSON.stringify(denied, null, 2)), contentType: 'application/json' });
-    } finally { await member?.context.close(); await admin.context.close(); }
+    } finally {
+      // The provisioned member menu is a tenant-owned (plugin_pid NULL) row;
+      // leaving it behind trips rbac-platform-baseline's menu containment and
+      // the OrphanMenuCheckRunner fail-fast at the next backend restart.
+      try {
+        let menuRowId = memberMenuRowId;
+        if (menuRowId == null) {
+          // Fall back to the flat menu listing, again on raw text: the listing
+          // embeds the row among plugin-owned ones, and parsing would round the id.
+          const allMenus = await admin.page.request.get('/api/menu/all');
+          if (allMenus.ok()) {
+            memberMenuRowId = await rowIdByPid(allMenus);
+          }
+        }
+        if (menuRowId != null) {
+          const deleted = await admin.page.request.delete(`/api/menu/${menuRowId}`);
+          if (!deleted.ok()) {
+            console.warn(`[i18n-admin] member menu cleanup failed: HTTP ${deleted.status()}`);
+          } else {
+            memberMenuRowId = null;
+          }
+        }
+      } catch (cleanupError) {
+        console.warn('[i18n-admin] member menu cleanup error:', String(cleanupError));
+      }
+      await member?.context.close(); await admin.context.close();
+    }
   });
 
   test('create, edit, submit, reject with reason, approve and delete through the admin UI', async ({ browser }, info) => {
@@ -409,8 +465,16 @@ test.describe('i18n admin real workflow', () => {
       await openSidebarPage(page, '/settings/i18n-workflow');
       // The workflow table filters by locale (page default ja-JP); the fixture resource
       // was created as zh-CN, so a real reviewer selects the matching locale first.
-      await page.locator('select').filter({ has: page.locator('option[value="zh-CN"]') }).selectOption('zh-CN');
-      await page.locator('select').filter({ has: page.locator('option[value="draft"]') }).selectOption('draft');
+      // The filter selects carry no label association (the visible labels are
+      // siblings without htmlFor) and the page also holds an AI-target select;
+      // address them structurally: Locale is the first select on the page and
+      // the Status filter is the only one offering the draft option. The page
+      // re-mounts its filter row while settling, so retry through each.
+      await expect(() => page.locator('main select').first().selectOption('zh-CN')).toPass({ timeout: 15_000 });
+      await expect(() => page.locator('main select')
+        .filter({ has: page.locator('option[value="draft"]') })
+        .first()
+        .selectOption('draft')).toPass({ timeout: 15_000 });
       await page.getByPlaceholder('Search by key or value…', { exact: true }).fill(key);
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       const rejectedWorkflowRow = page.locator('table').getByRole('row').filter({ has: page.getByRole('cell', { name: key, exact: true }) });

@@ -108,7 +108,7 @@ async function openCreateForm(page: Page): Promise<void> {
 // Helper: fill the minimum CRM Lead fields and submit
 // ---------------------------------------------------------------------------
 
-async function fillAndSubmitCrmLeadForm(page: Page, title: string): Promise<void> {
+async function fillAndSubmitCrmLeadForm(page: Page, title: string, customerName: string): Promise<void> {
   // Wait for DSL form to fully render
   await page.waitForLoadState('domcontentloaded');
 
@@ -135,7 +135,7 @@ async function fillAndSubmitCrmLeadForm(page: Page, title: string): Promise<void
     .first();
   const hasCustomer = await customerInput.isVisible({ timeout: 3_000 }).catch(() => false);
   if (hasCustomer) {
-    await customerInput.fill(`Customer ${UID}`);
+    await customerInput.fill(customerName);
   }
 
   // Submit
@@ -158,6 +158,10 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
   const companyForCreate = `UOF Create ${UID}`;
   const companyForDelete = `UOF Delete ${UID}`;
+  // The customer reference resolves by e2et_cust_name — seed both customers up
+  // front so the order form's reference validation finds them.
+  const customerForCreate = `UOF Customer ${UID}`;
+  const customerForDelete = `UOF Delete Cust ${UID}`;
   let deleteRecordId: string;
 
   // Seed a record that we will delete in UOF-003
@@ -165,12 +169,19 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
+      for (const cust of [customerForCreate, customerForDelete]) {
+        await executeCommandViaApi(page, 'e2et:create_customer', {
+          e2et_cust_code: `E2EC-${cust.slice(0, 24)}`,
+          e2et_cust_name: cust,
+          e2et_cust_region: 'north',
+        }, undefined, 'create').catch(() => {});
+      }
       const result = await executeCommandViaApi(
         page,
         'e2et:create_order',
         {
           e2et_order_title: companyForDelete,
-          e2et_order_customer: `UOF Customer ${UID}`,
+          e2et_order_customer: customerForCreate,
           e2et_order_type: 'normal',
         },
         undefined,
@@ -203,7 +214,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       )
       .catch(() => null);
 
-    await fillAndSubmitCrmLeadForm(page, companyForCreate);
+    await fillAndSubmitCrmLeadForm(page, companyForCreate, customerForCreate);
 
     // Wait for either: create API response OR navigation (whichever comes first)
     await Promise.race([

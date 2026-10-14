@@ -5,8 +5,14 @@
     "displayName:en": "Leave Code",
     "dataType": "string",
     "description": "Auto-generated leave request code.",
-    "constraints": { "required": true, "maxLength": 50 },
-    "feature": { "searchable": true, "sortable": true },
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    },
     "extension": {
       "readOnly": true,
       "placeholder:zh-CN": "系统自动生成",
@@ -19,7 +25,9 @@
     "displayName:en": "Employee",
     "dataType": "reference",
     "description": "Foreign key to the employee submitting this leave request.",
-    "constraints": { "required": true },
+    "constraints": {
+      "required": true
+    },
     "extension": {
       "refModelCode": "thr_employee",
       "refDisplayField": "thr_em_name"
@@ -32,8 +40,12 @@
     "dataType": "enum",
     "dictCode": "thr_leave_type",
     "description": "Type of leave being requested.",
-    "constraints": { "required": true },
-    "feature": { "searchable": true }
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "thr_lv_start_date",
@@ -41,8 +53,12 @@
     "displayName:en": "Start Date",
     "dataType": "date",
     "description": "First day of the leave period.",
-    "constraints": { "required": true },
-    "feature": { "sortable": true }
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
   },
   {
     "code": "thr_lv_end_date",
@@ -50,8 +66,12 @@
     "displayName:en": "End Date",
     "dataType": "date",
     "description": "Last day of the leave period.",
-    "constraints": { "required": true },
-    "feature": { "sortable": true }
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
   },
   {
     "code": "thr_lv_days",
@@ -59,8 +79,12 @@
     "displayName:en": "Days",
     "dataType": "decimal",
     "description": "Number of leave days requested. Supports half-day increments (e.g. 0.5, 1.5).",
-    "constraints": { "required": true },
-    "feature": { "sortable": true }
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
   },
   {
     "code": "thr_lv_status",
@@ -70,7 +94,9 @@
     "dictCode": "thr_leave_status",
     "defaultValue": "pending",
     "description": "Leave request lifecycle status. Managed by STATE_TRANSITION commands.",
-    "feature": { "searchable": true }
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "thr_lv_reason",
@@ -78,7 +104,9 @@
     "displayName:en": "Reason",
     "dataType": "text",
     "description": "Reason for the leave request.",
-    "constraints": { "maxLength": 2000 },
+    "constraints": {
+      "maxLength": 2000
+    },
     "extension": {
       "multiline": true,
       "placeholder:zh-CN": "请输入请假原因",

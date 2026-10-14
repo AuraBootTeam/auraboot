@@ -190,7 +190,7 @@ See the [plugin development guide](https://docs.auraboot.com) for details.
 
 ## Contributor License Agreement
 
-AuraBoot is dual-licensed (the [source-available AuraBoot License](LICENSE.txt) for the community edition + a separate commercial license for enterprise customers). To distribute your contribution under both licenses, we need a signed [Contributor License Agreement (CLA)](CLA.md).
+AuraBoot Community uses [Apache License 2.0 with trademark and commercial-contact supplements](LICENSE.txt). The supplements do not restrict Apache-2.0 rights; proprietary enterprise code and official services have separate commercial agreements. Contributions may be used in the community and commercial editions under the signed [Contributor License Agreement (CLA)](CLA.md); contributors retain their copyright.
 
 **On your first pull request**, the CLA Assistant bot will comment with a one-click sign-off instruction. You sign by replying:
 
