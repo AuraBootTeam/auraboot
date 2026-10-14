@@ -39,6 +39,34 @@ class ProcurementInventoryNativeAdmissionContractTest {
         assertThrows(AssertionError.class,()->fixture.fixture("qo_procurement_task_common:dispatch",()->{
             fail("A private production writer cannot execute");return null;}));
     }
+    @Test void fourSequentialCaseDirectoriesAlwaysCopyTheUnmodifiedProductionResources() throws Exception {
+        var root=java.nio.file.Files.createTempDirectory("inventory-directory-contract-");
+        var source=java.nio.file.Files.createDirectory(root.resolve("original"));
+        java.nio.file.Files.createDirectories(source.resolve("config/fields"));
+        java.nio.file.Files.createDirectories(source.resolve("config/commands"));
+        String original="{\"code\":\"qo_pr_contact_state\",\"allowedWriterCommands\":[\"pr_supplier_pcba_contact:sync_directory\"]}";
+        java.nio.file.Files.writeString(source.resolve("config/fields/contact.json"),original);
+        java.nio.file.Files.writeString(source.resolve("config/commands/formal.json"),"[]");
+        var fixture=new ProcurementInventoryReceiptRealDbIT();fixture.json=new com.fasterxml.jackson.databind.ObjectMapper();
+        fixture.procurementDirectory=source.toString();
+        try {
+            for(int index=0;index<4;index++) {
+                fixture.caseEvidence=java.nio.file.Files.createDirectory(root.resolve("case-"+index));
+                var proof=fixture.prepareReceiptDirectory();
+                assertEquals(source.toRealPath().toString(),proof.get("sourceDirectory"));
+                var field=fixture.json.readTree(java.nio.file.Path.of(fixture.procurementDirectory).resolve("config/fields/contact.json").toFile());
+                assertEquals(2,field.path("allowedWriterCommands").size());
+                assertEquals(original,java.nio.file.Files.readString(source.resolve("config/fields/contact.json")));
+                assertFalse(java.nio.file.Files.exists(source.resolve("config/commands/source-ui-native-initialization.json")));
+                fixture.restoreProductionDirectory();
+                assertEquals(source.toRealPath().toString(),fixture.procurementDirectory);
+            }
+        } finally {
+            try(var files=java.nio.file.Files.walk(root)) {
+                for(var file:files.sorted(java.util.Comparator.reverseOrder()).toList())java.nio.file.Files.delete(file);
+            }
+        }
+    }
     @Test void actualAopRejectsJointSaveAndBothCounterEntrypointsBeforeTargetInvocation() {
         var target=mock(DynamicDataService.class);
         var observation=new ProcurementInventoryReceiptRealDbIT.ReceiptReadOnlyObservation();

@@ -60,7 +60,9 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @Autowired ReceiptReadOnlyObservation receiptReadOnlyObservation;
     @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualReceiptEncryption;
     private String prerequisiteActor;
+    private Path originalProcurementDirectory;
     @Override protected void prepareEvidence(org.junit.jupiter.api.TestInfo test) throws Exception {
+        restoreProductionDirectory();
         super.prepareEvidence(test);
         var input=json.readTree(java.nio.file.Files.readAllBytes(Path.of(required("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"))));
         ProcurementInventoryNativeAdmission.validate(input, Path.of(required("PROCUREMENT_PUBLIC_SOURCE_EVIDENCE_DIR")),
@@ -82,10 +84,8 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     /** Only this inventory subclass replaces synthetic private production-writer prerequisites. */
     @Override protected void prepareInitialSourceRecords() throws Exception {
         prerequisiteActor=prerequisiteActor();
-        Path original=Path.of(procurementDirectory),copy=caseEvidence.resolve("receipt-directory-init");
-        var appendix=com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.prepareSourceUi(original,copy,json);
-        importDirectory(copy);writeArtifact("receipt-directory-initialization-appendix.json",appendix);
-        procurementDirectory=copy.toString(); // Later server-policy copies retain this exact declared test-writer appendix.
+        var appendix=prepareReceiptDirectory();
+        importDirectory(Path.of(procurementDirectory));writeArtifact("receipt-directory-initialization-appendix.json",appendix);
         String product=createRegistered(prerequisiteActor,"prod:create_product",Map.of("prod_name","Public source material",
                 "prod_custom_code",provider,"prod_type","raw_material","prod_unit","pcs"));
         prerequisiteAction(prerequisiteActor,"prod:activate_product",product,Map.of());
@@ -101,6 +101,17 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         task=prerequisiteAction(prerequisiteActor,"qo_procurement_task_common:create",null,
                 Map.of("title",provider,"connectionPid",connection)).path("recordPid").asText();
         assertFalse(task.isBlank());
+    }
+
+    @org.junit.jupiter.api.AfterEach void restoreProductionDirectory() {
+        if(originalProcurementDirectory!=null)procurementDirectory=originalProcurementDirectory.toString();
+    }
+    Map<String,Object> prepareReceiptDirectory() throws Exception {
+        if(originalProcurementDirectory==null)originalProcurementDirectory=Path.of(procurementDirectory).toRealPath();
+        Path original=originalProcurementDirectory,copy=caseEvidence.resolve("receipt-directory-init");
+        var appendix=com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.prepareSourceUi(original,copy,json);
+        procurementDirectory=copy.toString(); // Policy copies within this case retain its declared test writers.
+        return appendix;
     }
 
     private String directoryInitialize(String model,Map<String,Object> facts) throws Exception {
