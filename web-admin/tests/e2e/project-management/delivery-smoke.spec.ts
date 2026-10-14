@@ -59,7 +59,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await page.getByRole('dialog').getByRole('button', { name: /确认|确定/ }).click();
     const response = await commandResponse;
     const payload = response.request().postDataJSON();
-    expect(payload.targetRecordId).toBe(fixture.projects[0].milestones[2]);
+    expect(payload.targetRecordPid).toBe(fixture.projects[0].milestones[2]);
     const body = await response.json();
     expect(body.code).toBe('0');
     expect(body.data.phaseReached).toBe('completed');
@@ -85,9 +85,43 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByText('林悦', { exact: true }).last()).toBeVisible();
     await shot('P09');
     await page.getByText('林悦', { exact: true }).last().click();
-    await page.getByTestId('form-btn-cancel').click();
+    const newProjectName = '雨岚设计 · 合同协作门户';
+    await page.locator('#tpm_pj_name').fill(newProjectName);
+    await page.locator('#tpm_pj_customer').fill('雨岚设计');
+    await page.locator('#tpm_pj_description').fill('统一合同审批、版本管理与交付归档。（虚构示例数据）');
+    await page.locator('#tpm_pj_budget').fill('36000');
+    await shot('P11');
+    const createResponse = page.waitForResponse(response => response.url().includes('/execute/tpm:create_project') && response.request().method() === 'POST');
+    await page.getByTestId('form-btn-submit').click();
+    expect((await (await createResponse).json()).data.phaseReached).toBe('completed');
+    const newRow = page.getByRole('row').filter({ hasText: newProjectName });
+    await expect(newRow).toContainText('林悦');
+    await page.reload();
+    await expect(newRow).toContainText('雨岚设计');
+    await shot('P12');
     await fs.writeFile(path.join(evidence, 'completed-command.json'), JSON.stringify({ request: payload, response: body }, null, 2));
   } finally {
     await fs.writeFile(path.join(evidence, 'browser-network.json'), JSON.stringify(network, null, 2));
   }
+});
+
+
+test('delivery viewer can inspect progress but cannot edit or complete @smoke', async ({ page }) => {
+  const fixture = JSON.parse(await fs.readFile(path.join(evidence, 'fixture.json'), 'utf8'));
+  await page.goto('/login');
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+  await page.locator('#identifier').fill(fixture.viewerEmail);
+  await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
+  await page.locator('form button[type=submit]').click();
+  await page.waitForURL(url => !url.pathname.includes('/login'));
+  await page.getByText('项目', { exact: true }).click();
+  await expect(page.getByRole('button', { name: '新建项目', exact: true })).toHaveCount(0);
+  await page.getByRole('row').filter({ hasText: fixture.projects[0].name }).getByRole('button', { name: /查看|详情/ }).click();
+  await expect(page.getByTestId('metric-strip-value-progress')).toHaveText('75');
+  await expect(page.getByRole('button', { name: '编辑', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '完成里程碑', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: path.join(evidence, 'screenshots', 'P10.png') });
+  const matrix = JSON.parse(await fs.readFile(path.join(evidence, 'acceptance-matrix.json'), 'utf8'));
+  matrix.find((row: { id: string }) => row.id === 'P10').status = 'captured';
+  await fs.writeFile(path.join(evidence, 'acceptance-matrix.json'), JSON.stringify(matrix, null, 2));
 });

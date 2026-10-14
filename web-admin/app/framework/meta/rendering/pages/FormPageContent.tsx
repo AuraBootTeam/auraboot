@@ -2553,7 +2553,7 @@ export function FormPageContent(props: PageContentProps) {
           wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
           a comfortable 2-column line length while staying roomy for sub-tables. */}
         <div
-          className="mx-auto w-full max-w-6xl px-2 py-3"
+          className={`mx-auto w-full px-2 py-3 ${schema.extension?.formWidth === 'comfortable' ? 'max-w-4xl' : 'max-w-6xl'}`}
           data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
         >
           <div className="bg-transparent">

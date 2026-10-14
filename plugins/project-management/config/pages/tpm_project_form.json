@@ -141,5 +141,8 @@
       ],
       "area": "footer"
     }
-  ]
+  ],
+  "extension": {
+    "formWidth": "comfortable"
+  }
 }

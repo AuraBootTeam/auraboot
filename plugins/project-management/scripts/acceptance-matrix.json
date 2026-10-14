@@ -1,0 +1,158 @@
+[
+  {
+    "id": "P01",
+    "page": "list",
+    "state": "loaded",
+    "screenshot": "P01",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P02",
+    "page": "form",
+    "state": "loaded",
+    "screenshot": "P02",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P03",
+    "page": "form",
+    "state": "validation",
+    "screenshot": "P03",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P04",
+    "page": "detail",
+    "state": "loaded",
+    "screenshot": "P04",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P05",
+    "page": "detail",
+    "state": "confirmation",
+    "screenshot": "P05",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P06",
+    "page": "detail",
+    "state": "completion",
+    "screenshot": "P06",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P07",
+    "page": "detail",
+    "state": "reloaded",
+    "screenshot": "P07",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P08",
+    "page": "list",
+    "state": "filtered",
+    "screenshot": "P08",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P09",
+    "page": "form",
+    "state": "picker",
+    "screenshot": "P09",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P10",
+    "page": "detail",
+    "state": "readonly",
+    "screenshot": "P10",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "viewer"
+  },
+  {
+    "id": "P11",
+    "page": "form",
+    "state": "filled",
+    "screenshot": "P11",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P12",
+    "page": "list",
+    "state": "created",
+    "screenshot": "P12",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  }
+]

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import importlib.util,json,urllib.request,os
 from urllib.parse import urlparse
 from pathlib import Path
@@ -14,7 +15,7 @@ token=m.business_session(req,os.environ['ADMIN_EMAIL'],os.environ['ADMIN_PASSWOR
 receipts=[]
 def cmd(code,payload=None,pid=None):
  b={'payload':payload or {},'operationType':'update' if pid else 'create'}
- if pid:b['targetRecordId']=pid
+ if pid:b['targetRecordPid']=pid
  v=req('/api/meta/commands/execute/'+code,'POST',b,h)
  assert str(v.get('code'))=='0' and v['data']['phaseReached']=='completed',v
  receipts.append(v);return v['data']
@@ -23,16 +24,18 @@ def pid(v):
  for k in ['recordId','recordPid','targetRecordId','pid']:
   if v.get(k):return str(v[k])
  raise Exception('Missing record identity: '+str(v))
-users=req('/api/admin/users/search','GET',headers=h)
+existing=req('/api/dynamic/tpm_project/list','GET',headers=h)['data']['records']
+assert len(existing)==0,'Refuse to seed an already populated project fixture'
 owners=[]
 for login,name in [('delivery-lin','林悦'),('delivery-zhou','周予'),('delivery-chen','陈川')]:
  v=req('/api/admin/users','POST',{'userName':login,'displayName':name,'initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_manager'],'sendInviteEmail':False},h)
  assert str(v['code'])=='0',v
  owners.append(v['data']['userPid'])
+viewer_email='delivery-viewer@example.test'
+v=req('/api/admin/users','POST',{'email':viewer_email,'displayName':'交付观察员','initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_viewer'],'sendInviteEmail':False},h)
+assert str(v['code'])=='0',v
 owner=owners[0]
 projects=[]
-existing=req('/api/dynamic/tpm_project/list','GET',headers=h)['data']['records']
-assert len(existing)==0,'Refuse to seed an already populated project fixture'
 cases=[('青禾零售 · 会员系统上线','青禾零售',128000,3,'active','完成会员迁移、积分联调与门店培训，让会员权益在 12 家门店同步可用。'),('远山制造 · 售后工单门户','远山制造',86000,12,'active','统一设备报修、派工与服务回访，缩短跨部门协作时间。'),('星河物流 · 仓配数据看板','星河物流',68000,20,'planning','把订单履约、库存与配送异常汇总到业务看板。'),('知行教育 · 学员服务平台','知行教育',96000,7,'active','交付学员档案、课程安排和服务跟进流程。'),('澄川医疗 · 采购审批升级','澄川医疗',72000,16,'on_hold','梳理采购审批与预算核对，等待客户确认审批责任人。'),('南风餐饮 · 门店巡检应用','南风餐饮',48000,-2,'completed','统一巡检标准、整改跟踪和门店反馈。'),('松果科技 · 客户成功工作台','松果科技',110000,24,'planning','建立客户上线、使用反馈和续约提醒的团队协作流程。'),('拾光文旅 · 预约运营后台','拾光文旅',58000,10,'active','交付活动预约、名额管理与客户通知。')]
 for index,(name,customer,budget,offset,status,desc) in enumerate(cases):
  project=pid(cmd('tpm:create_project',{'tpm_pj_name':name,'tpm_pj_customer':customer,'tpm_pj_budget':budget,'tpm_pj_owner_user':owners[index%len(owners)],'tpm_pj_description':desc+'（虚构示例数据）','tpm_pj_start_date':str(date.today()-timedelta(days=21)),'tpm_pj_end_date':str(date.today()+timedelta(days=offset)),'tpm_pj_priority':'high' if index==0 else 'medium'}))
@@ -45,4 +48,4 @@ for index,(name,customer,budget,offset,status,desc) in enumerate(cases):
   if j < (4 if status=='completed' else 2 if status in ['active','on_hold'] else 0):cmd('tpm:reach_milestone',pid=mid)
   ms.append(mid)
  projects.append({'name':name,'pid':project,'milestones':ms})
-(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'projects':projects},ensure_ascii=False,indent=2));print('Created 8 fictional projects and 32 milestones through commands')
+(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'viewerEmail':viewer_email,'projects':projects},ensure_ascii=False,indent=2));print('Created 8 fictional projects and 32 milestones through commands')

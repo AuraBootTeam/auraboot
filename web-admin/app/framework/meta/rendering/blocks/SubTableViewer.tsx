@@ -481,6 +481,9 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           };
         }
 
+        if (config.defaultSort) {
+          filters = { ...filters, sortField: config.defaultSort.field, sortOrder: config.defaultSort.order };
+        }
         const result = await fetchResult<any>(endpoint, {
           method: 'get',
           params: filters,

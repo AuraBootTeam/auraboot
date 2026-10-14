@@ -515,11 +515,23 @@ describe('SubTableViewer', () => {
     expect(screen.getByTestId('subtable-add-row').textContent).toContain('添加联系人');
   });
 
+  it('sends the configured milestone date ordering to the child query', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: [] } });
+    render(<SubTableViewer config={{ ...buildConfig(), defaultSort: { field: 'due_date', order: 'asc' } }}
+      parentRecordPid="project" />);
+    await waitFor(() => expect(fetchResultMock).toHaveBeenCalledWith(
+      expect.stringContaining('/list'), expect.objectContaining({
+        params: expect.objectContaining({ sortField: 'due_date', sortOrder: 'asc' }),
+      }),
+    ));
+  });
+
   it('merges configured default values into create payloads with parent record templates', async () => {
-    fetchResultMock
-      .mockResolvedValueOnce({ code: '0', data: { records: [] } })
-      .mockResolvedValueOnce({ code: '0', data: {} })
-      .mockResolvedValueOnce({ code: '0', data: { records: [] } });
+    fetchResultMock.mockImplementation(async (endpoint: string) => {
+      if (endpoint.endsWith('/field-meta')) return { code: '0', data: [] };
+      if (endpoint.includes('/commands/execute/')) return { code: '0', data: {} };
+      return { code: '0', data: { records: [] } };
+    });
 
     render(
       <SubTableViewer

@@ -2404,6 +2404,7 @@ function DetailBlockRenderer({
           (block as any).dataSource ??
           (block as any).subTable?.dataSource
         }
+        compact={(block as any).extension?.density === 'compact'}
         businessRecordMapping={(block as any).businessRecordMapping}
       />
       </section>

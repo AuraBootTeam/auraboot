@@ -67,6 +67,7 @@ export interface ActivityTimelineProps {
   /** Optional product business-activity query merged with the platform audit log. */
   businessDataSource?: BusinessActivityDataSource;
   businessRecordMapping?: BusinessActivityRecordMapping;
+  compact?: boolean;
 }
 
 // Activity type → [icon, zh label, en label, dot color class]
@@ -95,6 +96,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   locale = 'zh-CN',
   businessDataSource,
   businessRecordMapping,
+  compact = false,
 }) => {
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,11 +151,13 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
       setActivities(merged);
 
       if (
-        merged.length === 0 &&
-        (!auditOutcome.ok || (businessOutcome != null && !businessOutcome.ok))
+        !auditOutcome.ok || (auditOutcome.ok && !ResultHelper.isSuccess(auditOutcome.value)) ||
+        (businessOutcome != null && (!businessOutcome.ok || !ResultHelper.isSuccess(businessOutcome.value)))
       ) {
         const denied =
           (!auditOutcome.ok && auditOutcome.error?.status === 403) ||
+          (auditOutcome.ok && String(auditOutcome.value.code) === '403') ||
+          (businessOutcome?.ok && String(businessOutcome.value.code) === '403') ||
           (businessOutcome != null && !businessOutcome.ok && businessOutcome.error?.status === 403);
         setError(
           denied
@@ -229,7 +233,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
   return (
     <div data-testid="activity-timeline">
-      <div className="border-border mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
+      {!compact && <div className="border-border mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="text-text text-base font-semibold">
             {locale === 'zh-CN' ? '客户互动时间线' : 'Customer activity timeline'}
@@ -260,7 +264,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {filteredActivities.length === 0 ? (
         <div className="text-text-3 rounded-card bg-subtle py-10 text-center text-sm">
@@ -305,12 +309,12 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                           className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`}
                         />
 
-                        <div className="rounded-card bg-panel border-border border px-4 py-3 shadow-sm">
+                        <div className={compact ? "border-border border-b pb-3" : "rounded-card bg-panel border-border border px-4 py-3 shadow-sm"}>
                           {/* Header: icon + type badge + actor + time */}
                           <div className="flex items-center gap-2 text-sm">
                             <span className="text-text-3 flex-shrink-0">{icon}</span>
                             <ActivityTypeBadge type={activityType} locale={locale} />
-                            <span className="text-text-2 font-medium">{actorLabel}</span>
+                            {!compact && <span className="text-text-2 font-medium">{actorLabel}</span>}
                             {actorType === 'agent' && (
                               <span className="bg-status-blue-bg text-status-blue rounded px-1.5 py-0.5 text-[10px] font-medium">
                                 AI
@@ -327,7 +331,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
                           {/* Content */}
                           {content && (
-                            <p className="text-text-2 mt-1 text-xs whitespace-pre-wrap">
+                            <p className={`text-text-2 mt-1 text-xs whitespace-pre-wrap ${compact ? 'line-clamp-2' : ''}`}>
                               {content}
                             </p>
                           )}

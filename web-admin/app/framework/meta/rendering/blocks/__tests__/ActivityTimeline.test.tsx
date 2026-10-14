@@ -145,4 +145,24 @@ describe('ActivityTimeline', () => {
       }),
     );
   });
+  it('keeps compact delivery activities without the CRM filter header', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: [{
+      id: 'completion', pid: 'completion', activityType: 'STATE_CHANGE',
+      subject: 'Integration accepted', actorType: 'SYSTEM', occurredAt: '2026-10-14T10:00:00Z',
+    }] });
+    render(<ActivityTimeline modelCode="tpm_project" recordPid="project" compact locale="en" />);
+    await waitFor(() => expect(screen.getByText('Integration accepted')).toBeVisible());
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByText('Customer activity timeline')).toBeNull();
+  });
+
+  it('shows a denied business source even when the audit source succeeds', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: [] })
+      .mockResolvedValueOnce({ code: '403', message: 'Access forbidden', data: null });
+    render(<ActivityTimeline modelCode="tpm_project" recordPid="project" locale="en"
+      businessDataSource={{ queryCode: 'delivery_activity' }} />);
+    await waitFor(() => expect(screen.getByText('No permission to view activities')).toBeVisible());
+    expect(screen.queryByTestId('activity-timeline-empty')).toBeNull();
+  });
+
 });

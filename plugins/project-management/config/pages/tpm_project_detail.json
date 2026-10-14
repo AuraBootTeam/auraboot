@@ -90,7 +90,8 @@
           "tone": "amber"
         }
       ],
-      "columns": 3
+      "columns": 3,
+      "density": "compact"
     },
     {
       "id": "overview",
@@ -218,6 +219,9 @@
         "subject": "subject",
         "content": "content",
         "actorName": "actor_name"
+      },
+      "extension": {
+        "density": "compact"
       }
     }
   ],
