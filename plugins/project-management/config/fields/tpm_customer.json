@@ -1,0 +1,25 @@
+[
+  {
+    "code": "tpm_cu_name",
+    "displayName:zh-CN": "客户名称",
+    "displayName:en": "Customer name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "tpm_cu_contact",
+    "displayName:zh-CN": "客户联系人",
+    "displayName:en": "Customer contact",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 200
+    }
+  }
+]

@@ -1,10 +1,214 @@
 [
-  { "code": "tpm_pj_code", "displayName:zh-CN": "项目编号", "displayName:en": "Project Code", "dataType": "string", "description": "Auto-generated project code.", "constraints": { "required": true, "maxLength": 50 }, "feature": { "searchable": true, "sortable": true }, "extension": { "readOnly": true, "placeholder:zh-CN": "系统自动生成", "placeholder:en": "Auto generated" } },
-  { "code": "tpm_pj_name", "displayName:zh-CN": "项目名称", "displayName:en": "Project Name", "dataType": "string", "description": "Project name.", "constraints": { "required": true, "maxLength": 200 }, "feature": { "searchable": true, "sortable": true }, "extension": { "placeholder:zh-CN": "请输入项目名称", "placeholder:en": "Enter project name" } },
-  { "code": "tpm_pj_description", "displayName:zh-CN": "项目描述", "displayName:en": "Description", "dataType": "text", "description": "Detailed project description.", "constraints": { "maxLength": 5000 }, "extension": { "multiline": true } },
-  { "code": "tpm_pj_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "tpm_project_status", "defaultValue": "planning", "description": "Project lifecycle status.", "feature": { "searchable": true } },
-  { "code": "tpm_pj_priority", "displayName:zh-CN": "优先级", "displayName:en": "Priority", "dataType": "enum", "dictCode": "tpm_priority", "defaultValue": "medium", "description": "Project priority.", "feature": { "searchable": true } },
-  { "code": "tpm_pj_owner", "displayName:zh-CN": "负责人", "displayName:en": "Owner", "dataType": "string", "description": "Project owner.", "constraints": { "maxLength": 100 }, "feature": { "searchable": true } },
-  { "code": "tpm_pj_start_date", "displayName:zh-CN": "开始日期", "displayName:en": "Start Date", "dataType": "date", "description": "Project start date.", "feature": { "sortable": true } },
-  { "code": "tpm_pj_end_date", "displayName:zh-CN": "结束日期", "displayName:en": "End Date", "dataType": "date", "description": "Project end date.", "feature": { "sortable": true } }
+  {
+    "code": "tpm_pj_code",
+    "displayName:zh-CN": "项目编号",
+    "displayName:en": "Project Code",
+    "dataType": "string",
+    "description": "Auto-generated project code.",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    },
+    "extension": {
+      "readOnly": true,
+      "placeholder:zh-CN": "系统自动生成",
+      "placeholder:en": "Auto generated"
+    }
+  },
+  {
+    "code": "tpm_pj_name",
+    "displayName:zh-CN": "项目名称",
+    "displayName:en": "Project Name",
+    "dataType": "string",
+    "description": "Project name.",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    },
+    "extension": {
+      "placeholder:zh-CN": "青禾零售 · 会员系统上线",
+      "placeholder:en": "Acorn Retail · Membership launch"
+    }
+  },
+  {
+    "code": "tpm_pj_description",
+    "displayName:zh-CN": "交付目标",
+    "displayName:en": "Delivery outcome",
+    "dataType": "text",
+    "description": "Detailed project description.",
+    "constraints": {
+      "maxLength": 5000
+    },
+    "extension": {
+      "multiline": true
+    }
+  },
+  {
+    "code": "tpm_pj_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "tpm_project_status",
+    "defaultValue": "planning",
+    "description": "Project lifecycle status.",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "tpm_pj_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "tpm_priority",
+    "defaultValue": "medium",
+    "description": "Project priority.",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "tpm_pj_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "description": "Project owner.",
+    "constraints": {
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "tpm_pj_start_date",
+    "displayName:zh-CN": "开始日期",
+    "displayName:en": "Start Date",
+    "dataType": "date",
+    "description": "Project start date.",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "tpm_pj_end_date",
+    "displayName:zh-CN": "交付日期",
+    "displayName:en": "Delivery date",
+    "dataType": "date",
+    "description": "Project end date.",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "tpm_pj_customer",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Customer",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true
+    },
+    "description": "Customer business name; not a CRM relationship."
+  },
+  {
+    "code": "tpm_pj_budget",
+    "displayName:zh-CN": "项目预算",
+    "displayName:en": "Budget",
+    "dataType": "decimal",
+    "constraints": {
+      "min": 0
+    },
+    "description": "Planned project budget in CNY.",
+    "extension": {
+      "renderComponent": "moneyinput"
+    }
+  },
+  {
+    "code": "tpm_pj_owner_user",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "reference",
+    "refTarget": {
+      "targetModel": "sys_user",
+      "targetField": "username",
+      "valueField": "pid"
+    },
+    "description": "Assigned space member.",
+    "extension": {
+      "renderComponent": "userselect"
+    },
+    "constraints": {
+      "required": true
+    }
+  },
+  {
+    "code": "tpm_pj_progress",
+    "displayName:zh-CN": "交付进度",
+    "displayName:en": "Delivery progress",
+    "dataType": "integer",
+    "constraints": {
+      "min": 0,
+      "max": 100
+    },
+    "defaultValue": 0,
+    "description": "Owner-reported delivery progress, independent of milestone completion ratio."
+  },
+  {
+    "code": "tpm_pj_customer_id",
+    "displayName:zh-CN": "所属客户",
+    "displayName:en": "Customer",
+    "dataType": "reference",
+    "refTarget": {
+      "targetModel": "tpm_customer",
+      "targetField": "tpm_cu_name",
+      "valueField": "pid"
+    },
+    "feature": {
+      "searchable": true
+    },
+    "description": "Tenant-scoped customer reference.",
+    "constraints": {
+      "required": true
+    }
+  },
+  {
+    "code": "tpm_pj_notes",
+    "displayName:zh-CN": "内部备注",
+    "displayName:en": "Internal notes",
+    "dataType": "text",
+    "constraints": {
+      "maxLength": 5000
+    }
+  },
+  {
+    "code": "tpm_pj_files",
+    "displayName:zh-CN": "合同与附件",
+    "displayName:en": "Contracts and files",
+    "dataType": "jsonb",
+    "extension": {
+      "multiple": true,
+      "maxCount": 5,
+      "renderComponent": "fileattachment"
+    }
+  },
+  {
+    "code": "tpm_pj_type",
+    "displayName:zh-CN": "项目类型",
+    "displayName:en": "Project type",
+    "dataType": "enum",
+    "dictCode": "tpm_project_type",
+    "defaultValue": "custom_application",
+    "description": "Delivery engagement category."
+  }
 ]

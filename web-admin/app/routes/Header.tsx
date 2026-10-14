@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSSE } from '~/hooks/useSSE';
 import { Link } from 'react-router';
+import { Folder } from 'lucide-react';
+import { usePagePresentation, usePresentationNavigation } from '~/shared/layout/PagePresentationContext';
 import {
   Bars3Icon,
   SunIcon,
@@ -39,6 +41,9 @@ export default function Header({
   showLanguageSwitch = true,
   simplified = false,
 }: HeaderProps) {
+  const presentation = usePagePresentation();
+  const { sidebarWidth } = usePresentationNavigation();
+  const workspace = presentation?.mode === 'workspace';
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
@@ -159,7 +164,8 @@ export default function Header({
   return (
     <>
       <header
-        className="print-hide fixed top-0 right-0 left-0 z-50 border-b border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95"
+        className={`print-hide fixed top-0 right-0 left-0 z-50 border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 ${workspace ? 'ltr:lg:left-[var(--workspace-sidebar-width)] rtl:lg:right-[var(--workspace-sidebar-width)] shadow-none' : 'shadow-lg backdrop-blur-sm'}`}
+        style={{ '--workspace-sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
         data-print="hide"
         data-hydrated={hydrated ? 'true' : 'false'}
       >
@@ -180,7 +186,7 @@ export default function Header({
               </button>
             )}
 
-            <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
+            {workspace ? <div className="text-text-2 flex items-center gap-3 text-xs" data-testid="workspace-breadcrumb"><Folder className="text-text-3 h-4 w-4" /><span>{presentation.section}</span><span className="text-text-3">/</span><span className="text-text font-medium">{presentation.title}</span></div> : <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
               <img
                 className="h-7 w-7 rounded-lg sm:h-8 sm:w-8"
                 src={branding.logoUrl}
@@ -200,10 +206,10 @@ export default function Header({
                   {envChipLabel}
                 </span>
               )}
-            </Link>
+            </Link>}
 
             {/* Current tenant name — hidden when env chip already encodes it (avoids "AuraBoot [Dev] · AuraBoot Dev") */}
-            {!simplified && user?.tenantName && !tenantDuplicatesChip && (
+            {!workspace && !simplified && user?.tenantName && !tenantDuplicatesChip && (
               <span className="ms-3 hidden items-center text-sm text-gray-400 2xl:flex dark:text-gray-500">
                 <span className="mx-2">·</span>
                 <span data-testid="current-tenant-name">{user.tenantName}</span>
@@ -217,7 +223,7 @@ export default function Header({
             {!simplified && <CommandPalette />}
 
             {/* AuraBot toggle */}
-            {!simplified && (
+            {!workspace && !simplified && (
               <button
                 onClick={toggleAI}
                 data-testid="ai-panel-toggle"
@@ -233,13 +239,13 @@ export default function Header({
             )}
 
             {/* Unified inbox entry point */}
-            {!simplified && showNotifications && <InboxHeaderWidget />}
+            {!workspace && !simplified && showNotifications && <InboxHeaderWidget />}
 
             {/* Notification centre bell (unread badge + SSE live updates) */}
             {!simplified && showNotifications && <NotificationHeaderWidget />}
 
             {/* Language switch — only shown in non-compact mode */}
-            {!simplified && showLanguageSwitch && (
+            {!workspace && !simplified && showLanguageSwitch && (
               <div
                 className="relative hidden sm:block"
                 ref={langDropdownRef}

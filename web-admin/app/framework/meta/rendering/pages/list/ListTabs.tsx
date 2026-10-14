@@ -25,6 +25,7 @@ export function ListTabs({ tabs, activeTab, onTabChange, locale, t }: ListTabsPr
           <button
             key={tab.key}
             data-testid={`tab-${tab.key}`}
+            aria-pressed={activeTab === tab.key}
             onClick={() => onTabChange(tab.key)}
             className={`border-b-2 px-1 py-3 text-sm font-medium whitespace-nowrap ${
               activeTab === tab.key
@@ -35,7 +36,7 @@ export function ListTabs({ tabs, activeTab, onTabChange, locale, t }: ListTabsPr
             {typeof tab.label === 'string' ? tab.label : getLocalizedText(tab.label, locale, t)}
             {(tab.count != null || tab.badge != null) && (
               <span
-                className={`ml-1.5 text-xs ${
+                className={`ml-1.5 rounded bg-subtle px-1.5 py-0.5 text-[11px] ${
                   activeTab === tab.key ? 'text-blue-400' : 'text-text-3'
                 }`}
               >

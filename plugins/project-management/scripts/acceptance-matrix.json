@@ -1,0 +1,301 @@
+[
+  {
+    "id": "P01",
+    "page": "list",
+    "state": "loaded",
+    "screenshot": "P01",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P02",
+    "page": "form",
+    "state": "loaded",
+    "screenshot": "P02",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P03",
+    "page": "form",
+    "state": "validation",
+    "screenshot": "P03",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P04",
+    "page": "detail",
+    "state": "loaded",
+    "screenshot": "P04",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P05",
+    "page": "detail",
+    "state": "confirmation",
+    "screenshot": "P05",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P06",
+    "page": "detail",
+    "state": "completion",
+    "screenshot": "P06",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P07",
+    "page": "detail",
+    "state": "reloaded",
+    "screenshot": "P07",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P08",
+    "page": "list",
+    "state": "filtered",
+    "screenshot": "P08",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P09",
+    "page": "form",
+    "state": "picker",
+    "screenshot": "P09",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P10",
+    "page": "detail",
+    "state": "readonly",
+    "screenshot": "P10",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "viewer"
+  },
+  {
+    "id": "P11",
+    "page": "form",
+    "state": "filled",
+    "screenshot": "P11",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P12",
+    "page": "list",
+    "state": "created",
+    "screenshot": "P12",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P13",
+    "page": "detail",
+    "state": "progress-dialog",
+    "screenshot": "P13",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P14",
+    "page": "detail",
+    "state": "progress-persisted-with-audit",
+    "screenshot": "P14",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P15",
+    "page": "detail",
+    "state": "milestones-tab",
+    "screenshot": "P15",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P16",
+    "page": "detail",
+    "state": "files-downloaded",
+    "screenshot": "P16",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P17",
+    "page": "detail",
+    "state": "changes-tab",
+    "screenshot": "P17",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P18",
+    "page": "detail",
+    "state": "created-attachment-persisted",
+    "screenshot": "P18",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P19",
+    "page": "detail",
+    "state": "edited-and-reloaded",
+    "screenshot": "P19",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P20",
+    "page": "list",
+    "state": "assigned-to-signed-in-member",
+    "screenshot": "P20",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "manager"
+  },
+  {
+    "id": "P21",
+    "page": "detail",
+    "state": "shared-attachment-downloaded",
+    "screenshot": "P21",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "manager"
+  },
+  {
+    "id": "P22",
+    "page": "form",
+    "state": "original-reference-populated",
+    "screenshot": "P22",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P23",
+    "page": "detail",
+    "state": "secondary-actions-open",
+    "screenshot": "P23",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  }
+]
