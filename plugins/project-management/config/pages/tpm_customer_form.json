@@ -55,7 +55,19 @@
           "label": {
             "zh-CN": "保存客户",
             "en": "Save customer"
-          }
+          },
+          "visibleWhen": "!form.pid"
+        },
+        {
+          "code": "update",
+          "action": "save",
+          "commandCode": "tpm:update_customer",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存客户",
+            "en": "Save customer"
+          },
+          "visibleWhen": "!!form.pid"
         },
         {
           "code": "cancel",
@@ -67,9 +79,5 @@
         }
       ]
     }
-  ],
-  "commands": {
-    "create": "tpm:create_customer",
-    "update": "tpm:update_customer"
-  }
+  ]
 }
