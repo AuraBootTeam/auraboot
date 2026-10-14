@@ -148,13 +148,34 @@ final class ProcurementSupplierUiInitialization {
             if (!fieldDefinitions.containsKey(model.getKey() + "::" + field))
                 throw new IllegalArgumentException("Exact model-bound physical field contribution missing: " + model.getKey() + "::" + field);
         for (var model : FIELDS.entrySet()) {
-            Path directory = owners.get(model.getKey()).resolve("config/commands");
-            Files.createDirectories(directory);
-            Path file = directory.resolve("supplier-ui-init-" + model.getKey() + ".json");
-            if (Files.exists(file)) throw new IllegalArgumentException("Initialization cannot replace a production command");
-            Files.writeString(file, json.writerWithDefaultPrettyPrinter().writeValueAsString(List.of(Map.of(
+            Path owner = owners.get(model.getKey());
+            var manifest = json.readTree(owner.resolve("plugin.json").toFile());
+            JsonNode registered = manifest.path("resourceDirs").path("commands");
+            if (!registered.isTextual() || registered.asText().isBlank())
+                throw new IllegalArgumentException("Explicit owner command resource registration required");
+            Path relative = Path.of(registered.asText());
+            Path resource = owner.resolve(relative).normalize();
+            if (relative.isAbsolute() || !resource.startsWith(owner) || resource.equals(owner))
+                throw new IllegalArgumentException("Owner command resource escapes the copied plugin");
+            var definition = json.valueToTree(Map.of(
                     "code", command(model.getKey()), "modelCode", model.getKey(), "displayName", "Synthetic supplier UI initialization",
-                    "type", "create", "inputFields", model.getValue(), "permissions", List.of("qo.procurement.integrate"), "cmd_risk_level", "L1"))));
+                    "type", "create", "inputFields", model.getValue(), "permissions", List.of("qo.procurement.integrate"), "cmd_risk_level", "L1"));
+            if (Files.isRegularFile(resource) && resource.getFileName().toString().endsWith(".json")) {
+                JsonNode current = json.readTree(resource.toFile());
+                if (!(current instanceof ArrayNode registeredCommands))
+                    throw new IllegalArgumentException("Explicit flat command array required");
+                for (JsonNode previous : registeredCommands)
+                    if (command(model.getKey()).equals(previous.path("code").asText()))
+                        throw new IllegalArgumentException("Initialization cannot replace a production command");
+                registeredCommands.add(definition);
+                Files.writeString(resource, json.writerWithDefaultPrettyPrinter().writeValueAsString(registeredCommands));
+            } else if (Files.isDirectory(resource)) {
+                Path file = resource.resolve("supplier-ui-init-" + model.getKey() + ".json");
+                if (Files.exists(file)) throw new IllegalArgumentException("Initialization cannot replace a production command");
+                Files.writeString(file, json.writerWithDefaultPrettyPrinter().writeValueAsString(List.of(definition)));
+            } else {
+                throw new IllegalArgumentException("Registered owner command resource must exist");
+            }
         }
         var sealed = new ArrayList<Map<String, Object>>();
         for (Map<String, Object> copy : copies) {

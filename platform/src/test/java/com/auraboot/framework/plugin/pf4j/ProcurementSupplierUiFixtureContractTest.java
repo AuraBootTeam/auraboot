@@ -92,8 +92,8 @@ class ProcurementSupplierUiFixtureContractTest {
     @Test void exactTwentyThreeOwnerCopiesPreserveWritersAndNeverGrantSyntheticUpdateDelete() throws Exception {
         var json = new ObjectMapper(); var sources = new java.util.ArrayList<Path>();
         for (int i = 0; i < 23; i++) {
-            Path source = root.resolve("source-" + i); Files.createDirectories(source.resolve("config/fields"));
-            Files.writeString(source.resolve("plugin.json"), "{\"pluginId\":\"com.test.hermetic.owner-" + i + "\"}"); sources.add(source);
+            Path source = root.resolve("source-" + i); Files.createDirectories(source.resolve("config/fields")); Files.createDirectories(source.resolve("config/commands"));
+            Files.writeString(source.resolve("plugin.json"), "{\"pluginId\":\"com.test.hermetic.owner-" + i + "\",\"resourceDirs\":{\"commands\":\"config/commands\"}}"); sources.add(source);
         }
         Path first = sources.getFirst();
         var models = json.createArrayNode(); var bindings = json.createArrayNode();
@@ -141,7 +141,28 @@ class ProcurementSupplierUiFixtureContractTest {
         for (String code : ProcurementSupplierUiInitialization.FIELDS.get("pr_spend_category"))
             flatFields.add(json.readTree(first.resolve("config/fields/" + code + ".json").toFile()));
         Files.writeString(second.resolve("config/fields.json"), json.writeValueAsString(flatFields));
+        var flatManifest = json.readTree(second.resolve("plugin.json").toFile());
+        ((ObjectNode) flatManifest.path("resourceDirs")).put("commands", "config/commands.json");
+        Files.writeString(second.resolve("plugin.json"), json.writeValueAsString(flatManifest));
+        var productionCommand = json.readTree("{\"code\":\"pr_spend_category:existing\",\"modelCode\":\"pr_spend_category\",\"type\":\"create\"}");
+        Files.writeString(second.resolve("config/commands.json"), json.writeValueAsString(List.of(productionCommand)));
         var scoped = ProcurementSupplierUiInitialization.prepare(sources, root.resolve("scoped-copy"), json);
+        @SuppressWarnings("unchecked") var scopedOwners = (List<Map<String, Object>>) scoped.get("ownerDirectories");
+        var loader = new com.auraboot.framework.plugin.service.impl.PluginDirectoryLoader();
+        var loaded = loader.loadFromDirectory(Path.of(scopedOwners.get(1).get("testDirectory").toString()));
+        assertEquals(Set.of("pr_spend_category:existing", ProcurementSupplierUiInitialization.command("pr_spend_category")),
+                loaded.getCommands().stream().map(command -> command.getCode()).collect(java.util.stream.Collectors.toSet()));
+        var copiedFlat = json.readTree(Path.of(scopedOwners.get(1).get("testDirectory").toString()).resolve("config/commands.json").toFile());
+        assertEquals(productionCommand, copiedFlat.get(0));
+        assertEquals(flatManifest, json.readTree(Path.of(scopedOwners.get(1).get("testDirectory").toString()).resolve("plugin.json").toFile()));
+        var wrongRegistration = flatManifest.deepCopy();
+        ((ObjectNode) wrongRegistration.path("resourceDirs")).put("commands", "../outside.json");
+        Files.writeString(second.resolve("plugin.json"), json.writeValueAsString(wrongRegistration));
+        assertThrows(IllegalArgumentException.class, () -> ProcurementSupplierUiInitialization.prepare(sources, root.resolve("escaped-copy"), json));
+        ((ObjectNode) wrongRegistration.path("resourceDirs")).remove("commands");
+        Files.writeString(second.resolve("plugin.json"), json.writeValueAsString(wrongRegistration));
+        assertThrows(IllegalArgumentException.class, () -> ProcurementSupplierUiInitialization.prepare(sources, root.resolve("unregistered-copy"), json));
+        Files.writeString(second.resolve("plugin.json"), json.writeValueAsString(flatManifest));
         @SuppressWarnings("unchecked") var scopedFields = (List<Map<String, Object>>) scoped.get("exactFieldWriterAppendix");
         var sameCode = scopedFields.stream().filter(f -> f.get("field").equals("pr_spc_name")).toList();
         assertEquals(2, sameCode.size());
