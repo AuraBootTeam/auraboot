@@ -107,7 +107,7 @@ CREATE TABLE public.ab_agent_definition (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     knowledge_base_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
     proactive_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT chk_agent_definition_knowledge_base_ids_array CHECK ((jsonb_typeof(knowledge_base_ids) = 'array'::text))
@@ -1439,7 +1439,7 @@ CREATE TABLE public.ab_agent_artifact (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -1986,7 +1986,7 @@ CREATE TABLE public.ab_agent_mcp_server (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     stdio_args jsonb DEFAULT '[]'::jsonb NOT NULL,
     transport_config jsonb DEFAULT '{}'::jsonb NOT NULL,
     last_sync_error character varying(1000)
@@ -2639,7 +2639,7 @@ CREATE TABLE public.ab_agent_schedule (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     agent_code character varying(64),
     manager_member_id bigint,
     quiet_hours_start time without time zone,
@@ -2831,7 +2831,7 @@ CREATE TABLE public.ab_agent_skill (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     output_schema jsonb,
     output_type character varying(30) DEFAULT 'text'::character varying,
     render_hint character varying(50),
@@ -3048,7 +3048,7 @@ CREATE TABLE public.ab_agent_task (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -3115,7 +3115,7 @@ CREATE TABLE public.ab_agent_tool (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -4032,7 +4032,7 @@ CREATE TABLE public.ab_approval_policy (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 

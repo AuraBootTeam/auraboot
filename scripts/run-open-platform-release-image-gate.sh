@@ -284,10 +284,17 @@ PYAPPSECRETS
 # builtin-import plugins (plugin.json + config/, no PF4J descriptor), and
 # since #2037 AuraPluginManager fails fast on undescribed paths instead of
 # skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
+APP_HOST_PORT="$(python3 - <<'PYAPPPORT'
+import socket
+with socket.socket() as listener:
+    listener.bind(("127.0.0.1", 0))
+    print(listener.getsockname()[1])
+PYAPPPORT
+)"
 docker run -d --name "$APP" --network "$NET" --network-alias app --memory=4g \
   --env-file "$APP_SECRET_ENV" \
   --label "aura.job-id=$AURA_CI_JOB_ID" --label "aura.source-ref=$REF_SHA" \
-  -p 127.0.0.1::6443 \
+  -p "127.0.0.1:$APP_HOST_PORT:6443" \
   -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
   -e DATABASE_URL="jdbc:postgresql://pg:5432/open_platform_ci" \
@@ -296,7 +303,7 @@ docker run -d --name "$APP" --network "$NET" --network-alias app --memory=4g \
   -e AURA_BUILTIN_PLUGINS_DIR=/app/plugins \
   -e AURA_PLUGINS_DIR=/app/pf4j-plugins \
   -e AURA_SSRF_ALLOWED_PRIVATE_HOSTS="$NETWORK_GATEWAY" \
-  "$IMAGE" >/dev/null
+  "$IMAGE" >/dev/null || fatal "application container could not bind its selected loopback port"
 docker inspect "$APP" --format '{{json .HostConfig.Memory}}' > "$ARTIFACTS/app-memory-limit.json"
 python3 - "$ARTIFACTS/app-memory-limit.json" <<'PYAPPMEMORY'
 import json, sys

@@ -107,7 +107,13 @@ assert.match(sdkPreparation, /if node consumer\.test\.mjs > runtime\.log 2>&1/);
 assert.match(sdkPreparation, /--strict --noEmit --module nodenext --target es2022 consumer-ts-check\.ts/);
 assert.match(sdkPreparation, /printf '0\\n' > types\.exit/);
 
-assert.match(gate, /-p 127\.0\.0\.1::6443/);
+assert.match(gate, /-p "127\.0\.0\.1:\$APP_HOST_PORT:6443"/);
+assert.doesNotMatch(gate, /127\.0\.0\.1::6443/);
+const portStart = gate.indexOf('APP_HOST_PORT=');
+const portGenerator = gate.slice(portStart,gate.indexOf('docker run -d',portStart));
+const portResult = spawnSync('bash',['-c',portGenerator+'\nprintf "%s" "$APP_HOST_PORT"'],{encoding:'utf8'});
+assert.equal(portResult.status,0,portResult.stderr);
+assert.ok(Number(portResult.stdout)>0 && Number(portResult.stdout)<65536);
 assert.match(gate, /protocol binding is not loopback-only/);
 assert.match(gate, /"sdkCases": 13/);
 assert.match(gate, /BUSINESS_FIXTURE_PATH=\/artifacts\/slo-fixture\.json/);
