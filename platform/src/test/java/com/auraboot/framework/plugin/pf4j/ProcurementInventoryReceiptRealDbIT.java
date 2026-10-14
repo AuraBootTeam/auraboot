@@ -138,7 +138,7 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         codes.addAll(List.of("qo.procurement.manage","model.pr_spend_category.read","model.pr_supplier_common.read",
                 "model.qo_procurement_history_common.read","model.qo_procurement_submission_common.read",
                 "model.qo_procurement_submission_line_common.read","model.qo_procurement_execution_common.read",
-                "model.qo_procurement_category_policy_common.read","prod.product.manage","model.prod_product.create","model.prod_product.update"));
+                "model.qo_procurement_category_policy_common.read","model.qo_procurement_category_supplier_common.read","prod.product.manage","model.prod_product.create","model.prod_product.update"));
         return List.copyOf(codes);
     }
     private String prerequisiteActor() {

@@ -29,7 +29,8 @@ class ProcurementInventoryNativeAdmissionContractTest {
     }
     @Test void prerequisiteActorHasOnlyDeclaredFunctionalAndModelPermissions() {
         var permissions=ProcurementInventoryReceiptRealDbIT.prerequisitePermissions();
-        assertEquals(21,permissions.size());assertEquals(21,Set.copyOf(permissions).size());
+        assertEquals(22,permissions.size());assertEquals(22,Set.copyOf(permissions).size());
+        assertTrue(permissions.contains("model.qo_procurement_category_supplier_common.read"));
         assertFalse(permissions.contains("*"));assertFalse(permissions.contains("qo.srm.use"));
         assertTrue(permissions.containsAll(List.of("meta.command.execute","qo.procurement.integrate",
                 "qo.procurement.manage","prod.product.manage","model.prod_product.create","model.prod_product.update")));
