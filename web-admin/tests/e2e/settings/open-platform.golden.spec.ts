@@ -99,7 +99,12 @@ const queryEnglish: Record<string, string> = {
   "停用查询": "Withdraw query",
   "查询操作确认": "Confirm query operation",
   "原对象属性": "Source property",
-  "对外属性名称": "Public property name"
+  "对外属性名称": "Public property name",
+  "执行预算": "Execution budgets",
+  "单页上限": "Maximum page size",
+  "结果总量上限": "Maximum result rows",
+  "查询超时（毫秒）": "Query timeout (ms)",
+  "同时执行上限": "Maximum concurrent executions"
 };
 const queryText = (cn: string) => {
   if (queryLocale === 'zh-CN') return cn;
@@ -760,13 +765,50 @@ test.describe('Dynamic query publication journey', () => {
       await expect(output).toBeInViewport({ ratio: 1 });
       await output.screenshot({ path: path.join(screenshotRoot, `${image}.png`) });
     }
+    const budgets = { maxPageSize: 7, maxRows: 35, timeoutMs: 1200, maxConcurrent: 3 };
+    const budgetInputs = [
+      ['maxPageSize', "单页上限"], ['maxRows', "结果总量上限"],
+      ['timeoutMs', "查询超时（毫秒）"], ['maxConcurrent', "同时执行上限"],
+    ] as const;
+    for (const [key, label] of budgetInputs) await editor.getByLabel(queryText(label), { exact: true }).fill(String(budgets[key]));
+    const pageLimit = editor.getByLabel(queryText("单页上限"), { exact: true });
+    const rowLimit = editor.getByLabel(queryText("结果总量上限"), { exact: true });
+    let prematureBudgetWrites = 0;
+    const observeBudgetWrites = (request: import('@playwright/test').Request) => {
+      if (request.method() === 'PUT' && new URL(request.url()).pathname.endsWith(`/query-publications/${publicCode}/draft`)) prematureBudgetWrites++;
+    };
+    page.on('request', observeBudgetWrites);
+    await rowLimit.fill('0');
+    await activateWithEnter(editor.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }));
+    await expect(pageLimit).toBeFocused();
+    await expect(pageLimit).toHaveAttribute('aria-invalid', 'true');
+    await expect(rowLimit).toHaveAttribute('aria-invalid', 'true');
+    await rowLimit.fill(String(budgets.maxRows));
+    await expect(rowLimit).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(pageLimit).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(pageLimit.locator('..').getByRole('alert')).toHaveCount(0);
+    expect(prematureBudgetWrites).toBe(0);
+    page.off('request', observeBudgetWrites);
+    const budgetRegion = editor.getByRole('heading', { name: queryText("执行预算"), exact: true }).locator('..');
+    await budgetRegion.scrollIntoViewIfNeeded();
+    await expect(budgetRegion).toBeInViewport({ ratio: 1 });
+    await budgetRegion.screenshot({ path: path.join(screenshotRoot, 'query-budget-configured-region.png') });
     await editor.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).locator('..').locator('..').screenshot({ path: path.join(screenshotRoot, 'query-footer-region.png') });
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
     await activateWithEnter(page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }));
     const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200); const saved = await savedHttp.json(); expect(String(saved.code)).toBe('0');
+    expect(saved.data.draft).toMatchObject(budgets);
     expect(saved.data.draft).toMatchObject({ sourceFingerprint: source.data.fingerprint, sourceResources: { [modelCode]: sourceCode }, parameters: { zone: { type: 'string', required: true, nullable: false } } });
     expect(saved.data.draft.fields.details).toMatchObject({ readable: true, writable: false, properties: { contactName: { source: 'contact_name', readable: true, writable: false } } });
     await expect(editor.getByRole('status')).toContainText(queryText("查询草稿已保存并通过来源校验")); await snapshot('query-draft');
+    await page.reload();
+    await editor.getByRole('listitem').filter({ has: page.getByText(publicCode, { exact: true }) })
+      .getByRole('button', { name: queryText("编辑查询合同"), exact: true }).click();
+    for (const [key, label] of budgetInputs) await expect(editor.getByLabel(queryText(label), { exact: true })).toHaveValue(String(budgets[key]));
+    await expect(editor.getByRole('button', { name: queryText("发布查询"), exact: true })).toBeEnabled();
+    await budgetRegion.scrollIntoViewIfNeeded();
+    await expect(budgetRegion).toBeInViewport({ ratio: 1 });
+    await budgetRegion.screenshot({ path: path.join(screenshotRoot, 'query-budget-reopened-region.png') });
     await activateWithEnter(page.getByRole('button', { name: queryText("发布查询"), exact: true }));
     await activateWithEnter(page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }));
     await expect(editor.getByRole('status')).toContainText(queryText("已发布查询")); await snapshot('query-publish');

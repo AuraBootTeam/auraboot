@@ -1,4 +1,4 @@
-import { cloneElement, useId, useState, type ReactElement, type ChangeEventHandler, type FormEventHandler } from 'react';
+import { cloneElement, useEffect, useId, useState, type ReactElement, type ChangeEventHandler, type FormEventHandler } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 
 type Control = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
@@ -8,6 +8,12 @@ export function PublicationField({ name, child, help }: { name: string; child: L
   const id = useId();
   const { t, locale } = useI18n();
   const [validationProblem, setValidationProblem] = useState<'required' | 'invalid' | null>(null);
+  useEffect(() => {
+    if (!validationProblem) return;
+    // A sibling value can change this control's native min/max constraints.
+    const control = document.getElementById(id) as Control | null;
+    if (control?.validity.valid) setValidationProblem(null);
+  });
   const validationError = validationProblem ? t(`openPlatform.controls.${validationProblem}`, undefined,
     locale.startsWith('zh') ? (validationProblem === 'required' ? `请填写${name}。` : `请检查${name}的输入格式或范围。`)
       : (validationProblem === 'required' ? `Enter ${name}.` : `Check the format or range of ${name}.`)) : '';
