@@ -402,9 +402,12 @@ if [[ "$RELEASE_MUTATION" == "webhook-backlog" ]]; then
     "INSERT INTO ab_webhook_subscription (tenant_id,pid,name,target_url,event_type)
        SELECT id,'ci-drain-mutation','CI drain mutation','https://example.invalid/hook','ci.mutation'
        FROM ab_tenant ORDER BY id LIMIT 1;
+     INSERT INTO ab_webhook_receiver_lane (tenant_id,receiver_key)
+       SELECT tenant_id,'https://example.invalid:443'
+       FROM ab_webhook_subscription WHERE pid='ci-drain-mutation';
      INSERT INTO ab_webhook_delivery_log
-       (pid,tenant_id,subscription_pid,request_url,delivery_status,retry_count,max_retries,next_retry_at,created_at,updated_at)
-       SELECT 'ci-drain-delivery',tenant_id,pid,target_url,'pending',0,3,NOW(),NOW(),NOW()
+       (pid,tenant_id,subscription_pid,receiver_key,request_url,delivery_status,retry_count,max_retries,next_retry_at,created_at,updated_at)
+       SELECT 'ci-drain-delivery',tenant_id,pid,'https://example.invalid:443',target_url,'pending',0,3,NOW(),NOW(),NOW()
        FROM ab_webhook_subscription WHERE pid='ci-drain-mutation';" >/dev/null
 fi
 DRAINED=0
