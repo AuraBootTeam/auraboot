@@ -1079,6 +1079,19 @@ export function shouldSkipModelFieldMeta(
 
 export type ListMiscBlocksPosition = 'beforeTable' | 'afterTable';
 
+/** Custom-only lists still render declared external tables, without enabling native model reads. */
+export function collectListMiscBlocks(schema: any, skipListData = shouldSkipListData(schema)): any[] {
+  if (!Array.isArray(schema?.blocks)) return [];
+  const specialized = new Set(['table', 'filters', 'toolbar', 'tabs', 'form-buttons', 'form-section']);
+  return schema.blocks.filter((block: any) => {
+    if (skipListData && block.blockType === 'table' && typeof block.dataSource === 'string') {
+      const source = schema.dataSources?.[block.dataSource];
+      return source?.type === 'api' && typeof source.endpoint === 'string' && source.endpoint.trim() !== '';
+    }
+    return !specialized.has(block.blockType);
+  });
+}
+
 export function resolveListMiscBlocksPosition(
   schema: { extension?: Record<string, any> } | null | undefined,
 ): ListMiscBlocksPosition {
@@ -1479,18 +1492,10 @@ function ListPageContentInner(props: PageContentProps) {
   // (chart / description / rich-text / divider / stat-card / etc.) were
   // previously dropped silently. Collect them here and render via BlockRenderer
   // at the end of the list page so they appear in the UI.
-  const LIST_SPECIALIZED_BLOCK_TYPES = new Set<string>([
-    'table',
-    'filters',
-    'toolbar',
-    'tabs',
-    'form-buttons',
-    'form-section',
-  ]);
-  const miscListBlocks = useMemo(() => {
-    if (!schema?.blocks) return [];
-    return schema.blocks.filter((b: any) => !LIST_SPECIALIZED_BLOCK_TYPES.has(b.blockType));
-  }, [schema]);
+  const miscListBlocks = useMemo(
+    () => collectListMiscBlocks(schema, skipListData),
+    [schema, skipListData],
+  );
 
   // Sync URL pagination params -> local state (supports refresh and browser back/forward).
   useEffect(() => {
