@@ -17,6 +17,10 @@ test('customer delivery from menu through milestone completion @smoke', async ({
   const shot = async (id: string) => {
     const row = matrix.find((entry: { id: string }) => entry.id === id);
     if (!row) throw new Error(`Unregistered screenshot scenario: ${id}`);
+    if (await page.getByTestId('object-section-overview').isVisible()) {
+      await expect(page.getByTestId('collection-completion')).toBeVisible();
+    }
+    await expect(page.getByText('加载中...', { exact: true })).toHaveCount(0);
     await fs.mkdir(path.join(evidence, 'screenshots'), { recursive: true });
     await page.screenshot({ path: path.join(evidence, 'screenshots', `${id}.png`) });
     row.status = 'captured';
@@ -102,6 +106,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByTestId('collection-completion')).toHaveText('3 / 4 已完成');
     await expect(page.getByTestId('object-summary').getByRole('progressbar')).toHaveAttribute('aria-valuenow', '68');
     await expect(page.getByTestId('detail-workspace-aside')).toContainText('核心功能联调');
+    await expect(page.getByTestId('collection-focus')).toContainText('验收与上线');
     await shot('P06');
     await page.reload();
     await expect(page.getByTestId('collection-completion')).toHaveText('3 / 4 已完成');
@@ -167,6 +172,9 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     expect((await (await uploadResponse).json()).code).toBe('0');
     await expect(page.getByTestId('form-field-tpm_pj_files')).toContainText('delivery-notes.txt');
     await shot('P11');
+    await page.getByTestId('form-field-tpm_pj_files').scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('form-field-tpm_pj_files')).toBeInViewport();
+    await page.screenshot({ path: path.join(evidence, 'screenshots', 'P11-supplement.png') });
     const createResponse = page.waitForResponse(response => response.url().includes('/execute/tpm:create_project') && response.request().method() === 'POST');
     await page.getByTestId('form-btn-submit').click();
     const createdResponse = await createResponse;
@@ -221,6 +229,8 @@ test('delivery viewer can inspect progress but cannot edit or complete @smoke', 
   await expect(page.getByRole('button', { name: '编辑项目', exact: true })).toHaveCount(0);
   await expect(page.getByTestId('toolbar-btn-update_progress')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '完成里程碑', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('collection-completion')).toHaveText('3 / 4 已完成');
+  await expect(page.getByText('加载中...', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(evidence, 'screenshots', 'P10.png') });
   const matrix = JSON.parse(await fs.readFile(path.join(evidence, 'acceptance-matrix.json'), 'utf8'));
   matrix.find((row: { id: string }) => row.id === 'P10').status = 'captured';
