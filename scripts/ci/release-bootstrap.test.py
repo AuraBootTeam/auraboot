@@ -17,8 +17,8 @@ class BootstrapTests(unittest.TestCase):
             def request(path, **kwargs):
                 calls.append((path, kwargs))
                 if "import-directory-sync" in path:
-                    return 200, {"code": "1" if fault == "envelope" else "0",
-                                 "data": {"success": fault != "import"}}, {}
+                    result = {"success": fault != "import"}
+                    return 200, {"code": "0", "data": result} if fault == "envelope" else result, {}
                 return 200, {"code": "0", "data": [] if fault == "command" else [{"code": "admin:create_member"}]}, {}
             if fault:
                 with self.assertRaises(RuntimeError):

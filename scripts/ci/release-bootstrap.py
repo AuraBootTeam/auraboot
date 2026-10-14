@@ -12,8 +12,7 @@ def provision_replay_actor_commands(request, admin):
                                    "autoPublishModels": True, "autoPublishFields": True,
                                    "autoPublishCommands": True, "autoPublishPages": True,
                                    "createResourcePermissions": True})
-        result = response_data(body, "replay actor plugin import")
-        if not isinstance(result, dict) or result.get("success") is not True:
+        if not isinstance(body, dict) or body.get("success") is not True:
             raise RuntimeError("Replay actor plugin import did not succeed: " + plugin)
     _, body, _ = request("/api/meta/commands?modelCode=tenant_member", headers=admin)
     commands = response_data(body, "replay actor command catalog")
