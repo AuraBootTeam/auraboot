@@ -26,6 +26,7 @@ interface FieldChangeLog {
 
 export interface FieldHistoryViewerProps {
   compact?: boolean;
+  units?: Record<string, string>;
   fields?: string[];
   modelCode: string;
   recordPid: string; // public record PID
@@ -40,6 +41,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   token,
   locale = 'zh-CN',
   compact = false,
+  units,
   fields,
 }) => {
   const [changes, setChanges] = useState<FieldChangeLog[]>([]);
@@ -153,14 +155,14 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                           className="text-status-green max-w-[200px] truncate"
                           title={entry.newValue || ''}
                         >
-                          {entry.newValue || '—'}
+                          {entry.newValue == null ? '—' : `${entry.newValue}${units?.[entry.fieldCode] || ''}`}
                         </span>
                       ) : entry.changeType.toLowerCase() === 'removed' ? (
                         <span
                           className="text-status-red max-w-[200px] truncate line-through"
                           title={entry.oldValue || ''}
                         >
-                          {entry.oldValue || '—'}
+                          {entry.oldValue == null ? '—' : `${entry.oldValue}${units?.[entry.fieldCode] || ''}`}
                         </span>
                       ) : (
                         <>
@@ -168,7 +170,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                             className="text-status-red max-w-[140px] truncate line-through"
                             title={entry.oldValue || ''}
                           >
-                            {entry.oldValue || '—'}
+                            {entry.oldValue == null ? '—' : `${entry.oldValue}${units?.[entry.fieldCode] || ''}`}
                           </span>
                           <svg
                             className="text-text-3 h-3 w-3 flex-shrink-0"
@@ -183,7 +185,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                             className="text-status-green max-w-[140px] truncate"
                             title={entry.newValue || ''}
                           >
-                            {entry.newValue || '—'}
+                            {entry.newValue == null ? '—' : `${entry.newValue}${units?.[entry.fieldCode] || ''}`}
                           </span>
                         </>
                       )}

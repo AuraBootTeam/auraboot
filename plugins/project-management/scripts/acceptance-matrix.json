@@ -271,5 +271,31 @@
     },
     "locale": "zh-CN",
     "role": "manager"
+  },
+  {
+    "id": "P22",
+    "page": "form",
+    "state": "original-reference-populated",
+    "screenshot": "P22",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P23",
+    "page": "detail",
+    "state": "secondary-actions-open",
+    "screenshot": "P23",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
   }
 ]

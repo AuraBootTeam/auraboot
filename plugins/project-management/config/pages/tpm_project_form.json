@@ -249,6 +249,52 @@
     "linkFileAttachments": true,
     "attachmentFields": [
       "tpm_pj_files"
-    ]
+    ],
+    "editGuidance": {
+      "title": {
+        "zh-CN": "完善项目的下一步",
+        "en": "Next steps for this project"
+      },
+      "description": {
+        "zh-CN": "交付阶段通过项目动作推进，整体进度由负责人汇报。",
+        "en": "Use project actions to advance the stage; the owner reports overall progress."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh-CN": "确认需求范围",
+            "en": "Confirm requirements"
+          },
+          "description": {
+            "zh-CN": "明确客户期望与交付边界",
+            "en": "Agree on customer expectations and delivery scope"
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "拆分交付里程碑",
+            "en": "Plan delivery milestones"
+          },
+          "description": {
+            "zh-CN": "为每个阶段安排内容和时间",
+            "en": "Define each deliverable and target date"
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "跟进进度与验收",
+            "en": "Track progress and acceptance"
+          },
+          "description": {
+            "zh-CN": "保留变更记录，减少沟通遗漏",
+            "en": "Keep change history to prevent missed communication"
+          }
+        }
+      ],
+      "note": {
+        "zh-CN": "项目属于当前空间。具体查看与编辑范围由成员权限决定。",
+        "en": "The project belongs to this space. Member permissions govern access."
+      }
+    }
   }
 }

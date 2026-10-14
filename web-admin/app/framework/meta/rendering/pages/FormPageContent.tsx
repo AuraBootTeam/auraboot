@@ -3012,7 +3012,7 @@ export function FormPageContent(props: PageContentProps) {
                 )}
             </form>
             </div>
-            {workspace && schema.extension?.formGuidance && <WorkspaceGuidance config={schema.extension.formGuidance} locale={locale} t={t} />}
+            {workspace && schema.extension?.formGuidance && <WorkspaceGuidance config={(isEditMode && schema.extension?.editGuidance) || schema.extension.formGuidance} locale={locale} t={t} />}
             </div>
           </div>
         </div>

@@ -310,7 +310,8 @@
                   "label": {
                     "zh-CN": "项目文件",
                     "en": "Project files"
-                  }
+                  },
+                  "hideLabel": true
                 }
               ],
               "extension": {
@@ -396,7 +397,10 @@
                 "fields": [
                   "tpm_pj_progress",
                   "tpm_pj_end_date"
-                ]
+                ],
+                "units": {
+                  "tpm_pj_progress": "%"
+                }
               }
             },
             {
@@ -545,7 +549,8 @@
                   "label": {
                     "zh-CN": "项目文件",
                     "en": "Project files"
-                  }
+                  },
+                  "hideLabel": true
                 }
               ],
               "extension": {
@@ -577,7 +582,10 @@
                 "fields": [
                   "tpm_pj_progress",
                   "tpm_pj_end_date"
-                ]
+                ],
+                "units": {
+                  "tpm_pj_progress": "%"
+                }
               }
             },
             {

@@ -2471,6 +2471,7 @@ function DetailBlockRenderer({
         t={t}
         compact={(block as any).extension?.density === 'compact'}
         fields={(block as any).extension?.fields}
+        units={(block as any).extension?.units}
       /></section>
     );
   }

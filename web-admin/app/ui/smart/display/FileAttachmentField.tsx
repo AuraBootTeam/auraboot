@@ -131,7 +131,7 @@ export function FileAttachmentField({
             rel="noopener noreferrer"
             className="text-accent flex items-center gap-2 text-sm hover:underline"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="border-border bg-subtle text-text-3 h-8 w-7 shrink-0 rounded border p-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

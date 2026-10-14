@@ -57,7 +57,7 @@ Run the browser journey with `DELIVERY_WEB_URL` and the same evidence directory:
 pnpm --dir web-admin exec playwright test -c playwright.delivery.config.ts
 ```
 
-Copy `scripts/acceptance-matrix.json` into the evidence round before running the journey (P01-P21). The completion test expects the first controlled project to begin with two of four milestones reached. It retains the completed milestone and requires a fresh controlled fixture for another full run; it does not silently revert business state.
+Copy `scripts/acceptance-matrix.json` into the evidence round before running the journey (P01-P23). The completion test expects the first controlled project to begin with two of four milestones reached. It retains the completed milestone and requires a fresh controlled fixture for another full run; it does not silently revert business state.
 
 `detailAsideBlockIds` is an opt-in shared detail layout: the configured blocks move into a responsive aside, other blocks retain their DSL order. Child mutations reload declared page data sources and remount activity blocks so unchanged parent snapshots cannot leave derived progress or activities stale. Completion time is assigned by the command, not supplied by the browser. Historical milestones without a recorded completion timestamp are excluded from completion facts; they are not backfilled into fictitious history.
 

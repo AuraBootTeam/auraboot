@@ -75,6 +75,16 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     const milestone = page.getByRole('row').filter({ hasText: '核心功能联调' });
     await expect(milestone).toContainText('待达成');
     await shot('P04');
+    await page.getByTestId('toolbar-btn-edit').click();
+    await expect(page.locator('#tpm_pj_name')).toHaveValue(projectName);
+    await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
+    await shot('P22');
+    await page.getByTestId('form-btn-cancel').click();
+    await projectRow().getByRole('button', { name: '查看', exact: true }).click();
+    await page.getByTestId('detail-toolbar-more').locator('summary').click();
+    await expect(page.getByTestId('toolbar-btn-submit_acceptance')).toBeVisible();
+    await shot('P23');
+    await page.getByTestId('detail-toolbar-more').locator('summary').click();
     await milestone.getByRole('button', { name: '完成里程碑', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await shot('P05');
@@ -130,11 +140,11 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await shot('P17');
 
     await page.getByText('项目', { exact: true }).click();
-    await page.getByRole('button', { name: '待验收', exact: true }).click();
+    await page.getByTestId('tab-acceptance').click();
     await expect(page.getByRole('row').filter({ hasText: '远航物流' })).toBeVisible();
     await expect(projectRow()).toHaveCount(0);
     await shot('P08');
-    await page.getByRole('button', { name: '全部项目', exact: true }).click();
+    await page.getByTestId('tab-all').click();
     await page.getByRole('button', { name: '新建项目', exact: true }).click();
     await page.getByTestId('user-select-trigger-tpm_pj_owner_user').click();
     await expect(page.getByTestId('user-select-search-tpm_pj_owner_user')).toBeVisible();
