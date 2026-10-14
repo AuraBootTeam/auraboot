@@ -46,8 +46,33 @@ assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) 
 assert.match(gate, /node \/sdk\/toolchain\/node_modules\/typescript\/bin\/tsc/);
 assert.match(gate, /PROFILE=production/);
 assert.match(gate, /SPRING_PROFILES_ACTIVE=community/);
-assert.match(gate, /JWT_KEY="\$\(openssl rand -base64 64/);
-assert.match(gate, /-e JWT_SECRET="\$JWT_KEY"/);
+assert.match(gate, /docker run -d.*--memory=4g/);
+assert.match(gate, /--env-file "\$APP_SECRET_ENV"/);
+assert.doesNotMatch(gate, /-e (?:JWT_SECRET|FIELD_ENCRYPTION_KEY|OPEN_PLATFORM_PROTOCOL_SIGNING_KEY)=/);
+const secretGenerator = gate.slice(gate.indexOf('python3 - "$APP_SECRET_ENV"'), gate.indexOf('# AURA_PLUGINS_DIR'));
+const keySizes = {FIELD_ENCRYPTION_KEY:32, OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:48, JWT_SECRET:64};
+const secretDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'open-platform-app-secrets-'));
+try {
+  const file = path.join(secretDirectory, 'app.env');
+  const generate = script => spawnSync('bash', ['-c', script], {encoding:'utf8', env:{...process.env, APP_SECRET_ENV:file}});
+  const result = generate(secretGenerator);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  const values = Object.fromEntries(fs.readFileSync(file, 'utf8').trim().split('\n').map(line => {
+    const index = line.indexOf('='); return [line.slice(0,index),line.slice(index+1)];
+  }));
+  assert.deepEqual(Object.keys(values).sort(), Object.keys(keySizes).sort());
+  for (const [name,size] of Object.entries(keySizes)) assert.equal(Buffer.from(values[name],'base64').length,size);
+  const before = fs.readFileSync(file);
+  assert.notEqual(generate(secretGenerator).status, 0);
+  assert.deepEqual(fs.readFileSync(file), before);
+  fs.unlinkSync(file);
+  const missing = generate(secretGenerator.replace('("FIELD_ENCRYPTION_KEY", 32),',''));
+  assert.equal(missing.status, 0, missing.stderr);
+  assert.equal(fs.readFileSync(file,'utf8').includes('FIELD_ENCRYPTION_KEY='),false);
+  assert.throws(()=>assert.deepEqual(fs.readFileSync(file,'utf8').trim().split('\n').map(s=>s.split('=')[0]).sort(),Object.keys(keySizes).sort()));
+} finally { fs.rmSync(secretDirectory,{recursive:true,force:true}); }
 assert.doesNotMatch(probe, /\/api\/test\/seed/);
 assert.match(slo, /open_api_errors/);
 assert.match(slo, /p\(95\)<250/);
@@ -106,7 +131,7 @@ assert.match(gate, /open_platform_backend_catalog\.py" verify/);
 assert.match(gate, /backend case reconciliation failed/);
 assert.match(gate, /--coverage "\$ARTIFACTS\/backend-jacoco\.xml"/);
 assert.match(gate, /"backend": json\.load\(open\("\$ARTIFACTS\/backend-receipt\.json"\)\)/);
-assert.ok(gate.indexOf('backend case reconciliation failed') < gate.indexOf('PROTOCOL_KEY='));
+assert.ok(gate.indexOf('backend case reconciliation failed') < gate.indexOf('PYAPPSECRETS'));
 assert.match(gate, /mapfile -t classes < \/artifacts\/backend-selectors\.txt/);
 assert.match(gate, /\.\/gradlew :test "\$\{args\[@\]\}" :jacocoTestReport --no-daemon/);
 assert.match(probe, /"tinv_pd_code": "REL-PRODUCT-001"/);
@@ -213,6 +238,8 @@ for (const [status, ownLock] of [[0, true], [1, true], [42, true], [42, false], 
     fs.writeFileSync(credentials, 'private-sentinel');
     const modelKey = path.join(artifacts, 'private-model-key');
     fs.writeFileSync(modelKey, 'private-sentinel');
+    const appKey = path.join(work, 'app-secrets.env');
+    fs.writeFileSync(appKey, 'private-sentinel');
     fs.writeFileSync(path.join(artifacts, 'slo-fixture.json'), 'private-sentinel');
     const calls = path.join(work, 'docker-calls');
     const result = spawnSync('bash', ['-c', `set -Eeuo pipefail
@@ -222,7 +249,7 @@ trap cleanup EXIT
 exit ${status}
 `], {
       encoding:'utf8', env:{...process.env, WORK_ROOT:work, ARTIFACTS:artifacts, LOCK_DIR:lock,
-        LOCK_TOKEN:'mine', CREDENTIAL_ARTIFACT:credentials, MODEL_EVENT_SECRET_FILE:modelKey, SLO_FIXTURE_ARTIFACT:path.join(artifacts, 'slo-fixture.json'), CALLS:calls, NET:'owned-network',
+        LOCK_TOKEN:'mine', CREDENTIAL_ARTIFACT:credentials, MODEL_EVENT_SECRET_FILE:modelKey, APP_SECRET_ENV:appKey, SLO_FIXTURE_ARTIFACT:path.join(artifacts, 'slo-fixture.json'), CALLS:calls, NET:'owned-network',
         DB_SAMPLE_PID:'', DB_SAMPLE_STOP:path.join(artifacts, 'db-sampling.stop'),
         APP:'owned-app', PG:'owned-pg', REDIS:'owned-redis', IMAGE:'owned-image'}
     });
@@ -230,6 +257,7 @@ exit ${status}
     assert.equal(fs.readFileSync(database, 'utf8'), 'retained database bytes');
     assert.equal(fs.existsSync(credentials), false);
     assert.equal(fs.existsSync(modelKey), false);
+    assert.equal(fs.existsSync(appKey), false);
     assert.equal(fs.existsSync(path.join(artifacts, 'slo-fixture.json')), false);
     assert.equal(fs.existsSync(lock), !ownLock);
     if (!ownLock) assert.equal(fs.readFileSync(path.join(lock, 'owner'), 'utf8'), 'other');
