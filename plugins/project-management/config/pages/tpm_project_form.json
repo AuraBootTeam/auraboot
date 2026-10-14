@@ -143,6 +143,11 @@
     }
   ],
   "extension": {
-    "formWidth": "comfortable"
+    "formWidth": "comfortable",
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目协作",
+      "en": "Project collaboration"
+    }
   }
 }

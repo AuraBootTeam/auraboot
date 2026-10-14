@@ -27,6 +27,8 @@
 import React from 'react';
 
 export interface PaginationProps {
+  /** Keep record count and navigation visible for a single-page workspace. */
+  alwaysVisible?: boolean;
   /** 当前页码 (从 1 开始) */
   current: number;
 
@@ -57,6 +59,7 @@ export interface PaginationProps {
 
 export const Pagination: React.FC<PaginationProps> = ({
   current,
+  alwaysVisible = false,
   pageSize,
   total,
   onChange,
@@ -171,7 +174,7 @@ export const Pagination: React.FC<PaginationProps> = ({
     return buttons;
   };
 
-  if (totalPages <= 1) {
+  if (totalPages <= 1 && !alwaysVisible) {
     return null; // 只有一页或没有数据时不显示分页
   }
 

@@ -3547,7 +3547,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
 
       // Use CellRendererRegistry for valueType-based rendering
-      const rendererType = (column as any).cellRenderer || effectiveValueType;
+      const rendererType = column.presentation ? 'workspace' : (column as any).cellRenderer || effectiveValueType;
       return cellRendererRegistry.render(rendererType, {
         value,
         record: recordForRenderer,
@@ -3561,6 +3561,7 @@ function ListPageContentInner(props: PageContentProps) {
           timezone: effectiveTimezone,
           render: column.render,
           tagMap: (column as any).tagMap,
+          presentation: column.presentation,
         },
         expressionContext: pageContext,
         locale,
@@ -4684,7 +4685,7 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Row height from current view config (with fallback)
-  const effectiveRowHeight: RowHeight = effectiveViewConfig?.rowHeight || DEFAULT_ROW_HEIGHT;
+  const effectiveRowHeight: RowHeight = effectiveViewConfig?.rowHeight || schemaExtension.rowHeight || DEFAULT_ROW_HEIGHT;
 
   // Handle row height change -> update SavedView
   const handleRowHeightChange = useCallback(
@@ -5048,6 +5049,96 @@ function ListPageContentInner(props: PageContentProps) {
     return found;
   }, [allBlocks]);
 
+  const workspace = schemaExtension.presentation === 'workspace';
+  const pageHeader = (
+          <ListPageHeader
+            title={
+              (() => {
+                // Import writes page titles into the tenant i18n bundle as
+                // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
+                // follows the UI locale; schema.title/schema.name are stored as
+                // plain zh strings and would otherwise pin the title to zh.
+                const listPageKey = schema.pageKey || tableName;
+                const keyedTitle = t(`page.${listPageKey}.title`);
+                if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
+                  return keyedTitle;
+                }
+                if (schema.title) return getLocalizedText(schema.title, locale, t);
+                if (schema.name && schema.name.trim()) {
+                  return getLocalizedText(schema.name, locale, t);
+                }
+                return tableName;
+              })()
+            }
+            workspace={workspace}
+            description={getLocalizedText(schemaExtension.pageDescription || {}, locale, t)}
+            modelCode={modelCode}
+            savedViews={savedViews}
+            currentView={currentView}
+            viewsLoading={viewsLoading}
+            activeViewType={activeViewType}
+            onSelectDefaultView={handleSelectDefaultView}
+            onSelectView={handleSelectView}
+            onCreateView={(viewType) => {
+              if (viewType) {
+                setActiveViewType(viewType);
+              }
+              setStartCreateViewMode(true);
+              setViewManageOpen(true);
+            }}
+            onManageViews={() => {
+              setStartCreateViewMode(false);
+              setViewManageOpen(true);
+            }}
+            onViewTypeChange={(vt) => {
+              setActiveViewType(vt);
+            }}
+            enableMultiView={Boolean(schemaExtension.enableMultiView)}
+            availableViewTypes={availableViewTypes}
+            buttons={actionBlock?.buttons || []}
+            toolbarActions={effectiveViewConfig?.toolbarActions}
+            onAction={handleAction}
+            onToolbarConfigChange={handleToolbarConfigChange}
+            resolveLabel={resolveButtonLabel}
+            t={t}
+            evaluateVisible={evaluateButtonVisible}
+            onImport={() => setImportOpen(true)}
+            onExport={handleExport}
+            exportFilters={exportFilterConditions}
+            isTenantMemberPage={isTenantMemberPage}
+            onInvite={
+              canInviteMembers
+                ? () => {
+                    inviteTriggerRef.current =
+                      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                    setInviteDialogOpen(true);
+                  }
+                : undefined
+            }
+            onImportMembers={
+              canManageMemberAccounts ? () => setMemberImportDialogOpen(true) : undefined
+            }
+            hideSavedViews={hideSavedViews}
+            hideBuiltInImport={
+              skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
+            }
+            hideBuiltInExport={
+              skipListData
+                ? true
+                : (listExtensions?.hideBuiltInExport ??
+                  (schema as any)?.extension?.hideBuiltInExport ??
+                  (schema as any)?.extension?.hideToolbarMore)
+            }
+            hideBuiltInPrint={
+              skipListData
+                ? true
+                : (listExtensions?.hideBuiltInPrint ??
+                  (schema as any)?.extension?.hideBuiltInPrint ??
+                  (schema as any)?.extension?.hideToolbarMore)
+            }
+          />
+  );
+
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
   if (error) {
     return (
@@ -5065,13 +5156,15 @@ function ListPageContentInner(props: PageContentProps) {
     <DataSourceProvider manager={dataSourceManager}>
       <div
         className="bg-subtle min-h-[calc(100vh-3.5rem)] w-full px-4 py-5 sm:px-6 lg:px-8"
+        style={workspace ? { backgroundColor: '#F7F7F8' } : undefined}
         data-testid="dynamic-list"
         data-model-code={modelCode}
         data-ready={dataReady && !loading && !viewsLoading && listQuerySettled}
         aria-busy={!dataReady || loading || viewsLoading || !listQuerySettled}
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
-        <div className="rounded-card border-border bg-panel relative overflow-hidden border shadow-sm">
+        {workspace && pageHeader}
+        <div className={`rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}>
           {/* §3: quiet auto-save confirmation — appears briefly after a
               sort/filter/column/row-height change is persisted to the view. */}
           {viewSavedHintOn && (
@@ -5197,90 +5290,7 @@ function ListPageContentInner(props: PageContentProps) {
             t={translateCommon}
           />
           {/* Page title, view selector, and action buttons */}
-          <ListPageHeader
-            title={
-              (() => {
-                // Import writes page titles into the tenant i18n bundle as
-                // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
-                // follows the UI locale; schema.title/schema.name are stored as
-                // plain zh strings and would otherwise pin the title to zh.
-                const listPageKey = schema.pageKey || tableName;
-                const keyedTitle = t(`page.${listPageKey}.title`);
-                if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
-                  return keyedTitle;
-                }
-                if (schema.title) return getLocalizedText(schema.title, locale, t);
-                if (schema.name && schema.name.trim()) {
-                  return getLocalizedText(schema.name, locale, t);
-                }
-                return tableName;
-              })()
-            }
-            modelCode={modelCode}
-            savedViews={savedViews}
-            currentView={currentView}
-            viewsLoading={viewsLoading}
-            activeViewType={activeViewType}
-            onSelectDefaultView={handleSelectDefaultView}
-            onSelectView={handleSelectView}
-            onCreateView={(viewType) => {
-              if (viewType) {
-                setActiveViewType(viewType);
-              }
-              setStartCreateViewMode(true);
-              setViewManageOpen(true);
-            }}
-            onManageViews={() => {
-              setStartCreateViewMode(false);
-              setViewManageOpen(true);
-            }}
-            onViewTypeChange={(vt) => {
-              setActiveViewType(vt);
-            }}
-            enableMultiView={Boolean(schemaExtension.enableMultiView)}
-            availableViewTypes={availableViewTypes}
-            buttons={actionBlock?.buttons || []}
-            toolbarActions={effectiveViewConfig?.toolbarActions}
-            onAction={handleAction}
-            onToolbarConfigChange={handleToolbarConfigChange}
-            resolveLabel={resolveButtonLabel}
-            t={t}
-            evaluateVisible={evaluateButtonVisible}
-            onImport={() => setImportOpen(true)}
-            onExport={handleExport}
-            exportFilters={exportFilterConditions}
-            isTenantMemberPage={isTenantMemberPage}
-            onInvite={
-              canInviteMembers
-                ? () => {
-                    inviteTriggerRef.current =
-                      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-                    setInviteDialogOpen(true);
-                  }
-                : undefined
-            }
-            onImportMembers={
-              canManageMemberAccounts ? () => setMemberImportDialogOpen(true) : undefined
-            }
-            hideSavedViews={hideSavedViews}
-            hideBuiltInImport={
-              skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
-            }
-            hideBuiltInExport={
-              skipListData
-                ? true
-                : (listExtensions?.hideBuiltInExport ??
-                  (schema as any)?.extension?.hideBuiltInExport ??
-                  (schema as any)?.extension?.hideToolbarMore)
-            }
-            hideBuiltInPrint={
-              skipListData
-                ? true
-                : (listExtensions?.hideBuiltInPrint ??
-                  (schema as any)?.extension?.hideBuiltInPrint ??
-                  (schema as any)?.extension?.hideToolbarMore)
-            }
-          />
+          {!workspace && pageHeader}
 
           {actionError && (
             <div
@@ -5628,6 +5638,7 @@ function ListPageContentInner(props: PageContentProps) {
 
               {!schemaExtension.hideListToolbar && (
                 <ListToolbar
+                  workspace={workspace}
                   keyword={keyword}
                   searchPlaceholder={tableSearchPlaceholder}
                   onKeywordChange={setKeyword}
@@ -5677,7 +5688,7 @@ function ListPageContentInner(props: PageContentProps) {
                   onRowHeightChange={handleRowHeightChange}
                   onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
                   onAnalysisOpen={
-                    namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
+                    schemaExtension.hideViewAnalysis || namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
                   }
                   chipFilters={chipFilters}
                   onChipFiltersChange={(nextChipFilters) => {
@@ -5810,6 +5821,7 @@ function ListPageContentInner(props: PageContentProps) {
                 loading={loading}
                 activeSorts={activeSorts}
                 selectedIds={selectedIds}
+                workspace={workspace}
                 rowHeight={effectiveRowHeight}
                 modelCode={modelCode}
                 columnOrder={columnOrder}
@@ -5866,6 +5878,7 @@ function ListPageContentInner(props: PageContentProps) {
 
               {/* Pagination + Bulk Action Toolbar */}
               <ListPagination
+                workspace={workspace}
                 current={pagination.current}
                 pageSize={pagination.pageSize}
                 total={pagination.total}

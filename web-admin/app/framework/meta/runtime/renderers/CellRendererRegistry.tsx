@@ -16,6 +16,7 @@
 
 import React from 'react';
 import { Star } from 'lucide-react';
+import { WorkspaceCell } from './WorkspaceCells';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { OwnerCell } from '~/framework/meta/runtime/renderers/OwnerCell';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
@@ -220,6 +221,8 @@ function renderSmartText(value: any): React.ReactNode {
 /**
  * 默认渲染器 - 带 URL/email 自动检测
  */
+cellRendererRegistry.register('workspace', (context) => <WorkspaceCell {...context} />);
+
 cellRendererRegistry.register('default', ({ value }) => {
   return renderSmartText(value);
 });

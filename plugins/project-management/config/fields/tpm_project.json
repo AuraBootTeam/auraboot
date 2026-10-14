@@ -148,5 +148,17 @@
     "extension": {
       "renderComponent": "userselect"
     }
+  },
+  {
+    "code": "tpm_pj_progress",
+    "displayName:zh-CN": "交付进度",
+    "displayName:en": "Delivery progress",
+    "dataType": "integer",
+    "constraints": {
+      "min": 0,
+      "max": 100
+    },
+    "defaultValue": 0,
+    "description": "Owner-reported delivery progress, independent of milestone completion ratio."
   }
 ]

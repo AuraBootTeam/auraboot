@@ -27,7 +27,7 @@ def pid(v):
 existing=req('/api/dynamic/tpm_project/list','GET',headers=h)['data']['records']
 assert len(existing)==0,'Refuse to seed an already populated project fixture'
 owners=[]
-for login,name in [('delivery-lin','林悦'),('delivery-zhou','周予'),('delivery-chen','陈川')]:
+for login,name in [('delivery-lin','林晓'),('delivery-zhou','周宁'),('delivery-chen','陈晨'),('delivery-wang','王越')]:
  v=req('/api/admin/users','POST',{'userName':login,'displayName':name,'initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_manager'],'sendInviteEmail':False},h)
  assert str(v['code'])=='0',v
  owners.append(v['data']['userPid'])
@@ -36,16 +36,22 @@ v=req('/api/admin/users','POST',{'email':viewer_email,'displayName':'交付观�
 assert str(v['code'])=='0',v
 owner=owners[0]
 projects=[]
-cases=[('青禾零售 · 会员系统上线','青禾零售',128000,3,'active','完成会员迁移、积分联调与门店培训，让会员权益在 12 家门店同步可用。'),('远山制造 · 售后工单门户','远山制造',86000,12,'active','统一设备报修、派工与服务回访，缩短跨部门协作时间。'),('星河物流 · 仓配数据看板','星河物流',68000,20,'planning','把订单履约、库存与配送异常汇总到业务看板。'),('知行教育 · 学员服务平台','知行教育',96000,7,'active','交付学员档案、课程安排和服务跟进流程。'),('澄川医疗 · 采购审批升级','澄川医疗',72000,16,'on_hold','梳理采购审批与预算核对，等待客户确认审批责任人。'),('南风餐饮 · 门店巡检应用','南风餐饮',48000,-2,'completed','统一巡检标准、整改跟踪和门店反馈。'),('松果科技 · 客户成功工作台','松果科技',110000,24,'planning','建立客户上线、使用反馈和续约提醒的团队协作流程。'),('拾光文旅 · 预约运营后台','拾光文旅',58000,10,'active','交付活动预约、名额管理与客户通知。')]
-for index,(name,customer,budget,offset,status,desc) in enumerate(cases):
- project=pid(cmd('tpm:create_project',{'tpm_pj_name':name,'tpm_pj_customer':customer,'tpm_pj_budget':budget,'tpm_pj_owner_user':owners[index%len(owners)],'tpm_pj_description':desc+'（虚构示例数据）','tpm_pj_start_date':str(date.today()-timedelta(days=21)),'tpm_pj_end_date':str(date.today()+timedelta(days=offset)),'tpm_pj_priority':'high' if index==0 else 'medium'}))
+references=json.loads((Path(__file__).parent/'reference-projects.json').read_text())
+states={'需求确认':'planning','实施中':'active','待验收':'acceptance','已交付':'completed'}
+owner_names=['林晓','周宁','陈晨','王越']
+for index,row in enumerate(references):
+ name,customer,code,stage,_,owner_name,_,_,progress,date_text,_,budget=row
+ status=states[stage]
+ due='2026-'+date_text.replace('月','-').replace('日','')
+ desc='整合供应商、采购与入库流程，为采购和仓储团队提供统一的协作工作台。'
+ project=pid(cmd('tpm:create_project',{'tpm_pj_code':code,'tpm_pj_name':name,'tpm_pj_customer':customer,'tpm_pj_budget':int(budget.replace(',','')),'tpm_pj_owner_user':owners[owner_names.index(owner_name)],'tpm_pj_progress':progress,'tpm_pj_description':desc+'（虚构示例数据）','tpm_pj_start_date':'2026-09-08','tpm_pj_end_date':due,'tpm_pj_priority':'high' if index==0 else 'medium'}))
  if status!='planning':cmd('tpm:activate_project',pid=project)
- if status=='on_hold':cmd('tpm:hold_project',pid=project)
+ if status=='acceptance':cmd('tpm:submit_acceptance',pid=project)
  if status=='completed':cmd('tpm:complete_project',pid=project)
  ms=[]
- for j,(title,criteria) in enumerate([('需求与方案确认','确认业务范围、数据迁移口径与验收清单'),('核心功能交付','完成会员档案、权益配置和门店基础流程'),('积分联调验收','核对积分增减与异常回滚，完成跨系统联调'),('上线与团队培训','完成部署、操作培训与上线验收')]):
-  mid=pid(cmd('tpm:create_milestone',{'tpm_ms_name':title if index==0 else ['范围与方案确认','核心流程交付','业务验收','上线与培训'][j],'tpm_ms_project_id':project,'tpm_ms_target_date':str(date.today()+timedelta(days=offset-9+j*3)),'tpm_ms_description':criteria}))
-  if j < (4 if status=='completed' else 2 if status in ['active','on_hold'] else 0):cmd('tpm:reach_milestone',pid=mid)
+ for j,(title,criteria,target) in enumerate([('需求范围确认','范围文档已由双方确认','2026-09-12'),('原型与方案评审','页面原型与技术方案已通过','2026-09-20'),('核心功能联调','采购与入库模块联调','2026-10-20'),('验收与上线','完成用户验收，准备上线',due)]):
+  mid=pid(cmd('tpm:create_milestone',{'tpm_ms_name':title,'tpm_ms_project_id':project,'tpm_ms_target_date':target,'tpm_ms_description':criteria}))
+  if j < (4 if status=='completed' else 2 if status in ['active','acceptance'] else 0):cmd('tpm:reach_milestone',pid=mid)
   ms.append(mid)
- projects.append({'name':name,'pid':project,'milestones':ms})
-(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'viewerEmail':viewer_email,'projects':projects},ensure_ascii=False,indent=2));print('Created 8 fictional projects and 32 milestones through commands')
+ projects.append({'name':name,'pid':project,'code':code,'progress':progress,'milestones':ms})
+(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'viewerEmail':viewer_email,'projects':projects},ensure_ascii=False,indent=2));print('Created the 8 approved reference projects and 32 real milestones through commands')

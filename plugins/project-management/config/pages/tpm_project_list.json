@@ -6,8 +6,8 @@
   "kind": "list",
   "schemaVersion": 4,
   "title": {
-    "zh-CN": "项目交付",
-    "en": "Project delivery"
+    "zh-CN": "项目管理",
+    "en": "Projects"
   },
   "layout": {
     "type": "stack"
@@ -37,45 +37,33 @@
         {
           "key": "all",
           "label": {
-            "en": "All",
-            "zh-CN": "全部"
+            "zh-CN": "全部项目",
+            "en": "All projects"
           },
           "filter": null
         },
         {
-          "key": "planning",
+          "key": "acceptance",
           "label": {
-            "en": "Planning",
-            "zh-CN": "规划中"
+            "zh-CN": "待验收",
+            "en": "Acceptance"
           },
           "filter": {
             "field": "tpm_pj_status",
-            "value": "planning",
-            "operator": "EQ"
-          }
-        },
-        {
-          "key": "active",
-          "label": {
-            "en": "Active",
-            "zh-CN": "进行中"
-          },
-          "filter": {
-            "field": "tpm_pj_status",
-            "value": "active",
-            "operator": "EQ"
+            "operator": "EQ",
+            "value": "acceptance"
           }
         },
         {
           "key": "completed",
           "label": {
-            "en": "Completed",
-            "zh-CN": "已完成"
+            "zh-CN": "已交付",
+            "en": "Delivered"
           },
           "filter": {
             "field": "tpm_pj_status",
-            "value": "completed",
-            "operator": "EQ"
+            "operator": "EQ",
+            "value": "completed"
           }
         }
       ],
@@ -87,31 +75,63 @@
       "columns": [
         {
           "field": "tpm_pj_name",
-          "width": 290,
-          "sortable": true
-        },
-        {
-          "field": "tpm_pj_customer",
-          "width": 180
+          "label": {
+            "zh-CN": "项目名称 / 客户",
+            "en": "Project / customer"
+          },
+          "width": 330,
+          "presentation": {
+            "kind": "object",
+            "subtitleFields": [
+              "tpm_pj_code",
+              "tpm_pj_customer"
+            ]
+          }
         },
         {
           "field": "tpm_pj_status",
-          "width": 110,
-          "renderType": "tag",
+          "label": {
+            "zh-CN": "阶段",
+            "en": "Stage"
+          },
+          "width": 130,
           "dictCode": "tpm_project_status"
         },
         {
           "field": "tpm_pj_owner_user",
-          "width": 130
+          "width": 120,
+          "presentation": {
+            "kind": "member"
+          }
+        },
+        {
+          "field": "tpm_pj_progress",
+          "width": 125,
+          "presentation": {
+            "kind": "progress"
+          }
         },
         {
           "field": "tpm_pj_end_date",
-          "width": 145,
-          "sortable": true
+          "label": {
+            "zh-CN": "计划交付",
+            "en": "Target delivery"
+          },
+          "width": 130,
+          "presentation": {
+            "kind": "deadline",
+            "completedField": "tpm_pj_status",
+            "completedValues": [
+              "completed"
+            ]
+          }
         },
         {
           "field": "tpm_pj_budget",
-          "width": 140
+          "width": 150,
+          "presentation": {
+            "kind": "currency"
+          }
         },
         {
           "field": "actions",
@@ -149,8 +169,8 @@
         "tpm_pj_customer"
       ],
       "defaultSort": {
-        "field": "tpm_pj_end_date",
-        "order": "asc"
+        "field": "tpm_pj_code",
+        "order": "desc"
       },
       "area": "main",
       "searchPlaceholder": {
@@ -172,6 +192,19 @@
   "description": "Customer delivery projects with lifecycle, ownership and target dates.",
   "extension": {
     "hideQuickFilters": true,
-    "hideRowHeight": true
+    "hideRowHeight": true,
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目协作",
+      "en": "Project collaboration"
+    },
+    "pageDescription": {
+      "zh-CN": "跟进客户项目，从需求确认到交付验收。",
+      "en": "Track customer projects from requirements to delivery."
+    },
+    "hideSavedViews": true,
+    "hideViewAnalysis": true,
+    "hideFilterChips": true,
+    "rowHeight": "tall"
   }
 }

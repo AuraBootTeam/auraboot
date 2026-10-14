@@ -8,7 +8,7 @@
       {
         "value": "planning",
         "label": "Planning",
-        "label:zh-CN": "规划中",
+        "label:zh-CN": "需求确认",
         "sortNo": 10,
         "color": "#1890ff",
         "status": "enabled",
@@ -19,12 +19,12 @@
       {
         "value": "active",
         "label": "Active",
-        "label:zh-CN": "进行中",
+        "label:zh-CN": "实施中",
         "sortNo": 20,
         "color": "#52c41a",
         "status": "enabled",
         "extension": {
-          "color": "green"
+          "color": "blue"
         }
       },
       {
@@ -41,7 +41,7 @@
       {
         "value": "completed",
         "label": "Completed",
-        "label:zh-CN": "已完成",
+        "label:zh-CN": "已交付",
         "sortNo": 40,
         "color": "#d9d9d9",
         "status": "enabled",
@@ -58,6 +58,16 @@
         "status": "enabled",
         "extension": {
           "color": "red"
+        }
+      },
+      {
+        "value": "acceptance",
+        "label": "Acceptance",
+        "label:zh-CN": "待验收",
+        "sortNo": 35,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
         }
       }
     ]

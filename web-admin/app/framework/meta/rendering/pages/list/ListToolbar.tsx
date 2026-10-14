@@ -17,6 +17,7 @@ import type { QuickFilterChip } from './quickFilterChips';
 type QuickFilterKey = QuickFilterPresetKey;
 
 export interface ListToolbarProps {
+  workspace?: boolean;
   /** Current keyword search value */
   keyword: string;
   /** Localized search guidance supplied by the table configuration. */
@@ -77,6 +78,7 @@ export interface ListToolbarProps {
 }
 
 export function ListToolbar({
+  workspace = false,
   keyword,
   searchPlaceholder,
   onKeywordChange,
@@ -134,7 +136,7 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className="print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6"
+        className={`print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:mr-auto' : ''}`}
         data-print="hide"
         data-testid="list-toolbar"
       >

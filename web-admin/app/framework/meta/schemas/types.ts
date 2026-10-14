@@ -212,6 +212,8 @@ export interface EventConfig {
 
 // Column 配置（用于列表）
 export interface ColumnConfig {
+  /** Structured, reusable business cell presentation. */
+  presentation?: import('../runtime/renderers/WorkspaceCells').WorkspaceCellPresentation;
   field: string;
   label?: string | LocalizedText; // optional: resolved by i18n Resolver from model displayName
   /** Runtime personalization may reorder but never hide this baseline field. */

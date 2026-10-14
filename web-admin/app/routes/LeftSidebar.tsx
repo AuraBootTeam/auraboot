@@ -7,6 +7,9 @@ import { XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { resolveIcon } from '~/utils/icon-resolver';
 import { useDirection } from '~/hooks/useDirection';
+import { COMMUNITY_BRANDING } from '~/config/branding';
+import { useTenantTheme } from '~/contexts/TenantThemeContext';
+import { usePagePresentation, usePresentationNavigation } from '~/shared/layout/PagePresentationContext';
 import { UserMenuWidget } from '~/ui/user/UserMenuWidget';
 
 const COLLAPSED_KEY = 'sidebar-collapsed';
@@ -17,6 +20,9 @@ interface LeftSidebarProps {
 }
 
 export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebarProps) {
+  const workspace = usePagePresentation()?.mode === 'workspace';
+  const { setSidebarWidth } = usePresentationNavigation();
+  const tenantTheme = useTenantTheme();
   const location = useLocation();
   const rootData = useRootLoaderData();
   const menus = rootData?.menus ?? [];
@@ -31,6 +37,8 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
     }
     return false;
   });
+
+  useEffect(() => { setSidebarWidth(collapsed ? 68 : workspace ? 216 : 256); }, [collapsed, workspace, setSidebarWidth]);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
@@ -65,7 +73,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
     return () => clearTimeout(timer);
   }, [location.pathname, collapsed]);
 
-  const widthClass = collapsed ? 'w-[68px]' : 'w-64';
+  const widthClass = collapsed ? 'w-[68px]' : workspace ? 'w-[216px]' : 'w-64';
 
   if (menus.length === 0) return null;
 
@@ -86,6 +94,16 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
       data-print="hide"
       data-testid="sidebar"
     >
+      {workspace && !collapsed && <>
+        <NavLink to="/" className="flex h-14 shrink-0 items-center gap-3 px-6">
+          <img className="h-6 w-6" src={tenantTheme?.logoUrl || rootData?.branding?.logoUrl || COMMUNITY_BRANDING.logoUrl} alt="" />
+          <span className="text-text text-lg font-semibold tracking-tight">{tenantTheme?.brandName || rootData?.branding?.productName || COMMUNITY_BRANDING.productName}</span>
+        </NavLink>
+        <div className="border-border mx-3.5 my-5 rounded-lg border px-3 py-3">
+          <div className="text-text text-xs font-semibold">{rootData?.user?.tenantName || t('sidebar.workspace', undefined, 'Workspace')}</div>
+          <div className="text-text-3 mt-1 text-[11px]">{t('sidebar.currentSpace', undefined, 'Current space')}</div>
+        </div>
+      </>}
       {/* Top bar: toggle + mobile close */}
       <div
         className={`flex items-center ${collapsed ? 'justify-center' : 'justify-end'} h-8 flex-shrink-0 px-2`}
@@ -112,7 +130,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
       {/* Navigation */}
       <nav
         ref={navRef}
-        className={`min-h-0 flex-1 ${collapsed ? 'px-2' : 'px-4'} pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent space-y-1 overflow-y-auto py-1 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500`}
+        className={`min-h-0 flex-1 ${collapsed ? 'px-2' : workspace ? 'px-3.5' : 'px-4'} pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent space-y-1 overflow-y-auto py-1 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500`}
       >
         {menus.map((menu: any, index: number) => (
           <div key={menu.id || index}>

@@ -60,8 +60,8 @@
         {
           "key": "progress",
           "label": {
-            "zh-CN": "交付进度",
-            "en": "Delivery progress"
+            "zh-CN": "里程碑完成率",
+            "en": "Milestone completion"
           },
           "valueField": "progress",
           "unit": "%",
@@ -237,7 +237,12 @@
     "detailAsideBlockIds": [
       "activity"
     ],
-    "showPdfExport": false
+    "showPdfExport": false,
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目协作",
+      "en": "Project collaboration"
+    }
   },
   "dataSources": {
     "deliveryProgress": {

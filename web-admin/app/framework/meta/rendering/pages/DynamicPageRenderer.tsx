@@ -14,6 +14,7 @@
  */
 
 import React, { Suspense } from 'react';
+import { useSchemaPresentation } from '~/shared/layout/PagePresentationContext';
 import { useSchemaLoader } from '~/framework/meta/hooks/useSchemaLoader';
 import { profileRegistry, ProfileProvider } from '@auraboot/runtime-kernel';
 import { ErrorAlert } from '~/ui/ErrorAlert';
@@ -62,6 +63,7 @@ export function DynamicPageRenderer({
 
   // 2. Load schema
   const { schema, loading, error } = useSchemaLoader(schemaRequest);
+  useSchemaPresentation(schema);
 
   if (!VALID_KINDS.includes(pageType)) {
     return (
