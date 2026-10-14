@@ -79,7 +79,7 @@ for name,label in [('项目需求范围说明.pdf','Approved reference fixture: 
  headers={**h,'Content-Type':'multipart/form-data; boundary='+boundary}
  with urllib.request.urlopen(urllib.request.Request(base+'/api/file/upload',data=multipart,method='POST',headers=headers),timeout=120) as response:upload=json.load(response)
  assert str(upload['code'])=='0',upload
- item=upload['data'];files.append({'name':name,'url':item['url'],'size':len(data),'type':'application/pdf','fileId':item['fileId']})
+ item=upload['data'];files.append({'name':name,'url':'/api/file/download/'+item['fileId'],'size':len(data),'type':'application/pdf','fileId':item['fileId']})
  (out/name).write_bytes(data)
 cmd('tpm:update_project',{'tpm_pj_files':files},projects[0]['pid'])
 relation=req('/api/file/relation','POST',{'entityType':'tpm_project','entityId':projects[0]['pid'],'fieldName':'tpm_pj_files','fileIds':[f['fileId'] for f in files]},h)

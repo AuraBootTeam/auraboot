@@ -42,7 +42,7 @@ export function WorkspaceRecordSection({ block, fields, record, token, locale, t
       {fields.map((field: any, index: number) => <div key={`${field.field}:${index}`} className={(field.colSpan || 6) >= 12 ? 'md:col-span-2' : ''}>
         <dt className="text-text-3 mb-1.5 text-[11px]">{getLocalizedText(field.label || {}, locale, t)}</dt>
         <dd className="text-text text-xs leading-6 whitespace-pre-wrap">
-          {field.dataType === 'file' ? <FileAttachmentField value={record[field.field]} readOnly /> : field.dataType === 'reference' && !field.referenceDisplayField && record[field.field] && (field.refTarget?.targetModel || field.referenceModelCode) ? <Link className="hover:text-accent" to={`/p/${field.refTarget?.targetModel || field.referenceModelCode}/view/${record[field.field]}`}>{display(field)}</Link> : display(field)}
+          {(field.dataType === 'file' || String(field.component).toLowerCase() === 'fileattachment') ? <FileAttachmentField value={record[field.field]} readOnly /> : field.dataType === 'reference' && !field.referenceDisplayField && record[field.field] && (field.refTarget?.targetModel || field.referenceModelCode) ? <Link className="hover:text-accent" to={`/p/${field.refTarget?.targetModel || field.referenceModelCode}/view/${record[field.field]}`}>{display(field)}</Link> : display(field)}
         </dd>
       </div>)}
     </dl>

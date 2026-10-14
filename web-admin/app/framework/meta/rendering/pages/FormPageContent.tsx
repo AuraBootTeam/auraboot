@@ -2100,7 +2100,7 @@ export function FormPageContent(props: PageContentProps) {
               const savedPid = recordPid || extractPid(responseData);
               if (!savedPid) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但未取得附件关联目标。请重新打开项目检查。', en: 'Saved, but attachment target is missing. Reopen the record to check.' }, locale, t));
               for (const [field, meta] of Object.entries(modelFields)) {
-                if (meta.dataType !== 'file' || !Array.isArray(commandPayload[field])) continue;
+                if (!schema.extension?.attachmentFields?.includes(field) || !Array.isArray(commandPayload[field])) continue;
                 const fileIds = commandPayload[field].map((file: any) => file.fileId).filter(Boolean);
                 if (!fileIds.length) continue;
                 const relation = await fetchResult('/api/file/relation', { method: 'post', token: token || undefined, params: { entityType: schema.modelCode || tableName, entityId: savedPid, fieldName: field, fileIds } });

@@ -243,6 +243,9 @@
         "en": "The project belongs to this space. Member permissions govern access."
       }
     },
-    "linkFileAttachments": true
+    "linkFileAttachments": true,
+    "attachmentFields": [
+      "tpm_pj_files"
+    ]
   }
 }

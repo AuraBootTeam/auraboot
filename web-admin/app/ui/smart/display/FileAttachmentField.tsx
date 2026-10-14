@@ -88,11 +88,11 @@ export function FileAttachmentField({
         try {
           const res = await uploadFile(file);
           const json = await res.json();
-          if (json.code === '0' && json.data) {
+          if (json.code === '0' && json.data?.fileId) {
             newFiles.push({
               name: file.name,
               fileId: json.data.fileId,
-              url: json.data.url,
+              url: `/api/file/download/${encodeURIComponent(json.data.fileId)}`,
               size: file.size,
               type: file.type,
             });

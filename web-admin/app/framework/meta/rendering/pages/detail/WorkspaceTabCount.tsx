@@ -9,7 +9,7 @@ export function WorkspaceTabCount({ config, record, runtime }: { config: { field
     if (Array.isArray(value)) count = value.length;
     else if (typeof value === 'string') { try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) count = parsed.length; } catch { /* Invalid values must not produce invented counts. */ } }
     else if (value == null) count = 0;
-  } else if (config.dataSource && readDataSourceState(runtime, config.dataSource)?.status === 'loaded') {
+  } else if (config.dataSource && readDataSourceState(runtime, config.dataSource)?.lastFetch != null && !readDataSourceState(runtime, config.dataSource)?.error) {
     const value = readDataSourceRecord(runtime, config.dataSource)[config.valueField || 'total'];
     if (value != null && Number.isFinite(Number(value))) count = Number(value);
   }
