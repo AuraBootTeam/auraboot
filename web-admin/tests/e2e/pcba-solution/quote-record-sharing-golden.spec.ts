@@ -202,21 +202,12 @@ test('quote sharing release gate: multiple members, role access and revocation t
   // Create a real isolated tenant through the same public company flow as host-first users.
   // Company changes invalidate that user's old credentials. Use an independent
   // fixture actor so provisioning cannot invalidate the owner's session.
-  const foreignContext = await browser.newContext({ storageState: await viewers[0].context.storageState(), locale: 'zh-CN' });
-  const foreign = { context: foreignContext, page: await foreignContext.newPage() };
-  const tenantResponse = await foreign.page.request.post('/api/tenant-selection/process', {
-    data: { action: 'create', tenantName: `quote-sharing-${Date.now()}`, displayName: 'Quote sharing isolation' },
-    timeout: 90_000,
+  // Prepare this identity through the existing seed integration runner with
+  // AURA_E2E_SEED_IDENTITY_ONLY=true. Public self-provisioning stays disabled in SINGLE.
+  const foreign = await openQuoteRolePage(browser, {
+    key: 'cross-tenant-fixture', email: 'e2e@test.local',
+    displayName: 'E2E Test Admin', password: 'E2eTestPass2026!', roleCodes: ['tenant_admin'],
   });
-  expect(tenantResponse.status(), await tenantResponse.text()).toBe(200);
-  const tenant = (await tenantResponse.json()).data;
-  expect(tenant.tenantId).toBeTruthy();
-  const switched = await foreign.page.request.post('/_action/switch-space', {
-    form: { tenantId: String(tenant.tenantId), redirectTo: '/' },
-    maxRedirects: 0,
-  });
-  expect(switched.status(), await switched.text()).toBe(302);
-  expect(switched.headers()['location']).toBe('/');
   try {
     const ownerIdentity = await page.request.get('/api/auth/me');
     const foreignIdentity = await foreign.page.request.get('/api/auth/me');
@@ -228,7 +219,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignMe.user.tenantId).toBeTruthy();
     expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
     expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
-    // The freshly created foreign tenant needs the
+    // The independently seeded foreign tenant needs the
     // same product page before this journey can exercise the record boundary.
     const quoteRoot = process.env.AURA_QUOTE_ROOT;
     expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
@@ -284,6 +275,12 @@ test('quote sharing release gate: multiple members, role access and revocation t
     ])] });
     expect(explicitRead.status()).toBe(200);
     expect(String((await explicitRead.json()).code)).toBe('0');
+    // A valid own-record read prevents an uninitialized foreign product or a
+    // blanket-deny session from masquerading as tenant isolation.
+    const foreignOwned = await seedBomPriceManualReviewQuote(foreign.page);
+    const ownRead = await foreign.page.request.get(`/api/dynamic/qo_quote_common/${foreignOwned.quoteId}`);
+    expect(ownRead.status()).toBe(200);
+    expect((await ownRead.json()).data.qo_quote_code).toBe(foreignOwned.quoteCode);
     const deniedRecord = foreign.page.waitForResponse(response =>
       new URL(response.url()).pathname === root && response.request().method() === 'GET');
     await foreign.page.goto(new URL(`/p/qo_quote_common/view/${quote.quoteId}`, page.url()).href);
