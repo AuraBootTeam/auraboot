@@ -555,6 +555,14 @@ final class ProductQuoteReminderNativeFacet {
         }));
     }
 
+    static Entity reminderSourceEntity() {
+        return new Entity("qo_procurement_reminder_common", List.of(new Exact("qo_pr_reminder_kind", "quote"), new Exact("qo_pr_reminder_state", "pending")));
+    }
+    static String reminderRuleConditionFilter() {
+        return SourceBindingCanonical.tree(reminderSourceEntity().equals().stream().map(predicate->
+                Map.of("fieldName",predicate.fieldCode(),"operator","EQ","value",predicate.value().raw())).toList()).toString();
+    }
+
     private long ruleAndTemplate() {
         String code = namespace + "_template";
         var template = new NotificationTemplateCreateRequest();
@@ -572,7 +580,7 @@ final class ProductQuoteReminderNativeFacet {
         rule.setTriggerType("EVENT");
         rule.setTriggerConfig("{\"modelCode\":\"qo_procurement_reminder_common\",\"event\":\"created\"}");
         rule.setConditionModelCode("qo_procurement_reminder_common");
-        rule.setConditionFilter("[{\"fieldName\":\"qo_pr_reminder_state\",\"operator\":\"EQ\",\"value\":\"pending\"}]");
+        rule.setConditionFilter(reminderRuleConditionFilter());
         rule.setActionChannel("IN_APP");
         rule.setActionTemplateCode(code);
         rule.setRecipientType("SPECIFIC_USERS");
@@ -690,7 +698,7 @@ final class ProductQuoteReminderNativeFacet {
                 approvals.add(new Approval(lookup.mode(), model, SourceBindingCanonical.hash(graph), owners, lookup.nativeFieldPids()));
             }
             return new Binding(1, namespace + "_notice", tenant.getId(), approvals,
-                    new Source(new Entity("qo_procurement_reminder_common", List.of(new Exact("qo_pr_reminder_kind", "quote"), new Exact("qo_pr_reminder_state", "pending"))),
+                    new Source(reminderSourceEntity(),
                             "pid", "qo_pr_reminder_supplier_pid", "qo_pr_reminder_slot_at",
                             new Target("qo_pr_reminder_targets", new Entity("s2p_bid", List.of(new Exact("s2p_bid_collaboration_managed", true), new Exact("s2p_bid_status", "draft"))),
                                     "s2p_bid_supplier_id", new Deadline("qo_pr_quote_cutoff_at", DeadlineRelation.AFTER_HOST_NOW))),
