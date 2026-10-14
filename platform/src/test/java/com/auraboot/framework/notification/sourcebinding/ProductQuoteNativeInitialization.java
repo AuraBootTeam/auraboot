@@ -81,7 +81,7 @@ public final class ProductQuoteNativeInitialization {
 
     public static String sourceUiCommand(String model) {
         if (!SOURCE_UI_FIELDS.containsKey(model)) throw new IllegalArgumentException("Unsupported source UI initialization model");
-        return model + ":initialize_source_ui_native_fixture";
+        return model + ":init_source_ui_fixture";
     }
 
     public static void validateSourceUiPayload(String model, Map<String, Object> facts) {

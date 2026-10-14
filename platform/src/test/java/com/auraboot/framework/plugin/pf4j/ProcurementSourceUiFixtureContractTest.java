@@ -57,14 +57,14 @@ class ProcurementSourceUiFixtureContractTest {
         ProductQuoteNativeInitialization.prepareSourceUi(source, copy, json);
         assertEquals(field, Files.readString(source.resolve("config/fields/contact.json")));
         var generated = json.readTree(copy.resolve("config/fields/contact.json").toFile());
-        assertEquals(List.of("pr_supplier_pcba_contact:sync_directory", "pr_supplier_pcba_contact:initialize_source_ui_native_fixture"),
+        assertEquals(List.of("pr_supplier_pcba_contact:sync_directory", "pr_supplier_pcba_contact:init_source_ui_fixture"),
                 json.convertValue(generated.path("allowedWriterCommands"), List.class));
         var commands = json.readTree(copy.resolve("config/commands/source-ui-native-initialization.json").toFile());
         assertEquals(6, commands.size());
         for (var command : commands) {
             assertEquals("create", command.path("type").asText());
             assertEquals("qo.procurement.integrate", command.path("permissions").get(0).asText());
-            assertTrue(command.path("code").asText().endsWith(":initialize_source_ui_native_fixture"));
+            assertTrue(command.path("code").asText().endsWith(":init_source_ui_fixture"));
         }
     }
 

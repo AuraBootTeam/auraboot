@@ -81,6 +81,16 @@ class ProductQuoteNativeInitializationTest {
                 "pr_supplier_code", "x", "pr_supplier_name", "x", "pr_supplier_status", "enabled", "qo_pr_supplier_account_id", "x"));
     }
 
+    @Test void sourceUiCommandsFitExistingChangeLogWidthWithoutChangingTheirModelPrefix() {
+        assertThat(ProductQuoteNativeInitialization.SOURCE_UI_FIELDS).hasSize(6);
+        for (String model : new java.util.TreeSet<>(ProductQuoteNativeInitialization.SOURCE_UI_FIELDS.keySet())) {
+            String code = ProductQuoteNativeInitialization.sourceUiCommand(model);
+            // ab_data_change_log.command_code retains its canonical VARCHAR(64) schema.
+            assertThat(code.length()).as("Persisted audit command width for %s", model).isLessThanOrEqualTo(64);
+            assertThat(code).startsWith(model + ":").endsWith(":init_source_ui_fixture");
+        }
+    }
+
     private Path sourceOwner() throws Exception {
         Path source = Files.createDirectory(root.resolve("owner"));
         Files.createDirectories(source.resolve("config/fields"));
