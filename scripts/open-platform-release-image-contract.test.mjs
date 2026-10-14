@@ -12,6 +12,8 @@ const dockerfile = fs.readFileSync(new URL('../platform/Dockerfile', import.meta
 
 assert.match(gate, /AURA_CI_EXPECTED_REF/);
 assert.match(gate, /prepare_openapi_verifier\.sh/);
+assert.match(gate, /AURA_OPENAPI_WHEELHOUSE=/);
+assert.match(gate, /open-platform-openapi-wheels\/\$OPENAPI_WHEEL_LOCK/);
 assert.match(gate, /verify_openapi_artifacts\.py/);
 assert.match(gate, /OpenAPI contract validation failed/);
 assert.match(gate, /Generated OpenAPI declaration consumer failed/);
@@ -189,6 +191,32 @@ print(json.dumps([{'Id':'sha256:'+'a'*64,'RepoDigests':[ref]}]))
   }
 } finally {fs.rmSync(pinDirectory,{recursive:true,force:true});}
 console.log('open-platform default digest pins without mutable aliases: 2 hermetic cases PASS');
+
+const wheelDirectory=fs.mkdtempSync(path.join(os.tmpdir(),'open-platform-wheels-'));
+try {
+  const fake=path.join(wheelDirectory,'fake-python');
+  fs.writeFileSync(fake,`#!/usr/bin/env python3
+import os,pathlib,sys
+if sys.argv[1:3]==['-m','venv']:
+ root=pathlib.Path(sys.argv[3]);(root/'bin').mkdir(parents=True)
+ p=root/'bin/python'
+ p.write_text("#!/usr/bin/env python3\\nimport json,os,sys\\nopen(os.environ['WHEEL_TEST_CALLS'],'w').write(json.dumps(sys.argv[1:]))\\nsys.exit(int(os.environ.get('WHEEL_TEST_EXIT','0')))\\n")
+ p.chmod(0o755)
+`,{mode:0o755});
+  const wheels=path.join(wheelDirectory,'wheelhouse');fs.mkdirSync(wheels);
+  for(const [mode,exit] of [['online',0],['offline',0],['missing',2],['bad-wheel',23]]) {
+    const output=path.join(wheelDirectory,mode),calls=path.join(wheelDirectory,mode+'.json');
+    const result=spawnSync('sh',[new URL('./ci/prepare_openapi_verifier.sh',import.meta.url).pathname,'/source',output],{encoding:'utf8',env:{...process.env,AURA_OPENAPI_PYTHON:fake,AURA_OPENAPI_WHEELHOUSE:mode==='online'?'':mode==='missing'?wheels+'-absent':wheels,WHEEL_TEST_CALLS:calls,WHEEL_TEST_EXIT:String(mode==='bad-wheel'?23:0)}});
+    assert.equal(result.status,exit,result.stderr);
+    if(mode==='missing'){assert.equal(fs.existsSync(output),false);continue;}
+    const args=JSON.parse(fs.readFileSync(calls,'utf8'));
+    assert.ok(args.includes('--require-hashes')&&args.includes('--only-binary=:all:'));
+    assert.equal(args.includes('--no-index'),mode!=='online');
+    assert.equal(args.includes('--index-url'),mode==='online');
+    if(mode!=='online')assert.equal(args[args.indexOf('--find-links')+1],wheels);
+  }
+} finally {fs.rmSync(wheelDirectory,{recursive:true,force:true});}
+console.log('open-platform isolated wheel bootstrap/no-network/fail-closed: 4 hermetic cases PASS');
 
 // Execute the production expected-red receipt block without a Docker lifecycle.
 const basePull = gate.slice(gate.indexOf("while IFS=$'\\t' read -r base_image expected_image_id; do"),

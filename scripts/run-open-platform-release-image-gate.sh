@@ -182,7 +182,9 @@ timeout 600 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" \
 python3 "$STAGE/scripts/ci/verify-open-platform-sdk.py" "$STAGE" "$SDK_ROOT" "$ARTIFACTS/sdk-archive.json" \
   || fail "fresh SDK archive reconciliation failed"
 OPENAPI_VERIFIER="$WORK_ROOT/openapi-verifier"
-timeout 180 sh "$STAGE/scripts/ci/prepare_openapi_verifier.sh" "$STAGE" "$OPENAPI_VERIFIER" \
+OPENAPI_WHEEL_LOCK="$(sha256sum "$STAGE/scripts/fixtures/open-platform-openapi/requirements.txt" | cut -d ' ' -f1)"
+AURA_OPENAPI_WHEELHOUSE="${AURA_CI_OPENAPI_WHEELHOUSE:-/opt/aura-ci/cache/open-platform-openapi-wheels/$OPENAPI_WHEEL_LOCK}" \
+  timeout 180 sh "$STAGE/scripts/ci/prepare_openapi_verifier.sh" "$STAGE" "$OPENAPI_VERIFIER" \
   > "$ARTIFACTS/logs/openapi-bootstrap.log" 2>&1 || fatal "OpenAPI verifier bootstrap unavailable"
 info "building exact-ref image $IMAGE"
 docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
