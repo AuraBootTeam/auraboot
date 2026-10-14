@@ -1108,14 +1108,30 @@ def run_source_binding_probe(request, human, installation_pid, machine, get_scop
           {"operations": ["get"], "readableFields": ["pid", "name"], "writableFields": [], "rowConstraints": []})
     path = f"/api/open/v1/resources/{resource}/{row['pid']}"
     _, baseline, baseline_headers = request(path, headers=machine)
-    rebound = [dict(field) for field in fields]
-    rebound[0]["columnName"] = "rel_binding_private"
-    model_path = f"/api/meta/models/{model['pid']}"
+    field_path = "/api/meta/fields/key/rel_binding_name"
+    original_field = human(field_path)
+    if not isinstance(original_field, dict) or original_field.get("code") != "rel_binding_name":
+        raise ProtocolError("source binding library fixture invalid")
+    original = {key: original_field.get(key) for key in
+                ["code", "dataType", "dataSourceId", "status", "feature", "refTarget", "indexHint",
+                 "uiSchema", "querySchema", "ruleSchema", "extension"]}
+    original["extension"] = original.get("extension") or {}
+    rebound = dict(original, extension=dict(original["extension"], columnName="rel_binding_private"))
     try:
-        human(model_path, "PUT", {"displayName": "Release source binding", "extension": {"fields": rebound}})
+        updated = human(f"/api/meta/fields/{original_field['pid']}", "PUT", rebound)
+        current = human(field_path)
+        extension = current.get("extension") or {}
+        column = extension.get("columnName") or (extension.get("extension") or {}).get("columnName")
+        bindings = human(f"/api/meta/models/{model['pid']}/bindings")
+        matching = [binding for binding in bindings if binding.get("code") == "rel_binding_name"]
+        if (current.get("pid") != updated.get("pid") or column != "rel_binding_private"
+                or current.get("id") is None or len(matching) != 1
+                or matching[0].get("fieldId") != current.get("id")):
+            raise ProtocolError("source binding mutation not persisted on the bound field")
         status, error, headers = request(path, headers=dict(machine, **{"X-Request-Id": "release-dynamic-source-binding"}), expected=(409,))
     finally:
-        human(model_path, "PUT", {"displayName": "Release source binding", "extension": {"fields": fields}})
+        current = human(field_path)
+        human(f"/api/meta/fields/{current['pid']}", "PUT", original)
     restored_status, restored, restored_headers = request(path, headers=machine)
     def header(values, name):
         return next((value for key, value in values.items() if key.lower() == name.lower()), None)

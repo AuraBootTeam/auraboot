@@ -464,22 +464,31 @@ class DynamicProbeTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
 
     def test_source_binding_fixture_restores_metadata_after_success_and_transport_failure(self):
-        for fail in [False, True]:
-            state = {"rebound": False, "restored": False}
+        for mode in ["success", "transport-failure", "binding-not-repointed"]:
+            state = {"rebound": False, "restored": False, "fieldPid": "field-original", "extension": {}}
             def human(path, method="GET", body=None):
                 if path == "/api/meta/models": return {"pid": "model-pid"}
                 if path.endswith("/create"): return {"pid": "source-pid"}
-                if path == "/api/meta/models/model-pid" and method == "PUT":
-                    state["rebound"] = body["extension"]["fields"][0]["columnName"] == "rel_binding_private"
+                if path == "/api/meta/fields/key/rel_binding_name":
+                    return {"id": state["fieldPid"], "pid": state["fieldPid"], "code": "rel_binding_name", "dataType": "string",
+                            "status": "published", "extension": state["extension"]}
+                if path == "/api/meta/models/model-pid/bindings":
+                    return [{"code": "rel_binding_name", "fieldId": "field-original" if mode == "binding-not-repointed" else state["fieldPid"]}]
+                if path.startswith("/api/meta/fields/") and method == "PUT":
+                    self.assertEqual(path, "/api/meta/fields/" + state["fieldPid"])
+                    state["rebound"] = body["extension"].get("columnName") == "rel_binding_private"
                     state["restored"] = not state["rebound"]
+                    state["fieldPid"] = "field-rebound" if state["rebound"] else "field-restored"
+                    state["extension"] = body["extension"]
+                    return {"pid": state["fieldPid"]}
                 return {}
             def request(path, **kwargs):
                 if state["rebound"]:
-                    if fail: raise ProtocolError("transport failure")
+                    if mode == "transport-failure": raise ProtocolError("transport failure")
                     return 409, {"success": False, "code": "open_api_source_changed", "message": "Published resource source binding is unavailable or changed"}, {"X-Request-Id": "release-dynamic-source-binding"}
                 return 200, {"pid": "source-pid", "name": "Storage binding original"}, {"ETag": '"opaque-etag-value"'}
-            with self.subTest(fail=fail):
-                if fail:
+            with self.subTest(mode=mode):
+                if mode != "success":
                     with self.assertRaises(ProtocolError): run_source_binding_probe(request, human, "install-pid", {}, "resource.get")
                 else:
                     self.assertEqual(run_source_binding_probe(request, human, "install-pid", {}, "resource.get")["status"], 409)
