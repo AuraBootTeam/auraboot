@@ -40,8 +40,8 @@
   },
   {
     "code": "tpm_pj_description",
-    "displayName:zh-CN": "项目描述",
-    "displayName:en": "Description",
+    "displayName:zh-CN": "交付目标",
+    "displayName:en": "Delivery outcome",
     "dataType": "text",
     "description": "Detailed project description.",
     "constraints": {
@@ -100,8 +100,8 @@
   },
   {
     "code": "tpm_pj_end_date",
-    "displayName:zh-CN": "结束日期",
-    "displayName:en": "End Date",
+    "displayName:zh-CN": "交付日期",
+    "displayName:en": "Delivery date",
     "dataType": "date",
     "description": "Project end date.",
     "feature": {
@@ -129,7 +129,10 @@
     "constraints": {
       "min": 0
     },
-    "description": "Planned project budget in CNY."
+    "description": "Planned project budget in CNY.",
+    "extension": {
+      "renderComponent": "moneyinput"
+    }
   },
   {
     "code": "tpm_pj_owner_user",
@@ -141,6 +144,9 @@
       "targetField": "username",
       "valueField": "pid"
     },
-    "description": "Assigned space member."
+    "description": "Assigned space member.",
+    "extension": {
+      "renderComponent": "userselect"
+    }
   }
 ]

@@ -81,13 +81,15 @@
         "columnExpr": "progress",
         "dataType": "number"
       }
-    ]
+    ],
+    "resourceCode": "tpm_milestone",
+    "actionCode": "read"
   },
   {
     "code": "tpm_delivery_activity",
     "name:zh-CN": "里程碑动态",
     "name:en": "Milestone activity",
-    "description": "Actual milestone command activity joined to the parent project, scoped by tenant.",
+    "description": "Persisted milestone completion facts; historical records without a completion timestamp are not backfilled.",
     "parameter_schema": {
       "type": "object",
       "properties": {
@@ -103,7 +105,7 @@
         "projectPid"
       ]
     },
-    "fromSql": "SELECT a.pid, a.occurred_at, a.activity_type, a.actor_name, m.tpm_ms_name AS subject, a.content FROM ab_activity a JOIN mt_tpm_milestone m ON a.object_record = m.pid AND a.tenant_id = m.tenant_id WHERE a.tenant_id = #{params.tenantId} AND a.object_model = 'tpm_milestone' AND m.tpm_ms_project_id = #{params.projectPid} ORDER BY a.occurred_at DESC",
+    "fromSql": "SELECT pid, tpm_ms_reached_at AS occurred_at, 'STATE_CHANGE' AS activity_type, tpm_ms_name AS subject, tpm_ms_description AS content FROM mt_tpm_milestone WHERE tenant_id = #{params.tenantId} AND tpm_ms_project_id = #{params.projectPid} AND tpm_ms_status = 'reached' AND tpm_ms_reached_at IS NOT NULL ORDER BY tpm_ms_reached_at DESC",
     "outputFields": [
       {
         "code": "pid",
@@ -121,11 +123,6 @@
         "dataType": "string"
       },
       {
-        "code": "actor_name",
-        "columnExpr": "actor_name",
-        "dataType": "string"
-      },
-      {
         "code": "subject",
         "columnExpr": "subject",
         "dataType": "string"
@@ -135,6 +132,8 @@
         "columnExpr": "content",
         "dataType": "string"
       }
-    ]
+    ],
+    "resourceCode": "tpm_milestone",
+    "actionCode": "read"
   }
 ]

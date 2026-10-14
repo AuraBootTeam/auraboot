@@ -46,16 +46,6 @@
             "en": "Put On Hold"
           },
           "visibleWhen": "form.tpm_pj_status === 'active'"
-        },
-        {
-          "code": "complete_project",
-          "commandCode": "tpm:complete_project",
-          "permissionCode": "tpm.project.manage",
-          "label": {
-            "zh-CN": "完成",
-            "en": "Complete"
-          },
-          "visibleWhen": "form.tpm_pj_status === 'active'"
         }
       ],
       "area": "header"
@@ -99,7 +89,8 @@
           "valueField": "pending",
           "tone": "amber"
         }
-      ]
+      ],
+      "columns": 3
     },
     {
       "id": "overview",
@@ -154,7 +145,7 @@
               "zh-CN": "交付内容",
               "en": "Deliverable"
             },
-            "width": 280
+            "width": 200
           },
           {
             "field": "tpm_ms_target_date",
@@ -162,7 +153,7 @@
               "zh-CN": "计划日期",
               "en": "Target date"
             },
-            "width": 150,
+            "width": 115,
             "dataType": "date"
           },
           {
@@ -171,7 +162,7 @@
               "zh-CN": "状态",
               "en": "Status"
             },
-            "width": 120,
+            "width": 85,
             "dictCode": "tpm_milestone_status",
             "renderType": "tag"
           },
@@ -181,7 +172,7 @@
               "zh-CN": "验收要点",
               "en": "Acceptance criteria"
             },
-            "width": 300
+            "width": 250
           }
         ],
         "actions": [
@@ -199,7 +190,11 @@
               "en": "Confirm the deliverable meets its acceptance criteria? Progress will update."
             }
           }
-        ]
+        ],
+        "defaultSort": {
+          "field": "tpm_ms_target_date",
+          "order": "asc"
+        }
       }
     },
     {
@@ -234,7 +229,11 @@
     "headerSubtitleFields": [
       "tpm_pj_customer",
       "tpm_pj_code"
-    ]
+    ],
+    "detailAsideBlockIds": [
+      "activity"
+    ],
+    "showPdfExport": false
   },
   "dataSources": {
     "deliveryProgress": {

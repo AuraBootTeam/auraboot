@@ -149,8 +149,8 @@
         "tpm_pj_customer"
       ],
       "defaultSort": {
-        "field": "created_at",
-        "order": "desc"
+        "field": "tpm_pj_end_date",
+        "order": "asc"
       },
       "area": "main",
       "searchPlaceholder": {

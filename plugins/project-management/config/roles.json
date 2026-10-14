@@ -1,0 +1,33 @@
+[
+  {
+    "code": "tpm_delivery_viewer",
+    "name:zh-CN": "项目交付只读",
+    "name:en": "Delivery viewer",
+    "description": "Read-only access to delivery projects and milestones.",
+    "permissions": [
+      "tpm.project.read",
+      "tpm.milestone.read",
+      "model.tpm_project.read",
+      "model.tpm_milestone.read"
+    ]
+  },
+  {
+    "code": "tpm_delivery_manager",
+    "name:zh-CN": "项目交付负责人",
+    "name:en": "Delivery manager",
+    "description": "Manage project plans and milestone completion.",
+    "permissions": [
+      "tpm.project.read",
+      "tpm.project.manage",
+      "tpm.milestone.read",
+      "tpm.milestone.manage",
+      "meta.command.execute",
+      "model.tpm_project.read",
+      "model.tpm_project.create",
+      "model.tpm_project.update",
+      "model.tpm_milestone.read",
+      "model.tpm_milestone.create",
+      "model.tpm_milestone.update"
+    ]
+  }
+]

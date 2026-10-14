@@ -1048,6 +1048,16 @@ function DetailPageContentInner(props: PageContentProps) {
     excludeDataSourceIds: permissionHiddenDataSourceIds,
   });
   useRuntimeStateSubscription(runtime);
+  const [detailRefreshVersion, setDetailRefreshVersion] = useState(0);
+  const refreshDetailAfterChildChange = useCallback(async () => {
+    await reloadRecord();
+    const sourceIds = Object.keys(schema?.dataSources || {}).filter(
+      (id) => !permissionHiddenDataSourceIds.has(id),
+    );
+    if (sourceIds.length > 0) await dataSourceManager.reload(sourceIds);
+    setDetailRefreshVersion((version) => version + 1);
+  }, [reloadRecord, schema?.dataSources, permissionHiddenDataSourceIds, dataSourceManager]);
+
 
   // Use unified action handler for toolbar buttons (commandCode, navigateTo)
   const {
@@ -1187,6 +1197,26 @@ function DetailPageContentInner(props: PageContentProps) {
       ),
     [allBlocks],
   );
+  const asideBlockIds = new Set<string>(
+    Array.isArray(schema?.extension?.detailAsideBlockIds)
+      ? schema.extension.detailAsideBlockIds.filter((id: unknown) => typeof id === 'string')
+      : [],
+  );
+  const workspaceContentBlocks = allBlocks.filter(
+    (block: BlockConfig) => block.blockType !== 'toolbar' && block.blockType !== 'tabs' &&
+      (block as { detailPlacement?: string }).detailPlacement !== 'header',
+  );
+  const renderWorkspaceBlock = (block: BlockConfig) => {
+    const key = `${block.id}:${block.blockType === 'activity-timeline' ? detailRefreshVersion : 0}`;
+    if (!DETAIL_SPECIALIZED_BLOCK_TYPES.has(block.blockType as string)) {
+      return runtime ? <BlockRenderer key={key} block={prepareDetailRuntimeBlock(block, recordData, recordPid!)} runtime={runtime} areaId="detail-workspace" /> : null;
+    }
+    return <DetailBlockRenderer key={key} block={block} recordData={recordData} rawData={rawData}
+      recordPid={recordPid!} token={token || undefined} locale={locale} t={t}
+      modelCode={schema?.modelCode || tableName} evaluateEditableWhen={evaluateVisibleWhen}
+      onDataChange={refreshDetailAfterChildChange} getDictItems={getDictItems} enrichField={enrichField}
+      runtime={runtime as SchemaRuntime} schemaDataSources={schema?.dataSources} dataSourceManager={dataSourceManager} />;
+  };
   const headerMiscBlocks = useMemo(
     () =>
       directMiscBlocks.filter(
@@ -1548,7 +1578,7 @@ function DetailPageContentInner(props: PageContentProps) {
                       t={t}
                       modelCode={schema?.modelCode || tableName}
                       evaluateEditableWhen={evaluateVisibleWhen}
-                      onDataChange={reloadRecord}
+                      onDataChange={refreshDetailAfterChildChange}
                       getDictItems={getDictItems}
                       enrichField={enrichField}
                       runtime={runtime as SchemaRuntime}
@@ -1574,7 +1604,7 @@ function DetailPageContentInner(props: PageContentProps) {
                       t={t}
                       modelCode={schema?.modelCode || tableName}
                       evaluateEditableWhen={evaluateVisibleWhen}
-                      onDataChange={reloadRecord}
+                      onDataChange={refreshDetailAfterChildChange}
                       getDictItems={getDictItems}
                       enrichField={enrichField}
                       runtime={runtime as SchemaRuntime}
@@ -1596,8 +1626,21 @@ function DetailPageContentInner(props: PageContentProps) {
             {recordData?.pid && <InlineApprovalPanel recordPid={recordData.pid} />}
           </div>
         ) : (
-          /* Direct mode: render form-sections and sub-tables without tabs */
-          <div className="space-y-4 p-5">
+          /* Direct mode: optional workspace layout is configured by DSL block ids. */
+          asideBlockIds.size > 0 ? (
+            <div className="space-y-5 p-5">
+              {runtime && headerMiscBlocks.map((block: BlockConfig) => <BlockRenderer key={block.id}
+                block={prepareDetailRuntimeBlock(block, recordData, recordPid!)} runtime={runtime} areaId="detail-header" />)}
+              <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]" data-testid="detail-workspace-layout">
+                <div className="min-w-0 space-y-5" data-testid="detail-workspace-main">
+                  {workspaceContentBlocks.filter((block: BlockConfig) => !asideBlockIds.has(block.id)).map(renderWorkspaceBlock)}
+                </div>
+                <aside className="border-border bg-panel min-w-0 rounded-card border p-4" data-testid="detail-workspace-aside">
+                  {workspaceContentBlocks.filter((block: BlockConfig) => asideBlockIds.has(block.id)).map(renderWorkspaceBlock)}
+                </aside>
+              </div>
+            </div>
+          ) : <div className="space-y-4 p-5">
             {/* Opt-in: misc blocks with detailPlacement === 'header' render at the
                 top (before form-sections / sub-tables). Default placement is
                 unchanged (rendered last), so existing pages are unaffected. */}
@@ -1627,7 +1670,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 t={t}
                 modelCode={schema?.modelCode || tableName}
                 evaluateEditableWhen={evaluateVisibleWhen}
-                onDataChange={reloadRecord}
+                onDataChange={refreshDetailAfterChildChange}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
                 runtime={runtime as SchemaRuntime}
@@ -1647,7 +1690,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 t={t}
                 modelCode={schema?.modelCode || tableName}
                 evaluateEditableWhen={evaluateVisibleWhen}
-                onDataChange={reloadRecord}
+                onDataChange={refreshDetailAfterChildChange}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
                 runtime={runtime as SchemaRuntime}
@@ -1667,7 +1710,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 t={t}
                 modelCode={schema?.modelCode || tableName}
                 evaluateEditableWhen={evaluateVisibleWhen}
-                onDataChange={reloadRecord}
+                onDataChange={refreshDetailAfterChildChange}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
                 runtime={runtime as SchemaRuntime}
@@ -1687,7 +1730,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 t={t}
                 modelCode={schema?.modelCode || tableName}
                 evaluateEditableWhen={evaluateVisibleWhen}
-                onDataChange={reloadRecord}
+                onDataChange={refreshDetailAfterChildChange}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
                 runtime={runtime as SchemaRuntime}
@@ -1707,7 +1750,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 t={t}
                 modelCode={schema?.modelCode || tableName}
                 evaluateEditableWhen={evaluateVisibleWhen}
-                onDataChange={reloadRecord}
+                onDataChange={refreshDetailAfterChildChange}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
                 runtime={runtime as SchemaRuntime}
@@ -2165,7 +2208,7 @@ function DetailBlockRenderer({
           {block.fields && block.fields.length > 0 && (
             <div className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2">
               {block.fields.map((field: FieldConfig) => {
-                const colSpan = field.layout?.colSpan || (field.span === 2 ? 12 : 6);
+                const colSpan = field.layout?.colSpan || field.colSpan || (field.span === 2 ? 12 : 6);
                 const isFullWidth = colSpan >= 12 || field.span === 2;
                 const resolvedField = resolveSettingsCardField(
                   field,
@@ -2226,7 +2269,7 @@ function DetailBlockRenderer({
         {block.fields && block.fields.length > 0 && (
           <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
             {block.fields.map((field: FieldConfig) => {
-              const colSpan = field.layout?.colSpan || (field.span === 2 ? 12 : 6);
+              const colSpan = field.layout?.colSpan || field.colSpan || (field.span === 2 ? 12 : 6);
               const isFullWidth = colSpan >= 12 || field.span === 2;
               const resolvedField: FieldConfig = field.label
                 ? field
@@ -2348,6 +2391,8 @@ function DetailBlockRenderer({
     // Activity API uses record PID, not numeric ID
     const pid = recordData?.pid || recordPid;
     return (
+      <section>
+      {block.title && <h3 className="text-text mb-4 text-sm font-semibold">{getLocalizedText(block.title, locale, t)}</h3>}
       <ActivityTimeline
         modelCode={modelCode || ''}
         recordPid={String(pid)}
@@ -2361,6 +2406,7 @@ function DetailBlockRenderer({
         }
         businessRecordMapping={(block as any).businessRecordMapping}
       />
+      </section>
     );
   }
 
