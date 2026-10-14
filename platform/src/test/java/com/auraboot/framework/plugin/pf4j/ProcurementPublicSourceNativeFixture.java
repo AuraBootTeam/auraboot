@@ -234,6 +234,12 @@ abstract class ProcurementPublicSourceNativeFixture {
         });server.start();
         var secret=new CloudConfigSaveRequest();secret.setConfigLevel("tenant");secret.setServiceType("integration");secret.setProviderCode(provider);secret.setEnabled(true);secret.setPriority(1);
         secret.setConfig("{\"appSecret\":\"local-test-secret\"}");configs.saveConfig(secret);
+        prepareInitialSourceRecords();
+        retainedTaskPids.add(task);
+        if(!isolated && baselineTargetTask==null) baselineTargetTask=task;
+    }
+    /** Override only prerequisite writes; the original Source/Order fixture retains this exact body. */
+    protected void prepareInitialSourceRecords() throws Exception {
         fixture(SYNC,()->{
             String product=pid(db.create("prod_product",Map.of("prod_code",provider,"prod_name","Public source material","prod_type","raw_material","prod_unit","pcs","prod_status","active")));
             connection=pid(db.create("customer_pcba_int_kingdee_connection",Map.of("customer_pcba_kd_profile_name",provider,"customer_pcba_kd_status","active", "customer_pcba_kd_acct_id",provider,
@@ -241,8 +247,6 @@ abstract class ProcurementPublicSourceNativeFixture {
             db.create("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_external_system","KINGDEE","customer_pcba_ref_instance_key",connection,"customer_pcba_ref_account_id",provider,"customer_pcba_ref_external_form_id","BD_MATERIAL","customer_pcba_ref_external_id","900","customer_pcba_ref_local_model_code","prod_product","customer_pcba_ref_local_pid",product));return null;
         });
         task=fixture("qo_procurement_task_common:create",()->pid((Map<?,?>)service("ProcurementTaskService",new Class<?>[]{DataAccessor.class},new Object[]{db},"create",new Class<?>[]{Object.class,String.class,Map.class},tenant,actor,Map.of("title",provider,"connectionPid",connection))));
-        retainedTaskPids.add(task);
-        if(!isolated && baselineTargetTask==null) baselineTargetTask=task;
     }
     @AfterEach void close() throws Exception {
         try {

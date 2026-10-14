@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(classes=TestApplication.class,properties={
     "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
     "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
-    "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
+    "security.field-encryption.key=${PROCUREMENT_RECEIPT_FIELD_ENCRYPTION_KEY}"})
 @ActiveProfiles("integration-test")
 @Import({ProcurementPublicSourceNativeFixture.IsolatedScheduling.class,ProcurementInventoryReceiptRealDbIT.CasObservationConfiguration.class})
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_TRUSTED_RECEIPT_IT",matches="true")
@@ -57,6 +57,134 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @Autowired MetaModelService models;
 
     @Autowired ReceiptCasObservation casObservation;
+    @Autowired ReceiptReadOnlyObservation receiptReadOnlyObservation;
+    @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualReceiptEncryption;
+    private String prerequisiteActor;
+    @Override protected void prepareEvidence(org.junit.jupiter.api.TestInfo test) throws Exception {
+        super.prepareEvidence(test);
+        var input=json.readTree(java.nio.file.Files.readAllBytes(Path.of(required("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"))));
+        ProcurementInventoryNativeAdmission.validate(input, Path.of(required("PROCUREMENT_PUBLIC_SOURCE_EVIDENCE_DIR")),
+                Path.of(input.path("applicationCoreRoot").asText()), actualReceiptEncryption,
+                requiredAllowEmpty("PROCUREMENT_RECEIPT_FIELD_ENCRYPTION_KEY"), plugins, json);
+        writeArtifact("receipt-artifact-crypto-admission.json",Map.of("actualProofValidated",true,
+                "actualEncryptionServiceProbed",true,"nativeFixtureOnly",true,"sourceSet",input.path("sourceSet")));
+    }
+    @Override protected <T>T fixture(String code,java.util.function.Supplier<T> work) {
+        assertEquals(SYNC,code,"Inventory prerequisites cannot enter a synthetic production writer scope");
+        receiptReadOnlyObservation.enter();
+        try{return super.fixture(code,work);}finally{receiptReadOnlyObservation.leave();}
+    }
+    private static String requiredAllowEmpty(String name) {
+        assertTrue(System.getenv().containsKey(name), "Matching runtime crypto value must be explicitly supplied");
+        return System.getenv(name);
+    }
+
+    /** Only this inventory subclass replaces synthetic private production-writer prerequisites. */
+    @Override protected void prepareInitialSourceRecords() throws Exception {
+        prerequisiteActor=prerequisiteActor();
+        Path original=Path.of(procurementDirectory),copy=caseEvidence.resolve("receipt-directory-init");
+        var appendix=com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.prepareSourceUi(original,copy,json);
+        importDirectory(copy);writeArtifact("receipt-directory-initialization-appendix.json",appendix);
+        procurementDirectory=copy.toString(); // Later server-policy copies retain this exact declared test-writer appendix.
+        String product=createRegistered(prerequisiteActor,"prod:create_product",Map.of("prod_name","Public source material",
+                "prod_custom_code",provider,"prod_type","raw_material","prod_unit","pcs"));
+        prerequisiteAction(prerequisiteActor,"prod:activate_product",product,Map.of());
+        connection=directoryInitialize("customer_pcba_int_kingdee_connection",Map.of("customer_pcba_kd_profile_name",provider,
+                "customer_pcba_kd_status","active","customer_pcba_kd_acct_id",provider,
+                "customer_pcba_kd_base_url","http://127.0.0.1:"+server.getAddress().getPort(),
+                "customer_pcba_kd_app_id","local-app","customer_pcba_kd_username","local-reader",
+                "customer_pcba_kd_app_secret_ref","cloud-config:"+provider,"customer_pcba_kd_auth_type","app-secret"));
+        directoryInitialize("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_external_system","KINGDEE",
+                "customer_pcba_ref_instance_key",connection,"customer_pcba_ref_account_id",provider,
+                "customer_pcba_ref_external_form_id","BD_MATERIAL","customer_pcba_ref_external_id","900",
+                "customer_pcba_ref_local_model_code","prod_product","customer_pcba_ref_local_pid",product));
+        task=prerequisiteAction(prerequisiteActor,"qo_procurement_task_common:create",null,
+                Map.of("title",provider,"connectionPid",connection)).path("recordPid").asText();
+        assertFalse(task.isBlank());
+    }
+
+    private String directoryInitialize(String model,Map<String,Object> facts) throws Exception {
+        com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.validateSourceUiPayload(model,facts);
+        return createRegistered(prerequisiteActor,
+                com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.sourceUiCommand(model),facts);
+    }
+
+    static List<String> prerequisitePermissions() {
+        var codes=new ArrayList<>(sourceActorPermissions(true));
+        codes.addAll(List.of("qo.procurement.manage","model.pr_spend_category.read","model.pr_supplier_common.read",
+                "model.qo_procurement_history_common.read","model.qo_procurement_submission_common.read",
+                "model.qo_procurement_submission_line_common.read","model.qo_procurement_execution_common.read",
+                "model.qo_procurement_category_policy_common.read","prod.product.manage","model.prod_product.create","model.prod_product.update"));
+        return List.copyOf(codes);
+    }
+    private String prerequisiteActor() {
+        context();String username=provider+"-receipt-prereq",email=username+"@example.invalid";
+        var user=users.signUp(email,PASSWORD,"Receipt lifecycle prerequisite actor",username);
+        var member=members.addMember(user.getId(),tenant,"active");
+        return actorToken(user.getId(),user.getPid(),member.getId(),email,prerequisitePermissions());
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode prerequisiteAction(String bearer,String code,String target,
+            Map<String,Object> payload) throws Exception {
+        var request=new LinkedHashMap<String,Object>();request.put("payload",payload);
+        request.put("clientRequestId","receipt-prereq-"+UUID.randomUUID());
+        if(target!=null){request.put("targetRecordPid",target);
+            request.put("expectedVersion",fixture(SYNC,()->db.getById(commands.findByCode(code).getModelCode(),target)).get("row_version"));}
+        com.auraboot.framework.application.tenant.MetaContext.clear();org.springframework.test.web.servlet.MvcResult result;
+        try{result=mvc.perform(post("/api/meta/commands/execute/"+code).header("Authorization","Bearer "+bearer)
+                .contentType("application/json").content(json.writeValueAsBytes(request))).andReturn();}finally{context();}
+        var body=json.readTree(result.getResponse().getContentAsByteArray());
+        writeArtifact("receipt-public-prerequisite-"+(++publicRequestSequence)+".json",Map.of("commandCode",code,
+                "httpStatus",result.getResponse().getStatus(),"businessCode",safeNumericCode(body.path("code")),
+                "rawResponseOrCredentialsPersisted",false));
+        assertEquals(200,result.getResponse().getStatus());assertEquals("0",body.path("code").asText());
+        assertEquals("completed",body.path("data").path("phaseReached").asText());return body.path("data").path("data");
+    }
+
+    @Override protected PreparedOrder prepareAllocatedOrder() throws Exception {
+        configurePolicy();assertEquals(200,call(token,selected("11")).status());
+        String source=pid(sources().getFirst());
+        String category=directoryInitialize("pr_spend_category",Map.of("pr_spc_code",provider,"pr_spc_name","Local source category"));
+        String supplier=directoryInitialize("pr_supplier_common",Map.of("pr_supplier_code",provider,
+                "pr_supplier_name","Local source supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider));
+        prerequisiteAction(prerequisiteActor,"qo_procurement_category_policy_common:create",null,Map.of("categoryPid",category,
+                "connectionPid",connection,"supplierPids",List.of(supplier),"defaultSupplierPids",List.of(supplier)));
+        var before=record("pr_purchase_request",source);
+        prerequisiteAction(prerequisiteActor,"qo_procurement_task_common:classify_source",task,
+                Map.of("sourcePid",source,"sourceRevision",before.get("qo_pr_source_revision"),"categoryPid",category));
+        long revision=new BigDecimal(record("pr_purchase_request",source).get("qo_pr_source_revision").toString()).longValueExact();
+        prerequisiteAction(prerequisiteActor,"qo_procurement_task_common:dispatch",task,
+                Map.of("supplierPids",List.of(supplier),"cutoffAt","2066-11-15T08:00:00Z"));
+        String quote=pid(only("s2p_bid",Map.of("s2p_bid_sourcing_event_id",task)));
+        context();String email=provider+"-receipt-supplier@example.invalid";
+        var supplierUser=users.signUp(email,PASSWORD,"Receipt prerequisite supplier",provider+"-receipt-supplier");
+        var supplierMember=members.addMember(supplierUser.getId(),tenant,"active");
+        String supplierToken=actorToken(supplierUser.getId(),supplierUser.getPid(),supplierMember.getId(),email,List.of("meta.command.execute","qo.srm.use"));
+        String contact=directoryInitialize("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
+                "pr_spc_name","Local supplier contact","qo_pr_contact_state","active"));
+        directoryInitialize("qo_procurement_membership_common",Map.of("qo_pr_membership_key",provider,
+                "qo_pr_membership_user_pid",supplierUser.getPid(),"qo_pr_membership_supplier_pid",supplier,
+                "qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active"));
+        var line=Map.<String,Object>of("sourcePid",source,"sourceRevision",revision,"unitPrice","1.25","currency","CNY",
+                "unit","PCS","taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2066-12-01");
+        long quoteRevision=new BigDecimal(record("s2p_bid",quote).get("qo_pr_quote_revision").toString()).longValueExact();
+        prerequisiteAction(supplierToken,"qo_procurement_quote_common:save_draft",quote,
+                Map.of("revision",quoteRevision,"lines",List.of(line),"paymentTerms","Net 30"));
+        quoteRevision=new BigDecimal(record("s2p_bid",quote).get("qo_pr_quote_revision").toString()).longValueExact();
+        String submission=prerequisiteAction(supplierToken,"qo_procurement_quote_common:submit",quote,Map.of("revision",quoteRevision)).path("submissionPid").asText();
+        assertFalse(submission.isBlank());
+        prerequisiteAction(prerequisiteActor,"qo_procurement_task_common:allocate",task,Map.of("sourceDemands",
+                List.of(Map.of("sourcePid",source,"sourceRevision",revision,"quantity","300.000001")),"allocations",
+                List.of(Map.of("quotePid",quote,"sourcePid",source,"submissionPid",submission,"quantity","300.000001"))));
+        var allocation=only(domainModel("allocation"),Map.of("qo_pr_allocation_source_pid",source,"qo_pr_allocation_submission_pid",submission));
+        String execution=allocation.get("qo_pr_allocation_execution_pid").toString();
+        directoryInitialize("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_external_system","KINGDEE",
+                "customer_pcba_ref_instance_key",connection,"customer_pcba_ref_account_id",provider,
+                "customer_pcba_ref_external_form_id","FixtureSupplier","customer_pcba_ref_external_id","supplier-local",
+                "customer_pcba_ref_local_model_code","pr_supplier_common","customer_pcba_ref_local_pid",supplier));
+        baselineOrderExecution=execution;return new PreparedOrder(new Submitted(source,quote,submission,revision),execution,supplier);
+    }
+
     private boolean splitRead;
     private enum Scenario { HAPPY, LATE_CAS, LOST_LEASE, HELD_LEASE }
     @Test void registeredReceiptCommandsPersistLineageAndCounterExactlyOnce() throws Exception {runReceiptScenario(Scenario.HAPPY);}
@@ -166,6 +294,22 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
     static class CasObservationConfiguration {
         @org.springframework.context.annotation.Bean ReceiptCasObservation receiptCasObservation(){return new ReceiptCasObservation();}
+        @org.springframework.context.annotation.Bean ReceiptReadOnlyObservation receiptReadOnlyObservation(){return new ReceiptReadOnlyObservation();}
+    }
+    /** The legacy synthetic permit is observation-only in this inventory subclass. */
+    @org.aspectj.lang.annotation.Aspect static class ReceiptReadOnlyObservation {
+        private final ThreadLocal<Integer> depth=ThreadLocal.withInitial(()->0);
+        void enter(){depth.set(depth.get()+1);}
+        void leave(){int value=depth.get()-1;if(value==0)depth.remove();else depth.set(value);}
+        @org.aspectj.lang.annotation.Before("execution(* com.auraboot.framework.meta.service.DynamicDataService+.create(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.update(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.delete(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.compareAndSet*(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.batch*(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.bulkCreate(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.createRelations(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.removeRelations(..))")
+        public void rejectSyntheticWrite(){assertEquals(0,depth.get(),"Synthetic fixture scope permits only read observations");}
     }
     /** Observes after an actual committed-to-T01 SQL CAS; never replaces the service or its result. */
     @org.aspectj.lang.annotation.Aspect static class ReceiptCasObservation {
