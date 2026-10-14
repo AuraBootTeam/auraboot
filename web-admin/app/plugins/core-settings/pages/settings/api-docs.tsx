@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import {
   ArrowPathIcon,
@@ -113,6 +113,13 @@ export default function OpenPlatformPage() {
   const [secret, setSecret] = useState<CredentialSecret | null>(null);
   const [operationsInstallation, setOperationsInstallation] = useState<string | null>(null);
   const [grantInstallation, setGrantInstallation] = useState<string | null>(null);
+  const grantTrigger = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!grantInstallation && grantTrigger.current?.isConnected && !grantTrigger.current.matches(':disabled')) {
+      grantTrigger.current.focus();
+      grantTrigger.current = null;
+    }
+  }, [grantInstallation]);
   const [notificationInstallation, setNotificationInstallation] = useState<string | null>(null);
   const [pendingRotate, setPendingRotate] = useState<{
     installationPid: string;
@@ -656,7 +663,7 @@ export default function OpenPlatformPage() {
                           {access.platformAdmin && application.permissions.manageRuntime && (
                             <button
                               type="button"
-                              onClick={() => setGrantInstallation(installation.pid)}
+                              onClick={event => { grantTrigger.current = event.currentTarget; setGrantInstallation(installation.pid); }}
                               disabled={grantInstallation !== null}
                               aria-expanded={grantInstallation === installation.pid}
                               className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"

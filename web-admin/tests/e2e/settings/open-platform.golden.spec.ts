@@ -334,6 +334,15 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-draft');
 
+    const savedTimeout = String(saved.data.draft.timeoutMs);
+    const resourceTimeout = page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true });
+    await resourceTimeout.fill(String(Number(savedTimeout) + 1));
+    await verifyConfirmedDiscard(page, page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }),
+      page.getByRole('group', { name: publicationText("操作确认"), exact: true }), publicationText("确认"),
+      page.getByTestId('publication-editor').getByRole('listitem').filter({ has: page.getByText(resourceCode, { exact: true }) })
+        .getByRole('button', { name: publicationText("编辑合同"), exact: true }),
+      resourceTimeout, savedTimeout, 'publication-confirmed-discard', `/api/open-platform/publications/${resourceCode}`);
+
     const otherEditor = await page.context().newPage();
     await otherEditor.goto('/p/c/open_platform_publications');
     await otherEditor.getByTestId('publication-editor').getByRole('listitem')
@@ -819,8 +828,16 @@ test.describe('Dynamic query publication journey', () => {
     await budgetRegion.scrollIntoViewIfNeeded();
     await expect(budgetRegion).toBeInViewport({ ratio: 1 });
     await budgetRegion.screenshot({ path: path.join(screenshotRoot, 'query-budget-reopened-region.png') });
+    const queryTimeout = editor.getByLabel(queryText("查询超时（毫秒）"), { exact: true });
+    await queryTimeout.fill(String(budgets.timeoutMs + 1));
+    await verifyConfirmedDiscard(page, editor.getByRole('button', { name: queryText("关闭编辑"), exact: true }),
+      editor.getByRole('group', { name: queryText("查询操作确认"), exact: true }), queryText("确认"),
+      editor.getByRole('listitem').filter({ has: page.getByText(publicCode, { exact: true }) })
+        .getByRole('button', { name: queryText("编辑查询合同"), exact: true }),
+      queryTimeout, String(budgets.timeoutMs), 'query-confirmed-discard', `/api/open-platform/query-publications/${publicCode}`);
     await activateWithEnter(page.getByRole('button', { name: queryText("发布查询"), exact: true }));
-    await activateWithEnter(page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }));
+    await verifyBusyPublish(page, editor.getByRole('group', { name: queryText("查询操作确认"), exact: true }),
+      queryText("确认"), queryText("取消"), `/api/open-platform/query-publications/${publicCode}/publish`);
     await expect(editor.getByRole('status')).toContainText(queryText("已发布查询")); await snapshot('query-publish');
     const originalDocumentResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications/${publicCode}/openapi`);
     expect(originalDocumentResponse.status()).toBe(200); const originalDocument = await originalDocumentResponse.json();
@@ -1026,6 +1043,13 @@ test.describe('Dynamic installation authority journey', () => {
     await expect(editor.getByRole('status').filter({ hasText: installationText('授权已保存') })).toBeVisible(); await snapshot('grant-saved');
     await page.reload(); await installationCard.getByRole('button', { name: installationText('数据授权'), exact: true }).click(); await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${resourceCode}`);
     await expect(editor.getByLabel(`${installationText('读取')} name`, { exact: true })).toBeChecked(); await expect(editor.getByTestId('grant-constraint-0').getByLabel(installationText('允许值（每行一个）'), { exact: true })).toHaveValue('A');
+    const grantedRows = editor.getByTestId('grant-constraint-0').getByLabel(installationText('允许值（每行一个）'), { exact: true });
+    await grantedRows.fill('B');
+    await verifyConfirmedDiscard(page, editor.getByRole('button', { name: installationText('关闭授权编辑'), exact: true }),
+      editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true }), installationText('确认'),
+      installationCard.getByRole('button', { name: installationText('数据授权'), exact: true }),
+      grantedRows, 'A', 'grant-confirmed-discard', `/api/open-platform/installations/${installation.pid}`,
+      async () => { await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${resourceCode}`); });
     const listed = await page.request.get(resourcePath, { headers: machineHeaders }); expect(listed.status()).toBe(200); expect((await listed.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A', zone: 'A' }]);
     expect((await page.request.get(`${resourcePath}/${recordB.pid}`, { headers: machineHeaders })).status()).toBe(404);
     const forbidden = await page.request.post(resourcePath, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-forbidden-${suffix}` }, data: { name: 'Denied', zone: 'B' } }); expect(forbidden.status()).toBe(403);
@@ -1213,6 +1237,90 @@ async function authenticate(page: import('@playwright/test').Page, locale = 'zh-
   ]);
   await page.addInitScript(value => localStorage.setItem('locale', value), locale);
 
+}
+
+async function verifyBusyPublish(page: import('@playwright/test').Page, group: import('@playwright/test').Locator,
+  confirmName: string, cancelName: string, pathname: string) {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let started!: (response: import('@playwright/test').APIResponse) => void;
+  let failed!: (error: unknown) => void;
+  const responseReady = new Promise<import('@playwright/test').APIResponse>((resolve, reject) => { started = resolve; failed = reject; });
+  let requests = 0;
+  const pattern = `**${pathname}`;
+  let received: Promise<import('@playwright/test').Response> | undefined;
+  let actualFetched = false;
+  await page.route(pattern, async route => {
+    try {
+      expect(route.request().method()).toBe('POST');
+      requests++;
+      const response = await route.fetch();
+      started(response);
+      await gate;
+      await route.fulfill({ response });
+    } catch (error) { failed(error); throw error; }
+  });
+  try {
+    await activateWithEnter(group.getByRole('button', { name: confirmName, exact: true }));
+    const actual = await responseReady;
+    actualFetched = true;
+    expect(actual.status()).toBe(200);
+    expect((await actual.json()).data).toMatchObject({ activeVersion: 1, status: 'published' });
+    await expect(group.getByRole('button', { name: confirmName, exact: true })).toBeDisabled();
+    await expect(group.getByRole('button', { name: cancelName, exact: true })).toBeDisabled();
+    await expect(group).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(group).toBeVisible();
+    await expect(group).toBeFocused();
+    expect(requests).toBe(1);
+    const root = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
+    await mkdir(root, { recursive: true });
+    await group.screenshot({ path: path.join(root, 'query-publish-busy.png') });
+    received = page.waitForResponse(response => new URL(response.url()).pathname === pathname && response.request().method() === 'POST');
+    release();
+    const clientResponse = await received;
+    expect(clientResponse.status()).toBe(200);
+    expect((await clientResponse.json()).data).toMatchObject({ activeVersion: 1, status: 'published' });
+    await expect(group).toHaveCount(0);
+    expect(requests).toBe(1);
+    await test.info().attach('busy-confirmation-publication', { contentType: 'application/json', body: JSON.stringify({
+      schemaVersion: 1, driver: 'actual-http-held-response', requests: 1,
+      cases: ['busy-disabled-controls', 'focused-escape-keeps-operation', 'single-real-publish-completes'],
+    }) });
+  } finally {
+    if (actualFetched && !received) received = page.waitForResponse(response => new URL(response.url()).pathname === pathname && response.request().method() === 'POST');
+    release();
+    if (received) await received;
+    await page.unroute(pattern);
+  }
+}
+
+async function verifyConfirmedDiscard(page: import('@playwright/test').Page,
+  close: import('@playwright/test').Locator, group: import('@playwright/test').Locator, confirmName: string,
+  reopen: import('@playwright/test').Locator, restored: import('@playwright/test').Locator, value: string,
+  id: string, writePrefix: string, configure?: () => Promise<void>) {
+  let writes = 0;
+  const observe = (request: import('@playwright/test').Request) => {
+    if (!['GET', 'HEAD'].includes(request.method()) && new URL(request.url()).pathname.startsWith(writePrefix)) writes++;
+  };
+  page.on('request', observe);
+  await activateWithEnter(close);
+  await expect(group).toBeVisible();
+  const root = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
+  await mkdir(root, { recursive: true });
+  await group.screenshot({ path: path.join(root, `${id}.png`) });
+  await activateWithEnter(group.getByRole('button', { name: confirmName, exact: true }));
+  await expect(group).toHaveCount(0);
+  await expect(reopen).toBeFocused();
+  await activateWithEnter(reopen);
+  await configure?.();
+  await expect(restored).toHaveValue(value);
+  expect(writes).toBe(0);
+  page.off('request', observe);
+  await test.info().attach('confirmed-discard-recovery', { contentType: 'application/json', body: JSON.stringify({
+    schemaVersion: 1, driver: 'native-keyboard', writes: 0,
+    cases: ['confirmed-discard-focus-return', 'no-write-server-state-restored'],
+  }) });
 }
 
 async function verifyDraftCancel(page: import('@playwright/test').Page,

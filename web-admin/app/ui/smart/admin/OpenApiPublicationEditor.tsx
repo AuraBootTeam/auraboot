@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { usePublicationConfirmation, PublicationField, type LabeledControl } from './PublicationControls';
+import { usePublicationCatalogFocus, usePublicationConfirmation, PublicationField, type LabeledControl } from './PublicationControls';
 import { Link } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, identityField, sourceField, publicValueType, type PublicationView,
@@ -40,6 +40,7 @@ export function OpenApiPublicationEditor() {
   const [confirm, setConfirm] = useState<'publish' | 'withdraw' | 'discard' | null>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
   const confirmationKeyDown = usePublicationConfirmation(confirm, confirmationRef, () => setConfirm(null), busy);
+  const { catalogRef, returnToCatalog } = usePublicationCatalogFocus(editing, loading, view?.code);
   useEffect(() => {
     if (sourceValidationAttempts > 0) sourceForm.current?.querySelector<HTMLElement>('input:invalid, select:invalid, textarea:invalid')?.focus();
   }, [sourceValidationAttempts]);
@@ -134,15 +135,15 @@ export function OpenApiPublicationEditor() {
     {notice && (!editing || denied) && <p role="status" className="text-sm text-success">{notice}</p>}
     {loading ? <p role="status" className="animate-pulse rounded-card bg-subtle p-5 text-text-2">{label('loading', '正在加载发布配置…', 'Loading publications…')}</p>
       : denied ? <button type="button" className={BUTTON} onClick={() => void load()}>{label('retry', '重新加载', 'Reload')}</button>
-        : <div className="space-y-4">
+        : <div ref={catalogRef} className="space-y-4">
           <div className="flex items-center justify-between"><h2 className="text-base font-semibold text-text">{label('catalog', '发布目录', 'Publication catalog')}</h2>
             <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => { setEditing(false); void load(); }}>{label('reload', '刷新目录', 'Reload catalog')}</button>
-              <button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => select()}>{label('new', '新建公共资源', 'New public resource')}</button></div></div>
+              <button type="button" className={BUTTON} data-editor-new disabled={busy || dirty} onClick={() => select()}>{label('new', '新建公共资源', 'New public resource')}</button></div></div>
           {!catalogReady ? null : views.length === 0 ? <div className="rounded-card border border-border bg-subtle p-5"><h3 className="font-medium text-text">{label('emptyTitle', '尚未公开业务模型', 'No business models are public yet')}</h3>
             <p className="mt-1 text-sm text-text-2">{label('emptyHint', '新建一个公共资源。保存草稿不会开放外部访问。', 'Create a public resource. Saving a draft does not enable external access.')}</p></div>
             : <ul className="divide-y divide-border rounded-card border border-border bg-panel">{views.map(row => <li key={row.code} className="flex items-center justify-between gap-3 p-4"><div><p className="font-medium text-text">{row.code}</p>
               <p className="text-sm text-text-2">{status(row)} · {label('activeVersion', '当前发布版本', 'Active version')} {row.activeVersion ?? '—'} · {label('draftRevision', '草稿修订', 'Draft revision')} {row.draftRevision}</p></div>
-              <button className={BUTTON} type="button" disabled={busy || dirty} onClick={() => select(row)}>{label('edit', '编辑合同', 'Edit contract')}</button></li>)}</ul>}
+              <button className={BUTTON} type="button" data-editor-code={row.code} disabled={busy || dirty} onClick={() => select(row)}>{label('edit', '编辑合同', 'Edit contract')}</button></li>)}</ul>}
         </div>}
     {editing && !denied && <form ref={sourceForm} className="space-y-4" onSubmit={event => { event.preventDefault(); void mutate('save'); }}>
       <fieldset disabled={busy || sourceLoading} className="space-y-4">
@@ -223,13 +224,13 @@ export function OpenApiPublicationEditor() {
           <button type="button" className={BUTTON} disabled={view?.status !== 'published'} onClick={() => void download('openapi')}>{label('openapi', '下载 OpenAPI', 'Download OpenAPI')}</button>
           <button type="button" className={BUTTON} disabled={view?.status !== 'published'} onClick={() => void download('types')}>{label('types', '下载类型声明', 'Download types')}</button>
           <button type="button" className={BUTTON.replace('text-text', 'text-danger')} disabled={view?.status !== 'published' || dirty} onClick={() => setConfirm('withdraw')}>{label('withdraw', '停用资源', 'Withdraw resource')}</button>
-          <button type="button" className={BUTTON} onClick={() => dirty ? setConfirm('discard') : setEditing(false)}>{label('close', '关闭编辑', 'Close editor')}</button></div></div>
+          <button type="button" className={BUTTON} onClick={() => { if (dirty) setConfirm('discard'); else { returnToCatalog(); setEditing(false); } }}>{label('close', '关闭编辑', 'Close editor')}</button></div></div>
       </fieldset>
-      {confirm && <div ref={confirmationRef} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '操作确认', 'Confirm operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4"><p className="text-sm text-text">{confirm === 'withdraw'
+      {confirm && <div ref={confirmationRef} tabIndex={-1} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '操作确认', 'Confirm operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4"><p className="text-sm text-text">{confirm === 'withdraw'
         ? label('withdrawConfirm', '停用将立即关闭此资源的外部访问、通知授权和合同下载。确认停用？', 'Withdrawal closes external access, event authority and downloads. Withdraw this resource?')
         : confirm === 'discard' ? label('discardConfirm', '放弃尚未保存的修改并关闭编辑？', 'Discard unsaved edits and close the editor?')
           : label('publishConfirm', '发布会创建不可变快照；服务端将检查来源和与当前版本的兼容性。确认发布？', 'Publishing creates an immutable snapshot. The server checks source validity and compatibility. Publish?')}</p>
-        <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => { if (confirm === 'discard') { setDirty(false); setEditing(false); setConfirm(null); void load(); } else void mutate(confirm); }}>{label('confirm', '确认', 'Confirm')}</button>
+        <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => { if (confirm === 'discard') { returnToCatalog(); setDirty(false); setEditing(false); setConfirm(null); void load(); } else void mutate(confirm); }}>{label('confirm', '确认', 'Confirm')}</button>
           <button type="button" className={BUTTON} disabled={busy} onClick={() => setConfirm(null)}>{label('cancel', '取消', 'Cancel')}</button></div></div>}
     </form>}
   </div>;

@@ -12,6 +12,9 @@ export function usePublicationConfirmation(state: string | null, container: RefO
       trigger.current = null;
     }
   }, [state, container]);
+  useEffect(() => {
+    if (state && busy) container.current?.focus();
+  }, [state, busy, container]);
   return (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape' && !busy) {
       event.preventDefault();
@@ -19,6 +22,23 @@ export function usePublicationConfirmation(state: string | null, container: RefO
       cancel();
     }
   };
+}
+
+export function usePublicationCatalogFocus(editing: boolean, loading: boolean, code?: string) {
+  const catalogRef = useRef<HTMLDivElement | null>(null);
+  const pending = useRef(false);
+  useEffect(() => {
+    if (!pending.current || editing || loading) return;
+    const root = catalogRef.current;
+    const matching = Array.from(root?.querySelectorAll<HTMLButtonElement>('[data-editor-code]') ?? [])
+      .find(button => button.dataset.editorCode === code);
+    const target = matching ?? root?.querySelector<HTMLButtonElement>('[data-editor-new]');
+    if (target && !target.matches(':disabled')) {
+      target.focus();
+      pending.current = false;
+    }
+  }, [editing, loading, code]);
+  return { catalogRef, returnToCatalog: () => { pending.current = true; } };
 }
 import { useI18n } from '~/contexts/I18nContext';
 

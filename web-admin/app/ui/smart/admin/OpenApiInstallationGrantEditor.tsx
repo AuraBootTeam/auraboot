@@ -104,7 +104,7 @@ export function OpenApiInstallationGrantEditor({ installationPid, active, scopes
       </div>
     </form>}
     {(!selected || denied) && error && <p role="alert">{error}</p>}
-    {confirmation && <div ref={confirmationRef} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '安装授权操作确认', 'Installation authority confirmation')} className="space-y-3 rounded-control border border-border bg-canvas p-3">
+    {confirmation && <div ref={confirmationRef} tabIndex={-1} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '安装授权操作确认', 'Installation authority confirmation')} className="space-y-3 rounded-control border border-border bg-canvas p-3">
       <p>{confirmation === 'revoke' ? label('revokeHelp', '确认撤销此安装的合同授权？后续调用及通知将按撤销后的权限处理。', 'Revoke this installation grant? Subsequent calls and notifications will use the revoked authority.') : label('discardHelp', '放弃未保存的授权修改并关闭？', 'Discard unsaved authority changes and close?')}</p>
       <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => confirmation === 'revoke' ? void revoke() : onClose()}>{label('confirm', '确认', 'Confirm')}</button><button type="button" className={BUTTON} disabled={busy} onClick={() => setConfirmation(null)}>{label('cancel', '取消', 'Cancel')}</button></div>
     </div>}

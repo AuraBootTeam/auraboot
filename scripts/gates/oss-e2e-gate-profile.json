@@ -123,6 +123,18 @@
               "draft-retained-no-write"
             ]
           }
+        },
+        {
+          "name": "confirmed-discard-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "confirmed-discard-focus-return",
+              "no-write-server-state-restored"
+            ]
+          }
         }
       ]
     },
@@ -162,6 +174,31 @@
               "enter-cancel-focus-return",
               "escape-cancel-focus-return",
               "draft-retained-no-write"
+            ]
+          }
+        },
+        {
+          "name": "confirmed-discard-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "confirmed-discard-focus-return",
+              "no-write-server-state-restored"
+            ]
+          }
+        },
+        {
+          "name": "busy-confirmation-publication",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "actual-http-held-response",
+            "requests": 1,
+            "cases": [
+              "busy-disabled-controls",
+              "focused-escape-keeps-operation",
+              "single-real-publish-completes"
             ]
           }
         }
@@ -235,6 +272,18 @@
               "enter-cancel-focus-return",
               "escape-cancel-focus-return",
               "draft-retained-no-write"
+            ]
+          }
+        },
+        {
+          "name": "confirmed-discard-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "confirmed-discard-focus-return",
+              "no-write-server-state-restored"
             ]
           }
         }

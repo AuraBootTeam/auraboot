@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, publicValueType, queryOutput, readOnlyQueryOutput, queryParameterItem,
   type PublicQuery, type QueryPublicationView, type QuerySource, type QuerySourceChoice, type PublicField, type PublicType } from '~/services/open-api-publications';
-import { usePublicationConfirmation, PublicationField, type LabeledControl } from './PublicationControls';
+import { usePublicationCatalogFocus, usePublicationConfirmation, PublicationField, type LabeledControl } from './PublicationControls';
 import { PublicValueSchemaEditor } from './PublicValueSchemaEditor';
 
 const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
@@ -53,6 +53,7 @@ export function OpenApiQueryPublicationEditor() {
     window.addEventListener('beforeunload', listener); return () => window.removeEventListener('beforeunload', listener);
   }, [dirty]);
   const confirmationKeyDown = usePublicationConfirmation(confirm, confirmationRef, () => setConfirm(null), busy);
+  const { catalogRef, returnToCatalog } = usePublicationCatalogFocus(editing, loading, view?.code);
   const change = (next: PublicQuery) => { setDraft(next); setDirty(true); setError(''); setNotice(''); };
   const chooseSource = async (code: string, reset = true) => { const id = ++sourceRequest.current; setSource(undefined); setSourceLoading(true); setError('');
     try { const next = await publicationRequest<QuerySource>(`/api/open-platform/query-sources/${encodeURIComponent(code)}`);
@@ -104,13 +105,13 @@ export function OpenApiQueryPublicationEditor() {
     {(!editing || denied) && feedback}
     {loading ? <p role="status">{label('loading', '正在加载查询发布…', 'Loading query publications…')}</p>
       : denied ? <button type="button" className={BUTTON} onClick={() => void load()}>{label('reload', '重新加载', 'Reload')}</button>
-        : <div className="space-y-4"><div className="flex flex-wrap justify-between gap-3"><h2 className="text-base font-semibold text-text">{label('catalog', '查询发布目录', 'Query publication catalog')}</h2>
+        : <div ref={catalogRef} className="space-y-4"><div className="flex flex-wrap justify-between gap-3"><h2 className="text-base font-semibold text-text">{label('catalog', '查询发布目录', 'Query publication catalog')}</h2>
           <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => { setEditing(false); void load(); }}>{label('refresh', '刷新目录', 'Reload catalog')}</button>
-            <button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => select()}>{label('new', '新建公共查询', 'New public query')}</button></div></div>
+            <button type="button" className={BUTTON} data-editor-new disabled={busy || dirty} onClick={() => select()}>{label('new', '新建公共查询', 'New public query')}</button></div></div>
           {!catalogReady ? null : views.length === 0 ? <p className="rounded-card border border-border bg-subtle p-5 text-sm text-text-2">{label('empty', '尚未公开命名查询。保存草稿不会开放外部执行。', 'No NamedQueries are public yet. Saving a draft does not enable external execution.')}</p>
             : <ul className="divide-y divide-border rounded-card border border-border bg-panel">{views.map(row => <li key={row.code} className="flex items-center justify-between gap-3 p-4"><div><p className="font-medium text-text">{row.code}</p>
               <p className="text-sm text-text-2">{row.status === 'published' ? label('live', '已发布', 'Published') : row.status === 'withdrawn' ? label('disabled', '已停用', 'Withdrawn') : label('draft', '草稿', 'Draft')} · {label('version', '当前发布版本', 'Active version')} {row.activeVersion ?? '—'} · {label('revision', '草稿修订', 'Draft revision')} {row.draftRevision}</p></div>
-              <button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => select(row)}>{label('edit', '编辑查询合同', 'Edit query contract')}</button></li>)}</ul>}</div>}
+              <button type="button" className={BUTTON} data-editor-code={row.code} disabled={busy || dirty} onClick={() => select(row)}>{label('edit', '编辑查询合同', 'Edit query contract')}</button></li>)}</ul>}</div>}
     {editing && !denied && <form className="space-y-4" onSubmit={event => { event.preventDefault(); void mutate('save'); }}><fieldset disabled={busy || sourceLoading} className="space-y-4">
       {section(label('identity', '来源与公共查询地址', 'Source and public query address'), <div className="grid gap-4 md:grid-cols-2">
         {input(label('code', '公共查询地址', 'Public query address'), <input required pattern="[a-z][a-z0-9.\-]{1,93}" className={CONTROL} value={draft.code} disabled={!!view} placeholder="sales.order-totals" onChange={event => change({ ...draft, code: event.target.value })} />,
@@ -166,13 +167,13 @@ export function OpenApiQueryPublicationEditor() {
         <button type="button" className={BUTTON} disabled={view?.status !== 'published'} onClick={() => void download('openapi')}>{label('openapi', '下载查询 OpenAPI', 'Download query OpenAPI')}</button>
         <button type="button" className={BUTTON} disabled={view?.status !== 'published'} onClick={() => void download('types')}>{label('types', '下载查询类型声明', 'Download query types')}</button>
         <button type="button" className={BUTTON.replace('text-text', 'text-danger')} disabled={view?.status !== 'published' || dirty} onClick={() => setConfirm('withdraw')}>{label('withdraw', '停用查询', 'Withdraw query')}</button>
-        <button type="button" className={BUTTON} onClick={() => dirty ? setConfirm('discard') : setEditing(false)}>{label('close', '关闭编辑', 'Close editor')}</button></div></div>
+        <button type="button" className={BUTTON} onClick={() => { if (dirty) setConfirm('discard'); else { returnToCatalog(); setEditing(false); } }}>{label('close', '关闭编辑', 'Close editor')}</button></div></div>
     </fieldset>
-    {confirm && <div ref={confirmationRef} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '查询操作确认', 'Confirm query operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4">
+    {confirm && <div ref={confirmationRef} tabIndex={-1} onKeyDown={confirmationKeyDown} role="group" aria-label={label('confirmation', '查询操作确认', 'Confirm query operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4">
       <p className="text-sm text-text">{confirm === 'discard' ? label('discardConfirm', '放弃未保存的修改并重新读取查询目录？', 'Discard unsaved edits and reload the query catalog?')
         : confirm === 'withdraw' ? label('withdrawConfirm', '停用会立即关闭此公共查询的外部执行和合同下载。确认停用？', 'Withdrawal immediately closes external execution and contract downloads. Withdraw?')
           : label('publishConfirm', '发布将校验来源与兼容性并固定不可变快照。确认发布查询？', 'Publishing validates source semantics and compatibility and pins an immutable snapshot. Publish?')}</p>
-      <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => { if (confirm === 'discard') { setDirty(false); setEditing(false); setConfirm(null); void load(); } else void mutate(confirm); }}>{label('confirm', '确认', 'Confirm')}</button>
+      <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => { if (confirm === 'discard') { returnToCatalog(); setDirty(false); setEditing(false); setConfirm(null); void load(); } else void mutate(confirm); }}>{label('confirm', '确认', 'Confirm')}</button>
         <button type="button" className={BUTTON} disabled={busy} onClick={() => setConfirm(null)}>{label('cancel', '取消', 'Cancel')}</button></div></div>}
     </form>}
   </div>;
