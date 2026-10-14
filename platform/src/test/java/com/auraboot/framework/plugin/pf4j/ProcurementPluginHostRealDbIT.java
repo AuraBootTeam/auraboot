@@ -373,7 +373,7 @@ class ProcurementPluginHostRealDbIT {
         var node=json.readTree(Files.readAllBytes(binding));
         assertEquals("procurement-web-stack-20261010",node.path("runtime").asText());assertEquals("enterprise_22",node.path("database").asText());
         assertEquals(fixtureEnv("TEST_TENANT_ID"),node.path("tenantId").asText());
-        assertEquals("7963046d33f9d7d8c34bc927de0900fe7bb9617b",node.path("nativeHostBaseCommit").asText());
+        assertEquals("0fe79702732970095e83f55e43ba0f9d35777bb7",node.path("nativeHostBaseCommit").asText());
         Path jar=Path.of(fixtureEnv("PROCUREMENT_PLUGIN_JAR")).toRealPath();
         assertEquals(node.path("productJarSha256").asText(),fixtureSha(jar));
         assertTrue(node.path("productJarSha256").asText().matches("[a-f0-9]{64}"));
@@ -1975,7 +1975,7 @@ class ProcurementPluginHostRealDbIT {
         assertTrue(node.path("productJarSha256").asText().matches("[a-f0-9]{64}"));
         Path testSource=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_TEST_SOURCE")).toRealPath();
         assertEquals(node.path("nativeHostTestSha256").asText(),fixtureSha(testSource));
-        assertEquals("7963046d33f9d7d8c34bc927de0900fe7bb9617b",node.path("nativeHostBaseCommit").asText());
+        assertEquals("0fe79702732970095e83f55e43ba0f9d35777bb7",node.path("nativeHostBaseCommit").asText());
         // Copy only declared nonsecret identity fields, never arbitrary input diagnostic/configuration data.
         fixtureBinding=new LinkedHashMap<>();
         for(String key:List.of("runtime","database","tenantId","productJarSha256","nativeHostTestSha256","nativeHostBaseCommit"))

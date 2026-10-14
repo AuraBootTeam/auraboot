@@ -113,7 +113,7 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         Path app = Path.of(input.path("applicationCoreRoot").asText()).toRealPath();
         assertEquals(input.path("applicationCoreCommit").asText(), gitRead(app, "rev-parse", "HEAD").strip());
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        assertEquals("", gitRead(app, "diff", "7963046d33f9d7d8c34bc927de0900fe7bb9617b", "HEAD", "--", "platform/src/main").strip());
+        assertEquals("", gitRead(app, "diff", "0fe79702732970095e83f55e43ba0f9d35777bb7", "HEAD", "--", "platform/src/main").strip());
         Path loaded = Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(), loaded);
         Path testRoot = app.resolve("platform/src/test/java/com/auraboot/framework");
