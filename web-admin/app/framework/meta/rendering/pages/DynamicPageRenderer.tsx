@@ -63,7 +63,7 @@ export function DynamicPageRenderer({
 
   // 2. Load schema
   const { schema, loading, error } = useSchemaLoader(schemaRequest);
-  useSchemaPresentation(schema);
+  useSchemaPresentation(schema, schema?.kind === 'form' ? (recordPid ? schema.extension?.editTitle : schema.extension?.createTitle) : undefined);
 
   if (!VALID_KINDS.includes(pageType)) {
     return (

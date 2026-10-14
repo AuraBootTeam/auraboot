@@ -27,13 +27,13 @@ export function PagePresentationProvider({ children }: { children: React.ReactNo
 
 export function usePagePresentation() { return useContext(PresentationContext).presentation; }
 
-export function useSchemaPresentation(schema: UnifiedSchema | null | undefined) {
+export function useSchemaPresentation(schema: UnifiedSchema | null | undefined, titleOverride?: string | Record<string, string>) {
   const { setPresentation, clearPresentation } = useContext(PresentationContext);
   const { locale, t } = useI18n();
   const owner = schema?.pageKey || '';
   const mode = schema?.extension?.presentation;
   const section = getLocalizedText(schema?.extension?.workspaceLabel || {}, locale, t);
-  const title = getLocalizedText(schema?.title || schema?.name || '', locale, t);
+  const title = getLocalizedText(titleOverride || schema?.title || schema?.name || '', locale, t);
   useEffect(() => {
     if (mode !== 'workspace' || !owner) return;
     setPresentation({ owner, mode, section, title });

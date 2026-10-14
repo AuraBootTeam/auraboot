@@ -78,6 +78,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await page.getByTestId('toolbar-btn-edit').click();
     await expect(page.locator('#tpm_pj_name')).toHaveValue(projectName);
     await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
+    await expect(page.getByTestId('workspace-breadcrumb')).toContainText('编辑项目');
     await shot('P22');
     await page.getByTestId('form-btn-cancel').click();
     await expect(page.getByTestId('object-summary').getByRole('progressbar')).toHaveAttribute('aria-valuenow', '68');
