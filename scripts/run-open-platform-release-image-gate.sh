@@ -355,6 +355,8 @@ DB_SAMPLE_PID=$!
 cat /proc/loadavg > "$ARTIFACTS/host-load-before.txt"
 
 info "running production-threshold k6 profile inside the CI network"
+bash "$SCRIPT_DIR/ci/collect-open-platform-jfr.sh" start "$APP" "$SAFE_JOB" "$REF_SHA" \
+  "$BUILD_JDK_IMAGE" "$ARTIFACTS" || fatal "Java SLO diagnostics could not start"
 SLO_RC=0
 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -v "$STAGE/tests/load/k6":/scripts:ro \
@@ -366,6 +368,9 @@ docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
 # Preserve normalized statements (no bound credential values) on both red and
 # green exits. Diagnostic collection must not hide an already-failed SLO.
 PROFILE_RC=0
+JFR_RC=0
+bash "$SCRIPT_DIR/ci/collect-open-platform-jfr.sh" collect "$APP" "$SAFE_JOB" "$REF_SHA" \
+  "$BUILD_JDK_IMAGE" "$ARTIFACTS" || JFR_RC=$?
 : > "$DB_SAMPLE_STOP"
 wait "$DB_SAMPLE_PID" || PROFILE_RC=$?
 DB_SAMPLE_PID=""
@@ -382,6 +387,7 @@ docker stats --no-stream --format '{{json .}}' "$APP" "$PG" "$REDIS" \
 python3 "$STAGE/scripts/ci/verify-open-platform-slo.py" "$ARTIFACTS/slo-summary.json" production \
   || fail "Open Platform business SLO sample reconciliation failed"
 [[ "$PROFILE_RC" == 0 ]] || fatal "SQL profile could not be collected"
+[[ "$JFR_RC" == 0 ]] || fatal "Java SLO diagnostics could not be collected"
 rm -f "$CREDENTIAL_ARTIFACT" "$SLO_FIXTURE_ARTIFACT"
 
 info "waiting for Webhook queue drain"

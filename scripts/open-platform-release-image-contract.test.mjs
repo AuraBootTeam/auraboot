@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import './open-platform-jfr.test.mjs';
 
 const gate = fs.readFileSync(new URL('./run-open-platform-release-image-gate.sh', import.meta.url), 'utf8');
 const probe = fs.readFileSync(new URL('./ci/open-platform-release-probe.py', import.meta.url), 'utf8');
@@ -45,6 +46,10 @@ assert.match(gate, /RUNNER_GID="\$\(id -g\)"/);
 assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) ?? []).length, 3);
 assert.match(gate, /node \/sdk\/toolchain\/node_modules\/typescript\/bin\/tsc/);
 assert.match(gate, /PROFILE=production/);
+assert.match(gate, /collect-open-platform-jfr\.sh" start/);
+assert.match(gate, /collect-open-platform-jfr\.sh" collect/);
+assert.ok(gate.indexOf('collect-open-platform-jfr.sh" collect') < gate.indexOf('[[ "$SLO_RC" == 0 ]]'));
+assert.match(gate, /\[\[ "\$JFR_RC" == 0 \]\] \|\| fatal/);
 assert.match(gate, /SPRING_PROFILES_ACTIVE=community/);
 assert.match(gate, /docker run -d.*--memory=4g/);
 assert.match(gate, /--env-file "\$APP_SECRET_ENV"/);
