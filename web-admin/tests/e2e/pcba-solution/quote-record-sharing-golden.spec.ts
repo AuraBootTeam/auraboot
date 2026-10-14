@@ -282,6 +282,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const dependencies = [
       [path.join(crmRoot!, 'plugin-aura', 'crm'), 'com.auraboot.crm'],
       [path.join(pluginsRoot!, 'pcba-crm'), 'com.auraboot.pcba-crm'],
+      [path.join(pluginsRoot!, 'customer-pcba-integration'), 'com.auraboot.customer-pcba-integration'],
       [path.join(pluginsRoot!, 'bom-standardization'), 'com.auraboot.bom-standardization'],
       [path.join(quoteRoot!, 'plugin-aura', 'quote-core'), 'com.auraboot.quote-core'],
     ];
