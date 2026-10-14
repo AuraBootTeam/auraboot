@@ -72,6 +72,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
     private boolean preparationCompleted;
     private String preparationToken;
     private Map<String,Object> preparationIdentity;
+    private Path immutableProductionDirectory;
     private final List<Map<String,Object>> preparationPublicActions = new ArrayList<>();
     private URI control;
     private String controlToken;
@@ -383,6 +384,8 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
     private void configureCombinedPolicy() throws Exception {
         context();
         Path original = Path.of(procurementDirectory);
+        Path formalOrigin=immutableProductionDirectory.resolve("config/commands/procurement.json");
+        requireUnchangedFormalCommands(formalOrigin,original.resolve("config/commands/procurement.json"));
         Path copy = Files.createDirectory(caseEvidence.resolve("ui-order-dsl"));
         try (var files = Files.walk(original)) {
             for (Path path : files.toList()) {
@@ -434,7 +437,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
             assertEquals(command.getId(), raw.get("id"));
             assertEquals(tenant, raw.get("tenant_id"));
             assertEquals(imported.getPluginPid(), raw.get("plugin_pid"));
-            JsonNode originalDefinition = json.readTree(original.resolve("config/commands/procurement.json").toFile());
+            JsonNode originalDefinition = json.readTree(formalOrigin.toFile());
             JsonNode rawOriginal = java.util.stream.StreamSupport.stream(originalDefinition.spliterator(), false)
                     .filter(row -> code.equals(row.path("code").asText())).findFirst().orElseThrow();
             JsonNode configuredDefinition = java.util.stream.StreamSupport.stream(definitions.spliterator(), false)
@@ -463,8 +466,8 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         var policy = new LinkedHashMap<String, Object>();
         policy.put("schemaVersion", 1);
         policy.put("kind", "procurement-order-ui-test-owned-policy-v1");
-        policy.put("originCommandPath", original.resolve("config/commands/procurement.json").toRealPath().toString());
-        policy.put("originCommandSha256", sha(original.resolve("config/commands/procurement.json")));
+        policy.put("originCommandPath", formalOrigin.toRealPath().toString());
+        policy.put("originCommandSha256", sha(formalOrigin));
         policy.put("configuredCommandPath", file.toRealPath().toString());
         policy.put("configuredCommandSha256", sha(file));
         policy.put("tenantId", tenant.toString());
@@ -612,7 +615,13 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         return body.path("data").path("data");
     }
 
+    static void requireUnchangedFormalCommands(Path formalOrigin,Path composedSource) throws Exception {
+        org.junit.jupiter.api.Assertions.assertArrayEquals(Files.readAllBytes(formalOrigin),Files.readAllBytes(composedSource),
+                "Composed initializer copy must preserve the exact original formal command bytes");
+    }
+
     private void prepareInitializationAppendix() throws Exception {
+        immutableProductionDirectory=Path.of(procurementDirectory).toRealPath();
         var proof = ProductQuoteNativeInitialization.prepareOrderUiComposed(Path.of(procurementDirectory),
                 caseEvidence.resolve("order-ui-initialization-dsl"), json);
         initializationDirectory = Path.of(proof.get("testDirectory").toString());

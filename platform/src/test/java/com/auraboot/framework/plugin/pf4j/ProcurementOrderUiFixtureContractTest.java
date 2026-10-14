@@ -9,6 +9,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Fixture contracts only: actual preparation and browser business behavior remain unexecuted. */
 class ProcurementOrderUiFixtureContractTest {
+    @Test void composedPolicyRetainsImmutableFormalCommandBytes(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        var original=root.resolve("formal.json");var copy=root.resolve("composed.json");
+        String commands="[{\"code\":\"qo_procurement_execution_common:generate_orders\",\"handlerParams\":{\"procurementOrderWriteContracts\":[]}}]";
+        java.nio.file.Files.writeString(original,commands);java.nio.file.Files.writeString(copy,commands);
+        ProcurementOrderUiFixtureProducerIT.requireUnchangedFormalCommands(original,copy);
+        java.nio.file.Files.writeString(copy,commands.replace("[]","[{}]"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->ProcurementOrderUiFixtureProducerIT.requireUnchangedFormalCommands(original,copy)).isInstanceOf(AssertionError.class);
+        assertThat(java.nio.file.Files.readString(original)).isEqualTo(commands);
+    }
     @Test void preparationMakerReadsCategoryMembershipWithoutExpandingBrowserActor() {
         var expected=new HashSet<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
         expected.add("model.qo_procurement_category_supplier_common.read");
