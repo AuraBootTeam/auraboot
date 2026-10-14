@@ -659,10 +659,21 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         } finally { context(); }
         assertEquals(200, result.getResponse().getStatus(), "Actual public command " + code);
         var body = json.readTree(result.getResponse().getContentAsByteArray());
-        assertEquals(200, body.path("code").asInt(-1));
+        var completedData=requireCompletedCommandResponse(body);
         publicActions.add(Map.of("command", code, "target", target == null ? "create" : target,
                 "httpStatus", 200, "payload", payload));
-        return body.path("data").path("data");
+        return completedData;
+    }
+
+    static JsonNode requireCompletedCommandResponse(JsonNode body) {
+        assertTrue(body!=null && body.isObject(),"Public command response must be an object");
+        assertTrue(body.path("code").isTextual() && "0".equals(body.path("code").textValue()),
+                "Public command requires its exact textual success code");
+        JsonNode result=body.path("data");
+        assertTrue(result.isObject() && result.path("phaseReached").isTextual()
+                && "completed".equals(result.path("phaseReached").textValue()),"Public command must complete");
+        assertTrue(result.path("data").isObject(),"Completed public command business data must be an object");
+        return result.path("data");
     }
 
     private Map<String, Object> submitQuote(Map<String, Object> stage, boolean allocate) throws Exception {

@@ -114,4 +114,24 @@ class ProcurementSourceUiFixtureContractTest {
         assertThrows(IllegalArgumentException.class, () -> ProcurementSourceUiFixtureProducerIT.fixtureRequestKey("other"));
     }
 
+    @Test void completedPublicCommandUsesTextualZeroAndObjectBusinessData() throws Exception {
+        var body=new ObjectMapper().readTree("{\"code\":\"0\",\"data\":{\"phaseReached\":\"completed\",\"data\":{\"recordPid\":\"owned\"}}}");
+        assertEquals("owned",ProcurementSourceUiFixtureProducerIT.requireCompletedCommandResponse(body).path("recordPid").asText());
+    }
+    @Test void publicCommandCannotAcceptHttpAliasCoercionOrIncompleteData() throws Exception {
+        var json=new ObjectMapper();
+        for(String invalid:List.of(
+                "{\"code\":\"200\",\"data\":{\"phaseReached\":\"completed\",\"data\":{}}}",
+                "{\"code\":0,\"data\":{\"phaseReached\":\"completed\",\"data\":{}}}",
+                "{\"data\":{\"phaseReached\":\"completed\",\"data\":{}}}",
+                "{\"code\":\"0\",\"data\":{\"phaseReached\":\"pending\",\"data\":{}}}",
+                "{\"code\":\"0\",\"data\":{\"data\":{}}}",
+                "{\"code\":\"0\"}",
+                "{\"code\":\"0\",\"data\":{\"phaseReached\":\"completed\"}}",
+                "{\"code\":\"0\",\"data\":{\"phaseReached\":\"completed\",\"data\":[]}}")) {
+            var body=json.readTree(invalid);
+            assertThrows(AssertionError.class,()->ProcurementSourceUiFixtureProducerIT.requireCompletedCommandResponse(body));
+        }
+    }
+
 }
