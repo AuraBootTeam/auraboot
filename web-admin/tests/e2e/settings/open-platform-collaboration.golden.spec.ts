@@ -200,6 +200,9 @@ test.describe('Open Platform collaboration golden states', () => {
     await application.getByRole('button', { name: '管理成员' }).click();
     const memberDialog = page.getByRole('dialog', { name: '管理成员' });
     await expect(memberDialog).toBeVisible();
+    await expect(memberDialog.getByText('Admin', { exact: true })).toBeVisible();
+    await expect(memberDialog.getByRole('paragraph').filter({ hasText: /^所有者$/ })).toBeVisible();
+    await expect(memberDialog.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
     await capture(page, 'OPC-UI-03');
     const soleOwnerRemove = memberDialog.getByRole('button', { name: /移除成员/ }).first();
     await expect(soleOwnerRemove).toBeDisabled();

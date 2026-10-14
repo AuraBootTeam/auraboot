@@ -2231,7 +2231,11 @@ test.describe('Open Platform golden journey', () => {
       });
     });
     await operations.getByTestId('open-platform-operations-refresh').click();
-    await expect(operations).toContainText('req-throttled');
+    for (const [requestId, status] of [['req-forbidden', '403'], ['req-throttled', '429'], ['req-failed', '500']]) {
+      const auditRow = callAudit.getByText(requestId, { exact: true }).locator('../..');
+      await expect(auditRow).toHaveCount(1);
+      await expect(auditRow.getByText(status, { exact: true })).toBeVisible();
+    }
     await capture(page, 'OP-OPS-05');
     await page.unroute('**/api/open-platform/installations/*/audits*');
 
@@ -2296,6 +2300,10 @@ test.describe('Open Platform golden journey', () => {
     });
     await operations.getByTestId('open-platform-operations-refresh').click();
     await expect(operations).toContainText('金蝶库存事件');
+    await expect(operations.getByTestId('webhook-delivery-delivery-success')).toContainText('HTTP 204');
+    await expect(operations.getByTestId('webhook-delivery-delivery-success')).toContainText('0/5');
+    await expect(operations.getByTestId('webhook-delivery-delivery-pending')).toContainText('待投递');
+    await expect(operations.getByTestId('webhook-delivery-delivery-golden')).toContainText('5/5');
     await capture(page, 'OP-OPS-06');
     await operations.getByLabel('投递状态').selectOption('dead_letter');
     await expect(operations.getByLabel('投递状态').locator('option:checked')).toHaveText('死信');
@@ -2306,8 +2314,14 @@ test.describe('Open Platform golden journey', () => {
     await operations.getByRole('button', { name: '重放' }).click();
     const replayConfirmation = operations.getByRole('alert');
     await expect(replayConfirmation).toContainText('重放此投递？');
+    await expect(replayConfirmation).toContainText('可能重复触发下游副作用');
     await replayConfirmation.scrollIntoViewIfNeeded();
     await capture(page, 'OP-OPS-08', false);
+    await replayConfirmation.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(replayConfirmation).toHaveCount(0);
+    expect(replayed, 'Cancelling replay must not submit a replay request').toBe(false);
+    await expect(operations.getByTestId('webhook-delivery-delivery-golden')).toContainText('5/5');
+    await operations.getByRole('button', { name: '重放', exact: true }).click();
     await operations.getByRole('button', { name: '确认重放' }).click();
     await expect(operations).toContainText(/没有.*筛选条件的投递/);
     await operations.getByLabel('投递状态').selectOption('');
@@ -2372,6 +2386,18 @@ test.describe('Open Platform golden journey', () => {
     });
     await operations.getByTestId('open-platform-operations-refresh').click();
     await expect(operations).toContainText(/没有.*筛选条件的调用/);
+    await expect(operations).toContainText(/没有.*筛选条件的投递/);
+    await expect(operations.getByText('P95', { exact: true }).locator('..')).toContainText('0 ms');
+    await expect(operations.getByText('HTTP 429', { exact: true }).locator('..')).toContainText('0');
+    for (const label of ['调用数', '错误调用', '死信']) {
+      await expect(operations.getByText(label, { exact: true }).locator('..').locator('div').last()).toHaveText('0');
+    }
+    await expect(operations.getByText('错误率', { exact: true }).locator('..')).toContainText('0.00%');
+    await expect(eventCatalog).not.toContainText('inventory.stock-in.confirmed');
+    await expect(eventCatalog.locator('code')).toHaveCount(0);
+    await expect(webhookHealth.locator('[data-rotation-status]')).toHaveCount(0);
+    await expect(eventCatalog).toContainText('暂无已发布的合作事件');
+    await expect(webhookHealth).toContainText('此安装暂无 Webhook 订阅');
     await capture(page, 'OP-OPS-13');
     await captureLocator(
       operations.getByTestId('open-platform-contract-health-grid'),
@@ -2397,6 +2423,7 @@ test.describe('Open Platform golden journey', () => {
     await page.unroute('**/api/open-platform/installations/*/overview*');
     await operations.getByRole('button', { name: /重试|Retry/ }).click();
     await expect(operations).toContainText('调用审计');
+    await expect(operations).not.toContainText('受控运维加载失败');
 
     await appCard.getByRole('button', { name: '查看凭据' }).click();
     const credentialList = appCard.locator('[data-testid^="open-platform-credentials-"]');
@@ -2417,7 +2444,18 @@ test.describe('Open Platform golden journey', () => {
       '请输入 5 至 10080 的整数分钟。',
     );
     await capture(page, 'OP-OPS-12');
+    const credentialsBeforeCancel = await page.request.get(
+      `${WEB_BASE_URL}/api/open-platform/installations/${principal.installationPid}/credentials`,
+    );
+    expect(credentialsBeforeCancel.status()).toBe(200);
+    const beforeCancelledRotation = (await credentialsBeforeCancel.json()).data;
     await rotateDialog.getByRole('button', { name: '取消' }).click();
+    await expect(rotateDialog).toHaveCount(0);
+    const credentialsAfterCancel = await page.request.get(
+      `${WEB_BASE_URL}/api/open-platform/installations/${principal.installationPid}/credentials`,
+    );
+    expect(credentialsAfterCancel.status()).toBe(200);
+    expect((await credentialsAfterCancel.json()).data).toEqual(beforeCancelledRotation);
     await credentialList.getByRole('button', { name: '轮换' }).click();
     await page.getByRole('dialog', { name: '轮换凭据' }).getByRole('spinbutton').fill('1440');
     await rotateDialog.getByRole('button', { name: '轮换' }).click();
