@@ -10,7 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "aura.storage")
 public class StorageProperties {
 
-    /** Storage provider type: local | minio | oss | s3. */
+    /** Storage provider type: local | minio | oss | cos | s3. */
     private String type = "local";
 
     /** Whether to isolate files by tenant ID in the key path. */
@@ -19,6 +19,7 @@ public class StorageProperties {
     private Local local = new Local();
     private Minio minio = new Minio();
     private Oss oss = new Oss();
+    private Cos cos = new Cos();
     private S3 s3 = new S3();
     private Cdn cdn = new Cdn();
 
@@ -42,6 +43,17 @@ public class StorageProperties {
         private String accessKeyId;
         private String accessKeySecret;
         private String bucket = "aura-files";
+    }
+
+    @Data
+    public static class Cos {
+        /** Region and full BucketName-APPID are required; no bucket is created automatically. */
+        private String region;
+        private String bucket;
+        @lombok.ToString.Exclude
+        private String secretId;
+        @lombok.ToString.Exclude
+        private String secretKey;
     }
 
     @Data

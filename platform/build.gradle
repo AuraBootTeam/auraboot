@@ -343,6 +343,7 @@ dependencies {
     runtimeOnly project(':platform-storage-minio')
     runtimeOnly project(':platform-storage-s3')
     runtimeOnly project(':platform-storage-oss')
+    runtimeOnly project(':platform-storage-cos')
 
     // XXL-JOB scheduler engine is opt-in only (-PwithSchedulerXxl=true): xxl-job-core
     // is GPL-3.0 and must never enter the default distribution. See
