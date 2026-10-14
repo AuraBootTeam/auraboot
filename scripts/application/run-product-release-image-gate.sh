@@ -200,7 +200,7 @@ mkdir -p "$ARTIFACTS/logs" "$ARTIFACTS/e2e"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
 mkdir -p "$WORK_PARENT"
 WORK_ROOT="$WORK_PARENT/${AURA_CI_JOB_ID}-${AURA_PRODUCT_ID}"
-[[ ! -e "$WORK_ROOT" ]] || fatal "stale work root exists: $WORK_ROOT"
+[[ ! -e "$WORK_ROOT" ]] || rm -rf "$WORK_ROOT"  # same-job retry: clean-recreate instead of fatal
 mkdir "$WORK_ROOT"
 CORE_RELEASE="$WORK_ROOT/core-release"
 PRODUCT_RELEASE="$WORK_ROOT/product-release"
@@ -258,7 +258,9 @@ cleanup() {
   [[ -z "$IMAGE_REF" ]] || docker image rm "$IMAGE_REF" >/dev/null 2>&1 || true
   [[ -z "$IMAGE_ID" ]] || docker image rm "$IMAGE_ID" >/dev/null 2>&1 || true
   [[ ! -d "$DOCKER_CONFIG_ROOT" ]] || find "$DOCKER_CONFIG_ROOT" -depth -delete
-  if [[ "$status" -eq 0 && -d "$WORK_ROOT" ]]; then find "$WORK_ROOT" -depth -delete; fi
+  # Diagnostics already live in ARTIFACTS (copied above); the work root is ephemeral
+  # on every verdict — retaining it on failure is what filled the disk with corpses.
+  [[ ! -d "$WORK_ROOT" ]] || find "$WORK_ROOT" -depth -delete
   exit "$status"
 }
 trap cleanup EXIT INT TERM
