@@ -2524,6 +2524,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const layoutStorageKey = drawerLayoutStorageKey(runtime, block, context);
   const configuredDefaultLayout: DrawerLayoutState = {
     ...DEFAULT_DRAWER_LAYOUT,
+    ...(isCompactReview ? { height: Math.round(getViewportSize().height * 0.85) } : {}),
     ...((block as any).defaultLayout || {}),
   };
   const initialLayoutRef = useRef<DrawerLayoutState | null>(null);
@@ -3016,7 +3017,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
           className={`grid h-full min-h-0 min-w-0 gap-3 ${
             hasLeftRail && hasCandidatesConfig
               ? isCompactReview
-                ? 'xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,1fr)]'
+                ? 'grid-rows-[minmax(0,0.25fr)_minmax(0,0.75fr)] md:grid-cols-[minmax(260px,0.34fr)_minmax(0,1fr)] md:grid-rows-1 xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,1fr)]'
                 : 'xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]'
               : 'grid-cols-1'
           }`}
@@ -3400,7 +3401,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               <div
                 data-testid="review-drawer-candidate-list"
                 aria-busy={candidateState?.loading ? true : undefined}
-                className={`relative min-h-0 flex-1 [scrollbar-gutter:stable] overflow-auto ${
+                className={`relative flex-1 [scrollbar-gutter:stable] overflow-auto ${
+                  isCompactReview ? 'min-h-[160px]' : 'min-h-0'
+                } ${
                   usesCandidateComparisonTable ? 'p-0' : 'space-y-1.5 p-2'
                 }`}
               >
@@ -3654,7 +3657,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0))) && (
                 <section
                   data-testid="review-drawer-decision-panel"
-                  className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
+                  className={`bg-subtle border-border shrink-0 overflow-auto border-t p-2.5 ${
+                    isCompactReview ? 'max-h-[28%]' : 'max-h-[48%]'
+                  }`}
                 >
                   {visibleCandidateContextFields.length > 0 && (
                     <section data-testid="review-drawer-context-evidence">
