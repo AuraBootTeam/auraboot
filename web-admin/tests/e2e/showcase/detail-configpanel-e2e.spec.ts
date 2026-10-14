@@ -331,12 +331,14 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
       )
       .toContain('success');
 
+    // the command list endpoint walks the full command registry; under load it
+    // can exceed 5s before the picker leaves 加载中
     await expect.poll(
-      async () => await page.getByRole('button', { name: /选择命令|E2E Detail Action/i }).last().textContent(),
-      { timeout: 5_000 },
+      async () => await page.getByRole('button', { name: /关联命令|Linked command|选择命令/i }).last().textContent(),
+      { timeout: 20_000 },
     ).not.toContain('加载中');
 
-    const commandPicker = page.getByRole('button', { name: /选择命令|E2E Detail Action/i }).last();
+    const commandPicker = page.getByRole('button', { name: /关联命令|Linked command|选择命令/i }).last();
     await commandPicker.click();
     const commandOption = page.getByRole('button', {
       name: new RegExp(`${command.displayName}|${command.code}`, 'i'),

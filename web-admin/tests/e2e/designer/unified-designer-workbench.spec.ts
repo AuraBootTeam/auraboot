@@ -6964,7 +6964,9 @@ async function grantRolePermissionByCode(
   }
   expect(permissionId, `permission not found in matrix: ${permissionCode}`).toBeTruthy();
 
-  const rolesResp = await page.request.get('/api/roles');
+  // Keyword-scoped: the roles list is paginated and full-gate runs create
+  // hundreds of e2e roles, pushing fixture roles past page 1.
+  const rolesResp = await page.request.get(`/api/roles?keyword=${encodeURIComponent(roleCode)}`);
   expect(rolesResp.ok(), 'roles fetch failed').toBeTruthy();
   const rolesBody = await rolesResp.json();
   const records = rolesBody?.data?.records ?? [];

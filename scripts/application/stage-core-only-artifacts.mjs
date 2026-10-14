@@ -526,7 +526,7 @@ function main() {
     { type: 'npm', id: '@auraboot/web-testkit', version, path: webTestkit },
     { type: 'migration', id: 'core', version, path: coreMigrations },
     { type: 'config', id: 'core-meta', version, path: coreMeta },
-    { type: 'config', id: 'platform-admin', version, path: platformAdmin },
+    { type: 'config', id: 'platform-admin', version: JSON.parse(readFileSync(resolve(platformAdmin, 'plugin.json'), 'utf8')).version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
     { type: 'config', id: 'core-decisionops', version: '1.0.0', path: coreDecisionops },

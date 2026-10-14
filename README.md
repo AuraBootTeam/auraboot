@@ -62,7 +62,7 @@ Full positioning rationale: [auraboot.com/docs/positioning](https://auraboot.com
 
 - **Website walkthrough:** [auraboot.com/demo](https://auraboot.com/demo) shows the core model -> page -> command loop.
 - **PCBA Pilot package:** the PCBA manufacturing package is available for scoped design-partner pilots. It is not GA and should not be described as a full ERP replacement.
-- **Trust posture:** [auraboot.com/trust](https://auraboot.com/trust) documents the current source-available license posture, security contact, and SOC 2 readiness position. AuraBoot does not claim SOC 2 Type I or Type II certification today.
+- **Trust posture:** [auraboot.com/trust](https://auraboot.com/trust) documents the Apache-2.0 community license, trademark boundary, security contact, and SOC 2 readiness position. AuraBoot does not claim SOC 2 Type I or Type II certification today.
 
 ## Key Features
 
@@ -320,17 +320,22 @@ To report a security vulnerability, please email [security@auraboot.com](mailto:
 
 ## License
 
-AuraBoot is released under the [AuraBoot License v1.3](LICENSE.txt), a source-available license based on Apache 2.0 with supplementary terms:
+The community edition is open source under [Apache License 2.0, with AuraBoot trademark and commercial-contact supplements](LICENSE.txt) (v2.0). The supplements do not restrict the rights granted by Apache-2.0.
 
-- **Free for internal use** — Use, modify, and deploy for your own business applications. No obligation to open-source your modifications.
-- **Free for ISV / project delivery** — Build and deliver business applications (ERP, CRM, vertical SaaS) to customers, with your changes kept private.
-- **Attribution required** — Retain copyright notices, license notices, and AuraBoot brand information.
-- **Platform restriction** — You may not offer AuraBoot itself as a hosted low-code / no-code / AI platform service without a commercial license.
+- **Commercial use and private modifications** — Self-host, deliver customer projects, modify the code, and keep your modifications and business code private.
+- **Own-brand SaaS and OEM** — Build business apps or a low-code/AI platform service under your own brand, including multi-tenant hosting, without a paid community-code license.
+- **White-label freedom** — Replace or remove the product name, logo, footer, and other UI branding. Preserve copyright, license, NOTICE, and modification notices as required by Apache-2.0.
+- **Separate commercial boundaries** — Proprietary enterprise code, official support, and use of the AuraBoot trademark follow their separate agreements. Community-code permission does not grant trademark rights.
 
 📖 **See the [License FAQ (中文)](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md)** for common questions about commercial use, modification, redistribution, and SaaS boundaries.
 
-For commercial licensing (multi-tenant low-code SaaS, white-labeling, or removing branding), use the [AuraBoot contact form](https://auraboot.com/contact).
+For proprietary enterprise capabilities, official support, or AuraBoot trademark permission, use the [AuraBoot contact form](https://auraboot.com/contact).
 
 ---
 
 <p align="center">Built with care by the <a href="https://github.com/AuraBootTeam">AuraBoot Team</a></p>
+
+
+### Proposed future commercial licensing
+
+A new-version Community License v3 proposal is available in [LICENSE-COMMUNITY-3.0-DRAFT.txt](LICENSE-COMMUNITY-3.0-DRAFT.txt). It proposes attributed business applications and industry SaaS, paid UI white-label permission, end-customer ISV authorization, product-scoped white-label OEM operation, and restrictions on competing general-purpose development platforms. The commercial offer is Standard at RMB 999/year or RMB 3,000 perpetual without mandatory renewal; proprietary modules and services are separately identified. See the [capability and delivery guide](https://auraboot.com/docs/core-concepts/community-capabilities). This custom source-available draft does not replace the current LICENSE.txt; formal adoption identifies the licensor and covered release.

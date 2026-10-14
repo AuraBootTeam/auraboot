@@ -53,6 +53,9 @@ public class TenantInvitationAcceptanceController {
     private final TenantService tenantService;
     private final UserApplicationPreferenceService userApplicationPreferenceService;
 
+    @org.springframework.beans.factory.annotation.Value("${aura.tenant.invitation-display-name-required:true}")
+    private boolean invitationDisplayNameRequired = true;
+
     public record InvitationAcceptanceRequest(
             String inviteCode,
             @JsonAlias("realName") String displayName) {}
@@ -88,10 +91,10 @@ public class TenantInvitationAcceptanceController {
         // A profile display name is never a globally unique login identifier.
         boolean needsName = user.getNickName() == null || user.getNickName().isBlank()
                 || "微信用户".equals(user.getNickName());
-        if (needsName && (request.displayName() == null || request.displayName().isBlank())) {
+        if (invitationDisplayNameRequired && needsName && (request.displayName() == null || request.displayName().isBlank())) {
             throw new BusinessException(ResponseCode.BadParam, "请填写显示名称");
         }
-        if (needsName) {
+        if (needsName && request.displayName() != null && !request.displayName().isBlank()) {
             String displayName = request.displayName().trim();
             if (displayName.length() > 24) {
                 throw new BusinessException(ResponseCode.BadParam, "显示名称不能超过24个字");

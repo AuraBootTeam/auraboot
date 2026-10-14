@@ -643,6 +643,11 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             data.setParentValue(item.getParentValue());
             data.setSortOrder(item.getSortNo());
             data.setEnabled(StatusConstants.ENABLED.equals(item.getStatus()));
+            // The item extra (which carries the localized "labels" map written
+            // at import/release time) must ride along so the controller can
+            // resolve the served label per request locale post cache — same
+            // contract as the by-code dict reads (DictLabelLocalizationHelper).
+            data.setExtension(item.getExtra());
             return data;
         }).collect(Collectors.toList());
     }
@@ -654,6 +659,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
         DictTreeNode node = new DictTreeNode(item.getValue(), item.getLabel(), item.getParentValue());
         node.setSortOrder(item.getSortOrder());
         node.setDisabled(!item.getEnabled());
+        node.setExtension(item.getExtension());
         return node;
     }
 

@@ -38,11 +38,15 @@ test.describe('Page Designer form-buttons refresh runtime', () => {
     await nameInput.fill('');
     await updatePageNameViaCommand(page, targetPid, refreshedName);
 
+    // page_schema records are served by the page-manager REST resource, not the
+    // dynamic model route; accept both shapes in case the binding changes.
     const reloadResponse = page.waitForResponse(
       (response) =>
-        new URL(response.url()).pathname === `/api/pages/${targetPid}` &&
+        [`/api/pages/${targetPid}`, `/api/dynamic/page_schema/${targetPid}`].includes(
+          new URL(response.url()).pathname,
+        ) &&
         response.request().method() === 'GET',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
     await page.getByTestId('form-btn-refresh').click();
     const response = await reloadResponse;

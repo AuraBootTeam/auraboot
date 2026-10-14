@@ -161,6 +161,14 @@ test.describe('Plugin Lifecycle', () => {
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
     await syncE2etOrderSequence();
     const sentinelTitle = `PL05 Reimport Sentinel ${uniqueId()}`;
+    // The order references its customer by name; the referenced row must exist
+    // before the order command (runtime reference existence validation).
+    await executeCommandViaApi(page, 'e2et:create_customer', {
+      e2et_cust_code: `PL05-CUST-${uniqueId()}`,
+      e2et_cust_name: 'PL05 Customer',
+      e2et_cust_region: 'south',
+      e2et_cust_active: true,
+    }, undefined, 'create').catch(() => null);
     const created = await executeCommandViaApi(page, 'e2et:create_order', {
       e2et_order_title: sentinelTitle,
       e2et_order_type: 'normal',

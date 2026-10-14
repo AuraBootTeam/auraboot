@@ -1,6 +1,7 @@
 package com.auraboot.framework.decision.service.impl;
 
 import com.auraboot.framework.decision.dto.DecisionImpactDTO;
+import com.auraboot.framework.decision.dto.DecisionFieldImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionImpactRefDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightRequest;
@@ -17,10 +18,54 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class DecisionImpactServiceImplTest {
+
+    private DecisionImpactRefDTO impactRef(String sourceType) {
+        DecisionImpactRefDTO ref = new DecisionImpactRefDTO();
+        ref.setSourceType(sourceType);
+        ref.setSourceCode("consumer-1");
+        return ref;
+    }
+
+    @Test
+    void getFieldImpactsProbesEveryRefWithoutRebuildingWhenAllHaveConsumers() {
+        when(usageIndexService.findFieldRefs("m.a")).thenReturn(List.of(impactRef("AUTOMATION")));
+        when(usageIndexService.findFieldRefs("m.b")).thenReturn(List.of(impactRef("SLA_RULE")));
+
+        Map<String, DecisionFieldImpactDTO> impacts = service.getFieldImpacts(List.of("m.a", "m.b"));
+
+        assertThat(impacts).containsOnlyKeys("m.a", "m.b");
+        assertThat(impacts.get("m.a").getReferences()).hasSize(1);
+        verify(usageIndexService, never()).rebuild();
+    }
+
+    @Test
+    void getFieldImpactsRebuildsOnceAndReprobesWhenAnyRefCameBackEmpty() {
+        when(usageIndexService.findFieldRefs("cold.m.f")).thenReturn(List.of())
+                .thenReturn(List.of(impactRef("NAMED_QUERY")));
+        when(usageIndexService.findFieldRefs("warm.m.f")).thenReturn(List.of(impactRef("SLA_RULE")));
+
+        Map<String, DecisionFieldImpactDTO> impacts = service.getFieldImpacts(List.of("cold.m.f", "warm.m.f"));
+
+        // One rebuild serves the whole batch: per-ref lazy rebuilds on a cold
+        // index used to multiply into ~10^3 full rebuilds per plugin import.
+        verify(usageIndexService, times(1)).rebuild();
+        assertThat(impacts).containsOnlyKeys("cold.m.f", "warm.m.f");
+        assertThat(impacts.get("cold.m.f").getReferences()).hasSize(1);
+        assertThat(impacts.get("warm.m.f").getReferences()).hasSize(1);
+    }
+
+    @Test
+    void getFieldImpactsSkipsBlankRefsAndAnswersEmptyInputWithoutProbing() {
+        assertThat(service.getFieldImpacts(List.of())).isEmpty();
+        assertThat(service.getFieldImpacts(java.util.Arrays.asList(" ", null))).isEmpty();
+        verifyNoInteractions(usageIndexService);
+    }
 
     private final DecisionUsageIndexService usageIndexService = mock(DecisionUsageIndexService.class);
     private final DecisionImpactAckService impactAckService = mock(DecisionImpactAckService.class);

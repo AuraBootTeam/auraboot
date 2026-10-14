@@ -851,6 +851,12 @@ public class DictServiceImpl implements DictService {
                 DictTreeNode node = new DictTreeNode(item.getValue(), item.getLabel(), item.getParentValue());
                 node.setSortOrder(item.getSortNo());
                 node.setDisabled(!StatusConstants.ENABLED.equals(item.getStatus()));
+                // The item extra (which carries the localized "labels" map
+                // written at import/release time) must ride along so the
+                // controller can resolve the served label per request locale
+                // post cache — same contract as the by-code dict reads
+                // (DictLabelLocalizationHelper).
+                node.setExtension(item.getExtra());
                 nodeMap.put(item.getValue(), node);
                 
                 String parentKey = item.getParentValue() != null ? item.getParentValue() : "root";

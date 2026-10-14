@@ -3754,7 +3754,14 @@ function ListPageContentInner(props: PageContentProps) {
     const found = allBlocks.find(
       (block: any) => block.blockType === 'form-buttons' || block.blockType === 'toolbar',
     );
-    return found;
+    if (!found) return found;
+    // Toolbar DSL may declare its entries as `actions` (localized-label navigate
+    // / command entries) instead of `buttons`; the chrome consumes `buttons`
+    // only, so merge both shapes into one renderable list.
+    const actions = Array.isArray(found.actions) ? found.actions : [];
+    const buttons = Array.isArray(found.buttons) ? found.buttons : [];
+    if (actions.length === 0) return found;
+    return { ...found, buttons: [...buttons, ...actions] };
   }, [allBlocks]);
 
   // System fields on every dynamic entity — not in DSL but available in API response

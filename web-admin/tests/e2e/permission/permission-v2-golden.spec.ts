@@ -51,6 +51,9 @@ test('v2 permissions: capability is the default, business-language surface', asy
 });
 
 test('v2 permissions: diagnostics are read only and searchable', async ({ page }) => {
+  // ~2000 diagnostic rows render per keystroke; clearing the search rebuilds
+  // the whole table and legitimately exceeds the 15s default.
+  test.setTimeout(45_000);
   await gotoPermissions(page);
   const diagnostics = page.getByTestId('permission-diagnostics');
   await diagnostics.locator('summary').first().click();

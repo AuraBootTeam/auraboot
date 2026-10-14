@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
+import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.plugin.dto.PluginResourceOwner;
 import com.auraboot.framework.plugin.dto.imports.OwnershipType;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
@@ -49,6 +50,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     private final PluginRecordMapper pluginRecordMapper;
     private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final MetaModelFieldBindingMapper bindingMapper;
+    private final NamedQueryMapper namedQueryMapper;
     private final ObjectMapper objectMapper;
     // JdbcTemplate retained only for getCurrentDatabaseState() which requires dynamic table/column queries
     private final JdbcTemplate jdbcTemplate;
@@ -453,6 +455,15 @@ public class PluginResourceServiceImpl implements PluginResourceService {
                 bindingMapper.softDeleteByPid(resourcePid);
             } else {
                 log.warn("Cannot delete binding: no resourcePid for resource code {}", resource.getResourceCode());
+            }
+        } else if (type == ResourceType.NAMED_QUERY) {
+            // ab_named_query has no deleted_flag column: named queries retire by
+            // status (the same contract rollbackResource applies), not soft-delete.
+            if (resourcePid != null) {
+                namedQueryMapper.updateStatusByPid(resourcePid, "archived");
+            } else {
+                log.warn("Cannot delete named query: no resourcePid for resource code {}",
+                        resource.getResourceCode());
             }
         } else {
             // All other resource tables support pid-based soft-delete

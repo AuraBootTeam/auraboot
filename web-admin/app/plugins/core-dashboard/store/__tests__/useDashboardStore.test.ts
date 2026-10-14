@@ -187,6 +187,32 @@ describe('useDashboardStore', () => {
       expect(findByPidMock).toHaveBeenCalledTimes(1);
     });
 
+    it('refetches instead of sharing a load that a reset already invalidated', async () => {
+      // Remount race (dashboard reload): the first mount starts a load, the
+      // effect cleanup resets the store, the re-run calls loadDashboard again.
+      // The shared promise's response predates the reset and is dropped as
+      // stale — sharing it would leave the designer blank forever, so the
+      // second call must issue a real fetch under the current generation.
+      let releaseFirst: (dashboard: Record<string, unknown>) => void = () => {};
+      findByPidMock.mockImplementationOnce(
+        () => new Promise((resolve) => { releaseFirst = resolve; }),
+      );
+      const first = useDashboardStore.getState().loadDashboard('dash-1');
+
+      useDashboardStore.getState().reset();
+
+      findByPidMock.mockResolvedValueOnce(minimalDashboard({ pid: 'dash-1', title: 'Reloaded' }));
+      const second = useDashboardStore.getState().loadDashboard('dash-1');
+
+      releaseFirst(minimalDashboard({ pid: 'dash-1', title: 'Stale mount' }));
+      await Promise.allSettled([first, second]);
+      await Promise.resolve();
+
+      expect(findByPidMock).toHaveBeenCalledTimes(2);
+      expect(useDashboardStore.getState().dashboard?.title).toBe('Reloaded');
+      expect(useDashboardStore.getState().isLoading).toBe(false);
+    });
+
     it('applies a load whose fetch started after the last local edit', async () => {
       // The dashboard on screen is dash-1 with one unsaved local addition.
       findByPidMock.mockResolvedValueOnce(minimalDashboard({ pid: 'dash-1' }));

@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -76,7 +77,41 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
             usageIndexService.rebuild();
             refs = usageIndexService.findFieldRefs(fieldRef);
         }
+        return fieldImpact(fieldRef, refs);
+    }
 
+    @Override
+    public Map<String, DecisionFieldImpactDTO> getFieldImpacts(Collection<String> fieldRefs) {
+        Map<String, DecisionFieldImpactDTO> impacts = new LinkedHashMap<>();
+        if (fieldRefs == null || fieldRefs.isEmpty()) {
+            return impacts;
+        }
+        List<String> pending = new ArrayList<>();
+        for (String fieldRef : fieldRefs) {
+            if (fieldRef == null || fieldRef.isBlank() || impacts.containsKey(fieldRef)) {
+                continue;
+            }
+            List<DecisionImpactRefDTO> refs = usageIndexService.findFieldRefs(fieldRef);
+            if (refs.isEmpty()) {
+                pending.add(fieldRef);
+            } else {
+                impacts.put(fieldRef, fieldImpact(fieldRef, refs));
+            }
+        }
+        if (!pending.isEmpty()) {
+            // One lazy rebuild serves the whole batch: publish governance asks
+            // for every candidate ref of a model in a single sweep, and per-ref
+            // rebuilds on a cold index multiplied into ~10^3 full rebuilds per
+            // plugin import.
+            usageIndexService.rebuild();
+            for (String fieldRef : pending) {
+                impacts.put(fieldRef, fieldImpact(fieldRef, usageIndexService.findFieldRefs(fieldRef)));
+            }
+        }
+        return impacts;
+    }
+
+    private DecisionFieldImpactDTO fieldImpact(String fieldRef, List<DecisionImpactRefDTO> refs) {
         DecisionFieldImpactDTO dto = new DecisionFieldImpactDTO();
         dto.setFieldRef(fieldRef);
         dto.setReferences(refs);
