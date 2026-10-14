@@ -184,38 +184,44 @@ class ModelEventTests(unittest.TestCase):
             with self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
 
     def test_source_binding_replay_restores_management_metadata_on_success_and_failure(self):
-        model = {"displayName": "Model", "fields": None, "extension": {"sourceRef": "fixture",
-                 "fields": [{"code": "rel_name", "columnName": "rel_name"},
-                            {"code": "rel_private", "columnName": "rel_private"}]}}
+        field = {"pid": "field_original", "id": "field_original", "code": "rel_name", "dataType": "string",
+                 "status": "published", "extension": {"columnName": "rel_name"}}
         dead = {"pid": "delivery_dead", "eventId": "evt_dead"}
-        for fail in [False, True]:
+        for mode in ["success", "observation-failure", "binding-not-repointed"]:
             calls = []
+            current = copy.deepcopy(field)
             def human(path, method="GET", body=None):
                 calls.append((path, method, copy.deepcopy(body)))
-                return copy.deepcopy(model) if method == "GET" else {}
+                if path == "/api/meta/fields/key/rel_name": return copy.deepcopy(current)
+                if path.endswith("/bindings"):
+                    return [{"code": "rel_name", "fieldId": "field_original" if mode == "binding-not-repointed" else current["id"]}]
+                if path.startswith("/api/meta/fields/") and method == "PUT":
+                    self.assertEqual(path, "/api/meta/fields/" + current["pid"])
+                    current.update(body, id="field_updated", pid="field_updated")
+                    return copy.deepcopy(current)
+                return {}
             def wait():
-                if fail: raise ProtocolError("observation failed")
+                if mode == "observation-failure": raise ProtocolError("observation failed")
                 return dict(dead, deliveryStatus="dead_letter", replayCount=1, retryCount=1)
-            if fail:
+            if mode != "success":
                 with self.assertRaises(ProtocolError):
                     run_source_binding_replay(human, "model_pid", "installation_pid", dead, wait, lambda: 0)
             else:
                 proof = run_source_binding_replay(human, "model_pid", "installation_pid", dead, wait, lambda: 0)
                 self.assertEqual(proof["receiverAttemptsAfter"], 0)
-            self.assertEqual(calls[1][2]["extension"]["fields"][0]["columnName"], "rel_private")
-            self.assertEqual(calls[-1], ("/api/meta/models/model_pid", "PUT", {
-                "displayName": "Model", "extension": model["extension"]}))
-            self.assertEqual(model["extension"]["fields"][0]["columnName"], "rel_name")
+            self.assertEqual(calls[1][2]["extension"]["columnName"], "rel_private")
+            self.assertEqual(calls[-1][0:2], ("/api/meta/fields/field_updated", "PUT"))
+            self.assertEqual(current["extension"], field["extension"])
 
     def test_missing_management_extension_fields_refuses_before_metadata_mutation(self):
-        for fields in [None, "invalid", [None]]:
+        for field in [None, "invalid", {"code": "wrong"}, {"code": "rel_name", "pid": None}]:
             calls = []
             def human(path, method="GET", body=None):
                 calls.append((path, method))
-                return {"displayName": "Model", "fields": [{"code": "rel_name"}], "extension": {"fields": fields}}
+                return field
             with self.assertRaises(ProtocolError):
                 run_source_binding_replay(human, "model", "installation", {"pid": "delivery"}, lambda: {}, lambda: 0)
-            self.assertEqual(calls, [("/api/meta/models/model", "GET")])
+            self.assertEqual(calls, [("/api/meta/fields/key/rel_name", "GET")])
 
     def test_complete_fixed_report_recomputes_all_six_signatures(self):
         report = passed()

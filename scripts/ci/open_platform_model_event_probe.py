@@ -147,20 +147,30 @@ def verify_source_binding(proof, restored):
 
 def run_source_binding_replay(human, model_pid, installation_pid, dead_log, wait_delivery, receiver_attempts):
     """Rebind through the management API, then restore even if replay or observation fails."""
-    model_path = f"/api/meta/models/{model_pid}"
-    model = human(model_path)
-    original = copy.deepcopy(model.get("extension") or {})
-    require(isinstance(original.get("fields"), list)
-            and all(isinstance(field, dict) for field in original["fields"]),
-            "model event source binding management fields missing")
-    rebound = copy.deepcopy(original)
-    fields = [field for field in rebound["fields"] if field.get("code") == "rel_name"]
-    require(len(fields) == 1, "model event source binding fixture field missing")
-    fields[0]["columnName"] = "rel_private"
+    field_path = "/api/meta/fields/key/rel_name"
+    field = human(field_path)
+    require(isinstance(field, dict) and field.get("code") == "rel_name"
+            and isinstance(field.get("pid"), str) and field.get("id") is not None
+            and isinstance(field.get("dataType"), str)
+            and (field.get("extension") is None or isinstance(field.get("extension"), dict)),
+            "model event source binding library field missing")
+    original = {key: copy.deepcopy(field.get(key)) for key in
+                ["code", "dataType", "dataSourceId", "status", "feature", "refTarget", "indexHint",
+                 "uiSchema", "querySchema", "ruleSchema", "extension"]}
+    original["extension"] = original.get("extension") or {}
+    rebound = dict(original, extension=dict(original["extension"], columnName="rel_private"))
     before = receiver_attempts()
     require(before == 0, "model event source binding receiver already used")
     try:
-        human(model_path, "PUT", {"displayName": model["displayName"], "extension": rebound})
+        updated = human(f"/api/meta/fields/{field['pid']}", "PUT", rebound)
+        current = human(field_path)
+        extension = current.get("extension") or {}
+        column = extension.get("columnName") or (extension.get("extension") or {}).get("columnName")
+        bindings = human(f"/api/meta/models/{model_pid}/bindings")
+        matching = [binding for binding in bindings if binding.get("code") == "rel_name"]
+        require(current.get("pid") == updated.get("pid") and column == "rel_private"
+                and len(matching) == 1 and matching[0].get("fieldId") == current.get("id"),
+                "model event source binding mutation did not reach the bound field")
         human(f"/api/open-platform/installations/{installation_pid}/webhook-deliveries/{dead_log['pid']}/replay", "POST", {})
         blocked = wait_delivery()
         after = receiver_attempts()
@@ -169,7 +179,8 @@ def run_source_binding_replay(human, model_pid, installation_pid, dead_log, wait
                 and blocked.get("retryCount") == 1 and after == 0,
                 "model event source binding allowed HTTP or changed durable identity")
     finally:
-        human(model_path, "PUT", {"displayName": model["displayName"], "extension": original})
+        current = human(field_path)
+        human(f"/api/meta/fields/{current['pid']}", "PUT", original)
     return {"eventId": blocked["eventId"], "deliveryPid": blocked["pid"], "blockedStatus": blocked["deliveryStatus"],
         "blockedReplayCount": blocked["replayCount"], "blockedRetryCount": blocked["retryCount"],
         "receiverAttemptsBefore": before, "receiverAttemptsAfter": after}
