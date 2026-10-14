@@ -125,6 +125,51 @@ class RegisteredSourcePlanResolverTest {
         assertThat(plans.getFirst().reference()).isEqualTo(SourceBindingCanonical.reference("notice", "src", 1));
     }
     @Test
+    void approvedPhysicalEnumPredicatesRetainExactStringAndChildSemantics() throws Exception {
+        remainingFixture(1000);
+        for (String model : List.of("source", "target", "owner", "link", "contact", "child")) {
+            metadataField(model, "state").put("data_type", "enum").put("dict_code", "approved_states");
+        }
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        f.put("target", "t1", Map.of("owner", "o1", "state", "OPEN"));
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void reapprovedStringPredicatesRejectEveryNonStringCarrier() throws Exception {
+        for (String model : List.of("source", "target", "owner", "link", "contact", "child")) {
+            for (String type : List.of("boolean", "integer", "decimal", "json", "reference", "datetime", "unknown")) {
+                f = new Fixture();
+                remainingFixture(1000);
+                metadataField(model, "state").put("data_type", type);
+                f.reapprove();
+                assertThatThrownBy(() -> f.resolver.plan(f.binding, "src"))
+                        .as("%s predicate must reject %s", model, type).isInstanceOf(IllegalArgumentException.class);
+            }
+        }
+    }
+
+    @Test
+    void booleanPredicateCannotUseAnEnumOrStringCarrier() {
+        Binding b = f.binding;
+        Binding bool = new Binding(b.schemaVersion(), b.code(), b.tenantId(), b.approvals(), b.source(),
+                new Entity("owner", List.of(new Exact("state", true))), b.principal(), b.verification(),
+                b.ruleId(), b.templateCode(), b.variableToSourceField());
+        for (String type : List.of("string", "enum")) {
+            metadataField("owner", "state").put("data_type", type);
+            f.binding = bool;
+            f.reapprove();
+            assertThatThrownBy(() -> new ImportedNotificationMetadataValidator().validate(f.binding, f))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        metadataField("owner", "state").put("data_type", "boolean");
+        f.reapprove();
+        assertThat(new ImportedNotificationMetadataValidator().validate(f.binding, f))
+                .containsKey("owner");
+    }
+
+    @Test
     void approvedPhysicalPidReferencesResolveEveryDeclaredModelEdge() throws Exception {
         remainingFixture(1000);
         for (String[] edge : List.of(new String[]{"source", "owner", "owner"},

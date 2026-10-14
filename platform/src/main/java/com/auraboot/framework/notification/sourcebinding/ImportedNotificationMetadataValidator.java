@@ -71,8 +71,7 @@ final class ImportedNotificationMetadataValidator {
             type(result, child.entity().modelCode(), child.orderedField(), DataType.DECIMAL.getCode());
             type(result, child.entity().modelCode(), child.submittedField(), DataType.DECIMAL.getCode());
             for (var predicate : child.entity().equals()) {
-                type(result, child.entity().modelCode(), predicate.fieldCode(), predicate.value().raw() instanceof Boolean
-                        ? DataType.BOOLEAN.getCode() : DataType.STRING.getCode());
+                predicateType(result, child.entity().modelCode(), predicate);
             }
         }
         // The platform account is not an imported descriptor model; it retains the original STRING contract.
@@ -82,8 +81,7 @@ final class ImportedNotificationMetadataValidator {
         pidRelation(approvedFields, b.verification().entity().modelCode(), b.verification().ownerField(), b.owner().modelCode());
         for (var entity : List.of(b.source().entity(), b.source().targets().entity(), b.owner(), b.principal().entity(), b.verification().entity())) {
             for (var predicate : entity.equals()) {
-                type(result, entity.modelCode(), predicate.fieldCode(), predicate.value().raw() instanceof Boolean
-                        ? DataType.BOOLEAN.getCode() : DataType.STRING.getCode());
+                predicateType(result, entity.modelCode(), predicate);
             }
         }
         b.variableToSourceField().values().forEach(f -> {
@@ -164,6 +162,18 @@ final class ImportedNotificationMetadataValidator {
         SourceBindingTypes.require(matches.size() == 1);
         return matches.getFirst();
     }
+    /** Enum codes are exact string values; approved metadata is never coerced to another scalar type. */
+    private void predicateType(Map<String, Map<String, String>> fields, String model,
+                               SourceBindingTypes.Exact predicate) {
+        String actual = fields.get(model).get(predicate.fieldCode());
+        if (predicate.value().type() == SourceBindingTypes.ScalarType.BOOLEAN) {
+            SourceBindingTypes.require(DataType.BOOLEAN.getCode().equals(actual));
+        } else {
+            SourceBindingTypes.require(DataType.STRING.getCode().equals(actual)
+                    || DataType.ENUM.getCode().equals(actual));
+        }
+    }
+
     private void type(Map<String, Map<String, String>> fields, String model, String field, String type) {
         SourceBindingTypes.require(type.equals(fields.get(model).get(field)));
     }
