@@ -2077,6 +2077,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (exists) {
+            // A previous uninstall leaves the dict soft-deleted while
+            // findCurrentByCode (no deleted_flag filter) still reports it as
+            // existing — the update-in-place below would silently refresh a dead
+            // row. Revive it first so the reimport lands on a live dict.
+            int revived = dictMapper.reviveRetiredByCode(dto.getCode());
+            if (revived > 0) {
+                log.info("Revived soft-deleted dict {} for plugin reimport", logSafe(dto.getCode()));
+            }
+
             // Update existing dict
             DictDTO existingDict = dictService.findByCode(dto.getCode());
 
