@@ -71,14 +71,29 @@ class ProductQuoteNativeInitializationTest {
         var commands = json.readTree(copy.resolve("config/commands/order-ui-native-initialization.json").toFile());
         assertThat(commands).hasSize(3);
         for (var command : commands) {
-            assertThat(command.path("code").asText()).endsWith(":initialize_order_ui_native_fixture")
+            assertThat(command.path("code").asText()).endsWith(":init_order_ui_fixture")
                     .doesNotContain("bind_verified_phone", "sync_directory");
+            assertThat(command.path("code").asText().length()).isLessThanOrEqualTo(64);
         }
         assertThatThrownBy(() -> ProductQuoteNativeInitialization.validateOrderUiPayload("pr_supplier_common", Map.of(
                 "pr_supplier_code", "x", "pr_supplier_name", "x", "pr_supplier_status", "enabled")))
                 .isInstanceOf(IllegalArgumentException.class);
         ProductQuoteNativeInitialization.validateOrderUiPayload("pr_supplier_common", Map.of(
                 "pr_supplier_code", "x", "pr_supplier_name", "x", "pr_supplier_status", "enabled", "qo_pr_supplier_account_id", "x"));
+    }
+
+
+    @Test void orderDirectoryUsesBoundedExactModelCommandsAndConnectionUpdateOnlyThreeFacts() {
+        assertThat(ProductQuoteNativeInitialization.orderUiDirectoryCommand("prod_product")).isEqualTo("prod_product:init_order_ui_fixture");
+        for(String model:ProductQuoteNativeInitialization.ORDER_DIRECTORY_FIELDS.keySet()) {
+            assertThat(ProductQuoteNativeInitialization.orderUiDirectoryCommand(model)).startsWith(model+":");
+            assertThat(ProductQuoteNativeInitialization.orderUiDirectoryCommand(model).length()).isLessThanOrEqualTo(64);
+        }
+        assertThatThrownBy(()->ProductQuoteNativeInitialization.orderUiDirectoryCommand("qo_procurement_task_common")).isInstanceOf(IllegalArgumentException.class);
+        ProductQuoteNativeInitialization.validateOrderConnectionUpdate(Map.of("customer_pcba_kd_base_url","http://127.0.0.1:52169", "customer_pcba_kd_username","test", "customer_pcba_kd_app_id","app"));
+        assertThatThrownBy(()->ProductQuoteNativeInitialization.validateOrderConnectionUpdate(Map.of("customer_pcba_kd_base_url","http://127.0.0.1:52169"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->ProductQuoteNativeInitialization.validateOrderConnectionUpdate(Map.of("customer_pcba_kd_base_url","http://127.0.0.1:52169", "customer_pcba_kd_username","test", "customer_pcba_kd_app_id","app","customer_pcba_kd_status","enabled"))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(ProductQuoteNativeInitialization.ORDER_CONNECTION_UPDATE_COMMAND.length()).isLessThanOrEqualTo(64);
     }
 
     @Test void sourceUiCommandsFitExistingChangeLogWidthWithoutChangingTheirModelPrefix() {

@@ -62,12 +62,17 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
     private Path encryptionProofPath;
     private String encryptionProofSha256;
     private Path initializationDirectory;
+    private final List<Map<String,Object>> directoryInitializationResults = new ArrayList<>();
+    private final List<Map<String,Object>> connectionUpdateResults = new ArrayList<>();
     private final List<Map<String, Object>> initializationResults = new ArrayList<>();
     private Map<String, Object> initializationPrincipal;
     static final List<String> ERP_COLUMNS = READ_COLUMNS.stream()
             .map(column -> "Read_" + (column.equals("specification") ? "material_spec" : column)).toList();
     private String preparationStage = "before-managed-provider-admission";
     private boolean preparationCompleted;
+    private String preparationToken;
+    private Map<String,Object> preparationIdentity;
+    private final List<Map<String,Object>> preparationPublicActions = new ArrayList<>();
     private URI control;
     private String controlToken;
     private Map<String, Object> managedReceipt;
@@ -145,6 +150,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         preparationStage = "managed-provider-admission";
         admitManagedProvider();
         preparationStage = "source-allocation-prerequisites";
+        assertNotNull(preparationToken);
         List<Group> groups = new ArrayList<>();
         groups.add(prepareGroup("pending", "21", 1, true));
         groups.add(prepareGroup("failed", "22", 1, false));
@@ -158,9 +164,8 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         assertTrue(validSyntheticCredential(erpSecret, 16));
         String erpUsername = provider + "-reader";
         String erpAppId = provider + "-app";
-        fixture(SYNC, () -> data.update("customer_pcba_int_kingdee_connection", connection,
-                new LinkedHashMap<>(Map.of("customer_pcba_kd_base_url", control.toString(),
-                        "customer_pcba_kd_username", erpUsername, "customer_pcba_kd_app_id", erpAppId))));
+        initializedConnectionUpdate(Map.of("customer_pcba_kd_base_url",control.toString(),
+                "customer_pcba_kd_username",erpUsername,"customer_pcba_kd_app_id",erpAppId));
         context();
         var secret = new CloudConfigSaveRequest();
         secret.setConfigLevel("tenant");
@@ -324,6 +329,16 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         receipt.put("producerMethod", "producePendingFailedUnknownAndMixedSupplierExecutionPrerequisites");
         receipt.put("initializationPrincipal", initializationPrincipal);
         receipt.put("initializationCommandResults", initializationResults);
+        receipt.put("directoryInitializationCommandResults",directoryInitializationResults);
+        receipt.put("connectionUpdateCommandResults",connectionUpdateResults);
+        receipt.put("preparationPublicActions",preparationPublicActions);
+        receipt.put("preparationMakerPermissions",preparationPermissionCodes());
+        receipt.put("preparationMaker",preparationIdentity);
+        for(String name:List.of("directory-initialization","integration-owner")) {
+            Path artifact=caseEvidence.resolve("order-ui-"+name+"-appendix.json");
+            String field=name.equals("directory-initialization")?"directoryInitializationAppendix":"integrationOwnerAppendix";
+            receipt.put(field+"Path",artifact.toString());receipt.put(field+"Sha256",sha(artifact));
+        }
         receipt.put("initializationAppendixPath", caseEvidence.resolve("order-ui-initialization-appendix.json").toString());
         receipt.put("initializationAppendixSha256", sha(caseEvidence.resolve("order-ui-initialization-appendix.json")));
         writeArtifact("order-ui-fixture-receipt.json", receipt);
@@ -467,17 +482,33 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         writeArtifact("ui-order-server-policy.json", policy);
     }
 
+    /** Replaces only this producer's first prerequisite writes; original Source/Order defaults stay unchanged. */
+    @Override protected void prepareInitialSourceRecords() throws Exception {
+        prepareInitializationAppendix();
+        preparationToken=preparationActor();
+        preparationIdentity=new LinkedHashMap<>(retainedActors.getLast());
+        String product=initializedDirectoryCreate("prod_product",Map.of("prod_code",provider,"prod_name","Public source material",
+                "prod_type","raw_material","prod_unit","pcs","prod_status","active"));
+        connection=initializedDirectoryCreate("customer_pcba_int_kingdee_connection",Map.of("customer_pcba_kd_profile_name",provider,
+                "customer_pcba_kd_status","active","customer_pcba_kd_acct_id",provider,"customer_pcba_kd_base_url","http://127.0.0.1:"+server.getAddress().getPort(),
+                "customer_pcba_kd_app_id","local-app","customer_pcba_kd_username","local-reader","customer_pcba_kd_app_secret_ref","cloud-config:"+provider,"customer_pcba_kd_auth_type","app-secret"));
+        initializedDirectoryCreate("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_external_system","KINGDEE","customer_pcba_ref_instance_key",connection,
+                "customer_pcba_ref_account_id",provider,"customer_pcba_ref_external_form_id","BD_MATERIAL","customer_pcba_ref_external_id","900",
+                "customer_pcba_ref_local_model_code","prod_product","customer_pcba_ref_local_pid",product));
+        task=publicAction(preparationToken,"qo_procurement_task_common:create",null,Map.of("title",provider,"connectionPid",connection)).path("recordPid").asText();
+        assertFalse(task.isBlank());
+    }
+
     private Group prepareGroup(String stage, String entry, int suppliers, boolean initialTask) throws Exception {
         if (!initialTask) {
-            task = fixture("qo_procurement_task_common:create", () -> pid((Map<?, ?>) service("ProcurementTaskService",
-                    new Class<?>[]{DataAccessor.class}, new Object[]{db}, "create", new Class<?>[]{Object.class, String.class, Map.class},
-                    tenant, actor, Map.of("title", provider + "-" + stage, "connectionPid", connection))));
+            task = publicAction(preparationToken,"qo_procurement_task_common:create",null,
+                    Map.of("title",provider+"-"+stage,"connectionPid",connection)).path("recordPid").asText();
+            assertFalse(task.isBlank());
             retainedTaskPids.add(task);
         }
         response = row(entry, 1000, "C");
         if (initialTask) {
             configurePolicy();
-            prepareInitializationAppendix();
         }
         assertEquals(200, call(token, selected(entry)).status());
         String currentTask = task;
@@ -490,12 +521,9 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
             allocations.add(Map.of("quotePid", quote.quote(), "sourcePid", source, "submissionPid", quote.submission(),
                     "quantity", quantities.get(index)));
         }
-        Object prepared = fixture("qo_procurement_task_common:allocate", () -> new TransactionTemplate(transactions)
-                .execute(status -> service("ProcurementAllocationService", new Class<?>[]{DataAccessor.class}, new Object[]{db},
-                        "allocate", new Class<?>[]{String.class, Map.class}, currentTask,
-                        Map.of("sourceDemands", List.of(Map.of("sourcePid", source, "sourceRevision", offers.getFirst().submitted().sourceRevision(),
-                                "quantity", "300.000001")), "allocations", allocations))));
-        assertTrue(prepared instanceof List<?>);
+        publicAction(preparationToken,"qo_procurement_task_common:allocate",currentTask,
+                Map.of("sourceDemands",List.of(Map.of("sourcePid",source,"sourceRevision",offers.getFirst().submitted().sourceRevision(),
+                        "quantity","300.000001")),"allocations",allocations));
         List<String> executionPids = new ArrayList<>();
         for (Offer offer : offers) {
             var found = fixture(SYNC, () -> db.query(domainModel("execution"),
@@ -507,80 +535,148 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         return new Group(stage, currentTask, source, entry, offers, executionPids, quantities);
     }
 
-    private List<Offer> prepareOffers(String stage, int count, String source) {
-        return fixture("qo_procurement_task_common:dispatch", () -> new TransactionTemplate(transactions).execute(status -> {
-            String category = pid(db.create("pr_spend_category", Map.of("pr_spc_code", provider + "-" + stage,
-                    "pr_spc_name", "Explicit order UI fixture category")));
-            List<String> supplierPids = new ArrayList<>();
-            for (int index = 0; index < count; index++) {
-                int slot = index;
-                supplierPids.add(initializedCreate("pr_supplier_common",
-                        Map.of("pr_supplier_code", provider + "-" + stage + "-" + slot, "pr_supplier_name", "Order UI " + stage + " " + slot,
-                                "pr_supplier_status", "enabled", "qo_pr_supplier_account_id", provider)));
-            }
-            fixture("qo_procurement_category_policy_common:create", () -> service("ProcurementCategoryPolicyService",
-                    new Class<?>[]{DataAccessor.class, Long.class}, new Object[]{db, tenant}, "createPolicy", new Class<?>[]{Map.class},
-                    Map.of("categoryPid", category, "connectionPid", connection, "supplierPids", supplierPids, "defaultSupplierPids", supplierPids)));
-            long revision = new BigDecimal(db.getById("pr_purchase_request", source).get("qo_pr_source_revision").toString()).longValueExact();
-            service("ProcurementPlanningService", new Class<?>[]{DataAccessor.class, Clock.class, Object.class}, new Object[]{db, Clock.systemUTC(), tenant},
-                    "classify", new Class<?>[]{String.class, Long.class, Map.class}, task, version(),
-                    Map.of("sourcePid", source, "sourceRevision", revision, "categoryPid", category));
-            long currentRevision = new BigDecimal(db.getById("pr_purchase_request", source).get("qo_pr_source_revision").toString()).longValueExact();
-            assertEquals(revision + 1, currentRevision);
-            service("ProcurementDispatchService", new Class<?>[]{DataAccessor.class, Clock.class, Long.class}, new Object[]{db, Clock.systemUTC(), tenant},
-                    "dispatch", new Class<?>[]{String.class, Long.class, Map.class}, task, version(),
-                    Map.of("supplierPids", supplierPids, "cutoffAt", "2066-11-15T08:00:00Z"));
-            List<Offer> offers = new ArrayList<>();
-            for (int index = 0; index < count; index++) {
-                String supplier = supplierPids.get(index);
-                var bid = db.query("s2p_bid", Map.of("s2p_bid_sourcing_event_id", task, "s2p_bid_supplier_id", supplier));
-                assertEquals(1, bid.size());
-                String quote = pid(bid.getFirst());
-                context();String key = provider + "-" + stage + "-" + index;
-                var user = users.signUp(key + "@example.invalid", PASSWORD, "Explicit supplier fixture", key);
-                members.addMember(user.getId(), tenant, "active");
-                String contact = initializedCreate("pr_supplier_pcba_contact",
-                        Map.of("pr_spc_supplier_id", supplier, "pr_spc_name", "Order UI supplier", "qo_pr_contact_state", "active"));
-                initializedCreate("qo_procurement_membership_common",
-                        Map.of("qo_pr_membership_key", key, "qo_pr_membership_user_pid", user.getPid(), "qo_pr_membership_supplier_pid", supplier,
-                                "qo_pr_membership_contact_pid", contact, "qo_pr_membership_state", "active"));
-                var line = Map.<String, Object>of("sourcePid", source, "sourceRevision", currentRevision, "unitPrice", "1.25",
-                        "currency", "CNY", "unit", "PCS", "taxRate", "0.13", "taxIncluded", true, "availableQty", "600", "deliveryDate", "2066-12-01");
-                fixture("qo_procurement_quote_common:save_draft", () -> service("ProcurementQuoteService", new Class<?>[]{DataAccessor.class, Clock.class},
-                        new Object[]{db, Clock.systemUTC()}, "execute", new Class<?>[]{String.class, String.class, String.class, Map.class},
-                        "save_draft", quote, user.getPid(), Map.of("revision", 0, "lines", List.of(line), "paymentTerms", "Net 30")));
-                var formal = (Map<?, ?>) fixture("qo_procurement_quote_common:submit", () -> service("ProcurementQuoteService",
-                        new Class<?>[]{DataAccessor.class, Clock.class}, new Object[]{db, Clock.systemUTC()}, "execute",
-                        new Class<?>[]{String.class, String.class, String.class, Map.class}, "submit", quote, user.getPid(), Map.of("revision", 1)));
-                String external = "supplier-" + stage + "-" + index;
-                fixture(SYNC, () -> db.create("customer_pcba_int_external_ref", Map.of("customer_pcba_ref_external_system", "KINGDEE",
-                        "customer_pcba_ref_instance_key", connection, "customer_pcba_ref_account_id", provider, "customer_pcba_ref_external_form_id", "FixtureSupplier",
-                        "customer_pcba_ref_external_id", external, "customer_pcba_ref_local_model_code", "pr_supplier_common", "customer_pcba_ref_local_pid", supplier)));
-                offers.add(new Offer(new Submitted(source, quote, formal.get("submissionPid").toString(), currentRevision), supplier, external));
-            }
-            return List.copyOf(offers);
-        }));
+    private List<Offer> prepareOffers(String stage, int count, String source) throws Exception {
+        String category = initializedDirectoryCreate("pr_spend_category",Map.of("pr_spc_code",provider+"-"+stage,
+                "pr_spc_name","Explicit order UI fixture category"));
+        List<String> supplierPids=new ArrayList<>();
+        for(int index=0;index<count;index++) supplierPids.add(initializedCreate("pr_supplier_common",
+                Map.of("pr_supplier_code",provider+"-"+stage+"-"+index,"pr_supplier_name","Order UI "+stage+" "+index,
+                        "pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)));
+        publicAction(preparationToken,"qo_procurement_category_policy_common:create",null,
+                Map.of("categoryPid",category,"connectionPid",connection,"supplierPids",supplierPids,"defaultSupplierPids",supplierPids));
+        long revision=fixture(SYNC,()->new BigDecimal(db.getById("pr_purchase_request",source).get("qo_pr_source_revision").toString()).longValueExact());
+        publicAction(preparationToken,"qo_procurement_task_common:classify_source",task,
+                Map.of("sourcePid",source,"sourceRevision",revision,"categoryPid",category));
+        long currentRevision=fixture(SYNC,()->new BigDecimal(db.getById("pr_purchase_request",source).get("qo_pr_source_revision").toString()).longValueExact());
+        assertEquals(revision+1,currentRevision);
+        publicAction(preparationToken,"qo_procurement_task_common:dispatch",task,
+                Map.of("supplierPids",supplierPids,"cutoffAt","2066-11-15T08:00:00Z"));
+        List<Offer> offers=new ArrayList<>();
+        for(int index=0;index<count;index++) {
+            String supplier=supplierPids.get(index);
+            var bid=fixture(SYNC,()->db.query("s2p_bid",Map.of("s2p_bid_sourcing_event_id",task,"s2p_bid_supplier_id",supplier)));
+            assertEquals(1,bid.size());String quote=pid(bid.getFirst());
+            context();String key=provider+"-"+stage+"-"+index;
+            var user=users.signUp(key+"@example.invalid",PASSWORD,"Explicit supplier fixture",key);
+            var member=members.addMember(user.getId(),tenant,"active");
+            String supplierToken=actorToken(user.getId(),user.getPid(),member.getId(),user.getEmail(),List.of("meta.command.execute","qo.srm.use"));
+            String contact=initializedCreate("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,"pr_spc_name","Order UI supplier","qo_pr_contact_state","active"));
+            initializedCreate("qo_procurement_membership_common",Map.of("qo_pr_membership_key",key,"qo_pr_membership_user_pid",user.getPid(),
+                    "qo_pr_membership_supplier_pid",supplier,"qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active"));
+            var line=Map.<String,Object>of("sourcePid",source,"sourceRevision",currentRevision,"unitPrice","1.25","currency","CNY","unit","PCS",
+                    "taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2066-12-01");
+            publicAction(supplierToken,"qo_procurement_quote_common:save_draft",quote,Map.of("revision",0,"lines",List.of(line),"paymentTerms","Net 30"));
+            var formal=publicAction(supplierToken,"qo_procurement_quote_common:submit",quote,Map.of("revision",1));
+            String external="supplier-"+stage+"-"+index;
+            initializedDirectoryCreate("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_external_system","KINGDEE","customer_pcba_ref_instance_key",connection,
+                    "customer_pcba_ref_account_id",provider,"customer_pcba_ref_external_form_id","FixtureSupplier","customer_pcba_ref_external_id",external,
+                    "customer_pcba_ref_local_model_code","pr_supplier_common","customer_pcba_ref_local_pid",supplier));
+            offers.add(new Offer(new Submitted(source,quote,formal.path("submissionPid").asText(),currentRevision),supplier,external));
+            assertFalse(offers.getLast().submitted().submission().isBlank());
+        }
+        return List.copyOf(offers);
+    }
+
+    private String preparationActor() {
+        context();String email=provider+"-preparation@example.invalid";
+        var user=users.signUp(email,PASSWORD,"Explicit order preparation maker",provider+"-preparation");
+        var member=members.addMember(user.getId(),tenant,"active");
+        return actorToken(user.getId(),user.getPid(),member.getId(),email,preparationPermissionCodes());
+    }
+
+    static List<String> preparationPermissionCodes() {
+        var codes=new ArrayList<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
+        codes.add("model.qo_procurement_category_supplier_common.read");assertEquals(20,codes.size());assertEquals(20,new java.util.HashSet<>(codes).size());return List.copyOf(codes);
+    }
+
+    static void requireCompletedPublicResponse(JsonNode body) {
+        assertTrue(body.path("code").isTextual());assertEquals("0",body.path("code").textValue());
+        assertEquals("completed",body.path("data").path("phaseReached").asText());
+        assertTrue(body.path("data").path("data").isObject() || body.path("data").path("data").isArray());
+    }
+
+    private JsonNode publicAction(String jwt,String code,String target,Map<String,Object> payload) throws Exception {
+        var request=new LinkedHashMap<String,Object>();
+        if(target!=null) {
+            request.put("targetRecordPid",target);
+            request.put("expectedVersion",fixture(SYNC,()->db.getById(commands.findByCode(code).getModelCode(),target).get("row_version")));
+        }
+        request.put("clientRequestId",java.util.UUID.randomUUID().toString());request.put("payload",payload);
+        MetaContext.clear();org.springframework.test.web.servlet.MvcResult result;
+        try {
+            result=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/meta/commands/execute/"+code)
+                    .header("Authorization","Bearer "+jwt).contentType("application/json").content(json.writeValueAsBytes(request))).andReturn();
+        } finally {context();}
+        assertEquals(200,result.getResponse().getStatus(),"Actual public command "+code);
+        var body=json.readTree(result.getResponse().getContentAsByteArray());requireCompletedPublicResponse(body);
+        preparationPublicActions.add(Map.of("command",code,"target",target==null?"create":target,"payload",payload,"httpStatus",200,"phaseReached","completed"));
+        writeArtifact("execution-preparation-public-actions.json",preparationPublicActions);
+        return body.path("data").path("data");
     }
 
     private void prepareInitializationAppendix() throws Exception {
-        var proof = ProductQuoteNativeInitialization.prepareOrderUi(caseEvidence.resolve("configured-dsl"),
+        var proof = ProductQuoteNativeInitialization.prepareOrderUi(Path.of(procurementDirectory),
                 caseEvidence.resolve("order-ui-initialization-dsl"), json);
         initializationDirectory = Path.of(proof.get("testDirectory").toString());
         assertTrue(initializationDirectory.toString().length() <= 256);
         importDirectory(initializationDirectory);
-        JsonNode expected = json.valueToTree(proof.get("exactWriterAppendix"));
-        for (var entry : ProductQuoteNativeInitialization.ORDER_UI_FIELDS.entrySet()) {
-            var definition = metadata.getModelDefinitionFromDb(entry.getKey()).orElseThrow();
-            for (String code : entry.getValue()) {
-                var field = definition.getFields().stream().filter(f -> code.equals(f.getCode())).findFirst().orElseThrow();
-                if (expected.has(code)) assertEquals(expected.path(code).path("testWriters"), json.valueToTree(field.getAllowedWriterCommands()));
+        var declared=new ArrayList<Path>();for(JsonNode value:json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES")))declared.add(Path.of(value.asText()));
+        Path integrationOwner=ProductQuoteNativeInitialization.sourceUiIntegrationOwner(declared,json);
+        var ownerProof=ProductQuoteNativeInitialization.prepareOrderUiIntegration(integrationOwner,caseEvidence.resolve("order-ui-integration-owner-dsl"),json);
+        var directoryProof=ProductQuoteNativeInitialization.prepareOrderUiDirectory(Path.of(procurementDirectory),caseEvidence.resolve("order-ui-directory-dsl"),json);
+        // All copies must be imported before the first directory initializer or connection update.
+        importDirectory(Path.of(ownerProof.get("testDirectory").toString()));
+        importDirectory(Path.of(directoryProof.get("testDirectory").toString()));
+        var writers=new LinkedHashMap<String,Object>();
+        for(var part:List.of(proof,ownerProof,directoryProof)) {
+            @SuppressWarnings("unchecked") var values=(Map<String,Object>)part.get("exactWriterAppendix");writers.putAll(values);
+        }
+        JsonNode expected=json.valueToTree(writers);
+        var allFields=new LinkedHashMap<String,List<String>>(ProductQuoteNativeInitialization.ORDER_UI_FIELDS);
+        allFields.putAll(ProductQuoteNativeInitialization.ORDER_DIRECTORY_FIELDS);
+
+        for(var entry:allFields.entrySet()) {
+            var definition=metadata.getModelDefinitionFromDb(entry.getKey()).orElseThrow();
+            for(String code:entry.getValue()) {
+                var field=definition.getFields().stream().filter(f->code.equals(f.getCode())).findFirst().orElseThrow();
+                if(expected.has(code))assertEquals(expected.path(code).path("testWriters"),json.valueToTree(field.getAllowedWriterCommands()));
             }
         }
+        for(String model:ProductQuoteNativeInitialization.ORDER_UI_FIELDS.keySet()) {
+            var command=commands.findByCode(ProductQuoteNativeInitialization.orderUiCommand(model));
+            assertEquals(model,command.getModelCode());assertEquals("published",command.getStatus());assertTrue(command.getCode().length()<=64);
+        }
+        for(String model:ProductQuoteNativeInitialization.ORDER_DIRECTORY_FIELDS.keySet()) {
+            var command=commands.findByCode(ProductQuoteNativeInitialization.orderUiDirectoryCommand(model));
+            assertEquals(model,command.getModelCode());assertEquals("published",command.getStatus());assertTrue(command.getCode().length()<=64);
+        }
+        var updater=commands.findByCode(ProductQuoteNativeInitialization.ORDER_CONNECTION_UPDATE_COMMAND);
+        assertEquals("customer_pcba_int_kingdee_connection",updater.getModelCode());assertEquals("published",updater.getStatus());assertTrue(updater.getCode().length()<=64);
+        writeArtifact("order-ui-directory-initialization-appendix.json",directoryProof);
+        writeArtifact("order-ui-integration-owner-appendix.json",ownerProof);
         writeArtifact("order-ui-initialization-appendix.json", proof);
     }
 
     private String initializedCreate(String model, Map<String, Object> facts) {
         ProductQuoteNativeInitialization.validateOrderUiPayload(model, facts);
+        return initializedAction(model,ProductQuoteNativeInitialization.orderUiCommand(model),facts,false);
+    }
+
+    private String initializedDirectoryCreate(String model,Map<String,Object> facts) {
+        if(!ProductQuoteNativeInitialization.ORDER_DIRECTORY_FIELDS.containsKey(model))throw new IllegalArgumentException("Unsupported order directory initializer");
+        if(!facts.keySet().equals(java.util.Set.copyOf(ProductQuoteNativeInitialization.ORDER_DIRECTORY_FIELDS.get(model))))throw new IllegalArgumentException("Exact order directory fields required");
+        return initializedAction(model,ProductQuoteNativeInitialization.orderUiDirectoryCommand(model),facts,false);
+    }
+
+    private void initializedConnectionUpdate(Map<String,Object> facts) {
+        ProductQuoteNativeInitialization.validateOrderConnectionUpdate(facts);
+        initializedAction("customer_pcba_int_kingdee_connection",ProductQuoteNativeInitialization.ORDER_CONNECTION_UPDATE_COMMAND,facts,true);
+        var actual=fixture(SYNC,()->db.getById("customer_pcba_int_kingdee_connection",connection));
+        for(var value:facts.entrySet())assertEquals(value.getValue(),actual.get(value.getKey()));
+    }
+
+    private String initializedAction(String model,String command,Map<String,Object> facts,boolean update) {
+        Integer updateVersion=update?fixture(SYNC,()->new BigDecimal(db.getById(model,connection).get("row_version").toString()).intValueExact()):null;
         MetaContext.Snapshot previous = MetaContext.snapshot();
         try {
             var initializer = users.findByPid(retainedBootstrapPrincipal.get("userPid").toString());
@@ -609,14 +705,22 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
                     "actualRoleCodes", roleCodes, "integrationPermissionVerified", true);
             var request = new CommandExecuteRequest();
             request.setPayload(new LinkedHashMap<>(facts));
-            request.setClientRequestId(java.util.UUID.randomUUID().toString());
-            String command = ProductQuoteNativeInitialization.orderUiCommand(model);
+            String requestKey=java.util.UUID.randomUUID().toString();assertTrue(requestKey.length()<=64 && command.length()<=64);
+            request.setClientRequestId(requestKey);
+            if(update) {
+                request.setTargetRecordPid(connection);
+                request.setExpectedVersion(updateVersion);
+            }
+            assertEquals(initializer.getId(),MetaContext.getCurrentUserId());assertEquals(member.getId(),MetaContext.getCurrentMemberId());
             var result = initializerCommands.execute(command, request);
             assertEquals("completed", result.getPhaseReached());
-            Object record = result.getData().get("recordPid");
+            Object record = update?connection:result.getData().get("recordPid");
             assertTrue(record instanceof String && !((String) record).isBlank());
-            initializationResults.add(Map.of("modelCode", model, "commandCode", command, "recordPid", record,
-                    "phaseReached", result.getPhaseReached()));
+            var evidence=new LinkedHashMap<String,Object>(Map.of("modelCode",model,"commandCode",command,"recordPid",record,
+                    "phaseReached",result.getPhaseReached(),"clientRequestId",requestKey));
+            if(update) {evidence.put("expectedVersion",request.getExpectedVersion());evidence.put("payload",facts);connectionUpdateResults.add(evidence);}
+            else if(ProductQuoteNativeInitialization.ORDER_UI_FIELDS.containsKey(model))initializationResults.add(evidence);
+            else directoryInitializationResults.add(evidence);
             return record.toString();
         } finally {
             MetaContext.clear();

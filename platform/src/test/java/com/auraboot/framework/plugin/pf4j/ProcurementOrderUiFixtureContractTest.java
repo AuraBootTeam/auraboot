@@ -9,6 +9,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Fixture contracts only: actual preparation and browser business behavior remain unexecuted. */
 class ProcurementOrderUiFixtureContractTest {
+    @Test void preparationMakerReadsCategoryMembershipWithoutExpandingBrowserActor() {
+        var expected=new HashSet<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
+        expected.add("model.qo_procurement_category_supplier_common.read");
+        assertThat(ProcurementOrderUiFixtureProducerIT.preparationPermissionCodes()).hasSize(20).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(expected).noneMatch(code->code.equals("*") || code.endsWith(".write") || code.contains("admin"));
+    }
+    @Test void publicPreparationRequiresActualTextualSuccessAndCompletedPhase() throws Exception {
+        var json=new com.fasterxml.jackson.databind.ObjectMapper();
+        var body=json.readTree("{\"code\":\"0\",\"data\":{\"phaseReached\":\"completed\",\"data\":{}}}");
+        ProcurementOrderUiFixtureProducerIT.requireCompletedPublicResponse(body);
+        for(String code:List.of("200","0")) {
+            var invalid=body.deepCopy();((com.fasterxml.jackson.databind.node.ObjectNode)invalid).put("code",Integer.parseInt(code));
+            org.assertj.core.api.Assertions.assertThatThrownBy(()->ProcurementOrderUiFixtureProducerIT.requireCompletedPublicResponse(invalid)).isInstanceOf(AssertionError.class);
+        }
+        ((com.fasterxml.jackson.databind.node.ObjectNode)body.path("data")).put("phaseReached","pending");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->ProcurementOrderUiFixtureProducerIT.requireCompletedPublicResponse(body)).isInstanceOf(AssertionError.class);
+    }
     @Test void browserActorAddsOnlyPageManageAndTheExistingP12ReadRequirements() {
         var expected = new HashSet<>(ProcurementPublicSourceNativeFixture.ORDER_PERMISSIONS);
         expected.addAll(List.of("qo.procurement.manage", "page.page.read", "model.pr_purchase_order.read", "model.pr_purchase_order_line.read", "model.qo_procurement_shipment_common.read",

@@ -47,7 +47,7 @@ public final class ProductQuoteNativeInitialization {
 
     public static String orderUiCommand(String model) {
         if (!ORDER_UI_FIELDS.containsKey(model)) throw new IllegalArgumentException("Unsupported order UI initialization model");
-        return model + ":initialize_order_ui_native_fixture";
+        return model + ":init_order_ui_fixture";
     }
 
     public static void validateOrderUiPayload(String model, Map<String, Object> facts) {
@@ -181,6 +181,78 @@ public final class ProductQuoteNativeInitialization {
             }
         }
         return result;
+    }
+
+    public static final Map<String,List<String>> ORDER_DIRECTORY_FIELDS=Map.of("pr_spend_category",SOURCE_UI_FIELDS.get("pr_spend_category"),
+            "prod_product",List.of("prod_code","prod_name","prod_type","prod_unit","prod_status"),
+            "customer_pcba_int_kingdee_connection",SOURCE_UI_FIELDS.get("customer_pcba_int_kingdee_connection"),
+            "customer_pcba_int_external_ref",SOURCE_UI_FIELDS.get("customer_pcba_int_external_ref"));
+    public static String orderUiDirectoryCommand(String model) {
+        if(!ORDER_DIRECTORY_FIELDS.containsKey(model))throw new IllegalArgumentException("Unsupported order directory model");
+        return "prod_product".equals(model)?model+":init_order_ui_fixture":sourceUiCommand(model);
+    }
+    public static Map<String,Object> prepareOrderUiDirectory(Path original,Path destination,ObjectMapper json) throws Exception {
+        return prepare(original,destination,json,ORDER_DIRECTORY_FIELDS,ProductQuoteNativeInitialization::orderUiDirectoryCommand,"order-ui-directory-initialization.json");
+    }
+
+    public static final List<String> ORDER_CONNECTION_UPDATE_FIELDS=List.of("customer_pcba_kd_base_url","customer_pcba_kd_username","customer_pcba_kd_app_id");
+    public static final String ORDER_CONNECTION_UPDATE_COMMAND="customer_pcba_int_kingdee_connection:update_order_ui_fixture";
+
+    public static void validateOrderConnectionUpdate(Map<String,Object> facts) {
+        if(!facts.keySet().equals(Set.copyOf(ORDER_CONNECTION_UPDATE_FIELDS)))
+            throw new IllegalArgumentException("Order UI connection update requires its exact three fields");
+    }
+
+    /** Same formal foreign owner as Source; only three extra controlled-connection update writers. */
+    public static Map<String,Object> prepareOrderUiIntegration(Path original,Path destination,ObjectMapper json) throws Exception {
+        var base=prepareSourceUiIntegration(original,destination,json);
+        JsonNode manifest=json.readTree(destination.resolve("plugin.json").toFile());
+        var fields=declaredResources(destination,manifest.path("resourceDirs").path("fields").asText(),json);
+        var bindings=declaredResources(destination,manifest.path("resourceDirs").path("modelFieldBindings").asText(),json);
+        var extra=new LinkedHashMap<String,Object>();
+        for(String field:ORDER_CONNECTION_UPDATE_FIELDS) {
+            var selected=fields.stream().filter(entry->field.equals(entry.node().path("code").asText())).toList();
+            long bound=bindings.stream().filter(entry->"customer_pcba_int_kingdee_connection".equals(entry.node().path("modelCode").asText())
+                    && field.equals(entry.node().path("fieldCode").asText())).count();
+            if(selected.size()!=1 || bound!=1)throw new IllegalArgumentException("Order UI update requires exact actual owner bindings");
+            ObjectNode definition=selected.getFirst().node();
+            if(definition.has("allowedWriterCommands")) {
+                JsonNode previous=definition.get("allowedWriterCommands").deepCopy();
+                ArrayNode next=appendWriter(previous,ORDER_CONNECTION_UPDATE_COMMAND);
+                definition.set("allowedWriterCommands",next);
+                extra.put(field,Map.of("productionWriters",previous,"testWriters",next));
+                JsonNode tree=json.readTree(selected.getFirst().file().toFile());
+                if(tree.isArray())for(int index=0;index<tree.size();index++) {
+                    if(field.equals(tree.get(index).path("code").asText()))((ArrayNode)tree).set(index,definition);
+                } else tree=definition;
+                Files.writeString(selected.getFirst().file(),json.writerWithDefaultPrettyPrinter().writeValueAsString(tree));
+            }
+        }
+        JsonNode models=json.readTree(destination.resolve(manifest.path("resourceDirs").path("models").asText()).toFile());
+        if(!models.isArray())throw new IllegalArgumentException("Order UI integration models must remain an array");
+        for(JsonNode model:models)if("customer_pcba_int_kingdee_connection".equals(model.path("code").asText())
+                && model.path("extension").has("recordCommandWriters")) {
+            JsonNode policy=model.path("extension").path("recordCommandWriters");
+            if(!(policy.path("commands") instanceof ObjectNode operations) || !operations.path("update").isArray())
+                throw new IllegalArgumentException("Order UI connection record update policy must remain explicit");
+            JsonNode prior=operations.path("update").deepCopy();operations.set("update",appendWriter(prior,ORDER_CONNECTION_UPDATE_COMMAND));
+            extra.put("$connectionRecordUpdate",Map.of("productionWriters",prior,"testWriters",operations.path("update")));
+        }
+        Files.writeString(destination.resolve(manifest.path("resourceDirs").path("models").asText()),json.writerWithDefaultPrettyPrinter().writeValueAsString(models));
+        var command=json.createObjectNode();command.put("code",ORDER_CONNECTION_UPDATE_COMMAND);command.put("modelCode","customer_pcba_int_kingdee_connection");
+        command.put("type","update");command.put("displayName","Synthetic order UI controlled connection only");
+        command.set("inputFields",json.valueToTree(ORDER_CONNECTION_UPDATE_FIELDS));command.set("permissions",json.valueToTree(List.of("qo.procurement.integrate")));command.put("cmd_risk_level","L1");
+        Path commandFile=destination.resolve(manifest.path("resourceDirs").path("commands").asText()).normalize();
+        if(!commandFile.startsWith(destination) || !Files.isRegularFile(commandFile))throw new IllegalArgumentException("Order UI update requires the actual declared command array");
+        JsonNode definitions=json.readTree(commandFile.toFile());
+        if(!(definitions instanceof ArrayNode commands))throw new IllegalArgumentException("Order UI actual commands must remain an array");
+        for(JsonNode existing:commands)if(ORDER_CONNECTION_UPDATE_COMMAND.equals(existing.path("code").asText()))throw new IllegalArgumentException("Order UI update cannot replace an existing command");
+        commands.add(command);Files.writeString(commandFile,json.writerWithDefaultPrettyPrinter().writeValueAsString(commands));
+        var combined=new LinkedHashMap<String,Object>(base);var writers=new LinkedHashMap<String,Object>();
+        @SuppressWarnings("unchecked") var previous=(Map<String,Object>)base.get("exactWriterAppendix");writers.putAll(previous);writers.putAll(extra);
+        combined.put("exactWriterAppendix",writers);combined.put("connectionUpdateCommand",command);combined.put("connectionUpdateFields",ORDER_CONNECTION_UPDATE_FIELDS);
+        var generated=new LinkedHashMap<String,String>();try(var paths=Files.walk(destination)) {for(Path file:paths.filter(Files::isRegularFile).sorted().toList())generated.put(destination.relativize(file).toString(),sha(file));}
+        combined.put("generatedResourceHashes",generated);return combined;
     }
 
     /** Only S06 task/bid facts need this exact source owner appendix; order UI directory facts do not. */
