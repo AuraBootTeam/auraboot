@@ -40,7 +40,6 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     }
 
     @Override
-    @Transactional
     public MachinePrincipal authenticate(HttpServletRequest request) {
         OpenApiCapabilityRegistry.Capability capability = capabilityRegistry.resolve(request.getMethod(), request.getRequestURI()).orElse(null);
         if (capability == null && !request.getRequestURI().matches("/api/open/v1/(?:resources/[a-z][a-z0-9.-]{1,99}(?:/[^/]+)?|queries/[a-z][a-z0-9.-]{1,93}:execute)")) {
@@ -63,6 +62,9 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
             capability = capabilityRegistry.resolve(identity.tenantId(), request.getMethod(), request.getRequestURI())
                     .orElseThrow(() -> new ExternalMachineAuthException(404, "open_api_capability_not_found"));
         }
+        // The mapper atomically validates authority, consumes quota and touches
+        // token use in one statement. Let that statement commit before mapping
+        // the principal instead of extending the installation lock into Java.
         var token = rateLimitMapper.authenticate(tokenHash,
                 OpenPlatformTokenService.AUDIENCE, usedAt,
                 usedAt.truncatedTo(ChronoUnit.MINUTES), capability.requiredScope());
