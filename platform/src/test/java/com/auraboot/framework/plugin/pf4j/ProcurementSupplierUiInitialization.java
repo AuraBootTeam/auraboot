@@ -72,6 +72,7 @@ final class ProcurementSupplierUiInitialization {
         var copies = new ArrayList<Map<String, Object>>();
         var fieldProofs = new ArrayList<Map<String, Object>>();
         var modelProofs = new ArrayList<Map<String, Object>>();
+        boolean exactOrderParentDeclared = false;
         for (int i = 0; i < sources.size(); i++) {
             Path original = sources.get(i).toRealPath();
             Path copy = destination.resolve("owner-" + i);
@@ -93,6 +94,13 @@ final class ProcurementSupplierUiInitialization {
                 for (ObjectNode model : objects(raw)) {
                     String code = model.path("code").asText();
                     if (!FIELDS.containsKey(code)) continue;
+                    if ("pr_purchase_order_line".equals(code)) {
+                        JsonNode extension = model.path("extension");
+                        if (!"pr_purchase_order".equals(extension.path("parentModel").asText())
+                                || !"pr_pol_order_id".equals(extension.path("parentField").asText()))
+                            throw new IllegalArgumentException("Exact order-line parent declaration required");
+                        exactOrderParentDeclared = true;
+                    }
                     if (owners.putIfAbsent(code, copy) != null) throw new IllegalArgumentException("Ambiguous model owner");
                     JsonNode policy = model.path("extension").path("recordCommandWriters");
                     if (!policy.isMissingNode()) {
@@ -101,6 +109,10 @@ final class ProcurementSupplierUiInitialization {
                             throw new IllegalArgumentException("Exact model writer policy required");
                         JsonNode production = policy.deepCopy();
                         operations.set("create", append(operations.path("create"), command(code)));
+                        // The canonical child create guard locks/checks its marked parent as update.
+                        // Grant only this synthetic child initializer, never the header initializer.
+                        if ("pr_purchase_order".equals(code))
+                            operations.set("update", append(operations.path("update"), command("pr_purchase_order_line")));
                         modelProofs.add(Map.of("model", code, "ownerPluginId", pluginId,
                                 "productionPolicy", production, "testPolicy", policy.deepCopy()));
                     }
@@ -143,6 +155,7 @@ final class ProcurementSupplierUiInitialization {
             copies.add(Map.of("sourceDirectory", original.toString(), "testDirectory", copy.toString(),
                     "pluginId", pluginId, "sourceResourceHashes", before));
         }
+        if (!exactOrderParentDeclared) throw new IllegalArgumentException("Exact order-line parent declaration missing");
         if (!owners.keySet().equals(FIELDS.keySet())) throw new IllegalArgumentException("All exact model owners required");
         for (var model : FIELDS.entrySet()) for (String field : model.getValue())
             if (!fieldDefinitions.containsKey(model.getKey() + "::" + field))

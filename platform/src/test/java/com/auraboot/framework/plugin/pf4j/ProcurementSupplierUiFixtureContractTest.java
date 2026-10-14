@@ -16,6 +16,35 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProcurementSupplierUiFixtureContractTest {
     @TempDir Path root;
 
+    @Test void markedParentRequiresExactChildInitializerAndNeverGrantsHeaderUpdateOrDelete() {
+        var marker = com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                .code("managed").dataType("boolean").immutable(true).build();
+        var model = com.auraboot.framework.meta.dto.ModelDefinition.builder().code("pr_purchase_order")
+                .fields(List.of(marker)).extension(Map.of("recordCommandWriters", Map.of("field", "managed", "commands",
+                        Map.of("create", List.of(ProcurementSupplierUiInitialization.command("pr_purchase_order")),
+                                "update", List.of("native:update"), "delete", List.of())))).build();
+        String child = ProcurementSupplierUiInitialization.command("pr_purchase_order_line");
+        var stored = Map.<String, Object>of("managed", true);
+        com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("ALL", null,
+                "pr_purchase_order_line", null, () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode(child, () -> {
+                    assertThrows(com.auraboot.framework.meta.exception.MetaServiceException.class, () ->
+                            com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard.assertStoredAllowed(model, stored, "update"));
+                    model.setExtension(Map.of("recordCommandWriters", Map.of("field", "managed", "commands",
+                            Map.of("create", List.of(ProcurementSupplierUiInitialization.command("pr_purchase_order")),
+                                    "update", List.of("native:update", child), "delete", List.of()))));
+                    com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard.assertStoredAllowed(model, stored, "update");
+                    assertThrows(com.auraboot.framework.meta.exception.MetaServiceException.class, () ->
+                            com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard.assertStoredAllowed(model, stored, "delete"));
+                }));
+        com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("ALL", null,
+                "pr_purchase_order", null, () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode(
+                        ProcurementSupplierUiInitialization.command("pr_purchase_order"), () ->
+                        assertThrows(com.auraboot.framework.meta.exception.MetaServiceException.class, () ->
+                                com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard.assertStoredAllowed(model, stored, "update"))));
+    }
+
     @Test void canonicalPostgresRowRetainsJsonObjectsNullsExactDecimalsAndLargeIdentities() throws Exception {
         var json = new ObjectMapper();
         var raw = "{\"pid\":\"fixture\",\"tenant_id\":368527801529274368,\"source_snapshot\":{\"quantity\":300.000001,\"optional\":null},\"address_snapshot\":{\"address\":\"A\"},\"amount\":375.00000125,\"updated_at\":\"2026-10-14T01:02:03.123456+00:00\"}";
@@ -89,7 +118,7 @@ class ProcurementSupplierUiFixtureContractTest {
         assertFalse(ProcurementSupplierUiInitialization.FIELDS.containsKey("qo_procurement_shipment_common"));
     }
 
-    @Test void exactTwentyThreeOwnerCopiesPreserveWritersAndNeverGrantSyntheticUpdateDelete() throws Exception {
+    @Test void exactTwentyThreeOwnerCopiesGrantOnlyDeclaredChildParentCheckAndPreserveOtherWriters() throws Exception {
         var json = new ObjectMapper(); var sources = new java.util.ArrayList<Path>();
         for (int i = 0; i < 23; i++) {
             Path source = root.resolve("source-" + i); Files.createDirectories(source.resolve("config/fields")); Files.createDirectories(source.resolve("config/commands"));
@@ -100,7 +129,10 @@ class ProcurementSupplierUiFixtureContractTest {
         Files.createDirectories(first.resolve("config/bindings"));
         for (var entry : ProcurementSupplierUiInitialization.FIELDS.entrySet()) {
             var model = models.addObject(); model.put("code", entry.getKey()); model.put("immutable", false);
-            var policy = model.putObject("extension").putObject("recordCommandWriters"); policy.put("field", "managed");
+            var extension = model.putObject("extension");
+            if ("pr_purchase_order_line".equals(entry.getKey()))
+                extension.put("parentModel", "pr_purchase_order").put("parentField", "pr_pol_order_id");
+            var policy = extension.putObject("recordCommandWriters"); policy.put("field", "managed");
             var commands = policy.putObject("commands"); commands.putArray("create").add("native:create"); commands.putArray("update").add("native:update"); commands.putArray("delete");
             for (String code : entry.getValue()) {
                 bindings.addObject().put("modelCode", entry.getKey()).put("fieldCode", code);
@@ -121,9 +153,20 @@ class ProcurementSupplierUiFixtureContractTest {
         for (var model : generated) {
             var operations = model.path("extension").path("recordCommandWriters").path("commands");
             assertEquals(List.of("native:create", ProcurementSupplierUiInitialization.command(model.path("code").asText())), json.convertValue(operations.path("create"), List.class));
-            assertEquals(List.of("native:update"), json.convertValue(operations.path("update"), List.class));
+            assertEquals(model.path("code").asText().equals("pr_purchase_order")
+                    ? List.of("native:update", ProcurementSupplierUiInitialization.command("pr_purchase_order_line"))
+                    : List.of("native:update"), json.convertValue(operations.path("update"), List.class));
             assertTrue(operations.path("delete").isEmpty()); assertFalse(model.path("immutable").asBoolean());
         }
+        var childDefinition = models.get(ProcurementSupplierUiInitialization.FIELDS.keySet().stream().toList().indexOf("pr_purchase_order_line"));
+        ((ObjectNode) childDefinition.path("extension")).put("parentField", "other_parent");
+        Files.writeString(first.resolve("config/models.json"), json.writeValueAsString(models));
+        assertThrows(IllegalArgumentException.class, () -> ProcurementSupplierUiInitialization.prepare(sources, root.resolve("wrong-parent-copy"), json));
+        ((ObjectNode) childDefinition.path("extension")).put("parentField", "pr_pol_order_id").put("parentModel", "other_model");
+        Files.writeString(first.resolve("config/models.json"), json.writeValueAsString(models));
+        assertThrows(IllegalArgumentException.class, () -> ProcurementSupplierUiInitialization.prepare(sources, root.resolve("wrong-parent-model-copy"), json));
+        ((ObjectNode) childDefinition.path("extension")).put("parentModel", "pr_purchase_order");
+        Files.writeString(first.resolve("config/models.json"), json.writeValueAsString(models));
         @SuppressWarnings("unchecked") var fields = (List<Map<String, Object>>) proof.get("exactFieldWriterAppendix");
         assertFalse(fields.isEmpty());
         for (Map<String, Object> field : fields) assertEquals(List.of("native:write"), json.convertValue(field.get("productionWriters"), List.class));
