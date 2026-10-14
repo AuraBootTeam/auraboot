@@ -331,6 +331,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         receipt.put("initializationCommandResults", initializationResults);
         receipt.put("directoryInitializationCommandResults",directoryInitializationResults);
         receipt.put("connectionUpdateCommandResults",connectionUpdateResults);
+        writeArtifact("execution-preparation-public-actions.json",preparationPublicActions);
         receipt.put("preparationPublicActions",preparationPublicActions);
         receipt.put("preparationMakerPermissions",preparationPermissionCodes());
         receipt.put("preparationMaker",preparationIdentity);
@@ -610,7 +611,6 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         assertEquals(200,result.getResponse().getStatus(),"Actual public command "+code);
         var body=json.readTree(result.getResponse().getContentAsByteArray());requireCompletedPublicResponse(body);
         preparationPublicActions.add(Map.of("command",code,"target",target==null?"create":target,"payload",payload,"httpStatus",200,"phaseReached","completed"));
-        writeArtifact("execution-preparation-public-actions.json",preparationPublicActions);
         return body.path("data").path("data");
     }
 
