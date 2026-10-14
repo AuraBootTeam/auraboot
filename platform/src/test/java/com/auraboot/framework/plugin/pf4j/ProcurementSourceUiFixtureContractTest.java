@@ -34,7 +34,8 @@ class ProcurementSourceUiFixtureContractTest {
         assertTrue(buyer.containsAll(List.of("page.page.read", "qo.procurement.manage", "qo.procurement.integrate",
                 "model.pr_supplier_common.read", "model.qo_procurement_history_common.read")));
         assertFalse(buyer.contains("*")); assertFalse(buyer.contains("qo.srm.use"));
-        assertEquals(19, maker.size()); assertTrue(maker.containsAll(buyer));
+        assertEquals(20, maker.size()); assertEquals(20, Set.copyOf(maker).size()); assertTrue(maker.containsAll(buyer));
+        assertTrue(maker.contains("model.qo_procurement_category_supplier_common.read"));
         assertTrue(maker.containsAll(List.of("model.qo_procurement_submission_common.read",
                 "model.qo_procurement_submission_line_common.read", "model.qo_procurement_execution_common.read",
                 "model.qo_procurement_category_policy_common.read")));

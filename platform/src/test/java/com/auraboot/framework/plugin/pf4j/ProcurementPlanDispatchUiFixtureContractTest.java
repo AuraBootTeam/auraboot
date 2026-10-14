@@ -36,9 +36,10 @@ class ProcurementPlanDispatchUiFixtureContractTest {
         assertThrows(AssertionError.class, () -> ProcurementPlanDispatchUiFixtureProducerIT.stageRow("draftPlan", "PAGE-1", "11"));
     }
 
-    @Test void exactSourceMakerRoleAddsOnlyActualCategoryMembershipRead() {
+    @Test void exactSourceMakerRoleAlreadyIncludesActualCategoryMembershipRead() {
         var expected = new java.util.ArrayList<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
-        expected.add("model.qo_procurement_category_supplier_common.read");
+        assertTrue(expected.contains("model.qo_procurement_category_supplier_common.read"));
+        assertEquals(20, expected.size());
         assertEquals(expected, ProcurementPlanDispatchUiFixtureProducerIT.BUYER_PERMISSIONS);
         assertEquals(20, Set.copyOf(expected).size());
         assertEquals(expected, ProcurementPlanDispatchUiFixtureProducerIT.MAKER_PERMISSIONS);

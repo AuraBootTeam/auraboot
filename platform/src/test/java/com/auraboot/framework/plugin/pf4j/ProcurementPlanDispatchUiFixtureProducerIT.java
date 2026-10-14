@@ -81,7 +81,6 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
 
     static List<String> buyerPermissions() {
         var exact = new ArrayList<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
-        exact.add("model.qo_procurement_category_supplier_common.read");
         assertEquals(20, exact.size());
         assertEquals(20, java.util.Set.copyOf(exact).size());
         return List.copyOf(exact);

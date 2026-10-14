@@ -83,7 +83,7 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         var permissions = new ArrayList<>(BUYER_PERMISSIONS);
         permissions.addAll(List.of("model.qo_procurement_submission_common.read",
                 "model.qo_procurement_submission_line_common.read", "model.qo_procurement_execution_common.read",
-                "model.qo_procurement_category_policy_common.read"));
+                "model.qo_procurement_category_policy_common.read","model.qo_procurement_category_supplier_common.read"));
         return List.copyOf(permissions);
     }
 
