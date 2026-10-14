@@ -1,3 +1,4 @@
+import type { RequestKeySession } from './request-key/session';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
 /**
@@ -45,6 +46,7 @@ function translateOrFallback(
  * - 添加表达式求值器
  */
 export interface ActionContext {
+  requestKeySession?: RequestKeySession;
   // 动作参数
   args?: Record<string, any>;
 
@@ -1072,13 +1074,19 @@ actionRegistry.register('form.set', ({ stateManager, scopeId, args, expressionEv
 });
 
 /** Allocate one domain request key in the existing scoped state, never per click. */
-actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args }) => {
+actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
-    || Object.keys(args).length !== 1 || typeof args.field !== 'string'
+    || Object.keys(args).some(key => !['field','persistence'].includes(key)) || typeof args.field !== 'string'
+    || (args.persistence !== undefined && args.persistence !== 'session')
     || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
     || ['__proto__', 'prototype', 'constructor'].includes(args.field))
     throw new Error('state.ensureRequestKey requires a scoped field');
   const current = stateManager.getContext(scopeId).state[args.field];
+  if (args.persistence === 'session') {
+    if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
+    stateManager.updateState(scopeId, args.field, requestKeySession.ensure(args.field, current));
+    return;
+  }
   if (current !== undefined && current !== null) {
     if (typeof current !== 'string' || !current.length || current.length > 128
       || current.trim() !== current || /[\x00-\x1f\x7f]/.test(current))
@@ -1089,6 +1097,20 @@ actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args
     throw new Error('Secure request key generation is unavailable');
   const key = globalThis.crypto.randomUUID();
   stateManager.updateState(scopeId, args.field, key);
+});
+
+/** Explicit completion/next-attempt transition; ordinary state.set never clears persisted intent. */
+actionRegistry.register('state.clearRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
+    || Object.keys(args).some(key => !['field','persistence'].includes(key))
+    || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
+    || ['__proto__','prototype','constructor'].includes(args.field)
+    || (args.persistence !== undefined && args.persistence !== 'session')) throw new Error('Invalid request key clear');
+  if (args.persistence === 'session') {
+    if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
+    requestKeySession.clear(args.field, stateManager.getContext(scopeId).state[args.field]);
+  }
+  stateManager.updateState(scopeId, args.field, null);
 });
 
 /**

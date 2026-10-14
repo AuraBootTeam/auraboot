@@ -182,6 +182,12 @@ export function usePageRuntime(
           skipDataSourceRegistration: true,
           initialContext: effectiveAdditionalContext,
           user: runtimeUser,
+          requestKeyIdentity: {
+            tenantId: sessionUser?.tenantId,
+            userId: sessionUser?.id,
+            pageKey: (schema as any)?.pageKey,
+            recordPid: (additionalContext as any).$page?.recordPid,
+          },
         },
   );
   let contributedRuntime: SchemaRuntime | null = runtime;

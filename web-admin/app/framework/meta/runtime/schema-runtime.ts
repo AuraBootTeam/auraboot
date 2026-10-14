@@ -1,3 +1,4 @@
+import { createRequestKeySession, type RequestKeyIdentity } from './actions/request-key/session';
 /**
  * Schema Runtime - 统一的 Schema 运行时
  * 整合状态管理、数据源、事件处理、表达式求值等核心功能
@@ -28,6 +29,7 @@ import { fetchResult } from '~/shared/services/http-client';
  * - 要求外部通过 usePageDataSources 创建并传入
  */
 export interface SchemaRuntimeConfig {
+  getRequestKeyIdentity?: () => RequestKeyIdentity | undefined;
   schema: UnifiedSchema;
   globalState: GlobalState;
   initialContext?: Partial<ExpressionContext>;
@@ -116,6 +118,7 @@ export class SchemaRuntime {
     this.handlers = new Map();
 
     this.flowRunner = new FlowRunner({
+      requestKeySession: config.getRequestKeyIdentity ? createRequestKeySession(config.getRequestKeyIdentity) : undefined,
       evaluator: expressionEvaluator,
       actionRegistry,
       navigate: this.navigate,
