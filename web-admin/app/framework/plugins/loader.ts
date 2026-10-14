@@ -140,6 +140,21 @@ export class PluginLoader {
     return Array.from(this.records.values())
   }
 
+  /** Whether an action handler is registered under this code. */
+  hasAction(code: string): boolean {
+    return this.actions.has(code)
+  }
+
+  /**
+   * Register a host-level action default. Plugin registrations always win:
+   * this refuses to overwrite an existing handler (boot order = after plugin
+   * activation), so a BPM web package owning `workflow.start` is untouched.
+   */
+  registerHostAction(code: string, handler: ActionHandler): void {
+    if (this.actions.has(code)) return
+    this.actions.set(code, handler)
+  }
+
   /** Invoke a registered action by code. */
   async invoke(code: string, ...args: unknown[]): Promise<unknown> {
     const handler = this.actions.get(code)

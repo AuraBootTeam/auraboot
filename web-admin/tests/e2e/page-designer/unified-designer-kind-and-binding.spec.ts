@@ -1423,7 +1423,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     // Select the first form-section from the outline.
     const sectionItem = page
       .locator('button[data-testid^="outline-item-"]')
-      .filter({ hasText: 'form-section' })
+      .filter({ hasText: /form-section|Form section|表单分组/ })
       .first();
     await expect(sectionItem).toBeVisible();
     const sectionTestId = await sectionItem.getAttribute('data-testid');
@@ -3456,7 +3456,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     const sectionItem = page
       .locator('button[data-testid^="outline-item-"]')
-      .filter({ hasText: 'form-section' })
+      .filter({ hasText: /form-section|Form section|表单分组/ })
       .first();
     await expect(sectionItem).toBeVisible();
     const sectionId = (await sectionItem.getAttribute('data-testid'))!.replace('outline-item-', '');

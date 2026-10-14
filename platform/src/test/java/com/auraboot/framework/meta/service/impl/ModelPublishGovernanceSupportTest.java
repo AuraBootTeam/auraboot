@@ -204,7 +204,7 @@ class ModelPublishGovernanceSupportTest {
         ref.setSourcePid("source-42"); ref.setMetadata(Map.of("sourceVersion", 2));
         var risk = new DecisionImpactRiskDTO(); risk.setBlocking(true); risk.setSummary("breaking field change");
         var impact = new DecisionFieldImpactDTO(); impact.setRisk(risk); impact.setReferences(List.of(ref));
-        when(impacts.getFieldImpact("invoice.amount")).thenReturn(impact);
+        when(impacts.getFieldImpacts(anyCollection())).thenReturn(Map.of("invoice.amount", impact));
         var published = new Model(); published.setVersion(2); published.setStatus("published");
         when(models.findAllVersionsByCode("invoice")).thenReturn(List.of(published));
         var preview = DDLPreviewResult.builder().ddlStatements(List.of("ALTER TABLE invoice DROP COLUMN amount")).build();

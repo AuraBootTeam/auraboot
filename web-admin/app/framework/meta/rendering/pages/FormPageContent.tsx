@@ -883,6 +883,12 @@ export function resolveEditRecordEndpoint(
     }
     return custom.replace(/\/+$/, '');
   }
+  // Page-registry records live behind the page-manager REST resource, not the
+  // dynamic model route — there is no `page_schema` dynamic model, so the
+  // default below 400s with "Model not found: page_schema".
+  if ((schema?.modelCode || tableName) === 'page_schema' && recordPid) {
+    return `/api/pages/${encodeURIComponent(recordPid)}`;
+  }
   if (!recordPid) {
     return `/api/dynamic/${schema?.modelCode || tableName}`;
   }

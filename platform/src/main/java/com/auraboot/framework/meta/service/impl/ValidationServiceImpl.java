@@ -362,9 +362,21 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         SqlSafetyUtils.validateIdentifier(targetTable, "reference targetTable");
         SqlSafetyUtils.validateIdentifier(valueField, "reference valueField");
         Long tenantId = MetaContext.getCurrentTenantId();
+        // A reference candidate is accepted when it resolves through the declared
+        // valueField, the target's pid column, or the display key — callers
+        // legitimately pass any of the three, and all identify the same row.
+        String displayField = (refTarget.getTargetField() != null && !refTarget.getTargetField().isBlank())
+                ? refTarget.getTargetField()
+                : null;
         for (String candidate : parseReferenceValues(rawValue)) {
+            String lookup = "(" + valueField + " = #{params.refValue}";
+            if (!valueField.equalsIgnoreCase("pid")) lookup += " OR pid = #{params.refValue}";
+            if (displayField != null && !displayField.equalsIgnoreCase(valueField)) {
+                lookup += " OR " + displayField + " = #{params.refValue}";
+            }
+            lookup += ")";
             String sql = "SELECT COUNT(*) as cnt FROM " + targetTable
-                    + " WHERE " + valueField + " = #{params.refValue}"
+                    + " WHERE " + lookup
                     + " AND tenant_id = #{params.tenantId}";
             Map<String, Object> params = new HashMap<>();
             params.put("refValue", candidate);

@@ -262,14 +262,19 @@ test.describe.serial('SavedView Personal-only management', () => {
     await expect(panel).toContainText('管理视图');
     await expect(panel).toContainText('新建个人视图');
     await expect(panel).toContainText(personalName);
-    // The management panel remains personal-only: global views stay out.
-    await expect(panel).not.toContainText(globalName);
+    // The panel separates personal views from authorized public share links:
+    // global views appear read-only in the share group (share action only, no
+    // edit/delete rows) and never mix into the personal group.
+    const personalRows = panel.locator('[data-testid^="saved-view-row-"]');
+    await expect(personalRows.filter({ hasText: personalName })).toHaveCount(1);
+    await expect(personalRows.filter({ hasText: globalName })).toHaveCount(0);
+    await expect(panel.getByTestId('saved-view-public-share-group')).toContainText(globalName);
     await expect(panel).not.toContainText(
       /View Management|New View|Configure|Skip|Done|Team Views|Global Views/,
     );
     await panel.getByTestId('saved-view-manage-search').fill(RUN_PREFIX);
-    await expect(panel).toContainText(personalName);
-    await expect(panel).not.toContainText('Default View');
+    await expect(personalRows.filter({ hasText: personalName })).toHaveCount(1);
+    await expect(personalRows.filter({ hasText: 'Default View' })).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/03-personal-management.png`, fullPage: true });
   });
 

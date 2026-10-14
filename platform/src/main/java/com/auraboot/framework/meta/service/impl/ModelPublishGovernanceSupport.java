@@ -139,15 +139,36 @@ final class ModelPublishGovernanceSupport {
             return List.of();
         }
 
-        List<DecisionFieldImpactDTO> impacts = new ArrayList<>();
+        // Collect every candidate ref across the model's fields and resolve them
+        // in one batched sweep: the impact service rebuilds its cold index at
+        // most once per publish instead of once per field.
+        List<Field> publishableFields = new ArrayList<>();
+        Map<Field, List<String>> refsByField = new LinkedHashMap<>();
+        LinkedHashSet<String> candidateRefs = new LinkedHashSet<>();
         for (Field field : fields) {
             if (field == null || SystemFieldConstants.isSystemField(field.getCode())) {
                 continue;
             }
+            List<String> refs = candidatePublishFieldRefs(model, field);
+            if (refs.isEmpty()) {
+                continue;
+            }
+            publishableFields.add(field);
+            refsByField.put(field, refs);
+            candidateRefs.addAll(refs);
+        }
+        if (publishableFields.isEmpty()) {
+            return List.of();
+        }
+        Map<String, DecisionFieldImpactDTO> impactsByRef =
+                decisionImpactService.getFieldImpacts(candidateRefs);
+
+        List<DecisionFieldImpactDTO> impacts = new ArrayList<>();
+        for (Field field : publishableFields) {
             String publishFieldRef = model.getCode() + "." + field.getCode();
             try {
-                DecisionFieldImpactDTO impact = loadFirstFieldImpact(candidatePublishFieldRefs(model, field));
-                if (impact != null && impact.getReferences() != null && !impact.getReferences().isEmpty()) {
+                DecisionFieldImpactDTO impact = firstNonEmptyImpact(refsByField.get(field), impactsByRef);
+                if (impact != null) {
                     impact.setFieldRef(publishFieldRef);
                     Map<String, Object> fieldGovernance = fieldGovernanceReplayMetadata(field);
                     if (!fieldGovernance.isEmpty()) {
@@ -164,12 +185,10 @@ final class ModelPublishGovernanceSupport {
         return impacts;
     }
 
-    private DecisionFieldImpactDTO loadFirstFieldImpact(List<String> fieldRefs) {
-        if (fieldRefs == null || fieldRefs.isEmpty()) {
-            return null;
-        }
+    private DecisionFieldImpactDTO firstNonEmptyImpact(List<String> fieldRefs,
+            Map<String, DecisionFieldImpactDTO> impactsByRef) {
         for (String fieldRef : fieldRefs) {
-            DecisionFieldImpactDTO impact = decisionImpactService.getFieldImpact(fieldRef);
+            DecisionFieldImpactDTO impact = impactsByRef.get(fieldRef);
             if (impact != null && impact.getReferences() != null && !impact.getReferences().isEmpty()) {
                 return impact;
             }

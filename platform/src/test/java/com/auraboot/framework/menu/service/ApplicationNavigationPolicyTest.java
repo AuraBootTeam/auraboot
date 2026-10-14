@@ -83,4 +83,20 @@ class ApplicationNavigationPolicyTest {
         assertThat(advanced.getChildren()).containsExactly(allowed);
         assertThat(ApplicationNavigationPolicy.deduplicateVisible(List.of(group(List.of())))).isEmpty();
     }
+
+    @Test
+    void directoryPathDoesNotHideADeclaredChildPageOnTheSamePath() {
+        // Rule Center (a type-1 entry that also parents the console's children)
+        // must not consume the /decision-ops slot: the plugin declares Strategy
+        // Studio as the default navigable entry on that path.
+        Menu ruleCenter = menu("decisionops_console", 1, "/decision-ops", "decision.definition.read");
+        Menu strategyStudio = menu("decisionops_strategy_studio", 1, "/decision-ops", "decision.definition.read");
+        Menu definitions = menu("decisionops_definitions", 1, "/p/decisionops_definitions", "decision.definition.read");
+        ruleCenter.setChildren(new java.util.ArrayList<>(List.of(strategyStudio, definitions)));
+
+        List<Menu> result = ApplicationNavigationPolicy.deduplicateVisible(List.of(ruleCenter));
+
+        assertThat(result).containsExactly(ruleCenter);
+        assertThat(ruleCenter.getChildren()).containsExactly(strategyStudio, definitions);
+    }
 }

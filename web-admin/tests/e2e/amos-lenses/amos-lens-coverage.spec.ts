@@ -80,7 +80,7 @@ async function openSettledLens(page: Page, code: string) {
   const pending = journey.queries.map(queryCode => page.waitForResponse(response =>
     new URL(response.url()).pathname === '/api/meta/chart-data'
       && response.request().method() === 'POST'
-      && response.request().postDataJSON()?.queryCode === queryCode));
+      && response.request().postDataJSON()?.queryCode === queryCode, { timeout: 20_000 }));
   await menu.click();
   await expect(page).toHaveURL(new RegExp(`/dashboards/view/${code}$`));
   if (journey.queries.length) {
@@ -114,7 +114,7 @@ test.describe('AMOS lens coverage journeys (S12 batch-1)', () => {
     test(`coverage journey: ${lens.code}`, async ({ page }) => {
       await openSettledLens(page, lens.code);
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
         `${lens.heading} renders on ${lens.code}`,
       ).toBeVisible();
       writeFileSync(
@@ -127,7 +127,7 @@ test.describe('AMOS lens coverage journeys (S12 batch-1)', () => {
     test(`coverage mobile: ${lens.code}`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await openSettledLens(page, lens.code);
-      await expect(page.getByRole('heading', { name: lens.heading })).toBeVisible();
+      await expect(page.getByRole('heading', { name: lens.heading, level: 1 })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
         'mobile page overflow is confined to its intentional table scroll areas').toBe(true);
       await page.screenshot({ path: `test-results/artifacts/amos-coverage-${lens.code}-mobile.png`, fullPage: true });
@@ -136,7 +136,7 @@ test.describe('AMOS lens coverage journeys (S12 batch-1)', () => {
     test(`coverage compact: ${lens.code}`, async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 720 });
       await openSettledLens(page, lens.code);
-      await expect(page.getByRole('heading', { name: lens.heading })).toBeVisible();
+      await expect(page.getByRole('heading', { name: lens.heading, level: 1 })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
         'compact dashboard fits the viewport').toBe(true);
       await page.screenshot({ path: `test-results/artifacts/amos-coverage-${lens.code}-compact.png`, fullPage: true });
@@ -159,7 +159,7 @@ test.describe('AMOS lens coverage journeys (S12 batch-1)', () => {
       // state (or governed state rows); card-only dashboards render their
       // governed card surfaces — never a blank canvas.
       await openSettledLens(page, lens.code);
-      await expect(page.getByRole('heading', { name: lens.heading })).toBeVisible();
+      await expect(page.getByRole('heading', { name: lens.heading, level: 1 })).toBeVisible();
       const tableHeaders = await page.locator('table thead th, table th').count();
       if (tableHeaders > 0) {
         expect(tableHeaders, `${lens.code} renders governed table structures`).toBeGreaterThan(0);

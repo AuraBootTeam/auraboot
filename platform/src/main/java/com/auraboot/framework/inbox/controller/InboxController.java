@@ -34,6 +34,7 @@ public class InboxController {
 
     private final InboxService inboxService;
     private final WorkflowCapabilityRegistry workflowCapabilities;
+    private final com.auraboot.framework.user.service.UserService users;
     private static final Set<String> REJECTION_ACTIONS = Set.of("reject", "rejected");
 
     /**
@@ -243,64 +244,151 @@ public class InboxController {
     }
 
     /**
-     * Delegate this approval to another user.
+     * Delegate this approval to another tenant member. Drives the real engine
+     * delegate (the task stays active with the delegation recorded) before the
+     * inbox item is marked acted; an engine failure leaves the item pending.
      */
     @PostMapping("/{id}/approval-delegate")
-    public ApiResponse<Void> delegateApproval(
+    public ApiResponse<Map<String, Object>> delegateApproval(
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
-        inboxService.markActed(id, userId, tenantId, "delegated");
-        return ApiResponse.success();
+        String targetUserPid = requireTenantMemberPid(body);
+        InboxItem item = requireWorkflowItem(id, userId, tenantId);
+        workflowCapabilities.execute("task.delegate", workflowRequest(Map.of(
+                "taskId", item.getSourceId(), "targetUserPid", targetUserPid,
+                "comment", textOrEmpty(body, "comment"))));
+        inboxService.recordCompletedWorkflowAction(id, userId, tenantId, item.getSourceId(), "delegated");
+        return ApiResponse.success(Map.of("status", "delegated", "targetUserPid", targetUserPid));
     }
 
     /**
-     * Transfer this approval to another approver.
+     * Forward this approval to another tenant member — the inbox-level alias of
+     * delegate used by mobile clients (approval-forward).
+     */
+    @PostMapping("/{id}/approval-forward")
+    public ApiResponse<Map<String, Object>> forwardApproval(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        return delegateApproval(id, body);
+    }
+
+    /**
+     * Transfer this approval to another tenant member. Drives the real engine
+     * transfer before the inbox item is marked acted.
      */
     @PostMapping("/{id}/approval-transfer")
-    public ApiResponse<Void> transferApproval(
+    public ApiResponse<Map<String, Object>> transferApproval(
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
-        inboxService.markActed(id, userId, tenantId, "transferred");
-        return ApiResponse.success();
+        String targetUserPid = requireTenantMemberPid(body);
+        InboxItem item = requireWorkflowItem(id, userId, tenantId);
+        workflowCapabilities.execute("task.transfer", workflowRequest(Map.of(
+                "taskId", item.getSourceId(), "targetUserPid", targetUserPid,
+                "comment", textOrEmpty(body, "comment"))));
+        inboxService.recordCompletedWorkflowAction(id, userId, tenantId, item.getSourceId(), "transferred");
+        return ApiResponse.success(Map.of("status", "transferred", "targetUserPid", targetUserPid));
     }
 
     /**
-     * Add a countersigner to this approval.
+     * Add a countersigner (additional assignee) to this approval. The engine
+     * models unordered additional assignees, so a directional request is
+     * rejected instead of being silently treated as a plain candidate add.
      */
     @PostMapping("/{id}/approval-countersign")
-    public ApiResponse<Void> addCountersigner(
+    public ApiResponse<Map<String, Object>> addCountersigner(
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
-        Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
-        inboxService.markActed(id, userId, tenantId, "countersigned");
-        return ApiResponse.success();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (body != null && body.get("direction") != null && !String.valueOf(body.get("direction")).isBlank()) {
+            throw new IllegalArgumentException(
+                    "Ordered countersign direction is not supported; additional assignees are unordered");
+        }
+        String targetUserPid = requireTenantMemberPid(body);
+        InboxItem item = requireWorkflowItem(id, userId, tenantId);
+        workflowCapabilities.execute("task.add-sign", workflowRequest(Map.of(
+                "taskId", item.getSourceId(), "targetUserPid", targetUserPid,
+                "reason", textOrEmpty(body, "comment"))));
+        inboxService.recordCompletedWorkflowAction(id, userId, tenantId, item.getSourceId(), "countersigned");
+        return ApiResponse.success(Map.of("status", "countersigned", "targetUserPid", targetUserPid));
     }
 
     /**
-     * Withdraw this approval request.
+     * Withdraw this approval request through the engine (subject to the
+     * process-level withdrawPolicy) before marking the inbox item acted.
      */
     @PostMapping("/{id}/approval-withdraw")
-    public ApiResponse<Void> withdrawApproval(
+    public ApiResponse<Map<String, Object>> withdrawApproval(
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
-        inboxService.markActed(id, userId, tenantId, "withdrawn");
-        return ApiResponse.success();
+        InboxItem item = requireWorkflowItem(id, userId, tenantId);
+        workflowCapabilities.execute("task.withdraw", workflowRequest(Map.of(
+                "taskId", item.getSourceId(), "reason", body == null
+                        ? "" : firstNonBlank(body.get("reason"), body.get("comment")))));
+        inboxService.recordCompletedWorkflowAction(id, userId, tenantId, item.getSourceId(), "withdrawn");
+        return ApiResponse.success(Map.of("status", "withdrawn"));
     }
 
     /**
-     * Urge approvers to act on this item.
+     * Urge the assignees of this approval. Writes real URGE notify records and a
+     * task_urge audit row through the engine capability; the inbox item stays
+     * pending because urging is not an approval decision.
      */
     @PostMapping("/{id}/approval-urge")
-    public ApiResponse<Void> urgeApproval(@PathVariable Long id) {
-        // No status change; just a notification nudge
-        return ApiResponse.success();
+    public ApiResponse<Map<String, Object>> urgeApproval(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body) {
+        Long userId = MetaContext.getCurrentUserId();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        InboxItem item = requireWorkflowItem(id, userId, tenantId);
+        WorkflowCapability.WorkflowResult result = workflowCapabilities.execute("task.urge",
+                workflowRequest(Map.of("taskId", item.getSourceId(),
+                        "comment", textOrEmpty(body, "comment"))));
+        long urged = result.payload() == null || !(result.payload().get("urged") instanceof Number number)
+                ? 0 : number.longValue();
+        return ApiResponse.success(Map.of("status", "urged", "urged", urged));
+    }
+
+    /** Workflow-sourced items only: approval actions drive the engine task in sourceId. */
+    private InboxItem requireWorkflowItem(Long itemId, Long userId, Long tenantId) {
+        InboxItem item = inboxService.getItem(itemId, userId, tenantId);
+        boolean workflowSourced = item != null
+                && ("bpm".equals(item.getSourceType()) || "workflow".equals(item.getSourceType()));
+        if (!workflowSourced || item.getSourceId() == null) {
+            throw new IllegalArgumentException(
+                    "Approval action requires a workflow-sourced inbox item: " + itemId);
+        }
+        return item;
+    }
+
+    /** Targets must be members of the current tenant; a global pid lookup is not membership evidence. */
+    private String requireTenantMemberPid(Map<String, Object> body) {
+        String targetUserPid = body == null ? null : textOrEmpty(body, "targetUserPid");
+        if (targetUserPid.isBlank()) {
+            throw new IllegalArgumentException("targetUserPid is required");
+        }
+        if (users.findInTenantByPid(MetaContext.getCurrentTenantId(), targetUserPid) == null) {
+            throw new IllegalArgumentException("Target user is not a member of the current tenant");
+        }
+        return targetUserPid;
+    }
+
+    private static String textOrEmpty(Map<String, ?> body, String key) {
+        Object value = body == null ? null : body.get(key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private static String firstNonBlank(Object first, Object second) {
+        for (Object value : new Object[] {first, second}) {
+            if (value != null && !String.valueOf(value).isBlank()) return String.valueOf(value);
+        }
+        return "";
     }
 
     /**

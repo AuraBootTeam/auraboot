@@ -1074,7 +1074,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               navigate(-1 as any);
               return;
             }
-            if (dataSourceManager) {
+            // Form pages have no dataSourceManager; the registry's refresh
+            // handler falls back to context.loadData (reload the edit record).
+            if (dataSourceManager || actionDef.name === 'refresh') {
               const { actionRegistry } =
                 await import('~/framework/meta/runtime/actions/ActionRegistry');
               if (actionRegistry.has(actionDef.name)) {

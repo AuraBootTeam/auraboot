@@ -184,6 +184,13 @@ test.describe('Account policy and employee account opening', () => {
     const employeeSelect = page.getByTestId('form-dialog-field-employeePid');
     await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 10_000 });
     await expect(employeeSelect).toBeVisible();
+    // Options load asynchronously from live data — wait for the employee
+    // option to be attached before selecting.
+    await employeeSelect
+        .locator('option', { hasText: employeeName })
+        .first()
+        .waitFor({ state: 'attached', timeout: 20_000 })
+        .catch(() => {});
     await employeeSelect.selectOption({ label: employeeName });
     await page.screenshot({
       path: join(evidenceDir, 'ui-16-account-provision-from-employee-form.png'),

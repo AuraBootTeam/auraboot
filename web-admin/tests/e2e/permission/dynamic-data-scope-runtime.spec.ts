@@ -78,6 +78,11 @@ test.describe('Permission data scope runtime', () => {
     const ownerPage = await ownerContext.newPage();
 
     try {
+      // Seed both customers up front as the admin: the owner persona's role has
+      // no create_customer permission, so per-persona seeding silently fails
+      // and the order's reference validation would 400.
+      await seedCustomer(page, `Customer ${titlePrefix} Owner`);
+      await seedCustomer(page, `Customer ${titlePrefix} Admin`);
       const ownerRecord = await createOrder(ownerPage, `${titlePrefix} Owner`);
       const adminRecord = await createOrder(page, `${titlePrefix} Admin`);
 
@@ -320,12 +325,21 @@ async function createSessionCookieValue(jwt: string): Promise<string | null> {
   return match?.[1] ?? null;
 }
 
+async function seedCustomer(page: Page, custName: string): Promise<void> {
+  const r = await page.request.post('/api/meta/commands/execute/e2et:create_customer', {
+    data: { payload: { e2et_cust_code: `E2EC-${custName.replace(/[^a-zA-Z0-9]/g, '').slice(-40)}`, e2et_cust_name: custName, e2et_cust_region: 'north', e2et_cust_active: true } },
+  });
+  await expectOk(r, `seed customer ${custName}`);
+}
+
 async function createOrder(page: Page, title: string): Promise<DynamicRecord> {
   const resp = await page.request.post(`/api/dynamic/${MODEL_CODE}`, {
     data: {
       e2et_order_title: title,
       e2et_order_type: 'normal',
       e2et_order_status: 'draft',
+      // Customer must pre-exist: the reference validator resolves by
+      // e2et_cust_name; seeding happens once via seedCustomer() as admin.
       e2et_order_customer: `Customer ${title}`,
       e2et_order_urgent: false,
       e2et_order_amount: 100,

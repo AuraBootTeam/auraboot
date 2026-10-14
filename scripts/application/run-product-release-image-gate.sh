@@ -12,6 +12,15 @@ create_isolated_network() {
     || fatal 'isolated release network unavailable'
 }
 
+# Verification-only key: generated per attempt, kept outside the artifact archive.
+create_verification_crypto_env() {
+  local file="$1" key
+  [[ "$file" == /* && ! -e "$file" && ! -L "$file" ]] || return 2
+  key="$(openssl rand -base64 32)" || return 2
+  [[ "$key" =~ ^[A-Za-z0-9+/]{43}=$ ]] || return 2
+  (umask 077; set -o noclobber; printf 'FIELD_ENCRYPTION_KEY=%s\n' "$key" > "$file")
+}
+
 wait_for_final_postgres() {
   local container="$1" database="$2" label="$3" attempt
   # The official image briefly exposes its temporary init server before
@@ -128,7 +137,7 @@ if [[ -n "$RUNTIME_ARGS_REL" ]]; then
     || fatal 'product runtime args file must be tracked at the exact product commit'
   while IFS= read -r runtime_arg || [[ -n "$runtime_arg" ]]; do
     [[ -n "$runtime_arg" && "$runtime_arg" != \#* ]] || continue
-    [[ "$runtime_arg" =~ ^--[a-z0-9.-]+=[A-Za-z0-9._/:=-]+$ ]] \
+    [[ "$runtime_arg" =~ ^--[a-z0-9.-]+=[A-Za-z0-9._/:=,-]+$ ]] \
       || fatal "invalid product runtime argument: $runtime_arg"
     RUNTIME_ARGS+=("$runtime_arg")
   done <"$PRODUCT_ROOT/$RUNTIME_ARGS_REL"
@@ -153,12 +162,45 @@ if [[ -n "$FIXTURE_REL" ]]; then
   FIXTURE_CONTAINER_ROOT="/tmp/aura-release-fixtures/$FIXTURE_REL"
 fi
 
+ACCEPTANCE_MIGRATIONS_REL="${AURA_PRODUCT_ACCEPTANCE_MIGRATIONS_DIR:-}"
+ACCEPTANCE_MIGRATION_ARGS=()
+FLYWAY_RUNTIME_LOCATIONS=filesystem:/flyway/core,filesystem:/flyway/product
+if [[ -n "$ACCEPTANCE_MIGRATIONS_REL" ]]; then
+  [[ -n "$FIXTURE_REL" && "$ACCEPTANCE_MIGRATIONS_REL" == "$FIXTURE_REL/migrations" ]] \
+    || fatal 'acceptance migrations must belong to the declared tracked fixture'
+  [[ "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$ACCEPTANCE_MIGRATIONS_REL" 2>/dev/null || true)" == tree ]] \
+    || fatal 'acceptance migration directory must be tracked at the exact product commit'
+  ACCEPTANCE_MIGRATION_ARGS=(-v "$PRODUCT_ROOT/$ACCEPTANCE_MIGRATIONS_REL:/flyway/acceptance:ro")
+  FLYWAY_RUNTIME_LOCATIONS+=,filesystem:/flyway/acceptance
+fi
+CORPUS_PREFLIGHT_SPEC="${AURA_PRODUCT_CORPUS_PREFLIGHT_SPEC:-}"
+CORPUS_PREFLIGHT_SETUP_SPEC="${AURA_PRODUCT_CORPUS_PREFLIGHT_SETUP_SPEC:-}"
+CORPUS_PREFLIGHT_COUNT="${AURA_PRODUCT_CORPUS_PREFLIGHT_COUNT:-}"
+if [[ -n "$CORPUS_PREFLIGHT_SPEC" ]]; then
+  [[ "$CORPUS_PREFLIGHT_COUNT" =~ ^[1-9][0-9]*$ ]] || fatal 'positive corpus preflight count required'
+  [[ -n "$CORPUS_CONFIG" && "$CORPUS_PREFLIGHT_SPEC" != /* && "$CORPUS_PREFLIGHT_SPEC" =~ ^[A-Za-z0-9._/-]+$ \
+    && "/$CORPUS_PREFLIGHT_SPEC/" != *'/../'* && "/$CORPUS_PREFLIGHT_SPEC/" != *'/./'* ]] \
+    || fatal 'corpus preflight requires one safe tracked spec'
+  [[ "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$CORPUS_PREFLIGHT_SPEC" 2>/dev/null || true)" == blob ]] \
+    || fatal 'corpus preflight spec must be tracked at the exact product commit'
+fi
+CORPUS_PREFLIGHT_ARGS=()
+if [[ -n "$CORPUS_PREFLIGHT_SETUP_SPEC" ]]; then
+  [[ -n "$CORPUS_PREFLIGHT_SPEC" && "$CORPUS_PREFLIGHT_SETUP_SPEC" != /* \
+    && "$CORPUS_PREFLIGHT_SETUP_SPEC" =~ ^[A-Za-z0-9._/-]+$ \
+    && "/$CORPUS_PREFLIGHT_SETUP_SPEC/" != *'/../'* && "/$CORPUS_PREFLIGHT_SETUP_SPEC/" != *'/./'* \
+    && "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$CORPUS_PREFLIGHT_SETUP_SPEC" 2>/dev/null || true)" == blob ]] \
+    || fatal 'corpus preflight setup must be one safe exact-commit tracked spec'
+  CORPUS_PREFLIGHT_ARGS+=("$CORPUS_PREFLIGHT_SETUP_SPEC")
+fi
+CORPUS_PREFLIGHT_ARGS+=("$CORPUS_PREFLIGHT_SPEC")
+
 ARTIFACTS="$(cd "$AURA_REGRESSION_ARTIFACTS" && pwd)"
 mkdir -p "$ARTIFACTS/logs" "$ARTIFACTS/e2e"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
 mkdir -p "$WORK_PARENT"
 WORK_ROOT="$WORK_PARENT/${AURA_CI_JOB_ID}-${AURA_PRODUCT_ID}"
-[[ ! -e "$WORK_ROOT" ]] || fatal "stale work root exists: $WORK_ROOT"
+[[ ! -e "$WORK_ROOT" ]] || rm -rf "$WORK_ROOT"  # same-job retry: clean-recreate instead of fatal
 mkdir "$WORK_ROOT"
 CORE_RELEASE="$WORK_ROOT/core-release"
 PRODUCT_RELEASE="$WORK_ROOT/product-release"
@@ -216,7 +258,9 @@ cleanup() {
   [[ -z "$IMAGE_REF" ]] || docker image rm "$IMAGE_REF" >/dev/null 2>&1 || true
   [[ -z "$IMAGE_ID" ]] || docker image rm "$IMAGE_ID" >/dev/null 2>&1 || true
   [[ ! -d "$DOCKER_CONFIG_ROOT" ]] || find "$DOCKER_CONFIG_ROOT" -depth -delete
-  if [[ "$status" -eq 0 && -d "$WORK_ROOT" ]]; then find "$WORK_ROOT" -depth -delete; fi
+  # Diagnostics already live in ARTIFACTS (copied above); the work root is ephemeral
+  # on every verdict — retaining it on failure is what filled the disk with corpses.
+  [[ ! -d "$WORK_ROOT" ]] || find "$WORK_ROOT" -depth -delete
   exit "$status"
 }
 trap cleanup EXIT INT TERM
@@ -248,6 +292,9 @@ docker run --rm --network "$NETWORK" \
   -locations=filesystem:/flyway/core,filesystem:/flyway/product \
   -table=ab_flyway_schema_history -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   >"$ARTIFACTS/logs/product-test-flyway.log" 2>&1 || fail 'product test database migration failed'
+TEST_EXPECTED_DATABASE=aura_product_build_ci \
+TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:$BUILD_PG_PORT/aura_product_build_ci" \
+TEST_DATABASE_USERNAME=auraboot TEST_DATABASE_PASSWORD=auraboot_ci \
 SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:$BUILD_PG_PORT/aura_product_build_ci" \
 SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot_ci \
 AURA_OCI_BUILDER=docker node "$PRODUCT_ROOT/scripts/build-application.mjs" \
@@ -325,11 +372,23 @@ PG_PORT="$(docker port "$PG_CONTAINER" 5432/tcp | tail -1)"; PG_PORT="${PG_PORT#
 docker run --rm --network "$NETWORK" \
   -v "$PRODUCT_RELEASE/migrations/core":/flyway/core:ro \
   -v "$PRODUCT_RELEASE/migrations/$AURA_PRODUCT_MIGRATION_OWNER":/flyway/product:ro \
+  "${ACCEPTANCE_MIGRATION_ARGS[@]}" \
   "$FLYWAY_IMAGE" -url="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
   -user=auraboot -password=auraboot_ci \
-  -locations=filesystem:/flyway/core,filesystem:/flyway/product \
+  -locations="$FLYWAY_RUNTIME_LOCATIONS" \
   -table=ab_flyway_schema_history -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   >"$ARTIFACTS/logs/flyway.log" 2>&1 || fail 'fresh database migration failed; see logs/flyway.log'
+if [[ -n "$ACCEPTANCE_MIGRATIONS_REL" ]]; then
+  [[ ! -e "$PRODUCT_RELEASE/$ACCEPTANCE_MIGRATIONS_REL" && ! -e "$IMAGE_PAYLOAD_ROOT/$ACCEPTANCE_MIGRATIONS_REL" ]] \
+    || fail 'acceptance migrations leaked into the release payload'
+  node - "$ARTIFACTS/acceptance-migrations.json" "$ACCEPTANCE_MIGRATIONS_REL" "$FIXTURE_DIGEST" "$PRODUCT_SHA" <<'NODE'
+const fs = require('node:fs');
+const [file, directory, fixtureDigest, sourceCommit] = process.argv.slice(2);
+fs.writeFileSync(file, JSON.stringify({schemaVersion:1, scope:'isolated-acceptance-only', directory,
+  fixtureDigest, sourceCommit, packagedInRelease:false, executionLog:'logs/flyway.log'}, null, 2)+'\n');
+NODE
+fi
+
 
 RUNTIME_DB_ROLE=aura_runtime_ci
 REGISTRATION_DB_ROLE=aura_registry_ci
@@ -370,6 +429,8 @@ APP_VERSION="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.pa
 LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write((r.image&&r.image.digest)||'')" "$PRODUCT_RELEASE/release-receipt.json")"
 JWT_SECRET="$(openssl rand -hex 32)"; SESSION_SECRET="$(openssl rand -hex 32)"; ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
 OPEN_PLATFORM_SIGNING_KEY="$(openssl rand -hex 32)"
+RUNTIME_CRYPTO_ENV_FILE="$WORK_ROOT/runtime-crypto.env"
+create_verification_crypto_env "$RUNTIME_CRYPTO_ENV_FILE" || fatal 'private verification encryption configuration failed'
 WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 REGISTRATION_PASSWORD_FILE="$WORK_ROOT/registry-registration-password"
 printf '%s\n' "$REGISTRATION_DB_PASSWORD" >"$REGISTRATION_PASSWORD_FILE"
@@ -378,6 +439,7 @@ printf '%s\n' "$REGISTRATION_DB_PASSWORD" >"$REGISTRATION_PASSWORD_FILE"
 start_application_phase() {
   local container="$1" db_role="$2" db_password="$3" phase="$4"
   docker run -d --name "$container" --network "$NETWORK" -p 127.0.0.1::6443 \
+    --env-file "$RUNTIME_CRYPTO_ENV_FILE" \
     -v "$REGISTRATION_PASSWORD_FILE":/run/secrets/aura-registry-password:ro \
     -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
     -e SPRING_DATASOURCE_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
@@ -499,6 +561,27 @@ if [[ -n "$CORPUS_CONFIG" ]]; then
     --config "$CORPUS_CONFIG" --list --reporter=json \
     >"$ARTIFACTS/corpus/collection.json" 2>"$ARTIFACTS/logs/corpus-collection.log" \
     || fail 'business corpus collection failed'
+  if [[ -n "$CORPUS_PREFLIGHT_SPEC" ]]; then
+    env "${CORPUS_ENV[@]}" PLAYWRIGHT_JSON_OUTPUT_FILE="$ARTIFACTS/corpus/preflight-results.json" \
+      pnpm --dir "$PRODUCT_ROOT" exec playwright test --config "$CORPUS_CONFIG" "${CORPUS_PREFLIGHT_ARGS[@]}" \
+      --reporter=line,json --output "$ARTIFACTS/corpus/preflight-artifacts" \
+      >"$ARTIFACTS/logs/corpus-preflight.log" 2>&1 || fail 'corpus dependency preflight failed before full business execution'
+    node - "$ARTIFACTS/corpus/preflight-results.json" "$CORPUS_PREFLIGHT_COUNT" <<'NODE'
+const fs = require('node:fs');
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const stats = report.stats;
+if (stats.expected !== Number(process.argv[3]) || stats.unexpected || stats.skipped || stats.flaky) throw new Error('corpus preflight denominator or outcome changed');
+const tests = [];
+function visit(suite) {
+  for (const spec of suite.specs ?? []) tests.push(...(spec.tests ?? []));
+  for (const child of suite.suites ?? []) visit(child);
+}
+for (const suite of report.suites ?? []) visit(suite);
+if (report.errors?.length || tests.length !== Number(process.argv[3]) || tests.some(test =>
+  test.status !== 'expected' || test.results?.length !== 1 || test.results[0].status !== 'passed'
+  || (test.results[0].retry ?? 0) !== 0)) throw new Error('corpus preflight requires every declared case to pass exactly once');
+NODE
+  fi
   corpus_status=0
   env "${CORPUS_ENV[@]}" PLAYWRIGHT_JSON_OUTPUT_FILE="$ARTIFACTS/corpus/results.json" \
     pnpm --dir "$PRODUCT_ROOT" exec playwright test --config "$CORPUS_CONFIG" \

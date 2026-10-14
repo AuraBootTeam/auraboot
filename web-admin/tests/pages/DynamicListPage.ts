@@ -129,10 +129,7 @@ export class DynamicListPage extends BasePage {
 
   /** Click a tab by text (fallback for tabs without data-testid) */
   async clickTabByText(text: string | RegExp): Promise<void> {
-    const tab = this.page
-      .locator('nav[aria-label="Tabs"] button')
-      .filter({ hasText: text })
-      .first();
+    const tab = this.statusTabs.filter({ hasText: text }).first();
     const listResponse = this.page
       .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
       .catch(() => null);
@@ -140,9 +137,14 @@ export class DynamicListPage extends BasePage {
     await listResponse;
   }
 
+  /** All status tabs (ListTabs renders data-testid="tab-<key>" buttons). */
+  get statusTabs(): Locator {
+    return this.page.locator('[data-testid^="tab-"]');
+  }
+
   /** Get all tabs */
   get tabs(): Locator {
-    return this.page.locator('nav[aria-label="Tabs"] button');
+    return this.statusTabs;
   }
 
   // --- Table section ---
