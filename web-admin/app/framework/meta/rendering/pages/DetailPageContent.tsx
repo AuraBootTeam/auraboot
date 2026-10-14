@@ -415,6 +415,28 @@ export async function loadDetailRecordRefreshSnapshot(
   return { rawData, recordData };
 }
 
+/** Validate only explicit parent identity/version facts before strict flow refresh can complete. */
+export function assertStrictDetailRefreshParent(
+  raw: unknown, recordPath: string | undefined, previous: Record<string, any>, expectedPid?: string,
+): void {
+  const parent = getByDataPath(raw, recordPath);
+  if (!parent || typeof parent !== 'object' || Array.isArray(parent)
+    || ![Object.prototype, null].includes(Object.getPrototypeOf(parent)) || Object.keys(parent).length===0)
+    throw new Error('Detail parent record is unavailable');
+  if (expectedPid && (typeof parent.pid !== 'string' || parent.pid !== expectedPid))
+    throw new Error('Detail parent identity does not match');
+  for (const field of ['rowVersion', 'row_version']) {
+    if (!Object.prototype.hasOwnProperty.call(previous, field)) continue;
+    const value = parent[field];
+    // Same number/string -> nonnegative safe-integer contract as registered command actions.
+    // Validation never rewrites the original wire value or invents a version field.
+    const version = typeof value === 'number' || typeof value === 'string'
+      ? (String(value).trim()==='' ? NaN : Number(value)) : NaN;
+    if (!Number.isSafeInteger(version) || version < 0)
+      throw new Error('Detail parent version is unavailable');
+  }
+}
+
 /**
  * Extract a nested array for a block's `dataPath` from the raw detail API payload
  * (e.g. `priceComponents` / `quotaTemplates` siblings of the master record in the DTO).
@@ -961,8 +983,16 @@ function DetailPageContentInner(props: PageContentProps) {
     const currentModelCode = recordModelCode;
     const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
     const shouldEnrich = currentRecordPid && !shouldSkipDetailModelFieldMeta(schema);
+    const previousParent = unwrapDetailRecord(rawData, recordPath);
+    const expectedPid = (schema as any)?.extension?.dataSource?.adaptor === 'commandRecord' && currentRecordPid
+      ? currentRecordPid : (typeof previousParent.pid === 'string' ? currentRecordPid || previousParent.pid : undefined);
     const snapshot = await loadDetailRecordRefreshSnapshot(
-      () => fetchDetailRecord(schema, currentModelCode, currentRecordPid, token || undefined, location.search),
+      async () => {
+        const result = await fetchDetailRecord(schema, currentModelCode, currentRecordPid, token || undefined, location.search);
+        if (isSuccessfulDetailResult(result))
+          assertStrictDetailRefreshParent(result.data, recordPath, previousParent, expectedPid);
+        return result;
+      },
       recordPath,
       currentModelCode,
       shouldEnrich ? currentRecordPid : undefined,
@@ -971,7 +1001,7 @@ function DetailPageContentInner(props: PageContentProps) {
     if (!snapshot) throw new Error('Detail record refresh failed');
     setRawData(snapshot.rawData);
     setRecordData(snapshot.recordData);
-  }, [routeRecordPid, recordModelCode, token, schema, hasApiSingletonRecordSource, location.search]);
+  }, [routeRecordPid, recordModelCode, token, schema, hasApiSingletonRecordSource, location.search, rawData]);
 
   // Existing sub-table callbacks retain their best-effort display refresh contract.
   const reloadRecord = useCallback(async (): Promise<void> => {
