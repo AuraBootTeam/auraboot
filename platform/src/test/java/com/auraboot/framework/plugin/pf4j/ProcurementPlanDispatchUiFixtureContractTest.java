@@ -45,4 +45,20 @@ class ProcurementPlanDispatchUiFixtureContractTest {
         assertFalse(expected.contains("*")); assertFalse(expected.contains("qo.srm.use"));
         assertFalse(expected.contains("model.pr_purchase_order.read"));
     }
+    @Test void independentRequestKeysRemainBoundedAndUniqueAcrossAllNineStages() {
+        var keys = new java.util.HashSet<String>();
+        for (String stage : ProcurementPlanDispatchUiFixtureProducerIT.STAGES) {
+            for (int i = 0; i < 100; i++) {
+                for (String action : List.of("init", "public")) {
+                    String key = ProcurementPlanDispatchUiFixtureProducerIT.fixtureRequestKey(action);
+                    assertTrue(key.length() <= 64, "Persisted request key exceeds varchar(64): " + key.length());
+                    assertTrue(keys.add(key), "Different commands across " + stage + " must not share a nonce");
+                    java.util.UUID.fromString(key.substring(key.length() - 36));
+                }
+            }
+        }
+        assertEquals(1800, keys.size());
+        assertThrows(IllegalArgumentException.class, () -> ProcurementPlanDispatchUiFixtureProducerIT.fixtureRequestKey("other"));
+    }
+
 }
