@@ -169,4 +169,97 @@ class ProductQuoteNativeInitializationTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    private Path integration(String name,boolean directory) throws Exception {
+        Path source=Files.createDirectory(root.resolve(name));Files.createDirectories(source.resolve("config"));
+        var manifest=json.createObjectNode().put("pluginId",ProductQuoteNativeInitialization.SOURCE_INTEGRATION_OWNER)
+                .put("namespace","customer_pcba_int");
+        manifest.putObject("resourceDirs").put("fields",directory?"config/fields":"config/fields.json")
+                .put("modelFieldBindings","config/bindings.json");
+        Files.writeString(source.resolve("plugin.json"),manifest.toString());
+        var fields=json.createArrayNode();var bindings=json.createArrayNode();
+        for(String model:java.util.List.of("customer_pcba_int_kingdee_connection","customer_pcba_int_external_ref"))
+            for(String code:ProductQuoteNativeInitialization.SOURCE_UI_FIELDS.get(model)) {
+                var field=fields.addObject().put("code",code).put("dataType","string");
+                if(java.util.Set.of("customer_pcba_ref_instance_key","customer_pcba_ref_account_id").contains(code)) {
+                    field.putObject("extension").put("systemManaged",true);
+                    field.putArray("allowedWriterCommands").add("qo_procurement_task_common:sync_sources");
+                }
+                bindings.addObject().put("modelCode",model).put("fieldCode",code);
+            }
+        fields.addObject().put("code","customer_pcba_ref_identity_key").putArray("allowedWriterCommands")
+                .add("qo_procurement_task_common:sync_sources");
+        if(directory) {
+            Files.createDirectory(source.resolve("config/fields"));
+            for(var field:fields)Files.writeString(source.resolve("config/fields/"+field.path("code").asText()+".json"),field.toString());
+        } else Files.writeString(source.resolve("config/fields.json"),fields.toString());
+        Files.writeString(source.resolve("config/bindings.json"),bindings.toString());
+        Files.writeString(source.resolve("config/commands.json"),"[{\"code\":\"customer_pcba_int:existing\"}]");
+        return source;
+    }
+    @Test void integrationOwnerArrayAndDirectoryDeclarationsAmendOnlyTheTwoProtectedPayloadFields() throws Exception {
+        for(boolean directory:java.util.List.of(false,true)) {
+            Path source=integration("owner-"+directory,directory),copy=root.resolve("copy-"+directory);
+            String manifest=Files.readString(source.resolve("plugin.json")),commands=Files.readString(source.resolve("config/commands.json"));
+            var proof=ProductQuoteNativeInitialization.prepareSourceUiIntegration(source,copy,json);
+            assertThat((Map<?,?>)proof.get("initializationFieldAudit")).hasSize(15);
+            var writers=(Map<?,?>)proof.get("exactWriterAppendix");
+            assertThat(writers.keySet().stream().map(Object::toString).toList()).containsExactlyInAnyOrder("customer_pcba_ref_instance_key","customer_pcba_ref_account_id");
+            assertThat(Files.readString(source.resolve("plugin.json"))).isEqualTo(manifest);
+            assertThat(Files.readString(copy.resolve("plugin.json"))).isEqualTo(manifest);
+            assertThat(Files.readString(copy.resolve("config/commands.json"))).isEqualTo(commands);
+            String code=ProductQuoteNativeInitialization.sourceUiCommand("customer_pcba_int_external_ref");
+            for(var fieldCode:writers.keySet()) {
+                var item=json.valueToTree(writers.get(fieldCode));
+                assertThat(item.path("testWriters").toString()).isEqualTo("[\"qo_procurement_task_common:sync_sources\",\""+code+"\"]");
+            }
+            if(!directory) {
+                var original=json.readTree(source.resolve("config/fields.json").toFile());
+                var amended=json.readTree(copy.resolve("config/fields.json").toFile());
+                assertThat(original.get(original.size()-1)).isEqualTo(amended.get(amended.size()-1));
+                assertThat(original.toString()).doesNotContain(code);
+            }
+        }
+    }
+    @Test void integrationOwnerCannotBeGuessedDuplicatedOrReusedWithAnExistingWriterAppendix() throws Exception {
+        Path source=integration("guard-owner",false);
+        assertThat(ProductQuoteNativeInitialization.sourceUiIntegrationOwner(java.util.List.of(original(),source),json)).isEqualTo(source.toRealPath());
+        assertThatThrownBy(()->ProductQuoteNativeInitialization.sourceUiIntegrationOwner(java.util.List.of(source,source),json)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->ProductQuoteNativeInitialization.sourceUiIntegrationOwner(java.util.List.of(),json)).isInstanceOf(IllegalArgumentException.class);
+        Path copy=root.resolve("guard-copy");ProductQuoteNativeInitialization.prepareSourceUiIntegration(source,copy,json);
+        assertThatThrownBy(()->ProductQuoteNativeInitialization.prepareSourceUiIntegration(copy,root.resolve("reappended"),json))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("duplicated");
+        var manifest=json.readTree(source.resolve("plugin.json").toFile());((com.fasterxml.jackson.databind.node.ObjectNode)manifest).put("pluginId","com.auraboot.quote-procurement");
+        Files.writeString(source.resolve("plugin.json"),manifest.toString());
+        assertThatThrownBy(()->ProductQuoteNativeInitialization.prepareSourceUiIntegration(source,root.resolve("wrong-owner"),json)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void integrationOwnerRequiresEveryActualPayloadBindingAndExplicitProtectedWriterArray() throws Exception {
+        for(String defect:java.util.List.of("binding","duplicate","writers")) {
+            Path source=integration("bad-"+defect,false);
+            if(defect.equals("binding")) {
+                var bindings=(com.fasterxml.jackson.databind.node.ArrayNode)json.readTree(source.resolve("config/bindings.json").toFile());bindings.remove(0);
+                Files.writeString(source.resolve("config/bindings.json"),bindings.toString());
+            } else {
+                var fields=(com.fasterxml.jackson.databind.node.ArrayNode)json.readTree(source.resolve("config/fields.json").toFile());
+                if(defect.equals("duplicate"))fields.add(fields.get(0).deepCopy());
+                else for(var field:fields)if(field.path("code").asText().equals("customer_pcba_ref_account_id"))
+                    ((com.fasterxml.jackson.databind.node.ObjectNode)field).put("allowedWriterCommands","ALL");
+                Files.writeString(source.resolve("config/fields.json"),fields.toString());
+            }
+            assertThatThrownBy(()->ProductQuoteNativeInitialization.prepareSourceUiIntegration(source,root.resolve("bad-copy-"+defect),json)).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test void fourSequentialIntegrationAppendicesStartFromTheSameUnmodifiedActualOwner() throws Exception {
+        Path source=integration("sequential-owner",false);
+        byte[] fields=Files.readAllBytes(source.resolve("config/fields.json"));
+        for(int index=0;index<4;index++) {
+            var proof=ProductQuoteNativeInitialization.prepareSourceUiIntegration(source,root.resolve("sequential-"+index),json);
+            assertThat(proof.get("sourceDirectory")).isEqualTo(source.toRealPath().toString());
+            assertThat(Files.readAllBytes(source.resolve("config/fields.json"))).isEqualTo(fields);
+            var writers=(Map<?,?>)proof.get("exactWriterAppendix");
+            assertThat(writers).hasSize(2);
+            for(Object writer:writers.values())assertThat(json.valueToTree(writer).path("testWriters").size()).isEqualTo(2);
+        }
+    }
+
 }

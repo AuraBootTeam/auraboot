@@ -95,6 +95,94 @@ public final class ProductQuoteNativeInitialization {
                 "source-ui-native-initialization.json");
     }
 
+    public static final String SOURCE_INTEGRATION_OWNER="com.auraboot.customer-pcba-integration";
+    /** Select only the formally sealed dependency owner; never derive authority from the fixture payload. */
+    public static Path sourceUiIntegrationOwner(List<Path> directories,ObjectMapper json) throws Exception {
+        var owners=new java.util.ArrayList<Path>();
+        for(Path directory:directories) {
+            JsonNode manifest=json.readTree(directory.resolve("plugin.json").toFile());
+            if(SOURCE_INTEGRATION_OWNER.equals(manifest.path("pluginId").asText()))owners.add(directory.toRealPath());
+        }
+        if(owners.size()!=1)throw new IllegalArgumentException("Source UI requires one exact integration owner");
+        return owners.getFirst();
+    }
+    /** Test-only writer amendment on the actual foreign-field owner, with no replacement command definitions. */
+    public static Map<String,Object> prepareSourceUiIntegration(Path original,Path destination,ObjectMapper json) throws Exception {
+        JsonNode manifest=json.readTree(original.resolve("plugin.json").toFile());
+        if(!SOURCE_INTEGRATION_OWNER.equals(manifest.path("pluginId").asText())
+                || !"customer_pcba_int".equals(manifest.path("namespace").asText()) || Files.exists(destination))
+            throw new IllegalArgumentException("Source UI requires its fresh actual integration owner copy");
+        var originals=new LinkedHashMap<String,String>();
+        try(var paths=Files.walk(original)) {
+            for(Path file:paths.sorted().toList()) {
+                if(Files.isSymbolicLink(file))throw new IllegalArgumentException("Source UI owner cannot copy symbolic resources");
+                Path target=destination.resolve(original.relativize(file));
+                if(Files.isDirectory(file))Files.createDirectories(target);
+                else {Files.copy(file,target);originals.put(original.relativize(file).toString(),sha(file));}
+            }
+        }
+        var declaredFields=declaredResources(destination,manifest.path("resourceDirs").path("fields").asText(),json);
+        var bindings=declaredResources(destination,manifest.path("resourceDirs").path("modelFieldBindings").asText(),json);
+        var audit=new LinkedHashMap<String,Object>();var writers=new LinkedHashMap<String,Object>();
+        for(String model:List.of("customer_pcba_int_kingdee_connection","customer_pcba_int_external_ref")) {
+            for(String field:SOURCE_UI_FIELDS.get(model)) {
+                long bound=bindings.stream().filter(entry->model.equals(entry.node().path("modelCode").asText())
+                        && field.equals(entry.node().path("fieldCode").asText())).count();
+                var definitions=declaredFields.stream().filter(entry->field.equals(entry.node().path("code").asText())).toList();
+                if(bound!=1 || definitions.size()!=1)throw new IllegalArgumentException("Source UI initialization field must have one actual owner binding");
+                ObjectNode definition=definitions.getFirst().node();
+                if(definition.has("allowedWriterCommands")) {
+                    JsonNode prior=definition.get("allowedWriterCommands").deepCopy();
+                    if(!prior.isArray())throw new IllegalArgumentException("Source UI owner writers must be explicit array");
+                    String command=sourceUiCommand(model);ArrayNode next=(ArrayNode)prior.deepCopy();
+                    for(JsonNode writer:next)if(!writer.isTextual() || command.equals(writer.textValue()))
+                        throw new IllegalArgumentException("Source UI owner writer cannot be duplicated");
+                    next.add(command);definition.set("allowedWriterCommands",next);
+                    writers.put(field,Map.of("productionWriters",prior,"testWriters",next));
+                }
+                audit.put(field,Map.of("modelCode",model,"ownerPluginId",SOURCE_INTEGRATION_OWNER,
+                        "resource",destination.relativize(definitions.getFirst().file()).toString(),
+                        "protectedWriterDeclared",definition.has("allowedWriterCommands")));
+            }
+        }
+        for(Path file:declaredFields.stream().map(OwnerResource::file).distinct().toList()) {
+            JsonNode tree=json.readTree(file.toFile());
+            // Replace only the exact declared field objects, preserving unrelated array entries.
+            if(tree.isArray())for(int i=0;i<tree.size();i++) {
+                final String code=tree.get(i).path("code").asText();
+                var replacement=declaredFields.stream().filter(entry->entry.file().equals(file) && code.equals(entry.node().path("code").asText())).findFirst().orElseThrow();
+                ((ArrayNode)tree).set(i,replacement.node());
+            } else tree=declaredFields.stream().filter(entry->entry.file().equals(file)).findFirst().orElseThrow().node();
+            Files.writeString(file,json.writerWithDefaultPrettyPrinter().writeValueAsString(tree));
+        }
+        for(var entry:originals.entrySet())if(!sha(original.resolve(entry.getKey())).equals(entry.getValue()))
+            throw new IllegalArgumentException("Source UI owner changed during appendix preparation");
+        var generated=new LinkedHashMap<String,String>();
+        try(var paths=Files.walk(destination)) {for(Path file:paths.filter(Files::isRegularFile).sorted().toList())
+            generated.put(destination.relativize(file).toString(),sha(file));}
+        return Map.of("pluginId",SOURCE_INTEGRATION_OWNER,"sourceDirectory",original.toRealPath().toString(),
+                "testDirectory",destination.toRealPath().toString(),"sourceResourceHashes",originals,
+                "generatedResourceHashes",generated,"exactWriterAppendix",writers,"initializationFieldAudit",audit);
+    }
+    private record OwnerResource(Path file,ObjectNode node) {}
+    private static List<OwnerResource> declaredResources(Path root,String relative,ObjectMapper json) throws Exception {
+        Path resource=root.resolve(relative).normalize();
+        if(relative.isBlank() || !resource.startsWith(root) || !Files.exists(resource))
+            throw new IllegalArgumentException("Source UI declared owner resource is missing");
+        var files=new java.util.ArrayList<Path>();
+        if(Files.isDirectory(resource))try(var paths=Files.walk(resource)) {files.addAll(paths.filter(Files::isRegularFile).sorted().toList());}
+        else files.add(resource);
+        var result=new java.util.ArrayList<OwnerResource>();
+        for(Path file:files) {
+            JsonNode tree=json.readTree(file.toFile());var entries=tree.isArray()?tree:json.createArrayNode().add(tree);
+            for(JsonNode entry:entries) {
+                if(!(entry instanceof ObjectNode object))throw new IllegalArgumentException("Source UI owner resource must contain objects");
+                result.add(new OwnerResource(file,object));
+            }
+        }
+        return result;
+    }
+
     /** Only S06 task/bid facts need this exact source owner appendix; order UI directory facts do not. */
     static Map<String, Object> prepareSourceToPay(Path original, Path destination, ObjectMapper json) throws Exception {
         JsonNode manifest = json.readTree(original.resolve("plugin.json").toFile());

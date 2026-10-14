@@ -402,15 +402,37 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         return jwt;
     }
 
+    private Path initializerIntegrationOriginal;
+    private boolean initializerIntegrationImported;
+    @org.junit.jupiter.api.AfterEach void restoreInitializerIntegrationOwner() throws Exception {
+        if(initializerIntegrationImported) {
+            context();formalImport(initializerIntegrationOriginal,"source-ui-integration-owner-restored",
+                    ProductQuoteNativeInitialization.SOURCE_INTEGRATION_OWNER);
+            initializerIntegrationImported=false;
+        }
+    }
+
     private void importInitializer() throws Exception {
         activeStage = "test-only-initializer-import";
+        var directories=new ArrayList<Path>();
+        for(JsonNode directory:json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES")))directories.add(Path.of(directory.asText()));
+        Path integration=ProductQuoteNativeInitialization.sourceUiIntegrationOwner(directories,json);
+        var ownerAppendix=ProductQuoteNativeInitialization.prepareSourceUiIntegration(integration,
+                caseEvidence.resolve("source-ui-integration-owner-appendix"),json);
+        writeArtifact("source-ui-integration-owner-appendix.json",ownerAppendix);
+        initializerIntegrationOriginal=integration;initializerIntegrationImported=true;
+        formalImport(Path.of(ownerAppendix.get("testDirectory").toString()),"source-ui-integration-owner",
+                ProductQuoteNativeInitialization.SOURCE_INTEGRATION_OWNER);
         var appendix = ProductQuoteNativeInitialization.prepareSourceUi(Path.of(procurementDirectory),
                 caseEvidence.resolve("source-ui-initialization-appendix"), json);
         writeArtifact("source-ui-initialization-appendix.json", appendix);
         formalImport(Path.of(appendix.get("testDirectory").toString()), "source-ui-initializer");
     }
 
-    private String formalImport(Path directory, String label) throws Exception {
+    private String formalImport(Path directory,String label) throws Exception {
+        return formalImport(directory,label,"com.auraboot.quote-procurement");
+    }
+    private String formalImport(Path directory, String label,String expectedPlugin) throws Exception {
         var preview = imports.parseDirectory(directory.toString(), true);
         writeArtifact(label + "-preview.json", preview);
         assertTrue(preview.isValid(), "Actual plan/dispatch preview: " + preview.getErrors());
@@ -421,8 +443,10 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         var result = imports.execute(preview.getImportId(), request);
         writeArtifact(label + "-result.json", result);
         assertTrue(result.isSuccess(), "Actual plan/dispatch import: " + result.getErrorMessage());
-        assertEquals("com.auraboot.quote-procurement", result.getPluginId());
-        JsonNode expected = json.readTree(caseEvidence.resolve("source-ui-initialization-appendix.json").toFile()).path("exactWriterAppendix");
+        assertEquals(expectedPlugin, result.getPluginId());
+        if(ProductQuoteNativeInitialization.SOURCE_INTEGRATION_OWNER.equals(expectedPlugin))return result.getPluginPid();
+        var expected = (com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(caseEvidence.resolve("source-ui-initialization-appendix.json").toFile()).path("exactWriterAppendix");
+        expected.setAll((com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(caseEvidence.resolve("source-ui-integration-owner-appendix.json").toFile()).path("exactWriterAppendix"));
         for (String model : ProductQuoteNativeInitialization.SOURCE_UI_FIELDS.keySet()) {
             var command = commands.findByCode(ProductQuoteNativeInitialization.sourceUiCommand(model));
             assertEquals(tenant, command.getTenantId());

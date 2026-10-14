@@ -61,6 +61,8 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualReceiptEncryption;
     private String prerequisiteActor;
     private Path originalProcurementDirectory;
+    private Path originalIntegrationDirectory;
+    private boolean integrationOwnerInstalled;
     @Override protected void prepareEvidence(org.junit.jupiter.api.TestInfo test) throws Exception {
         restoreProductionDirectory();
         super.prepareEvidence(test);
@@ -84,6 +86,14 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     /** Only this inventory subclass replaces synthetic private production-writer prerequisites. */
     @Override protected void prepareInitialSourceRecords() throws Exception {
         prerequisiteActor=prerequisiteActor();
+        var directories=new ArrayList<Path>();
+        for(var directory:json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES")))directories.add(Path.of(directory.asText()));
+        originalIntegrationDirectory=com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.sourceUiIntegrationOwner(directories,json);
+        var ownerAppendix=com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.prepareSourceUiIntegration(
+                originalIntegrationDirectory,caseEvidence.resolve("receipt-integration-owner-init"),json);
+        // Mark before import so even a failed import restores the exact formal owner definition.
+        integrationOwnerInstalled=true;importDirectory(Path.of(ownerAppendix.get("testDirectory").toString()));
+        writeArtifact("receipt-integration-owner-initialization-appendix.json",ownerAppendix);
         var appendix=prepareReceiptDirectory();
         importDirectory(Path.of(procurementDirectory));writeArtifact("receipt-directory-initialization-appendix.json",appendix);
         String product=createRegistered(prerequisiteActor,"prod:create_product",Map.of("prod_name","Public source material",
@@ -103,8 +113,11 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         assertFalse(task.isBlank());
     }
 
-    @org.junit.jupiter.api.AfterEach void restoreProductionDirectory() {
+    @org.junit.jupiter.api.AfterEach void restoreProductionDirectory() throws Exception {
         if(originalProcurementDirectory!=null)procurementDirectory=originalProcurementDirectory.toString();
+        if(integrationOwnerInstalled) {
+            context();importDirectory(originalIntegrationDirectory);integrationOwnerInstalled=false;
+        }
     }
     Map<String,Object> prepareReceiptDirectory() throws Exception {
         if(originalProcurementDirectory==null)originalProcurementDirectory=Path.of(procurementDirectory).toRealPath();
