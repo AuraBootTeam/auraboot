@@ -27,6 +27,45 @@ class ProcurementInventoryNativeAdmissionContractTest {
                 "replacedDeliveryLeaseRejectsOldReceiverWithoutEffects"),methods);
         assertEquals(Set.of("com.auraboot.inventory","com.auraboot.procurement"),ProcurementInventoryNativeAdmission.PLUGINS);
     }
+    @Test void receiptUsesActualRegisteredCommandControllerRoute() {
+        var controller=com.auraboot.framework.meta.controller.config.CommandController.class;
+        String prefix=controller.getAnnotation(org.springframework.web.bind.annotation.RequestMapping.class).value()[0];
+        var routes=Arrays.stream(controller.getDeclaredMethods()).map(method->method.getAnnotation(org.springframework.web.bind.annotation.PostMapping.class))
+                .filter(java.util.Objects::nonNull).flatMap(mapping->Arrays.stream(mapping.value())).filter(path->path.contains("{commandCode}")).toList();
+        assertEquals(List.of("/execute/{commandCode}"),routes);
+        assertEquals(prefix+routes.getFirst().replace("{commandCode}","pr:confirm_purchase_receipt"),
+                ProcurementInventoryReceiptRealDbIT.receiptCommandPath("pr:confirm_purchase_receipt"));
+    }
+    @Test void repeatedFormalImportUsesOriginalTenantCreatorAndAlwaysRestoresCurrentPublicActor() {
+        var principals=new java.util.LinkedHashMap<Long,com.auraboot.framework.application.tenant.MetaContext.Snapshot>();
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.setContext(11L,101L,"creator-a","creator-a");
+            com.auraboot.framework.application.tenant.MetaContext.setMemberId(201L);
+            var original=com.auraboot.framework.application.tenant.MetaContext.snapshot();
+            ProcurementInventoryReceiptRealDbIT.withFormalImportPrincipal(principals,()->assertEquals("creator-a",com.auraboot.framework.application.tenant.MetaContext.getCurrentUserPid()));
+            com.auraboot.framework.application.tenant.MetaContext.setContext(11L,102L,"case-two-actor","case-two");
+            com.auraboot.framework.application.tenant.MetaContext.setMemberId(202L);
+            var current=com.auraboot.framework.application.tenant.MetaContext.snapshot();
+            var used=ProcurementInventoryReceiptRealDbIT.withFormalImportPrincipal(principals,()->{
+                assertEquals("creator-a",com.auraboot.framework.application.tenant.MetaContext.getCurrentUserPid());
+                assertEquals(201L,com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId());
+            });
+            assertEquals(original,used);assertEquals(current,com.auraboot.framework.application.tenant.MetaContext.snapshot());
+            assertThrows(IllegalStateException.class,()->ProcurementInventoryReceiptRealDbIT.withFormalImportPrincipal(principals,()->{throw new IllegalStateException("controlled import failure");}));
+            assertEquals(current,com.auraboot.framework.application.tenant.MetaContext.snapshot());
+            com.auraboot.framework.application.tenant.MetaContext.setContext(12L,103L,"creator-b","creator-b");
+            com.auraboot.framework.application.tenant.MetaContext.setMemberId(203L);
+            ProcurementInventoryReceiptRealDbIT.withFormalImportPrincipal(principals,()->{
+                assertEquals(12L,com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId());
+                assertEquals("creator-b",com.auraboot.framework.application.tenant.MetaContext.getCurrentUserPid());
+            });
+            assertEquals(2,principals.size());
+            var foreignCurrent=com.auraboot.framework.application.tenant.MetaContext.snapshot();
+            principals.put(12L,original);
+            assertThrows(AssertionError.class,()->ProcurementInventoryReceiptRealDbIT.withFormalImportPrincipal(principals,()->fail("Foreign tenant cannot borrow the baseline creator")));
+            assertEquals(foreignCurrent,com.auraboot.framework.application.tenant.MetaContext.snapshot());
+        } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
+    }
     @Test void prerequisiteActorHasOnlyDeclaredFunctionalAndModelPermissions() {
         var permissions=ProcurementInventoryReceiptRealDbIT.prerequisitePermissions();
         assertEquals(22,permissions.size());assertEquals(22,Set.copyOf(permissions).size());

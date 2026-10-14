@@ -59,6 +59,8 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @Autowired ReceiptCasObservation casObservation;
     @Autowired ReceiptReadOnlyObservation receiptReadOnlyObservation;
     @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualReceiptEncryption;
+    private final Map<Long,com.auraboot.framework.application.tenant.MetaContext.Snapshot> formalImportPrincipals=new LinkedHashMap<>();
+    private int formalImportSequence;
     private String prerequisiteActor;
     private Path originalProcurementDirectory;
     private Path originalIntegrationDirectory;
@@ -78,6 +80,28 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         receiptReadOnlyObservation.enter();
         try{return super.fixture(code,work);}finally{receiptReadOnlyObservation.leave();}
     }
+    /** Reused tenant definitions retain their original actual creator; tested actors never inherit this context. */
+    @Override protected void importDirectory(Path directory) {
+        var principal=withFormalImportPrincipal(formalImportPrincipals,()->super.importDirectory(directory));
+        if(caseEvidence!=null)try {
+            writeArtifact("receipt-formal-import-principal-"+(++formalImportSequence)+".json",Map.of(
+                    "tenantId",principal.tenantId().toString(),"userPid",principal.userPid(),"memberId",principal.memberId().toString(),
+                    "sourceDirectory",directory.toString(),"purpose","Original formal import creator only; no public command authority",
+                    "publicActorRoleExpanded",false,"currentActorRestored",true));
+        } catch(Exception failure){throw new IllegalStateException("Cannot seal formal import identity evidence",failure);}
+    }
+    static com.auraboot.framework.application.tenant.MetaContext.Snapshot withFormalImportPrincipal(
+            Map<Long,com.auraboot.framework.application.tenant.MetaContext.Snapshot> principals,Runnable operation) {
+        var current=com.auraboot.framework.application.tenant.MetaContext.snapshot();
+        assertNotNull(current);assertNotNull(current.tenantId());assertNotNull(current.userId());assertNotNull(current.memberId());
+        assertNotNull(current.userPid());assertFalse(current.userPid().isBlank());
+        var principal=principals.computeIfAbsent(current.tenantId(),ignored->current);
+        assertEquals(current.tenantId(),principal.tenantId());
+        try {com.auraboot.framework.application.tenant.MetaContext.restore(principal);operation.run();return principal;}
+        finally {com.auraboot.framework.application.tenant.MetaContext.restore(current);}
+    }
+    static String receiptCommandPath(String code) {return "/api/meta/commands/execute/"+code;}
+
     private static String requiredAllowEmpty(String name) {
         assertTrue(System.getenv().containsKey(name), "Matching runtime crypto value must be explicitly supplied");
         return System.getenv(name);
@@ -514,7 +538,7 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         input.put("clientRequestId",key);input.put("payload",payload);
         com.auraboot.framework.application.tenant.MetaContext.clear();
         org.springframework.test.web.servlet.MvcResult result;observed.publicRequestActive=true;
-        try {result=mvc.perform(post("/api/commands/"+code).header("Authorization","Bearer "+bearer).header("X-Locale","en-US")
+        try {result=mvc.perform(post(receiptCommandPath(code)).header("Authorization","Bearer "+bearer).header("X-Locale","en-US")
             .contentType("application/json").content(json.writeValueAsBytes(input))).andReturn();}
         finally {observed.publicRequestActive=false;}context();
         var response=json.readTree(result.getResponse().getContentAsByteArray());
