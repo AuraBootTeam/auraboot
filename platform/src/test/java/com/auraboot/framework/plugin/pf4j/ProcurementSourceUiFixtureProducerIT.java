@@ -369,6 +369,11 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         return result.getPluginPid();
     }
 
+    static String fixtureRequestKey(String action) {
+        if (!List.of("init", "public").contains(action)) throw new IllegalArgumentException("Invalid fixture action");
+        return "source-" + action + "-" + UUID.randomUUID();
+    }
+
     private String initialize(String model, Map<String, Object> values) throws Exception {
         ProductQuoteNativeInitialization.validateSourceUiPayload(model, values);
         var saved = MetaContext.snapshot();
@@ -385,7 +390,7 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
             assertEquals(initializer.getId(), authenticated.getUserId());
             var request = new CommandExecuteRequest();
             request.setPayload(new LinkedHashMap<>(values));
-            request.setClientRequestId(provider + "-init-" + UUID.randomUUID());
+            request.setClientRequestId(fixtureRequestKey("init"));
             var result = actualCommands.execute(ProductQuoteNativeInitialization.sourceUiCommand(model), request);
             assertEquals("completed", result.getPhaseReached());
             String pid = result.getData().get("recordPid").toString();
@@ -551,7 +556,7 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
             request.put("targetRecordPid", target);
             request.put("expectedVersion", fixture(SYNC, () -> db.getById(commands.findByCode(code).getModelCode(), target).get("row_version")));
         }
-        request.put("clientRequestId", provider + "-public-" + UUID.randomUUID());
+        request.put("clientRequestId", fixtureRequestKey("public"));
         request.put("payload", payload);
         MetaContext.clear();
         org.springframework.test.web.servlet.MvcResult result;

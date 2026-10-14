@@ -100,4 +100,18 @@ class ProcurementSourceUiFixtureContractTest {
                 () -> policyMethod.invoke(null, "connection", "account", "FNote"));
     }
 
+    @Test void independentRequestKeysFitThePersistedContractAndNeverReuseAcrossStages() {
+        var keys = new java.util.HashSet<String>();
+        for (int i = 0; i < 1000; i++) {
+            for (String action : List.of("init", "public")) {
+                String key = ProcurementSourceUiFixtureProducerIT.fixtureRequestKey(action);
+                assertTrue(key.length() <= 64, "Persisted request key exceeds varchar(64): " + key.length());
+                assertTrue(keys.add(key), "Different initialization or public commands must not share a nonce");
+                java.util.UUID.fromString(key.substring(key.length() - 36));
+            }
+        }
+        assertEquals(2000, keys.size());
+        assertThrows(IllegalArgumentException.class, () -> ProcurementSourceUiFixtureProducerIT.fixtureRequestKey("other"));
+    }
+
 }
