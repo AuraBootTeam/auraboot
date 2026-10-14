@@ -11,7 +11,7 @@ import re
 import time
 from pathlib import Path
 
-from open_platform_http import ProtocolError
+from open_platform_http import ProtocolError, bind_physical_fixture_fields
 from open_platform_model_event_probe import read_secret, verify_report as verify_model_event_report
 
 CASES = (
@@ -1264,6 +1264,8 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audi
         _, result, _ = request(path, method=method, body=body, headers=admin)
         if not isinstance(result, dict) or str(result.get("code")) != "0":
             raise ProtocolError("dynamic probe administration failed")
+        if path == "/api/meta/models" and method == "POST":
+            bind_physical_fixture_fields(request, admin, body, result.get("data"))
         return result.get("data")
 
     def header(headers, name):

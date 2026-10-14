@@ -20,7 +20,7 @@ from http.server import HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from queue import Queue
 
-from open_platform_http import ProtocolError
+from open_platform_http import ProtocolError, bind_physical_fixture_fields
 from open_platform_receiver import Receiver, handler
 from open_platform_webhook_evidence import read_delivery, verify_delivery
 
@@ -403,6 +403,8 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
         _, response, _ = call(path, method, body=body, headers=admin)
         require(isinstance(response, dict) and str(response.get("code")) == "0",
                 "model event administration failed")
+        if path == "/api/meta/models" and method == "POST":
+            bind_physical_fixture_fields(request, admin, body, response.get("data"))
         return response.get("data")
 
     def record(case, condition=True):

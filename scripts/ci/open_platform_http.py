@@ -4,6 +4,7 @@ Importing this module never provisions fixtures, logs in, or contacts a server.
 """
 
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -11,6 +12,64 @@ import urllib.request
 
 class ProtocolError(RuntimeError):
     """A safe diagnostic that never includes response bodies or credentials."""
+
+
+def bind_physical_fixture_fields(request, admin, definition, model):
+    """Materialize physical fixture fields through the real metadata APIs.
+
+    Inline model fields describe metadata; physical publication requires actual
+    library bindings. Virtual models keep their inline projection definitions.
+    """
+    if definition.get("sourceType", "physical") != "physical":
+        return
+    fields = definition.get("fields", [])
+    if not fields:
+        return
+    pid = model.get("pid") if isinstance(model, dict) else None
+    if not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", pid):
+        raise ProtocolError("physical fixture model identity invalid")
+
+    def human(path, method="GET", body=None):
+        _, response, _ = request(path, method=method, body=body, headers=admin)
+        if not isinstance(response, dict) or str(response.get("code")) != "0":
+            raise ProtocolError("physical fixture field administration failed")
+        return response.get("data")
+
+    for field in fields:
+        code, kind = field.get("code"), field.get("dataType")
+        if (not isinstance(code, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,99}", code)
+                or not isinstance(kind, str) or not kind):
+            raise ProtocolError("physical fixture field definition invalid")
+        _, lookup, _ = request("/api/meta/fields/key/" + code, headers=admin)
+        if not isinstance(lookup, dict):
+            raise ProtocolError("physical fixture field lookup invalid")
+        if str(lookup.get("code")) == "0":
+            stored = lookup.get("data")
+        elif str(lookup.get("code")) == "1" and lookup.get("data") is None:
+            stored = human("/api/meta/fields", "POST", {
+                "code": code, "dataType": kind, "autoPublish": True,
+                "feature": {key: bool(field.get(key, False)) for key in ["filterable", "sortable"]},
+            })
+        else:
+            raise ProtocolError("physical fixture field lookup refused")
+        if (not isinstance(stored, dict) or stored.get("code") != code
+                or str(stored.get("dataType", "")).lower() != kind.lower()
+                or not isinstance(stored.get("pid"), str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", stored["pid"])):
+            raise ProtocolError("physical fixture library field mismatch")
+        human(f"/api/meta/models/{pid}/fields/bind", "POST", {
+            "fieldPid": stored["pid"], "required": bool(field.get("required", False)),
+            "nullable": not bool(field.get("required", False)), "visible": True,
+            "editable": bool(field.get("editable", True)),
+            "readonly": not bool(field.get("editable", True)),
+        })
+    bound = human(f"/api/meta/models/{pid}/fields")
+    if not isinstance(bound, list):
+        raise ProtocolError("physical fixture field readback invalid")
+    for field in fields:
+        matches = [row for row in bound if isinstance(row, dict) and row.get("code") == field["code"]]
+        if len(matches) != 1 or str(matches[0].get("dataType", "")).lower() != field["dataType"].lower():
+            raise ProtocolError("physical fixture field binding not persisted")
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

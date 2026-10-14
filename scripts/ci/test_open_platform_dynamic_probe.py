@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin, run_public_plugin_metadata_rollback
-from open_platform_http import ProtocolError
+from open_platform_http import ProtocolError, bind_physical_fixture_fields
 from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent, run_claimed_query_rollback, verify_virtual_resource
 
 
@@ -284,6 +284,39 @@ def command_passed():
 
 
 class DynamicProbeTests(unittest.TestCase):
+    def test_physical_fixture_requires_real_library_bindings_and_readback(self):
+        definition = {"sourceType": "physical", "fields": [
+            {"code": "rel_name", "dataType": "string", "required": True, "editable": True}]}
+        for mode in ["create", "reuse", "wrong-type", "missing-binding", "lookup-refused", "bind-refused"]:
+            with self.subTest(mode=mode):
+                calls = []
+                stored = {"pid": "field-pid", "code": "rel_name", "dataType": "string"}
+                def request(path, method="GET", body=None, headers=None):
+                    self.assertEqual(headers, {"Authorization": "private-test-sentinel"})
+                    calls.append((path, method, body))
+                    if path == "/api/meta/fields/key/rel_name":
+                        if mode == "create": return 200, {"code": 1, "data": None}, {}
+                        if mode == "lookup-refused": return 200, {"code": 403, "data": None}, {}
+                        return 200, {"code": 0, "data": dict(stored, dataType="integer") if mode == "wrong-type" else stored}, {}
+                    if path == "/api/meta/fields":
+                        self.assertTrue(body["autoPublish"])
+                        return 200, {"code": 0, "data": stored}, {}
+                    if path.endswith("/fields/bind"):
+                        self.assertEqual(body, {"fieldPid": "field-pid", "required": True,
+                            "nullable": False, "visible": True, "editable": True, "readonly": False})
+                        return 200, {"code": 403 if mode == "bind-refused" else 0, "data": {}}, {}
+                    self.assertEqual(path, "/api/meta/models/model-pid/fields")
+                    return 200, {"code": 0, "data": [] if mode == "missing-binding" else [stored]}, {}
+                if mode in ["create", "reuse"]:
+                    bind_physical_fixture_fields(request, {"Authorization": "private-test-sentinel"}, definition, {"pid": "model-pid"})
+                    self.assertEqual(calls[-1][0], "/api/meta/models/model-pid/fields")
+                else:
+                    with self.assertRaises(ProtocolError) as failure:
+                        bind_physical_fixture_fields(request, {"Authorization": "private-test-sentinel"}, definition, {"pid": "model-pid"})
+                    self.assertNotIn("sentinel", str(failure.exception))
+        bind_physical_fixture_fields(lambda *a, **k: self.fail("virtual fixture must not create bindings"), {},
+            dict(definition, sourceType="namedQuery"), {"pid": "model-pid"})
+
     def test_claimed_query_rollback_proof_is_mandatory_and_strict(self):
         report = passed(); del report["queryRollbackProtection"]
         with self.assertRaises(ProtocolError): verify_report(report)
