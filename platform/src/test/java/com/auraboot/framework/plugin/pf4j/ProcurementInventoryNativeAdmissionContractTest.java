@@ -39,6 +39,22 @@ class ProcurementInventoryNativeAdmissionContractTest {
         assertThrows(AssertionError.class,()->fixture.fixture("qo_procurement_task_common:dispatch",()->{
             fail("A private production writer cannot execute");return null;}));
     }
+    @Test void actualAopRejectsJointSaveAndBothCounterEntrypointsBeforeTargetInvocation() {
+        var target=mock(DynamicDataService.class);
+        var observation=new ProcurementInventoryReceiptRealDbIT.ReceiptReadOnlyObservation();
+        var factory=new AspectJProxyFactory(target);factory.addAspect(observation);
+        DynamicDataService proxy=factory.getProxy();
+        var request=new com.auraboot.framework.meta.dto.JointSubTableSaveRequest();
+        observation.enter();
+        try {
+            assertThrows(AssertionError.class,()->proxy.saveWithRelations("pr_purchase_order",request));
+            verify(target,never()).saveWithRelations(any(),any());
+            assertThrows(AssertionError.class,()->proxy.incrementWithinCap("pr_purchase_order_line","owned","pr_pol_received_qty",1L,"pr_pol_qty"));
+            verify(target,never()).incrementWithinCap(any(),any(),any(),anyLong(),any());
+            assertThrows(AssertionError.class,()->proxy.increment("pr_purchase_order_line","owned","pr_pol_received_qty",1L));
+            verify(target,never()).increment(any(),any(),any(),anyLong());
+        } finally {observation.leave();}
+    }
     @Test void actualAopBlocksAllSyntheticMutationsButKeepsReadonlyAndOrdinaryPublicCalls() {
         var target=mock(DynamicDataService.class);var observation=new ProcurementInventoryReceiptRealDbIT.ReceiptReadOnlyObservation();
         var factory=new AspectJProxyFactory(target);factory.addAspect(observation);

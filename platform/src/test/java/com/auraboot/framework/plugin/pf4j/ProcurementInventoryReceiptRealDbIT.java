@@ -308,7 +308,10 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
                 +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.batch*(..)) || "
                 +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.bulkCreate(..)) || "
                 +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.createRelations(..)) || "
-                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.removeRelations(..))")
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.removeRelations(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.saveWithRelations(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.incrementWithinCap(..)) || "
+                +"execution(* com.auraboot.framework.meta.service.DynamicDataService+.increment(..))")
         public void rejectSyntheticWrite(){assertEquals(0,depth.get(),"Synthetic fixture scope permits only read observations");}
     }
     /** Observes after an actual committed-to-T01 SQL CAS; never replaces the service or its result. */
