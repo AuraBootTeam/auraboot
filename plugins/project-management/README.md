@@ -77,3 +77,9 @@ These business pages remain list/form/detail DSL. The platform components contai
 - Field auditing is a platform configuration. `scripts/field-audit-config.json` is applied explicitly by the local initialization script through `/api/audit/field-config/bulk`; enabling audit is not an automatic application-start side effect. An existing tenant must configure the declared audit fields through the same authorized platform surface. History permissions are separate from project read permission and are not granted implicitly by the template.
 
 The fixture uploads actual small PDF documents, preserves their real sizes and timestamps, and records an actual 60 → 68 progress command before visual review. Every sample project and customer is fictional. The browser journey then reports 72, completes a milestone, creates and edits another project, uploads and downloads a file, and verifies member and observer behavior. A fresh owned fixture is required for a full rerun.
+
+## First-use evaluation setup
+
+On an empty local evaluation instance, run `bash scripts/project-delivery-demo.sh` after starting the stack. It performs the normal quickstart, explicitly imports this template, and creates fictional sample customers, real local members, projects, milestones, files and audit configuration through platform APIs. No SQL or application-start backfill is used.
+
+The default frontend URL is `http://localhost:3000`. Host-first maintainers set `BACKEND_URL` to their owned frontend URL and `PLUGINS_PATH` to the plugin directory visible to the backend. The script accepts only local HTTP evaluation URLs; it never clears projects and refuses to seed an already populated project list. The initialization receipt directory is printed. Existing installations may import the template with `bash scripts/quickstart.sh --project-delivery` without requesting sample data.
