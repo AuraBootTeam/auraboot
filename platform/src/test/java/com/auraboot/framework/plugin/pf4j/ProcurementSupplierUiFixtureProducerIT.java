@@ -494,7 +494,24 @@ class ProcurementSupplierUiFixtureProducerIT extends ProcurementPublicSourceNati
 
     private List<Map<String, Object>> rows(String model) {
         String table = actualMetadata.getTableName(model); assertTrue(table.matches("[A-Za-z_][A-Za-z0-9_]{0,62}"));
-        return new JdbcTemplate(postgres).queryForList("SELECT * FROM \"" + table + "\" WHERE tenant_id=? ORDER BY pid", tenant);
+        return new JdbcTemplate(postgres).query(
+                "SELECT row_to_json(t)::text FROM \"" + table + "\" t WHERE t.tenant_id=? ORDER BY t.pid",
+                (result, index) -> canonicalSnapshotRow(json, result.getString(1)), tenant);
+    }
+
+    static Map<String, Object> canonicalSnapshotRow(com.fasterxml.jackson.databind.ObjectMapper mapper, String raw) {
+        if (raw == null) throw new IllegalArgumentException("Snapshot row must be canonical PostgreSQL JSON");
+        try {
+            var tree = mapper.readTree(raw);
+            if (tree == null || !tree.isObject())
+                throw new IllegalArgumentException("Snapshot row must be a JSON object");
+            return mapper.readerFor(new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() { })
+                    .with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                    .with(com.fasterxml.jackson.databind.DeserializationFeature.USE_LONG_FOR_INTS)
+                    .readValue(raw);
+        } catch (java.io.IOException error) {
+            throw new IllegalArgumentException("Invalid canonical PostgreSQL snapshot row", error);
+        }
     }
 
     private Map<String, Object> raw(String model, String pid) {

@@ -16,6 +16,23 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProcurementSupplierUiFixtureContractTest {
     @TempDir Path root;
 
+    @Test void canonicalPostgresRowRetainsJsonObjectsNullsExactDecimalsAndLargeIdentities() throws Exception {
+        var json = new ObjectMapper();
+        var raw = "{\"pid\":\"fixture\",\"tenant_id\":368527801529274368,\"source_snapshot\":{\"quantity\":300.000001,\"optional\":null},\"address_snapshot\":{\"address\":\"A\"},\"amount\":375.00000125,\"updated_at\":\"2026-10-14T01:02:03.123456+00:00\"}";
+        var actual = ProcurementSupplierUiFixtureProducerIT.canonicalSnapshotRow(json, raw);
+        assertEquals(368527801529274368L, actual.get("tenant_id"));
+        assertEquals(new java.math.BigDecimal("375.00000125"), actual.get("amount"));
+        var snapshot = (Map<?, ?>) actual.get("source_snapshot");
+        assertEquals(new java.math.BigDecimal("300.000001"), snapshot.get("quantity"));
+        assertTrue(snapshot.containsKey("optional")); assertNull(snapshot.get("optional"));
+        assertEquals(Map.of("address", "A"), actual.get("address_snapshot"));
+        assertEquals("2026-10-14T01:02:03.123456+00:00", actual.get("updated_at"));
+        assertEquals(raw, json.writeValueAsString(actual));
+        for (String invalid : List.of("[]", "null", "not-json"))
+            assertThrows(IllegalArgumentException.class, () -> ProcurementSupplierUiFixtureProducerIT.canonicalSnapshotRow(json, invalid));
+        assertThrows(IllegalArgumentException.class, () -> ProcurementSupplierUiFixtureProducerIT.canonicalSnapshotRow(json, null));
+    }
+
     @Test void completedResponseUsesActualApiResponseTextCodeAndRejectsNumericOrHttpAliases() throws Exception {
         var json = new ObjectMapper();
         var actual = json.valueToTree(com.auraboot.framework.common.dto.ApiResponse.success(
