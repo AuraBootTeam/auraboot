@@ -5,7 +5,7 @@ import secrets
 
 def provision_replay_actor_commands(request, admin):
     """Install the declared DSL dependencies for the restricted replay actor."""
-    for plugin in ("core-meta", "platform-admin"):
+    for plugin in ("core-meta", "org-management", "platform-admin"):
         _, body, _ = request("/api/plugins/import/import-directory-sync", method="POST", headers=admin,
                              body={"path": "/plugins/" + plugin, "conflictStrategy": "OVERWRITE",
                                    "validateReferences": True, "autoDeployProcesses": True,

@@ -25,9 +25,10 @@ class BootstrapTests(unittest.TestCase):
                     module.provision_replay_actor_commands(request, {"Authorization": "fixture"})
             else:
                 module.provision_replay_actor_commands(request, {"Authorization": "fixture"})
-                self.assertEqual([row[1]["body"]["path"] for row in calls[:2]],
-                                 ["/plugins/core-meta", "/plugins/platform-admin"])
-                self.assertTrue(all(row[1]["body"]["autoPublishCommands"] for row in calls[:2]))
+                self.assertEqual([row[1]["body"]["path"] for row in calls[:3]],
+                                 ["/plugins/core-meta", "/plugins/org-management", "/plugins/platform-admin"])
+                self.assertTrue(all(row[1]["body"]["autoPublishCommands"] for row in calls[:3]))
+                self.assertTrue(all(row[1]["body"]["validateReferences"] for row in calls[:3]))
                 self.assertEqual(calls[-1][0], "/api/meta/commands?modelCode=tenant_member")
 
     def run_probe(self, changes=None):
