@@ -1533,7 +1533,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 the same row/test ids across tabs; hidden pre-rendered tabs create
                 duplicate DOM and unnecessary dataSource requests. */}
             {activeDetailTab && (
-              <div key={activeDetailTab.tab.key || activeDetailTab.index} className="p-6">
+              <div key={activeDetailTab.tab.key || activeDetailTab.index} className="p-5">
                 <LayoutRenderer
                   layout={(activeDetailTab.tab as any).layout}
                   blocks={activeDetailTab.tab.blocks || []}

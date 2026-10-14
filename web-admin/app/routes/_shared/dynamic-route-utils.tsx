@@ -934,8 +934,8 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
   };
 
   return (
-    <div className="mb-4">
-      <label className="mb-0.5 block text-xs font-medium tracking-wide text-gray-500 uppercase">
+    <div className={readOnly ? "min-w-0" : "mb-4"}>
+      <label className="text-text-2 mb-1 block text-xs font-medium">
         {label}
         {isRequired && <span className="ml-1 text-red-500">*</span>}
       </label>
