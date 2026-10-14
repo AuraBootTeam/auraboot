@@ -953,29 +953,31 @@ function DetailPageContentInner(props: PageContentProps) {
     location.search,
   ]);
 
-  // Stable callback to reload the parent record (used after sub-table command execution)
-  const reloadRecord = useCallback(async (): Promise<void> => {
-    if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode) return;
+  // Flow refresh must reject incomplete reads before exiting edit mode or clearing drafts.
+  const reloadRecordStrict = useCallback(async (): Promise<void> => {
+    if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode)
+      throw new Error('Detail record refresh is unavailable');
     const currentRecordPid = routeRecordPid;
     const currentModelCode = recordModelCode;
-    try {
-      const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
-      const shouldEnrich = currentRecordPid && !shouldSkipDetailModelFieldMeta(schema);
-      const snapshot = await loadDetailRecordRefreshSnapshot(
-        () => fetchDetailRecord(schema, currentModelCode, currentRecordPid, token || undefined, location.search),
-        recordPath,
-        currentModelCode,
-        shouldEnrich ? currentRecordPid : undefined,
-        token || undefined,
-      );
-      if (!snapshot) return;
-      setRawData(snapshot.rawData);
-      setRecordData(snapshot.recordData);
-    } catch {
-      // Preserve the current detail snapshot when a transient refresh fails.
-      // The action itself has already succeeded; a later refresh can recover.
-    }
+    const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+    const shouldEnrich = currentRecordPid && !shouldSkipDetailModelFieldMeta(schema);
+    const snapshot = await loadDetailRecordRefreshSnapshot(
+      () => fetchDetailRecord(schema, currentModelCode, currentRecordPid, token || undefined, location.search),
+      recordPath,
+      currentModelCode,
+      shouldEnrich ? currentRecordPid : undefined,
+      token || undefined,
+    );
+    if (!snapshot) throw new Error('Detail record refresh failed');
+    setRawData(snapshot.rawData);
+    setRecordData(snapshot.recordData);
   }, [routeRecordPid, recordModelCode, token, schema, hasApiSingletonRecordSource, location.search]);
+
+  // Existing sub-table callbacks retain their best-effort display refresh contract.
+  const reloadRecord = useCallback(async (): Promise<void> => {
+    try { await reloadRecordStrict(); }
+    catch { /* Preserve the current snapshot; a later explicit refresh can recover. */ }
+  }, [reloadRecordStrict]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
@@ -1075,6 +1077,7 @@ function DetailPageContentInner(props: PageContentProps) {
     token: token || undefined,
     showToast,
     additionalContext: runtimeContext,
+    loadData: reloadRecordStrict,
     excludeDataSourceIds: permissionHiddenDataSourceIds,
   });
   useRuntimeStateSubscription(runtime);

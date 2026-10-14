@@ -29,6 +29,7 @@ import { fetchResult } from '~/shared/services/http-client';
  * - 要求外部通过 usePageDataSources 创建并传入
  */
 export interface SchemaRuntimeConfig {
+  loadData?: (params?: any) => Promise<void>;
   getRequestKeyIdentity?: () => RequestKeyIdentity | undefined;
   schema: UnifiedSchema;
   globalState: GlobalState;
@@ -118,6 +119,7 @@ export class SchemaRuntime {
     this.handlers = new Map();
 
     this.flowRunner = new FlowRunner({
+      loadData: config.loadData,
       requestKeySession: config.getRequestKeyIdentity ? createRequestKeySession(config.getRequestKeyIdentity) : undefined,
       evaluator: expressionEvaluator,
       actionRegistry,

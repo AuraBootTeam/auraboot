@@ -428,7 +428,7 @@ actionRegistry.register('refresh', async ({ loadData, filters, dataSourceManager
     return;
   }
 
-  console.error('[ActionRegistry] refresh: missing loadData or dataSource target');
+  throw new Error('Page refresh loader is unavailable');
 });
 
 /**

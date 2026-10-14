@@ -10,6 +10,7 @@ interface ActionRegistryLike {
 }
 
 interface FlowRunnerDeps {
+  loadData?: (params?: any) => Promise<void>;
   requestKeySession?: RequestKeySession;
   evaluator: {
     evaluateCondition: (code: string, context: ExpressionContext) => boolean;
@@ -117,6 +118,7 @@ export class FlowRunner {
       args: mergedArgs,
       requestKeySession: this.deps.requestKeySession,
       navigate: this.deps.navigate,
+      loadData: this.deps.loadData || (typeof (context as any).loadData === 'function' ? (context as any).loadData : undefined),
       showToast: this.deps.showToast,
       stateManager: this.deps.stateManager,
       scopeId: this.deps.scopeId,
