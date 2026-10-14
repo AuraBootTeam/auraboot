@@ -67,6 +67,9 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByTestId('object-summary').getByRole('progressbar')).toHaveAttribute('aria-valuenow', '68');
     await expect(page.getByTestId('collection-completion')).toHaveText('2 / 4 已完成');
     await expect(page.getByTestId('collection-focus')).toContainText('核心功能联调');
+    await expect(page.getByTestId('object-section-overview')).toContainText('张经理 · 采购部');
+    await expect(page.getByTestId('object-section-overview').getByRole('alert')).toHaveCount(0);
+    await expect(page.getByRole('tab')).toHaveCount(4);
     await expect(page.getByTestId('attachment-download-0')).toContainText('项目需求范围说明.pdf');
     await expect(page.getByTestId('detail-workspace-aside')).toBeVisible();
     const milestone = page.getByRole('row').filter({ hasText: '核心功能联调' });
@@ -109,10 +112,10 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByTestId('field-history')).toContainText('68');
     await expect(page.getByTestId('field-history')).toContainText('72');
     await shot('P14');
-    await page.getByRole('tab', { name: '任务与里程碑', exact: true }).click();
+    await page.getByRole('tab', { name: /^任务与里程碑/ }).click();
     await expect(page.getByTestId('collection-completion')).toHaveText('3 / 4 已完成');
     await shot('P15');
-    await page.getByRole('tab', { name: '合同与附件', exact: true }).click();
+    await page.getByRole('tab', { name: /^合同与附件/ }).click();
     await expect(page.getByTestId('attachment-download-0')).toBeVisible();
     const fileDownload = page.waitForEvent('download');
     await page.getByTestId('attachment-download-0').click();
@@ -171,6 +174,18 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await notes.saveAs(path.join(evidence, 'downloaded-notes.txt'));
     expect(await fs.readFile(path.join(evidence, 'downloaded-notes.txt'), 'utf8')).toBe('Delivery review notes: scope agreed.');
     await shot('P18');
+    await page.getByTestId('toolbar-btn-edit').click();
+    await page.getByTestId('form-section-supplement').locator('summary').click();
+    await page.locator('#tpm_pj_notes').fill('客户已确认交付范围，附件保存并可下载。');
+    const editResponse = page.waitForResponse(response => response.url().includes('/execute/tpm:update_project') && response.request().method() === 'POST');
+    await page.getByTestId('form-btn-submit').click();
+    const edited = await editResponse;
+    expect(edited.request().postDataJSON().payload.tpm_pj_notes).toBe('客户已确认交付范围，附件保存并可下载。');
+    expect((await edited.json()).data.phaseReached).toBe('completed');
+    await newRow.getByRole('button', { name: '查看', exact: true }).click();
+    await page.reload();
+    await expect(page.getByTestId('object-section-overview')).toContainText('客户已确认交付范围，附件保存并可下载。');
+    await shot('P19');
     await fs.writeFile(path.join(evidence, 'completed-command.json'), JSON.stringify({ request: payload, response: body }, null, 2));
   } finally {
     await fs.writeFile(path.join(evidence, 'browser-network.json'), JSON.stringify(network, null, 2));
@@ -197,5 +212,33 @@ test('delivery viewer can inspect progress but cannot edit or complete @smoke', 
   await page.screenshot({ path: path.join(evidence, 'screenshots', 'P10.png') });
   const matrix = JSON.parse(await fs.readFile(path.join(evidence, 'acceptance-matrix.json'), 'utf8'));
   matrix.find((row: { id: string }) => row.id === 'P10').status = 'captured';
+  await fs.writeFile(path.join(evidence, 'acceptance-matrix.json'), JSON.stringify(matrix, null, 2));
+});
+
+
+test('assigned view resolves the signed-in member and preserves shared attachments @smoke', async ({ page }) => {
+  const fixture = JSON.parse(await fs.readFile(path.join(evidence, 'fixture.json'), 'utf8'));
+  await page.goto('/login');
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+  await page.locator('#identifier').fill('delivery-lin');
+  await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
+  await page.locator('form button[type=submit]').click();
+  await page.waitForURL(url => !url.pathname.includes('/login'));
+  await page.getByText('项目', { exact: true }).click();
+  await expect(page.getByTestId('tab-mine')).toContainText('3');
+  await page.getByTestId('tab-mine').click();
+  await expect(page.getByRole('row').filter({ hasText: fixture.projects[0].name })).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: fixture.projects[1].name })).toHaveCount(0);
+  const matrix = JSON.parse(await fs.readFile(path.join(evidence, 'acceptance-matrix.json'), 'utf8'));
+  await page.screenshot({ path: path.join(evidence, 'screenshots', 'P20.png') });
+  matrix.find((row: { id: string }) => row.id === 'P20').status = 'captured';
+  await page.getByRole('row').filter({ hasText: '雨岚设计 · 合同协作门户' }).getByRole('button', { name: '查看', exact: true }).click();
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByTestId('attachment-download-0').click();
+  const download = await downloadEvent;
+  await download.saveAs(path.join(evidence, 'member-downloaded-notes.txt'));
+  expect(await fs.readFile(path.join(evidence, 'member-downloaded-notes.txt'), 'utf8')).toBe('Delivery review notes: scope agreed.');
+  await page.screenshot({ path: path.join(evidence, 'screenshots', 'P21.png') });
+  matrix.find((row: { id: string }) => row.id === 'P21').status = 'captured';
   await fs.writeFile(path.join(evidence, 'acceptance-matrix.json'), JSON.stringify(matrix, null, 2));
 });

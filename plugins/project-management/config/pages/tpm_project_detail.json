@@ -70,7 +70,8 @@
             "zh-CN": "启动项目",
             "en": "Activate Project"
           },
-          "visibleWhen": "form.tpm_pj_status === 'planning' || form.tpm_pj_status === 'on_hold'"
+          "visibleWhen": "form.tpm_pj_status === 'planning' || form.tpm_pj_status === 'on_hold'",
+          "overflow": true
         },
         {
           "code": "hold_project",
@@ -80,7 +81,72 @@
             "zh-CN": "暂停项目",
             "en": "Put On Hold"
           },
-          "visibleWhen": "form.tpm_pj_status === 'active'"
+          "visibleWhen": "form.tpm_pj_status === 'active'",
+          "overflow": true
+        },
+        {
+          "code": "submit_acceptance",
+          "commandCode": "tpm:submit_acceptance",
+          "permissionCode": "tpm.project.manage",
+          "overflow": true,
+          "danger": false,
+          "visibleWhen": "form.tpm_pj_status === 'active'",
+          "label": {
+            "zh-CN": "提交验收",
+            "en": "Submit for acceptance"
+          },
+          "confirm": {
+            "zh-CN": "确认提交验收？",
+            "en": "Confirm submit for acceptance?"
+          }
+        },
+        {
+          "code": "complete_project",
+          "commandCode": "tpm:complete_project",
+          "permissionCode": "tpm.project.manage",
+          "overflow": true,
+          "danger": false,
+          "visibleWhen": "form.tpm_pj_status === 'acceptance'",
+          "label": {
+            "zh-CN": "标记已交付",
+            "en": "Mark delivered"
+          },
+          "confirm": {
+            "zh-CN": "确认标记已交付？",
+            "en": "Confirm mark delivered?"
+          }
+        },
+        {
+          "code": "cancel_project",
+          "commandCode": "tpm:cancel_project",
+          "permissionCode": "tpm.project.manage",
+          "overflow": true,
+          "danger": true,
+          "visibleWhen": "form.tpm_pj_status === 'planning' || form.tpm_pj_status === 'active'",
+          "label": {
+            "zh-CN": "取消项目",
+            "en": "Cancel project"
+          },
+          "confirm": {
+            "zh-CN": "确认取消项目？",
+            "en": "Confirm cancel project?"
+          }
+        },
+        {
+          "code": "delete_project",
+          "commandCode": "tpm:delete_project",
+          "permissionCode": "tpm.project.manage",
+          "overflow": true,
+          "danger": true,
+          "visibleWhen": "form.tpm_pj_status === 'planning'",
+          "label": {
+            "zh-CN": "删除项目",
+            "en": "Delete project"
+          },
+          "confirm": {
+            "zh-CN": "确认删除项目？",
+            "en": "Confirm delete project?"
+          }
         }
       ],
       "area": "header"
@@ -120,7 +186,11 @@
                 },
                 {
                   "field": "tpm_pj_start_date",
-                  "colSpan": 6
+                  "colSpan": 6,
+                  "label": {
+                    "zh-CN": "计划开始",
+                    "en": "Planned start"
+                  }
                 },
                 {
                   "field": "tpm_pj_type",
@@ -128,7 +198,11 @@
                 },
                 {
                   "field": "tpm_pj_description",
-                  "colSpan": 12
+                  "colSpan": 12,
+                  "label": {
+                    "zh-CN": "项目说明",
+                    "en": "Project description"
+                  }
                 },
                 {
                   "field": "tpm_pj_notes",
@@ -321,8 +395,7 @@
                 "density": "compact",
                 "fields": [
                   "tpm_pj_progress",
-                  "tpm_pj_end_date",
-                  "tpm_pj_status"
+                  "tpm_pj_end_date"
                 ]
               }
             },
@@ -349,7 +422,8 @@
                 "actorName": "actor_name"
               },
               "extension": {
-                "density": "compact"
+                "density": "compact",
+                "previewLimit": 2
               }
             }
           ]
@@ -502,8 +576,7 @@
               "extension": {
                 "fields": [
                   "tpm_pj_progress",
-                  "tpm_pj_end_date",
-                  "tpm_pj_status"
+                  "tpm_pj_end_date"
                 ]
               }
             },
@@ -530,7 +603,8 @@
                 "actorName": "actor_name"
               },
               "extension": {
-                "density": "compact"
+                "density": "compact",
+                "previewLimit": 2
               }
             }
           ]
@@ -605,6 +679,18 @@
           "kind": "progress"
         }
       }
+    ],
+    "hiddenSystemTabs": [
+      "__field_history__"
+    ],
+    "detailAsideGroups": [
+      [
+        "focus"
+      ],
+      [
+        "history",
+        "activity"
+      ]
     ]
   },
   "dataSources": {

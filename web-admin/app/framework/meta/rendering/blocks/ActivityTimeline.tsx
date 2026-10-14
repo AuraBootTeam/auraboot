@@ -68,6 +68,7 @@ export interface ActivityTimelineProps {
   businessDataSource?: BusinessActivityDataSource;
   businessRecordMapping?: BusinessActivityRecordMapping;
   compact?: boolean;
+  previewLimit?: number;
 }
 
 // Activity type → [icon, zh label, en label, dot color class]
@@ -97,6 +98,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   businessDataSource,
   businessRecordMapping,
   compact = false,
+  previewLimit,
 }) => {
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,7 +193,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     () => activities.filter((activity) => matchesTimelineFilter(activity, activeFilter)),
     [activeFilter, activities],
   );
-  const groups = groupByDate(filteredActivities);
+  const groups = groupByDate(previewLimit ? filteredActivities.slice(0, previewLimit) : filteredActivities);
 
   if (loading) {
     return (

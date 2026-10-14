@@ -106,7 +106,7 @@
     "modelCode": "tpm_project",
     "fieldCode": "tpm_pj_owner_user",
     "sequence": 11,
-    "required": false,
+    "required": true,
     "visible": true,
     "editable": true
   },
@@ -123,7 +123,8 @@
     "fieldCode": "tpm_pj_customer_id",
     "sequence": 13,
     "visible": true,
-    "editable": true
+    "editable": true,
+    "required": true
   },
   {
     "modelCode": "tpm_project",

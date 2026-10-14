@@ -67,5 +67,9 @@
         }
       ]
     }
-  ]
+  ],
+  "commands": {
+    "create": "tpm:create_customer",
+    "update": "tpm:update_customer"
+  }
 }

@@ -53,7 +53,8 @@ for index,row in enumerate(references):
  status=states[stage]
  due='2026-'+date_text.replace('月','-').replace('日','')
  desc='整合供应商、采购与入库流程，为采购和仓储团队提供统一的协作工作台。'
- project=pid(cmd('tpm:create_project',{'tpm_pj_code':code,'tpm_pj_name':name,'tpm_pj_customer':customer,'tpm_pj_customer_id':customers[customer],'tpm_pj_budget':int(budget.replace(',','')),'tpm_pj_owner_user':owners[owner_names.index(owner_name)],'tpm_pj_progress':progress,'tpm_pj_description':desc+'（虚构示例数据）','tpm_pj_start_date':'2026-09-08','tpm_pj_end_date':due,'tpm_pj_priority':'high' if index==0 else 'medium'}))
+ project=pid(cmd('tpm:create_project',{'tpm_pj_code':code,'tpm_pj_name':name,'tpm_pj_customer':customer,'tpm_pj_customer_id':customers[customer],'tpm_pj_budget':int(budget.replace(',','')),'tpm_pj_owner_user':owners[owner_names.index(owner_name)],'tpm_pj_progress':60 if index==0 else progress,'tpm_pj_description':desc+'（虚构示例数据）','tpm_pj_start_date':'2026-09-08','tpm_pj_end_date':due,'tpm_pj_priority':'high' if index==0 else 'medium'}))
+ if index==0:cmd('tpm:update_progress',{'tpm_pj_progress':progress},project)
  if status!='planning':cmd('tpm:activate_project',pid=project)
  if status=='acceptance':cmd('tpm:submit_acceptance',pid=project)
  if status=='completed':cmd('tpm:complete_project',pid=project)

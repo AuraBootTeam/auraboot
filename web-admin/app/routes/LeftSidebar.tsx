@@ -26,7 +26,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
   const location = useLocation();
   const rootData = useRootLoaderData();
   const menus = rootData?.menus ?? [];
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { isRTL } = useDirection();
   const navRef = useRef<HTMLElement>(null);
   const revalidator = useRevalidator();
@@ -101,7 +101,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
         </NavLink>
         <div className="border-border mx-3.5 my-5 rounded-lg border px-3 py-3">
           <div className="text-text text-xs font-semibold">{rootData?.user?.tenantName || t('sidebar.workspace', undefined, 'Workspace')}</div>
-          <div className="text-text-3 mt-1 text-[11px]">{t('sidebar.currentSpace', undefined, 'Current space')}</div>
+          <div className="text-text-3 mt-1 text-[11px]">{t('sidebar.currentSpace', undefined, locale.startsWith('zh') ? '当前空间' : 'Current space')}</div>
         </div>
       </>}
       {/* Top bar: toggle + mobile close */}

@@ -40,7 +40,8 @@
               "zh-CN": "按名称搜索空间内客户",
               "en": "Search customers in this space"
             }
-          }
+          },
+          "required": true
         },
         {
           "field": "tpm_pj_owner_user",
@@ -50,7 +51,8 @@
               "zh-CN": "按姓名搜索空间成员",
               "en": "Search space members"
             }
-          }
+          },
+          "required": true
         },
         {
           "field": "tpm_pj_description",
@@ -111,7 +113,8 @@
               "zh-CN": "新项目从需求确认开始，创建后通过项目动作推进阶段。",
               "en": "New projects start in requirements; use project actions to advance their stage."
             }
-          }
+          },
+          "defaultValue": "planning"
         }
       ],
       "description": {

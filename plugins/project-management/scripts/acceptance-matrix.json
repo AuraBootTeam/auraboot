@@ -232,5 +232,44 @@
     },
     "locale": "zh-CN",
     "role": "admin"
+  },
+  {
+    "id": "P19",
+    "page": "detail",
+    "state": "edited-and-reloaded",
+    "screenshot": "P19",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P20",
+    "page": "list",
+    "state": "assigned-to-signed-in-member",
+    "screenshot": "P20",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "manager"
+  },
+  {
+    "id": "P21",
+    "page": "detail",
+    "state": "shared-attachment-downloaded",
+    "screenshot": "P21",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "manager"
   }
 ]

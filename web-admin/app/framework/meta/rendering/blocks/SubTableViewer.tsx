@@ -1316,14 +1316,14 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       </div>;
     }
     return <div data-testid="subtable-viewer" className="min-w-0">
-      <p className="text-text-3 mb-3 text-[11px]" data-testid="collection-completion">{locale.startsWith('zh') ? `${completed.length} / ${displayRows.length} 已完成` : `${completed.length} / ${displayRows.length} completed`}</p>
+      <div className="mb-4 flex flex-wrap items-center gap-3">{view.title && <h3 className="text-text text-sm font-semibold">{getLocalizedText(view.title, locale, t)}</h3>}<p className="text-text-3 text-[11px]" data-testid="collection-completion">{locale.startsWith('zh') ? `${completed.length} / ${displayRows.length} 已完成` : `${completed.length} / ${displayRows.length} completed`}</p></div>
       {displayRows.length === 0 && <p data-testid="subtable-empty-state" className="text-text-3 py-6 text-center text-xs">{emptyStateTitle}</p>}
       <div role="table" aria-label={locale.startsWith('zh') ? '关联事项' : 'Related items'}>
         {displayRows.map((row, index) => {
           const done = view.completedValues.includes(String(row[view.statusField]));
-          return <div role="row" key={row.pid} className="border-border flex flex-wrap items-center gap-3 border-t py-3" data-testid={`collection-row-${row.pid}`}>
+          return <div role="row" key={row.pid} className="border-border flex flex-wrap items-center gap-3 border-t py-2" data-testid={`collection-row-${row.pid}`}>
             <span aria-hidden="true" className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${done ? 'border-status-green bg-status-green-bg text-status-green' : 'border-border bg-panel text-text-3'}`}>{done ? '✓' : ''}</span>
-            <div role="cell" className="min-w-0 flex-1"><strong className="text-text text-xs font-medium">{String(row[view.titleField] || '—')}</strong>{view.descriptionField && <p className="text-text-3 mt-1 text-[11px] leading-5">{String(row[view.descriptionField] || '')}</p>}</div>
+            <div role="cell" className="min-w-0 flex-1"><strong className="text-text text-xs font-medium">{String(row[view.titleField] || '—')}</strong>{view.descriptionField && <p className="text-text-3 mt-1 text-[11px] leading-4">{String(row[view.descriptionField] || '')}</p>}</div>
             {view.dateField && <span role="cell" className="text-text-3 text-[11px] tabular-nums">{formatCellValue(row[view.dateField], effectiveColumns.find(col => col.field === view.dateField) || { field: view.dateField, valueType: 'date' }, getDictLabel, timezone, formats)}</span>}
             <span role="cell" className="text-xs">{formatCellValue(row[view.statusField], effectiveColumns.find(col => col.field === view.statusField) || { field: view.statusField }, getDictLabel, timezone, formats)}</span>
             {configuredRowActions.filter(button => button && isRowActionVisible(button, row)).map(button => <button key={button.code} type="button" data-testid={`subtable-row-action-${button.code}-${index}`} disabled={Boolean(rowActionLoadingKey) || isRowActionDisabled(button, row)} onClick={() => handleRowAction(button, row, index)} className="text-accent text-[11px] disabled:opacity-40">{resolveButtonLabel(button)}</button>)}

@@ -165,6 +165,7 @@ export function resolveDetailFieldComponent(meta?: {
   };
   const referenceModel = String(
     refTarget.targetModel ||
+      refTarget.targetEntity ||
       refTarget.modelCode ||
       meta.referenceModelCode ||
       meta.extension?.referenceModelCode ||
@@ -419,6 +420,7 @@ export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>
   }
 
   const extensionProps = getMetaExtension(meta);
+  if (!enriched.dataType) enriched.dataType = meta.dataType;
   const refTarget = {
     ...(extensionProps.refTarget || {}),
     ...(meta.refTarget || {}),
@@ -458,6 +460,7 @@ export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>
       extensionProps.referenceModelCode ||
       extensionProps.refModelCode ||
       refTarget.targetModel ||
+      refTarget.targetEntity ||
       refTarget.modelCode;
   }
 
@@ -514,7 +517,7 @@ export function resolveSettingsCardDisplayValue(
 }
 
 export function collectDetailDictCodes(
-  schema: { blocks?: BlockConfig[] } | undefined | null,
+  schema: { blocks?: BlockConfig[]; extension?: Record<string, any> } | undefined | null,
   modelFieldMap: Map<string, any>,
 ): string[] {
   if (!schema?.blocks) return [];
@@ -548,6 +551,7 @@ export function collectDetailDictCodes(
     }
   };
   walkBlocks(schema.blocks);
+  if (schema.extension?.headerStatusField) collectFromFields([{ field: schema.extension.headerStatusField }]);
   return [...new Set(codes)];
 }
 
@@ -1447,6 +1451,7 @@ function DetailPageContentInner(props: PageContentProps) {
                       canRenderDetailToolbarButton(button, hasPermission),
                     )
                     .filter((button: ButtonConfig) => evaluateVisibleWhen(button.visibleWhen))
+                    .filter((button: ButtonConfig) => !(button as any).overflow)
                     .map((button: ButtonConfig) => (
                       <button
                         key={button.code}
@@ -1469,6 +1474,12 @@ function DetailPageContentInner(props: PageContentProps) {
                         {resolveButtonLabel(button)}
                       </button>
                     ))}
+                  {effectiveHeaderToolbar.buttons.some((button: ButtonConfig) => (button as any).overflow && canRenderDetailToolbarButton(button, hasPermission) && evaluateVisibleWhen(button.visibleWhen)) && <details className="relative" data-testid="detail-toolbar-more">
+                    <summary aria-label={getLocalizedText({ 'zh-CN': '更多操作', en: 'More actions' }, locale, t)} className="text-text-2 hover:bg-hover flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-control text-xl">⋮</summary>
+                    <div className="border-border bg-panel absolute right-0 top-10 z-40 min-w-40 rounded-card border p-1 shadow-lg">
+                      {effectiveHeaderToolbar.buttons.filter((button: ButtonConfig) => (button as any).overflow && canRenderDetailToolbarButton(button, hasPermission) && evaluateVisibleWhen(button.visibleWhen)).map((button: ButtonConfig) => <button key={button.code} type="button" data-testid={`toolbar-btn-${button.code}`} disabled={actionLoading} className={`hover:bg-hover block w-full rounded px-3 py-2 text-left text-xs ${button.danger ? 'text-status-red' : 'text-text-2'}`} onClick={event => { const menu = event.currentTarget.closest('details'); if (menu) menu.open = false; void handleAction(button, recordData); }}>{resolveButtonLabel(button)}</button>)}
+                    </div>
+                  </details>}
                 </>
               )}
             </div>
@@ -1579,7 +1590,7 @@ function DetailPageContentInner(props: PageContentProps) {
               <div key={activeDetailTab.tab.key || activeDetailTab.index} className={workspace ? '' : 'p-5'}>
                 {workspace ? <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_290px]" data-testid="detail-workspace-layout">
                   <div className="min-w-0 space-y-4" data-testid="detail-workspace-main">{(activeDetailTab.tab.blocks || []).filter(block => !asideBlockIds.has(block.id)).map(renderWorkspaceBlock)}</div>
-                  {(activeDetailTab.tab.blocks || []).some(block => asideBlockIds.has(block.id)) && <aside className="min-w-0 space-y-4" data-testid="detail-workspace-aside">{(activeDetailTab.tab.blocks || []).filter(block => asideBlockIds.has(block.id)).map(block => <section key={block.id} className="border-border bg-panel rounded-card border p-5">{renderWorkspaceBlock(block)}</section>)}</aside>}
+                  {(activeDetailTab.tab.blocks || []).some(block => asideBlockIds.has(block.id)) && <aside className="min-w-0 space-y-4" data-testid="detail-workspace-aside">{(Array.isArray(schema.extension?.detailAsideGroups) ? schema.extension.detailAsideGroups : (activeDetailTab.tab.blocks || []).filter(block => asideBlockIds.has(block.id)).map(block => [block.id])).map((ids: string[], groupIndex: number) => { const group = (activeDetailTab.tab.blocks || []).filter(block => ids.includes(block.id) && (!block.permissionCode || hasPermission(block.permissionCode))); return group.length ? <section key={groupIndex} className="border-border bg-panel rounded-card border p-5">{group.map(renderWorkspaceBlock)}</section> : null; })}</aside>}
                 </div> : (                <LayoutRenderer
                   layout={(activeDetailTab.tab as any).layout}
                   blocks={activeDetailTab.tab.blocks || []}
@@ -2206,7 +2217,7 @@ function DetailBlockRenderer({
       : recordData;
     const displayVariant = String((block as any).extension?.displayVariant || '');
     if (displayVariant === 'object') {
-      return <WorkspaceRecordSection block={block} fields={(block.fields || []).map(field => {
+      return <WorkspaceRecordSection block={block} fields={(block.fields || []).filter(field => !field.visibleWhen || !evaluateEditableWhen || evaluateEditableWhen(field.visibleWhen)).map(field => {
         const labeled = field.label ? field : { ...field, label: resolveModelFieldLabel(field.field) };
         return enrichField ? enrichField(labeled) : labeled;
       })} record={sectionRecord} token={token} locale={locale} timezone={timezone} t={t} getDictItems={getDictItems} />;
@@ -2376,14 +2387,14 @@ function DetailBlockRenderer({
           : !subTableConfig.readOnly);
 
       return (
-        <div className="sub-table-section">
-          {block.title && (
+        <div className={(subTableConfig as any).presentation?.kind === 'collection' ? 'sub-table-section border-border bg-panel rounded-card border px-6 py-5' : 'sub-table-section'}>
+          {block.title && (subTableConfig as any).presentation?.kind !== 'collection' && (
             <h3 className="text-text-2 mb-5 text-sm font-semibold tracking-wider uppercase">
               {getLocalizedText(block.title, locale, t)}
             </h3>
           )}
           <SubTableViewer
-            config={subTableConfig}
+            config={(subTableConfig as any).presentation?.kind === 'collection' ? { ...subTableConfig, presentation: { ...(subTableConfig as any).presentation, title: block.title } } : subTableConfig}
             parentRecordPid={recordPid}
             parentRecordData={recordData}
             token={token}
@@ -2428,6 +2439,7 @@ function DetailBlockRenderer({
           (block as any).subTable?.dataSource
         }
         compact={(block as any).extension?.density === 'compact'}
+        previewLimit={(block as any).extension?.previewLimit}
         businessRecordMapping={(block as any).businessRecordMapping}
       />
       </section>
@@ -2451,7 +2463,7 @@ function DetailBlockRenderer({
     // Field audit queries are scoped to the public record PID.
     const auditRecordPid = recordData?.pid || recordPid;
     return (
-      <FieldHistoryViewer
+      <section>{block.title && <h3 className="text-text mb-4 text-sm font-semibold">{getLocalizedText(block.title, locale, t)}</h3>}<FieldHistoryViewer
         modelCode={modelCode || ''}
         recordPid={String(auditRecordPid)}
         token={token}
@@ -2459,7 +2471,7 @@ function DetailBlockRenderer({
         t={t}
         compact={(block as any).extension?.density === 'compact'}
         fields={(block as any).extension?.fields}
-      />
+      /></section>
     );
   }
 

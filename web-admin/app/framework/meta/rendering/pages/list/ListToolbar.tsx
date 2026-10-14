@@ -184,6 +184,7 @@ export function ListToolbar({
                   : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
               }`}
               data-testid="sort-popover-trigger"
+            style={workspace ? { order: 3 } : undefined}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -210,6 +211,7 @@ export function ListToolbar({
             onClick={onColumnSettingsOpen}
             className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
             data-testid="column-settings-btn"
+            style={workspace ? { order: 4 } : undefined}
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -299,6 +301,7 @@ export function ListToolbar({
             onClick={(e) => onAddFilter(e)}
             className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
             data-testid="add-filter-btn"
+            style={workspace ? { order: 2 } : undefined}
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -313,7 +316,7 @@ export function ListToolbar({
         )}
 
         {/* Spacer */}
-        <div className="hidden flex-1 sm:block" />
+        {!workspace && <div className="hidden flex-1 sm:block" />}
 
         {/* Quick filter chips */}
         {!hideQuickFilters && (

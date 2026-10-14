@@ -10,7 +10,7 @@ import { FileAttachmentField } from '~/ui/smart/display/FileAttachmentField';
 export function WorkspaceRecordSection({ block, fields, record, token, locale, timezone, t, getDictItems }: any) {
   const [references, setReferences] = useState<Record<string, any>>({});
   const [referenceError, setReferenceError] = useState(false);
-  const targets = JSON.stringify(fields.filter((field: any) => field.referenceDisplayField && record[field.field]).map((field: any) => ({ field: field.field, model: field.refTarget?.targetModel || field.referenceModelCode, pid: record[field.field] })));
+  const targets = JSON.stringify(fields.filter((field: any) => field.referenceDisplayField && record[field.field]).map((field: any) => ({ field: field.field, model: field.refTarget?.targetModel || field.refTarget?.targetEntity || field.referenceModelCode, pid: record[field.field] })));
   useEffect(() => {
     let current = true;
     setReferences({}); setReferenceError(false);
@@ -31,18 +31,18 @@ export function WorkspaceRecordSection({ block, fields, record, token, locale, t
       const item = (getDictItems(field.dictCode) || []).find((item: any) => String(item.value) === String(value));
       return item ? getLocalizedText(item.label, locale, t) : '—';
     }
-    if (field.dataType === 'date') return formatInTimezone(value, 'YYYY年MM月DD日', timezone);
+    if (field.dataType === 'date') return formatInTimezone(value, locale.startsWith('zh') ? 'YYYY年MM月DD日' : 'MMM DD, YYYY', timezone);
     if (typeof value === 'object' || /^[0-9A-HJKMNP-TV-Z]{26}$/.test(String(value))) return '—';
     return String(value);
   };
-  return <section className="border-border bg-panel rounded-card border px-6 py-5" data-testid={`object-section-${block.id}`}>
-    <h3 className="text-text mb-5 text-sm font-semibold">{getLocalizedText(block.title, locale, t)}</h3>
+  return <section className="border-border bg-panel rounded-card border px-6 py-4" data-testid={`object-section-${block.id}`}>
+    <h3 className="text-text mb-4 text-sm font-semibold">{getLocalizedText(block.title, locale, t)}</h3>
     {referenceError && <p role="alert" className="text-status-red mb-3 text-xs">{getLocalizedText({ 'zh-CN': '关联对象加载失败，请刷新重试。', en: 'Could not load the related object. Refresh to try again.' }, locale, t)}</p>}
-    <dl className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
+    <dl className="grid grid-cols-1 gap-x-8 gap-y-3 md:grid-cols-2">
       {fields.map((field: any, index: number) => <div key={`${field.field}:${index}`} className={(field.colSpan || 6) >= 12 ? 'md:col-span-2' : ''}>
-        <dt className="text-text-3 mb-1.5 text-[11px]">{getLocalizedText(field.label || {}, locale, t)}</dt>
-        <dd className="text-text text-xs leading-6 whitespace-pre-wrap">
-          {(field.dataType === 'file' || String(field.component).toLowerCase() === 'fileattachment') ? <FileAttachmentField value={record[field.field]} readOnly /> : field.dataType === 'reference' && !field.referenceDisplayField && record[field.field] && (field.refTarget?.targetModel || field.referenceModelCode) ? <Link className="hover:text-accent" to={`/p/${field.refTarget?.targetModel || field.referenceModelCode}/view/${record[field.field]}`}>{display(field)}</Link> : display(field)}
+        <dt className="text-text-3 mb-1 text-[11px]">{getLocalizedText(field.label || {}, locale, t)}</dt>
+        <dd className="text-text text-xs leading-5 whitespace-pre-wrap">
+          {(field.dataType === 'file' || String(field.component).toLowerCase() === 'fileattachment') ? <FileAttachmentField value={record[field.field]} readOnly /> : field.dataType === 'reference' && !field.referenceDisplayField && record[field.field] && (field.refTarget?.targetModel || field.refTarget?.targetEntity || field.referenceModelCode) ? <Link className="hover:text-accent" to={`/p/${field.refTarget?.targetModel || field.refTarget?.targetEntity || field.referenceModelCode}/view/${record[field.field]}`}>{display(field)}</Link> : display(field)}
         </dd>
       </div>)}
     </dl>

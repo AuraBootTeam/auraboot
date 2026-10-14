@@ -147,6 +147,9 @@
     "description": "Assigned space member.",
     "extension": {
       "renderComponent": "userselect"
+    },
+    "constraints": {
+      "required": true
     }
   },
   {
@@ -174,7 +177,10 @@
     "feature": {
       "searchable": true
     },
-    "description": "Tenant-scoped customer reference."
+    "description": "Tenant-scoped customer reference.",
+    "constraints": {
+      "required": true
+    }
   },
   {
     "code": "tpm_pj_notes",

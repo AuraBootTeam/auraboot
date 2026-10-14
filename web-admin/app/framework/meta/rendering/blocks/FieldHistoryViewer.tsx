@@ -102,7 +102,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
     );
   }
 
-  const visibleChanges = fields ? changes.filter(change => fields.includes(change.fieldCode)) : changes;
+  const visibleChanges = changes.filter(change => (!fields || fields.includes(change.fieldCode)) && (!compact || change.changeType.toLowerCase() === 'modified'));
   if (visibleChanges.length === 0) {
     return (
       <div className="text-text-3 py-12 text-center text-sm" data-testid="field-history-empty">

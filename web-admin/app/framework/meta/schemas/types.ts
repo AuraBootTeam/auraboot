@@ -538,6 +538,7 @@ export interface SummaryFieldConfig {
 export interface SubTableConfig {
   presentation?: {
     kind: 'collection' | 'focus';
+    title?: string | LocalizedText;
     titleField: string;
     descriptionField?: string;
     dateField?: string;
