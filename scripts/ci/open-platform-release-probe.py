@@ -137,6 +137,7 @@ def run_static_probe(request, admin):
 def main():
     request = Client(BASE, max_requests=1000, allow_expected_rate_limit=True).request
     admin = bootstrap_module.bootstrap_admin(request)
+    bootstrap_module.provision_replay_actor_commands(request, admin)
     static = run_static_probe(request, admin)
     credential = static["credential"]
 
