@@ -1099,6 +1099,18 @@ actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args
   stateManager.updateState(scopeId, args.field, key);
 });
 
+/** Restore only an existing authenticated session UUID; never allocate or persist one. */
+actionRegistry.register('state.peekRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
+    || Object.keys(args).length !== 2 || Object.keys(args).some(key => !['field','persistence'].includes(key))
+    || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
+    || ['__proto__','prototype','constructor'].includes(args.field) || args.persistence !== 'session')
+    throw new Error('Invalid request key peek');
+  if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
+  const restored = requestKeySession.peek(args.field, stateManager.getContext(scopeId).state[args.field]);
+  stateManager.updateState(scopeId, args.field, restored);
+});
+
 /** Explicit completion/next-attempt transition; ordinary state.set never clears persisted intent. */
 actionRegistry.register('state.clearRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args

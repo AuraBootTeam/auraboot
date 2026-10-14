@@ -48,7 +48,7 @@ function Page({ record = 'p1' }: { record?: string }) {
   const { runtime } = usePageRuntime(schema, {
     additionalContext: {
       global: { user: { id: 'forged' }, tenant: { id: '999' } },
-      form: { quantity: '250.0000' },
+      form: { pid: record, quantity: '250.0000' },
       record: { pid: record },
       $page: { recordPid: record },
     },
@@ -86,6 +86,39 @@ function Page({ record = 'p1' }: { record?: string }) {
               },
             },
             { code: 'refresh', content: 'Refresh' },
+            {
+              code: 'check',
+              content: 'Check attempt',
+              action: {
+                type: 'flow',
+                steps: [
+                  {
+                    action: 'state.peekRequestKey',
+                    args: { field: 'requestKey', persistence: 'session' },
+                  },
+                  {
+                    type: 'if',
+                    condition: '${state.requestKey != null}',
+                    trueNext: 'query',
+                    falseNext: 'absent',
+                  },
+                  {
+                    id: 'query',
+                    action: 'api.request',
+                    endpoint: '/api/example/attempt',
+                    method: 'post',
+                    body: {
+                      targetRecordPid: '${record.pid}',
+                      payload: { requestKey: '${state.requestKey}' },
+                    },
+                    target: 'attemptResult',
+                    next: 'end',
+                  },
+                  { id: 'absent', action: 'state.set', args: { noAttempt: true }, next: 'end' },
+                  { id: 'end' },
+                ],
+              },
+            },
           ],
         } as any
       }
@@ -103,6 +136,24 @@ async function send() {
   await waitFor(() => expect(screen.getByTestId('form-btn-send')).toBeDefined());
   fireEvent.click(screen.getByTestId('form-btn-send'));
 }
+function observeSessionStorage() {
+  const actual = window.sessionStorage;
+  const writes = vi.fn((key: string, value: string) => actual.setItem(key, value));
+  const removes = vi.fn((key: string) => actual.removeItem(key));
+  const reads = vi.fn((key: string) => actual.getItem(key));
+  const delegate = {
+    getItem: reads,
+    setItem: writes,
+    removeItem: removes,
+    key: (index: number) => actual.key(index),
+    clear: () => actual.clear(),
+    get length() {
+      return actual.length;
+    },
+  } as Storage;
+  vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue(delegate);
+  return { writes, removes, reads };
+}
 const identity = { tenantId: '11', userId: 'u1', pageKey: 'example_order_detail', recordPid: 'p1' };
 describe('Actual authenticated page runtime persists scoped UUID attempts', () => {
   beforeEach(() => {
@@ -111,7 +162,101 @@ describe('Actual authenticated page runtime persists scoped UUID attempts', () =
     auth.toast.mockReset();
     auth.transport.mockReset().mockResolvedValue({ code: '500', message: 'Unknown outcome' });
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+  it('peek restores an existing UUID across mounted recovery flows without generating, persisting or clearing it', async () => {
+    const stored = createRequestKeySession(() => identity).ensure('requestKey', null);
+    const random = vi.spyOn(globalThis.crypto, 'randomUUID');
+    const { writes, removes, reads } = observeSessionStorage();
+    auth.transport.mockResolvedValue({
+      code: '0',
+      data: { phaseReached: 'completed', data: { submitted: true } },
+    });
+    const first = mount();
+    await waitFor(() => expect(screen.getByTestId('form-btn-check')).toBeDefined());
+    fireEvent.click(screen.getByTestId('form-btn-check'));
+    await waitFor(() => expect(auth.transport).toHaveBeenCalledTimes(1));
+    expect(auth.transport.mock.calls[0]).toEqual([
+      '/api/example/attempt',
+      { method: 'post', params: { targetRecordPid: 'p1', payload: { requestKey: stored } } },
+    ]);
+    expect(observed.getContext().state.requestKey).toBe(stored);
+    expect(observed.getContext().state.attemptResult).toEqual({
+      phaseReached: 'completed',
+      data: { submitted: true },
+    });
+    first.unmount();
+    mount();
+    await waitFor(() => expect(screen.getByTestId('form-btn-check')).toBeDefined());
+    fireEvent.click(screen.getByTestId('form-btn-check'));
+    await waitFor(() => expect(auth.transport).toHaveBeenCalledTimes(2));
+    expect(auth.transport.mock.calls[1][1].params.payload.requestKey).toBe(stored);
+    expect(random).not.toHaveBeenCalled();
+    expect(writes).not.toHaveBeenCalled();
+    expect(removes).not.toHaveBeenCalled();
+    expect(reads).toHaveBeenCalled();
+    expect(sessionStorage.getItem(sessionStorage.key(0)!)).toBe(stored);
+  });
+  it('peek absent or another authenticated namespace stays null and does not query or generate', async () => {
+    createRequestKeySession(() => identity).ensure('requestKey', null);
+    const random = vi.spyOn(globalThis.crypto, 'randomUUID');
+    const { writes } = observeSessionStorage();
+    for (const [tenantId, id, record] of [
+      ['11', 'other', 'p1'],
+      ['22', 'u1', 'p1'],
+      ['11', 'u1', 'p2'],
+    ]) {
+      auth.user = { id, tenantId };
+      const view = mount(record);
+      await waitFor(() => expect(screen.getByTestId('form-btn-check')).toBeDefined());
+      fireEvent.click(screen.getByTestId('form-btn-check'));
+      await waitFor(() => expect(observed.getContext().state.noAttempt).toBe(true));
+      expect(observed.getContext().state.requestKey).toBeNull();
+      view.unmount();
+    }
+    expect(auth.transport).not.toHaveBeenCalled();
+    expect(random).not.toHaveBeenCalled();
+    expect(writes).not.toHaveBeenCalled();
+    expect(sessionStorage.length).toBe(1);
+  });
+  it('peek refuses corrupt storage, missing persisted match, forged state or live identity changes atomically', async () => {
+    const controller = createRequestKeySession(() => identity);
+    const retained = controller.ensure('requestKey', null);
+    const name = sessionStorage.key(0)!;
+    sessionStorage.setItem(name, 'invalid');
+    const view = mount();
+    await waitFor(() => expect(screen.getByTestId('form-btn-check')).toBeDefined());
+    fireEvent.click(screen.getByTestId('form-btn-check'));
+    await waitFor(() => expect(auth.toast).toHaveBeenCalled());
+    expect(auth.transport).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(name)).toBe('invalid');
+    sessionStorage.setItem(name, retained);
+    observed
+      .getStateManager()
+      .updateState(observed.getScopeId(), 'requestKey', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    auth.toast.mockClear();
+    fireEvent.click(screen.getByTestId('form-btn-check'));
+    await waitFor(() => expect(auth.toast).toHaveBeenCalled());
+    expect(auth.transport).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(name)).toBe(retained);
+    sessionStorage.removeItem(name);
+    expect(() => controller.peek('requestKey', retained)).toThrow('does not match');
+    sessionStorage.setItem(name, retained);
+    observed.getStateManager().updateState(observed.getScopeId(), 'requestKey', null);
+    auth.toast.mockClear();
+    auth.user = { id: 'u1', tenantId: '33' };
+    view.rerender(
+      <MemoryRouter>
+        <Page />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId('form-btn-check'));
+    await waitFor(() => expect(auth.toast).toHaveBeenCalled());
+    expect(auth.transport).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(name)).toBe(retained);
+  });
   it('retains unknown outcome across remount/refresh/reset; success clears both before a new attempt', async () => {
     const first = mount();
     await send();

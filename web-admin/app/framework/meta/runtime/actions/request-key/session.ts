@@ -7,6 +7,7 @@ export interface RequestKeyIdentity {
 }
 export interface RequestKeySession {
   ensure(field: string, current: unknown): string;
+  peek(field: string, current: unknown): string | null;
   clear(field: string, current: unknown): void;
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -78,6 +79,16 @@ export function createRequestKeySession(
     return existing || persisted;
   }
   return {
+    peek(field, current) {
+      const name = key(field);
+      const storage = getStorage();
+      const stored = storage.getItem(name);
+      const existing = current === null || current === undefined ? undefined : uuid(current);
+      const persisted = stored === null ? undefined : uuid(stored);
+      if (existing && existing !== persisted)
+        throw new Error('Request key state does not match its persisted attempt');
+      return persisted || null;
+    },
     ensure(field, current) {
       const name = key(field);
       const storage = getStorage();
