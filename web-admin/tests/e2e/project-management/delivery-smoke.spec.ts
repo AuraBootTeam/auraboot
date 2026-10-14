@@ -80,7 +80,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
     await shot('P22');
     await page.getByTestId('form-btn-cancel').click();
-    await projectRow().getByRole('button', { name: '查看', exact: true }).click();
+    await expect(page.getByTestId('object-summary').getByRole('progressbar')).toHaveAttribute('aria-valuenow', '68');
     await page.getByTestId('detail-toolbar-more').locator('summary').click();
     await expect(page.getByTestId('toolbar-btn-submit_acceptance')).toBeVisible();
     await shot('P23');
