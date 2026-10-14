@@ -58,7 +58,7 @@ export function formButtonSourceDependencies(buttons: ButtonConfig[]): string[] 
       try {
         visit(parser.parse(expression).ast);
       } catch {
-        /* Invalid gates remain fail-closed in the evaluator. */
+        throw new Error('Invalid form button condition');
       }
     }
   }
@@ -111,6 +111,8 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
 
   // 处理按钮点击事件 - 委托给 useActionHandler
   const handleButtonClick = (button: ButtonConfig) => {
+    // Mutable configuration must pass the same syntax boundary at dispatch time.
+    formButtonSourceDependencies([button]);
     const freshContext = runtime.getContext();
     if (button.permissionCode && !hasPermission(button.permissionCode)) return;
     if (button.visibleWhen && !evaluator.evaluateCondition(button.visibleWhen, freshContext))
