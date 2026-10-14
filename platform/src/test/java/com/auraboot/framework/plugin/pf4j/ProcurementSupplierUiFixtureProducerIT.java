@@ -296,6 +296,12 @@ class ProcurementSupplierUiFixtureProducerIT extends ProcurementPublicSourceNati
         return result;
     }
 
+    static void requireCompletedCommandResponse(JsonNode body) {
+        assertTrue(body.path("code").isTextual(), "Command ApiResponse code must be textual");
+        assertEquals("0", body.path("code").textValue());
+        assertEquals("completed", body.path("data").path("phaseReached").asText());
+    }
+
     private JsonNode action(String jwt, String code, String target, Map<String, Object> payload) throws Exception {
         var request = new LinkedHashMap<String, Object>(); request.put("payload", payload); request.put("clientRequestId", requestKey());
         if (target != null) {
@@ -306,7 +312,7 @@ class ProcurementSupplierUiFixtureProducerIT extends ProcurementPublicSourceNati
             var response = mvc.perform(post("/api/meta/commands/execute/" + code).header("Authorization", "Bearer " + jwt)
                     .contentType("application/json").content(json.writeValueAsBytes(request))).andReturn();
             assertEquals(200, response.getResponse().getStatus()); JsonNode body = json.readTree(response.getResponse().getContentAsByteArray());
-            assertEquals(200, body.path("code").asInt(-1)); assertEquals("completed", body.path("data").path("phaseReached").asText());
+            requireCompletedCommandResponse(body);
             publicActions.add(Map.of("command", code, "target", target == null ? "create" : target, "payload", payload, "httpStatus", 200));
             return body.path("data").path("data");
         } finally { context(); }

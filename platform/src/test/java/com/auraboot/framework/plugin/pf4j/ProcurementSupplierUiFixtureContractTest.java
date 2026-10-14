@@ -16,6 +16,23 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProcurementSupplierUiFixtureContractTest {
     @TempDir Path root;
 
+    @Test void completedResponseUsesActualApiResponseTextCodeAndRejectsNumericOrHttpAliases() throws Exception {
+        var json = new ObjectMapper();
+        var actual = json.valueToTree(com.auraboot.framework.common.dto.ApiResponse.success(
+                Map.of("phaseReached", "completed", "data", Map.of("recordPid", "fixture-pid"))));
+        assertTrue(actual.path("code").isTextual());
+        assertEquals("0", actual.path("code").asText());
+        ProcurementSupplierUiFixtureProducerIT.requireCompletedCommandResponse(actual);
+        for (String code : List.of("0", "200", "\"200\"", "null")) {
+            var wrong = actual.deepCopy(); ((ObjectNode) wrong).set("code", json.readTree(code));
+            assertThrows(AssertionError.class, () -> ProcurementSupplierUiFixtureProducerIT.requireCompletedCommandResponse(wrong));
+        }
+        var missing = actual.deepCopy(); ((ObjectNode) missing).remove("code");
+        assertThrows(AssertionError.class, () -> ProcurementSupplierUiFixtureProducerIT.requireCompletedCommandResponse(missing));
+        var failed = actual.deepCopy(); ((ObjectNode) failed.path("data")).put("phaseReached", "failed");
+        assertThrows(AssertionError.class, () -> ProcurementSupplierUiFixtureProducerIT.requireCompletedCommandResponse(failed));
+    }
+
     @Test void browserIdentityKeepsExactlyThreePermissionsAndNeverBorrowsNativeMakerAuthority() {
         assertEquals(List.of("meta.command.execute", "qo.srm.use", "page.page.read"), ProcurementSupplierUiFixtureProducerIT.SUPPLIER_PERMISSIONS);
         var maker = ProcurementSupplierUiFixtureProducerIT.INITIALIZER_PERMISSIONS;
