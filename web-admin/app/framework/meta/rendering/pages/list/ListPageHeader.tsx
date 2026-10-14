@@ -90,10 +90,10 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   const { t: contextT } = useI18n();
   const t = providedT ?? contextT;
   return (
-    <div className="border-border bg-panel border-b px-6 py-4">
+    <div className="border-border bg-panel border-b px-5 py-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="text-text flex-shrink-0 text-xl font-semibold tracking-tight whitespace-nowrap">
+          <h2 className="text-text min-w-0 text-xl font-semibold tracking-tight break-words">
             {title}
           </h2>
           {!hideSavedViews && (

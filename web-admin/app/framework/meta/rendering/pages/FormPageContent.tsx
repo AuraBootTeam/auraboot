@@ -1,3 +1,4 @@
+import { FormSection } from './form/FormSection';
 /**
  * FormPageContent - Extracted form rendering logic for DSL-driven form pages
  *
@@ -29,7 +30,10 @@ import { uploadCommandFile } from '~/framework/meta/utils/promptUpload';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
 import { scrollToFormField } from '~/framework/meta/rendering/pages/form/scrollToFormField';
-import { buildConstraintFieldMessage, buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
+import {
+  buildConstraintFieldMessage,
+  buildRequiredFieldMessage,
+} from '~/framework/meta/utils/validationMessages';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
@@ -378,13 +382,21 @@ export function buildFormCommandPayload(
   );
 }
 
-export function resolveAsyncCommandDispatch(responseData: any, submitMode?: unknown): { taskCode: string } | null {
+export function resolveAsyncCommandDispatch(
+  responseData: any,
+  submitMode?: unknown,
+): { taskCode: string } | null {
   const dispatch =
     responseData?.data && typeof responseData.data === 'object' ? responseData.data : responseData;
   // A configured task-detail page owns progress polling after durable admission.
   // A generic async acknowledgement without a task record must still be awaited.
-  if (submitMode === 'redirect' && dispatch?.queued === true &&
-      typeof dispatch?.taskId === 'string' && dispatch.taskId.trim()) return null;
+  if (
+    submitMode === 'redirect' &&
+    dispatch?.queued === true &&
+    typeof dispatch?.taskId === 'string' &&
+    dispatch.taskId.trim()
+  )
+    return null;
   const taskCode = dispatch?.taskCode;
   if (dispatch?.async === true && typeof taskCode === 'string' && taskCode.trim()) {
     return { taskCode: taskCode.trim() };
@@ -777,8 +789,11 @@ export function isFormAuthoringDenied(
   hasPermission: (permissionCode: string) => boolean,
 ): boolean {
   const primaryActions = activeButtons.filter((button) => button.primary === true);
-  return primaryActions.length > 0 && primaryActions.every(
-    (button) => !!button.permissionCode && !hasPermission(button.permissionCode),
+  return (
+    primaryActions.length > 0 &&
+    primaryActions.every(
+      (button) => !!button.permissionCode && !hasPermission(button.permissionCode),
+    )
   );
 }
 
@@ -1446,12 +1461,22 @@ export function FormPageContent(props: PageContentProps) {
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   const [fieldMetaLoaded, setFieldMetaLoaded] = useState(false);
-  const aiFields = useMemo(() => collectFormFillFields(schema, modelFields, fieldPermissions,
-    (value) => getLocalizedText(value as any, locale, t) || t('ai.fill.field')),
-    [schema, modelFields, fieldPermissions, locale, t]);
+  const aiFields = useMemo(
+    () =>
+      collectFormFillFields(
+        schema,
+        modelFields,
+        fieldPermissions,
+        (value) => getLocalizedText(value as any, locale, t) || t('ai.fill.field'),
+      ),
+    [schema, modelFields, fieldPermissions, locale, t],
+  );
   const aiFill = useFormFill(
     `${schema?.id ?? schema?.pageKey ?? tableName}:${routeRecordPid ?? 'new'}`,
-    schema?.modelCode || tableName, aiFields, formData, setFormData,
+    schema?.modelCode || tableName,
+    aiFields,
+    formData,
+    setFormData,
     mainRecordLoaded && fieldMetaLoaded,
   );
 
@@ -2048,7 +2073,10 @@ export function FormPageContent(props: PageContentProps) {
               // The reason a command refused the submit lives in context.detail.
               throw new Error(resolveCommandErrorMessage(result, effectiveCommandCode, t));
             }
-            const asyncDispatch = resolveAsyncCommandDispatch(result.data, schema?.extension?.asyncSubmitMode);
+            const asyncDispatch = resolveAsyncCommandDispatch(
+              result.data,
+              schema?.extension?.asyncSubmitMode,
+            );
             const responseData = asyncDispatch
               ? await (async () => {
                   const message = t('common.asyncProcessing');
@@ -2528,11 +2556,11 @@ export function FormPageContent(props: PageContentProps) {
           className="mx-auto w-full max-w-6xl px-2 py-3"
           data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
         >
-          <div className="rounded-card bg-panel shadow-sm">
+          <div className="bg-transparent">
             {/* Page Header */}
-            <div className="border-border border-b px-6 py-4">
+            <div className="pt-2 pb-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-text text-lg font-medium">
+                <h2 className="text-text text-xl font-semibold tracking-tight">
                   {getLocalizedText(schema.title, locale, t)}
                 </h2>
                 {onCancelOverride ? (
@@ -2606,7 +2634,11 @@ export function FormPageContent(props: PageContentProps) {
             )}
 
             {/* Form Content - Using ComponentLoader Pattern */}
-            <form className="p-6" data-testid="dynamic-form" onSubmit={(e) => e.preventDefault()}>
+            <form
+              className="space-y-4"
+              data-testid="dynamic-form"
+              onSubmit={(e) => e.preventDefault()}
+            >
               {!formInteractionReady ? (
                 <div
                   className="text-text-3 py-8 text-center text-sm"
@@ -2618,13 +2650,6 @@ export function FormPageContent(props: PageContentProps) {
                 <>
                   {/* B-003: top-level non-whitelist blocks (ai-fill-banner etc.) via the kernel
                     BlockRenderer, rendered above the form so operators see them first. */}
-                  {runtime && !miscFormBlocks.some((block: any) => block.blockType === 'ai-fill-banner')
-                    && aiFields.some((field) => !field.locked) && (
-                    <div className="mb-4">
-                      <BlockRenderer block={{ id: 'form-ai-fill', blockType: 'ai-fill-banner' } as any}
-                        runtime={runtime} areaId="form-ai-fill" />
-                    </div>
-                  )}
                   {runtime &&
                     miscFormBlocks.map((block: any, idx: number) => (
                       <div
@@ -2635,7 +2660,14 @@ export function FormPageContent(props: PageContentProps) {
                         <BlockRenderer block={block} runtime={runtime} areaId="form-misc" />
                       </div>
                     ))}
-                  {aiFill.receipt && <FormFillReceipt receipt={aiFill.receipt} fields={aiFields} t={t} onUndo={aiFill.undo} />}
+                  {aiFill.receipt && (
+                    <FormFillReceipt
+                      receipt={aiFill.receipt}
+                      fields={aiFields}
+                      t={t}
+                      onUndo={aiFill.undo}
+                    />
+                  )}
                   {customBlocks.length > 0 &&
                     customBlocks.map((block: any) => {
                       // Honour DSL visibility condition (matches form-section behavior below).
@@ -2694,41 +2726,21 @@ export function FormPageContent(props: PageContentProps) {
                         const isSettingsCard = displayVariant === 'settings-card';
 
                         return (
-                          <div
+                          <FormSection
                             key={block.id || `block-${blockIndex}`}
-                            data-testid={
-                              isSettingsCard && block.id ? `settings-card-${block.id}` : undefined
-                            }
-                            className={
-                              isSettingsCard
-                                ? 'form-section overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm'
-                                : 'form-section'
+                            title={blockTitle}
+                            description={blockDescription}
+                            collapsible={block.extension?.collapsible === true}
+                            defaultCollapsed={block.extension?.defaultCollapsed === true}
+                            hasError={(block.fields || []).some((field: any) =>
+                              Boolean(fieldErrors[field.field]),
+                            )}
+                            testId={
+                              isSettingsCard && block.id
+                                ? `settings-card-${block.id}`
+                                : `form-section-${block.id || blockIndex}`
                             }
                           >
-                            {/* Section Title */}
-                            {blockTitle && (
-                              <div
-                                className={
-                                  isSettingsCard
-                                    ? 'border-b border-slate-100 bg-slate-50 px-5 py-4'
-                                    : 'border-border mb-4 border-b pb-2'
-                                }
-                              >
-                                <h3
-                                  className={
-                                    isSettingsCard
-                                      ? 'text-base font-semibold text-slate-900'
-                                      : 'text-text text-base font-semibold'
-                                  }
-                                >
-                                  {blockTitle}
-                                </h3>
-                                {isSettingsCard && blockDescription ? (
-                                  <p className="mt-1 text-sm text-slate-500">{blockDescription}</p>
-                                ) : null}
-                              </div>
-                            )}
-
                             {/* Section Fields */}
                             {block.fields && block.fields.length > 0 && (
                               <div
@@ -2839,7 +2851,7 @@ export function FormPageContent(props: PageContentProps) {
                                 })}
                               </div>
                             )}
-                          </div>
+                          </FormSection>
                         );
                       })}
                     </div>
@@ -2925,7 +2937,7 @@ export function FormPageContent(props: PageContentProps) {
                 effectiveButtonBlock &&
                 effectiveButtonBlock.buttons &&
                 effectiveButtonBlock.buttons.length > 0 && (
-                  <div className="border-border mt-6 flex justify-end space-x-3 border-t pt-6">
+                  <div className="border-border bg-panel rounded-card sticky bottom-0 z-20 mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm">
                     {effectiveButtonBlock.buttons.map((button: any) => {
                       if (!canRenderFormButton(button, hasPermission)) return null;
                       // Check button visibility condition

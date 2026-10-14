@@ -1329,7 +1329,7 @@ function DetailPageContentInner(props: PageContentProps) {
       className="mx-auto w-full px-2 py-3"
       data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
     >
-      <div className="rounded-card bg-panel shadow-sm">
+      <div className="rounded-card border-border bg-panel border shadow-sm">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
         <div className="print-hide border-border border-b px-4 py-4 sm:px-6" data-print="hide">
           <div className={headerLayout.container}>
@@ -1358,7 +1358,7 @@ function DetailPageContentInner(props: PageContentProps) {
                   </Link>
                 ))}
               <div className="min-w-0">
-                <h2 className="text-text text-lg leading-tight font-semibold break-words">
+                <h2 className="text-text text-xl leading-tight font-semibold tracking-tight break-words">
                   {headerTitle}
                 </h2>
                 {headerSubtitle ? (
@@ -1560,7 +1560,7 @@ function DetailPageContentInner(props: PageContentProps) {
               </div>
             )}
             {topLevelDetailBlocks.length > 0 && (
-              <div className="space-y-6 border-t p-6">
+              <div className="space-y-4 border-t p-5">
                 {topLevelDetailBlocks.map((block: BlockConfig, blockIndex: number) =>
                   DETAIL_SPECIALIZED_BLOCK_TYPES.has(block.blockType as string) ? (
                     <DetailBlockRenderer
@@ -1597,7 +1597,7 @@ function DetailPageContentInner(props: PageContentProps) {
           </div>
         ) : (
           /* Direct mode: render form-sections and sub-tables without tabs */
-          <div className="space-y-6 p-6">
+          <div className="space-y-4 p-5">
             {/* Opt-in: misc blocks with detailPlacement === 'header' render at the
                 top (before form-sections / sub-tables). Default placement is
                 unchanged (rendered last), so existing pages are unaffected. */}
@@ -2217,14 +2217,14 @@ function DetailBlockRenderer({
       );
     }
     return (
-      <div className="form-section">
+      <section className="form-section border-border bg-panel rounded-card border p-5 shadow-sm">
         {block.title && (
-          <h3 className="text-text-2 mb-5 text-sm font-semibold tracking-wider uppercase">
+          <h3 className="text-text mb-4 text-sm font-semibold">
             {getLocalizedText(block.title, locale, t)}
           </h3>
         )}
         {block.fields && block.fields.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
             {block.fields.map((field: FieldConfig) => {
               const colSpan = field.layout?.colSpan || (field.span === 2 ? 12 : 6);
               const isFullWidth = colSpan >= 12 || field.span === 2;
@@ -2237,7 +2237,7 @@ function DetailBlockRenderer({
                 <div
                   key={field.field}
                   data-testid={`form-field-${field.field}`}
-                  className={`${isFullWidth ? 'md:col-span-2' : ''} border-border border-b pb-4`}
+                  className={`${isFullWidth ? 'md:col-span-2' : ''} min-w-0`}
                 >
                   <DynamicField
                     field={enrichedField}
@@ -2259,7 +2259,7 @@ function DetailBlockRenderer({
             })}
           </div>
         )}
-      </div>
+      </section>
     );
   }
 
