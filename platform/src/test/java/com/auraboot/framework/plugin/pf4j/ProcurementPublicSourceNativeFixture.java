@@ -141,7 +141,7 @@ abstract class ProcurementPublicSourceNativeFixture {
     @BeforeEach void prepare(TestInfo test) throws Exception {
         retainedActors.clear();retainedTaskPids.clear();retainedBootstrapPrincipal=null;priorCaseFacts=null;
         caseEvidence=null;tenant=null;userId=null;memberId=null;actor=null;provider=null;token=null;deniedToken=null;
-        loginCount.set(0);queryCount.set(0);orderSaveCount.set(0);orderLookupCount.set(0);orderReadCount.set(0);readClosedStatus="LOCAL_OPEN";readQuantity="300.000001";savedOrder=null;ambiguousOrderSave=false;publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";observed.targetNotFound.set(false);
+        loginCount.set(0);queryCount.set(0);orderSaveCount.set(0);orderLookupCount.set(0);orderReadCount.set(0);readClosedStatus="LOCAL_OPEN";readQuantity="300.000001";readReceivedQuantity="250";savedOrder=null;ambiguousOrderSave=false;publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";observed.targetNotFound.set(false);
         prepareEvidence(test);
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
         try(var sql=postgres.getConnection()){assertEquals("enterprise_22",sql.getCatalog());}
@@ -211,16 +211,17 @@ abstract class ProcurementPublicSourceNativeFixture {
             var request=json.readTree(http.getRequestBody().readAllBytes());String content=response;
             if("FixturePurchase".equals(request.path("data").path("FormId").asText())) {
                 assertNotNull(savedOrder);assertEquals(Set.of("data"),json.convertValue(request,Map.class).keySet());var query=request.path("data");
-                assertEquals(0,query.path("StartRow").asInt(-1));assertEquals(2,query.path("Limit").asInt(-1));
+                assertEquals(2,query.path("Limit").asInt(-1));
                 if("OrderId,BillNo,Marker".equals(query.path("FieldKeys").asText())) {
-                    orderLookupCount.incrementAndGet();assertEquals("Marker = '"+savedOrder.path("Marker").asText()+"'",query.path("FilterString").asText());
+                    assertEquals(0,query.path("StartRow").asInt(-1));orderLookupCount.incrementAndGet();assertEquals("Marker = '"+savedOrder.path("Marker").asText()+"'",query.path("FilterString").asText());
                     content=json.writeValueAsString(List.of(List.of("local-order-1","LOCAL-PO-1",savedOrder.path("Marker").asText())));
                 } else {
                     orderReadCount.incrementAndGet();assertEquals(String.join(",",READ_COLUMNS.stream().map(column->"Read_"+column).toList()),query.path("FieldKeys").asText());
                     String filter=query.path("FilterString").asText();assertTrue(filter.equals("Read_erp_id = 'local-order-1'") || filter.equals(""));
                     assertEquals("Read_erp_id ASC,Read_erp_entry_id ASC",query.path("OrderString").asText());assertEquals(0,query.path("TopRowCount").asInt(-1));
-                    var line=savedOrder.path("Lines").get(0);
-                    content=json.writeValueAsString(List.of(List.of("local-order-1","LOCAL-PO-1","local-entry-1",savedOrder.path("Supplier").path("Id").asText(),line.path("Material").path("Id").asText(),savedOrder.path("Date").asText(),"LOCAL_APPROVED",readClosedStatus,readQuantity,"0","250","LOCAL-MATERIAL","Local material","local","PCS",line.path("DeliveryDate").asText(),line.path("Source").path("Head").asText(),line.path("Source").path("Entry").asText())));
+                    var rows=orderReadRows();int start=query.path("StartRow").asInt(-1);
+                    assertTrue(start>=0 && start<=rows.size() && start%2==0,"Controlled read page must be canonical");
+                    content=json.writeValueAsString(rows.subList(start,Math.min(start+2,rows.size())));
                 }
             } else queryCount.incrementAndGet();
             byte[] bytes=content.getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
@@ -407,7 +408,12 @@ abstract class ProcurementPublicSourceNativeFixture {
     protected record Result(int status,com.fasterxml.jackson.databind.JsonNode body){}
     protected static final String SYNC_ORDERS="qo_procurement_order_common:sync_orders",SYNC_CLOSURES="qo_procurement_order_common:sync_closures";
     protected static final List<String> READ_COLUMNS=List.of("erp_id","bill_no","erp_entry_id","supplier_external_id","material_id","order_date","business_status","closed_status","ordered_qty","submitted_qty","received_qty","material_code","material_name","specification","unit","delivery_date","requisition_id","entry_id");
-    protected String readClosedStatus="LOCAL_OPEN",readQuantity="300.000001";
+    protected String readClosedStatus="LOCAL_OPEN",readQuantity="300.000001",readReceivedQuantity="250";
+    /** Controlled ERP read fixture seam; default rows preserve all original source/order cases. */
+    protected List<List<Object>> orderReadRows() {
+        var line=savedOrder.path("Lines").get(0);
+        return List.of(List.of("local-order-1","LOCAL-PO-1","local-entry-1",savedOrder.path("Supplier").path("Id").asText(),line.path("Material").path("Id").asText(),savedOrder.path("Date").asText(),"LOCAL_APPROVED",readClosedStatus,readQuantity,"0",readReceivedQuantity,"LOCAL-MATERIAL","Local material","local","PCS",line.path("DeliveryDate").asText(),line.path("Source").path("Head").asText(),line.path("Source").path("Entry").asText()));
+    }
     protected final AtomicInteger orderReadCount=new AtomicInteger();
     protected void verifyPublicOrderSynchronization(PreparedOrder order,Map<String,Object> source,List<Map<String,Object>> allocations,Map<String,Object> formal) throws Exception {
         assertTrue(extensions.getCommandHandler(SYNC_ORDERS).isPresent());assertTrue(extensions.getCommandHandler(SYNC_CLOSURES).isPresent());
