@@ -194,6 +194,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     expect(edited.request().postDataJSON().payload.tpm_pj_notes).toBe('客户已确认交付范围，附件保存并可下载。');
     expect((await edited.json()).data.phaseReached).toBe('completed');
     await newRow.getByRole('button', { name: '查看', exact: true }).click();
+    await expect(page.getByTestId('object-section-overview')).toContainText('客户已确认交付范围，附件保存并可下载。');
     await page.reload();
     await expect(page.getByTestId('object-section-overview')).toContainText('客户已确认交付范围，附件保存并可下载。');
     await shot('P19');

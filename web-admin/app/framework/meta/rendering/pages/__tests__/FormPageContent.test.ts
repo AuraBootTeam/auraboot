@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFormCommandPayload,
+  collectAttachmentRelationIds,
   getBomUploadReviewError,
   canRenderFormButton,
   isFormAuthoringDenied,
@@ -781,5 +782,21 @@ describe('BOM review submission validation', () => {
     expect(getBomUploadReviewError(review(true, ['mpn', 'quantity']), 'Invalid BOM')).toBeNull();
     expect(getBomUploadReviewError(null, 'Invalid BOM')).toBeNull();
     expect(getBomUploadReviewError('file-id', 'Invalid BOM')).toBeNull();
+  });
+});
+
+
+describe('attachment sharing serialization contract', () => {
+  it('uses public file identifiers from either native or serialized JSON collections', () => {
+    const files = [{ name: 'notes.txt', fileId: 'public-file-1' }];
+    expect(collectAttachmentRelationIds(files)).toEqual(['public-file-1']);
+    expect(collectAttachmentRelationIds(JSON.stringify(files))).toEqual(['public-file-1']);
+  });
+  it('allows an explicit empty collection to clear record relations', () => {
+    expect(collectAttachmentRelationIds('[]')).toEqual([]);
+  });
+  it('rejects missing identifiers and malformed collections rather than skipping sharing', () => {
+    expect(() => collectAttachmentRelationIds('[{"name":"unlinked.txt"}]')).toThrow();
+    expect(() => collectAttachmentRelationIds('{}')).toThrow();
   });
 });

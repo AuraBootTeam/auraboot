@@ -668,6 +668,18 @@ function resolveComponentByFieldMeta(
   return DATA_TYPE_TO_COMPONENT[String(dataType).toLowerCase()];
 }
 
+/** Decode the persisted JSON collection before registering public file relations. */
+export function collectAttachmentRelationIds(value: unknown): string[] {
+  const decoded = typeof value === 'string' ? JSON.parse(value) : value;
+  if (!Array.isArray(decoded)) throw new Error('Attachment collection must be an array.');
+  return decoded.map(item => {
+    if (!item || typeof item !== 'object' || typeof item.fileId !== 'string' || !item.fileId) {
+      throw new Error('Attachment collection requires public file identifiers.');
+    }
+    return item.fileId;
+  });
+}
+
 export function normalizePayloadValue(rawValue: any, dataType?: string) {
   if (isDatetimeDataType(dataType)) {
     return normalizeDateTimePayloadValue(rawValue);
@@ -2100,9 +2112,10 @@ export function FormPageContent(props: PageContentProps) {
               const savedPid = recordPid || extractPid(responseData);
               if (!savedPid) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但未取得附件关联目标。请重新打开项目检查。', en: 'Saved, but attachment target is missing. Reopen the record to check.' }, locale, t));
               for (const [field, meta] of Object.entries(modelFields)) {
-                if (!schema.extension?.attachmentFields?.includes(field) || !Array.isArray(commandPayload[field])) continue;
-                const fileIds = commandPayload[field].map((file: any) => file.fileId).filter(Boolean);
-                if (!fileIds.length) continue;
+                if (!schema.extension?.attachmentFields?.includes(field) || commandPayload[field] === undefined) continue;
+                let fileIds: string[];
+                try { fileIds = collectAttachmentRelationIds(commandPayload[field]); }
+                catch { throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但附件信息不完整。请重新上传附件。', en: 'Saved, but attachment metadata is incomplete. Upload the files again.' }, locale, t)); }
                 const relation = await fetchResult('/api/file/relation', { method: 'post', token: token || undefined, params: { entityType: schema.modelCode || tableName, entityId: savedPid, fieldName: field, fileIds } });
                 if (!ResultHelper.isSuccess(relation)) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但附件共享关联失败。请重新打开项目检查附件。', en: 'Saved, but attachment sharing failed. Reopen the record to check files.' }, locale, t));
               }
