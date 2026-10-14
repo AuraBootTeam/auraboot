@@ -25,12 +25,18 @@ if [[ "$ACTION" == start ]]; then
   [[ ! -e "$ARTIFACTS/open-platform-slo.jfr" ]] || die 'recording already exists'
   CONFIG=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/open-platform-slo.jfc
   docker cp "$CONFIG" "$APP:/tmp/open-platform-slo.jfc"
+  # CI's checkout umask may make docker-cp's root-owned file unreadable to the
+  # non-root JVM. Only this public diagnostic configuration is made readable.
+  docker exec --user 0 "$APP" chmod 0644 /tmp/open-platform-slo.jfc
   attach JFR.start name=open-platform-slo settings=/tmp/open-platform-slo.jfc \
     disk=true maxsize=32m maxage=3m > "$ARTIFACTS/logs/jfr-start.log" 2>&1
+  # jcmd exits zero even when the JVM rejects a diagnostic command.
+  grep -q 'Started recording ' "$ARTIFACTS/logs/jfr-start.log" || die 'JVM rejected JFR.start'
 else
   [[ ! -e "$ARTIFACTS/open-platform-slo.jfr" ]] || die 'recording already exists'
   attach JFR.stop name=open-platform-slo filename=/app/data/artifacts/open-platform-slo.jfr \
     > "$ARTIFACTS/logs/jfr-stop.log" 2>&1
+  grep -q 'Stopped recording ' "$ARTIFACTS/logs/jfr-stop.log" || die 'JVM rejected JFR.stop'
   docker cp "$APP:/app/data/artifacts/open-platform-slo.jfr" "$ARTIFACTS/open-platform-slo.jfr"
   [[ -s "$ARTIFACTS/open-platform-slo.jfr" ]] || die 'empty recording'
   timeout 30 docker run --rm --network none --user "$(id -u):$(id -g)" \

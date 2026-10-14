@@ -18,10 +18,14 @@ with open(os.environ['JFR_TEST_CALLS'],'a') as f: f.write(json.dumps(a)+'\\n')
 mode=os.environ.get('JFR_TEST_MODE','')
 if a[0]=='inspect': print(('false' if mode=='stopped' else 'true')+' job '+('c'*40 if mode=='wrong-source' else 'a'*40))
 elif a[0]=='exec':
- if a[-2:]==['id','-u'] or a[-2:]==['id','-g']: print('1000')
+ if 'chmod' in a:
+  if mode=='chmod-failed': sys.exit(43)
+ elif a[-2:]==['id','-u'] or a[-2:]==['id','-g']: print('1000')
  else: print('7\\n8' if mode=='multiple-java' else '7')
 elif a[0]=='run':
  if mode=='attach-failed' and 'jcmd' in a: sys.exit(42)
+ if 'JFR.start' in a or 'JFR.stop' in a:
+  print('Could not access recording configuration' if mode=='jvm-rejected' else ('Started recording 1' if 'JFR.start' in a else 'Stopped recording 1'))
  if 'summary' in a: print(' jdk.InitialEnvironmentVariable '+('1' if mode=='sensitive' else '0')+' 0\\n jdk.InitialSystemProperty 0 0')
 elif a[0]=='cp' and a[1].startswith('open-platform-job-app:'):
  open(a[2],'wb').write(b'fixture-recording')
@@ -41,6 +45,7 @@ elif a[0]=='cp' and a[1].startswith('open-platform-job-app:'):
     assert.equal(attach[attach.indexOf('--user')+1],'1000:1000');
     assert.equal(attach[attach.indexOf('jcmd')+1],'7');
     assert.equal(attach[attach.indexOf('jcmd')-1],jdk);
+    if(action==='start') assert.ok(result.calls.some(a=>a.join(' ')==='exec --user 0 open-platform-job-app chmod 0644 /tmp/open-platform-slo.jfc'));
     assert.equal(result.calls.some(a=>a.some(s=>s.includes('VM.system_properties')||s.includes('Config.Env'))),false);
   }
   for (const mode of ['stopped','wrong-source','multiple-java']) {
@@ -54,5 +59,10 @@ elif a[0]=='cp' and a[1].startswith('open-platform-job-app:'):
     assert.equal(fs.existsSync(path.join(result.artifacts,'open-platform-slo.jfr')),false);
   }
   const sensitive=run('collect','sensitive');assert.notEqual(sensitive.status,0);assert.match(sensitive.stderr,/unexpected sensitive JFR event/);
+  for(const action of ['start','collect']) {
+    const rejected=run(action,'jvm-rejected');assert.equal(rejected.status,2);assert.match(rejected.stderr,/JVM rejected JFR/);
+    assert.equal(fs.existsSync(path.join(rejected.artifacts,'open-platform-slo.jfr')),false);
+  }
+  const unreadable=run('start','chmod-failed');assert.equal(unreadable.status,43);assert.equal(unreadable.calls.some(a=>a.includes('jcmd')),false);
   console.log(`open-platform JFR identity/privacy/collection: ${cases} hermetic cases PASS`);
 } finally {fs.rmSync(root,{recursive:true,force:true});}
