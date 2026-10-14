@@ -83,7 +83,7 @@ class ProcurementSupplierUiFixtureProducerIT extends ProcurementPublicSourceNati
 
     static List<String> initializerPermissions() {
         var permissions = new ArrayList<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
-        permissions.addAll(List.of("model.qo_procurement_category_supplier_common.read", "model.pr_purchase_order.read",
+        permissions.addAll(List.of("model.pr_purchase_order.read",
                 "model.pr_purchase_order_line.read", "model.pr_supplier_pcba_contact.read",
                 "model.qo_procurement_membership_common.read", "model.qo_procurement_address_common.read"));
         return List.copyOf(permissions);

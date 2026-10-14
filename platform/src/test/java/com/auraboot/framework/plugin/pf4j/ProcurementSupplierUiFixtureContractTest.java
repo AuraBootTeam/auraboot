@@ -83,6 +83,11 @@ class ProcurementSupplierUiFixtureContractTest {
         assertEquals(List.of("meta.command.execute", "qo.srm.use", "page.page.read"), ProcurementSupplierUiFixtureProducerIT.SUPPLIER_PERMISSIONS);
         var maker = ProcurementSupplierUiFixtureProducerIT.INITIALIZER_PERMISSIONS;
         assertEquals(25, maker.size()); assertEquals(25, Set.copyOf(maker).size());
+        var expected=new java.util.HashSet<>(ProcurementSourceUiFixtureProducerIT.MAKER_PERMISSIONS);
+        expected.addAll(List.of("model.pr_purchase_order.read","model.pr_purchase_order_line.read",
+                "model.pr_supplier_pcba_contact.read","model.qo_procurement_membership_common.read",
+                "model.qo_procurement_address_common.read"));
+        assertEquals(25,expected.size());assertEquals(expected,Set.copyOf(maker));
         assertFalse(maker.contains("*")); assertFalse(maker.contains("qo.srm.use"));
         assertEquals(List.of("quoteSubmit", "quoteDecline", "shipmentJourney", "shipmentUnknown", "closedOrder"), ProcurementSupplierUiFixtureProducerIT.STAGES);
         assertEquals(5, Set.copyOf(ProcurementSupplierUiFixtureProducerIT.STAGES).size());
