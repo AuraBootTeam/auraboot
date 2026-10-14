@@ -3592,7 +3592,7 @@ CREATE TABLE public.ab_announcement (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
