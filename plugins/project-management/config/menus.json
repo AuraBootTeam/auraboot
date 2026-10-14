@@ -2,14 +2,14 @@
   {
     "code": "tpm_root",
     "parentCode": null,
-    "name:zh-CN": "项目管理",
-    "name:en": "Projects",
+    "name:zh-CN": "项目交付",
+    "name:en": "Project delivery",
     "path": null,
     "component": null,
     "icon": "IconBriefcase",
     "type": 0,
     "permissionCode": null,
-    "orderNo": 810,
+    "orderNo": 50,
     "visible": true
   },
   {
