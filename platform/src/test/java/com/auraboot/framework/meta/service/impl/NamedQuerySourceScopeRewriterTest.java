@@ -11,9 +11,25 @@ class NamedQuerySourceScopeRewriterTest {
             NamedQuerySourceModels.identity("customers"), "created_by = 20");
 
     @Test void leftJoinFiltersItsInputRatherThanOuterWhere() {
-        String sql = rewriter.rewrite("SELECT o.pid, c.pid FROM orders o LEFT JOIN customers c ON c.pid = o.customer WHERE o.pid = #{params.pid}", scopes);
-        assertTrue(sql.contains("LEFT JOIN (SELECT * FROM \"public\".\"customers\" WHERE (created_by = 20)) c ON"), sql);
-        assertTrue(sql.endsWith("WHERE o.pid = #{params.pid}"), sql);
+        var previous = (com.baomidou.mybatisplus.extension.parser.cache.JsqlParseCache)
+                org.springframework.test.util.ReflectionTestUtils.getField(
+                        com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.class, "jsqlParseCache");
+        var cache = new com.baomidou.mybatisplus.extension.parser.cache.JdkSerialCaffeineJsqlParseCache(
+                builder -> builder.maximumSize(32));
+        com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.setJsqlParseCache(cache);
+        try {
+            String sql = rewriter.rewrite("SELECT o.pid, c.pid FROM orders o LEFT JOIN customers c ON c.pid = o.customer WHERE o.pid = #{params.pid}", scopes);
+            assertTrue(sql.contains("LEFT JOIN (SELECT * FROM \"public\".\"customers\" WHERE (created_by = 20)) c ON"), sql);
+            assertTrue(sql.endsWith("WHERE o.pid = #{params.pid}"), sql);
+            String source = "SELECT o.pid, c.pid FROM orders o LEFT JOIN customers c ON c.pid = o.customer WHERE o.pid = #{params.pid}";
+            var pristine = cache.getStatement(source.replace("#{params.pid}", ":__nq_scope_parameter_0"));
+            assertNotNull(pristine, "Source scope rewriting must reuse the shared syntax cache");
+            assertFalse(pristine.toString().contains("created_by"));
+            String other = rewriter.rewrite(source, Map.of(NamedQuerySourceModels.identity("orders"), "",
+                    NamedQuerySourceModels.identity("customers"), "created_by = 21"));
+            assertTrue(other.contains("created_by = 21"), other);
+            assertFalse(other.contains("created_by = 20"), other);
+        } finally { com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.setJsqlParseCache(previous); }
     }
     @Test void nestedAndScalarSourcesBothReceiveScope() {
         String sql = rewriter.rewrite("SELECT x.pid, (SELECT max(pid) FROM customers) AS latest FROM (SELECT pid FROM customers) x", scopes);

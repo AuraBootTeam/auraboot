@@ -191,7 +191,7 @@ public class MybatisPlusConfig {
                         (long) sql.length() * 2 + ast.length))
                 .expireAfterAccess(java.time.Duration.ofMinutes(5))
                 .build();
-        JsqlParserGlobal.setJsqlParseCache(new JdkSerialCaffeineJsqlParseCache(parsedSql));
+        JsqlParserGlobal.setJsqlParseCache(new SqlSyntaxCache(parsedSql));
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
         // env-layering #19 — UPDATE/DELETE write-side lock guard. Registered FIRST so it sees
@@ -357,6 +357,23 @@ public class MybatisPlusConfig {
                 active, tenantBypassTablePrefixes);
     }
 
+
+    /** Single and multi parsing can consume identical SQL, but produce different AST types. */
+    static final class SqlSyntaxCache extends JdkSerialCaffeineJsqlParseCache {
+        SqlSyntaxCache(com.github.benmanes.caffeine.cache.Cache<String, byte[]> storage) { super(storage); }
+        @Override public net.sf.jsqlparser.statement.Statement getStatement(String sql) {
+            return super.getStatement("single:" + sql);
+        }
+        @Override public void putStatement(String sql, net.sf.jsqlparser.statement.Statement ast) {
+            super.putStatement("single:" + sql, ast);
+        }
+        @Override public net.sf.jsqlparser.statement.Statements getStatements(String sql) {
+            return super.getStatements("multi:" + sql);
+        }
+        @Override public void putStatements(String sql, net.sf.jsqlparser.statement.Statements ast) {
+            super.putStatements("multi:" + sql, ast);
+        }
+    }
 
     /**
      * Tenant/env line interceptor that skips host-owned mapper statements entirely,

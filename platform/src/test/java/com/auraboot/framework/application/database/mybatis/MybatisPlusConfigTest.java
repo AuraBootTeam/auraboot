@@ -125,6 +125,10 @@ public class MybatisPlusConfigTest {
         var originalUpdate = com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.parseStatements(update);
         String updateSql = originalUpdate.toString();
         assertNotSame(originalUpdate, cache.getStatements(update));
+        assertInstanceOf(net.sf.jsqlparser.statement.update.Update.class,
+                com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.parse(update));
+        assertEquals(updateSql, cache.getStatements(update).toString(),
+                "Single-statement classification must not replace the multi-statement cache entry");
         var tenant = findTenantInterceptor(interceptor);
         try (var workers = java.util.concurrent.Executors.newFixedThreadPool(4)) {
             java.util.List<java.util.concurrent.Callable<String>> calls = new java.util.ArrayList<>();

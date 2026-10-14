@@ -5,7 +5,7 @@ import com.auraboot.framework.meta.exception.MetaServiceException;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.ExpressionVisitorAdapter;
 import net.sf.jsqlparser.expression.Function;
-import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.*;
@@ -40,7 +40,7 @@ final class NamedQueryColumnLineage {
     Set<PhysicalColumn> resolveConsumedSql(String sql) {
         inspectConsumption = true; consumed.clear();
         try {
-            projection((Select) CCJSqlParserUtil.parse(sql.replaceAll("#\\{params\\.[a-zA-Z0-9_]+}", "?")), Map.of());
+            projection((Select) JsqlParserGlobal.parse(sql.replaceAll("#\\{params\\.[a-zA-Z0-9_]+}", "?")), Map.of());
             return Set.copyOf(consumed);
         } catch (net.sf.jsqlparser.JSQLParserException failure) {
             throw new MetaServiceException("Cannot resolve complete named query dependencies", failure);
@@ -55,7 +55,7 @@ final class NamedQueryColumnLineage {
                     .map(field -> field.getColumnExpr() + " AS " + field.getFieldCode()).toList());
             String sql = ("SELECT " + outputs + " FROM " + source)
                     .replaceAll("#\\{params\\.[a-zA-Z0-9_]+}", "?");
-            Projection projection = projection((Select) CCJSqlParserUtil.parse(sql), Map.of());
+            Projection projection = projection((Select) JsqlParserGlobal.parse(sql), Map.of());
             Map<String, Origin> result = new LinkedHashMap<>();
             for (NamedQueryField field : fields) {
                 if (result.putIfAbsent(field.getFieldCode(), projection.resolve(identifier(field.getFieldCode()))) != null)
@@ -164,7 +164,7 @@ final class NamedQueryColumnLineage {
             String definition = views.get(NamedQuerySourceModels.identity(tableName));
             if (definition != null) {
                 final Projection underlying;
-                try { underlying = projection((Select) CCJSqlParserUtil.parse(definition), Map.of()); }
+                try { underlying = projection((Select) JsqlParserGlobal.parse(definition), Map.of()); }
                 catch (net.sf.jsqlparser.JSQLParserException invalid) {
                     throw new MetaServiceException("Cannot resolve view column sources", invalid);
                 }
