@@ -24,7 +24,8 @@
           "label": {
             "zh-CN": "编辑",
             "en": "Edit"
-          }
+          },
+          "visibleWhen": "true"
         },
         {
           "code": "activate_project",
@@ -33,7 +34,8 @@
           "label": {
             "zh-CN": "启动项目",
             "en": "Activate Project"
-          }
+          },
+          "visibleWhen": "form.tpm_pj_status === 'planning' || form.tpm_pj_status === 'on_hold'"
         },
         {
           "code": "hold_project",
@@ -42,7 +44,8 @@
           "label": {
             "zh-CN": "暂停项目",
             "en": "Put On Hold"
-          }
+          },
+          "visibleWhen": "form.tpm_pj_status === 'active'"
         },
         {
           "code": "complete_project",
@@ -51,149 +54,200 @@
           "label": {
             "zh-CN": "完成",
             "en": "Complete"
-          }
-        },
-        {
-          "code": "cancel_project",
-          "commandCode": "tpm:cancel_project",
-          "permissionCode": "tpm.project.manage",
-          "label": {
-            "zh-CN": "取消",
-            "en": "Cancel"
-          }
-        },
-        {
-          "code": "delete",
-          "action": "delete",
-          "danger": true,
-          "commandCode": "tpm:delete_project",
-          "permissionCode": "tpm.project.manage",
-          "confirmMessageKey": "delete.confirm",
-          "label": {
-            "zh-CN": "删除",
-            "en": "Delete"
-          }
+          },
+          "visibleWhen": "form.tpm_pj_status === 'active'"
         }
       ],
       "area": "header"
     },
     {
-      "id": "info",
-      "blockType": "form-section",
+      "id": "progress",
+      "blockType": "metric-strip",
+      "dataSource": "deliveryProgress",
+      "detailPlacement": "header",
+      "variant": "cards",
+      "metrics": [
+        {
+          "key": "progress",
+          "label": {
+            "zh-CN": "交付进度",
+            "en": "Delivery progress"
+          },
+          "valueField": "progress",
+          "unit": "%",
+          "tone": "blue",
+          "subText": {
+            "zh-CN": "按已达成里程碑计算",
+            "en": "Based on reached milestones"
+          }
+        },
+        {
+          "key": "reached",
+          "label": {
+            "zh-CN": "已达成",
+            "en": "Reached"
+          },
+          "valueField": "reached",
+          "tone": "green"
+        },
+        {
+          "key": "pending",
+          "label": {
+            "zh-CN": "待交付",
+            "en": "Pending"
+          },
+          "valueField": "pending",
+          "tone": "amber"
+        }
+      ]
+    },
+    {
+      "id": "overview",
+      "blockType": "detail-section",
       "readOnly": true,
       "title": {
-        "zh-CN": "项目信息",
-        "en-US": "Project Information"
+        "zh-CN": "交付约定",
+        "en": "Delivery agreement"
       },
       "fields": [
-        {
-          "field": "tpm_pj_code",
-          "colSpan": 6
-        },
-        {
-          "field": "tpm_pj_name",
-          "colSpan": 6
-        },
         {
           "field": "tpm_pj_status",
           "colSpan": 6
         },
         {
-          "field": "tpm_pj_priority",
+          "field": "tpm_pj_customer",
           "colSpan": 6
         },
         {
-          "field": "tpm_pj_owner",
+          "field": "tpm_pj_owner_user",
           "colSpan": 6
-        },
-        {
-          "field": "tpm_pj_start_date",
-          "colSpan": 3
         },
         {
           "field": "tpm_pj_end_date",
-          "colSpan": 3
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_budget",
+          "colSpan": 6
         },
         {
           "field": "tpm_pj_description",
           "colSpan": 12
         }
-      ],
-      "area": "main"
-    },
-    {
-      "id": "tasks",
-      "blockType": "sub-table",
-      "title": {
-        "zh-CN": "任务",
-        "en-US": "Tasks"
-      },
-      "modelCode": "tpm_task",
-      "foreignKey": "tpm_ts_project_id",
-      "columns": [
-        {
-          "field": "tpm_ts_code",
-          "width": 140
-        },
-        {
-          "field": "tpm_ts_title",
-          "width": 220
-        },
-        {
-          "field": "tpm_ts_status",
-          "width": 110,
-          "renderType": "tag",
-          "dictCode": "tpm_task_status"
-        },
-        {
-          "field": "tpm_ts_priority",
-          "width": 100,
-          "renderType": "tag",
-          "dictCode": "tpm_priority"
-        },
-        {
-          "field": "tpm_ts_assignee",
-          "width": 120
-        },
-        {
-          "field": "tpm_ts_due_date",
-          "width": 120
-        }
-      ],
-      "createCommandCode": "tpm:create_task",
-      "area": "sub-tables"
+      ]
     },
     {
       "id": "milestones",
       "blockType": "sub-table",
       "title": {
-        "zh-CN": "里程碑",
-        "en-US": "Milestones"
+        "zh-CN": "交付里程碑",
+        "en": "Delivery milestones"
       },
-      "modelCode": "tpm_milestone",
-      "foreignKey": "tpm_ms_project_id",
-      "columns": [
-        {
-          "field": "tpm_ms_code",
-          "width": 140
+      "subTable": {
+        "childModel": "tpm_milestone",
+        "parentField": "tpm_ms_project_id",
+        "readOnly": true,
+        "columns": [
+          {
+            "field": "tpm_ms_name",
+            "label": {
+              "zh-CN": "交付内容",
+              "en": "Deliverable"
+            },
+            "width": 280
+          },
+          {
+            "field": "tpm_ms_target_date",
+            "label": {
+              "zh-CN": "计划日期",
+              "en": "Target date"
+            },
+            "width": 150,
+            "dataType": "date"
+          },
+          {
+            "field": "tpm_ms_status",
+            "label": {
+              "zh-CN": "状态",
+              "en": "Status"
+            },
+            "width": 120,
+            "dictCode": "tpm_milestone_status",
+            "renderType": "tag"
+          },
+          {
+            "field": "tpm_ms_description",
+            "label": {
+              "zh-CN": "验收要点",
+              "en": "Acceptance criteria"
+            },
+            "width": 300
+          }
+        ],
+        "actions": [
+          {
+            "code": "reach",
+            "label": {
+              "zh-CN": "完成里程碑",
+              "en": "Complete milestone"
+            },
+            "commandCode": "tpm:reach_milestone",
+            "permissionCode": "tpm.milestone.manage",
+            "visibleWhen": "row.tpm_ms_status === 'pending'",
+            "confirm": {
+              "zh-CN": "确认本项交付已达到约定的验收要求？完成后将更新项目交付进度。",
+              "en": "Confirm the deliverable meets its acceptance criteria? Progress will update."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "activity",
+      "blockType": "activity-timeline",
+      "title": {
+        "zh-CN": "最近动态",
+        "en": "Recent activity"
+      },
+      "businessDataSource": {
+        "queryCode": "tpm_delivery_activity",
+        "params": {
+          "projectPid": "${recordPid}"
         },
-        {
-          "field": "tpm_ms_name",
-          "width": 220
-        },
-        {
-          "field": "tpm_ms_status",
-          "width": 110,
-          "renderType": "tag",
-          "dictCode": "tpm_milestone_status"
-        },
-        {
-          "field": "tpm_ms_target_date",
-          "width": 130
-        }
-      ],
-      "createCommandCode": "tpm:create_milestone",
-      "area": "sub-tables"
+        "method": "get"
+      },
+      "businessRecordMapping": {
+        "pid": "pid",
+        "occurredAt": "occurred_at",
+        "activityType": "activity_type",
+        "subject": "subject",
+        "content": "content",
+        "actorName": "actor_name"
+      }
     }
-  ]
+  ],
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "headerTitleField": "tpm_pj_name",
+    "headerSubtitleFields": [
+      "tpm_pj_customer",
+      "tpm_pj_code"
+    ]
+  },
+  "dataSources": {
+    "deliveryProgress": {
+      "type": "namedQuery",
+      "queryCode": "tpm_delivery_progress",
+      "params": {
+        "projectPid": "${form.pid}"
+      },
+      "adaptor": "table",
+      "format": "records",
+      "dependOn": [
+        "form.pid"
+      ]
+    }
+  }
 }

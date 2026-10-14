@@ -6,33 +6,101 @@
   "kind": "form",
   "schemaVersion": 4,
   "title": {
-    "zh-CN": "项目表单",
-    "en": "Project Form"
+    "zh-CN": "项目计划",
+    "en": "Project plan"
   },
   "layout": {
     "type": "stack"
   },
   "blocks": [
     {
-      "id": "basic",
+      "id": "outcome",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "项目信息",
-        "en-US": "Project Information"
+        "zh-CN": "客户与交付目标",
+        "en": "Customer and outcome"
       },
       "fields": [
         {
           "field": "tpm_pj_name",
+          "colSpan": 6,
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：青禾零售 · 会员系统上线",
+              "en": "e.g. Acorn Retail · Membership launch"
+            },
+            "helpText": {
+              "zh-CN": "使用客户与交付内容命名，便于团队识别。",
+              "en": "Name the customer and deliverable."
+            }
+          }
+        },
+        {
+          "field": "tpm_pj_customer",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：青禾零售",
+              "en": "e.g. Acorn Retail"
+            },
+            "helpText": {
+              "zh-CN": "填写客户的业务名称。",
+              "en": "Use the customer business name."
+            }
+          }
+        },
+        {
+          "field": "tpm_pj_description",
           "colSpan": 12,
-          "required": true
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：完成会员迁移、积分联调与门店培训",
+              "en": "e.g. Migrate members, integrate points and train stores"
+            },
+            "helpText": {
+              "zh-CN": "写明本次交付的验收目标。",
+              "en": "Describe the acceptance outcome."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "交付计划",
+        "en": "Delivery plan"
+      },
+      "fields": [
+        {
+          "field": "tpm_pj_owner_user",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "按姓名搜索空间成员",
+              "en": "Search space members"
+            },
+            "helpText": {
+              "zh-CN": "选择负责推进与协调的空间成员。",
+              "en": "Assign a member responsible for delivery."
+            }
+          }
         },
         {
-          "field": "tpm_pj_priority",
-          "colSpan": 6
-        },
-        {
-          "field": "tpm_pj_owner",
-          "colSpan": 6
+          "field": "tpm_pj_budget",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：128000",
+              "en": "e.g. 128000"
+            },
+            "helpText": {
+              "zh-CN": "单位为人民币元，不含额外变更费用。",
+              "en": "CNY; excludes additional scope changes."
+            }
+          }
         },
         {
           "field": "tpm_pj_start_date",
@@ -43,11 +111,10 @@
           "colSpan": 6
         },
         {
-          "field": "tpm_pj_description",
-          "colSpan": 12
+          "field": "tpm_pj_priority",
+          "colSpan": 6
         }
-      ],
-      "area": "main"
+      ]
     },
     {
       "id": "buttons",
@@ -59,8 +126,8 @@
           "commandCode": "tpm:create_project",
           "primary": true,
           "label": {
-            "zh-CN": "提交",
-            "en": "Submit"
+            "zh-CN": "保存项目",
+            "en": "Save project"
           }
         },
         {

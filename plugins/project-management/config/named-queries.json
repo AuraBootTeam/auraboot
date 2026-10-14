@@ -5,12 +5,136 @@
     "name:en": "Task Summary by Project",
     "description": "Task counts grouped by status for each project.",
     "purpose": "Provides task breakdown per project for progress tracking dashboards.",
-    "parameter_schema": { "type": "object", "properties": { "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" } }, "required": ["tenantId"] },
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "description": "Tenant ID (auto-injected)"
+        }
+      },
+      "required": [
+        "tenantId"
+      ]
+    },
     "fromSql": "SELECT tpm_ts_project_id AS project_id, tpm_ts_status AS status, COUNT(*) AS count FROM mt_tpm_task WHERE tenant_id = #{params.tenantId} GROUP BY tpm_ts_project_id, tpm_ts_status ORDER BY tpm_ts_project_id, CASE tpm_ts_status WHEN 'todo' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'in_review' THEN 3 WHEN 'done' THEN 4 ELSE 5 END",
     "outputFields": [
-      { "code": "project_id", "columnExpr": "project_id", "dataType": "string", "searchable": true },
-      { "code": "status", "columnExpr": "status", "dataType": "string", "searchable": true },
-      { "code": "count", "columnExpr": "count", "dataType": "number", "sortable": true }
+      {
+        "code": "project_id",
+        "columnExpr": "project_id",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "status",
+        "columnExpr": "status",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "count",
+        "columnExpr": "count",
+        "dataType": "number",
+        "sortable": true
+      }
+    ]
+  },
+  {
+    "code": "tpm_delivery_progress",
+    "name:zh-CN": "交付进度",
+    "name:en": "Delivery progress",
+    "description": "Reached milestone ratio for exactly one tenant-scoped project.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "projectPid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "projectPid"
+      ]
+    },
+    "fromSql": "SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE tpm_ms_status = 'reached') AS reached, COUNT(*) FILTER (WHERE tpm_ms_status = 'pending') AS pending, COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE tpm_ms_status = 'reached') / NULLIF(COUNT(*), 0)), 0) AS progress FROM mt_tpm_milestone WHERE tenant_id = #{params.tenantId} AND tpm_ms_project_id = #{params.projectPid}",
+    "outputFields": [
+      {
+        "code": "total",
+        "columnExpr": "total",
+        "dataType": "number"
+      },
+      {
+        "code": "reached",
+        "columnExpr": "reached",
+        "dataType": "number"
+      },
+      {
+        "code": "pending",
+        "columnExpr": "pending",
+        "dataType": "number"
+      },
+      {
+        "code": "progress",
+        "columnExpr": "progress",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "code": "tpm_delivery_activity",
+    "name:zh-CN": "里程碑动态",
+    "name:en": "Milestone activity",
+    "description": "Actual milestone command activity joined to the parent project, scoped by tenant.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "projectPid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "projectPid"
+      ]
+    },
+    "fromSql": "SELECT a.pid, a.occurred_at, a.activity_type, a.actor_name, m.tpm_ms_name AS subject, a.content FROM ab_activity a JOIN mt_tpm_milestone m ON a.object_record = m.pid AND a.tenant_id = m.tenant_id WHERE a.tenant_id = #{params.tenantId} AND a.object_model = 'tpm_milestone' AND m.tpm_ms_project_id = #{params.projectPid} ORDER BY a.occurred_at DESC",
+    "outputFields": [
+      {
+        "code": "pid",
+        "columnExpr": "pid",
+        "dataType": "string"
+      },
+      {
+        "code": "occurred_at",
+        "columnExpr": "occurred_at",
+        "dataType": "string"
+      },
+      {
+        "code": "activity_type",
+        "columnExpr": "activity_type",
+        "dataType": "string"
+      },
+      {
+        "code": "actor_name",
+        "columnExpr": "actor_name",
+        "dataType": "string"
+      },
+      {
+        "code": "subject",
+        "columnExpr": "subject",
+        "dataType": "string"
+      },
+      {
+        "code": "content",
+        "columnExpr": "content",
+        "dataType": "string"
+      }
     ]
   }
 ]

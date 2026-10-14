@@ -6,8 +6,8 @@
   "kind": "list",
   "schemaVersion": 4,
   "title": {
-    "zh-CN": "项目列表",
-    "en": "Projects"
+    "zh-CN": "项目交付",
+    "en": "Project delivery"
   },
   "layout": {
     "type": "stack"
@@ -23,8 +23,8 @@
           "primary": true,
           "permissionCode": "tpm.project.manage",
           "label": {
-            "zh-CN": "新建",
-            "en": "Create"
+            "zh-CN": "新建项目",
+            "en": "New project"
           }
         }
       ],
@@ -86,14 +86,13 @@
       "blockType": "table",
       "columns": [
         {
-          "field": "tpm_pj_code",
-          "width": 150,
+          "field": "tpm_pj_name",
+          "width": 290,
           "sortable": true
         },
         {
-          "field": "tpm_pj_name",
-          "width": 220,
-          "sortable": true
+          "field": "tpm_pj_customer",
+          "width": 180
         },
         {
           "field": "tpm_pj_status",
@@ -102,24 +101,17 @@
           "dictCode": "tpm_project_status"
         },
         {
-          "field": "tpm_pj_priority",
-          "width": 100,
-          "renderType": "tag",
-          "dictCode": "tpm_priority"
-        },
-        {
-          "field": "tpm_pj_owner",
-          "width": 120
-        },
-        {
-          "field": "tpm_pj_start_date",
-          "width": 120,
-          "sortable": true
+          "field": "tpm_pj_owner_user",
+          "width": 130
         },
         {
           "field": "tpm_pj_end_date",
-          "width": 120,
+          "width": 145,
           "sortable": true
+        },
+        {
+          "field": "tpm_pj_budget",
+          "width": 140
         },
         {
           "field": "actions",
@@ -143,18 +135,6 @@
                 "zh-CN": "编辑",
                 "en": "Edit"
               }
-            },
-            {
-              "code": "delete",
-              "action": "delete",
-              "danger": true,
-              "commandCode": "tpm:delete_project",
-              "permissionCode": "tpm.project.manage",
-              "confirmMessageKey": "delete.confirm",
-              "label": {
-                "zh-CN": "删除",
-                "en": "Delete"
-              }
             }
           ],
           "label": {
@@ -165,13 +145,29 @@
       ],
       "searchFields": [
         "tpm_pj_name",
-        "tpm_pj_code"
+        "tpm_pj_code",
+        "tpm_pj_customer"
       ],
       "defaultSort": {
         "field": "created_at",
         "order": "desc"
       },
-      "area": "main"
+      "area": "main",
+      "searchPlaceholder": {
+        "zh-CN": "搜索项目或客户",
+        "en": "Search projects or customers"
+      },
+      "empty": {
+        "title": {
+          "zh-CN": "还没有交付项目",
+          "en": "No delivery projects yet"
+        },
+        "description": {
+          "zh-CN": "新建项目，明确客户、交付目标和计划日期。",
+          "en": "Create a project with a customer, outcome and target date."
+        }
+      }
     }
-  ]
+  ],
+  "description": "Customer delivery projects with lifecycle, ownership and target dates."
 }

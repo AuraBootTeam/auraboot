@@ -11,7 +11,10 @@
       "tpm_pj_priority",
       "tpm_pj_owner",
       "tpm_pj_start_date",
-      "tpm_pj_end_date"
+      "tpm_pj_end_date",
+      "tpm_pj_customer",
+      "tpm_pj_budget",
+      "tpm_pj_owner_user"
     ],
     "autoSetFields": {
       "tpm_pj_code": {
@@ -50,7 +53,10 @@
       "tpm_pj_priority",
       "tpm_pj_owner",
       "tpm_pj_start_date",
-      "tpm_pj_end_date"
+      "tpm_pj_end_date",
+      "tpm_pj_customer",
+      "tpm_pj_budget",
+      "tpm_pj_owner_user"
     ],
     "permissions": [
       "tpm.project.manage"
