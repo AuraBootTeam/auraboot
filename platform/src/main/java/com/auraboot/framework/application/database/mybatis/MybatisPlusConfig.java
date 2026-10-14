@@ -7,6 +7,9 @@ import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal;
+import com.baomidou.mybatisplus.extension.parser.cache.JdkSerialCaffeineJsqlParseCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
@@ -180,6 +183,15 @@ public class MybatisPlusConfig {
                                                           ApplicationContext applicationContext,
                                                           org.springframework.core.env.Environment environment) {
         guardTenantBypassPrefixes(environment);
+        // Interceptors mutate ASTs while adding current tenant/env predicates.
+        // Cache serialized syntax only; each lookup deserializes an independent
+        // tree, never a prior caller's authority or rewritten SQL.
+        var parsedSql = Caffeine.newBuilder().maximumWeight(16L * 1024 * 1024)
+                .weigher((String sql, byte[] ast) -> (int) Math.min(Integer.MAX_VALUE,
+                        (long) sql.length() * 2 + ast.length))
+                .expireAfterAccess(java.time.Duration.ofMinutes(5))
+                .build();
+        JsqlParserGlobal.setJsqlParseCache(new JdkSerialCaffeineJsqlParseCache(parsedSql));
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
         // env-layering #19 — UPDATE/DELETE write-side lock guard. Registered FIRST so it sees

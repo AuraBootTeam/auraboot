@@ -102,12 +102,49 @@ public class MybatisPlusConfigTest {
 
     @Test
     @DisplayName("验证MybatisPlusInterceptor已正确创建")
-    public void testMybatisPlusInterceptorCreation() {
+    public void testMybatisPlusInterceptorCreation() throws Exception {
         // When
         MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
 
         // Then
         assertNotNull(interceptor, "MybatisPlusInterceptor不应为null");
+        var cache = (com.baomidou.mybatisplus.extension.parser.cache.JsqlParseCache)
+                org.springframework.test.util.ReflectionTestUtils.getField(
+                        com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.class, "jsqlParseCache");
+        assertNotNull(cache, "Repeated tenant/env SQL parsing must use the bounded AST cache");
+        var storage = (com.github.benmanes.caffeine.cache.Cache<?, ?>)
+                org.springframework.test.util.ReflectionTestUtils.getField(cache, "cache");
+        assertEquals(16L * 1024 * 1024, storage.policy().eviction().orElseThrow().getMaximum());
+        String sql = "SELECT id FROM mt_parser_cache_probe WHERE pid = ?";
+        var first = com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.parse(sql);
+        var second = com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.parse(sql);
+        assertNotSame(first, second, "Tenant interceptors must receive independent mutable trees");
+        assertNotNull(cache.getStatement(sql), "The configured cache must actually retain parsed SQL");
+        String originalSql = second.toString();
+        String update = "UPDATE mt_parser_cache_probe SET name = ? WHERE pid = ?";
+        var originalUpdate = com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.parseStatements(update);
+        String updateSql = originalUpdate.toString();
+        assertNotSame(originalUpdate, cache.getStatements(update));
+        var tenant = findTenantInterceptor(interceptor);
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(4)) {
+            java.util.List<java.util.concurrent.Callable<String>> calls = new java.util.ArrayList<>();
+            for (long id = 101; id < 133; id++) {
+                final long current = id;
+                calls.add(() -> {
+                    MetaContext.setSystemTenantContext(current);
+                    try {
+                        String rewritten = current % 2 == 0 ? tenant.parserSingle(sql, null) : tenant.parserMulti(update, null);
+                        assertTrue(rewritten.contains("tenant_id = '" + current + "'"), rewritten);
+                        assertEquals(1, rewritten.split("tenant_id =", -1).length - 1, rewritten);
+                        return rewritten;
+                    } finally { MetaContext.clear(); }
+                });
+            }
+            for (var future : workers.invokeAll(calls)) future.get();
+        }
+        assertEquals(originalSql, cache.getStatement(sql).toString(),
+                "Concurrent tenant rewrites must not contaminate the cached source AST");
+        assertEquals(updateSql, cache.getStatements(update).toString());
     }
 
     @Test
