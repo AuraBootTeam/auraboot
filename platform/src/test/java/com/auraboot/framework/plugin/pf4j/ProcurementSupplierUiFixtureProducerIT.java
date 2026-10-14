@@ -58,7 +58,7 @@ class ProcurementSupplierUiFixtureProducerIT extends ProcurementPublicSourceNati
             "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementSourceUiFixtureProducerIT.java",
             "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java",
             "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/ProductQuoteNativeInitialization.java");
-    static final String MAIN_BASE = "9a41680d8e94efb0baa1e9d8703706bd4a73bb84";
+    static final String MAIN_BASE = "1210c6e2ce89ed2ec28b9fc2120bd86051eb043e";
     static final List<String> DOMAINS = List.of("task", "source", "quote", "quote_line", "history", "submission", "submission_line", "allocation", "execution", "order", "order_line", "externalReferences");
     static final List<String> AUXILIARY = List.of("supplier", "contact", "membership", "address", "shipment", "shipment_line", "product", "category", "category_policy", "category_supplier", "connection");
     @Autowired CommandExecutor actualCommands;

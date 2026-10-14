@@ -78,7 +78,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         Path app = Path.of(binding.path("applicationCoreRoot").asText()).toRealPath();
         assertEquals(binding.path("applicationCoreCommit").asText(), gitRead(app, "rev-parse", "HEAD").strip());
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        assertEquals("", gitRead(app, "diff", "9a41680d8e94efb0baa1e9d8703706bd4a73bb84", "HEAD", "--", "platform/src/main").strip());
+        assertEquals("", gitRead(app, "diff", "1210c6e2ce89ed2ec28b9fc2120bd86051eb043e", "HEAD", "--", "platform/src/main").strip());
         Path loaded = Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(), loaded);
         Path packageRoot = app.resolve("platform/src/test/java/com/auraboot/framework");
@@ -259,7 +259,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         String actualHead = gitRead(app, "rev-parse", "HEAD").strip();
         assertEquals(binding.path("applicationCoreCommit").asText(), actualHead);
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        String mainBase = "9a41680d8e94efb0baa1e9d8703706bd4a73bb84";
+        String mainBase = "1210c6e2ce89ed2ec28b9fc2120bd86051eb043e";
         assertEquals("", gitRead(app, "diff", mainBase, "HEAD", "--", "platform/src/main").strip());
         Path test = app.resolve("platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java").toRealPath();
         Path shared = test.resolveSibling("ProcurementPublicSourceNativeFixture.java");
