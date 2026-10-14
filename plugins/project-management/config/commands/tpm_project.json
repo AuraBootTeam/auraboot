@@ -16,7 +16,10 @@
       "tpm_pj_budget",
       "tpm_pj_owner_user",
       "tpm_pj_code",
-      "tpm_pj_progress"
+      "tpm_pj_progress",
+      "tpm_pj_customer_id",
+      "tpm_pj_notes",
+      "tpm_pj_files"
     ],
     "autoSetFields": {
       "tpm_pj_code": {
@@ -31,6 +34,10 @@
       "tpm_pj_progress": {
         "strategy": "default_value",
         "value": 0
+      },
+      "tpm_pj_type": {
+        "strategy": "fixed_value",
+        "value": "custom_application"
       }
     },
     "permissions": [
@@ -63,7 +70,10 @@
       "tpm_pj_end_date",
       "tpm_pj_customer",
       "tpm_pj_budget",
-      "tpm_pj_owner_user"
+      "tpm_pj_owner_user",
+      "tpm_pj_customer_id",
+      "tpm_pj_notes",
+      "tpm_pj_files"
     ],
     "permissions": [
       "tpm.project.manage"

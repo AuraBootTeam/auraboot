@@ -1,0 +1,30 @@
+[
+  {
+    "code": "tpm:create_customer",
+    "displayName:zh-CN": "新建客户",
+    "displayName:en": "Create customer",
+    "type": "create",
+    "modelCode": "tpm_customer",
+    "inputFields": [
+      "tpm_cu_name",
+      "tpm_cu_contact"
+    ],
+    "permissions": [
+      "tpm.project.manage"
+    ]
+  },
+  {
+    "code": "tpm:update_customer",
+    "displayName:zh-CN": "编辑客户",
+    "displayName:en": "Update customer",
+    "type": "update",
+    "modelCode": "tpm_customer",
+    "inputFields": [
+      "tpm_cu_name",
+      "tpm_cu_contact"
+    ],
+    "permissions": [
+      "tpm.project.manage"
+    ]
+  }
+]

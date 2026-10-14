@@ -54,5 +54,20 @@
       "subtitleField": "tpm_ms_code",
       "activityTimelineEnabled": true
     }
+  },
+  {
+    "code": "tpm_customer",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Customer",
+    "description": "Customer reference for project delivery.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "extension": {
+      "titleField": "tpm_cu_name",
+      "icon": "Building",
+      "category": "project-management"
+    }
   }
 ]

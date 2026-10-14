@@ -536,6 +536,15 @@ export interface SummaryFieldConfig {
 
 // Sub-table configuration (for master-detail forms)
 export interface SubTableConfig {
+  presentation?: {
+    kind: 'collection' | 'focus';
+    titleField: string;
+    descriptionField?: string;
+    dateField?: string;
+    statusField: string;
+    completedValues: string[];
+    ownerField?: string;
+  };
   childModel: string;
   parentField: string;
   readOnly?: boolean;

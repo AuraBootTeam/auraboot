@@ -3,6 +3,7 @@ import type { CellRendererContext } from './CellRendererRegistry';
 import { getAvatarColor, getInitials } from '~/ui/smart/picker/avatar-utils';
 
 export interface WorkspaceCellPresentation {
+  size?: 'summary';
   kind: 'object' | 'member' | 'progress' | 'deadline' | 'currency';
   currencyCode?: string;
   precision?: number;
@@ -41,12 +42,12 @@ export function WorkspaceCell({ value, record, column, locale = 'en' }: CellRend
   }
   if (config.kind === 'currency') {
     const amount = Number(value);
-    return Number.isFinite(amount) ? <span className="text-text text-[12px] tabular-nums">{new Intl.NumberFormat(locale, { style: 'currency', currency: config.currencyCode || 'CNY', minimumFractionDigits: config.precision ?? 0, maximumFractionDigits: config.precision ?? 0 }).format(amount)}</span> : <span className="text-text-3">—</span>;
+    return Number.isFinite(amount) ? <span className={`text-text tabular-nums ${config.size === 'summary' ? 'text-lg font-semibold' : 'text-[12px]'}`}>{new Intl.NumberFormat(locale, { style: 'currency', currency: config.currencyCode || 'CNY', minimumFractionDigits: config.precision ?? 0, maximumFractionDigits: config.precision ?? 0 }).format(amount)}</span> : <span className="text-text-3">—</span>;
   }
   if (config.kind === 'progress') {
     const progress = Number(value);
     if (value == null || !Number.isFinite(progress) || progress < 0 || progress > 100) return <span className="text-text-3">—</span>;
-    return <div className="w-[76px]"><div className="text-text-2 mb-1.5 text-[11px] tabular-nums">{progress}%</div><div role="progressbar" aria-label={locale.startsWith('zh') ? '进度' : 'Progress'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="bg-subtle h-1 overflow-hidden rounded-full"><div className={`h-full rounded-full ${progress === 100 ? 'bg-status-green' : 'bg-accent'}`} style={{ width: `${progress}%` }} /></div></div>;
+    return <div className={config.size === 'summary' ? 'w-[120px]' : 'w-[76px]'}><div className={`text-text-2 mb-1.5 tabular-nums ${config.size === 'summary' ? 'text-xl font-semibold' : 'text-[11px]'}`}>{progress}%</div><div role="progressbar" aria-label={locale.startsWith('zh') ? '进度' : 'Progress'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="bg-subtle h-1 overflow-hidden rounded-full"><div className={`h-full rounded-full ${progress === 100 ? 'bg-status-green' : 'bg-accent'}`} style={{ width: `${progress}%` }} /></div></div>;
   }
   if (config.kind === 'deadline') {
     if (!value) return <span className="text-text-3">—</span>;
@@ -57,7 +58,7 @@ export function WorkspaceCell({ value, record, column, locale = 'en' }: CellRend
     const zh = locale.startsWith('zh');
     const hint = completed ? (zh ? '已交付' : 'Delivered') : days < 0 ? (zh ? `逾期 ${-days} 天` : `${-days} days overdue`) : days === 0 ? (zh ? '今天交付' : 'Due today') : (zh ? `还有 ${days} 天` : `${days} days remaining`);
     const date = new Date(text.slice(0, 10) + 'T12:00:00Z');
-    return <div className=""><div className="text-text text-[12px] leading-5 tabular-nums">{new Intl.DateTimeFormat(locale, { month: zh ? 'long' : 'short', day: '2-digit', timeZone: 'UTC' }).format(date)}</div><div className={`mt-1 text-[10px] leading-4 ${!completed && days <= 7 ? 'text-status-amber' : 'text-text-3'}`}>{hint}</div></div>;
+    return <div className=""><div className={`text-text leading-5 tabular-nums ${config.size === 'summary' ? 'text-sm font-medium' : 'text-[12px]'}`}>{new Intl.DateTimeFormat(locale, { month: zh ? 'long' : 'short', day: '2-digit', timeZone: 'UTC' }).format(date)}</div><div className={`mt-1 text-[10px] leading-4 ${!completed && days <= 7 ? 'text-status-amber' : 'text-text-3'}`}>{hint}</div></div>;
   }
   throw new Error(`Unsupported workspace cell presentation: ${config.kind}`);
 }

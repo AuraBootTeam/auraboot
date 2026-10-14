@@ -26,6 +26,10 @@
     {
       "type": "model",
       "code": "tpm_milestone"
+    },
+    {
+      "type": "model",
+      "code": "tpm_customer"
     }
   ],
   "requires": [],

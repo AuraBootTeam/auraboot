@@ -13,6 +13,7 @@
  * - Command-based CRUD (create, update, delete)
  */
 
+import { WorkspaceCell } from '~/framework/meta/runtime/renderers/WorkspaceCells';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import type {
@@ -1298,6 +1299,38 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   if (error) {
     return <div role="alert" className="text-status-red py-4 text-center text-sm">{error}</div>;
+  }
+
+  if (config.presentation) {
+    const view = config.presentation;
+    const completed = displayRows.filter(row => view.completedValues.includes(String(row[view.statusField])));
+    const next = displayRows.find(row => !view.completedValues.includes(String(row[view.statusField])));
+    if (view.kind === 'focus') {
+      return <div data-testid="collection-focus" className="space-y-3">
+        {next ? <><p className="text-text-2 text-xs leading-6">{String(next[view.descriptionField || view.titleField] || next[view.titleField])}</p>
+          <div className="bg-subtle rounded-control px-3 py-3"><p className="text-text-3 mb-2 text-[11px]">{locale.startsWith('zh') ? '下一次交付节点' : 'Next delivery checkpoint'}</p>
+            <strong className="text-text text-xs font-medium">{String(next[view.titleField])}</strong>
+            {view.dateField && <div className="mt-2"><WorkspaceCell value={next[view.dateField]} record={next} column={{ field: view.dateField, timezone, presentation: { kind: 'deadline' } }} locale={locale} /></div>}
+            {view.ownerField && parentRecordData?.[`${view.ownerField}_display`] && <p className="text-text-2 mt-2 text-[11px]">{String(parentRecordData[`${view.ownerField}_display`])}</p>}
+          </div></> : <p className="text-text-3 text-xs">{locale.startsWith('zh') ? '暂无待完成里程碑' : 'No pending checkpoints'}</p>}
+      </div>;
+    }
+    return <div data-testid="subtable-viewer" className="min-w-0">
+      <p className="text-text-3 mb-3 text-[11px]" data-testid="collection-completion">{locale.startsWith('zh') ? `${completed.length} / ${displayRows.length} 已完成` : `${completed.length} / ${displayRows.length} completed`}</p>
+      {displayRows.length === 0 && <p data-testid="subtable-empty-state" className="text-text-3 py-6 text-center text-xs">{emptyStateTitle}</p>}
+      <div role="table" aria-label={locale.startsWith('zh') ? '关联事项' : 'Related items'}>
+        {displayRows.map((row, index) => {
+          const done = view.completedValues.includes(String(row[view.statusField]));
+          return <div role="row" key={row.pid} className="border-border flex flex-wrap items-center gap-3 border-t py-3" data-testid={`collection-row-${row.pid}`}>
+            <span aria-hidden="true" className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${done ? 'border-status-green bg-status-green-bg text-status-green' : 'border-border bg-panel text-text-3'}`}>{done ? '✓' : ''}</span>
+            <div role="cell" className="min-w-0 flex-1"><strong className="text-text text-xs font-medium">{String(row[view.titleField] || '—')}</strong>{view.descriptionField && <p className="text-text-3 mt-1 text-[11px] leading-5">{String(row[view.descriptionField] || '')}</p>}</div>
+            {view.dateField && <span role="cell" className="text-text-3 text-[11px] tabular-nums">{formatCellValue(row[view.dateField], effectiveColumns.find(col => col.field === view.dateField) || { field: view.dateField, valueType: 'date' }, getDictLabel, timezone, formats)}</span>}
+            <span role="cell" className="text-xs">{formatCellValue(row[view.statusField], effectiveColumns.find(col => col.field === view.statusField) || { field: view.statusField }, getDictLabel, timezone, formats)}</span>
+            {configuredRowActions.filter(button => button && isRowActionVisible(button, row)).map(button => <button key={button.code} type="button" data-testid={`subtable-row-action-${button.code}-${index}`} disabled={Boolean(rowActionLoadingKey) || isRowActionDisabled(button, row)} onClick={() => handleRowAction(button, row, index)} className="text-accent text-[11px] disabled:opacity-40">{resolveButtonLabel(button)}</button>)}
+          </div>;
+        })}
+      </div>
+    </div>;
   }
 
   const tableHeader = (

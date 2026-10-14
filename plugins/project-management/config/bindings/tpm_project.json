@@ -117,5 +117,33 @@
     "required": false,
     "visible": true,
     "editable": false
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_customer_id",
+    "sequence": 13,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_notes",
+    "sequence": 14,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_files",
+    "sequence": 15,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_type",
+    "sequence": 16,
+    "visible": true,
+    "editable": false
   }
 ]

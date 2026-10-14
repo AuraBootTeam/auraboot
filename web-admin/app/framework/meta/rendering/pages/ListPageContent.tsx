@@ -886,14 +886,14 @@ export function viewFilterToQueryCondition(
 }
 
 /** Normalize a DSL list-tab filter through the same array-aware query contract as saved views. */
-export function tabFilterToQueryCondition(filter: any): ListQueryFilterCondition | null {
+export function tabFilterToQueryCondition(filter: any, currentUserPid?: string): ListQueryFilterCondition | null {
   if (!filter || typeof filter !== 'object') return null;
   const fieldCode = filter.fieldName || filter.field;
   if (!fieldCode) return null;
   return viewFilterToQueryCondition({
     fieldCode,
     operator: String(filter.operator || 'EQ').toLowerCase() as ViewFilterConfig['operator'],
-    value: filter.value,
+    value: filter.value === '$currentUser' ? currentUserPid : filter.value,
   });
 }
 
@@ -2259,8 +2259,8 @@ function ListPageContentInner(props: PageContentProps) {
     if (!tabsBlock?.tabs) return null;
     const currentTab = (tabsBlock.tabs as any[]).find((tab: any) => tab.key === activeTab);
     if (!currentTab?.filter) return null;
-    return tabFilterToQueryCondition(currentTab.filter);
-  }, [schema, activeTab]);
+    return tabFilterToQueryCondition(currentTab.filter, user?.pid);
+  }, [schema, activeTab, user?.pid]);
 
   const displayData = useMemo(() => {
     const tabCondition = getTabFilter();
@@ -2713,7 +2713,7 @@ function ListPageContentInner(props: PageContentProps) {
         const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
         const tabDef = (tabsBlock?.tabs as any[])?.find((t: any) => t.key === tabKey);
         if (tabDef?.filter) {
-          tabCondition = tabFilterToQueryCondition(tabDef.filter);
+          tabCondition = tabFilterToQueryCondition(tabDef.filter, user?.pid);
         }
       }
 
@@ -2776,6 +2776,12 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.filters = filtersParam;
             }
           }
+          if (!isApiDatasource) {
+            if (activeSorts.length > 1) queryParams.sortFields = activeSorts.map(sort => `${sort.fieldCode}:${sort.direction}`).join(',');
+            else if (activeSorts.length === 1) { queryParams.sortField = activeSorts[0].fieldCode; queryParams.sortOrder = activeSorts[0].direction; }
+            else if (tableBlock?.defaultSort?.field) { queryParams.sortField = tableBlock.defaultSort.field; queryParams.sortOrder = tableBlock.defaultSort.order || 'desc'; }
+          }
+          if (keywordRef.current.trim()) queryParams.keyword = keywordRef.current.trim();
 
           const result = await fetchResult<PaginationResult<DynamicEntity>>(endpoint, {
             method,
@@ -5049,6 +5055,28 @@ function ListPageContentInner(props: PageContentProps) {
     return found;
   }, [allBlocks]);
 
+  const [workspaceTabCounts, setWorkspaceTabCounts] = useState<Record<string, number>>({});
+  const [workspaceTabCountError, setWorkspaceTabCountError] = useState(false);
+  useEffect(() => {
+    if (!listTabsBlock?.showCounts || !schema?.modelCode || !dataReady) return;
+    let current = true;
+    setWorkspaceTabCounts({});
+    setWorkspaceTabCountError(false);
+    Promise.all((listTabsBlock.tabs as any[]).map(async tab => {
+      const condition = tabFilterToQueryCondition(tab.filter, user?.pid);
+      const queryFilters = buildFiltersParam(condition, filters, chipFilters, modelFieldMapRef.current);
+      const result = await fetchResult<PaginationResult<DynamicEntity>>(`${buildApiEndpoint(schema.modelCode!)}/list`, {
+        method: 'get', token: token || undefined,
+        params: { pageNum: 1, pageSize: 1, ...(keywordRef.current.trim() ? { keyword: keywordRef.current.trim() } : {}), ...(queryFilters ? { filters: queryFilters } : {}) },
+      });
+      if (!ResultHelper.isSuccess(result) || !result.data || Array.isArray(result.data)) throw new Error('View count query failed.');
+      const total = Number(result.data.total);
+      if (!Number.isFinite(total)) throw new Error('View count is invalid.');
+      return [tab.key, total] as const;
+    })).then(entries => { if (current) setWorkspaceTabCounts(Object.fromEntries(entries)); })
+      .catch(() => { if (current) setWorkspaceTabCountError(true); });
+    return () => { current = false; };
+  }, [listTabsBlock, schema?.modelCode, data, dataReady, filters, chipFilters, token, user?.pid]);
   const workspace = schemaExtension.presentation === 'workspace';
   const pageHeader = (
           <ListPageHeader
@@ -5427,7 +5455,7 @@ function ListPageContentInner(props: PageContentProps) {
           {listTabsBlock?.tabs && (listTabsBlock.tabs as any[]).length > 0 && (
             <div data-aura-block-id={listTabsBlock.id} data-aura-element-id={listTabsBlock.id}>
               <ListTabs
-                tabs={listTabsBlock.tabs as any[]}
+                tabs={(listTabsBlock.tabs as any[]).map(tab => ({ ...tab, ...(listTabsBlock.showCounts ? { count: workspaceTabCounts[tab.key] } : {}) }))}
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 locale={locale}
@@ -5436,6 +5464,7 @@ function ListPageContentInner(props: PageContentProps) {
             </div>
           )}
 
+          {workspaceTabCountError && <p role="status" className="text-status-amber px-6 py-2 text-xs">{getLocalizedText({ 'zh-CN': '视图数量暂不可用，请刷新重试。', en: 'View counts are unavailable. Refresh to try again.' }, locale, t)}</p>}
           {/* Filter area - Using Smart Components with collapse/expand (hidden in print) */}
           {filterFormVisible &&
             filterBlock &&

@@ -1,3 +1,6 @@
+import { WorkspaceTabCount } from './detail/WorkspaceTabCount';
+import { WorkspaceRecordSection } from './detail/WorkspaceRecordSection';
+import { WorkspaceObjectSummary } from './detail/WorkspaceObjectSummary';
 /**
  * DetailPageContent - Page content component for detail/view pages
  *
@@ -788,6 +791,7 @@ export function resolveActiveDetailTab(
  * this component loads record data client-side using fetchResult in a useEffect.
  */
 function DetailPageContentInner(props: PageContentProps) {
+  const { timezone } = useTimezone();
   const { schema, tableName, recordPid, token } = props;
   const pdfExportTargetRef = useRef<HTMLDivElement | null>(null);
   const { hasPermission } = useAuth();
@@ -1071,7 +1075,7 @@ function DetailPageContentInner(props: PageContentProps) {
     tableName,
     context: {
       record: recordData,
-      loadData: reloadRecord,
+      loadData: refreshDetailAfterChildChange,
     },
     dataSourceManager,
     locale,
@@ -1207,7 +1211,9 @@ function DetailPageContentInner(props: PageContentProps) {
       (block as { detailPlacement?: string }).detailPlacement !== 'header',
   );
   const renderWorkspaceBlock = (block: BlockConfig) => {
-    const key = `${block.id}:${block.blockType === 'activity-timeline' ? detailRefreshVersion : 0}`;
+    if (block.permissionCode && !hasPermission(block.permissionCode)) return null;
+    if (block.visibleWhen && !evaluateVisibleWhen(block.visibleWhen)) return null;
+    const key = `${block.id}:${['activity-timeline', 'field-history'].includes(block.blockType) ? detailRefreshVersion : 0}`;
     if (!DETAIL_SPECIALIZED_BLOCK_TYPES.has(block.blockType as string)) {
       return runtime ? <BlockRenderer key={key} block={prepareDetailRuntimeBlock(block, recordData, recordPid!)} runtime={runtime} areaId="detail-workspace" /> : null;
     }
@@ -1325,6 +1331,7 @@ function DetailPageContentInner(props: PageContentProps) {
     );
   }
 
+  const workspace = schema.extension?.presentation === 'workspace';
   const headerTitleField = String(schema?.extension?.headerTitleField || '').trim();
   const headerTitleValue = headerTitleField ? recordData?.[headerTitleField] : undefined;
   const headerTitle =
@@ -1356,12 +1363,12 @@ function DetailPageContentInner(props: PageContentProps) {
 
   return (
     <div
-      className="mx-auto w-full px-2 py-3"
+      className={workspace ? 'min-h-[calc(100vh-56px)] bg-[#F7F7F8] px-6 pt-7 pb-8 lg:px-8' : 'mx-auto w-full px-2 py-3'}
       data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
     >
-      <div className="rounded-card border-border bg-panel border shadow-sm">
+      <div className={workspace ? 'min-w-0' : 'rounded-card border-border bg-panel border shadow-sm'}>
         {/* Page Header with title + toolbar buttons (hidden in print) */}
-        <div className="print-hide border-border border-b px-4 py-4 sm:px-6" data-print="hide">
+        <div className={workspace ? 'print-hide pb-6' : 'print-hide border-border border-b px-4 py-4 sm:px-6'} data-print="hide">
           <div className={headerLayout.container}>
             <div className="flex min-w-0 items-start gap-3">
               {schema.extension?.showBack !== false &&
@@ -1388,9 +1395,13 @@ function DetailPageContentInner(props: PageContentProps) {
                   </Link>
                 ))}
               <div className="min-w-0">
-                <h2 className="text-text text-xl leading-tight font-semibold tracking-tight break-words">
+                <div className="flex flex-wrap items-center gap-3"><h2 className="text-text text-2xl leading-tight font-semibold tracking-tight break-words">
                   {headerTitle}
-                </h2>
+                </h2>{workspace && schema.extension?.headerStatusField && <span className="text-accent bg-accent-weak rounded px-2 py-1 text-xs">{(() => {
+                  const field = enrichField({ field: schema.extension.headerStatusField } as FieldConfig);
+                  const item = (getDictItems(field.dictCode || '') || []).find(item => String(item.value) === String(recordData?.[field.field]));
+                  return item ? getLocalizedText(item.label as any, locale, t) : '—';
+                })()}</span>}</div>
                 {headerSubtitle ? (
                   <p className="text-text-3 mt-1 truncate text-xs" title={headerSubtitle}>
                     {headerSubtitle}
@@ -1509,6 +1520,7 @@ function DetailPageContentInner(props: PageContentProps) {
           )}
         </div>
 
+        {workspace && schema.extension?.objectSummary && <WorkspaceObjectSummary items={schema.extension.objectSummary} record={recordData || {}} locale={locale} timezone={timezone} t={t} />}
         {/* Content: Tabs mode or Direct mode */}
         {tabs.length > 0 ? (
           <div>
@@ -1527,7 +1539,7 @@ function DetailPageContentInner(props: PageContentProps) {
 
             {/* Tab headers (hidden in print — only active tab content shows) */}
             <div
-              className="print-hide border-border overflow-x-auto border-b px-6"
+              className={workspace ? 'print-hide border-border mb-4 overflow-x-auto border-b' : 'print-hide border-border overflow-x-auto border-b px-6'}
               data-print="hide"
             >
               <nav
@@ -1554,6 +1566,7 @@ function DetailPageContentInner(props: PageContentProps) {
                     }`}
                   >
                     {getLocalizedText(tab.label, locale, t)}
+                    {workspace && (tab as any).count && runtime && <WorkspaceTabCount config={(tab as any).count} record={recordData} runtime={runtime} />}
                   </button>
                 ))}
               </nav>
@@ -1563,8 +1576,11 @@ function DetailPageContentInner(props: PageContentProps) {
                 the same row/test ids across tabs; hidden pre-rendered tabs create
                 duplicate DOM and unnecessary dataSource requests. */}
             {activeDetailTab && (
-              <div key={activeDetailTab.tab.key || activeDetailTab.index} className="p-5">
-                <LayoutRenderer
+              <div key={activeDetailTab.tab.key || activeDetailTab.index} className={workspace ? '' : 'p-5'}>
+                {workspace ? <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_290px]" data-testid="detail-workspace-layout">
+                  <div className="min-w-0 space-y-4" data-testid="detail-workspace-main">{(activeDetailTab.tab.blocks || []).filter(block => !asideBlockIds.has(block.id)).map(renderWorkspaceBlock)}</div>
+                  {(activeDetailTab.tab.blocks || []).some(block => asideBlockIds.has(block.id)) && <aside className="min-w-0 space-y-4" data-testid="detail-workspace-aside">{(activeDetailTab.tab.blocks || []).filter(block => asideBlockIds.has(block.id)).map(block => <section key={block.id} className="border-border bg-panel rounded-card border p-5">{renderWorkspaceBlock(block)}</section>)}</aside>}
+                </div> : (                <LayoutRenderer
                   layout={(activeDetailTab.tab as any).layout}
                   blocks={activeDetailTab.tab.blocks || []}
                   renderBlock={(block: BlockConfig) => (
@@ -1586,7 +1602,8 @@ function DetailPageContentInner(props: PageContentProps) {
                       dataSourceManager={dataSourceManager}
                     />
                   )}
-                />
+                />)}
+
               </div>
             )}
             {topLevelDetailBlocks.length > 0 && (
@@ -2188,6 +2205,12 @@ function DetailBlockRenderer({
       ? getByDataPath(rawData, sectionDataPath) || {}
       : recordData;
     const displayVariant = String((block as any).extension?.displayVariant || '');
+    if (displayVariant === 'object') {
+      return <WorkspaceRecordSection block={block} fields={(block.fields || []).map(field => {
+        const labeled = field.label ? field : { ...field, label: resolveModelFieldLabel(field.field) };
+        return enrichField ? enrichField(labeled) : labeled;
+      })} record={sectionRecord} token={token} locale={locale} timezone={timezone} t={t} getDictItems={getDictItems} />;
+    }
     if (block.blockType === 'detail-section' && displayVariant === 'settings-card') {
       const Icon = resolveDetailSectionIcon(block);
       const title = block.title ? getLocalizedText(block.title, locale, t) : '';
@@ -2434,6 +2457,8 @@ function DetailBlockRenderer({
         token={token}
         locale={locale}
         t={t}
+        compact={(block as any).extension?.density === 'compact'}
+        fields={(block as any).extension?.fields}
       />
     );
   }

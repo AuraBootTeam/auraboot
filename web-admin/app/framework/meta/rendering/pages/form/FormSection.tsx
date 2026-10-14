@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 export interface FormSectionProps {
   title: string;
+  index?: string;
   description?: string;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
@@ -13,6 +14,7 @@ export interface FormSectionProps {
 /** Shared DSL section presentation. Collapsed fields stay mounted and retain their values. */
 export function FormSection({
   title,
+  index,
   description,
   collapsible = false,
   defaultCollapsed = false,
@@ -47,7 +49,7 @@ export function FormSection({
       data-testid={testId}
       className="form-section border-border bg-panel rounded-card border p-5 shadow-sm"
     >
-      {title && <div className="mb-4">{heading}</div>}
+      {title && <div className="mb-5 flex items-start justify-between"><div>{heading}</div>{index && <span className="text-text-3 text-[11px]">{index}</span>}</div>}
       {children}
     </section>
   );

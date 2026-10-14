@@ -1,3 +1,5 @@
+import { WorkspaceGuidance } from './form/WorkspaceGuidance';
+import { usePresentationNavigation } from '~/shared/layout/PagePresentationContext';
 import { FormSection } from './form/FormSection';
 /**
  * FormPageContent - Extracted form rendering logic for DSL-driven form pages
@@ -1110,6 +1112,7 @@ function mergeFieldValidationRules(
  * expression-driven visibility, and action dispatch.
  */
 export function FormPageContent(props: PageContentProps) {
+  const { sidebarWidth } = usePresentationNavigation();
   const {
     schema,
     tableName,
@@ -2088,6 +2091,22 @@ export function FormPageContent(props: PageContentProps) {
                   return pollFormAsyncCommandTask(asyncDispatch.taskCode, token || undefined);
                 })()
               : result.data;
+            if (schema.extension?.linkFileAttachments === true) {
+              const extractPid = (value: any): string | undefined => {
+                if (!value || typeof value !== 'object') return undefined;
+                const pid = value.recordPid || value.recordId || value.pid;
+                return typeof pid === 'string' ? pid : extractPid(value.data);
+              };
+              const savedPid = recordPid || extractPid(responseData);
+              if (!savedPid) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但未取得附件关联目标。请重新打开项目检查。', en: 'Saved, but attachment target is missing. Reopen the record to check.' }, locale, t));
+              for (const [field, meta] of Object.entries(modelFields)) {
+                if (meta.dataType !== 'file' || !Array.isArray(commandPayload[field])) continue;
+                const fileIds = commandPayload[field].map((file: any) => file.fileId).filter(Boolean);
+                if (!fileIds.length) continue;
+                const relation = await fetchResult('/api/file/relation', { method: 'post', token: token || undefined, params: { entityType: schema.modelCode || tableName, entityId: savedPid, fieldName: field, fileIds } });
+                if (!ResultHelper.isSuccess(relation)) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但附件共享关联失败。请重新打开项目检查附件。', en: 'Saved, but attachment sharing failed. Reopen the record to check files.' }, locale, t));
+              }
+            }
             setFieldErrors({});
             setSummaryErrors([]);
             dirtyFieldsRef.current.clear();
@@ -2537,6 +2556,7 @@ export function FormPageContent(props: PageContentProps) {
   const miscFormBlocks = allBlocks.filter(
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
   );
+  const workspace = schema.extension?.presentation === 'workspace';
   const backLink = resolveFormBackLink(schema, tableName);
   const activeButtons = (effectiveButtonBlock?.buttons || []).filter(
     (button: any) => !button.visibleWhen || evaluateCondition(button.visibleWhen, pageContext),
@@ -2553,16 +2573,17 @@ export function FormPageContent(props: PageContentProps) {
           wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
           a comfortable 2-column line length while staying roomy for sub-tables. */}
         <div
-          className={`mx-auto w-full px-2 py-3 ${schema.extension?.formWidth === 'comfortable' ? 'max-w-4xl' : 'max-w-6xl'}`}
+          className={workspace ? 'min-h-[calc(100vh-56px)] bg-[#F7F7F8] px-6 pt-7 pb-24 lg:px-8' : `mx-auto w-full px-2 py-3 ${schema.extension?.formWidth === 'comfortable' ? 'max-w-4xl' : 'max-w-6xl'}`}
           data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
         >
           <div className="bg-transparent">
             {/* Page Header */}
             <div className="pt-2 pb-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-text text-xl font-semibold tracking-tight">
-                  {getLocalizedText(schema.title, locale, t)}
+              <div className="flex items-start justify-between">
+                <div><h2 className="text-text text-2xl font-semibold tracking-tight">
+                  {getLocalizedText((isEditMode ? schema.extension?.editTitle : schema.extension?.createTitle) || schema.title, locale, t)}
                 </h2>
+                {workspace && schema.extension?.pageDescription && <p className="text-text-2 mt-2 text-xs">{getLocalizedText(schema.extension.pageDescription, locale, t)}</p>}</div>
                 {onCancelOverride ? (
                   <button
                     type="button"
@@ -2584,6 +2605,8 @@ export function FormPageContent(props: PageContentProps) {
               </div>
             </div>
 
+            <div className={workspace ? 'grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_246px]' : ''}>
+            <div className="min-w-0">
             {/* Error Summary */}
             {summaryErrors.length > 0 ? (
               <div
@@ -2729,6 +2752,7 @@ export function FormPageContent(props: PageContentProps) {
                           <FormSection
                             key={block.id || `block-${blockIndex}`}
                             title={blockTitle}
+                            index={workspace && !block.extension?.collapsible ? String(blockIndex + 1).padStart(2, '0') : undefined}
                             description={blockDescription}
                             collapsible={block.extension?.collapsible === true}
                             defaultCollapsed={block.extension?.defaultCollapsed === true}
@@ -2937,8 +2961,11 @@ export function FormPageContent(props: PageContentProps) {
                 effectiveButtonBlock &&
                 effectiveButtonBlock.buttons &&
                 effectiveButtonBlock.buttons.length > 0 && (
-                  <div className="border-border bg-panel rounded-card sticky bottom-0 z-20 mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm">
-                    {effectiveButtonBlock.buttons.map((button: any) => {
+                  <div className={workspace ? 'border-border bg-panel fixed right-0 bottom-0 z-30 flex flex-wrap items-center justify-end gap-3 border-t px-8 py-4' : 'border-border bg-panel rounded-card sticky bottom-0 z-20 mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm'}
+                    style={workspace ? { left: sidebarWidth } : undefined}
+                    data-testid="form-action-footer">
+                    {workspace && schema.extension?.footerNote && <p className="text-text-3 mr-auto text-xs">{getLocalizedText(schema.extension.footerNote, locale, t)}</p>}
+                    {[...effectiveButtonBlock.buttons].sort((a: any, b: any) => workspace ? Number(Boolean(a.primary)) - Number(Boolean(b.primary)) : 0).map((button: any) => {
                       if (!canRenderFormButton(button, hasPermission)) return null;
                       // Check button visibility condition
                       if (button.visibleWhen) {
@@ -2984,6 +3011,9 @@ export function FormPageContent(props: PageContentProps) {
                   </div>
                 )}
             </form>
+            </div>
+            {workspace && schema.extension?.formGuidance && <WorkspaceGuidance config={schema.extension.formGuidance} locale={locale} t={t} />}
+            </div>
           </div>
         </div>
       </DslFormFillProvider>

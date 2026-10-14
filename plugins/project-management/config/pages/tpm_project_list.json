@@ -43,6 +43,18 @@
           "filter": null
         },
         {
+          "key": "mine",
+          "label": {
+            "zh-CN": "我负责的",
+            "en": "Assigned to me"
+          },
+          "filter": {
+            "field": "tpm_pj_owner_user",
+            "operator": "EQ",
+            "value": "$currentUser"
+          }
+        },
+        {
           "key": "acceptance",
           "label": {
             "zh-CN": "待验收",
@@ -67,7 +79,8 @@
           }
         }
       ],
-      "area": "list-tabs"
+      "area": "list-tabs",
+      "showCounts": true
     },
     {
       "id": "tpm_pj_table",
@@ -84,7 +97,7 @@
             "kind": "object",
             "subtitleFields": [
               "tpm_pj_code",
-              "tpm_pj_customer"
+              "tpm_pj_customer_id"
             ]
           }
         },

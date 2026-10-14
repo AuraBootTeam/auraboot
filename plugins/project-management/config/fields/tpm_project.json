@@ -160,5 +160,49 @@
     },
     "defaultValue": 0,
     "description": "Owner-reported delivery progress, independent of milestone completion ratio."
+  },
+  {
+    "code": "tpm_pj_customer_id",
+    "displayName:zh-CN": "所属客户",
+    "displayName:en": "Customer",
+    "dataType": "reference",
+    "refTarget": {
+      "targetModel": "tpm_customer",
+      "targetField": "tpm_cu_name",
+      "valueField": "pid"
+    },
+    "feature": {
+      "searchable": true
+    },
+    "description": "Tenant-scoped customer reference."
+  },
+  {
+    "code": "tpm_pj_notes",
+    "displayName:zh-CN": "内部备注",
+    "displayName:en": "Internal notes",
+    "dataType": "text",
+    "constraints": {
+      "maxLength": 5000
+    }
+  },
+  {
+    "code": "tpm_pj_files",
+    "displayName:zh-CN": "合同与附件",
+    "displayName:en": "Contracts and files",
+    "dataType": "file",
+    "extension": {
+      "multiple": true,
+      "maxCount": 5,
+      "renderComponent": "fileattachment"
+    }
+  },
+  {
+    "code": "tpm_pj_type",
+    "displayName:zh-CN": "项目类型",
+    "displayName:en": "Project type",
+    "dataType": "enum",
+    "dictCode": "tpm_project_type",
+    "defaultValue": "custom_application",
+    "description": "Delivery engagement category."
   }
 ]

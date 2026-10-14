@@ -216,5 +216,22 @@
         }
       }
     ]
+  },
+  {
+    "code": "tpm_project_type",
+    "name:zh-CN": "项目类型",
+    "name:en": "Project type",
+    "items": [
+      {
+        "value": "custom_application",
+        "label:zh-CN": "企业应用定制",
+        "label:en": "Custom business application",
+        "label": "Custom business application",
+        "sortNo": 10,
+        "status": "enabled"
+      }
+    ],
+    "name": "Project type",
+    "dictType": "static"
   }
 ]

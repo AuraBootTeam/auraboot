@@ -136,12 +136,12 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className={`print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:mr-auto' : ''}`}
+        className={`print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:sm:mr-auto' : ''}`}
         data-print="hide"
         data-testid="list-toolbar"
       >
         {/* Search input */}
-        <div className="relative min-w-0 flex-1 basis-full sm:flex-none sm:basis-auto">
+        <div className="relative min-w-0 flex-1 basis-full sm:flex-none sm:basis-auto" style={workspace ? { marginInlineEnd: 'auto' } : undefined}>
           <input
             type="text"
             value={keyword}
@@ -167,7 +167,7 @@ export function ListToolbar({
         </div>
 
         {/* Separator */}
-        {showInlineControls && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}
+        {showInlineControls && !workspace && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}
 
         {/* Sort popover trigger */}
         {!hideSort && (

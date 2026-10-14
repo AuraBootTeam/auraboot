@@ -6,8 +6,8 @@
   "kind": "form",
   "schemaVersion": 4,
   "title": {
-    "zh-CN": "项目计划",
-    "en": "Project plan"
+    "zh-CN": "新建项目",
+    "en": "New project"
   },
   "layout": {
     "type": "stack"
@@ -17,36 +17,38 @@
       "id": "outcome",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "客户与交付目标",
-        "en": "Customer and outcome"
+        "zh-CN": "基本信息",
+        "en": "Project information"
       },
       "fields": [
         {
           "field": "tpm_pj_name",
-          "colSpan": 6,
+          "colSpan": 12,
           "required": true,
           "props": {
             "placeholder": {
-              "zh-CN": "例如：青禾零售 · 会员系统上线",
-              "en": "e.g. Acorn Retail · Membership launch"
-            },
-            "helpText": {
-              "zh-CN": "使用客户与交付内容命名，便于团队识别。",
-              "en": "Name the customer and deliverable."
+              "zh-CN": "例如：客户名称 · 项目名称",
+              "en": "e.g. Customer · Project name"
             }
           }
         },
         {
-          "field": "tpm_pj_customer",
+          "field": "tpm_pj_customer_id",
           "colSpan": 6,
           "props": {
             "placeholder": {
-              "zh-CN": "例如：青禾零售",
-              "en": "e.g. Acorn Retail"
-            },
-            "helpText": {
-              "zh-CN": "填写客户的业务名称。",
-              "en": "Use the customer business name."
+              "zh-CN": "按名称搜索空间内客户",
+              "en": "Search customers in this space"
+            }
+          }
+        },
+        {
+          "field": "tpm_pj_owner_user",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "按姓名搜索空间成员",
+              "en": "Search space members"
             }
           }
         },
@@ -57,11 +59,11 @@
             "placeholder": {
               "zh-CN": "例如：完成会员迁移、积分联调与门店培训",
               "en": "e.g. Migrate members, integrate points and train stores"
-            },
-            "helpText": {
-              "zh-CN": "写明本次交付的验收目标。",
-              "en": "Describe the acceptance outcome."
             }
+          },
+          "label": {
+            "zh-CN": "项目说明",
+            "en": "Project description"
           }
         }
       ]
@@ -75,18 +77,12 @@
       },
       "fields": [
         {
-          "field": "tpm_pj_owner_user",
-          "colSpan": 6,
-          "props": {
-            "placeholder": {
-              "zh-CN": "按姓名搜索空间成员",
-              "en": "Search space members"
-            },
-            "helpText": {
-              "zh-CN": "选择负责推进与协调的空间成员。",
-              "en": "Assign a member responsible for delivery."
-            }
-          }
+          "field": "tpm_pj_start_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_end_date",
+          "colSpan": 6
         },
         {
           "field": "tpm_pj_budget",
@@ -97,22 +93,58 @@
               "en": "e.g. 128000"
             },
             "helpText": {
-              "zh-CN": "单位为人民币元，不含额外变更费用。",
-              "en": "CNY; excludes additional scope changes."
+              "zh-CN": "人民币元（CNY）",
+              "en": "Chinese yuan (CNY)"
             }
           }
         },
         {
-          "field": "tpm_pj_start_date",
-          "colSpan": 6
+          "field": "tpm_pj_status",
+          "colSpan": 6,
+          "readOnly": true,
+          "label": {
+            "zh-CN": "当前阶段",
+            "en": "Current stage"
+          },
+          "props": {
+            "helpText": {
+              "zh-CN": "新项目从需求确认开始，创建后通过项目动作推进阶段。",
+              "en": "New projects start in requirements; use project actions to advance their stage."
+            }
+          }
+        }
+      ],
+      "description": {
+        "zh-CN": "用于安排项目节奏，也方便团队识别即将到期的任务。",
+        "en": "Schedule delivery and identify upcoming deadlines."
+      }
+    },
+    {
+      "id": "supplement",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "补充信息",
+        "en": "Additional information"
+      },
+      "extension": {
+        "collapsible": true,
+        "defaultCollapsed": true
+      },
+      "fields": [
+        {
+          "field": "tpm_pj_notes",
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "补充团队需要了解的事项",
+              "en": "Add context for your team"
+            }
+          }
         },
         {
-          "field": "tpm_pj_end_date",
-          "colSpan": 6
-        },
-        {
-          "field": "tpm_pj_priority",
-          "colSpan": 6
+          "field": "tpm_pj_files",
+          "colSpan": 12,
+          "component": "fileattachment"
         }
       ]
     },
@@ -148,6 +180,69 @@
     "workspaceLabel": {
       "zh-CN": "项目协作",
       "en": "Project collaboration"
-    }
+    },
+    "createTitle": {
+      "zh-CN": "新建项目",
+      "en": "New project"
+    },
+    "editTitle": {
+      "zh-CN": "编辑项目",
+      "en": "Edit project"
+    },
+    "pageDescription": {
+      "zh-CN": "先确定项目、客户与负责人，交付细节可以后续完善。",
+      "en": "Set the project, customer and owner; refine delivery details later."
+    },
+    "footerNote": {
+      "zh-CN": "项目保存后可继续添加里程碑与附件。",
+      "en": "Add milestones and files after saving."
+    },
+    "formGuidance": {
+      "title": {
+        "zh-CN": "创建后，下一步做什么？",
+        "en": "What comes after creation?"
+      },
+      "description": {
+        "zh-CN": "项目从需求确认开始，负责人可以继续完善交付计划。",
+        "en": "The project starts in requirements; its owner can refine delivery plans."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh-CN": "确认需求范围",
+            "en": "Confirm requirements"
+          },
+          "description": {
+            "zh-CN": "明确客户期望与交付边界",
+            "en": "Agree on customer expectations and delivery scope"
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "拆分交付里程碑",
+            "en": "Plan delivery milestones"
+          },
+          "description": {
+            "zh-CN": "为每个阶段安排内容和时间",
+            "en": "Define each deliverable and target date"
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "跟进进度与验收",
+            "en": "Track progress and acceptance"
+          },
+          "description": {
+            "zh-CN": "保留变更记录，减少沟通遗漏",
+            "en": "Keep change history to prevent missed communication"
+          }
+        }
+      ],
+      "note": {
+        "zh-CN": "项目属于当前空间。具体查看与编辑范围由成员权限决定。",
+        "en": "The project belongs to this space. Member permissions govern access."
+      }
+    },
+    "linkFileAttachments": true
   }
 }

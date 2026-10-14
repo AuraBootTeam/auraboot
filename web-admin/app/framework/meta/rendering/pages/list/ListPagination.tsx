@@ -57,6 +57,7 @@ export function ListPagination({
       <div className="print-hide" data-print="hide">
         <Pagination
           alwaysVisible={workspace}
+          compact={workspace}
           showPageSizeSelector={!workspace}
           current={current}
           pageSize={pageSize}

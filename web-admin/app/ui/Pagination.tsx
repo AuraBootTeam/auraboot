@@ -29,6 +29,7 @@ import React from 'react';
 export interface PaginationProps {
   /** Keep record count and navigation visible for a single-page workspace. */
   alwaysVisible?: boolean;
+  compact?: boolean;
   /** 当前页码 (从 1 开始) */
   current: number;
 
@@ -60,6 +61,7 @@ export interface PaginationProps {
 export const Pagination: React.FC<PaginationProps> = ({
   current,
   alwaysVisible = false,
+  compact = false,
   pageSize,
   total,
   onChange,
@@ -69,7 +71,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   showQuickJumper: _showQuickJumper = true,
   showPageSizeSelector = true,
 }) => {
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // 处理页码变化
   const handlePageChange = (newPage: number) => {
@@ -199,8 +201,8 @@ export const Pagination: React.FC<PaginationProps> = ({
 
       {/* 中间：页码按钮 */}
       <div className="flex items-center space-x-2">
-        {/* 首页 */}
-        <button
+        {/* First page */}
+        {!compact && <button
           data-testid="pagination-first"
           onClick={() => handlePageChange(1)}
           disabled={current === 1}
@@ -210,7 +212,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             const v = t('common.first_page');
             return v !== 'common.first_page' ? v : '首页';
           })()}
-        </button>
+        </button>}
 
         {/* 上一页 */}
         <button
@@ -241,8 +243,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           })()}
         </button>
 
-        {/* 末页 */}
-        <button
+        {/* Last page */}
+        {!compact && <button
           data-testid="pagination-last"
           onClick={() => handlePageChange(totalPages)}
           disabled={current === totalPages}
@@ -252,7 +254,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             const v = t('common.last_page');
             return v !== 'common.last_page' ? v : '末页';
           })()}
-        </button>
+        </button>}
       </div>
 
       {/* 右侧：每页条数选择 */}

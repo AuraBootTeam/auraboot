@@ -154,5 +154,83 @@
     },
     "locale": "zh-CN",
     "role": "admin"
+  },
+  {
+    "id": "P13",
+    "page": "detail",
+    "state": "progress-dialog",
+    "screenshot": "P13",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P14",
+    "page": "detail",
+    "state": "progress-persisted-with-audit",
+    "screenshot": "P14",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P15",
+    "page": "detail",
+    "state": "milestones-tab",
+    "screenshot": "P15",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P16",
+    "page": "detail",
+    "state": "files-downloaded",
+    "screenshot": "P16",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P17",
+    "page": "detail",
+    "state": "changes-tab",
+    "screenshot": "P17",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
+  },
+  {
+    "id": "P18",
+    "page": "detail",
+    "state": "created-attachment-persisted",
+    "screenshot": "P18",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin"
   }
 ]
