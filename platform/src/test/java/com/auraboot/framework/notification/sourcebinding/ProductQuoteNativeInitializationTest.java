@@ -83,6 +83,29 @@ class ProductQuoteNativeInitializationTest {
     }
 
 
+    @Test void singleOwnerCompositionPreservesBothWriterFamiliesAcrossPolicyCopies() throws Exception {
+        Path source=original();
+        Files.writeString(source.resolve("config/fields/membership.json"),"{\"code\":\"qo_pr_membership_state\",\"allowedWriterCommands\":[]}");
+        String contactOriginal=Files.readString(source.resolve("config/fields/contact.json"));
+        var proof=ProductQuoteNativeInitialization.prepareOrderUiComposed(source,root.resolve("composed"),json);
+        Path composed=Path.of(proof.get("testDirectory").toString());
+        assertThat(proof.get("sourceDirectory")).isEqualTo(source.toRealPath().toString());
+        assertThat(proof.get("compositionKind")).isEqualTo("order-ui-single-owner-initialization-v1");
+        assertThat(json.readTree(composed.resolve("config/commands/order-ui-composed-initialization.json").toFile())).hasSize(7);
+        assertThat(json.readTree(composed.resolve("config/fields/contact.json").toFile()).path("allowedWriterCommands").toString())
+            .isEqualTo("[\"pr_supplier_pcba_contact:sync_directory\",\"pr_supplier_pcba_contact:init_order_ui_fixture\"]");
+        assertThat(json.readTree(composed.resolve("config/fields/membership.json").toFile()).path("allowedWriterCommands").toString())
+            .isEqualTo("[\"qo_procurement_membership_common:init_order_ui_fixture\"]");
+        assertThat(Files.readString(source.resolve("config/fields/contact.json"))).isEqualTo(contactOriginal);
+        Path policy=Files.createDirectory(root.resolve("policy-copy"));
+        try(var files=Files.walk(composed)){for(Path file:files.toList()){
+            Path target=policy.resolve(composed.relativize(file));if(Files.isDirectory(file))Files.createDirectories(target);else Files.copy(file,target);
+        }}
+        assertThat(Files.readAllBytes(policy.resolve("config/fields/contact.json"))).isEqualTo(Files.readAllBytes(composed.resolve("config/fields/contact.json")));
+        assertThat(Files.readAllBytes(policy.resolve("config/fields/membership.json"))).isEqualTo(Files.readAllBytes(composed.resolve("config/fields/membership.json")));
+        assertThat(Files.readAllBytes(policy.resolve("config/commands/order-ui-composed-initialization.json"))).isEqualTo(Files.readAllBytes(composed.resolve("config/commands/order-ui-composed-initialization.json")));
+    }
+
     @Test void orderDirectoryUsesBoundedExactModelCommandsAndConnectionUpdateOnlyThreeFacts() {
         assertThat(ProductQuoteNativeInitialization.orderUiDirectoryCommand("prod_product")).isEqualTo("prod_product:init_order_ui_fixture");
         for(String model:ProductQuoteNativeInitialization.ORDER_DIRECTORY_FIELDS.keySet()) {

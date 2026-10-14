@@ -191,6 +191,17 @@ public final class ProductQuoteNativeInitialization {
         if(!ORDER_DIRECTORY_FIELDS.containsKey(model))throw new IllegalArgumentException("Unsupported order directory model");
         return "prod_product".equals(model)?model+":init_order_ui_fixture":sourceUiCommand(model);
     }
+    /** One overwrite import must carry both exact initializer families for this owner. */
+    public static Map<String,Object> prepareOrderUiComposed(Path original,Path destination,ObjectMapper json) throws Exception {
+        var fields=new LinkedHashMap<String,List<String>>(ORDER_UI_FIELDS);fields.putAll(ORDER_DIRECTORY_FIELDS);
+        var proof=new LinkedHashMap<String,Object>(prepare(original,destination,json,fields,
+                model->ORDER_UI_FIELDS.containsKey(model)?orderUiCommand(model):orderUiDirectoryCommand(model),
+                "order-ui-composed-initialization.json"));
+        proof.put("compositionKind","order-ui-single-owner-initialization-v1");
+        proof.put("initializerFields",fields);
+        return proof;
+    }
+
     public static Map<String,Object> prepareOrderUiDirectory(Path original,Path destination,ObjectMapper json) throws Exception {
         return prepare(original,destination,json,ORDER_DIRECTORY_FIELDS,ProductQuoteNativeInitialization::orderUiDirectoryCommand,"order-ui-directory-initialization.json");
     }

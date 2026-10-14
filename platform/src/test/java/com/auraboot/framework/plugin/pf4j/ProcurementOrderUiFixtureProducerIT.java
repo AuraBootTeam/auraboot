@@ -335,11 +335,9 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         receipt.put("preparationPublicActions",preparationPublicActions);
         receipt.put("preparationMakerPermissions",preparationPermissionCodes());
         receipt.put("preparationMaker",preparationIdentity);
-        for(String name:List.of("directory-initialization","integration-owner")) {
-            Path artifact=caseEvidence.resolve("order-ui-"+name+"-appendix.json");
-            String field=name.equals("directory-initialization")?"directoryInitializationAppendix":"integrationOwnerAppendix";
-            receipt.put(field+"Path",artifact.toString());receipt.put(field+"Sha256",sha(artifact));
-        }
+        Path ownerArtifact=caseEvidence.resolve("order-ui-integration-owner-appendix.json");
+        receipt.put("integrationOwnerAppendixPath",ownerArtifact.toString());
+        receipt.put("integrationOwnerAppendixSha256",sha(ownerArtifact));
         receipt.put("initializationAppendixPath", caseEvidence.resolve("order-ui-initialization-appendix.json").toString());
         receipt.put("initializationAppendixSha256", sha(caseEvidence.resolve("order-ui-initialization-appendix.json")));
         writeArtifact("order-ui-fixture-receipt.json", receipt);
@@ -615,20 +613,20 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
     }
 
     private void prepareInitializationAppendix() throws Exception {
-        var proof = ProductQuoteNativeInitialization.prepareOrderUi(Path.of(procurementDirectory),
+        var proof = ProductQuoteNativeInitialization.prepareOrderUiComposed(Path.of(procurementDirectory),
                 caseEvidence.resolve("order-ui-initialization-dsl"), json);
         initializationDirectory = Path.of(proof.get("testDirectory").toString());
         assertTrue(initializationDirectory.toString().length() <= 256);
-        importDirectory(initializationDirectory);
         var declared=new ArrayList<Path>();for(JsonNode value:json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES")))declared.add(Path.of(value.asText()));
         Path integrationOwner=ProductQuoteNativeInitialization.sourceUiIntegrationOwner(declared,json);
         var ownerProof=ProductQuoteNativeInitialization.prepareOrderUiIntegration(integrationOwner,caseEvidence.resolve("order-ui-integration-owner-dsl"),json);
-        var directoryProof=ProductQuoteNativeInitialization.prepareOrderUiDirectory(Path.of(procurementDirectory),caseEvidence.resolve("order-ui-directory-dsl"),json);
         // All copies must be imported before the first directory initializer or connection update.
         importDirectory(Path.of(ownerProof.get("testDirectory").toString()));
-        importDirectory(Path.of(directoryProof.get("testDirectory").toString()));
+        importDirectory(initializationDirectory);
+        // Every subsequent same-owner policy copy must retain both initializer families.
+        procurementDirectory=initializationDirectory.toString();
         var writers=new LinkedHashMap<String,Object>();
-        for(var part:List.of(proof,ownerProof,directoryProof)) {
+        for(var part:List.of(proof,ownerProof)) {
             @SuppressWarnings("unchecked") var values=(Map<String,Object>)part.get("exactWriterAppendix");writers.putAll(values);
         }
         JsonNode expected=json.valueToTree(writers);
@@ -652,7 +650,6 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         }
         var updater=commands.findByCode(ProductQuoteNativeInitialization.ORDER_CONNECTION_UPDATE_COMMAND);
         assertEquals("customer_pcba_int_kingdee_connection",updater.getModelCode());assertEquals("published",updater.getStatus());assertTrue(updater.getCode().length()<=64);
-        writeArtifact("order-ui-directory-initialization-appendix.json",directoryProof);
         writeArtifact("order-ui-integration-owner-appendix.json",ownerProof);
         writeArtifact("order-ui-initialization-appendix.json", proof);
     }
