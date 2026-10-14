@@ -38,6 +38,15 @@ describe('Workspace business cells', () => {
     expect(screen.getByText('已交付')).toBeVisible();
     expect(screen.queryByText(/逾期/)).toBeNull();
   });
+  it.each([null, undefined, ''])('keeps an unspecified amount distinct from an explicit zero (%s)', value => {
+    render(<WorkspaceCell value={value} record={{}} locale="en-US" column={{ field: 'amount', presentation: { kind: 'currency', currencyCode: 'USD' } }} />);
+    expect(screen.getByText('—')).toBeVisible();
+    expect(screen.queryByText('$0')).toBeNull();
+  });
+  it('preserves an explicitly recorded zero amount', () => {
+    render(<WorkspaceCell value={0} record={{}} locale="en-US" column={{ field: 'amount', presentation: { kind: 'currency', currencyCode: 'USD' } }} />);
+    expect(screen.getByText('$0')).toBeVisible();
+  });
   it('formats other currencies through the same presentation contract', () => {
     render(<WorkspaceCell value={128000} record={{}} locale="en-US" column={{ field: 'amount', presentation: { kind: 'currency', currencyCode: 'USD', precision: 0 } }} />);
     expect(screen.getByText('$128,000')).toBeVisible();

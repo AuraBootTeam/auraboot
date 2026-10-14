@@ -41,6 +41,7 @@ export function WorkspaceCell({ value, record, column, locale = 'en' }: CellRend
     return <span className="inline-flex items-center gap-2 text-[12px]"><span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px]`} style={{ color: getAvatarColor(text), backgroundColor: `${getAvatarColor(text)}15` }}>{/\p{Script=Han}/u.test(text) ? Array.from(text)[0] : getInitials(text)}</span><span className="text-text truncate">{text}</span></span>;
   }
   if (config.kind === 'currency') {
+    if (value == null || value === '') return <span className="text-text-3">—</span>;
     const amount = Number(value);
     return Number.isFinite(amount) ? <span className={`text-text tabular-nums ${config.size === 'summary' ? 'text-lg font-semibold' : 'text-[12px]'}`}>{new Intl.NumberFormat(locale, { style: 'currency', currency: config.currencyCode || 'CNY', minimumFractionDigits: config.precision ?? 0, maximumFractionDigits: config.precision ?? 0 }).format(amount)}</span> : <span className="text-text-3">—</span>;
   }
