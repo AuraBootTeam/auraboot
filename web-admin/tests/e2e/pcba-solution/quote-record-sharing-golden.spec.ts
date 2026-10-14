@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { createWriteStream, readFileSync, statSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDetailFromList,
   seedBomPriceManualReviewQuote, seedDownloadableQuote, type QuoteRoleUser } from './quote-e2e-helpers';
@@ -12,6 +13,54 @@ const recipients: QuoteRoleUser[] = [
   makeQuoteRoleUser('share_b', sharingUid, ['qo_sales']),
   makeQuoteRoleUser('share_proc', sharingUid, ['qo_procurement']),
 ];
+
+test.beforeAll(async ({}, testInfo) => {
+  test.setTimeout(180_000);
+  const required = (key: string): string => {
+    const value = process.env[key];
+    if (!value) throw new Error(`${key} is required for managed foreign identity preparation`);
+    return value;
+  };
+  const workspace = required('AURA_WORKSPACE_ROOT');
+  const core = required('AURA_CORE_PROJECT_ROOT');
+  for (const root of [workspace, core]) expect(path.isAbsolute(root)).toBe(true);
+  const runtime = required('AURA_RUNTIME_NAME');
+  const database = required('POSTGRES_DB');
+  expect(database).toBe(required('PG_DB'));
+  const project = path.join(core, 'platform');
+  const started = Date.now();
+  const logPath = testInfo.outputPath('cross-tenant-identity-seed.log');
+  const log = createWriteStream(logPath);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(process.execPath, [path.join(workspace, 'aura'), 'gradle', runtime,
+        '--project', project, '--', ':test', '--tests',
+        'com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.seed_createsTestTenantAndUser',
+        '--no-daemon', '--rerun-tasks'], {
+        cwd: project,
+        env: { ...process.env, AURA_E2E_SEED_IDENTITY_ONLY: 'true',
+          TEST_DATABASE_URL: `jdbc:postgresql://${required('POSTGRES_HOST')}:${required('POSTGRES_PORT')}/${database}`,
+          TEST_DATABASE_USERNAME: required('POSTGRES_USER'), TEST_DATABASE_PASSWORD: required('POSTGRES_PASSWORD'),
+          SPRING_DATA_REDIS_HOST: required('REDIS_HOST'), SPRING_DATA_REDIS_PORT: required('REDIS_PORT'),
+          SPRING_DATA_REDIS_DATABASE: required('REDIS_DATABASE'),
+        }, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      child.stdout.pipe(log, { end: false });
+      child.stderr.pipe(log, { end: false });
+      child.once('error', reject);
+      child.once('close', code => code === 0 ? resolve() : reject(new Error(
+        `Managed foreign identity preparation failed (${code}); evidence: ${logPath}`)));
+    });
+  } finally { log.end(); }
+  const receipt = path.join(project, 'build/test-results/test/TEST-com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.xml');
+  expect(statSync(receipt).mtimeMs).toBeGreaterThanOrEqual(started);
+  const xml = readFileSync(receipt, 'utf8');
+  const header = xml.match(/<testsuite\b[^>]*>/)?.[0] ?? '';
+  for (const [key, value] of Object.entries({ tests: '1', skipped: '0', failures: '0', errors: '0' })) {
+    expect(header).toMatch(new RegExp(`\\b${key}="${value}"`));
+  }
+  await testInfo.attach('managed-foreign-identity-junit', { path: receipt, contentType: 'application/xml' });
+});
 
 test('quote sharing release gate: multiple members, role access and revocation through UI', async ({ page, browser }, testInfo) => {
   test.setTimeout(300_000);
@@ -233,6 +282,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const dependencies = [
       [path.join(crmRoot!, 'plugin-aura', 'crm'), 'com.auraboot.crm'],
       [path.join(pluginsRoot!, 'pcba-crm'), 'com.auraboot.pcba-crm'],
+      [path.join(pluginsRoot!, 'bom-standardization'), 'com.auraboot.bom-standardization'],
       [path.join(quoteRoot!, 'plugin-aura', 'quote-core'), 'com.auraboot.quote-core'],
     ];
     for (const [pluginPath, pluginId] of dependencies) {
