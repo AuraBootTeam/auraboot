@@ -34,22 +34,67 @@ class ImportedNotificationMetadataReaderTest {
     BackgroundDataAccessor data = mock(BackgroundDataAccessor.class);
     CapturingJdbc jdbc = new CapturingJdbc();
     ImportedNotificationMetadataReader reader;
+    com.auraboot.framework.meta.service.MetaModelService models = mock(com.auraboot.framework.meta.service.MetaModelService.class);
     RegisteredSourcePlanResolverTest.Fixture fixture = new RegisteredSourcePlanResolverTest.Fixture();
     @BeforeEach
     void setup() {
         when(sessions.getConfiguration()).thenReturn(new Configuration(new Environment("test", new JdbcTransactionFactory(), ds)));
-        reader = new ImportedNotificationMetadataReader(ds, new DataSourceTransactionManager(ds), sessions, mock(DynamicDataService.class));
+        reader = new ImportedNotificationMetadataReader(ds, new DataSourceTransactionManager(ds), sessions, mock(DynamicDataService.class), models);
         ReflectionTestUtils.setField(reader, "jdbc", jdbc);
         ReflectionTestUtils.setField(reader, "data", data);
+        when(models.findByCode("source")).thenReturn(definition());
         TransactionSynchronizationManager.setActualTransactionActive(true);
     }
     @AfterEach
     void cleanup() {
         TransactionSynchronizationManager.clear();
     }
+    private com.auraboot.framework.meta.dto.MetaModelDTO definition() {
+        return com.auraboot.framework.meta.dto.MetaModelDTO.builder().id(11L).pid("model-source").tenantId(1L)
+                .code("source").version(1).isCurrent(true).status("published").sourceType("physical")
+                .tableName("approved_table").build();
+    }
+    private JsonNode model(Map<String,Object> facts) {
+        var values=new java.util.LinkedHashMap<String,Object>(Map.of("id",11,"pid","model-source","tenant_id",1,
+                "code","source","version",1,"is_current",true,"deleted_flag",false,"status","published",
+                "source_type","physical","plugin_pid","plugin"));
+        values.putAll(facts);return SourceBindingCanonical.tree(values);
+    }
+    @Test void nullableRawTableUsesCanonicalProjectionWithoutChangingApprovalFacts() {
+        var raw=(com.fasterxml.jackson.databind.node.ObjectNode)model(Map.of());raw.putNull("table_name");
+        String original=raw.toString();jdbc.rows.add(raw);
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id",1,"pid","src")));
+        when(data.getById(1,"source","src")).thenReturn(Map.of("pid","src"));
+        assertThat(reader.record(fixture.binding,"source","src")).containsEntry("tenant_id",1L);
+        assertThat(jdbc.sql.get(1)).contains("FROM \"approved_table\" r").doesNotContain("FROM \"null\"");
+        assertThat(raw.toString()).isEqualTo(original);
+    }
+    @Test void canonicalProjectionCannotUseForeignTenantOwnerTableOrModelRevision() {
+        for(String change:List.of("tenant","id","pid","code","revision","current","status","source","table","missing")) {
+            jdbc.rows.clear();jdbc.sql.clear();var dto=definition();
+            switch(change) {
+                case "tenant"->dto.setTenantId(2L);case "id"->dto.setId(12L);case "pid"->dto.setPid("other-model");
+                case "code"->dto.setCode("other");case "revision"->dto.setVersion(2);case "current"->dto.setIsCurrent(false);
+                case "status"->dto.setStatus("draft");case "source"->dto.setSourceType("namedQuery");
+                case "table"->dto.setTableName("different_table");case "missing"->dto=null;
+            }
+            when(models.findByCode("source")).thenReturn(dto);jdbc.rows.add(model(Map.of("table_name","approved_table")));
+            assertThatThrownBy(()->reader.record(fixture.binding,"source","src")).as(change).isInstanceOf(IllegalArgumentException.class);
+            assertThat(jdbc.sql).as(change).hasSize(1);
+        }
+        verifyNoInteractions(data);
+        when(models.findByCode("source")).thenReturn(definition());
+        for(var invalid:List.of(Map.<String,Object>of("plugin_pid","foreign-owner"),Map.<String,Object>of("tenant_id",2),
+                Map.<String,Object>of("version",2),Map.<String,Object>of("is_current",false),Map.<String,Object>of("deleted_flag",true))) {
+            jdbc.rows.clear();jdbc.sql.clear();jdbc.rows.add(model(invalid));
+            assertThatThrownBy(()->reader.record(fixture.binding,"source","src")).isInstanceOf(IllegalArgumentException.class);
+            assertThat(jdbc.sql).hasSize(1);
+        }
+        verifyNoInteractions(data);
+    }
     @Test
     void physicalIdentifiersComeFromServerMetadataAndTenantPidAreBound() {
-        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table")));
+        jdbc.rows.add(model(Map.of("table_name", "approved_table")));
         jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src")));
         when(data.getById(1, "source", "src")).thenReturn(Map.of("pid", "src"));
         assertThat(reader.record(fixture.binding, "source", "src")).containsEntry("tenant_id", 1L).doesNotContainKey("deleted_flag");
@@ -62,7 +107,7 @@ class ImportedNotificationMetadataReaderTest {
         for (Object policy : List.of(false, "false", true, "true")) {
             jdbc.rows.clear(); jdbc.sql.clear(); jdbc.args.clear();
             boolean soft = Boolean.TRUE.equals(policy) || "true".equals(policy);
-            jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table",
+            jdbc.rows.add(model(Map.of("table_name", "approved_table",
                     "extension", Map.of("extension", Map.of("softDelete", policy)))));
             jdbc.rows.add(SourceBindingCanonical.tree(soft
                     ? Map.of("tenant_id", 1, "pid", "src", "deleted_flag", false)
@@ -78,7 +123,7 @@ class ImportedNotificationMetadataReaderTest {
     void malformedPolicyIsRejectedBeforeBusinessQueryOrProjection() {
         for (Object value : List.of("TRUE", "garbage", 1, Map.of("nested", true))) {
             jdbc.rows.clear(); jdbc.sql.clear();
-            jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension", Map.of("softDelete", value))));
+            jdbc.rows.add(model(Map.of("table_name", "approved_table", "extension", Map.of("softDelete", value))));
             assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
             assertThat(jdbc.sql).hasSize(1);
         }
@@ -86,19 +131,19 @@ class ImportedNotificationMetadataReaderTest {
     }
     @Test
     void softDeletedAndHardMissingRowsCannotBecomeLiveProjection() {
-        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension", Map.of("softDelete", true))));
+        jdbc.rows.add(model(Map.of("table_name", "approved_table", "extension", Map.of("softDelete", true))));
         jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src", "deleted_flag", true)));
         when(data.getById(1, "source", "src")).thenReturn(Map.of("pid", "src"));
         assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(data);
-        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table")));
+        jdbc.rows.add(model(Map.of("table_name", "approved_table")));
         jdbc.rows.add(null);
         assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(data);
     }
     @Test
     void textualExtensionUsesCanonicalNestedPrecedenceAndInvalidFormsReject() {
-        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension",
+        jdbc.rows.add(model(Map.of("table_name", "approved_table", "extension",
                 "{\"extension\":{\"softDelete\":false},\"softDelete\":true}")));
         jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src")));
         when(data.getById(1, "source", "src")).thenReturn(Map.of("pid", "src"));
@@ -106,14 +151,14 @@ class ImportedNotificationMetadataReaderTest {
         assertThat(jdbc.sql.get(1)).doesNotContain("deleted_flag=FALSE");
         for (Object invalid : List.of("not-json", List.of("not-object"), Map.of("softDelete", "false "))) {
             jdbc.rows.clear(); jdbc.sql.clear();
-            jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension", invalid)));
+            jdbc.rows.add(model(Map.of("table_name", "approved_table", "extension", invalid)));
             assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
             assertThat(jdbc.sql).hasSize(1);
         }
     }
     @Test
     void lockedPhysicalRowCannotBypassMissingDataScopeProjection() {
-        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table")));
+        jdbc.rows.add(model(Map.of("table_name", "approved_table")));
         jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src")));
         assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
     }
@@ -121,7 +166,7 @@ class ImportedNotificationMetadataReaderTest {
     void callerCannotSelectUnapprovedModelOrUnsafeTable() {
         assertThatThrownBy(() -> reader.record(fixture.binding, "unregistered", "src")).isInstanceOf(IllegalArgumentException.class);
         assertThat(jdbc.sql).isEmpty();
-        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "x\"; DROP TABLE t")));
+        jdbc.rows.add(model(Map.of("table_name", "x\"; DROP TABLE t")));
         assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
         assertThat(jdbc.sql).hasSize(1);
         verifyNoInteractions(data);
@@ -132,7 +177,7 @@ class ImportedNotificationMetadataReaderTest {
         assertThatThrownBy(() -> reader.rule(1, 10)).isInstanceOf(IllegalArgumentException.class);
         assertThat(jdbc.sql).isEmpty();
         TransactionSynchronizationManager.setActualTransactionActive(true);
-        var different = new ImportedNotificationMetadataReader(ds, new DataSourceTransactionManager(mock(DataSource.class)), sessions, mock(DynamicDataService.class));
+        var different = new ImportedNotificationMetadataReader(ds, new DataSourceTransactionManager(mock(DataSource.class)), sessions, mock(DynamicDataService.class), models);
         ReflectionTestUtils.setField(different, "jdbc", jdbc);
         assertThatThrownBy(() -> different.rule(1, 10)).isInstanceOf(IllegalArgumentException.class);
         assertThat(jdbc.sql).isEmpty();

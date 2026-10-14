@@ -25,9 +25,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 final class ImportedNotificationMetadataReader implements SourceBindingReader {
     private final JdbcTemplate jdbc;
     private final BackgroundDataAccessor data;
+    private final com.auraboot.framework.meta.service.MetaModelService models;
     private final boolean sameResource;
-    ImportedNotificationMetadataReader(@Qualifier("dataSource") DataSource ds, PlatformTransactionManager manager, SqlSessionFactory sessions, DynamicDataService dynamic) {
+    ImportedNotificationMetadataReader(@Qualifier("dataSource") DataSource ds, PlatformTransactionManager manager, SqlSessionFactory sessions, DynamicDataService dynamic, com.auraboot.framework.meta.service.MetaModelService models) {
         sameResource = manager instanceof DataSourceTransactionManager tx && tx.getDataSource() == ds && sessions.getConfiguration().getEnvironment().getDataSource() == ds;
+        this.models = models;
         jdbc = new JdbcTemplate(ds);
         data = new BackgroundDataAccessorImpl(dynamic, null, ds, manager);
     }
@@ -66,8 +68,7 @@ final class ImportedNotificationMetadataReader implements SourceBindingReader {
         allowed(b, model);
         SourceBindingTypes.pid(pid);
         JsonNode nativeModel = one(rows("SELECT to_jsonb(m)::text FROM ab_meta_model m WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE FOR SHARE", b.tenantId(), model));
-        String table = nativeModel.path("table_name").asText();
-        SourceBindingTypes.require(table.matches("[A-Za-z_][A-Za-z0-9_]{0,127}"));
+        String table = physicalTable(b, model, nativeModel);
         boolean softDelete = softDelete(nativeModel);
         String predicate = softDelete ? " AND deleted_flag=FALSE" : "";
         JsonNode nativeRow = one(rows("SELECT to_jsonb(r)::text FROM \"" + table + "\" r WHERE tenant_id=? AND pid=?" + predicate + " FOR SHARE", b.tenantId(), pid));
@@ -82,6 +83,30 @@ final class ImportedNotificationMetadataReader implements SourceBindingReader {
         record.put("tenant_id", nativeRow.path("tenant_id").longValue());
         if (softDelete) record.put("deleted_flag", nativeRow.path("deleted_flag").booleanValue());
         return new SourceBindingReader.LiveRecord(record, softDelete);
+    }
+    /** Resolve through the canonical projection, while binding it to the locked approved identity. */
+    private String physicalTable(SourceBindingTypes.Binding b, String model, JsonNode raw) {
+        var approval=b.approvals().stream().filter(a->a.modelCode().equals(model)).findFirst().orElseThrow();
+        SourceBindingTypes.require(raw.path("tenant_id").isIntegralNumber() && raw.path("tenant_id").longValue()==b.tenantId()
+                && model.equals(raw.path("code").textValue()) && raw.path("id").isIntegralNumber()
+                && raw.path("version").isIntegralNumber() && raw.path("is_current").isBoolean() && raw.path("is_current").booleanValue()
+                && raw.path("deleted_flag").isBoolean() && !raw.path("deleted_flag").booleanValue()
+                && "published".equals(raw.path("status").textValue()) && "physical".equals(raw.path("source_type").textValue())
+                && (!raw.has("source_ref") || raw.path("source_ref").isNull())
+                && approval.owners().stream().anyMatch(owner->owner.pid().equals(raw.path("plugin_pid").textValue())));
+        var definition=models.findByCode(model);
+        SourceBindingTypes.require(definition!=null && java.util.Objects.equals(definition.getTenantId(),b.tenantId())
+                && java.util.Objects.equals(definition.getId(),raw.path("id").longValue())
+                && java.util.Objects.equals(definition.getPid(),raw.path("pid").textValue())
+                && model.equals(definition.getCode()) && java.util.Objects.equals(definition.getVersion(),raw.path("version").intValue())
+                && Boolean.TRUE.equals(definition.getIsCurrent()) && "published".equals(definition.getStatus())
+                && "physical".equals(definition.getSourceType()) && definition.getSourceRef()==null);
+        String table=definition.getTableName();
+        SourceBindingTypes.require(table!=null && table.matches("[A-Za-z_][A-Za-z0-9_]{0,127}"));
+        JsonNode declared=raw.path("table_name");
+        SourceBindingTypes.require(declared.isMissingNode() || declared.isNull()
+                || (declared.isTextual() && (declared.textValue().isBlank() || table.equals(declared.textValue().trim()))));
+        return table;
     }
     private boolean softDelete(JsonNode model) {
         JsonNode raw = model.path("extension");
