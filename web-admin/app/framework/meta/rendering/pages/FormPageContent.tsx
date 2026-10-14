@@ -2830,7 +2830,7 @@ export function FormPageContent(props: PageContentProps) {
 
                                   // Calculate column span based on field layout or DSL span
                                   const colSpan =
-                                    field.layout?.colSpan || (field.span ? field.span * 6 : 6);
+                                    field.layout?.colSpan || field.colSpan || (field.span ? field.span * 6 : 6);
                                   const isFullWidth = colSpan >= 12;
 
                                   return (

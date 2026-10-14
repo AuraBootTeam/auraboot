@@ -71,7 +71,21 @@
               "en-US": "Enter a unit price; decimals are supported."
             }
           }
-        },
+        }
+      ],
+      "extension": {
+        "collapsible": false,
+        "defaultCollapsed": false
+      }
+    },
+    {
+      "id": "state_plan",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "状态与计划",
+        "en-US": "Status and schedule"
+      },
+      "fields": [
         {
           "field": "sc_budget",
           "colSpan": 4,
@@ -104,21 +118,7 @@
             },
             "placeholder": "0–5"
           }
-        }
-      ],
-      "extension": {
-        "collapsible": false,
-        "defaultCollapsed": false
-      }
-    },
-    {
-      "id": "state_plan",
-      "blockType": "form-section",
-      "title": {
-        "zh-CN": "状态与计划",
-        "en-US": "Status and schedule"
-      },
-      "fields": [
+        },
         {
           "field": "sc_status",
           "colSpan": 4,
