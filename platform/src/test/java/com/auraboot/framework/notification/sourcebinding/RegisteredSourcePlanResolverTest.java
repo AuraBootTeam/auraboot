@@ -181,6 +181,61 @@ class RegisteredSourcePlanResolverTest {
         assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void approvedImporterOwningCardinalityKeepsExactPidResolutionAndRawApproval() throws Exception {
+        remainingFixture(1000);
+        for (String[] edge : List.of(new String[]{"source", "owner", "owner"},
+                new String[]{"target", "owner", "owner"}, new String[]{"link", "owner", "owner"},
+                new String[]{"link", "contact", "contact"}, new String[]{"contact", "owner", "owner"},
+                new String[]{"child", "parent", "target"})) {
+            referenceField(edge[0], edge[1], Map.of("targetEntity", edge[2], "valueField", "pid",
+                    "refType", "entity", "relationship", "many_to_one",
+                    "targetField", "display_name", "displayField", "display_name"));
+        }
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        referenceField("target", "owner", Map.of("targetModel", "owner", "valueField", "pid",
+                "relationship", "many_to_one"));
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        metadataField("child", "parent").put("ref_target",
+                "{\"targetEntity\":\"target\",\"valueField\":\"pid\",\"relationship\":\"many_to_one\"}");
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+    }
+
+    @Test
+    void importedCardinalityRejectsOtherRelationsAndNonTextEvenAfterReapproval() {
+        for (Object relationship : List.of("one_to_many", "many_to_many", "one_to_one", "MANY_TO_ONE", "", false, 1,
+                List.of("many_to_one"), Map.of("kind", "many_to_one"))) {
+            referenceField("target", "owner", Map.of("targetEntity", "owner", "valueField", "pid", "relationship", relationship));
+            f.reapprove();
+            assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        }
+        referenceField("target", "owner", Map.of("targetEntity", "owner", "valueField", "pid"));
+        ((ObjectNode) metadataField("target", "owner").path("ref_target")).putNull("relationship");
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void owningCardinalityNeverGrantsAlternateTargetValueOrDynamicAuthority() {
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                Map.of("targetEntity", "other"), Map.of("valueField", "code"),
+                Map.of("targetTable", "other_table"), Map.of("refType", "api"),
+                Map.of("apiConfig", Map.of("url", "https://example.invalid")),
+                Map.of("queryCondition", Map.of("limit", 1)), Map.of("extensions", Map.of("enabled", true)),
+                Map.of("bidirectional", Map.of("relationType", "many_to_many")),
+                Map.of("unknownSource", "lookup"))) {
+            Map<String, Object> target = new HashMap<>(Map.of("targetEntity", "owner", "valueField", "pid", "relationship", "many_to_one"));
+            target.putAll(bad);
+            referenceField("target", "owner", target);
+            f.reapprove();
+            assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
     private ObjectNode metadataField(String model, String code) {
         for (JsonNode field : f.graphs.get(model).path("fields")) {
             if (code.equals(field.path("code").asText())) return (ObjectNode) field;

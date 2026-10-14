@@ -107,6 +107,11 @@ final class ImportedNotificationMetadataValidator {
             if (!java.lang.reflect.Modifier.isStatic(property.getModifiers())) known.add(property.getName());
         }
         known.add("targetModel"); // Canonical FieldRefTargetBean alias.
+        // The importer preserves the physical owning relation's cardinality in raw metadata.
+        known.add("relationship");
+        SourceBindingTypes.require(!target.has("relationship")
+                || (target.path("relationship").isTextual()
+                    && "many_to_one".equals(target.path("relationship").textValue())));
         target.fieldNames().forEachRemaining(name -> SourceBindingTypes.require(known.contains(name)));
         SourceBindingTypes.require(!(target.has("targetEntity") && target.has("targetModel")));
         FieldRefTargetBean reference = SourceBindingCanonical.refTarget(target);
