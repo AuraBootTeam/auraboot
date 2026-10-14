@@ -404,7 +404,7 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
         require(isinstance(response, dict) and str(response.get("code")) == "0",
                 "model event administration failed")
         if path == "/api/meta/models" and method == "POST":
-            bind_physical_fixture_fields(request, admin, body, response.get("data"))
+            bind_physical_fixture_fields(call, admin, body, response.get("data"))
         return response.get("data")
 
     def record(case, condition=True):
