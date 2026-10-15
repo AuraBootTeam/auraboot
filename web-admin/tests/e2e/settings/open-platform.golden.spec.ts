@@ -2959,6 +2959,7 @@ test.describe('Public business API management journey', () => {
       await guidePage.close();
     } finally { await page.context().setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` }); }
     await page.getByTestId('open-platform-actions-link').click();
+    await expect(page).toHaveURL(/\/p\/c\/open_platform_actions(?:\?|$)/);
     const editor = page.getByTestId('action-publication-editor'); await expect(editor).toBeVisible();
     await editor.getByRole('button', { name: text('New business API'), exact: true }).click();
     const form = editor.getByTestId('action-publication-form');
@@ -3039,6 +3040,7 @@ test.describe('Public business API management journey', () => {
     await revokeGroup.getByRole('button', { name: text('Confirm'), exact: true }).click(); expect((await revoke).status()).toBe(200); expect((await invoke()).status()).toBe(403);
     await grants.getByRole('button', { name: text('Close authority editor'), exact: true }).click();
     await page.getByTestId('open-platform-actions-link').click();
+    await expect(page).toHaveURL(/\/p\/c\/open_platform_actions(?:\?|$)/);
     await editor.locator('li').filter({ hasText: code }).getByRole('button', { name: text('Edit business contract'), exact: true }).click();
     await form.getByRole('button', { name: text('Withdraw business API'), exact: true }).click();
     confirmation = editor.getByRole('group', { name: text('Business API operation confirmation'), exact: true });

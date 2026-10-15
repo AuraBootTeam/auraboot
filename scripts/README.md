@@ -295,3 +295,5 @@ T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/pat
 
 | `ci/prepare_openapi_verifier.sh` | 1 | 2026-10-14 | Bootstrap exact hashed dependencies for the isolated OpenAPI verifier. |
 | `ci/verify_openapi_artifacts.py` | 1 | 2026-10-14 | Validate actual generated OpenAPI structure, component schemas, payloads and formats with a fixed case receipt. |
+
+| `ci/collect-open-platform-jfr.sh` | 1 | 2026-10-15 | Collect request-correlated JFR evidence from the owned Open Platform release container without changing latency thresholds. |

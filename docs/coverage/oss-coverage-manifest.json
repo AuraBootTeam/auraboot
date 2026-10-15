@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "776e4ad8f",
+    "commit": "3b9e0e4fe",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -1188,9 +1188,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/settings/open-platform.golden.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "tasset:complete_maintenance",
@@ -3529,12 +3531,24 @@
           "note": "kind=form"
         },
         {
+          "id": "page:open_platform_actions",
+          "action": "open_platform_actions",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list"
+        },
+        {
           "id": "page:open_platform_publications",
           "action": "open_platform_publications",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
             "web-admin/tests/e2e/settings/open-platform.golden.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
@@ -3548,6 +3562,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
             "web-admin/tests/e2e/settings/open-platform.golden.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
@@ -3718,6 +3733,16 @@
         {
           "id": "tpm:complete_task",
           "action": "tpm:complete_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:create_customer",
+          "action": "tpm:create_customer",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -3904,6 +3929,26 @@
           "verdict": "untested"
         },
         {
+          "id": "tpm:submit_acceptance",
+          "action": "tpm:submit_acceptance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:update_customer",
+          "action": "tpm:update_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "tpm:update_milestone",
           "action": "tpm:update_milestone",
           "surface": "ui",
@@ -3913,6 +3958,16 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:update_progress",
+          "action": "tpm:update_progress",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "tpm:update_project",
@@ -3935,6 +3990,39 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:tpm_customer_detail",
+          "action": "tpm_customer_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tpm_customer"
+        },
+        {
+          "id": "page:tpm_customer_form",
+          "action": "tpm_customer_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tpm_customer"
+        },
+        {
+          "id": "page:tpm_customer_list",
+          "action": "tpm_customer_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tpm_customer"
         },
         {
           "id": "page:tpm_milestone_detail",
@@ -4694,8 +4782,10 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
+            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -4709,6 +4799,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
+            "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-loading-states.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
@@ -4966,9 +5057,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/crm/pipeline-journey-golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=e2et_crm_opp"
         },
         {
@@ -6769,10 +6862,10 @@
     }
   ],
   "stats": {
-    "commands": 257,
-    "untested": 173,
-    "pages": 174,
-    "pagesUntested": 107,
+    "commands": 261,
+    "untested": 176,
+    "pages": 178,
+    "pagesUntested": 110,
     "platformPages": 95,
     "platformPagesUntested": 37
   }
