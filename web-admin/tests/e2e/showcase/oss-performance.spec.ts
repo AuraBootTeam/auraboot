@@ -121,7 +121,9 @@ test('PERF journey: home, menu, search, pagination and persisted CRUD @critical'
       saves.push(request.url());
   });
   await page.getByTestId('form-btn-submit').click();
-  await expect(page.getByTestId('form-error-summary')).toBeVisible();
+  await expect(
+    page.getByTestId('form-field-sc_name').getByText('请填写名称', { exact: true }),
+  ).toBeVisible();
   expect(saves).toEqual([]);
   await capture(page, 'PERF-05');
 
@@ -194,6 +196,7 @@ test('PERF journey: home, menu, search, pagination and persisted CRUD @critical'
 
 test('PERF auth: anonymous home requires login', async ({ browser }) => {
   const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
     locale: 'zh-CN',
     viewport: { width: 1440, height: 1000 },
   });
