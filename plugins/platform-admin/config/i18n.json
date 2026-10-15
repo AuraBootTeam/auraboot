@@ -6060,5 +6060,12 @@
     "en-US": "Public Query Publications",
     "source": "import",
     "refType": "ui"
-  }
+  },
+{
+  "key": "page.open_platform_actions.title",
+  "zh-CN": "公共业务接口",
+  "en-US": "Public Business APIs",
+  "source": "import",
+  "refType": "ui"
+}
 ]

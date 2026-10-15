@@ -57,7 +57,10 @@ public class OpenApiConfig {
                             .title("AuraBoot Open Platform API")
                             .version("v1")
                             .description("Explicitly published machine-to-machine APIs."));
-                    api.setSecurity(java.util.List.of(new SecurityRequirement().addList("oauth2ClientCredentials")));
+                    api.setSecurity(java.util.List.of(new SecurityRequirement().addList("integrationToken"),
+                            new SecurityRequirement().addList("oauth2ClientCredentials")));
+                    api.getComponents().addSecuritySchemes("integrationToken", new SecurityScheme().type(SecurityScheme.Type.HTTP)
+                            .scheme("bearer").bearerFormat("opaque").description("Direct integration token; current installation authority applies"));
                     api.getComponents().addSecuritySchemes("oauth2ClientCredentials",
                             new SecurityScheme()
                                     .type(SecurityScheme.Type.OAUTH2)

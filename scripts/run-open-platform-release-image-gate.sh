@@ -22,7 +22,7 @@ RELEASE_MUTATION="${AURA_OPEN_PLATFORM_RELEASE_MUTATION:-}"
   || fatal "exact frozen source-set digest is required"
 [[ "$(uname -s)" == "Linux" ]] || fatal "release images must be verified on the admitted Linux CI host"
 [[ "$(uname -m)" == "x86_64" ]] || fatal "release image builder must be x86_64"
-for command_name in docker git openssl python3 timeout; do need "$command_name"; done
+for command_name in docker git openssl python3 timeout bash curl jq; do need "$command_name"; done
 RUNNER_UID="$(id -u)"
 RUNNER_GID="$(id -g)"
 [[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all)" ]] || fatal "CI checkout is dirty"
@@ -232,6 +232,7 @@ python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" plan --root "$STAGE
 BACKEND_GRADLE_HOME="$WORK_ROOT/backend-gradle"
 mkdir -p "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
 cp -a "$GRADLE_DISTRIBUTION_DIR" "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin/"
+BACKEND_RC=0
 timeout 1200 docker run --rm --memory=4g --network "$NET" \
   -v "$STAGE":/source -v "$ARTIFACTS":/artifacts \
   -v "$BACKEND_GRADLE_HOME":/gradle-home -w /source/platform \
@@ -250,10 +251,14 @@ timeout 1200 docker run --rm --memory=4g --network "$NET" \
       -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" \
       -Dorg.gradle.workers.max=1 -PauraTestMaxHeap=1024m -PauraTestMinHeap=128m \
       -PauraTestMaxMetaspace=384m -PspringTestContextCacheMaxSize=1
-  ' > "$ARTIFACTS/logs/backend-tests.log" 2>&1 || fail "backend blocking tests failed"
+  ' > "$ARTIFACTS/logs/backend-tests.log" 2>&1 || BACKEND_RC=$?
 mkdir -p "$ARTIFACTS/backend-junit"
-cp "$STAGE/platform/build/test-results/test/"TEST-*.xml "$ARTIFACTS/backend-junit/"
-chmod 0600 "$ARTIFACTS/backend-junit/"*.xml
+for result in "$STAGE/platform/build/test-results/test/"TEST-*.xml; do
+  [[ -f "$result" ]] || continue
+  cp "$result" "$ARTIFACTS/backend-junit/"
+  chmod 0600 "$ARTIFACTS/backend-junit/$(basename "$result")"
+done
+[[ "$BACKEND_RC" == 0 ]] || fail "backend blocking tests failed (exit $BACKEND_RC); available JUnit evidence retained"
 cp "$STAGE/platform/build/reports/jacoco/test/jacocoTestReport.xml" "$ARTIFACTS/backend-jacoco.xml"
 python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" verify --root "$STAGE" \
   --plan "$ARTIFACTS/backend-plan.json" --results "$ARTIFACTS/backend-junit" \
@@ -321,6 +326,13 @@ for attempt in $(seq 1 90); do
   [[ "$attempt" != 90 ]] || { docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1; fail "app health did not become UP"; }
   sleep 2
 done
+
+info "reconciling frozen quick-access browser and original-image evidence"
+: "${OPEN_PLATFORM_UI_EVIDENCE:?immutable quick-access UI archive is required}"
+[[ -f "$OPEN_PLATFORM_UI_EVIDENCE" && ! -L "$OPEN_PLATFORM_UI_EVIDENCE" ]] || fatal "quick-access UI input must be a regular archive"
+python3 "$STAGE/scripts/ci/open_platform_quick_ui.py" verify --archive "$OPEN_PLATFORM_UI_EVIDENCE" \
+  --root "$STAGE" --expected-ref "$REF_SHA" > "$ARTIFACTS/quick-ui-receipt.json" \
+  2> "$ARTIFACTS/logs/quick-ui.log" || fail "quick-access UI evidence incomplete or from another candidate"
 
 info "running two-domain HTTP protocol probe"
 # Create the secret handoff as the unprivileged host runner before the rootful helper container
@@ -439,6 +451,8 @@ json.dump({
   "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 18, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
   "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
   "backend": json.load(open("$ARTIFACTS/backend-receipt.json")),
+  "quickAccessUi": json.load(open("$ARTIFACTS/quick-ui-receipt.json")),
+  "officeGuide": json.load(open("$ARTIFACTS/office-guide/result.json")),
   "openapi": json.load(open("$ARTIFACTS/openapi-receipt.json")), "openapiTypes": "strict-positive-negative-ok",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"

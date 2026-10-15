@@ -12,6 +12,8 @@ from open_platform_http import Client, data
 from open_platform_dynamic_probe import run_dynamic_probe, run_sdk_consumer, audited_command, verify_command_audits, prepare_slo_fixture
 from open_platform_model_event_probe import run_model_event_probe
 from open_platform_model_event_runtime import DockerInfrastructure
+from open_platform_integration_token_probe import run_integration_token_probe
+from open_platform_office_probe import run_office_probe
 
 bootstrap_spec = importlib.util.spec_from_file_location(
     "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
@@ -135,44 +137,65 @@ def run_static_probe(request, admin):
 
 
 def main():
-    request = Client(BASE, max_requests=1000, allow_expected_rate_limit=True).request
-    admin = bootstrap_module.bootstrap_admin(request)
-    bootstrap_module.provision_replay_actor_commands(request, admin)
-    static = run_static_probe(request, admin)
-    credential = static["credential"]
+    # Preserve the original qualification budget; new independent journeys own bounded budgets.
+    clients = {"baseline": Client(BASE, max_requests=1000, allow_expected_rate_limit=True),
+               "integrationTokens": Client(BASE, max_requests=64),
+               "officeGuide": Client(BASE, max_requests=512)}
 
-    sdk_command = ["docker", "run", "--rm", "-i", "--user", os.environ["SDK_RUNNER_USER"],
-                   "--network", os.environ["SDK_NETWORK"], "-v", os.environ["SDK_CONSUMER_ROOT"] + ":/consumer:ro",
-                   os.environ["SDK_NODE_IMAGE"], "node", "/consumer/real-backend.mjs"]
-    sdk = None
-    load_input = None
+    def request_counts():
+        return {name: {"executed": client.request_count, "limit": client.max_requests}
+                for name, client in clients.items()}
 
-    def consume(fixture):
-        nonlocal sdk, load_input
-        load_input = fixture
-        sdk = run_sdk_consumer(fixture, sdk_command, base_url=os.environ["SDK_BASE_URL"],
-                               evidence_path=Path(ARTIFACT).with_name("sdk-probe.json"))
+    try:
+        request = clients["baseline"].request
+        admin = bootstrap_module.bootstrap_admin(request)
+        bootstrap_module.provision_replay_actor_commands(request, admin)
+        static = run_static_probe(request, admin)
+        integration_tokens = run_integration_token_probe(clients["integrationTokens"].request, admin)
+        credential = static["credential"]
 
-    from open_platform_authentication_probe import PsqlAuditReader
-    audit_reader = PsqlAuditReader(["docker", "exec", "-i", os.environ["MODEL_POSTGRES"], "psql", "-U", "auraboot",
-                                   "-d", "open_platform_ci", "-X", "-At", "-v", "ON_ERROR_STOP=1"], "open_platform_ci", allow_fixture_clock=True)
-    dynamic = run_dynamic_probe(request, admin, audit_reader=audit_reader, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"),
-                                consumer=consume)
-    infrastructure = DockerInfrastructure(app=os.environ["MODEL_APP"], postgres=os.environ["MODEL_POSTGRES"],
-        network=os.environ["SDK_NETWORK"], job_id=os.environ["AURA_CI_JOB_ID"],
-        source_ref=os.environ["MODEL_SOURCE_REF"], image_digest=os.environ["MODEL_IMAGE_DIGEST"],
-        base_url=BASE, receiver_host=os.environ["MODEL_RECEIVER_HOST"])
-    model_events = run_model_event_probe(request, admin, infrastructure,
-        evidence_path=Path(ARTIFACT).parent / "model-events" / "result.json",
-        receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"], measure_load=True, measure_sustained=True, measure_isolation=True, qualify_replay_scope=True)
+        sdk_command = ["docker", "run", "--rm", "-i", "--user", os.environ["SDK_RUNNER_USER"],
+                       "--network", os.environ["SDK_NETWORK"], "-v", os.environ["SDK_CONSUMER_ROOT"] + ":/consumer:ro",
+                       os.environ["SDK_NODE_IMAGE"], "node", "/consumer/real-backend.mjs"]
+        sdk = None
+        load_input = None
 
-    slo_fixture = prepare_slo_fixture(request, admin, dynamic, load_input,
-        fixture_path=os.environ.get("SLO_FIXTURE_ARTIFACT", str(Path(ARTIFACT).with_name("slo-fixture.json"))))
+        def consume(fixture):
+            nonlocal sdk, load_input
+            load_input = fixture
+            sdk = run_sdk_consumer(fixture, sdk_command, base_url=os.environ["SDK_BASE_URL"],
+                                   evidence_path=Path(ARTIFACT).with_name("sdk-probe.json"))
 
-    with open(ARTIFACT, "w", encoding="utf-8") as handle:
-        json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
-    os.chmod(ARTIFACT, 0o600)
-    print(json.dumps(dict(static["public"], dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
+        from open_platform_authentication_probe import PsqlAuditReader
+        audit_reader = PsqlAuditReader(["docker", "exec", "-i", os.environ["MODEL_POSTGRES"], "psql", "-U", "auraboot",
+                                       "-d", "open_platform_ci", "-X", "-At", "-v", "ON_ERROR_STOP=1"], "open_platform_ci", allow_fixture_clock=True)
+        dynamic = run_dynamic_probe(request, admin, audit_reader=audit_reader, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"),
+                                    consumer=consume)
+        infrastructure = DockerInfrastructure(app=os.environ["MODEL_APP"], postgres=os.environ["MODEL_POSTGRES"],
+            network=os.environ["SDK_NETWORK"], job_id=os.environ["AURA_CI_JOB_ID"],
+            source_ref=os.environ["MODEL_SOURCE_REF"], image_digest=os.environ["MODEL_IMAGE_DIGEST"],
+            base_url=BASE, receiver_host=os.environ["MODEL_RECEIVER_HOST"])
+        model_events = run_model_event_probe(request, admin, infrastructure,
+            evidence_path=Path(ARTIFACT).parent / "model-events" / "result.json",
+            receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"], measure_load=True, measure_sustained=True, measure_isolation=True, qualify_replay_scope=True)
+
+        infrastructure.identity()
+        office = run_office_probe(clients["officeGuide"].request, admin, base_url=BASE,
+            guide=Path(__file__).resolve().parents[2] / "web-admin/public/docs/open-platform-integration.html",
+            evidence=Path(ARTIFACT).parent / "office-guide", receiver_host=os.environ["MODEL_RECEIVER_HOST"],
+            secret=Path(os.environ["MODEL_EVENT_SECRET_FILE"]).read_bytes().rstrip(b"\r\n"))
+        infrastructure.identity()
+
+        slo_fixture = prepare_slo_fixture(request, admin, dynamic, load_input,
+            fixture_path=os.environ.get("SLO_FIXTURE_ARTIFACT", str(Path(ARTIFACT).with_name("slo-fixture.json"))))
+
+        with open(ARTIFACT, "w", encoding="utf-8") as handle:
+            json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
+        os.chmod(ARTIFACT, 0o600)
+        print(json.dumps(dict(static["public"], requestCounts=request_counts(), integrationTokens=integration_tokens, officeGuide=office, dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
+    finally:
+        with open(Path(ARTIFACT).with_name("protocol-request-counts.json"), "x") as output:
+            json.dump(request_counts(), output, sort_keys=True)
 
 
 if __name__ == "__main__":

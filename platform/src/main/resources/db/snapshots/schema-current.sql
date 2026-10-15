@@ -1541,7 +1541,7 @@ CREATE TABLE public.ab_agent_batch_job (
     submitted_at timestamp with time zone DEFAULT now() NOT NULL,
     completed_at timestamp with time zone,
     created_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -1636,7 +1636,7 @@ CREATE TABLE public.ab_agent_capability (
     capability_status character varying(20) DEFAULT 'active'::character varying,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -1847,7 +1847,7 @@ CREATE TABLE public.ab_agent_eval_case (
     expected_risk_level character varying(20),
     expects_confirmation boolean DEFAULT false NOT NULL,
     plugin_source character varying(100),
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -2071,7 +2071,7 @@ CREATE TABLE public.ab_agent_memory (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     shareable boolean DEFAULT false,
     embedding public.vector(1536),
     scope character varying(16) DEFAULT 'tenant'::character varying NOT NULL,
@@ -3210,7 +3210,7 @@ CREATE TABLE public.ab_agent_user_profile (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -3725,14 +3725,23 @@ CREATE TABLE public.ab_application_access_token (
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
     installation_id bigint NOT NULL,
-    credential_id bigint NOT NULL,
+    credential_id bigint,
     token_hash character(64) NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     audience character varying(96) DEFAULT 'auraboot-open-api'::character varying NOT NULL,
     issued_at timestamp with time zone NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone,
     last_used_at timestamp with time zone,
-    revoked_at timestamp with time zone
+    revoked_at timestamp with time zone,
+    token_kind character varying(16) DEFAULT 'oauth'::character varying NOT NULL,
+    token_name character varying(160),
+    never_expires boolean DEFAULT false NOT NULL,
+    accept_until timestamp with time zone,
+    rotated_at timestamp with time zone,
+    replaced_by_pid character varying(26),
+    management_key character varying(160),
+    CONSTRAINT ck_application_token_kind CHECK (((((token_kind)::text = 'oauth'::text) AND (credential_id IS NOT NULL) AND (expires_at IS NOT NULL) AND (NOT never_expires) AND (token_name IS NULL) AND (management_key IS NULL)) OR (((token_kind)::text = 'integration'::text) AND (credential_id IS NULL) AND (token_name IS NOT NULL) AND ((length(TRIM(BOTH FROM token_name)) >= 1) AND (length(TRIM(BOTH FROM token_name)) <= 160)) AND (management_key IS NOT NULL) AND ((never_expires AND (expires_at IS NULL)) OR ((NOT never_expires) AND (expires_at IS NOT NULL) AND (expires_at > issued_at)))))),
+    CONSTRAINT ck_application_token_rotation CHECK ((((rotated_at IS NULL) AND (accept_until IS NULL) AND (replaced_by_pid IS NULL)) OR ((rotated_at IS NOT NULL) AND (accept_until IS NOT NULL) AND (accept_until >= rotated_at))))
 );
 
 
@@ -6274,7 +6283,7 @@ CREATE TABLE public.ab_capability (
     published_by bigint,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -6363,7 +6372,7 @@ CREATE TABLE public.ab_category (
     max_descendants_depth integer DEFAULT 0,
     i18n_name jsonb,
     external_taxonomy jsonb,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     created_by bigint,
     updated_by bigint,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
@@ -6441,7 +6450,7 @@ CREATE TABLE public.ab_cloud_config (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by character varying(26),
     updated_by character varying(26),
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -6901,7 +6910,7 @@ CREATE TABLE public.ab_data_domain (
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -8127,7 +8136,7 @@ CREATE TABLE public.ab_edi_message_type (
     validation_rules jsonb,
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -8171,7 +8180,7 @@ CREATE TABLE public.ab_edi_partner (
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -8261,7 +8270,7 @@ CREATE TABLE public.ab_email_account (
     status character varying(20) DEFAULT 'active'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -8394,7 +8403,7 @@ CREATE TABLE public.ab_email_sequence (
     created_by bigint,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -9487,7 +9496,7 @@ CREATE TABLE public.ab_file (
     status character varying(32) DEFAULT 'active'::character varying,
     created_time timestamp with time zone,
     updated_time timestamp with time zone,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     retention_locked boolean DEFAULT false NOT NULL
 );
 
@@ -9506,7 +9515,7 @@ CREATE TABLE public.ab_file_relation (
     sort_order integer DEFAULT 0,
     created_time timestamp with time zone,
     updated_time timestamp with time zone,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     tenant_id bigint
 );
 
@@ -10659,7 +10668,7 @@ CREATE TABLE public.ab_kb_document (
     process_completed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     process_retry_count integer DEFAULT 0 NOT NULL,
     active_version_pid character varying(26),
     version_no integer DEFAULT 1 NOT NULL,
@@ -10827,7 +10836,7 @@ CREATE TABLE public.ab_knowledge_base (
     created_by bigint,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     visibility character varying(20) DEFAULT 'tenant'::character varying NOT NULL,
     active_index_release_pid character varying(26),
     CONSTRAINT chk_kb_status CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'disabled'::character varying])::text[]))),
@@ -11124,7 +11133,7 @@ CREATE TABLE public.ab_marketplace_plugin (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     published_at timestamp with time zone,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     tenant_id bigint DEFAULT 1 NOT NULL,
     CONSTRAINT chk_mp_status CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'in_review'::character varying, 'published'::character varying, 'rejected'::character varying, 'deprecated'::character varying, 'delisted'::character varying])::text[]))),
     CONSTRAINT chk_mp_visibility CHECK (((visibility)::text = ANY ((ARRAY['public'::character varying, 'private'::character varying, 'unlisted'::character varying])::text[])))
@@ -11179,7 +11188,7 @@ CREATE TABLE public.ab_marketplace_solution (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     published_at timestamp with time zone,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     tenant_id bigint DEFAULT 1 NOT NULL,
     CONSTRAINT chk_sol_price_type CHECK (((price_type)::text = ANY ((ARRAY['free'::character varying, 'paid'::character varying])::text[]))),
     CONSTRAINT chk_sol_status CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'archived'::character varying])::text[])))
@@ -12354,7 +12363,7 @@ CREATE TABLE public.ab_notification_rule (
     recipient_field character varying(100),
     last_evaluated_at timestamp with time zone,
     send_count integer DEFAULT 0,
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -12485,7 +12494,7 @@ CREATE TABLE public.ab_object_alias (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -12765,7 +12774,7 @@ CREATE TABLE public.ab_ot_device (
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -14224,7 +14233,7 @@ CREATE TABLE public.ab_plugin_import_log (
     created_by bigint,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -14846,7 +14855,7 @@ CREATE TABLE public.ab_push_device_token (
     last_used_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -15033,7 +15042,7 @@ CREATE TABLE public.ab_reconciliation_profile (
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -16124,7 +16133,7 @@ CREATE TABLE public.ab_semantic_term (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -16166,7 +16175,7 @@ CREATE TABLE public.ab_sod_rule (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false NOT NULL
 );
 
 
@@ -16768,7 +16777,7 @@ CREATE TABLE public.ab_user (
     area character varying(512),
     signature character varying(512),
     img_id character varying(128),
-    deleted_flag boolean DEFAULT false,
+    deleted_flag boolean DEFAULT false NOT NULL,
     user_type character varying(20) DEFAULT 'human'::character varying
 );
 
@@ -25955,6 +25964,13 @@ CREATE INDEX idx_application_installation_tenant ON public.ab_application_instal
 
 
 --
+-- Name: idx_application_integration_token_list; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_application_integration_token_list ON public.ab_application_access_token USING btree (tenant_id, installation_id, issued_at DESC) WHERE ((token_kind)::text = 'integration'::text);
+
+
+--
 -- Name: idx_application_scope_grant_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -30008,6 +30024,13 @@ CREATE UNIQUE INDEX uq_ai_token_tenant_user_provider ON public.ab_ai_provider_to
 
 
 --
+-- Name: uq_application_token_management_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_application_token_management_key ON public.ab_application_access_token USING btree (tenant_id, installation_id, management_key) WHERE ((token_kind)::text = 'integration'::text);
+
+
+--
 -- Name: uq_aurabot_skill_idemp; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -30694,6 +30717,14 @@ ALTER TABLE ONLY public.ab_analytics_task_execution
 
 ALTER TABLE ONLY public.ab_application_access_token
     ADD CONSTRAINT ab_application_access_token_credential_id_fkey FOREIGN KEY (credential_id) REFERENCES public.ab_application_credential(id);
+
+
+--
+-- Name: ab_application_access_token ab_application_access_token_replaced_by_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_access_token
+    ADD CONSTRAINT ab_application_access_token_replaced_by_pid_fkey FOREIGN KEY (replaced_by_pid) REFERENCES public.ab_application_access_token(pid) ON DELETE SET NULL;
 
 
 --

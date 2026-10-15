@@ -1,5 +1,6 @@
 [
   {
+    "capabilities": { "list": true, "detail": true, "create": true, "update": true, "delete": true, "sort": true, "filter": true, "paginate": true },
     "code": "tasset_asset", "displayName:zh-CN": "资产", "displayName:en": "Asset",
     "description": "Physical or software asset tracked through its lifecycle.",
     "modelType": "entity", "modelCategory": "entity",

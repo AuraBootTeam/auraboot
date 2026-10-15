@@ -11,6 +11,40 @@ from open_platform_http import ProtocolError, bind_physical_fixture_fields
 from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent, run_claimed_query_rollback, verify_virtual_resource
 
 
+def integration_tokens_passed():
+    from open_platform_integration_token_probe import CASES
+    return {'profile': 'integration-token-http-v1', 'cases': list(CASES), 'executed': len(CASES),
+            'passed': len(CASES), 'failed': 0, 'skipped': 0}
+
+
+def office_passed():
+    import base64, hashlib, hmac
+    from open_platform_office_probe import CASES as OFFICE_CASES, Examples
+    from test_open_platform_model_event_probe import SECRET
+    guide = Path(__file__).resolve().parents[2] / 'web-admin/public/docs/open-platform-integration.html'
+    examples = Examples(); examples.feed(guide.read_text())
+    receipts, records = [], {}
+    for pid,version,kind,status in [('assigned-pid',1,'created','available'),('assigned-pid',2,'updated','available'),
+                                   ('assigned-pid',3,'updated','in_use'),('assigned-pid',4,'updated','in_use'),
+                                   ('deleted-pid',1,'created','available'),('deleted-pid',2,'deleted','available')]:
+        event = {'id':pid+'-'+str(version),'subject':{'type':'office.devices','pid':pid},'type':'open.resource.office.devices.'+kind,
+                 'schemaVersion':1,'recordVersion':version,'data':{'pid':pid,'assetCode':pid,'name':'Office device','location':'HQ','status':status}}
+        if status=='in_use': event['data']['assignedTo']='External integration operator'
+        raw = json.dumps(event).encode(); stamp='1792036800'
+        receipt={'raw':base64.b64encode(raw).decode(),'timestamp':stamp,'receivedAt':1792036800.5,'status':204,
+            'deliveryPid':event['id'],'eventType':event['type'],'eventVersion':'1','signature':'sha256='+hmac.new(SECRET,stamp.encode()+b'.'+raw,hashlib.sha256).hexdigest()}
+        if (pid,version) in [('assigned-pid',1),('deleted-pid',2)]:receipts.append(dict(receipt,status=503))
+        receipts.append(receipt)
+        records[pid] = {'pid':pid,'version':version,'deleted':int(kind=='deleted'),'data':event['data']}
+    before={'pid':'deleted-pid-2','eventId':'deleted-pid-2','status':'dead_letter','retryCount':1,'maxRetries':1,'replayCount':0}
+    return dict(profile='office-guide-http-v1',cases=list(OFFICE_CASES),executed=len(OFFICE_CASES),passed=len(OFFICE_CASES),failed=0,skipped=0,
+        applicationPid='app-pid',installationPid='installation-pid',subscriptionPids=['created-sub','updated-sub','deleted-sub'],subscriptionsDisabled=True,
+        inboxRows=6,pendingInboxRows=0,replayProof={'before':before,'after':dict(before,status='success',replayCount=1,retryCount=0),'machineStatus':401},
+        sourceModel='tasset_asset',resource='office.devices',sourceKinds=['command','handler'],guideSha256=hashlib.sha256(guide.read_bytes()).hexdigest(),
+        examples={name:hashlib.sha256(content.encode()).hexdigest() for name,content in examples.files.items()},receipts=receipts,
+        projection=sorted(records.values(),key=lambda row:row['pid']))
+
+
 def passed():
     audits = []
     fixtures = [("resource-row-field-projection", "list", 200, None, None),
@@ -660,6 +694,12 @@ class DynamicProbeTests(unittest.TestCase):
             if path.startswith("/api/meta/named-queries/by-code/"): result = {"policy": {"rateLimitPerMinute": 100000}}
             if path.endswith("/installations"): result = {"pid": "load-install"}
             if path.endswith("/credentials"): result = {"clientId": "private-client", "clientSecret": "private-secret"}
+            if path == "/api/meta/commands": result = {"pid":"load-command"}
+            if path.startswith("/api/open-platform/action-sources?"):
+                result = [dict(sourceKind=kind,sourceCode=code,available=True,fingerprint="a"*64,permission="release.slo.manage" if kind=="command" else None,
+                    parameters={},inputFields={},effectFields=["name","zone"] if kind=="command" else [],outputFields={},minTimeoutMs=5000)
+                    for kind,code in [("command","release_slo_assign"),("handler","core.visible-page")]]
+            if path.endswith("/integration-tokens"): result = {"token":"private-direct-token","metadata":{"expirationMode":"never","expiresAt":None}}
             return 200, {"code": 0, "data": result}, {}
         consumer = {"resourceCode": "release.dynamic.parts", "queryCode": "release.dynamic.by-zone", "allowedPid": "allowed-pid", "hiddenPid": "hidden-pid"}
         with tempfile.TemporaryDirectory() as directory:
@@ -672,8 +712,12 @@ class DynamicProbeTests(unittest.TestCase):
             self.assertEqual(contract["maxConcurrent"], 2)
             self.assertEqual(calls[2][2]["definition"]["maxConcurrent"], 20)
             self.assertEqual(public["applicationPid"], "load-app")
-            self.assertEqual(calls[5][0], "/api/open-platform/applications/load-app/installations")
-            self.assertEqual(calls[5][2]["rateLimitPerMinute"], 100000)
+            installed = next(row for row in calls if row[0]=="/api/open-platform/applications/load-app/installations")
+            self.assertEqual(installed[2]["rateLimitPerMinute"],100000)
+            self.assertEqual(private["integrationToken"],"private-direct-token")
+            self.assertNotIn("private-direct-token",json.dumps(public))
+            self.assertEqual(public["authentication"],"integration-token")
+            self.assertEqual(public["businessActions"],["release.slo.command","release.slo.handler"])
             calls.clear()
             with self.assertRaises(ProtocolError): prepare_slo_fixture(request, {}, passed(), consumer, fixture_path=path)
             self.assertEqual(calls, [])
@@ -939,20 +983,43 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()}, model_event_secret=SECRET)
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
                                   model_event_secret=SECRET)
         measured = model_passed(); measured["loadMeasurement"] = load_passed(); measured["sustainedMeasurement"] = sustained_passed(); measured["receiverIsolation"] = isolation_passed(); measured["genericReplay"] = generic_replay_passed()
-        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed()},
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
                                               model_event_secret=SECRET)["sdk"], sdk)
         for field in ['loadMeasurement', 'sustainedMeasurement', 'receiverIsolation', 'genericReplay']:
             omitted = dict(measured); omitted.pop(field)
             with self.assertRaises(ProtocolError):
                 verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": omitted,
-                    "commandAudits": command_passed()}, model_event_secret=SECRET)
+                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}}, model_event_secret=SECRET)
         measured["loadMeasurement"]["metrics"]["accepted"] = 0
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
                                   model_event_secret=SECRET)
+
+    def test_release_phase_budgets_preserve_original_and_reject_missing_or_unbounded_counts(self):
+        from open_platform_dynamic_probe import verify_request_counts
+        good = {"baseline": {"executed": 999, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}
+        self.assertEqual(verify_request_counts(good), good)
+        for value in [None, {}, {**good, "unknown": {}}, {key: row for key, row in good.items() if key != "officeGuide"}]:
+            with self.assertRaises(ProtocolError): verify_request_counts(value)
+        for name in good:
+            for field, value in [("executed", 0), ("executed", True), ("executed", good[name]["limit"] + 1), ("limit", good[name]["limit"] + 1)]:
+                bad = {key: dict(row) for key, row in good.items()}; bad[name][field] = value
+                with self.assertRaises(ProtocolError): verify_request_counts(bad)
+
+    def test_direct_token_release_denominator_rejects_omissions_and_fabricated_totals(self):
+        from open_platform_integration_token_probe import verify_integration_token_report
+        valid = integration_tokens_passed()
+        self.assertEqual(verify_integration_token_report(valid), valid)
+        for omitted in valid:
+            incomplete = dict(valid); incomplete.pop(omitted)
+            with self.assertRaises(ProtocolError): verify_integration_token_report(incomplete)
+        for field, value in [('executed', 0), ('passed', True), ('failed', 1), ('skipped', 1), ('cases', []),
+                             ('cases', valid['cases'][:-1]), ('cases', list(reversed(valid['cases']))), ('secret', 'must-not-be-reported')]:
+            invalid = dict(valid); invalid[field] = value
+            with self.assertRaises(ProtocolError): verify_integration_token_report(invalid)
 
     def test_consumer_private_stdin_and_fixed_safe_ledger(self):
         import subprocess
@@ -1002,6 +1069,100 @@ class SdkReportTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     run_sdk_consumer({}, [], base_url="http://backend", evidence_path=evidence)
             self.assertEqual(json.loads(evidence.read_text())["cases"], report["cases"])
+
+
+class OfficeGuideVerifierTest(unittest.TestCase):
+    def verify(self, report):
+        from open_platform_office_probe import verify_office_report
+        from test_open_platform_model_event_probe import SECRET
+        return verify_office_report(report,secret=SECRET)
+
+    def test_complete_guide_receipts_are_independently_reconciled(self):
+        report=office_passed(); self.assertEqual(self.verify(report),report)
+
+    def test_omitted_cases_skips_hashes_raw_receipts_and_projection_are_rejected(self):
+        mutations=[lambda r:r.pop('cases'),lambda r:r.update(executed=True),lambda r:r.update(skipped=1),
+            lambda r:r['cases'].pop(),lambda r:r.update(guideSha256='0'*64),lambda r:r['examples'].update({'crud.sh':'0'*64}),
+            lambda r:r['receipts'].pop(),lambda r:r['receipts'][0].update(raw='e30='),
+            lambda r:r['receipts'][0].update(signature='sha256='+'0'*64),lambda r:r['receipts'][0].update(status=401),
+            lambda r:r['receipts'][0].update(receivedAt=0),lambda r:r['projection'][0].update(version=99),
+            lambda r:r['projection'][1].update(deleted=0),lambda r:r.update(sourceKinds=['handler']),
+            lambda r:r.update(inboxRows=8),lambda r:r.update(pendingInboxRows=1),lambda r:r.update(subscriptionsDisabled=False),
+            lambda r:r['replayProof']['before'].update(status='success'),lambda r:r['replayProof'].update(machineStatus=200),
+            lambda r:r['replayProof']['after'].update(replayCount=True)]
+        for mutate in mutations:
+            with self.subTest(mutation=mutations.index(mutate)):
+                report=office_passed(); mutate(report)
+                with self.assertRaises(ProtocolError):self.verify(report)
+
+
+class QuickAccessUiVerifierTest(unittest.TestCase):
+    def fixture(self, directory, mutate=None):
+        import hashlib, struct, zlib, zipfile
+        from open_platform_quick_ui import SOURCE_FILES, TITLES, TOKEN_IMAGES, BUSINESS_IMAGES, TOKEN_STATES, BUSINESS_STATES
+        root=Path(directory)/'source';root.mkdir()
+        for name in SOURCE_FILES:
+            target=root/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_text('Hermetic source fixture '+name)
+        chunk=lambda tag,raw:struct.pack('>I',len(raw))+tag+raw+struct.pack('>I',zlib.crc32(tag+raw)&0xffffffff)
+        png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',100,100,8,2,0,0,0))+chunk(b'IDAT',zlib.compress((b'\x00'+b'\xff'*300)*100))+chunk(b'IEND',b'')
+        digest=lambda raw:hashlib.sha256(raw).hexdigest()
+        files={};runs=[]
+        for locale in ('zh-CN','en-US'):
+            for viewport in ('desktop','narrow'):
+                report={'stats':{'expected':3,'unexpected':0,'flaky':0,'skipped':0},'errors':[],
+                    'suites':[{'specs':[{'title':title,'ok':True,'tests':[{'expectedStatus':'passed','status':'expected','annotations':[],
+                        'results':[{'status':'passed','retry':0}]}]} for title in sorted(TITLES)]}]}
+                filename=locale+'-'+viewport+'.json';raw=json.dumps(report).encode();files[filename]=raw
+                run={'locale':locale,'viewport':viewport,'report':filename,'reportSha256':digest(raw),'journeys':[],'images':[],'artifacts':[]}
+                base='ui-golden-20260914/'
+                for kind in ('token','command','handler'):
+                    prefix=base+(f'quick-token-{locale}-{viewport}' if kind=='token' else f'business-api-{locale}-{viewport}-{kind}')+'/'
+                    journey={'profile':'quick-token-browser-v1' if kind=='token' else 'business-api-browser-v1','locale':locale,'viewport':viewport,
+                        'passed':True,'executed':TOKEN_STATES if kind=='token' else BUSINESS_STATES}
+                    if kind!='token':journey['kind']=kind
+                    name=prefix+'result.json';raw=json.dumps(journey).encode();files[name]=raw;run['journeys'].append({'path':name,'sha256':digest(raw)})
+                    for leaf in (['QAT-07-'+name for name in TOKEN_IMAGES] if kind=='token' else BUSINESS_IMAGES):
+                        name=prefix+leaf+'.png';files[name]=png;run['images'].append({'path':name,'sha256':digest(png),
+                            'review':{'verdict':'passed','notes':'Hermetic parser fixture; not real visual evidence.'}})
+                    if kind!='token':
+                        name=prefix+'fixture.openapi.json';raw=json.dumps({'openapi':'3.1.0','paths':{'/api/open/v1/actions/fixture:execute':{'post':{}}},'description':'Hermetic artifact fixture'}).encode();files[name]=raw;run['artifacts'].append({'path':name,'sha256':digest(raw)})
+                        name=prefix+'fixture.d.ts';raw=b'export type ActionRequest = {input: {limit: number}}; export type ActionResult = {countOnPage:number,hasMore:boolean};';files[name]=raw;run['artifacts'].append({'path':name,'sha256':digest(raw)})
+                runs.append(run)
+        receipt={'profile':'open-platform-quick-ui-v1','coreCommit':'a'*40,'sourceHashes':{name:digest((root/name).read_bytes()) for name in SOURCE_FILES},'runs':runs}
+        if mutate:mutate(receipt,files)
+        files['receipt.json']=json.dumps(receipt).encode();archive=Path(directory)/'proof.zip'
+        with zipfile.ZipFile(archive,'w') as bundle:
+            for name,raw in files.items():bundle.writestr(name,raw)
+        return root,archive
+
+    def test_full_input_is_reconciled_and_missing_failed_or_unreviewed_evidence_is_rejected(self):
+        from open_platform_quick_ui import verify_archive
+        with tempfile.TemporaryDirectory() as directory:
+            root,archive=self.fixture(directory)
+            result=verify_archive(archive,root=root,expected_ref='a'*40)
+            self.assertEqual((result['browserCases'],result['reviewedOriginalImages'],result['downloadedArtifacts']),(12,80,16))
+            with self.assertRaises(ProtocolError):verify_archive(archive,root=root,expected_ref='b'*40)
+        mutations=[lambda r,f:r['runs'].pop(),lambda r,f:r['sourceHashes'].update({next(iter(r['sourceHashes'])):'0'*64}),
+            lambda r,f:r['runs'][0]['images'].pop(),lambda r,f:r['runs'][0]['images'][0]['review'].update(verdict='pending'),
+            lambda r,f:r['runs'][0]['images'][0].update(sha256='0'*64),lambda r,f:r['runs'][0]['artifacts'].pop(),
+            lambda r,f:r['runs'][0]['journeys'].pop(),lambda r,f:r['runs'][0].update(viewport='desktop',locale='en-US')]
+        for index,mutate in enumerate(mutations):
+            with self.subTest(mutation=index),tempfile.TemporaryDirectory() as directory:
+                root,archive=self.fixture(directory,mutate)
+                with self.assertRaises(ProtocolError):verify_archive(archive,root=root,expected_ref='a'*40)
+
+    def test_actual_browser_result_rejects_skip_retry_missing_actions_and_false_green(self):
+        from open_platform_quick_ui import parse_browser, TITLES
+        report={'stats':{'expected':3,'unexpected':0,'flaky':0,'skipped':0},'errors':[],
+            'suites':[{'specs':[{'title':title,'ok':True,'tests':[{'expectedStatus':'passed','status':'expected','annotations':[],
+                'results':[{'status':'passed','retry':0}]}]} for title in TITLES]}]}
+        self.assertEqual(parse_browser(json.dumps(report).encode()),report)
+        for mutate in [lambda r:r['stats'].update(skipped=1),lambda r:r['suites'][0]['specs'].pop(),
+            lambda r:r['suites'][0]['specs'][0]['tests'][0]['results'][0].update(retry=1),
+            lambda r:r['suites'][0]['specs'][0]['tests'][0]['results'][0].update(status='skipped'),
+            lambda r:r['suites'][0]['specs'][0]['tests'][0]['annotations'].append({'type':'fixme'})]:
+            bad=copy.deepcopy(report);mutate(bad)
+            with self.assertRaises(ProtocolError):parse_browser(json.dumps(bad).encode())
 
 
 if __name__ == "__main__":

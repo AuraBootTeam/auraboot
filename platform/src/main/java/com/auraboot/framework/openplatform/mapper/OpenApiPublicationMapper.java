@@ -29,13 +29,16 @@ public interface OpenApiPublicationMapper {
         JOIN ab_application_access_token t ON t.tenant_id = i.tenant_id AND t.installation_id = i.id
         WHERE p.tenant_id = #{tenantId} AND p.code = #{code} AND p.status = 'published'
             AND i.pid = #{installationPid} AND i.status = 'active' AND a.status = 'active'
-            AND t.pid = #{tokenPid} AND t.revoked_at IS NULL AND t.expires_at > NOW()
+            AND t.pid = #{tokenPid} AND t.revoked_at IS NULL
+            AND (t.never_expires OR t.expires_at > clock_timestamp())
+            AND (t.accept_until IS NULL OR t.accept_until > clock_timestamp())
             AND t.audience = 'auraboot-open-api'
-            AND t.scopes @> jsonb_build_array(s.definition->'scopes'->>#{operation})
+            AND (t.token_kind = 'integration' OR t.scopes @> jsonb_build_array(s.definition->'scopes'->>#{operation}))
             AND EXISTS (SELECT 1 FROM ab_application_scope_grant sg
                 WHERE sg.tenant_id = i.tenant_id AND sg.installation_id = i.id
                     AND sg.scope_code = s.definition->'scopes'->>#{operation})
         """)
+    @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
     ResourceAuthority authority(@Param("tenantId") Long tenantId, @Param("installationPid") String installationPid,
                                 @Param("tokenPid") String tokenPid, @Param("code") String code, @Param("operation") String operation);
 
@@ -120,6 +123,26 @@ public interface OpenApiPublicationMapper {
         FROM ab_open_api_publication WHERE tenant_id = #{tenantId} AND jsonb_exists(draft, 'queryCode') ORDER BY code
         """)
     List<PublicationRow> listQueries(@Param("tenantId") Long tenantId);
+
+    @Select("""
+        SELECT code, draft::text, draft_revision, active_version, status
+        FROM ab_open_api_publication WHERE tenant_id = #{tenantId} AND jsonb_exists(draft, 'sourceKind') ORDER BY code
+        """)
+    List<PublicationRow> listActions(@Param("tenantId") Long tenantId);
+
+    @Select("""
+        SELECT s.definition::text FROM ab_open_api_publication p
+        JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
+            AND s.code = p.code AND s.schema_version = p.active_version
+        WHERE p.tenant_id = #{tenantId} AND p.status = 'published' AND jsonb_exists(s.definition, 'sourceKind') ORDER BY p.code
+        """)
+    List<String> activeActionDefinitions(@Param("tenantId") Long tenantId);
+
+    @Select("""
+        SELECT policy::text FROM ab_open_api_resource_grant
+        WHERE tenant_id = #{tenantId} AND installation_id = #{installationId} AND resource_code = #{code}
+        """)
+    String storedPolicy(@Param("tenantId") Long tenantId, @Param("installationId") Long installationId, @Param("code") String code);
 
     @Select("""
         SELECT s.definition::text FROM ab_open_api_publication p

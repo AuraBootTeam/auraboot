@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 
-OPERATIONS = ("create", "replay", "get", "list", "query", "update", "delete")
+OPERATIONS = ("create", "replay", "get", "list", "query", "update", "command", "commandReplay", "handler", "delete")
 
 
 def verify_summary(summary, *, profile, require_business=True):
@@ -61,7 +61,7 @@ def verify_summary(summary, *, profile, require_business=True):
         if profile == "production" and value("business_duration" + suffix, "p(99)") >= 500:
             raise ValueError("SLO business operation tail latency not met: " + operation)
     if sum(counts) != total: raise ValueError("SLO business sample denominator invalid")
-    if not counts[0] >= counts[1] >= counts[2] >= counts[3] >= counts[4] >= counts[5] >= counts[6]:
+    if any(earlier < later for earlier,later in zip(counts,counts[1:])):
         raise ValueError("SLO operation execution order invalid")
     return summary
 

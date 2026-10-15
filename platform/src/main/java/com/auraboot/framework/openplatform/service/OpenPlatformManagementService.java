@@ -371,7 +371,7 @@ public class OpenPlatformManagementService {
         scopeMapper.deleteForInstallation(tenantId, installation.getId());
         request.scopes().stream().sorted().forEach(scope ->
                 scopeMapper.grant(tenantId, installation.getId(), scope, MetaContext.getCurrentUserPid()));
-        tokenMapper.revokeInstallationTokens(tenantId, installation.getId(), Instant.now());
+        tokenMapper.revokeInstallationOAuthTokens(tenantId, installation.getId(), Instant.now());
         return toView(tenantId, installation);
     }
 
@@ -490,6 +490,13 @@ public class OpenPlatformManagementService {
             throw new IllegalStateException("User context is required");
         }
         return userPid;
+    }
+
+    ApplicationInstallation authorizeIntegrationTokens(String installationPid) {
+        Long tenantId = requireTenant();
+        ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
+        requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canManageRuntime);
+        return installation;
     }
 
     private void requireActiveCredentialInstallation(Long tenantId, ApplicationInstallation installation) {

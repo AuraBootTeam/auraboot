@@ -27,7 +27,12 @@ public interface OpenPlatformAuthMapper {
     CredentialAuthRecord findCredential(@Param("clientId") String clientId);
 
     @Select("""
-            SELECT t.pid AS token_pid, t.tenant_id, t.installation_id, t.scopes,
+            SELECT t.pid AS token_pid, t.tenant_id, t.installation_id,
+                   CASE WHEN t.token_kind = 'integration' THEN
+                       (SELECT COALESCE(jsonb_agg(g.scope_code ORDER BY g.scope_code), '[]'::jsonb)
+                        FROM ab_application_scope_grant g
+                        WHERE g.tenant_id = t.tenant_id AND g.installation_id = t.installation_id)
+                       ELSE t.scopes END AS scopes,
                    t.expires_at AS token_expires_at,
                    i.pid AS installation_pid, i.environment, i.rate_limit_per_minute,
                    i.status AS installation_status,
@@ -38,7 +43,8 @@ public interface OpenPlatformAuthMapper {
             WHERE t.token_hash = #{tokenHash}
               AND t.audience = #{audience}
               AND t.revoked_at IS NULL
-              AND t.expires_at > #{now}
+              AND (t.never_expires OR t.expires_at > #{now})
+              AND (t.accept_until IS NULL OR t.accept_until > #{now})
             LIMIT 1
             """)
     TokenAuthRecord findToken(@Param("tokenHash") String tokenHash,

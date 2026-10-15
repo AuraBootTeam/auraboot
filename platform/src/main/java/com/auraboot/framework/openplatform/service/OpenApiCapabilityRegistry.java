@@ -19,14 +19,19 @@ public class OpenApiCapabilityRegistry {
     private final List<Capability> capabilities;
     private OpenApiPublicationService dynamicPublications;
     private OpenApiQueryPublicationService dynamicQueries;
+    private OpenApiActionPublicationService dynamicActions;
 
     @org.springframework.beans.factory.annotation.Autowired
     public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications,
-                                     OpenApiQueryPublicationService queries) {
+                                     OpenApiQueryPublicationService queries, OpenApiActionPublicationService actions) {
         this(contributors);
         this.dynamicPublications = publications;
         this.dynamicQueries = queries;
+        this.dynamicActions = actions;
     }
+
+    public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications,
+                                     OpenApiQueryPublicationService queries) { this(contributors, publications, queries, null); }
 
     public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications) {
         this(contributors, publications, null);
@@ -76,6 +81,7 @@ public class OpenApiCapabilityRegistry {
         List<Capability> published = new ArrayList<>(capabilities);
         dynamicPublications.publishedContracts(tenantId).forEach(contract -> published.addAll(resourceCapabilities(contract)));
         if (dynamicQueries != null) dynamicQueries.published(tenantId).forEach(contract -> published.add(queryCapability(contract)));
+        if (dynamicActions != null) dynamicActions.published(tenantId).forEach(contract -> published.add(actionCapability(contract)));
         assertUnique(published);
         return List.copyOf(published);
     }
@@ -93,6 +99,10 @@ public class OpenApiCapabilityRegistry {
         Optional<Capability> fixed = resolve(method, path);
         if (fixed.isPresent() || dynamicPublications == null) return fixed;
         String[] segments = path.split("/", -1);
+        if (dynamicActions != null && segments.length == 6 && "actions".equals(segments[4]) && segments[5].endsWith(":execute")) {
+            String code = segments[5].substring(0, segments[5].length() - ":execute".length());
+            return dynamicActions.active(tenantId, code).map(this::actionCapability).filter(capability -> capability.method().matches(method));
+        }
         if (dynamicQueries != null && segments.length == 6 && "queries".equals(segments[4]) && segments[5].endsWith(":execute")) {
             String code = segments[5].substring(0, segments[5].length() - ":execute".length());
             return dynamicQueries.active(tenantId, code).map(this::queryCapability).filter(capability -> capability.method().matches(method));
@@ -110,6 +120,11 @@ public class OpenApiCapabilityRegistry {
     private Capability queryCapability(OpenApiQueryContract contract) {
         return new Capability("query." + contract.code() + ".execute", HttpMethod.POST,
                 "/api/open/v1/queries/" + contract.code() + ":execute", contract.scopes().get("execute"), "source-grants", contract.schemaVersion());
+    }
+
+    private Capability actionCapability(OpenApiActionContract contract) {
+        return new Capability("action." + contract.code() + ".execute", HttpMethod.POST,
+                "/api/open/v1/actions/" + contract.code() + ":execute", contract.scopes().get("execute"), "bound-resource-grants", contract.schemaVersion());
     }
 
     private List<Capability> resourceCapabilities(OpenApiResourceContract contract) {

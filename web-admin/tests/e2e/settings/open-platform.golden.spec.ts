@@ -2,11 +2,17 @@ import { expect, test } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { verifyModelNotifications } from '../../helpers/open-platform-notifications';
+
+// Secrets are captured only by explicit masked screenshots, never worker recordings.
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+// Playwright also records an automatic ARIA page snapshot on failure; it may contain one-time token values.
+process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
 
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
 const PUBLICATION_VIEWPORT = process.env.AURA_OPEN_PLATFORM_PUBLICATION_VIEWPORT || 'desktop';
@@ -127,7 +133,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak', 'editor-tab-order'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak', 'editor-tab-order', 'token-artifact-failure'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -2778,5 +2784,272 @@ test.describe('Open Platform golden journey', () => {
     expect(String(preserved.code)).toBe('0');
     const preservedPids = (preserved.data as Array<{ pid: string }>).map((entry) => entry.pid);
     expect(preservedPids).toEqual(expect.arrayContaining(existingPids));
+  });
+});
+
+// Explicit masked captures replace automatic trace/video/screenshots for one-time secrets.
+const tokenTranslations: Record<string, string> = {
+  "Token revoked. Subsequent requests are rejected.": "Token 已撤销，后续请求将被拒绝。",
+  "Active": "有效",
+  "Close token manager": "关闭 Token 管理",
+  "Generate token": "生成 Token",
+  "No integration tokens yet.": "还没有快捷接入 Token。",
+  "New token": "新 Token",
+  "Old token accepted until": "旧 Token 接受截止",
+  "Saved; close secret": "已保存，关闭原文",
+  "Rotate token": "轮换 Token",
+  "Revoke token": "撤销 Token",
+  "Token name": "Token 名称",
+  "Expiration mode": "有效期模式",
+  "Valid for days": "有效天数",
+  "Old token grace minutes": "旧 Token 宽限分钟数",
+  "Cancel": "取消",
+  "Confirm": "确认"
+};
+const tokenText = (en: string) => publicationLocale === 'zh-CN' ? tokenTranslations[en] ?? en : en;
+test.describe('Quick integration token journey', () => {
+  test.setTimeout(120_000);
+  test.use({ storageState: { cookies: [], origins: [] }, locale: publicationLocale, viewport: publicationViewport });
+  test('generates expiring and permanent tokens, rotates and revokes through the installation UI', async ({ page }) => {
+    await authenticate(page, publicationLocale);
+    const name = `Office token acceptance ${Date.now()}`;
+    const created = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications`, { data: { name } });
+    expect(created.status()).toBe(200); const app = (await created.json()).data;
+    const installed = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications/${app.pid}/installations`,
+      { data: { environment: 'development', scopes: ['openapi.profile.read'], rateLimitPerMinute: 10000 } });
+    expect(installed.status()).toBe(200); const installation = (await installed.json()).data;
+    const evidence = path.join(EVIDENCE_DIR, `quick-token-${publicationLocale}-${PUBLICATION_VIEWPORT}`); await mkdir(evidence, { recursive: true });
+    const captureToken = async (id: string) => {
+      const panel = page.getByTestId('integration-token-panel');
+      const region = id.includes('secret') ? panel.getByTestId('integration-token-secret')
+        : id.includes('fixed-form') || id.includes('permanent-form') ? panel.getByTestId('integration-token-create')
+        : id.includes('rotation-form') ? panel.getByTestId('integration-token-rotate')
+        : id.includes('revoke-confirmation') ? panel.getByTestId('integration-token-revoke') : panel;
+      await region.scrollIntoViewIfNeeded();
+      await region.screenshot({ path: path.join(evidence, `${id}.png`),
+        mask: [panel.getByTestId('integration-token-secret').locator('textarea')] });
+    };
+    const machineStatus = async (token: string, status: number) => {
+      const result = await page.request.get(`${BACKEND_URL}/api/open/v1/whoami`, { headers: { Authorization: `Bearer ${token}` } });
+      expect(result.status()).toBe(status);
+      if (status === 200) { const identity = await result.json(); expect(identity.applicationPid).toBe(app.pid); expect(identity.installationPid).toBe(installation.pid); }
+    };
+    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    const appCard = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: name });
+    await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
+    let panel = page.getByTestId('integration-token-panel');
+    await expect(panel.getByText(tokenText("No integration tokens yet."), { exact: true })).toBeVisible();
+    await captureToken('QAT-07-empty');
+    await panel.getByRole('button', { name: tokenText("Generate token"), exact: true }).click();
+    await panel.getByLabel(tokenText("Token name"), { exact: true }).fill('Office expiring');
+    await expect(panel.getByLabel(tokenText("Expiration mode"), { exact: true })).toHaveValue('fixed');
+    await expect(panel.getByLabel(tokenText("Valid for days"), { exact: true })).toHaveValue('30');
+    await captureToken('QAT-07-fixed-form');
+    await panel.getByRole('button', { name: tokenText("Cancel"), exact: true }).click();
+    await expect(panel.getByTestId('integration-token-row')).toHaveCount(0);
+    await panel.getByRole('button', { name: tokenText("Generate token"), exact: true }).click();
+    await panel.getByLabel(tokenText("Token name"), { exact: true }).fill('Office expiring');
+    const issuedFixed = page.waitForResponse(r => r.url().endsWith(`/installations/${installation.pid}/integration-tokens`) && r.request().method() === 'POST');
+    await panel.getByRole('button', { name: tokenText("Confirm"), exact: true }).click();
+    const fixedResponse = await issuedFixed; expect(fixedResponse.status()).toBe(200);
+    expect(fixedResponse.headers()['cache-control']).toContain('no-store');
+    await expect(panel.getByLabel(tokenText("New token"), { exact: true })).toBeVisible();
+    const fixed = await panel.getByLabel(tokenText("New token"), { exact: true }).inputValue();
+    expect(fixed.startsWith('ab_at_')).toBe(true); await machineStatus(fixed, 200);
+    if (UI_MUTATION === 'token-artifact-failure') {
+      // Keep the secret visible while deliberately failing, but revoke the disposable credential first.
+      const issued = (await fixedResponse.json()).data;
+      expect((await page.request.delete(`${WEB_BASE_URL}/api/open-platform/installations/${installation.pid}/integration-tokens/${issued.metadata.pid}`)).status()).toBe(200);
+      await writeFile(path.join(evidence, 'token-artifact-mutation.json'), JSON.stringify({
+        mutation: 'token-artifact-failure', guard: 'token-artifact-redaction',
+        secretSha256: createHash('sha256').update(fixed).digest('hex'),
+        tokenRevoked: true, secretWidgetVisible: await panel.getByLabel(tokenText("New token"), { exact: true }).isVisible(),
+        automaticAriaCaptureDisabled: process.env.PLAYWRIGHT_NO_COPY_PROMPT === '1',
+      }, null, 2));
+      throw new Error('EXPECTED_RED: token artifact redaction probe with the one-time secret still visible');
+    }
+    await captureToken('QAT-07-fixed-secret');
+    await panel.getByRole('button', { name: tokenText("Saved; close secret"), exact: true }).click();
+    await page.reload(); await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
+    panel = page.getByTestId('integration-token-panel');
+    await expect(panel.getByTestId('integration-token-row')).toHaveCount(1);
+    await expect(panel.getByLabel(tokenText("New token"), { exact: true })).toHaveCount(0);
+    await panel.getByRole('button', { name: tokenText("Generate token"), exact: true }).click();
+    await panel.getByLabel(tokenText("Token name"), { exact: true }).fill('Office permanent');
+    await panel.getByLabel(tokenText("Expiration mode"), { exact: true }).selectOption('never');
+    await expect(panel.getByLabel(tokenText("Valid for days"), { exact: true })).toHaveCount(0);
+    await captureToken('QAT-07-permanent-form');
+    await panel.getByRole('button', { name: tokenText("Confirm"), exact: true }).click();
+    await expect(panel.getByLabel(tokenText("New token"), { exact: true })).toBeVisible();
+    const permanent = await panel.getByLabel(tokenText("New token"), { exact: true }).inputValue();
+    expect(permanent.startsWith('ab_at_')).toBe(true); await machineStatus(permanent, 200);
+    await panel.getByRole('button', { name: tokenText("Saved; close secret"), exact: true }).click();
+    const permanentRow = panel.getByTestId('integration-token-row').filter({ hasText: 'Office permanent' });
+    await permanentRow.getByRole('button', { name: tokenText("Rotate token"), exact: true }).click();
+    await panel.getByLabel(tokenText("Expiration mode"), { exact: true }).selectOption('never');
+    await panel.getByLabel(tokenText("Old token grace minutes"), { exact: true }).fill('0');
+    await captureToken('QAT-07-rotation-form');
+    await panel.getByRole('button', { name: tokenText("Confirm"), exact: true }).click();
+    await expect(panel.getByLabel(tokenText("New token"), { exact: true })).toBeVisible();
+    const replacement = await panel.getByLabel(tokenText("New token"), { exact: true }).inputValue();
+    expect(replacement.startsWith('ab_at_')).toBe(true);
+    await machineStatus(permanent, 401); await machineStatus(replacement, 200); await machineStatus(fixed, 200);
+    await expect(panel.getByTestId('integration-token-secret')).toContainText(tokenText("Old token accepted until"));
+    await captureToken('QAT-07-rotation-secret');
+    await panel.getByRole('button', { name: tokenText("Saved; close secret"), exact: true }).click();
+    const active = panel.getByTestId('integration-token-row').filter({ hasText: 'Office permanent' }).filter({ has: page.getByText(tokenText("Active"), { exact: true }) });
+    await active.getByRole('button', { name: tokenText("Revoke token"), exact: true }).click();
+    await captureToken('QAT-07-revoke-confirmation');
+    await panel.getByRole('button', { name: tokenText("Cancel"), exact: true }).click(); await machineStatus(replacement, 200);
+    await active.getByRole('button', { name: tokenText("Revoke token"), exact: true }).click();
+    await panel.getByRole('button', { name: tokenText("Confirm"), exact: true }).click();
+    await expect(panel.getByText(tokenText("Token revoked. Subsequent requests are rejected."), { exact: true })).toBeVisible();
+    await machineStatus(replacement, 401); await machineStatus(fixed, 200);
+    await captureToken('QAT-07-revoked');
+    await panel.getByRole('button', { name: tokenText("Close token manager"), exact: true }).click();
+    await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
+    await expect(page.getByTestId('integration-token-panel').getByLabel(tokenText("New token"), { exact: true })).toHaveCount(0);
+    await writeFile(path.join(evidence, 'result.json'), JSON.stringify({ profile: 'quick-token-browser-v1',
+      executed: ['empty', 'fixed-cancel', 'fixed-create-and-bearer', 'reload-redaction', 'permanent-create-and-bearer',
+        'rotate-immediate-and-bearer', 'revoke-cancel', 'revoke-and-bearer', 'sibling-preserved', 'reopen-redaction'],
+      locale: publicationLocale, viewport: PUBLICATION_VIEWPORT, passed: true }, null, 2));
+  });
+});
+
+test.describe('Public business API management journey', () => {
+  test.setTimeout(120_000);
+  test.use({ storageState: { cookies: [], origins: [] }, locale: publicationLocale, viewport: publicationViewport });
+  const translations: Record<string, string> = {
+    'Public business APIs': '公共业务接口', 'New business API': '新建业务接口', 'Public API address': '公共接口地址',
+    'Bound public resource': '绑定公共资源', 'Registered implementation': '已注册实现', 'Execution scope': '接口调用 Scope',
+    'Save and validate business draft': '保存并校验业务草稿', 'Publish business API': '发布业务接口',
+    'Business API operation confirmation': '业务接口操作确认', 'Confirm': '确认', 'Cancel': '取消',
+    'Download business OpenAPI': '下载业务 OpenAPI', 'Download business types': '下载业务类型声明',
+    'Back to Open Platform': '返回开放平台', 'Data authority': '数据授权', 'Authority contract': '授权合同',
+    'Allow this business API': '允许调用此业务接口', 'Save installation authority': '保存安装授权',
+    'Revoke installation authority': '撤销安装授权', 'Installation authority confirmation': '安装授权操作确认',
+    'Close authority editor': '关闭授权编辑', 'Edit business contract': '编辑业务合同',
+    'Withdraw business API': '停用业务接口', 'Withdrawn': '已停用',
+  };
+  const text = (en: string) => publicationLocale === 'zh-CN' ? translations[en] ?? en : en;
+  for (const kind of ['command', 'handler'] as const) test(`publishes, grants, calls and withdraws a real ${kind} through management UI`, async ({ page }) => {
+    await authenticate(page, publicationLocale);
+    const code = `office.ui.${kind}.${Date.now()}`;
+    const evidence = path.join(EVIDENCE_DIR, `business-api-${publicationLocale}-${PUBLICATION_VIEWPORT}-${kind}`);
+    await mkdir(evidence, { recursive: true });
+    const captureAction = async (region: import('@playwright/test').Locator, name: string) => {
+      await region.scrollIntoViewIfNeeded(); await expect(region).toBeVisible();
+      await region.screenshot({ path: path.join(evidence, `${name}.png`) });
+    };
+    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    // The project adds Referer for APIRequestContext CSRF. A real noreferrer popup has no such forced header.
+    await page.context().setExtraHTTPHeaders({});
+    try {
+      const guidePopup = page.waitForEvent('popup');
+      await page.getByTestId('open-platform-integration-guide').click();
+      const guidePage = await guidePopup; await expect(guidePage.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+      await expect(guidePage.locator('code[data-filename="crud.sh"]')).toContainText('AURABOOT_TOKEN');
+      await expect(guidePage.locator('code[data-filename="receiver.py"]')).toContainText('BEGIN IMMEDIATE');
+      await guidePage.screenshot({ path: path.join(evidence,'QAT-08-guide-entry.png'), fullPage: false });
+      const anonymous = await page.context().browser()!.newContext({ storageState: { cookies: [], origins: [] } });
+      try {
+        const anonymousGuide = await anonymous.newPage(); const response = await anonymousGuide.goto(guidePage.url());
+        expect(response?.status()).toBe(200); await expect(anonymousGuide.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+      } finally { await anonymous.close(); }
+      await guidePage.close();
+    } finally { await page.context().setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` }); }
+    await page.getByTestId('open-platform-actions-link').click();
+    await expect(page).toHaveURL(/\/p\/c\/open_platform_actions(?:\?|$)/);
+    const editor = page.getByTestId('action-publication-editor'); await expect(editor).toBeVisible();
+    await editor.getByRole('button', { name: text('New business API'), exact: true }).click();
+    const form = editor.getByTestId('action-publication-form');
+    await form.getByLabel(text('Public API address'), { exact: true }).fill(code);
+    await form.getByLabel(text('Bound public resource'), { exact: true }).selectOption('office.devices');
+    await expect(form.getByLabel(text('Registered implementation'), { exact: true })).toBeEnabled();
+    await form.getByLabel(text('Registered implementation'), { exact: true }).selectOption(kind === 'command' ? 'command:tasset:assign_asset' : 'handler:core.visible-page');
+    await form.getByLabel(text('Execution scope'), { exact: true }).fill(`${code}.execute`);
+    await captureAction(form, 'QAT-06-configured');
+    const save = page.waitForResponse(r => r.url().endsWith(`/action-publications/${code}/draft`) && r.request().method() === 'PUT');
+    await form.getByRole('button', { name: text('Save and validate business draft'), exact: true }).click();
+    const saved = await save; expect(saved.status()).toBe(200);
+    expect(saved.request().postDataJSON().definition).toMatchObject({ code, resourceCode: 'office.devices', sourceKind: kind, schemaVersion: 1 });
+    await form.getByRole('button', { name: text('Publish business API'), exact: true }).click();
+    let confirmation = editor.getByRole('group', { name: text('Business API operation confirmation'), exact: true });
+    await captureAction(confirmation, 'QAT-06-publish-confirmation');
+    await confirmation.getByRole('button', { name: text('Cancel'), exact: true }).click();
+    await form.getByRole('button', { name: text('Publish business API'), exact: true }).click();
+    const publish = page.waitForResponse(r => r.url().endsWith(`/action-publications/${code}/publish`) && r.request().method() === 'POST');
+    await confirmation.getByRole('button', { name: text('Confirm'), exact: true }).click(); expect((await publish).status()).toBe(200);
+    for (const artifact of ['openapi', 'types'] as const) {
+      const download = page.waitForEvent('download');
+      await form.getByRole('button', { name: text(artifact === 'openapi' ? 'Download business OpenAPI' : 'Download business types'), exact: true }).click();
+      const file = await download; expect(file.suggestedFilename()).toBe(`${code}.${artifact === 'openapi' ? 'openapi.json' : 'd.ts'}`);
+      const target = path.join(evidence, file.suggestedFilename()); await file.saveAs(target); const content = await readFile(target, 'utf-8');
+      expect(content.length).toBeGreaterThan(100);
+      if (artifact === 'openapi') {
+        const contract = JSON.parse(content); expect(contract.openapi).toBe('3.1.0');
+        expect(contract.paths[`/api/open/v1/actions/${code}:execute`].post.security).toEqual(expect.arrayContaining([{ integrationToken: [] }]));
+      } else expect(content).toContain('export type ActionRequest');
+      expect(content).not.toContain('tasset_as_'); expect(content).not.toContain('tasset:assign_asset');
+    }
+    // Provision the caller fixture through real administration APIs after UI publication.
+    const name = `Office business ${kind} ${Date.now()}`;
+    const appResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications`, { data: { name } });
+    expect(appResponse.status()).toBe(200); const app = (await appResponse.json()).data;
+    const installResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications/${app.pid}/installations`,
+      { data: { environment: 'development', scopes: ['office.devices.read','office.devices.write',`${code}.execute`], rateLimitPerMinute: 10000 } });
+    expect(installResponse.status()).toBe(200); const installation = (await installResponse.json()).data;
+    const root = `${WEB_BASE_URL}/api/open-platform/installations/${installation.pid}`;
+    const grantResponse = await page.request.put(`${root}/resources/office.devices`, { data: {
+      operations: ['list','get','create','update','delete'], readableFields: ['pid','assetCode','name','status','location','serialNumber','assignedTo'],
+      writableFields: ['assetCode','name','location','serialNumber','assignedTo'], rowConstraints: [{ field: 'location', values: ['HQ'] }],
+    } }); expect(grantResponse.status()).toBe(200);
+    const tokenResponse = await page.request.post(`${root}/integration-tokens`, { headers: { 'Idempotency-Key': `ui-${code}` }, data: { name: 'Business UI caller', expirationMode: 'never' } });
+    expect(tokenResponse.status()).toBe(200); const token = (await tokenResponse.json()).data.token;
+    const machine = { Authorization: `Bearer ${token}` };
+    const createdResponse = await page.request.post(`${BACKEND_URL}/api/open/v1/resources/office.devices`, { headers: { ...machine, 'Idempotency-Key': `create-${code}` },
+      data: { assetCode: `UI-${Date.now()}`, name: 'Business UI device', location: 'HQ' } });
+    expect(createdResponse.status()).toBe(201); const device = await createdResponse.json(); expect(device.status).toBe('available');
+    const requestData = kind === 'command' ? { targetPid: device.pid, input: { assignedTo: 'UI integration operator' } } : { input: { limit: 20 } };
+    const headers = kind === 'command' ? { ...machine, 'If-Match': createdResponse.headers().etag, 'Idempotency-Key': `execute-${code}` } : machine;
+    const invoke = () => page.request.post(`${BACKEND_URL}/api/open/v1/actions/${code}:execute`, { headers, data: requestData });
+    expect((await invoke()).status()).toBe(403);
+    await editor.getByRole('link', { name: text('Back to Open Platform'), exact: true }).click();
+    const card = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: name });
+    await card.getByRole('button', { name: text('Data authority'), exact: true }).click();
+    const grants = card.getByTestId('installation-grant-editor');
+    await grants.getByLabel(text('Authority contract'), { exact: true }).selectOption(`action:${code}`);
+    await grants.getByLabel(text('Allow this business API'), { exact: true }).check();
+    if (kind === 'command') for (const field of ['assignedTo','status']) await grants.getByLabel(field, { exact: true }).check();
+    const saveGrant = page.waitForResponse(r => r.url().endsWith(`/installations/${installation.pid}/actions/${code}`) && r.request().method() === 'PUT');
+    await grants.getByRole('button', { name: text('Save installation authority'), exact: true }).click(); expect((await saveGrant).status()).toBe(200);
+    const call = await invoke(); expect(call.status()).toBe(200); const body = await call.json();
+    if (kind === 'command') { expect(body.resource).toMatchObject({ pid: device.pid, status: 'in_use', assignedTo: 'UI integration operator' });
+      const replay = await invoke(); expect(replay.status()).toBe(200); expect(replay.headers()['idempotent-replay']).toBe('true');
+    } else expect(body.countOnPage).toBeGreaterThan(0);
+    await captureAction(grants, 'QAT-05-authorized');
+    await page.reload(); await card.getByRole('button', { name: text('Data authority'), exact: true }).click();
+    await grants.getByLabel(text('Authority contract'), { exact: true }).selectOption(`action:${code}`);
+    await expect(grants.getByLabel(text('Allow this business API'), { exact: true })).toBeChecked();
+    await grants.getByRole('button', { name: text('Revoke installation authority'), exact: true }).click();
+    const revokeGroup = grants.getByRole('group', { name: text('Installation authority confirmation'), exact: true });
+    await captureAction(revokeGroup, 'QAT-05-revoke-confirmation');
+    await revokeGroup.getByRole('button', { name: text('Cancel'), exact: true }).click(); expect((await invoke()).status()).toBe(200);
+    await grants.getByRole('button', { name: text('Revoke installation authority'), exact: true }).click();
+    const revoke = page.waitForResponse(r => r.url().endsWith(`/installations/${installation.pid}/actions/${code}`) && r.request().method() === 'DELETE');
+    await revokeGroup.getByRole('button', { name: text('Confirm'), exact: true }).click(); expect((await revoke).status()).toBe(200); expect((await invoke()).status()).toBe(403);
+    await grants.getByRole('button', { name: text('Close authority editor'), exact: true }).click();
+    await page.getByTestId('open-platform-actions-link').click();
+    await expect(page).toHaveURL(/\/p\/c\/open_platform_actions(?:\?|$)/);
+    await editor.locator('li').filter({ hasText: code }).getByRole('button', { name: text('Edit business contract'), exact: true }).click();
+    await form.getByRole('button', { name: text('Withdraw business API'), exact: true }).click();
+    confirmation = editor.getByRole('group', { name: text('Business API operation confirmation'), exact: true });
+    await captureAction(confirmation, 'QAT-06-withdraw-confirmation');
+    await confirmation.getByRole('button', { name: text('Cancel'), exact: true }).click();
+    await form.getByRole('button', { name: text('Withdraw business API'), exact: true }).click();
+    const withdraw = page.waitForResponse(r => r.url().endsWith(`/action-publications/${code}/withdraw`) && r.request().method() === 'POST');
+    await confirmation.getByRole('button', { name: text('Confirm'), exact: true }).click(); expect((await withdraw).status()).toBe(200); expect((await invoke()).status()).toBe(404);
+    await writeFile(path.join(evidence, 'result.json'), JSON.stringify({ profile: 'business-api-browser-v1', locale: publicationLocale, viewport: PUBLICATION_VIEWPORT, kind,
+      executed: ['menu-entry','packaged-guide-entry-and-anonymous-read','source-contract-save','publication-cancel-confirm','openapi-types-download','ungranted-denial','authority-save-call','reload-persistence','revoke-cancel-confirm-denial','withdraw-cancel-confirm-denial'], passed: true }, null, 2));
   });
 });

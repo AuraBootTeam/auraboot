@@ -56,6 +56,9 @@ describe('OpenPlatformPage', () => {
     const user = userEvent.setup();
     render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     expect(await screen.findByTestId('open-platform-empty')).toBeVisible();
+    const guide = screen.getByRole('link', { name: 'Integration guide (English)' });
+    expect(guide).toHaveAttribute('href', '/docs/open-platform-integration.html');
+    expect(guide).toHaveAttribute('rel', 'noopener noreferrer');
 
     await user.click(screen.getByTestId('open-platform-create-app'));
     await user.type(screen.getByTestId('open-platform-app-name'), 'ERP Bridge');

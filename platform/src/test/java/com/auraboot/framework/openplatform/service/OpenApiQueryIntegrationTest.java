@@ -38,6 +38,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenApiResourceService publicResources;
     @Autowired private OpenPlatformManagementService management;
     @Autowired private OpenPlatformTokenService tokens;
+    @Autowired private IntegrationTokenService integrationTokens;
     @Autowired private OpenPlatformSecretCodec secrets;
     @Autowired private OpenPlatformAuthMapper auth;
     @Autowired private org.springframework.test.web.servlet.MockMvc http;
@@ -51,6 +52,52 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     private MachinePrincipal principalA,principalB;
     private String tokenA, tokenB;
     private Set<String> scopes;
+
+    @Test void fixedAndPermanentIntegrationTokensUseRealResourceAndQueryAuthority() throws Exception {
+        var human = MetaContext.snapshot();
+        for (String mode : List.of("fixed", "never")) {
+            MetaContext.restore(human);
+            var issued = integrationTokens.create(principalA.installationPid(),
+                    new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Query " + mode, mode, null),
+                    "query-integration-" + mode);
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + root.code())
+                    .header("Authorization", "Bearer " + issued.token()))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].name").value("Root A"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].secret").doesNotExist());
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/open/v1/queries/" + rows.code() + ":execute")
+                    .header("Authorization", "Bearer " + issued.token()).contentType("application/json")
+                    .content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].childName").value("Child A"));
+        }
+        MetaContext.restore(human);
+    }
+
+    @Test void integrationResourceAuthorityRechecksLiveScopeRotationAndRevocationForStalePrincipal() {
+        var issued = integrationTokens.create(principalA.installationPid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Live authority", "never", null), "live-authority-create");
+        var identity = auth.findToken(secrets.sha256(issued.token()), OpenPlatformTokenService.AUDIENCE, Instant.now());
+        var principal = new MachinePrincipal(identity.tenantId(), identity.tokenPid(), "machine", scopes,
+                identity.applicationPid(), identity.installationPid(), identity.environment(), identity.tokenPid());
+        assertThat(run(principal, rows, "A").get("items")).asList().hasSize(1);
+        String queryScope = rows.scopes().get("execute");
+        var narrowed = new HashSet<>(scopes); narrowed.remove(queryScope);
+        management.updateScopes(principal.installationPid(), new com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest(narrowed));
+        assertThatThrownBy(() -> run(principal, rows, "A")).isInstanceOf(AccessDeniedException.class);
+        management.updateScopes(principal.installationPid(), new com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest(scopes));
+        assertThat(run(principal, rows, "A").get("items")).asList().hasSize(1);
+        var rotated = integrationTokens.rotate(principal.installationPid(), issued.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "live-authority-rotate");
+        assertThatThrownBy(() -> run(principal, rows, "A")).isInstanceOf(AccessDeniedException.class);
+        var replacement = auth.findToken(secrets.sha256(rotated.credential().token()), OpenPlatformTokenService.AUDIENCE, Instant.now());
+        var next = new MachinePrincipal(replacement.tenantId(), replacement.tokenPid(), "machine", scopes,
+                replacement.applicationPid(), replacement.installationPid(), replacement.environment(), replacement.tokenPid());
+        assertThat(run(next, rows, "A").get("items")).asList().hasSize(1);
+        integrationTokens.revoke(principal.installationPid(), rotated.credential().metadata().pid());
+        assertThatThrownBy(() -> run(next, rows, "A")).isInstanceOf(AccessDeniedException.class);
+    }
 
     @BeforeEach void fixture() {
         grantCommittedPermissionToTestRole("sys.connector.update","system","connector","update","Manage Open Platform");

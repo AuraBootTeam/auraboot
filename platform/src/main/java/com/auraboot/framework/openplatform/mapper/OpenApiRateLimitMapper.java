@@ -12,7 +12,12 @@ import java.time.Instant;
 public interface OpenApiRateLimitMapper {
     @Select(value = """
             WITH token AS MATERIALIZED (
-                SELECT t.pid AS token_pid, t.tenant_id, t.installation_id, t.scopes,
+                SELECT t.pid AS token_pid, t.tenant_id, t.installation_id,
+                   CASE WHEN t.token_kind = 'integration' THEN
+                       (SELECT COALESCE(jsonb_agg(g.scope_code ORDER BY g.scope_code), '[]'::jsonb)
+                        FROM ab_application_scope_grant g
+                        WHERE g.tenant_id = t.tenant_id AND g.installation_id = t.installation_id)
+                       ELSE t.scopes END AS scopes,
                        t.expires_at AS token_expires_at,
                        i.pid AS installation_pid, i.environment, i.rate_limit_per_minute,
                        i.status AS installation_status,
@@ -21,7 +26,8 @@ public interface OpenApiRateLimitMapper {
                 JOIN ab_application_installation i ON i.id = t.installation_id
                 JOIN ab_external_application a ON a.id = i.application_id
                 WHERE t.token_hash = #{tokenHash} AND t.audience = #{audience}
-                  AND t.revoked_at IS NULL AND t.expires_at > #{usedAt}
+                  AND t.revoked_at IS NULL AND (t.never_expires OR t.expires_at > #{usedAt})
+                  AND (t.accept_until IS NULL OR t.accept_until > #{usedAt})
                 LIMIT 1
             ), locked AS MATERIALIZED (
                 SELECT installation_id,

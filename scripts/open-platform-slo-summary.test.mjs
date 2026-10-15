@@ -36,7 +36,7 @@ function runtime(invalidQuery = false) {
   const observations = [];
   const fixture = { schemaVersion: 1, profile: 'open-platform-dynamic-slo-v1', runId: 'slo-' + 'a'.repeat(20),
     resourceCode: 'release.dynamic.parts', queryCode: 'release.slo.by-zone',
-    allowedPid: 'allowed-pid', hiddenPid: 'hidden-pid', clientId: 'private-client', clientSecret: 'private-secret' };
+    allowedPid: 'allowed-pid', hiddenPid: 'hidden-pid', clientId: 'private-client', clientSecret: 'private-secret', integrationToken: 'private-direct-token', commandCode: 'release.slo.command', handlerCode: 'release.slo.handler' };
   let created;
   const metric = class { constructor(name) { this.name = name; } add(value, tags) { observations.push({ name: this.name, value, tags }); } };
   const response = (status, value, headers) => ({ status, body: status === 204 ? '' : JSON.stringify(value),
@@ -58,6 +58,12 @@ function runtime(invalidQuery = false) {
         if (operation === 'list') return response(200, { items: [{ pid: 'allowed-pid', name: 'Seed', zone: 'A' }, created] }, headers);
         if (operation === 'query') return response(200, { items: [{ pid: 'allowed-pid', name: 'Seed', ...(invalidQuery ? { secret: 'private-value' } : {}) }] }, headers);
         if (operation === 'update') { created = { ...created, ...JSON.parse(body) }; return response(200, created, { ...headers, ETag: '"v2"' }); }
+        if (operation === 'command' || operation === 'commandReplay') {
+          created = { ...created, name: 'Business API qualified' };
+          return response(200, { action: fixture.commandCode, resource: created, idempotentReplay: operation === 'commandReplay' },
+            { ...headers, ETag: '"v3"', ...(operation === 'commandReplay' ? { 'Idempotent-Replay': 'true' } : {}) });
+        }
+        if (operation === 'handler') return response(200, { countOnPage: 2, hasMore: false }, headers);
         if (operation === 'delete') return response(204, null, headers);
         throw new Error('Unexpected workload operation');
       } } };
@@ -67,12 +73,12 @@ function runtime(invalidQuery = false) {
   return { context, observations };
 }
 
-test('original k6 workload executes all seven business operations and checks public results', () => {
+test('original k6 workload executes all ten business operations and checks public results', () => {
   const { context, observations } = runtime();
   context.runIteration({ token: 'private-token', businessToken: 'private-machine-token', runId: 'fresh-run' });
   assert.deepEqual(observations.filter(row => row.name === 'business_requests').map(row => row.tags.operation),
-    ['create', 'replay', 'get', 'list', 'query', 'update', 'delete']);
-  assert.equal(observations.filter(row => row.name === 'business_errors').length, 7);
+    ['create', 'replay', 'get', 'list', 'query', 'update', 'command', 'commandReplay', 'handler', 'delete']);
+  assert.equal(observations.filter(row => row.name === 'business_errors').length, 10);
   assert.ok(observations.filter(row => row.name === 'business_errors').every(row => row.value === false));
 });
 
@@ -106,9 +112,9 @@ test('actual Python SLO verifier rejects missing samples, false green and wrong 
   metric('open_api_errors', { rate: 0, passes: 0, fails: 20 });
   metric('open_api_duration', { 'p(95)': 100, 'p(99)': 150 });
   metric('http_reqs', { rate: 100 });
-  metric('business_requests', { count: 140, rate: 70 });
-  metric('business_errors', { rate: 0, passes: 0, fails: 140 });
-  for (const operation of ['create', 'replay', 'get', 'list', 'query', 'update', 'delete']) {
+  metric('business_requests', { count: 200, rate: 70 });
+  metric('business_errors', { rate: 0, passes: 0, fails: 200 });
+  for (const operation of ['create', 'replay', 'get', 'list', 'query', 'update', 'command', 'commandReplay', 'handler', 'delete']) {
     metric(`business_requests{operation:${operation}}`, { count: 20 });
     metric(`business_errors{operation:${operation}}`, { rate: 0, passes: 0, fails: 20 });
     metric(`business_duration{operation:${operation}}`, { 'p(95)': 100, 'p(99)': 150 });
@@ -127,7 +133,7 @@ test('actual Python SLO verifier rejects missing samples, false green and wrong 
       value => { delete value.metrics['business_requests{operation:delete}']; },
       value => { value.metrics['business_errors{operation:create}'].values.fails = 0; },
       value => { value.metrics['business_duration{operation:query}'].values['p(95)'] = 900; },
-      value => { value.metrics.business_requests.values.count = 141; },
+      value => { value.metrics.business_requests.values.count = 201; },
       value => { value.metrics['business_requests{operation:get}'].values.count = true; },
       value => { value.metrics.business_requests.values.rate = 19; },
       value => { value.metrics['business_duration{operation:delete}'].thresholds.required.ok = false; },

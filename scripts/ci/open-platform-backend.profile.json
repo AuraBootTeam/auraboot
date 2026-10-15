@@ -10,7 +10,15 @@
     "DOP-06",
     "DOP-07",
     "DOP-10",
-    "DOP-11"
+    "DOP-11",
+    "QAT-02",
+    "QAT-03",
+    "QAT-04",
+    "QAT-05",
+    "QAT-01",
+    "QAT-06",
+    "QAT-08",
+    "QAT-09"
   ],
   "packages": [
     "com.auraboot.framework.openplatform"
@@ -47,7 +55,9 @@
     "com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest",
     "com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest",
     "com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest",
-    "com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT"
+    "com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT",
+    "com.auraboot.framework.meta.service.impl.MetaModelServiceCustomColumnMappingTest",
+    "com.auraboot.framework.plugin.service.impl.PluginResourceImporterFieldReimportTest"
   ],
   "coverage": {
     "minimumLinePercent": 80,

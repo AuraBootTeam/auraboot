@@ -103,17 +103,73 @@ public final class OpenApiContractArtifacts {
         return document(contract.code(), contract.schemaVersion(), contract.scopes().values(), Map.of("/api/open/v1/queries/" + contract.code() + ":execute", Map.of("post", endpoint)), schemas);
     }
 
+    public static Map<String, Object> action(OpenApiActionContract contract, OpenApiResourceContract resource) {
+        var parameters = actionParameters(contract);
+        var input = object(parameters, true, true);
+        var properties = new LinkedHashMap<String, Object>(); properties.put("input", input);
+        var required = new ArrayList<>(List.of("input"));
+        boolean command = "command".equals(contract.sourceKind());
+        if (command) { properties.put("targetPid", pid()); required.add("targetPid"); }
+        var schemas = new LinkedHashMap<String, Object>();
+        schemas.put("ActionRequest", Map.of("type", "object", "additionalProperties", false, "properties", properties, "required", required));
+        if (command) {
+            schemas.put("Resource", object(resource.fields(), false, false, true));
+            schemas.put("ActionResult", Map.of("type", "object", "additionalProperties", false,
+                    "properties", Map.of("action", Map.of("type", "string", "const", contract.code()), "resource", ref("Resource"),
+                            "etag", Map.of("type", "string"), "idempotentReplay", Map.of("type", "boolean")),
+                    "required", List.of("action", "resource", "etag", "idempotentReplay")));
+        } else {
+            var output = new TreeMap<String, Object>();
+            contract.outputFields().forEach((alias, type) -> output.put(alias, field(new Field(alias, type, true, false, true, false,
+                    Set.of(), false, null, Map.of(), null), false)));
+            schemas.put("ActionResult", Map.of("type", "object", "additionalProperties", false, "properties", output, "required", List.copyOf(output.keySet())));
+        }
+        var endpoint = endpoint(contract.code() + ".execute", contract.scopes().get("execute"));
+        endpoint.put("requestBody", Map.of("required", true, "content", content(ref("ActionRequest"))));
+        if (command) endpoint.put("parameters", List.of(parameter("If-Match", "header", true, Map.of("type", "string")),
+                parameter("Idempotency-Key", "header", true, Map.of("type", "string", "minLength", 8, "maxLength", 128))));
+        var responses = errors(); responses.put("200", Map.of("description", "Current installation-projected business result", "content", content(ref("ActionResult"))));
+        endpoint.put("responses", responses); endpoint.put("x-timeout-ms", contract.timeoutMs()); endpoint.put("x-max-concurrent", contract.maxConcurrent());
+        endpoint.put("x-bound-resource", contract.resourceCode()); endpoint.put("x-controlled-effects", contract.effectFields());
+        return document(contract.code(), contract.schemaVersion(), contract.scopes().values(),
+                Map.of("/api/open/v1/actions/" + contract.code() + ":execute", Map.of("post", endpoint)), schemas);
+    }
+
+    public static String actionTypes(OpenApiActionContract contract, OpenApiResourceContract resource) {
+        String input = objectType(actionParameters(contract), true, true);
+        String result;
+        if ("command".equals(contract.sourceKind())) result = "{ action: string; resource: " + objectType(resource.fields(), false, false, true)
+                + "; etag: string; idempotentReplay: boolean }";
+        else {
+            var fields = new TreeMap<String, Field>(); contract.outputFields().forEach((alias, type) -> fields.put(alias,
+                    new Field(alias, type, false, true, true, false, Set.of(), false, null, Map.of(), null)));
+            result = objectType(fields, true, true);
+        }
+        return "// AuraBoot " + contract.code() + " schema " + contract.schemaVersion() + "\n"
+                + "export type ActionRequest = { " + ("command".equals(contract.sourceKind()) ? "targetPid: string; " : "") + "input: " + input + " };\n"
+                + "export type ActionResult = " + result + ";\n";
+    }
+    private static Map<String, Field> actionParameters(OpenApiActionContract contract) {
+        var fields = new TreeMap<String, Field>(); contract.parameters().forEach((name, p) -> fields.put(name,
+                new Field(name, p.type(), false, true, p.required(), p.nullable(), Set.of(), false, null, Map.of(), p.items())));
+        return fields;
+    }
+
     private static Map<String, Object> document(String code, int version, Collection<String> scopes, Map<String, Object> paths, Map<String, Object> schemas) {
         var scopeDescriptions = new TreeMap<String, String>(); scopes.forEach(scope -> scopeDescriptions.put(scope, "Explicit installation capability"));
         var result = new LinkedHashMap<String, Object>(); result.put("openapi", "3.1.0");
         result.put("info", Map.of("title", "AuraBoot " + code, "version", "1." + version, "description", "Published schema; installation grants may narrow operations and visible fields"));
         result.put("servers", List.of(Map.of("url", "/"))); result.put("paths", paths); result.put("x-schema-version", version);
         result.put("components", Map.of("schemas", schemas, "securitySchemes", Map.of("oauth2ClientCredentials",
-                Map.of("type", "oauth2", "flows", Map.of("clientCredentials", Map.of("tokenUrl", "/oauth2/token", "scopes", scopeDescriptions))))));
+                Map.of("type", "oauth2", "flows", Map.of("clientCredentials", Map.of("tokenUrl", "/oauth2/token", "scopes", scopeDescriptions))),
+                "integrationToken", Map.of("type", "http", "scheme", "bearer", "bearerFormat", "opaque",
+                        "description", "Direct integration token issued by an authorized application administrator; current installation scopes apply"))));
         return result;
     }
     private static Map<String, Object> endpoint(String id, String scope) {
-        var result = new LinkedHashMap<String, Object>(); result.put("operationId", id); result.put("security", List.of(Map.of("oauth2ClientCredentials", List.of(scope)))); return result;
+        var result = new LinkedHashMap<String, Object>(); result.put("operationId", id);
+        result.put("security", List.of(Map.of("integrationToken", List.of()), Map.of("oauth2ClientCredentials", List.of(scope))));
+        result.put("x-required-scope", scope); return result;
     }
     private static Map<String, Object> errors() {
         var result = new LinkedHashMap<String, Object>();

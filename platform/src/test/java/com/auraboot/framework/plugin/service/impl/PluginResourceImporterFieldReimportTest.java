@@ -93,7 +93,7 @@ class PluginResourceImporterFieldReimportTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"type", "precision", "feature", "reference"})
+    @ValueSource(strings = {"type", "precision", "feature", "reference", "default"})
     void changedDefinitionStillSynchronizesPublishedModels(String change) {
         var dto = definition();
         switch (change) {
@@ -101,10 +101,29 @@ class PluginResourceImporterFieldReimportTest {
             case "precision" -> dto.getConstraints().setPrecision(20);
             case "feature" -> dto.setFeature(Map.of("unique", true));
             case "reference" -> dto.setRefTarget(Map.of("targetEntity", "supplier"));
+            case "default" -> dto.setDefaultValue("0");
             default -> throw new IllegalArgumentException(change);
         }
         assertThat(reimport(dto).getResourcePid()).isEqualTo("field-pid");
         verify(schemas).updateTableByModel("quote_line");
+    }
+
+    @Test
+    void topLevelDslDefaultSurvivesImportWithoutConstraints() {
+        var dto = new FieldDefinitionDTO(); dto.setCode("tasset_as_status"); dto.setDataType("enum");
+        dto.setDefaultValue("available"); dto.setFeature(Map.of("filterable", true));
+        Map<String, Object> feature = ReflectionTestUtils.invokeMethod(importer, "buildFieldFeature", dto);
+        assertThat(feature).containsEntry("defaultValue", "available").containsEntry("filterable", true);
+        var persisted = json.convertValue(feature, com.auraboot.framework.meta.entity.payload.FieldFeatureBean.class);
+        assertThat(persisted.getDefaultValue()).isEqualTo("available");
+    }
+
+    @Test
+    void FeatureDefaultRemainsWhenTopLevelDefaultIsAbsent() {
+        var dto = new FieldDefinitionDTO(); dto.setCode("tasset_as_status"); dto.setDataType("enum");
+        dto.setFeature(Map.of("defaultValue", "available"));
+        Map<String, Object> feature = ReflectionTestUtils.invokeMethod(importer, "buildFieldFeature", dto);
+        assertThat(feature).containsEntry("defaultValue", "available");
     }
 
     @Test

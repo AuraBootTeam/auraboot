@@ -18,7 +18,8 @@ public interface ApplicationAccessTokenMapper extends BaseMapper<ApplicationAcce
             WHERE token_hash = #{tokenHash}
               AND audience = #{audience}
               AND revoked_at IS NULL
-              AND expires_at > #{now}
+              AND (never_expires OR expires_at > #{now})
+              AND (accept_until IS NULL OR accept_until > #{now})
             LIMIT 1
             """)
     ApplicationAccessToken findActive(@Param("tokenHash") String tokenHash,
@@ -44,4 +45,13 @@ public interface ApplicationAccessTokenMapper extends BaseMapper<ApplicationAcce
     int revokeCredentialTokens(@Param("tenantId") Long tenantId,
                                @Param("credentialId") Long credentialId,
                                @Param("now") Instant now);
+    @Update("""
+            UPDATE ab_application_access_token SET revoked_at = #{now}
+            WHERE tenant_id = #{tenantId} AND installation_id = #{installationId}
+              AND token_kind = 'oauth' AND revoked_at IS NULL
+            """)
+    int revokeInstallationOAuthTokens(@Param("tenantId") Long tenantId,
+                                      @Param("installationId") Long installationId,
+                                      @Param("now") Instant now);
+
 }

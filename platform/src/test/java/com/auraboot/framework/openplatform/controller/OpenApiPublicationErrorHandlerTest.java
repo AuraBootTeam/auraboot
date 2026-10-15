@@ -15,9 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OpenApiPublicationErrorHandlerTest {
     private final OpenApiPublicationService resources = mock(OpenApiPublicationService.class);
     private final OpenApiQueryPublicationService queries = mock(OpenApiQueryPublicationService.class);
+    private final com.auraboot.framework.openplatform.service.OpenPlatformManagementService management = mock(com.auraboot.framework.openplatform.service.OpenPlatformManagementService.class);
     private final org.springframework.test.web.servlet.MockMvc http = MockMvcBuilders.standaloneSetup(
-            new OpenApiPublicationController(resources), new OpenApiQueryPublicationController(queries))
-            .setControllerAdvice(new OpenApiPublicationErrorHandler())
+            new OpenApiPublicationController(resources), new OpenApiQueryPublicationController(queries),
+            new OpenPlatformManagementController(management, mock(com.auraboot.framework.openplatform.service.OpenApiCapabilityRegistry.class),
+                    mock(com.auraboot.framework.openplatform.service.OpenApiEventCatalog.class)))
+            .setControllerAdvice(new OpenApiPublicationErrorHandler(), new OpenPlatformManagementErrorHandler())
             .setMessageConverters(new MappingJackson2HttpMessageConverter()).build();
 
     @Test void invalidResourceAndQueryContractsAreClientErrors() throws Exception {
@@ -56,4 +59,21 @@ class OpenApiPublicationErrorHandlerTest {
         }
         verifyNoInteractions(resources, queries);
     }
+    @Test void applicationScopeErrorsAre400AndPreserveTheirUsefulPublicReason() throws Exception {
+        when(management.install(eq("application"), any())).thenThrow(new IllegalArgumentException("One or more scopes are not published by the Open API registry"));
+        http.perform(post("/api/open-platform/applications/application/installations").contentType("application/json")
+                .content("{\"environment\":\"development\",\"scopes\":[\"unpublished.scope\"],\"rateLimitPerMinute\":100}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("400"))
+                .andExpect(jsonPath("$.message").value("One or more scopes are not published by the Open API registry"));
+    }
+
+    @Test void applicationErrorsKeepTheirOwnMalformedAndPermissionContract() throws Exception {
+        http.perform(post("/api/open-platform/applications/application/installations").contentType("application/json")
+                .content("{\"rateLimitPerMinute\":\"invalid\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Invalid Open Platform management request"));
+        when(management.listApplications()).thenThrow(new AccessDeniedException("private application actor"));
+        http.perform(get("/api/open-platform/applications")).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Application management permission required"));
+    }
+
 }

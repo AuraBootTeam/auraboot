@@ -1,0 +1,207 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AuraBoot External Integration Guide</title><meta name="description" content="Direct appId and integration token access, office-device CRUD/List, business APIs and signed events."><style>
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,sans-serif;line-height:1.65;color:#172034;background:#f5f7fb}*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;background:white;padding:48px clamp(20px,5vw,64px)}h1{font-size:clamp(28px,5vw,42px);line-height:1.15;letter-spacing:-.025em}h2{line-height:1.3;font-size:24px}header p{color:#526078}nav{display:grid;gap:8px;border-left:3px solid #6366f1;padding:12px 20px;margin:28px 0}a{color:#4338ca;text-underline-offset:3px}section{margin:48px 0;scroll-margin-top:24px}p,li,td{overflow-wrap:anywhere}li{margin-bottom:10px}code{font-size:.88em;background:#eef1f7;border-radius:4px;padding:.1em .3em}pre{max-width:100%;overflow:auto;padding:20px;background:#111827;color:#e5e7eb;border-radius:10px;font-size:13px;line-height:1.6;tab-size:4}pre code{background:none;padding:0;font-size:inherit;color:inherit}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #d7ddea;padding:12px 8px}th:first-child{width:25%}footer{border-top:1px solid #d7ddea;padding-top:24px;color:#526078}@media(prefers-color-scheme:dark){:root{background:#0b1020;color:#e5e7eb}main{background:#141b2d}header p,footer{color:#b5bfd3}a{color:#a5b4fc}code{background:#273149}}@media print{main{max-width:none;padding:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}nav{break-inside:avoid}}
+</style></head><body><main><header><p>AuraBoot · Developer documentation · English</p><h1>External Integration Guide</h1><p>Use your application ID and integration token to call explicitly published HTTPS APIs. The office equipment walkthrough uses the existing OSS asset-management model.</p></header><nav aria-label="On this page"><a href="#prepare">1. Receive your integration package</a><a href="#auth">2. Authenticate and manage tokens</a><a href="#crud">3. Run office-device CRUD/List and business APIs</a><a href="#subscribe">4. Subscribe to model events</a><a href="#verify">5. Verify and persist notifications</a><a href="#retry">6. Handle failures and replay</a><a href="#oauth">7. Existing OAuth integrations</a></nav><section id="prepare"><h2>1. Receive your integration package</h2><p>Ask the operator for the HTTPS API origin, environment, stable <code>appId</code>, one integration token, its fixed expiry or explicit permanent status, public OpenAPI/type exports, granted scopes/operations/fields/rows and support contact. Webhook signing secrets are separate from API tokens. Keep each environment separate and credentials in a server-side secret manager.</p><p>The administrator publishes the office resource in <a href="/p/c/open_platform_publications">Public resources</a> and explicit assignment/page-summary APIs in <a href="/p/c/open_platform_actions">Public business APIs</a>. In <a href="/settings/api-docs">Open Platform</a>, an authorized application owner/maintainer selects an installation, grants the required resource and business API authority, then opens <strong>Quick integration tokens</strong>. Choose a name and fixed/permanent mode, generate, and deliver the once-visible token through a secure channel. Closing or refreshing cannot reveal it again. A token alone grants no business data.</p><p><strong>Office example contract:</strong> the operator installs OSS <code>asset-management</code> and publishes it as <code>office.devices</code>. Public fields are <code>pid</code> (server generated, read-only), <code>assetCode</code> and <code>name</code> (required strings), <code>location</code>, <code>serialNumber</code>, <code>assignedTo</code> (nullable strings), and <code>status</code> (read-only). New records default to <code>available</code>. The example grants all five operations, writable fields except status/pid, location restricted to <code>HQ</code>, location EQ filtering, name sorting, page size 20 or higher and created/updated/deleted events. Asset codes are caller-supplied labels here; the returned PID is the record identity.</p><p><code>office.devices.assign</code> explicitly maps the native asset assignment command to this resource: required string <code>assignedTo</code>, effects <code>assignedTo</code> and <code>status</code>, state available → in_use. Both effects require a separate business API grant; status need not be generically writable. <code>office.devices.page-summary</code> binds the registered read-only page handler: integer limit → countOnPage/hasMore. These public aliases and grants must be published by your operator; they are not automatically enabled by installing the plugin. Other public contracts can use different aliases and allowed operations.</p></section>
+<section id="auth"><h2>2. Authenticate and manage tokens</h2><p>Send <code>Authorization: Bearer &lt;integration-token&gt;</code> directly. No OAuth exchange, extra appId header, tenant header or client secret is required. <code>GET /api/open/v1/whoami</code> requires <code>openapi.profile.read</code>; verify its <code>applicationPid</code> matches your delivered appId and the installation/environment is expected. appId is an identifier, not a secret or extra source of authority.</p><p><strong>Fixed tokens:</strong> default 30 days, server range one hour through 90 days; the management form accepts 1–90 days. <strong>Permanent tokens:</strong> explicitly selected and no scheduled expiry; they remain subject to rotation cutoff, revocation, parent application/installation status and current authority. Missing mode means fixed, not permanent.</p><p><strong>Rotation:</strong> choose a new fixed/permanent token and the old-token grace period (default 24 hours; 0 for immediate cutoff; at most 7 days). Deploy and verify the new secret before the actual old cutoff. A fixed old token never lives beyond its original expiry; a permanent old token also receives a finite cutoff. appId stays unchanged. New and old token states/cutoffs appear in the list. Single-token revoke takes effect without revoking siblings; disabling the installation/application blocks its tokens. Current scope/field/row changes apply to existing integration tokens.</p><p>Generate/rotate responses are no-store and reveal the secret once. If the response is lost, inspect the token list and revoke the uncertain token before generating a replacement; repeating the same management request key conflicts rather than revealing or silently duplicating a secret. External machine tokens cannot generate/revoke tokens, grant authority or operate replay.</p><p>Public resource GET/POST/PATCH returns a projected record, not the administration <code>{code,data}</code> envelope. Create returns 201/Location/ETag; read/update 200/ETag; delete 204 with no body. List returns <code>{items,hasMore,nextCursor}</code>. A command returns <code>{action,resource,etag,idempotentReplay}</code>; read-only handler output matches its exported schema. Retain <code>X-Request-Id</code> for support, without logging credentials.</p></section>
+<section id="crud"><h2>3. Run office-device CRUD/List and business APIs</h2><p>Save as <code>crud.sh</code>. Set AURABOOT_BASE_URL, AURABOOT_APP_ID and AURABOOT_TOKEN securely, then run <code>bash crud.sh</code> in development. It leaves one assigned device for review and creates/deletes a separate available device. The token needs the operator-defined resource read/write and business execute scopes plus identity scope. Never print the environment or enable shell tracing.</p><pre><code data-language="bash" data-filename="crud.sh">#!/usr/bin/env bash
+set -euo pipefail
+# Requires Bash, curl, jq and Python 3. Never enable shell tracing.
+: &quot;${AURABOOT_BASE_URL:?Set the operator-provided HTTPS origin}&quot;
+: &quot;${AURABOOT_APP_ID:?Set the application ID delivered with the token}&quot;
+: &quot;${AURABOOT_TOKEN:?Load the integration token from your secret manager}&quot;
+BASE=${AURABOOT_BASE_URL%/}
+RESOURCE=office.devices
+TASK_DIR=$(mktemp -d); chmod 700 &quot;$TASK_DIR&quot;; umask 077
+trap &#x27;rm -rf &quot;$TASK_DIR&quot;&#x27; EXIT
+# Production requires HTTPS. Only isolated local development may use loopback HTTP.
+python3 - &lt;&lt;&#x27;CHECK&#x27;
+import os, urllib.parse
+u=urllib.parse.urlsplit(os.environ[&#x27;AURABOOT_BASE_URL&#x27;])
+assert (u.scheme==&#x27;https&#x27; or (u.scheme==&#x27;http&#x27; and u.hostname in (&#x27;localhost&#x27;,&#x27;127.0.0.1&#x27;)))
+assert u.hostname and not u.username and not u.password and not u.query and not u.fragment and u.path in (&#x27;&#x27;,&#x27;/&#x27;)
+t=os.environ[&#x27;AURABOOT_TOKEN&#x27;]; assert t and &#x27;\r&#x27; not in t and &#x27;\n&#x27; not in t
+CHECK
+# Keep the token out of curl&#x27;s command-line arguments and terminal output.
+python3 - &lt;&lt;&#x27;AUTH&#x27; &gt; &quot;$TASK_DIR/auth.headers&quot;
+import os
+print(&#x27;Authorization: Bearer &#x27;+os.environ[&#x27;AURABOOT_TOKEN&#x27;])
+AUTH
+new_key() { python3 -c &#x27;import uuid; print(uuid.uuid4())&#x27;; }
+etag() { awk &#x27;tolower($1)==&quot;etag:&quot; {sub(/\r$/, &quot;&quot;); $1=&quot;&quot;; sub(/^ /, &quot;&quot;); print}&#x27; &quot;$1&quot;; }
+curl --fail-with-body -sS -H @&quot;$TASK_DIR/auth.headers&quot; &quot;$BASE/api/open/v1/whoami&quot; &gt; &quot;$TASK_DIR/identity.json&quot;
+jq -e --arg app &quot;$AURABOOT_APP_ID&quot; &#x27;.applicationPid == $app&#x27; &quot;$TASK_DIR/identity.json&quot; &gt; /dev/null
+# Persist each key, exact body and ETag before a write in a real integration.
+# On uncertain transport failure, repeat the SAME intent. This sample has no auto-retry.
+CREATE_KEY=$(new_key)
+jq -n --arg code &quot;LAPTOP-$(new_key)&quot; &#x27;{assetCode:$code,name:&quot;Office laptop&quot;,location:&quot;HQ&quot;}&#x27; &gt; &quot;$TASK_DIR/create.json&quot;
+curl --fail-with-body -sS -D &quot;$TASK_DIR/create.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $CREATE_KEY&quot; --data-binary @&quot;$TASK_DIR/create.json&quot; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/created.json&quot;
+PID=$(jq -er &#x27;.pid&#x27; &quot;$TASK_DIR/created.json&quot;)
+jq -e &#x27;.status==&quot;available&quot; and .name==&quot;Office laptop&quot;&#x27; &quot;$TASK_DIR/created.json&quot; &gt; /dev/null
+curl --fail-with-body -sS -D &quot;$TASK_DIR/get.headers&quot; -H @&quot;$TASK_DIR/auth.headers&quot; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE/$PID&quot; &gt; &quot;$TASK_DIR/current.json&quot;
+ETAG=$(etag &quot;$TASK_DIR/get.headers&quot;); test -n &quot;$ETAG&quot;
+UPDATE_KEY=$(new_key)
+printf &#x27;%s&#x27; &#x27;{&quot;name&quot;:&quot;Office laptop verified&quot;,&quot;serialNumber&quot;:null}&#x27; &gt; &quot;$TASK_DIR/update.json&quot;
+curl --fail-with-body -sS -X PATCH -D &quot;$TASK_DIR/update.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $UPDATE_KEY&quot; -H &quot;If-Match: $ETAG&quot; \
+ --data-binary @&quot;$TASK_DIR/update.json&quot; &quot;$BASE/api/open/v1/resources/$RESOURCE/$PID&quot; &gt; &quot;$TASK_DIR/updated.json&quot;
+ETAG=$(etag &quot;$TASK_DIR/update.headers&quot;); test -n &quot;$ETAG&quot;
+jq -e &#x27;.name==&quot;Office laptop verified&quot; and .serialNumber==null&#x27; &quot;$TASK_DIR/updated.json&quot; &gt; /dev/null
+# Walk all authorized pages; the cursor is opaque and is not a synchronization watermark.
+CURSOR=&#x27;&#x27;; FOUND=0
+while :; do
+ ARGS=(--data-urlencode &#x27;limit=20&#x27; --data-urlencode &#x27;sort=name&#x27; --data-urlencode &#x27;direction=ASC&#x27;
+       --data-urlencode &#x27;filters=[{&quot;field&quot;:&quot;location&quot;,&quot;operator&quot;:&quot;EQ&quot;,&quot;value&quot;:&quot;HQ&quot;}]&#x27;)
+ if test -n &quot;$CURSOR&quot;; then ARGS+=(--data-urlencode &quot;cursor=$CURSOR&quot;); fi
+ curl --fail-with-body -sS -G -H @&quot;$TASK_DIR/auth.headers&quot; &quot;${ARGS[@]}&quot; \
+  &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/page.json&quot;
+ if jq -e --arg pid &quot;$PID&quot; &#x27;.items | any(.pid==$pid)&#x27; &quot;$TASK_DIR/page.json&quot; &gt; /dev/null; then FOUND=1; fi
+ if test &quot;$(jq -r &#x27;.hasMore&#x27; &quot;$TASK_DIR/page.json&quot;)&quot; = false; then break; fi
+ NEXT=$(jq -er &#x27;.nextCursor | select(length&gt;0)&#x27; &quot;$TASK_DIR/page.json&quot;); test &quot;$NEXT&quot; != &quot;$CURSOR&quot;; CURSOR=$NEXT
+done
+test &quot;$FOUND&quot; = 1
+# Explicit business API: native assignment state transition, same resource ETag and grant.
+ASSIGN_KEY=$(new_key)
+jq -n --arg pid &quot;$PID&quot; --arg person &quot;${AURABOOT_ASSIGNED_TO:-External integration operator}&quot; \
+ &#x27;{targetPid:$pid,input:{assignedTo:$person}}&#x27; &gt; &quot;$TASK_DIR/assign.json&quot;
+curl --fail-with-body -sS -D &quot;$TASK_DIR/assign.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $ASSIGN_KEY&quot; -H &quot;If-Match: $ETAG&quot; --data-binary @&quot;$TASK_DIR/assign.json&quot; \
+ &quot;$BASE/api/open/v1/actions/office.devices.assign:execute&quot; &gt; &quot;$TASK_DIR/assigned.json&quot;
+jq -e &#x27;.resource.status==&quot;in_use&quot; and .idempotentReplay==false&#x27; &quot;$TASK_DIR/assigned.json&quot; &gt; /dev/null
+# A registered no-target, read-only handler counts only one authorized page, not total inventory.
+curl --fail-with-body -sS -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ --data &#x27;{&quot;input&quot;:{&quot;limit&quot;:20}}&#x27; &quot;$BASE/api/open/v1/actions/office.devices.page-summary:execute&quot; &gt; &quot;$TASK_DIR/summary.json&quot;
+jq -e &#x27;.countOnPage&gt;=1 and (.hasMore|type)==&quot;boolean&quot;&#x27; &quot;$TASK_DIR/summary.json&quot; &gt; /dev/null
+# Delete a separate AVAILABLE example; preserve the assigned device as a reviewable business trace.
+jq -n --arg code &quot;TEMP-$(new_key)&quot; &#x27;{assetCode:$code,name:&quot;Temporary office device&quot;,location:&quot;HQ&quot;}&#x27; &gt; &quot;$TASK_DIR/delete-example.json&quot;
+TEMP_KEY=$(new_key)
+curl --fail-with-body -sS -D &quot;$TASK_DIR/temp.headers&quot; -H @&quot;$TASK_DIR/auth.headers&quot; \
+ -H &#x27;Content-Type: application/json&#x27; -H &quot;Idempotency-Key: $TEMP_KEY&quot; \
+ --data-binary @&quot;$TASK_DIR/delete-example.json&quot; &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/temp.json&quot;
+TEMP_PID=$(jq -er &#x27;.pid&#x27; &quot;$TASK_DIR/temp.json&quot;); TEMP_ETAG=$(etag &quot;$TASK_DIR/temp.headers&quot;); test -n &quot;$TEMP_ETAG&quot;
+DELETE_KEY=$(new_key)
+STATUS=$(curl --fail-with-body -sS -X DELETE -o &quot;$TASK_DIR/delete.body&quot; -w &#x27;%{http_code}&#x27; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &quot;Idempotency-Key: $DELETE_KEY&quot; -H &quot;If-Match: $TEMP_ETAG&quot; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE/$TEMP_PID&quot;)
+test &quot;$STATUS&quot; = 204
+printf &#x27;Office CRUD/List, assignment and page summary completed.\n&#x27;
+</code></pre><p>Keep cursor, filters, sorting, direction and page limit unchanged between pages; a changed contract/policy or expired cursor requires starting over. This list is not a stable full-data snapshot. List plus events does not guarantee gap-free synchronization; watermarks, incremental catchup and snapshot boundaries are outside this release.</p><p>Omitted PATCH fields stay unchanged; explicit null clears only nullable writable fields. Preserve the exact quoted resource ETag. For every write, persist a unique key, exact body and applicable ETag before sending; on an ambiguous transport outcome resend that same intent. Keys are installation/route scoped with a 24-hour retention boundary; do not issue a new key until the previous outcome is reconciled. Mismatch/expiry conflicts; successful replay has <code>Idempotent-Replay: true</code>. Authorization is rechecked and replay cannot restore revoked access. A 412 requires reread and business reconciliation, never a blind retry with a newer ETag.</p><p>Business APIs are explicit POST contracts, not internal controller URLs or arbitrary scripts. Assignment uses the bound office resource ETag, current row/field grants, declared effects and native state rules. Read-only handlers have no target, If-Match or Idempotency-Key. Exported NamedQuery APIs remain available where separately published; they accept typed parameters, not SQL. The TypeScript SDK supports direct access-token configuration and resource CRUD/List/query methods; use direct HTTP for the business API calls shown here.</p></section>
+<section id="subscribe"><h2>4. Subscribe to model events</h2><ol><li>The operator publishes the office resource events and grants installation read/row/field authority and the event directory scope.</li><li>Deploy the receiver behind valid HTTPS and retain its signing secret separately from API tokens.</li><li>In the installation card, open <strong>Model notifications</strong>; select the advertised event/schema version, HTTPS endpoint and signing secret. Create subscriptions for created, updated and deleted as required.</li><li>Trigger real CRUD or assignment, inspect delivery status and confirm the event in your durable inbox. A generic test notification does not prove model projection or authority.</li></ol><p><code>GET /api/open/v1/event-catalog</code> lists currently available event contracts with its required scope. Events are <code>open.resource.office.devices.created</code>, <code>.updated</code> and <code>.deleted</code>, schema version 1 in this example. Current publication, source and installation authority is checked for every attempt/replay. Tokens and signing secrets have separate lifecycles.</p><pre><code data-language="http">POST /webhooks/auraboot
+Content-Type: application/json
+X-Webhook-Event: open.resource.office.devices.updated
+X-Webhook-Event-Version: 1
+X-Webhook-Timestamp: 1792020000
+X-Webhook-Delivery: delivery_public_pid
+X-Webhook-Signature: sha256=LOWERCASE_HEX_HMAC
+
+{&quot;id&quot;:&quot;event_public_id&quot;,&quot;type&quot;:&quot;open.resource.office.devices.updated&quot;,&quot;schemaVersion&quot;:1,&quot;occurredAt&quot;:&quot;2026-10-15T00:00:00Z&quot;,&quot;subject&quot;:{&quot;type&quot;:&quot;office.devices&quot;,&quot;pid&quot;:&quot;record_public_pid&quot;},&quot;recordVersion&quot;:2,&quot;correlationId&quot;:&quot;request_correlation&quot;,&quot;data&quot;:{&quot;pid&quot;:&quot;record_public_pid&quot;,&quot;assetCode&quot;:&quot;LAPTOP-001&quot;,&quot;name&quot;:&quot;Office laptop&quot;,&quot;status&quot;:&quot;in_use&quot;,&quot;location&quot;:&quot;HQ&quot;,&quot;assignedTo&quot;:&quot;External integration operator&quot;}}</code></pre><p>Payload contains only currently visible published fields. An omitted field is not a null or an instruction to erase an existing business value. Deleted events contain the projected pre-delete record with a newer version. Delivery is at least once, with possible duplicates and reordering. Retain event IDs and per-record versions/tombstones; versions need not be contiguous. Authorized UI/import/command changes can also produce events. When grants shrink, your own retention policy must remove no-longer-authorized stored data; replay is not a historical permission snapshot.</p></section>
+<section id="verify"><h2>5. Verify and persist notifications</h2><p>Verify <code>sha256=hex(HMAC-SHA256(UTF8(secret), ASCII(timestamp)+b"."+raw_body))</code> before JSON parsing. Compare in constant time and enforce a clock window (sample ±300 seconds). Validate event type, schema, resource identity, version and projected field types. The example below targets the office contract; adapt the whitelist and required fields to your actual export/grants. Keep clocks synchronized. Configure request/body/read timeouts and concurrency at the HTTPS reverse proxy.</p><p>Save as <code>receiver.py</code>. Set stable AURABOOT_CONSUMER_KEY, secret-manager AURABOOT_WEBHOOK_SECRET and an absolute persistent INBOX_DB path. Run <code>python3 receiver.py</code> behind the proxy forwarding only /webhooks/auraboot to loopback 8099, and periodically run <code>python3 receiver.py --drain</code> as a separate worker. Optional AURABOOT_WEBHOOK_PREVIOUS_SECRET requires an explicit Unix AURABOOT_WEBHOOK_PREVIOUS_UNTIL cutoff; remove the old key after rotation.</p><pre><code data-language="python" data-filename="receiver.py">#!/usr/bin/env python3
+&quot;&quot;&quot;Python 3 stdlib office-device receiver and atomic inbox worker; HTTPS proxy required.&quot;&quot;&quot;
+import hashlib, hmac, json, os, sqlite3, stat, sys, time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+DB = os.environ[&#x27;INBOX_DB&#x27;]
+CONSUMER = os.environ[&#x27;AURABOOT_CONSUMER_KEY&#x27;]
+SECRET = os.environ[&#x27;AURABOOT_WEBHOOK_SECRET&#x27;].encode(&#x27;utf-8&#x27;)
+assert os.path.isabs(DB) and CONSUMER and SECRET, &#x27;Persistent absolute DB path and secrets required&#x27;
+RESOURCE = &#x27;office.devices&#x27;
+TYPES = {f&#x27;open.resource.{RESOURCE}.{suffix}&#x27; for suffix in (&#x27;created&#x27;,&#x27;updated&#x27;,&#x27;deleted&#x27;)}
+FIELDS = {&#x27;pid&#x27;,&#x27;assetCode&#x27;,&#x27;name&#x27;,&#x27;status&#x27;,&#x27;location&#x27;,&#x27;serialNumber&#x27;,&#x27;assignedTo&#x27;}
+def connect():
+    # Create private storage and reject an unsafe existing path instead of changing its permissions.
+    try:
+        fd = os.open(DB, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600); os.close(fd)
+    except FileExistsError:
+        info = os.lstat(DB)
+        if not stat.S_ISREG(info.st_mode) or info.st_mode &amp; 0o077:
+            raise ValueError('Inbox storage must be a private regular file')
+    db = sqlite3.connect(DB, timeout=5)
+    db.execute(&#x27;PRAGMA journal_mode=WAL&#x27;)
+    db.execute(&#x27;CREATE TABLE IF NOT EXISTS inbox (consumer TEXT, id TEXT, body BLOB, done INTEGER DEFAULT 0, PRIMARY KEY(consumer,id))&#x27;)
+    db.execute(&#x27;CREATE TABLE IF NOT EXISTS projection (consumer TEXT, resource TEXT, pid TEXT, version INTEGER, deleted INTEGER, data TEXT, PRIMARY KEY(consumer,resource,pid))&#x27;)
+    return db
+
+def validate(event, headers):
+    if not isinstance(event, dict) or event.get(&#x27;type&#x27;) not in TYPES:
+        raise ValueError(&#x27;Unsubscribed event&#x27;)
+    if (headers.get(&#x27;X-Webhook-Event&#x27;) != event[&#x27;type&#x27;] or headers.get(&#x27;X-Webhook-Event-Version&#x27;) != &#x27;1&#x27;
+        or type(event.get(&#x27;schemaVersion&#x27;)) is not int or event[&#x27;schemaVersion&#x27;] != 1
+        or type(event.get(&#x27;recordVersion&#x27;)) is not int or not 1 &lt;= event[&#x27;recordVersion&#x27;] &lt;= 9223372036854775807):
+        raise ValueError(&#x27;Schema or version mismatch&#x27;)
+    subject, data = event.get(&#x27;subject&#x27;), event.get(&#x27;data&#x27;)
+    if not isinstance(subject, dict) or subject.get(&#x27;type&#x27;) != RESOURCE or not isinstance(data, dict):
+        raise ValueError(&#x27;Invalid resource&#x27;)
+    for identity in (event.get(&#x27;id&#x27;), subject.get(&#x27;pid&#x27;)):
+        if not isinstance(identity,str) or not 1 &lt;= len(identity) &lt;= 200 or any(ord(c)&lt;33 for c in identity):
+            raise ValueError(&#x27;Invalid identity&#x27;)
+    if set(data) - FIELDS or data.get(&#x27;pid&#x27;) != subject[&#x27;pid&#x27;]:
+        raise ValueError(&#x27;Unexpected field or identity&#x27;)
+    for key, value in data.items():
+        if value is not None and (not isinstance(value,str) or len(value)&gt;10000):
+            raise ValueError(&#x27;Invalid field type&#x27;)
+    # Adapt required fields to the actual projected contract and current installation policy.
+    if any(key in data and data[key] is None for key in (&#x27;pid&#x27;,&#x27;assetCode&#x27;,&#x27;name&#x27;)):
+        raise ValueError(&#x27;Required field cannot be null&#x27;)
+
+def drain():
+    db = connect()
+    try:
+        while True:
+            with db:
+                db.execute(&#x27;BEGIN IMMEDIATE&#x27;)
+                row = db.execute(&#x27;SELECT id,body FROM inbox WHERE consumer=? AND done=0 ORDER BY rowid LIMIT 1&#x27;, (CONSUMER,)).fetchone()
+                if row is None: return
+                event = json.loads(row[1]); subject = event[&#x27;subject&#x27;]
+                deleted = int(event[&#x27;type&#x27;].endswith(&#x27;.deleted&#x27;))
+                db.execute(&#x27;INSERT INTO projection VALUES (?,?,?,?,?,?) ON CONFLICT(consumer,resource,pid) DO UPDATE SET version=excluded.version,deleted=excluded.deleted,data=excluded.data WHERE excluded.version&gt;projection.version&#x27;,
+                    (CONSUMER,subject[&#x27;type&#x27;],subject[&#x27;pid&#x27;],event[&#x27;recordVersion&#x27;],deleted,json.dumps(event[&#x27;data&#x27;])))
+                db.execute(&#x27;UPDATE inbox SET done=1 WHERE consumer=? AND id=?&#x27;, (CONSUMER,row[0]))
+    finally: db.close()
+
+class Receiver(BaseHTTPRequestHandler):
+    def log_message(self, *_): pass  # Never log bodies, secrets or authorization headers.
+    def do_POST(self):
+        if self.path != &#x27;/webhooks/auraboot&#x27;: self.send_error(404); return
+        try:
+            length = int(self.headers.get(&#x27;Content-Length&#x27;,&#x27;0&#x27;))
+            if not 0 &lt; length &lt;= 1048576: self.send_error(413); return
+            raw = self.rfile.read(length)
+            if len(raw) != length: raise ValueError(&#x27;Incomplete body&#x27;)
+            stamp = self.headers.get(&#x27;X-Webhook-Timestamp&#x27;,&#x27;&#x27;)
+            if not stamp.isascii() or not stamp.isdecimal() or len(stamp)&gt;12 or abs(time.time()-int(stamp))&gt;300:
+                self.send_error(401); return
+            signature = self.headers.get(&#x27;X-Webhook-Signature&#x27;,&#x27;&#x27;)
+            if len(signature)!=71 or not signature.startswith(&#x27;sha256=&#x27;):
+                self.send_error(401); return
+            keys = [SECRET]
+            previous = os.environ.get(&#x27;AURABOOT_WEBHOOK_PREVIOUS_SECRET&#x27;)
+            # Previous signing key is accepted only until an explicit local Unix deadline.
+            if previous and time.time() &lt; int(os.environ[&#x27;AURABOOT_WEBHOOK_PREVIOUS_UNTIL&#x27;]): keys.append(previous.encode(&#x27;utf-8&#x27;))
+            if not any(hmac.compare_digest(signature, &#x27;sha256=&#x27;+hmac.new(k,stamp.encode(&#x27;ascii&#x27;)+b&#x27;.&#x27;+raw,hashlib.sha256).hexdigest()) for k in keys):
+                self.send_error(401); return
+            event = json.loads(raw); validate(event,self.headers)
+            db = connect()
+            try:
+                with db:
+                    old = db.execute(&#x27;SELECT body FROM inbox WHERE consumer=? AND id=?&#x27;, (CONSUMER,event[&#x27;id&#x27;])).fetchone()
+                    if old is not None:
+                        # Same event ID must retain its record identity and version. Projection may narrow on replay.
+                        prior = json.loads(old[0])
+                        if any(prior.get(k)!=event.get(k) for k in (&#x27;type&#x27;,&#x27;subject&#x27;,&#x27;recordVersion&#x27;,&#x27;schemaVersion&#x27;)):
+                            raise ValueError(&#x27;Conflicting duplicate event&#x27;)
+                    else: db.execute(&#x27;INSERT INTO inbox(consumer,id,body) VALUES(?,?,?)&#x27;, (CONSUMER,event[&#x27;id&#x27;],raw))
+            finally: db.close()
+            self.send_response(204); self.end_headers()  # Durable inbox committed before acknowledgement.
+        except (ValueError,UnicodeError,KeyError,TypeError): self.send_error(400)
+        except sqlite3.Error: self.send_error(503)
+
+if __name__==&#x27;__main__&#x27;:
+    if sys.argv[1:]==[&#x27;--drain&#x27;]: drain()
+    elif sys.argv[1:]: raise SystemExit(&#x27;Usage: receiver.py [--drain]&#x27;)
+    else: HTTPServer((&#x27;127.0.0.1&#x27;,int(os.environ.get(&#x27;PORT&#x27;,&#x27;8099&#x27;))),Receiver).serve_forever()
+</code></pre><p>A 204 follows committed inbox storage; storage errors return 503 for retry. Duplicate identity/version is accepted once. The worker atomically updates the latest projected event view and inbox completion, keeps tombstones and ignores older versions. This local event view contains exactly the latest received projection; it is not a full synchronized business record or an erasure protocol. Add your own transactional outbox/idempotency for external business side effects.</p></section>
+<section id="retry"><h2>6. Handle failures and replay</h2><table><thead><tr><th>Result</th><th>External caller action</th></tr></thead><tbody><tr><td>400</td><td>Correct inputs against the exported contract; do not repeatedly resend unchanged invalid data.</td></tr><tr><td>401 / 403</td><td>For direct integration tokens, ask the operator to check expiry, cutoff, revoke, parent status and current grants. Do not attempt an OAuth exchange with that token.</td></tr><tr><td>409 / 412</td><td>Reconcile intent/source/contract conflict or reread concurrent data. Never silently invent a new write key or ETag.</td></tr><tr><td>429</td><td>Honor Retry-After where supplied, apply bounded backoff/jitter and preserve the original write intent.</td></tr><tr><td>Timeout / 5xx</td><td>Bound retries and keep the same write intent; investigate persistent errors with requestId and safe metadata.</td></tr></tbody></table><p>Webhook failures retry with exponential backoff and jitter capped at one hour. maxRetries is the failed-attempt budget, not that many additional attempts. HTTP 4xx/5xx and transport failures consume it; SSRF/configuration or revoked model authority may dead-letter immediately. Redirects are not followed. Return a fast 2xx only after durable acceptance. Per-tenant receiver-origin lanes bound in-flight requests across subscriptions; notification development measurements are not a production throughput/SLO promise.</p><ol><li>Find the failed/dead-letter delivery in the installation log; retain delivery/event IDs, requestId, status and time without secrets or sensitive payloads.</li><li>Repair receiver/database/schema or ask the operator to repair source/publication/grants.</li><li>An authorized operator opens <strong>Replay</strong>, reviews the repeated-side-effect warning and confirms. Machine tokens cannot administer replay.</li><li>Confirm the same event is accepted once in the inbox and the delivery succeeds. Replay does not create a new business event or bypass current authorization.</li></ol><p>Operator route: <code>POST /api/open-platform/installations/{installationPid}/webhook-deliveries/{deliveryPid}/replay</code>, using the administration session and its CSRF policy, with management envelope. Prefer the page. Agree production rate/latency/support and schema compatibility separately.</p></section>
+<section id="oauth"><h2>7. Existing OAuth integrations</h2><p>Existing client-credentials integrations remain supported: POST /oauth2/token with form-encoded grant_type=client_credentials, client_id, client_secret and granted space-separated scope, or use HTTP Basic client authentication without duplicate form credentials. Cache the returned access_token securely and honor expires_in. There is no refresh-token flow; request another client-credentials token. On 401, exchange once and retry the same intent; repeated failures need operator attention. Installation scope edits revoke existing OAuth tokens and require a new exchange. Permanent integration tokens do not change OAuth expiry or requested-scope limits.</p></section><footer>Reference: <a href="/swagger-ui/index.html?urls.primaryName=open-platform">Open Platform API reference</a>. Obtain tenant-specific resource, query and business API contracts from the operator. This public guide contains no credentials.</footer></main></body></html>
