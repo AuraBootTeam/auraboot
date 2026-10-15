@@ -54,7 +54,7 @@ def endpoints_passed():
     return dict(profile='controller-endpoints-http-v1',observations=dict(STATUSES),executed=len(STATUSES),failed=0,skipped=0,
         contracts=[dict(code='office.endpoint.'+name,candidateCode=d[0],adapterCode=d[1],bindingCode=d[2],method=d[3],target=d[4],
             fingerprint='a'*64,openapiSha256='b'*64,typesSha256='c'*64) for name,d in DEFINITIONS.items()],
-        resourceProof=dict(pid='record-pid',created=created,replayed=dict(created),updated=updated,stalePersisted=dict(updated),
+        resourceProof=dict(pid='record-pid',created=created,replayed=dict(created),updated=updated,stalePersisted=dict(updated),deniedPersisted=dict(updated),
             assigned=dict(updated,status='in_use',assignedTo='Endpoint operator'),createReplayHeader='true',commandReplayHeader='true',createdEtag='"v1"',updatedEtag='"v2"'),
         queryProjection=[{'pid':'allowed-pid','name':'Visible'}],hiddenQueryItems=[],unadaptedBlocked=True,expirationModes=['fixed','never'],publishedVersion=1)
 
@@ -1119,6 +1119,7 @@ class EndpointVerifierTest(unittest.TestCase):
             lambda r:r.update(executed=0),lambda r:r.update(skipped=1),lambda r:r['contracts'].pop(),
             lambda r:r['contracts'][0].update(candidateCode='unregistered'),lambda r:r['contracts'][0].update(typesSha256=''),
             lambda r:r['resourceProof']['replayed'].update(pid='different'),lambda r:r['resourceProof'].update(updatedEtag='"v1"'),
+            lambda r:r['resourceProof']['deniedPersisted'].update(serialNumber='Restricted'),
             lambda r:r['resourceProof']['assigned'].update(status='available'),lambda r:r['queryProjection'][0].update(secret='private'),
             lambda r:r.update(hiddenQueryItems=[{'pid':'hidden'}]),lambda r:r.update(unadaptedBlocked=False)]
         for index,mutate in enumerate(mutations):

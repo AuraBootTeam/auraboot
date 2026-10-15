@@ -44,7 +44,7 @@ def verify_endpoint_report(report):
         and proof['assigned'].get('pid')==proof['pid'],'actual CRUD and command result')
     require(proof.get('createReplayHeader')==proof.get('commandReplayHeader')=='true'
         and isinstance(proof.get('createdEtag'),str) and proof['createdEtag'].startswith('"')
-        and proof.get('updatedEtag')!=proof['createdEtag'] and proof.get('stalePersisted')==proof['updated'],'replay and optimistic concurrency')
+        and proof.get('updatedEtag')!=proof['createdEtag'] and proof.get('stalePersisted')==proof['updated'] and proof.get('deniedPersisted')==proof['updated'],'replay and optimistic concurrency')
     require(report.get('queryProjection') and all(set(row)=={'pid','name'} for row in report['queryProjection'])
         and report.get('hiddenQueryItems')==[] and report.get('unadaptedBlocked') is True,'row and projection authority')
     require(report.get('expirationModes')==['fixed','never'] and report.get('publishedVersion')==1,'token and publication identity')
@@ -92,7 +92,7 @@ def run_endpoint_probe(request, admin, *, evidence):
     install,_=human('/api/open-platform/applications/'+app['pid']+'/installations','POST',{'environment':'development','scopes':scopes,'rateLimitPerMinute':10000})
     root='/api/open-platform/installations/'+install['pid']
     policy={'operations':['list','get','create','update','delete'],'readableFields':['pid','assetCode','name','status','location','serialNumber','assignedTo'],
-            'writableFields':['assetCode','name','location','serialNumber','assignedTo'],'rowConstraints':[{'field':'location','values':['HQ']}]}
+            'writableFields':['assetCode','name','location','assignedTo'],'rowConstraints':[{'field':'location','values':['HQ']}]}
     human(root+'/resources/office.devices','PUT',policy)
     human(root+'/actions/office.devices.assign','PUT',{'execute':True,'effectFields':['assignedTo','status']})
     human(root+'/resources/release.dynamic.parts','PUT',{'operations':['list'],'readableFields':['pid','name','zone'],'writableFields':[], 'rowConstraints':[{'field':'zone','values':['A']}]})
@@ -119,8 +119,10 @@ def run_endpoint_probe(request, admin, *, evidence):
     updated_etag=header(updated_headers,'ETag')
     call('stale-update',path('update')+'/'+pid,'PATCH',{'name':'Stale'},dict(machine,**{'Idempotency-Key':'endpoint-stale-'+uuid.uuid4().hex,'If-Match':etag}))
     _,persisted,_=request(path('get')+'/'+pid,headers=machine)
-    for case,body in [('field-denial',{'status':'in_use'}),('row-denial',{'location':'BRANCH'})]:
+    for case,body in [('field-denial',{'serialNumber':'Restricted'}),('row-denial',{'location':'BRANCH'})]:
         call(case,path('update')+'/'+pid,'PATCH',body,dict(machine,**{'Idempotency-Key':'endpoint-deny-'+uuid.uuid4().hex,'If-Match':updated_etag}))
+    _,denied_persisted,_=request(path('get')+'/'+pid,headers=machine)
+    require(denied_persisted==changed,'denied writes must not persist')
     command_intent={'targetPid':pid,'input':{'assignedTo':'Endpoint operator'}}
     command_headers=dict(machine,**{'Idempotency-Key':'endpoint-command-'+uuid.uuid4().hex,'If-Match':updated_etag})
     assigned,assigned_headers=call('command',path('command'),'POST',command_intent,command_headers)
@@ -139,7 +141,7 @@ def run_endpoint_probe(request, admin, *, evidence):
     call('withdrawn-document','/api/open-platform/endpoint-publications/office.endpoint.get/openapi',headers=admin)
     report=dict(profile='controller-endpoints-http-v1',observations=observed,executed=len(observed),failed=0,skipped=0,contracts=contracts,
         resourceProof=dict(pid=pid,created=created,replayed=replayed,updated=changed,assigned=assigned['resource'],createdEtag=etag,updatedEtag=updated_etag,
-            createReplayHeader=header(replay_headers,'Idempotent-Replay'),commandReplayHeader=header(command_replay_headers,'Idempotent-Replay'),stalePersisted=persisted),
+            createReplayHeader=header(replay_headers,'Idempotent-Replay'),commandReplayHeader=header(command_replay_headers,'Idempotent-Replay'),stalePersisted=persisted,deniedPersisted=denied_persisted),
         queryProjection=queried['items'],hiddenQueryItems=hidden['items'],unadaptedBlocked=True,expirationModes=['fixed','never'],publishedVersion=1)
     (evidence/'types-consumer.ts').write_text("""import type { EndpointRequest as Create, EndpointResult as Created } from './office.endpoint.create.js';
 import type { EndpointRequest as Patch } from './office.endpoint.update.js';
