@@ -271,6 +271,23 @@ class CloudConfigServiceImplTest {
     }
 
     @Test
+    void savesFeishuCallbackSecretsThroughExistingEncryption() {
+        CloudConfigSaveRequest request = new CloudConfigSaveRequest();
+        request.setServiceType("im");
+        request.setProviderCode("feishu_bot");
+        request.setConfigLevel("tenant");
+        request.setConfig("{\"encryptKey\":\"callback-key\",\"verificationToken\":\"verify-secret\"}");
+        request.setEnabled(true);
+        when(fieldEncryptionService.encrypt("callback-key")).thenReturn("ENC:callback");
+        when(fieldEncryptionService.encrypt("verify-secret")).thenReturn("ENC:verify");
+        ArgumentCaptor<CloudConfig> config = ArgumentCaptor.forClass(CloudConfig.class);
+        cloudConfigService.saveConfig(request);
+        verify(cloudConfigMapper).insert(config.capture());
+        assertThat(config.getValue().getConfig()).contains("ENC:callback", "ENC:verify")
+                .doesNotContain("callback-key", "verify-secret");
+    }
+
+    @Test
     void saveConfig_encryptsLlmApiKey() {
         CloudConfigSaveRequest request = new CloudConfigSaveRequest();
         request.setServiceType("llm");

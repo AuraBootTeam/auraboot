@@ -104,8 +104,10 @@ public final class AgentTurnOverrides {
     private final List<ToolDefinition> extraTools;
     private final Boolean persistSessionTape;
     private final Set<String> effectivePermissions;
+    private final boolean readOnlyExecution;
 
     private AgentTurnOverrides(Builder b) {
+        this.readOnlyExecution = b.readOnlyExecution;
         this.systemPromptOverride = b.systemPromptOverride;
         this.messagesOverride = b.messagesOverride;
         this.toolDefsOverride = b.toolDefsOverride;
@@ -128,6 +130,9 @@ public final class AgentTurnOverrides {
     /** {@code null} = no server-computed permission boundary supplied. */
     public Set<String> effectivePermissions() { return effectivePermissions; }
 
+    /** Server-imposed capability ceiling; cannot be supplied by a public chat DTO. */
+    public boolean readOnlyExecution() { return readOnlyExecution; }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -139,6 +144,7 @@ public final class AgentTurnOverrides {
         private List<ToolDefinition> extraTools;
         private Boolean persistSessionTape;
         private Set<String> effectivePermissions;
+        private boolean readOnlyExecution;
 
         private Builder() {}
 
@@ -148,6 +154,8 @@ public final class AgentTurnOverrides {
         public Builder extraTools(List<ToolDefinition> v) { this.extraTools = v; return this; }
         public Builder persistSessionTape(Boolean v) { this.persistSessionTape = v; return this; }
         public Builder effectivePermissions(Set<String> v) { this.effectivePermissions = v; return this; }
+
+        public Builder readOnlyExecution(boolean value) { this.readOnlyExecution = value; return this; }
 
         public AgentTurnOverrides build() {
             return new AgentTurnOverrides(this);

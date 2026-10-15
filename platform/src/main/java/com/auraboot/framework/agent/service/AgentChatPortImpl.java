@@ -319,6 +319,18 @@ public class AgentChatPortImpl implements AgentChatPort {
             return new TurnOutcome.Failed(msg, null);
         }
         AgentProfile profile = agentProfileResolver.resolve(objectMapper, agentDef);
+        if (overrides != null && overrides.readOnlyExecution()) {
+            var policy = profile.contextPolicy();
+            var ceiling = policy.capabilityCeiling() == com.auraboot.framework.agent.runtime.policy.ToolCapabilityCeiling.NO_TOOLS
+                    ? policy.capabilityCeiling() : com.auraboot.framework.agent.runtime.policy.ToolCapabilityCeiling.READ_ONLY;
+            var exposure = policy.toolExposure() == com.auraboot.framework.agent.runtime.policy.ToolExposure.ANSWER_ONLY
+                    ? policy.toolExposure() : com.auraboot.framework.agent.runtime.policy.ToolExposure.READ_ONLY_CATALOG;
+            profile = new AgentProfile(profile.agentCode(), profile.profilePermissions(),
+                    new com.auraboot.framework.agent.runtime.policy.AgentContextPolicy(policy.scopes(), false,
+                            ceiling, exposure, com.auraboot.framework.agent.runtime.policy.DurabilityPreference.NONE),
+                    profile.evidenceFirst());
+            recordOverrideUsage("readOnlyExecution");
+        }
 
         // Resolve provider + model from agent definition
         String providerCode = LlmRuntimeResolver.resolveAgentProviderCode(objectMapper, providerFactory, agentDef);
