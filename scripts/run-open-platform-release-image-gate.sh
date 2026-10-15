@@ -232,6 +232,7 @@ python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" plan --root "$STAGE
 BACKEND_GRADLE_HOME="$WORK_ROOT/backend-gradle"
 mkdir -p "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
 cp -a "$GRADLE_DISTRIBUTION_DIR" "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin/"
+BACKEND_RC=0
 timeout 1200 docker run --rm --memory=4g --network "$NET" \
   -v "$STAGE":/source -v "$ARTIFACTS":/artifacts \
   -v "$BACKEND_GRADLE_HOME":/gradle-home -w /source/platform \
@@ -250,10 +251,14 @@ timeout 1200 docker run --rm --memory=4g --network "$NET" \
       -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" \
       -Dorg.gradle.workers.max=1 -PauraTestMaxHeap=1024m -PauraTestMinHeap=128m \
       -PauraTestMaxMetaspace=384m -PspringTestContextCacheMaxSize=1
-  ' > "$ARTIFACTS/logs/backend-tests.log" 2>&1 || fail "backend blocking tests failed"
+  ' > "$ARTIFACTS/logs/backend-tests.log" 2>&1 || BACKEND_RC=$?
 mkdir -p "$ARTIFACTS/backend-junit"
-cp "$STAGE/platform/build/test-results/test/"TEST-*.xml "$ARTIFACTS/backend-junit/"
-chmod 0600 "$ARTIFACTS/backend-junit/"*.xml
+for result in "$STAGE/platform/build/test-results/test/"TEST-*.xml; do
+  [[ -f "$result" ]] || continue
+  cp "$result" "$ARTIFACTS/backend-junit/"
+  chmod 0600 "$ARTIFACTS/backend-junit/$(basename "$result")"
+done
+[[ "$BACKEND_RC" == 0 ]] || fail "backend blocking tests failed (exit $BACKEND_RC); available JUnit evidence retained"
 cp "$STAGE/platform/build/reports/jacoco/test/jacocoTestReport.xml" "$ARTIFACTS/backend-jacoco.xml"
 python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" verify --root "$STAGE" \
   --plan "$ARTIFACTS/backend-plan.json" --results "$ARTIFACTS/backend-junit" \

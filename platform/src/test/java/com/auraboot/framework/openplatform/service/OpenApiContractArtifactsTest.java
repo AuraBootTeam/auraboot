@@ -59,7 +59,16 @@ class OpenApiContractArtifactsTest {
         var collection = doc.path("paths").path("/api/open/v1/resources/fixture.parts");
         var record = doc.path("paths").path("/api/open/v1/resources/fixture.parts/{recordPid}");
         assertThat(collection.size()).isEqualTo(2); assertThat(record.size()).isEqualTo(3);
-        assertThat(collection.path("post").path("security").get(0).path("oauth2ClientCredentials").get(0).asText()).isEqualTo("parts.create");
+        var createSecurity = collection.path("post").path("security");
+        assertThat(createSecurity).hasSize(2);
+        assertThat(createSecurity).containsExactlyInAnyOrder(
+                tree(Map.of("integrationToken", List.of())),
+                tree(Map.of("oauth2ClientCredentials", List.of("parts.create"))));
+        var schemes = doc.path("components").path("securitySchemes");
+        assertThat(schemes.path("integrationToken").path("type").asText()).isEqualTo("http");
+        assertThat(schemes.path("integrationToken").path("scheme").asText()).isEqualTo("bearer");
+        assertThat(schemes.path("oauth2ClientCredentials").path("flows").path("clientCredentials")
+                .path("scopes").has("parts.create")).isTrue();
         assertThat(record.path("patch").path("parameters").toString()).contains("If-Match", "Idempotency-Key", "recordPid");
         assertThat(record.path("delete").path("responses").path("204").has("content")).isFalse();
         assertThat(collection.path("post").path("responses").path("201").path("headers").has("Location")).isTrue();
