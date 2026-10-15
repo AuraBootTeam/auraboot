@@ -1171,7 +1171,7 @@ class QuickAccessUiVerifierTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root,archive=self.fixture(directory)
             result=verify_archive(archive,root=root,expected_ref='a'*40)
-            self.assertEqual((result['browserCases'],result['reviewedOriginalImages'],result['downloadedArtifacts']),(16,104,24))
+            self.assertEqual((result['browserCases'],result['reviewedOriginalImages'],result['downloadedArtifacts']),(16,124,24))
             with self.assertRaises(ProtocolError):verify_archive(archive,root=root,expected_ref='b'*40)
         mutations=[lambda r,f:r['runs'].pop(),lambda r,f:r['sourceHashes'].update({next(iter(r['sourceHashes'])):'0'*64}),
             lambda r,f:r['runs'][0]['images'].pop(),lambda r,f:r['runs'][0]['images'][0]['review'].update(verdict='pending'),

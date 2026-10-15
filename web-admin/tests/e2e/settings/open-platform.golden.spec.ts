@@ -2968,7 +2968,7 @@ test.describe('Public business API management journey', () => {
     await expect(form.getByLabel(text('Registered implementation'), { exact: true })).toBeEnabled();
     await form.getByLabel(text('Registered implementation'), { exact: true }).selectOption(kind === 'command' ? 'command:tasset:assign_asset' : 'handler:core.visible-page');
     await form.getByLabel(text('Execution scope'), { exact: true }).fill(`${code}.execute`);
-    await captureAction(form, 'QAT-06-configured');
+    await captureAction(form.locator('fieldset'), 'QAT-06-configured');
     const save = page.waitForResponse(r => r.url().endsWith(`/action-publications/${code}/draft`) && r.request().method() === 'PUT');
     await form.getByRole('button', { name: text('Save and validate business draft'), exact: true }).click();
     const saved = await save; expect(saved.status()).toBe(200);
@@ -2992,6 +2992,9 @@ test.describe('Public business API management journey', () => {
       } else expect(content).toContain('export type ActionRequest');
       expect(content).not.toContain('tasset_as_'); expect(content).not.toContain('tasset:assign_asset');
     }
+    await form.locator('div.sticky').scrollIntoViewIfNeeded();
+    await expect(form.getByRole('button',{name:text('Download business types'),exact:true})).toBeEnabled();
+    await page.screenshot({path:path.join(evidence,'QAT-06-downloads.png')});
     // Provision the caller fixture through real administration APIs after UI publication.
     const name = `Office business ${kind} ${Date.now()}`;
     const appResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications`, { data: { name } });
@@ -3074,8 +3077,9 @@ test.describe('Adapted Controller endpoint management journey', () => {
     await button(page.getByTestId('action-publication-editor'), 'Publish internal endpoints', '内部接口对外发布').click();
     const editor = page.getByTestId('endpoint-publication-editor'); await expect(editor).toBeVisible();
     await editor.getByText(label('Inspect internal candidates and eligibility','查看内部候选与未开放原因'), { exact: true }).click();
-    await expect(editor.getByText(label('No machine adaptation; direct publication is blocked','尚未登记机器适配，禁止直接开放'), { exact: false }).first()).toBeVisible();
-    await capture(editor, 'CEP-01-catalog');
+    const unsupported = editor.getByText(label('No machine adaptation; direct publication is blocked','尚未登记机器适配，禁止直接开放'), { exact: false }).first();
+    await unsupported.scrollIntoViewIfNeeded(); await expect(unsupported).toBeInViewport();
+    await capture(editor.locator('details'), 'CEP-01-catalog');
     await button(editor, 'New external endpoint','新建外部接口').click();
     const form = editor.getByTestId('endpoint-publication-form');
     await form.getByLabel(label('External endpoint code','外部接口编码'), { exact: true }).fill(code);
@@ -3087,6 +3091,26 @@ test.describe('Adapted Controller endpoint management journey', () => {
     let confirmation = editor.getByRole('group', { name: label('External endpoint confirmation','外部接口操作确认'), exact: true });
     await button(confirmation,'Cancel','取消').click();
     await expect(form.getByLabel(label('External endpoint code','外部接口编码'), { exact: true })).toHaveValue(code);
+    await button(form,'Close endpoint editor','关闭接口编辑').click();
+    await capture(confirmation,'CEP-08-discard-confirmation');
+    await button(confirmation,'Confirm','确认').click(); await expect(form).toHaveCount(0);
+    await button(editor,'New external endpoint','新建外部接口').click();
+    await expect(form.getByLabel(label('External endpoint code','外部接口编码'), {exact:true})).toHaveValue('');
+    await form.getByLabel(label('External endpoint code','外部接口编码'),{exact:true}).fill(code);
+    await form.getByLabel(label('Internal source endpoint','内部来源接口'),{exact:true}).selectOption('dynamic.get');
+    await form.getByLabel(label('Bound public contract','绑定公开合同'),{exact:true}).selectOption('office.devices');
+    await form.getByLabel(label('Endpoint invocation scope','接口调用 Scope'),{exact:true}).fill(`${code}.invoke`);
+    // Controlled failure responses test recovery UI only; successful configuration and calls still use the real server.
+    const sourcePattern = '**/api/open-platform/endpoint-source?*';
+    for (const failure of ['network',403,409] as const) {
+      await page.route(sourcePattern, route => failure === 'network' ? route.abort('failed') : route.fulfill({status:failure,contentType:'application/json',body:JSON.stringify({code:String(failure),message:'Controlled source verification failure'})}),{times:1});
+      await button(form,'Validate source and contract','校验来源与合同').click();
+      await expect(editor.getByRole('alert')).toContainText(failure===403 ? label('management permission','管理权限') : failure===409 ? label('Configuration or source changed','配置或来源已变化') : label('Endpoint configuration failed','接口配置请求失败'));
+      await expect(button(form,'Save endpoint draft','保存接口草稿')).toBeDisabled();
+      if (failure==='network') { await editor.getByRole('alert').scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(evidence,'CEP-07-recovery.png')}); }
+      await page.unroute(sourcePattern);
+      if (failure===403) { await button(editor,'Refresh endpoint catalog','刷新接口目录').click(); await expect(form.getByLabel(label('External endpoint code','外部接口编码'),{exact:true})).toHaveValue(code); }
+    }
     await button(form,'Validate source and contract','校验来源与合同').click();
     await expect(button(form,'Save endpoint draft','保存接口草稿')).toBeEnabled();
     await capture(form, 'CEP-02-configured');
@@ -3110,6 +3134,9 @@ test.describe('Adapted Controller endpoint management journey', () => {
         expect(doc.paths[`/api/open/v1/endpoints/${code}/{recordPid}`].get['x-required-scopes']).toEqual(expect.arrayContaining([`${code}.invoke`,'office.devices.read']));
       } else expect(content).toContain('export type EndpointRequest');
     }
+    await form.locator('div.sticky').scrollIntoViewIfNeeded();
+    await expect(button(form,'Download endpoint types','下载接口类型')).toBeEnabled();
+    await page.screenshot({path:path.join(evidence,'CEP-04-downloads.png')});
     const name = `Office endpoint ${Date.now()}`;
     const appResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications`,{ data:{name} }); expect(appResponse.status()).toBe(200);
     const app = (await appResponse.json()).data;
@@ -3154,6 +3181,6 @@ test.describe('Adapted Controller endpoint management journey', () => {
     await button(confirmation,'Confirm','确认').click(); expect((await withdrawn).status()).toBe(200); expect((await invoke()).status()).toBe(404);
     expect((await page.request.get(`${WEB_BASE_URL}/api/open-platform/endpoint-publications/${code}/openapi`)).status()).toBe(404);
     await writeFile(path.join(evidence,'result.json'),JSON.stringify({profile:'controller-endpoint-browser-v1',locale:publicationLocale,viewport:PUBLICATION_VIEWPORT,
-      executed:['menu-catalog-and-unadapted-denial','source-validation-and-dirty-cancel','draft-save','publish-cancel-confirm','openapi-types-download','ungranted-denial','authority-save-call','reload-persistence','revoke-cancel-confirm-denial','withdraw-cancel-confirm-denial'],passed:true},null,2));
+      executed:['menu-catalog-and-unadapted-denial','source-validation-and-dirty-cancel','dirty-discard-confirm','network-permission-source-recovery','draft-save','publish-cancel-confirm','openapi-types-download','ungranted-denial','authority-save-call','reload-persistence','revoke-cancel-confirm-denial','withdraw-cancel-confirm-denial'],passed:true},null,2));
   });
 });

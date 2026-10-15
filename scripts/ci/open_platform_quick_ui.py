@@ -18,9 +18,9 @@ TITLES = {
 }
 COMBINATIONS = {(locale,viewport) for locale in ('zh-CN','en-US') for viewport in ('desktop','narrow')}
 TOKEN_IMAGES = {'empty','fixed-form','fixed-secret','permanent-form','rotation-form','rotation-secret','revoke-confirmation','revoked'}
-BUSINESS_IMAGES = {'QAT-08-guide-entry','QAT-06-configured','QAT-06-publish-confirmation','QAT-05-authorized','QAT-05-revoke-confirmation','QAT-06-withdraw-confirmation'}
-ENDPOINT_IMAGES = {'CEP-01-catalog','CEP-02-configured','CEP-03-publish-confirmation','CEP-04-authorized','CEP-05-revoke-confirmation','CEP-06-withdraw-confirmation'}
-ENDPOINT_STATES = ['menu-catalog-and-unadapted-denial','source-validation-and-dirty-cancel','draft-save','publish-cancel-confirm','openapi-types-download','ungranted-denial','authority-save-call','reload-persistence','revoke-cancel-confirm-denial','withdraw-cancel-confirm-denial']
+BUSINESS_IMAGES = {'QAT-06-downloads','QAT-08-guide-entry','QAT-06-configured','QAT-06-publish-confirmation','QAT-05-authorized','QAT-05-revoke-confirmation','QAT-06-withdraw-confirmation'}
+ENDPOINT_IMAGES = {'CEP-04-downloads','CEP-07-recovery','CEP-08-discard-confirmation','CEP-01-catalog','CEP-02-configured','CEP-03-publish-confirmation','CEP-04-authorized','CEP-05-revoke-confirmation','CEP-06-withdraw-confirmation'}
+ENDPOINT_STATES = ['menu-catalog-and-unadapted-denial','source-validation-and-dirty-cancel','dirty-discard-confirm','network-permission-source-recovery','draft-save','publish-cancel-confirm','openapi-types-download','ungranted-denial','authority-save-call','reload-persistence','revoke-cancel-confirm-denial','withdraw-cancel-confirm-denial']
 TOKEN_STATES = ['empty','fixed-cancel','fixed-create-and-bearer','reload-redaction','permanent-create-and-bearer',
                 'rotate-immediate-and-bearer','revoke-cancel','revoke-and-bearer','sibling-preserved','reopen-redaction']
 BUSINESS_STATES = ['menu-entry','packaged-guide-entry-and-anonymous-read','source-contract-save','publication-cancel-confirm',
@@ -95,7 +95,7 @@ def verify_archive(archive, *, root, expected_ref):
                         and isinstance(journey.get('executed'),list) and len(journey['executed'])>=9
                         and len(set(journey['executed']))==len(journey['executed']),'executed journey states')
             require(profiles=={('quick-token-browser-v1',None),('business-api-browser-v1','command'),('business-api-browser-v1','handler'),('controller-endpoint-browser-v1',None)},'journey types')
-            images=run.get('images');require(isinstance(images,list) and len(images)==26,'original-image denominator')
+            images=run.get('images');require(isinstance(images,list) and len(images)==31,'original-image denominator')
             base='ui-golden-20260914/'
             expected_images={base+f"quick-token-{run['locale']}-{run['viewport']}/QAT-07-{name}.png" for name in TOKEN_IMAGES}
             expected_images|={base+f"business-api-{run['locale']}-{run['viewport']}-{kind}/{name}.png" for kind in ('command','handler') for name in BUSINESS_IMAGES}
