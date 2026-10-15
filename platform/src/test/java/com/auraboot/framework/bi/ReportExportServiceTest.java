@@ -131,6 +131,72 @@ class ReportExportServiceTest {
     }
 
     @Test
+    void markdownRendersRealGfmCellsWithCjkPipesMultilineAndNulls() {
+        Map<String, Object> emptyContact = new LinkedHashMap<>();
+        emptyContact.put("name", "空联系人");
+        emptyContact.put("contact", null);
+        String markdown = exportMarkdownFixture(Map.of("title", "中文客户报告",
+                "dataSources", Map.of("customers", Map.of("type", "static", "data", List.of(
+                        Map.of("name", "华辰 | 制造", "contact", "张经理\r\n采购部\n<script>"), emptyContact))),
+                "body", List.of(Map.of("blockType", "table", "dataSource", "customers",
+                        "columns", List.of(Map.of("field", "name", "label", "客户名称"),
+                                Map.of("field", "contact", "label", "客户联系人"))))));
+        assertThat(markdown).contains("| 客户名称 | 客户联系人 |\n| --- | --- |\n",
+                "| 华辰 \\| 制造 | 张经理<br>采购部<br>&lt;script&gt; |\n",
+                "| 空联系人 |  |\n").doesNotContain("## table", "<script>", "\n\n| 空联系人");
+    }
+
+    @Test
+    void markdownUsesOnlyExplicitTitlesAndNeverImplementationTypeHeadings() {
+        String markdown = exportMarkdownFixture(Map.of("title", "报告", "dataSources", Map.of(),
+                "body", List.of(Map.of("blockType", "rich-text", "content", "先核对客户。\n再联系采购。"),
+                        Map.of("blockType", "stat-card", "label", "客户数", "value", 2),
+                        Map.of("blockType", "unknown-technical-block"))));
+        assertThat(markdown).contains("# 报告", "先核对客户。", "再联系采购。", "客户数")
+                .doesNotContain("rich-text", "stat-card", "unknown-technical-block", "## Block");
+    }
+
+    @Test
+    void markdownKeepsHeaderSeparatorForAnEmptyTable() {
+        String markdown = exportMarkdownFixture(Map.of("title", "空表", "dataSources", Map.of(),
+                "body", List.of(Map.of("blockType", "table", "title", "客户清单", "columns",
+                        List.of(Map.of("field", "name", "label", "客户名称"))))));
+        assertThat(markdown).contains("## 客户清单\n\n| 客户名称 |\n| --- |\n")
+                .doesNotContain("## table");
+    }
+
+    @Test
+    void markdownRetainsGroupedRowsCrossTabTotalsAndChartValuesWithoutTypeTitles() {
+        String markdown = exportMarkdownFixture(Map.of("title", "交付分析", "dataSources", Map.of("work",
+                Map.of("type", "static", "data", List.of(
+                        Map.of("department", "研发", "stage", "新建", "amount", 2),
+                        Map.of("department", "研发", "stage", "交付", "amount", 3)))),
+                "body", List.of(
+                        Map.of("blockType", "grouped-table", "dataSource", "work", "groupByField", "department",
+                                "columns", List.of(Map.of("field", "stage", "label", "阶段"),
+                                        Map.of("field", "amount", "label", "金额"))),
+                        Map.of("blockType", "cross-tab", "dataSource", "work", "rowField", "department",
+                                "columnField", "stage", "valueField", "amount", "aggregation", "sum"),
+                        Map.of("blockType", "chart", "dataSource", "work", "categoryField", "stage",
+                                "valueField", "amount", "aggregation", "sum"))));
+        assertThat(markdown).contains("### 研发", "| 阶段 | 金额 |\n| --- | --- |",
+                "| 新建 | 2 |", "| Category | 交付 | 新建 | Total |\n| --- | --- | --- | --- |",
+                "| 研发 | 3 | 2 | 5 |", "| Total | 3 | 2 | 5 |", "| Category | Value |\n| --- | --- |",
+                "| 交付 | 3 |")
+                .doesNotContain("## grouped-table", "## cross-tab", "## chart");
+    }
+
+    private String exportMarkdownFixture(Map<String, Object> dsl) {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().valueToTree(dsl).toString());
+        when(reportStorageService.findByPid("md-fixture")).thenReturn(report);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("md-fixture");
+        return new String(reportExportService.exportMarkdown(request).getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    @Test
     void htmlUsesConfiguredRendererAndRecordsSuccessfulArtifactOnly() {
         ReportEntity report = new ReportEntity();
         report.setTenantId(MetaContext.getCurrentTenantId());

@@ -8,6 +8,10 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { navigateToMenuByClick } from '../helpers';
 
 // Existing integrated fixture, intentionally shared with SC05; not AI-generated.
@@ -246,6 +250,37 @@ test('SC06-FORMATS manual customer template persists and exports real Chinese da
     } else {
       text = bytes.toString('utf8');
       expect(text).toMatch(/^# /);
+      expect(text).not.toMatch(
+        /^#{1,6}\s+(?:rich-text|table|grouped-table|cross-tab|stat-card|chart)\s*$/m,
+      );
+      // Parse the actual artifact with the application's GFM libraries. String
+      // containment cannot prove that pipes form a table or rows stay aligned.
+      const markdownHtml = renderToStaticMarkup(
+        createElement(ReactMarkdown, {
+          remarkPlugins: [remarkGfm],
+          children: text,
+        }),
+      );
+      const parsedMarkdown = await page.evaluate((html) => {
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        return Array.from(document.querySelectorAll('table')).map((table) => ({
+          headers: Array.from(table.querySelectorAll('thead th')).map(
+            (cell) => cell.textContent || '',
+          ),
+          rows: Array.from(table.querySelectorAll('tbody tr')).map((row) =>
+            Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent || ''),
+          ),
+        }));
+      }, markdownHtml);
+      expect(parsedMarkdown).toHaveLength(1);
+      expect(parsedMarkdown[0].headers).toEqual(['客户名称', '客户联系人']);
+      expect(parsedMarkdown[0].rows).toHaveLength(customers.length);
+      expect(parsedMarkdown[0].rows.every((row) => row.length === 2)).toBe(true);
+      expect(parsedMarkdown[0].rows).toEqual(
+        expect.arrayContaining(
+          customers.map((customer) => [customer.tpm_cu_name, customer.tpm_cu_contact || '']),
+        ),
+      );
       text = text.replace(/\\([\\`*_{}\[\]()#+.!|<>-])/g, '$1');
     }
     expect(compact(text)).toContain(compact(title));
