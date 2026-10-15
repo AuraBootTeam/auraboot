@@ -149,7 +149,16 @@ test('SC06-PERMISSIONS report artifact grants do not bypass customer source read
       await expect(actor.getByTestId('report-reader-toolbar').filter({ visible: true })).toContainText('只读报表');
       const artifacts: unknown[] = [];
       if (!hasSourceRead) {
-        await assertSourceDenied(queryResponse);
+        expect(queryResponse.status()).toBe(403);
+        // The UI intentionally throws on 403 headers before consuming the Fetch
+        // body (requireReportResponse). Do not wait for that unread browser body.
+        // A separate real request under this same UI-authenticated BFF session
+        // verifies the exact source permission, alongside the UI denial below.
+        const sourceDenied = await actor.request.get('/api/dynamic/tpm_customer/list', {
+          params: { pageNum: '1', pageSize: '500' },
+          headers: { Origin: origin, Referer: actor.url() },
+        });
+        deniedExports.push({ format: 'model-preview', status: sourceDenied.status(), body: await assertSourceDenied(sourceDenied) });
         await expect(actor.getByRole('alert')).toContainText('查询未成功');
         await expect(actor.getByRole('alert')).toContainText('当前账号无权读取');
         await expect(actor.getByRole('alert')).toContainText('当前没有可用结果');
