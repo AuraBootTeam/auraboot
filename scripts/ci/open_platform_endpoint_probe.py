@@ -16,7 +16,7 @@ DEFINITIONS = {
     'query': ('query.execute','query.execute','release.dynamic.by-zone','POST',False),
 }
 STATUSES = {'anonymous':401,'ungranted':403,'wrong-method':404,'fixed-list':200,'permanent-list':200,
-    'create':201,'create-replay':201,'get':200,'update':200,'stale-update':412,'field-denial':403,'row-denial':403,
+    'create':201,'create-replay':201,'get':200,'update':200,'stale-update':412,'field-denial':400,'row-denial':403,
     'command':200,'command-replay':200,'query':200,'query-hidden':200,'underlying-revoked':403,'restored':200,
     'endpoint-revoked':403,'endpoint-restored':200,'delete':204,'deleted':404,'withdrawn':404,'withdrawn-document':404}
 
@@ -44,7 +44,7 @@ def verify_endpoint_report(report):
         and proof['assigned'].get('pid')==proof['pid'],'actual CRUD and command result')
     require(proof.get('createReplayHeader')==proof.get('commandReplayHeader')=='true'
         and isinstance(proof.get('createdEtag'),str) and proof['createdEtag'].startswith('"')
-        and proof.get('updatedEtag')!=proof['createdEtag'] and proof.get('stalePersisted')==proof['updated'] and proof.get('deniedPersisted')==proof['updated'],'replay and optimistic concurrency')
+        and proof.get('updatedEtag')!=proof['createdEtag'] and proof.get('stalePersisted')==proof['updated'] and proof.get('deniedPersisted')==proof['updated'] and proof.get('fieldDenialCode')=='invalid_request','replay and optimistic concurrency')
     require(report.get('queryProjection') and all(set(row)=={'pid','name'} for row in report['queryProjection'])
         and report.get('hiddenQueryItems')==[] and report.get('unadaptedBlocked') is True,'row and projection authority')
     require(report.get('expirationModes')==['fixed','never'] and report.get('publishedVersion')==1,'token and publication identity')
@@ -119,8 +119,12 @@ def run_endpoint_probe(request, admin, *, evidence):
     updated_etag=header(updated_headers,'ETag')
     call('stale-update',path('update')+'/'+pid,'PATCH',{'name':'Stale'},dict(machine,**{'Idempotency-Key':'endpoint-stale-'+uuid.uuid4().hex,'If-Match':etag}))
     _,persisted,_=request(path('get')+'/'+pid,headers=machine)
+    field_denial_code=None
     for case,body in [('field-denial',{'serialNumber':'Restricted'}),('row-denial',{'location':'BRANCH'})]:
-        call(case,path('update')+'/'+pid,'PATCH',body,dict(machine,**{'Idempotency-Key':'endpoint-deny-'+uuid.uuid4().hex,'If-Match':updated_etag}))
+        denied,_=call(case,path('update')+'/'+pid,'PATCH',body,dict(machine,**{'Idempotency-Key':'endpoint-deny-'+uuid.uuid4().hex,'If-Match':updated_etag}))
+        if case=='field-denial':
+            field_denial_code=denied.get('code')
+            require(field_denial_code=='invalid_request' and denied.get('message')=='Input exceeds installation field policy','exact installation field rejection')
     _,denied_persisted,_=request(path('get')+'/'+pid,headers=machine)
     require(denied_persisted==changed,'denied writes must not persist')
     command_intent={'targetPid':pid,'input':{'assignedTo':'Endpoint operator'}}
@@ -141,7 +145,7 @@ def run_endpoint_probe(request, admin, *, evidence):
     call('withdrawn-document','/api/open-platform/endpoint-publications/office.endpoint.get/openapi',headers=admin)
     report=dict(profile='controller-endpoints-http-v1',observations=observed,executed=len(observed),failed=0,skipped=0,contracts=contracts,
         resourceProof=dict(pid=pid,created=created,replayed=replayed,updated=changed,assigned=assigned['resource'],createdEtag=etag,updatedEtag=updated_etag,
-            createReplayHeader=header(replay_headers,'Idempotent-Replay'),commandReplayHeader=header(command_replay_headers,'Idempotent-Replay'),stalePersisted=persisted,deniedPersisted=denied_persisted),
+            createReplayHeader=header(replay_headers,'Idempotent-Replay'),commandReplayHeader=header(command_replay_headers,'Idempotent-Replay'),stalePersisted=persisted,deniedPersisted=denied_persisted,fieldDenialCode=field_denial_code),
         queryProjection=queried['items'],hiddenQueryItems=hidden['items'],unadaptedBlocked=True,expirationModes=['fixed','never'],publishedVersion=1)
     (evidence/'types-consumer.ts').write_text("""import type { EndpointRequest as Create, EndpointResult as Created } from './office.endpoint.create.js';
 import type { EndpointRequest as Patch } from './office.endpoint.update.js';
