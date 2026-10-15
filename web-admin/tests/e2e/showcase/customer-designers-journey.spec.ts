@@ -338,7 +338,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   }
   await info.attach('SC02-model-identity', {
     body: JSON.stringify(
-      { modelCode: code, modelPid: pid, fields: metadata.data, generated: generated.data },
+      { modelCode: code, modelPid: pid, fields: metadata.data, generated: generationBody.data },
       null,
       2,
     ),

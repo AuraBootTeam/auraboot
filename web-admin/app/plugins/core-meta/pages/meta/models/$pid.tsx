@@ -1569,7 +1569,7 @@ export default function ModelDetailPage() {
                           <div className="text-sm font-medium text-gray-900">
                             {getRelatedPageTitle(page, text)}
                           </div>
-                          <div className="mt-1 text-xs text-gray-500">{resolvePageRoute(page)}</div>
+                          <div className="mt-1 text-xs text-gray-500">{resolveModelPageRoute(page)}</div>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                             <span
                               className={`rounded-full px-2 py-1 font-medium ${getPageStatusClass(page)}`}

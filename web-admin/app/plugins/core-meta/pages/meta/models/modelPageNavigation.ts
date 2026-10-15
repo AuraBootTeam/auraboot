@@ -24,6 +24,6 @@ export function resolveModelPageRoute(page: RelatedPage): string {
 }
 
 /** A record-free primary preview should open the list before a form or detail. */
-export function primaryModelPreview(pages: Partial<Record<'list' | 'form' | 'detail', RelatedPage>>) {
+export function primaryModelPreview(pages: Partial<Record<'list' | 'form' | 'detail', RelatedPage | null>>) {
   return pages.list ?? pages.form ?? pages.detail;
 }
