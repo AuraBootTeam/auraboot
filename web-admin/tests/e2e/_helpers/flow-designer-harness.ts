@@ -168,6 +168,9 @@ export async function connectEdge(
   targetNodeId: string,
   sourceHandle?: 'true' | 'false',
 ): Promise<string> {
+  // A compact inspector backdrop consumes the first canvas pointer event.
+  // Dismiss it through the normal UI before measuring and dragging handles.
+  await closeCompactDrawers(page);
   const idsBefore = await currentEdgeIds(page);
   const srcSel = sourceHandle
     ? `[data-testid="node-handle-source-${sourceNodeId}-${sourceHandle}"]`
@@ -195,6 +198,7 @@ export async function connectEdge(
       return fresh || null;
     },
     idsBefore,
+    { timeout: 5_000 },
   );
   return String(await newId.jsonValue());
 }
@@ -347,6 +351,7 @@ async function closeCompactDrawers(page: Page): Promise<void> {
   const backdrop = page.locator('[data-testid="flow-drawer-backdrop"]');
   if (await backdrop.isVisible().catch(() => false)) {
     await backdrop.click();
+    await expect(backdrop).toBeHidden();
   }
 }
 
