@@ -100,6 +100,7 @@ test.describe('Model Fields to Pages Impact E2E', () => {
       await expect(page.getByTestId('field-selection-dialog')).toBeVisible({ timeout: 10_000 });
       await page.getByTestId('field-selection-tab-create').click();
       const dialog = page.getByTestId('field-selection-dialog');
+      await dialog.getByTestId('field-create-display-name').fill('客户跟进备注');
       await dialog.getByPlaceholder('例如: user_name, email, age').fill(`${modelData.code}_ui_added`);
       await dialog.locator('select').first().selectOption('string');
 

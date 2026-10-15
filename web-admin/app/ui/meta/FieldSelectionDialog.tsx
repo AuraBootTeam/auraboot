@@ -17,6 +17,7 @@ import { FieldBindingConfigForm } from './FieldBindingConfigForm';
 import { FieldCreationForm, type FieldCreationFormData } from './FieldCreationForm';
 import { useToastContext } from '~/contexts/ToastContext';
 import { PermissionGuard } from '~/ui/PermissionGuard';
+import { useSmartText } from '~/utils/i18n';
 
 interface FieldSelectionDialogProps {
   isOpen: boolean;
@@ -36,6 +37,8 @@ export function FieldSelectionDialog({
   onFieldBound,
 }: FieldSelectionDialogProps) {
   const { showErrorToast } = useToastContext();
+  const text = useSmartText();
+  const [duplicateCode, setDuplicateCode] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabMode>('select');
@@ -201,6 +204,12 @@ export function FieldSelectionDialog({
     setCreating(true);
     try {
       const { modelPid: _modelPid, ...fieldDefinition } = creationFormData;
+      setDuplicateCode(false);
+      const unique = await fieldLibraryService.checkFieldCodeUnique(fieldDefinition.code);
+      if (!unique) {
+        setDuplicateCode(true);
+        return;
+      }
       // Create the field
       const newField = await fieldLibraryService.createField(fieldDefinition);
 
@@ -235,6 +244,7 @@ export function FieldSelectionDialog({
       setBaseTypeFilter('');
       setSemanticTypeFilter('');
       setCreationFormData(null);
+      setDuplicateCode(false);
       setIsCreationFormValid(false);
       setActiveTab('select');
       onClose();
@@ -508,6 +518,18 @@ export function FieldSelectionDialog({
                   onValidationChange={setIsCreationFormValid}
                   onChange={setCreationFormData}
                 />
+                {duplicateCode && (
+                  <p
+                    role="alert"
+                    data-testid="field-create-duplicate"
+                    className="text-status-red mt-3 text-sm"
+                  >
+                    {text({
+                      zh: '字段编码已存在。请选择已有字段，或更换编码后创建。',
+                      en: 'This field code already exists. Select the existing field or choose a different code.',
+                    })}
+                  </p>
+                )}
               </div>
             )}
           </div>

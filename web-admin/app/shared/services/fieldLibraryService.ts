@@ -219,6 +219,7 @@ export async function createField(
   request: {
     code: string;
     dataType: string;
+    uiSchema?: Record<string, unknown>;
     feature?: {
       required?: boolean;
       unique?: boolean;

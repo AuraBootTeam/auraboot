@@ -1514,6 +1514,7 @@ export function FormPageContent(props: PageContentProps) {
         refTarget?: Record<string, any> | null;
         referenceModelCode?: string;
         extension?: any;
+        uiSchema?: { label?: string };
         required?: boolean;
         feature?: Record<string, any>;
         ruleSchema?: Record<string, any>;
@@ -1527,7 +1528,7 @@ export function FormPageContent(props: PageContentProps) {
         if (fieldsResp && ResultHelper.isSuccess(fieldsResp) && Array.isArray(fieldsResp.data)) {
           const map: Record<string, FieldMetaInfo> = {};
           for (const f of fieldsResp.data) {
-            const displayName = resolveExtensionDisplayName(f.extension, f.code, locale);
+            const displayName = resolveExtensionDisplayName(f.extension, f.code, locale, f.uiSchema?.label);
             // Merge constraints from extension.extension.constraints into feature.validation
             // Plugin imports store constraints (min, max, maxLength, minLength, pattern)
             // in extension.extension.constraints, but mergeFieldValidationRules reads from
@@ -2318,6 +2319,7 @@ export function FormPageContent(props: PageContentProps) {
           refTarget?: Record<string, any> | null;
           referenceModelCode?: string;
           extension?: any;
+          uiSchema?: { label?: string };
         }>
       >(`/api/dynamic/${normalizedModel}/field-meta`, {
         method: 'get',
@@ -2341,7 +2343,7 @@ export function FormPageContent(props: PageContentProps) {
           for (const f of fieldsResp.data) {
             fieldMap[f.code] = {
               dataType: f.dataType,
-              displayName: resolveExtensionDisplayName(f.extension, f.code, locale),
+              displayName: resolveExtensionDisplayName(f.extension, f.code, locale, f.uiSchema?.label),
               dictCode: f.dictCode,
               refTarget: mergeRefTarget(f.refTarget, f.extension?.refTarget),
               referenceModelCode:

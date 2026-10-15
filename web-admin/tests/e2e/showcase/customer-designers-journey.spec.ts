@@ -53,6 +53,9 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     await page.getByTestId('model-fields-add-button').click();
     await page.getByTestId('field-selection-tab-create').click();
     const dialog = page.getByTestId('field-selection-dialog');
+    await dialog
+      .getByTestId('field-create-display-name')
+      .fill(suffix === 'customer_name' ? '客户名称' : '商机金额');
     await dialog.getByPlaceholder('例如: user_name, email, age').fill(`${code}_${suffix}`);
     await dialog.locator('select').first().selectOption(type);
     const bind = page.waitForResponse(
@@ -65,10 +68,30 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     expect(String((await bound.json()).code)).toBe('0');
     await expect(dialog).toBeHidden();
   }
+  await page.getByTestId('model-fields-add-button').click();
+  await page.getByTestId('field-selection-tab-create').click();
+  const invalidDialog = page.getByTestId('field-selection-dialog');
+  await expect(page.getByTestId('field-selection-create-bind')).toBeDisabled();
+  await invalidDialog.getByTestId('field-create-display-name').fill('重复客户名称');
+  await invalidDialog.getByPlaceholder('例如: user_name, email, age').fill('invalid-code');
+  await expect(page.getByTestId('field-selection-create-bind')).toBeDisabled();
+  await invalidDialog.getByPlaceholder('例如: user_name, email, age').fill(`${code}_customer_name`);
+  const duplicate = page.waitForResponse((r) =>
+    r.url().includes(`/api/meta/fields/key/${code}_customer_name/unique`),
+  );
+  await page.getByTestId('field-selection-create-bind').click();
+  expect((await (await duplicate).json()).data).toBe(false);
+  await expect(page.getByTestId('field-create-duplicate')).toBeVisible();
+  await screenshot(page, info, 'SC02-duplicate-field-denied');
+  await invalidDialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(invalidDialog).toBeHidden();
   const fields = await page.request.get(`/api/meta/models/${pid}/fields`);
   expect(fields.ok()).toBe(true);
   const metadata = await fields.json();
   expect(JSON.stringify(metadata.data)).toContain(`${code}_customer_name`);
+  expect(JSON.stringify(metadata.data)).toContain('客户名称');
+  expect(JSON.stringify(metadata.data)).toContain('商机金额');
+  expect(metadata.data).toHaveLength(2);
   expect(JSON.stringify(metadata.data)).toContain(`${code}_opportunity_amount`);
   await page.getByTestId('model-more-actions').click();
   await page.getByTestId('model-publish-action').click();
@@ -98,6 +121,14 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     /Page Unavailable|Page not found|Access forbidden/,
   );
   await screenshot(page, info, 'SC02-generated-page-reopened');
+  await page.goBack();
+  await expect(page.getByTestId('model-primary-page-preview')).toBeVisible();
+  await page.getByTestId('model-primary-page-preview').click();
+  await expect(page.getByRole('columnheader', { name: '客户名称', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '商机金额', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('columnheader', { name: '客户名称', exact: true })).toBeVisible();
+  await screenshot(page, info, 'SC02-runtime-business-labels');
   await info.attach('SC02-model-identity', {
     body: JSON.stringify(
       { modelCode: code, modelPid: pid, fields: metadata.data, generated: generated.data },
@@ -159,13 +190,11 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
       },
     ],
   };
-  await page
-    .getByTestId('designer-import-input')
-    .setInputFiles({
-      name: 'customer.page.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(imported)),
-    });
+  await page.getByTestId('designer-import-input').setInputFiles({
+    name: 'customer.page.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(imported)),
+  });
   await page.getByTestId('outline-item-customer_section_imported').click();
   await page.getByTestId('inspector-field-title').fill('客户经营与交付信息');
   const downloadEvent = page.waitForEvent('download');
@@ -206,13 +235,11 @@ test('SC05-REPORT: design template import, refinement, export and persisted reop
   expect(dsl.title).toBe(title);
   expect(dsl.dataSources.customers.modelCode).toBe('tpm_customer');
   expect(dsl.body).toHaveLength(2);
-  await page
-    .getByTestId('report-template-import-input')
-    .setInputFiles({
-      name: 'invalid.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from('{"format":"not-a-template"}'),
-    });
+  await page.getByTestId('report-template-import-input').setInputFiles({
+    name: 'invalid.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"format":"not-a-template"}'),
+  });
   await expect(page.getByTestId('report-template-error')).toBeVisible();
   await expect(page.getByRole('textbox', { name: '报表标题', exact: true })).toHaveValue(title);
   const save = page.waitForResponse(
