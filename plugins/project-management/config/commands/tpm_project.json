@@ -19,7 +19,9 @@
       "tpm_pj_progress",
       "tpm_pj_customer_id",
       "tpm_pj_notes",
-      "tpm_pj_files"
+      "tpm_pj_files",
+      "tpm_pj_risk_summary",
+      "tpm_pj_next_action"
     ],
     "autoSetFields": {
       "tpm_pj_code": {
@@ -73,7 +75,9 @@
       "tpm_pj_owner_user",
       "tpm_pj_customer_id",
       "tpm_pj_notes",
-      "tpm_pj_files"
+      "tpm_pj_files",
+      "tpm_pj_risk_summary",
+      "tpm_pj_next_action"
     ],
     "permissions": [
       "tpm.project.manage"

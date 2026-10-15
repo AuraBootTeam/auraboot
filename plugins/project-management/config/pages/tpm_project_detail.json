@@ -208,6 +208,14 @@
                   "field": "tpm_pj_notes",
                   "colSpan": 12,
                   "visibleWhen": "!!form.tpm_pj_notes"
+                },
+                {
+                  "field": "tpm_pj_risk_summary",
+                  "colSpan": 12
+                },
+                {
+                  "field": "tpm_pj_next_action",
+                  "colSpan": 12
                 }
               ],
               "extension": {

@@ -146,5 +146,19 @@
     "sequence": 16,
     "visible": true,
     "editable": false
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_risk_summary",
+    "sequence": 17,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_next_action",
+    "sequence": 18,
+    "visible": true,
+    "editable": true
   }
 ]

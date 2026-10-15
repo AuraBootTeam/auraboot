@@ -135,5 +135,82 @@
     ],
     "resourceCode": "tpm_milestone",
     "actionCode": "read"
+  },
+  {
+    "code": "tpm_delivery_brief",
+    "name:zh-CN": "客户项目交付简报",
+    "name:en": "Customer project delivery brief",
+    "description": "Current-space project facts and active owner labels. No AI interpretation.",
+    "resourceCode": "tpm_project",
+    "actionCode": "read",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId"
+      ]
+    },
+    "fromSql": "SELECT p.pid, p.tpm_pj_code AS project_code, p.tpm_pj_name AS project_name, p.tpm_pj_customer AS customer_name, CASE WHEN m.id IS NOT NULL THEN COALESCE(NULLIF(u.nick_name, ''), u.user_name) ELSE '待分配' END AS owner_name, CASE p.tpm_pj_status WHEN 'planning' THEN '需求确认' WHEN 'active' THEN '实施中' WHEN 'acceptance' THEN '待验收' WHEN 'completed' THEN '已交付' WHEN 'on_hold' THEN '已暂停' WHEN 'cancelled' THEN '已取消' ELSE '未分类' END AS delivery_stage, p.tpm_pj_progress AS progress, p.tpm_pj_end_date AS delivery_date, p.tpm_pj_budget AS budget, p.tpm_pj_risk_summary AS risk_summary, p.tpm_pj_next_action AS next_action FROM mt_tpm_project p LEFT JOIN ab_user u ON u.pid = p.tpm_pj_owner_user AND u.deleted_flag = false LEFT JOIN ab_tenant_member m ON m.user_id = u.id AND m.tenant_id = p.tenant_id AND m.status = 'active' AND m.deleted_flag = false WHERE p.tenant_id = #{params.tenantId} AND p.deleted_flag = false ORDER BY p.tpm_pj_end_date ASC, p.tpm_pj_code ASC",
+    "outputFields": [
+      {
+        "code": "pid",
+        "columnExpr": "pid",
+        "dataType": "string"
+      },
+      {
+        "code": "project_code",
+        "columnExpr": "project_code",
+        "dataType": "string"
+      },
+      {
+        "code": "project_name",
+        "columnExpr": "project_name",
+        "dataType": "string"
+      },
+      {
+        "code": "customer_name",
+        "columnExpr": "customer_name",
+        "dataType": "string"
+      },
+      {
+        "code": "owner_name",
+        "columnExpr": "owner_name",
+        "dataType": "string"
+      },
+      {
+        "code": "delivery_stage",
+        "columnExpr": "delivery_stage",
+        "dataType": "string"
+      },
+      {
+        "code": "progress",
+        "columnExpr": "progress",
+        "dataType": "number"
+      },
+      {
+        "code": "delivery_date",
+        "columnExpr": "delivery_date",
+        "dataType": "date"
+      },
+      {
+        "code": "budget",
+        "columnExpr": "budget",
+        "dataType": "number"
+      },
+      {
+        "code": "risk_summary",
+        "columnExpr": "risk_summary",
+        "dataType": "string"
+      },
+      {
+        "code": "next_action",
+        "columnExpr": "next_action",
+        "dataType": "string"
+      }
+    ]
   }
 ]
