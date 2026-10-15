@@ -127,7 +127,7 @@ test('PERF journey: home, menu, search, pagination and persisted CRUD @critical'
   expect(saves).toEqual([]);
   await capture(page, 'PERF-05');
 
-  const recordName = `PERF-UI-${test.info().testId}-${Date.now()}`;
+  const recordName = `性能验收记录 ${new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date())}`;
   await nameInput.fill(recordName);
   await page.getByTestId('form-field-sc_quantity').locator('input').fill('37');
   const createdResponse = page.waitForResponse(
@@ -149,15 +149,20 @@ test('PERF journey: home, menu, search, pagination and persisted CRUD @critical'
   await expect(row).toContainText(recordName);
   await capture(page, 'PERF-06');
   await row.getByTestId('row-action-view').click();
+  await expect(page).toHaveURL(new RegExp(record.pid));
   await expect(page.getByText(recordName, { exact: true }).first()).toBeVisible();
-  expect(page.url()).toContain(record.pid);
   await capture(page, 'PERF-07');
   await menuList(page);
   await search(page, recordName);
-  await row.getByTestId('row-action-edit').click();
+  await row.getByTestId('row-action-more').click();
+  await expect(
+    page.getByTestId('row-action-dropdown').getByTestId('row-action-edit'),
+  ).toBeVisible();
+  await capture(page, 'PERF-13');
+  await page.getByTestId('row-action-dropdown').getByTestId('row-action-edit').click();
   await expect(nameInput).toHaveValue(recordName);
   await capture(page, 'PERF-08');
-  const editedName = `${recordName}-edited`;
+  const editedName = `${recordName}（已更新）`;
   await nameInput.fill(editedName);
   const updatedResponse = page.waitForResponse(
     (r) => new URL(r.url()).pathname === `${command}sc:update_showcase` && r.status() === 200,
@@ -176,14 +181,15 @@ test('PERF journey: home, menu, search, pagination and persisted CRUD @critical'
     .filter({ has: page.getByText(editedName, { exact: true }) });
   await expect(editedRow).toHaveCount(1);
   await capture(page, 'PERF-09');
-  await editedRow.getByTestId('row-action-delete').click();
+  await editedRow.getByTestId('row-action-more').click();
+  await page.getByTestId('row-action-dropdown').getByTestId('row-action-delete').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await capture(page, 'PERF-10');
   const deletedResponse = page.waitForResponse(
     (r) => new URL(r.url()).pathname === `${command}sc:delete_showcase` && r.status() === 200,
   );
-  await dialog.getByRole('button', { name: /删除|确认/ }).click();
+  await dialog.getByTestId('confirm-ok').click();
   expect((await (await deletedResponse).json()).code).toBe('0');
   await page.reload();
   const removed = await search(page, editedName);
