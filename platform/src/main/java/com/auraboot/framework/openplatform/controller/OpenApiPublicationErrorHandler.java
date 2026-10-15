@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Human administration uses the host envelope and explicit recoverable HTTP statuses. */
 @Order(0)
-@RestControllerAdvice(assignableTypes = {OpenApiPublicationController.class, OpenApiQueryPublicationController.class, OpenApiActionPublicationController.class, OpenPlatformManagementController.class})
+@RestControllerAdvice(assignableTypes = {OpenApiPublicationController.class, OpenApiQueryPublicationController.class, OpenApiActionPublicationController.class})
 public class OpenApiPublicationErrorHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> invalid(IllegalArgumentException error) {
@@ -21,7 +21,7 @@ public class OpenApiPublicationErrorHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> malformed() {
-        return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_JSON).body(ApiResponse.error(400, "Open Platform request contains invalid values or types"));
+        return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_JSON).body(ApiResponse.error(400, "Publication request contains invalid values or types"));
     }
 
     @ExceptionHandler(PublicationConflictException.class)
@@ -31,6 +31,6 @@ public class OpenApiPublicationErrorHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> denied() {
-        return ResponseEntity.status(403).contentType(MediaType.APPLICATION_JSON).body(ApiResponse.error(403, "Open Platform management permission required"));
+        return ResponseEntity.status(403).contentType(MediaType.APPLICATION_JSON).body(ApiResponse.error(403, "Open Platform administrator permission required"));
     }
 }
