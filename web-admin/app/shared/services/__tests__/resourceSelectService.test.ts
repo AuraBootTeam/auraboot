@@ -25,6 +25,7 @@ import {
   fetchCommandOptions,
   fetchModelOptions,
   fetchFieldOptions,
+  fetchFieldDictOptions,
   fetchDictOptions,
   fetchSemanticModelOptions,
 } from '../resourceSelectService';
@@ -111,5 +112,29 @@ describe('resourceSelectService — error propagation', () => {
       .mockResolvedValueOnce({ data: { pid: 'model-pid-1' } })
       .mockRejectedValueOnce(new Error('Fields fetch failed'));
     await expect(fetchFieldOptions('order')).rejects.toThrow('Fields fetch failed');
+  });
+});
+
+describe('model field dictionary resolution', () => {
+  beforeEach(() => fetchResultMock.mockReset());
+  it('loads the declared dictionary instead of assuming the field code is a dictionary code', async () => {
+    fetchResultMock.mockResolvedValueOnce({code: '0', data: {pid: 'task-model'}})
+      .mockResolvedValueOnce({code: '0', data: [{code: 'task_state', dataType: 'enum', dictCode: 'task_lifecycle'}]})
+      .mockResolvedValueOnce({code: '0', data: {items: [{value: 'in_review', label: '审核中'}]}});
+    expect(await fetchFieldDictOptions('task', 'task_state')).toEqual([{value: 'in_review', label: '审核中', description: undefined}]);
+    expect(fetchResultMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/meta/models/code/task', '/api/meta/models/task-model/fields',
+      '/api/meta/dict/by-code/task_lifecycle/data',
+    ]);
+  });
+  it('rejects an unbound field without falling back to its field code', async () => {
+    fetchResultMock.mockResolvedValueOnce({data: {pid: 'task-model'}})
+      .mockResolvedValueOnce({data: [{code: 'task_state', dataType: 'enum'}]});
+    await expect(fetchFieldDictOptions('task', 'task_state')).rejects.toThrow('no dictionary');
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+  });
+  it('surfaces a business-error envelope instead of claiming an empty dictionary', async () => {
+    fetchResultMock.mockResolvedValueOnce({code: '1', data: null, context: 'missing dictionary'});
+    await expect(fetchDictOptions('missing')).rejects.toThrow('could not be loaded');
   });
 });
