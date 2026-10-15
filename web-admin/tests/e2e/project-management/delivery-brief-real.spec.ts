@@ -23,6 +23,10 @@ test('delivery brief imports through the designer and exports the same governed 
  await page.getByTestId('report-designer-toolbar-btn-save').click();const saved=await save;expect(saved.status()).toBe(200);
  const body=await saved.json();expect(String(body.code)).toBe('0');const pid=body.data.pid;
  expect(saved.request().postDataJSON().dsl.dataSources.projects.queryCode).toBe('tpm_delivery_brief');
+ await expect(page.getByTestId('report-designer-toolbar-btn-save')).toBeEnabled();
+ await navigateToMenuByClick(page,['元数据管理','报表管理']);
+ await page.getByRole('row').filter({hasText:title}).getByRole('link').click();
+ await expect(page).toHaveURL(new RegExp(`/report-designer/${pid}$`));
  await page.reload();await expect(page.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(title);
  const toolbar=page.getByTestId('report-designer-toolbar');
  const query=page.waitForResponse(r=>r.url().includes('tpm_delivery_brief')&&r.request().method()==='GET');
