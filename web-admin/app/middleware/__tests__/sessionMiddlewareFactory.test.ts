@@ -52,6 +52,8 @@ describe('createSessionMiddleware', () => {
   it('shares only the packaged integration guide without exposing management routes', async () => {
     const { isPublicRoute } = await import('~/middleware/sessionMiddlewareFactory');
     expect(isPublicRoute('/docs/open-platform-integration.html')).toBe(true);
+    expect(isPublicRoute('/docs/open-platform-integration.zh-CN.html')).toBe(true);
+    expect(isPublicRoute('/docs/open-platform-integration.zh-CN.html/private')).toBe(false);
     expect(isPublicRoute('/docs/private.html')).toBe(false);
     expect(isPublicRoute('/settings/api-docs')).toBe(false);
     expect(isPublicRoute('/docs/open-platform-integration.html/private')).toBe(false);

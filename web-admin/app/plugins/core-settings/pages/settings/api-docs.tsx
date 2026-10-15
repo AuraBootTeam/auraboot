@@ -458,14 +458,24 @@ export default function OpenPlatformPage() {
             {t('openPlatform.actions.title', undefined, locale.startsWith('zh') ? '公共业务接口' : 'Public business APIs')}
           </Link>}
           <a
-            href="/docs/open-platform-integration.html"
+            href={locale.startsWith('zh') ? '/docs/open-platform-integration.zh-CN.html' : '/docs/open-platform-integration.html'}
             target="_blank"
             rel="noopener noreferrer"
             data-testid="open-platform-integration-guide"
             className="rounded-control border-border-strong bg-panel text-text inline-flex items-center gap-2 border px-3 py-2 text-sm"
           >
             <ClipboardDocumentIcon className="h-4 w-4" />
-            {t('openPlatform.integrationGuide', undefined, locale.startsWith('zh') ? '接入指南（英文）' : 'Integration guide (English)')}
+            {t('openPlatform.integrationGuide', undefined, locale.startsWith('zh') ? '接入指南（中文）' : 'Integration guide (English)')}
+            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+          </a>
+          <a
+            href={locale.startsWith('zh') ? '/docs/open-platform-integration.html' : '/docs/open-platform-integration.zh-CN.html'}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="open-platform-integration-guide-alternate"
+            className="rounded-control border-border-strong bg-panel text-text inline-flex items-center gap-2 border px-3 py-2 text-sm"
+          >
+            {t('openPlatform.integrationGuideAlternate', undefined, locale.startsWith('zh') ? 'English guide' : '接入指南（中文）')}
             <ArrowTopRightOnSquareIcon className="h-4 w-4" />
           </a>
           <button

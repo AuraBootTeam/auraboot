@@ -1,0 +1,210 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AuraBoot 外部系统接入指南</title><meta name="description" content="使用 appId 和定期或永久 token 接入办公设备 CRUD/List、自定义业务接口与签名事件通知。"><style>
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,sans-serif;line-height:1.65;color:#172034;background:#f5f7fb}*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;background:white;padding:48px clamp(20px,5vw,64px)}h1{font-size:clamp(28px,5vw,42px);line-height:1.15;letter-spacing:-.025em}h2{line-height:1.3;font-size:24px}header p{color:#526078}nav{display:grid;gap:8px;border-left:3px solid #6366f1;padding:12px 20px;margin:28px 0}a{color:#4338ca;text-underline-offset:3px}section{margin:48px 0;scroll-margin-top:24px}p,li,td{overflow-wrap:anywhere}li{margin-bottom:10px}code{font-size:.88em;background:#eef1f7;border-radius:4px;padding:.1em .3em}pre{max-width:100%;overflow:auto;padding:20px;background:#111827;color:#e5e7eb;border-radius:10px;font-size:13px;line-height:1.6;tab-size:4}pre code{background:none;padding:0;font-size:inherit;color:inherit}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #d7ddea;padding:12px 8px}th:first-child{width:25%}footer{border-top:1px solid #d7ddea;padding-top:24px;color:#526078}@media(prefers-color-scheme:dark){:root{background:#0b1020;color:#e5e7eb}main{background:#141b2d}header p,footer{color:#b5bfd3}a{color:#a5b4fc}code{background:#273149}}@media print{main{max-width:none;padding:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}nav{break-inside:avoid}}
+</style></head><body><main><header><p>AuraBoot · 开发者文档 · 简体中文 · <a href="/docs/open-platform-integration.html" lang="en">English</a></p><h1>外部系统接入指南</h1><p>使用 appId 和集成 token，直接调用已发布的 HTTPS 接口。本文以已有的办公设备模型为例，依次完成管理员开通、设备增删改查和列表、设备分配、事件订阅与失败恢复。</p></header>
+<nav aria-label="本文目录"><a href="#prepare">1. 管理员准备与交付</a><a href="#auth">2. 认证与 token 管理</a><a href="#crud">3. 办公设备 CRUD/List 与业务接口</a><a href="#subscribe">4. 订阅模型事件</a><a href="#verify">5. 验签与可靠接收</a><a href="#retry">6. 失败重试、死信与重放</a><a href="#oauth">7. 既有 OAuth 接入</a></nav>
+<section id="prepare"><h2>1. 管理员准备与交付</h2><p><strong>谁来操作：</strong>我们的管理员负责发布接口、创建应用和环境安装、授权及签发 token；外部开发者负责调用接口和部署通知接收端。机器 token 不能管理权限、生成 token 或执行通知重放。</p><ol><li>通过正式插件入口安装 OSS <code>asset-management</code>。在<a href="/p/c/open_platform_publications">公共资源发布</a>中选择设备来源 <code>tasset_asset</code>，以 <code>office.devices</code> 发布，明确字段、五种操作、过滤/排序能力和事件。</li><li>在<a href="/p/c/open_platform_actions">公共业务接口</a>中发布 <code>office.devices.assign</code> 和 <code>office.devices.page-summary</code>，分别绑定原生设备分配命令和已注册只读页面统计 Handler。安装插件不会自动公开接口。</li><li>进入“设置 → <a href="/settings/api-docs">开放平台</a>”，创建外部应用，记录 appId，再为目标环境创建安装。授予 <code>openapi.profile.read</code>、<code>openapi.events.read</code>、<code>office.devices.read</code>、<code>office.devices.write</code>、<code>office.devices.assign.execute</code>、<code>office.devices.page-summary.execute</code>；这些 scope 以本例发布的合同为前提。</li><li>在安装的数据授权中选择允许的操作、可读/可写字段及行范围。本例允许五种操作，除 status/pid 外的字段可写，行范围限定 <code>location = HQ</code>；单独授予设备分配和页面统计业务接口，分配影响字段为 assignedTo/status。</li><li>打开安装的“快捷接入令牌”，填写用途名称，选择定期或永久，生成后通过安全渠道交付仅显示一次的 token。</li></ol><p><strong>交付清单：</strong>HTTPS API 地址、环境、稳定 appId、token、明确到期时间或永久标识、已授权操作/字段/行范围、下载的 OpenAPI/类型合同、支持联系人。本指南可匿名阅读，不包含任何真实凭证。每个环境独立保管凭证，外部服务将其存入服务端密钥管理系统。</p><p><strong>办公设备字段：</strong><code>pid</code> 为服务端生成的只读标识；<code>assetCode</code> 和 <code>name</code> 为必填字符串；<code>location</code>、<code>serialNumber</code>、<code>assignedTo</code> 为可空字符串；<code>status</code> 只读，新设备默认 <code>available</code>。本例允许 location EQ 过滤、name 排序、每页至少 20 条及 created/updated/deleted 事件。设备编号是调用方标签，返回的 PID 才是记录身份。</p><p><code>office.devices.assign</code> 要求字符串 assignedTo，将状态从 available 改为 in_use；必须单独授予其影响字段权限，无需让 status 成为通用可写字段。<code>office.devices.page-summary</code> 接受整数 limit，返回 countOnPage/hasMore，只统计一个授权页面。其他接口合同可以使用不同别名和操作。</p></section>
+<section id="auth"><h2>2. 认证与 token 管理</h2><p>直接发送 <code>Authorization: Bearer &lt;token&gt;</code>，无需 OAuth 换取、额外 appId/租户请求头或 client secret。先调用 <code>GET /api/open/v1/whoami</code>（需要 openapi.profile.read），核对 applicationPid 等于交付的 appId，并确认安装和环境。appId 是公开标识，不能用来切换 token 绑定的租户或环境。</p><p><strong>定期 token：</strong>默认 30 天，管理页可选 1–90 天，服务端允许 1 小时至 90 天。<strong>永久 token：</strong>必须显式选择，无自然到期时间，但仍受轮换截止、撤销、应用/安装状态及当前授权约束。未选择永久模式不会意外生成永久 token。</p><p><strong>轮换：</strong>管理员选择新 token 的定期/永久模式及旧 token 宽限期，默认 24 小时，可选 0（立即截止），最长 7 天。新 token 立即可用，appId 不变。外部在旧 token 截止前替换并验证新 token；定期旧 token 不超过原到期时间，永久旧 token 也会获得有限截止时间。列表显示状态与实际截止时间。</p><p><strong>撤销与撤权：</strong>单独撤销不影响同安装的其他 token；停用应用/安装将阻断所属 token。操作、scope、行或字段授权变化立即影响既有集成 token 的后续请求。已经通过鉴权的在途事务不承诺回滚。</p><p>生成/轮换响应为 no-store，原文只显示一次；关闭或刷新后不能找回。若响应丢失，先检查列表并撤销不确定的 token，再生成替代项。重复管理请求 key 返回冲突，不会重新显示或静默复制密钥。</p><p>公共资源返回投影记录，不使用管理 API 的 <code>{code,data}</code> 包装。创建返回 201/Location/ETag；读取和修改返回 200/ETag；删除返回 204 无正文；列表返回 <code>{items,hasMore,nextCursor}</code>；命令返回 <code>{action,resource,etag,idempotentReplay}</code>；只读 Handler 按导出 schema 返回。保留 X-Request-Id 便于排查，不记录凭证。</p></section>
+<section id="crud"><h2>3. 办公设备 CRUD/List 与业务接口</h2><p>将下列代码保存为 <code>crud.sh</code>。安全设置 AURABOOT_BASE_URL、AURABOOT_APP_ID、AURABOOT_TOKEN，然后在开发环境执行 <code>bash crud.sh</code>。脚本依次验证身份、登记设备、读取/修改、过滤分页、分配设备和页面统计，最后另建并删除一台可用设备；已分配设备保留供检查。需要 Bash、curl、jq、Python 3，以及上节授权。不要输出环境变量或启用 shell tracing。</p><pre><code data-language="bash" data-filename="crud.sh">#!/usr/bin/env bash
+set -euo pipefail
+# Requires Bash, curl, jq and Python 3. Never enable shell tracing.
+: &quot;${AURABOOT_BASE_URL:?Set the operator-provided HTTPS origin}&quot;
+: &quot;${AURABOOT_APP_ID:?Set the application ID delivered with the token}&quot;
+: &quot;${AURABOOT_TOKEN:?Load the integration token from your secret manager}&quot;
+BASE=${AURABOOT_BASE_URL%/}
+RESOURCE=office.devices
+TASK_DIR=$(mktemp -d); chmod 700 &quot;$TASK_DIR&quot;; umask 077
+trap &#x27;rm -rf &quot;$TASK_DIR&quot;&#x27; EXIT
+# Production requires HTTPS. Only isolated local development may use loopback HTTP.
+python3 - &lt;&lt;&#x27;CHECK&#x27;
+import os, urllib.parse
+u=urllib.parse.urlsplit(os.environ[&#x27;AURABOOT_BASE_URL&#x27;])
+assert (u.scheme==&#x27;https&#x27; or (u.scheme==&#x27;http&#x27; and u.hostname in (&#x27;localhost&#x27;,&#x27;127.0.0.1&#x27;)))
+assert u.hostname and not u.username and not u.password and not u.query and not u.fragment and u.path in (&#x27;&#x27;,&#x27;/&#x27;)
+t=os.environ[&#x27;AURABOOT_TOKEN&#x27;]; assert t and &#x27;\r&#x27; not in t and &#x27;\n&#x27; not in t
+CHECK
+# Keep the token out of curl&#x27;s command-line arguments and terminal output.
+python3 - &lt;&lt;&#x27;AUTH&#x27; &gt; &quot;$TASK_DIR/auth.headers&quot;
+import os
+print(&#x27;Authorization: Bearer &#x27;+os.environ[&#x27;AURABOOT_TOKEN&#x27;])
+AUTH
+new_key() { python3 -c &#x27;import uuid; print(uuid.uuid4())&#x27;; }
+etag() { awk &#x27;tolower($1)==&quot;etag:&quot; {sub(/\r$/, &quot;&quot;); $1=&quot;&quot;; sub(/^ /, &quot;&quot;); print}&#x27; &quot;$1&quot;; }
+curl --fail-with-body -sS -H @&quot;$TASK_DIR/auth.headers&quot; &quot;$BASE/api/open/v1/whoami&quot; &gt; &quot;$TASK_DIR/identity.json&quot;
+jq -e --arg app &quot;$AURABOOT_APP_ID&quot; &#x27;.applicationPid == $app&#x27; &quot;$TASK_DIR/identity.json&quot; &gt; /dev/null
+# Persist each key, exact body and ETag before a write in a real integration.
+# On uncertain transport failure, repeat the SAME intent. This sample has no auto-retry.
+CREATE_KEY=$(new_key)
+jq -n --arg code &quot;LAPTOP-$(new_key)&quot; &#x27;{assetCode:$code,name:&quot;Office laptop&quot;,location:&quot;HQ&quot;}&#x27; &gt; &quot;$TASK_DIR/create.json&quot;
+curl --fail-with-body -sS -D &quot;$TASK_DIR/create.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $CREATE_KEY&quot; --data-binary @&quot;$TASK_DIR/create.json&quot; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/created.json&quot;
+PID=$(jq -er &#x27;.pid&#x27; &quot;$TASK_DIR/created.json&quot;)
+jq -e &#x27;.status==&quot;available&quot; and .name==&quot;Office laptop&quot;&#x27; &quot;$TASK_DIR/created.json&quot; &gt; /dev/null
+curl --fail-with-body -sS -D &quot;$TASK_DIR/get.headers&quot; -H @&quot;$TASK_DIR/auth.headers&quot; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE/$PID&quot; &gt; &quot;$TASK_DIR/current.json&quot;
+ETAG=$(etag &quot;$TASK_DIR/get.headers&quot;); test -n &quot;$ETAG&quot;
+UPDATE_KEY=$(new_key)
+printf &#x27;%s&#x27; &#x27;{&quot;name&quot;:&quot;Office laptop verified&quot;,&quot;serialNumber&quot;:null}&#x27; &gt; &quot;$TASK_DIR/update.json&quot;
+curl --fail-with-body -sS -X PATCH -D &quot;$TASK_DIR/update.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $UPDATE_KEY&quot; -H &quot;If-Match: $ETAG&quot; \
+ --data-binary @&quot;$TASK_DIR/update.json&quot; &quot;$BASE/api/open/v1/resources/$RESOURCE/$PID&quot; &gt; &quot;$TASK_DIR/updated.json&quot;
+ETAG=$(etag &quot;$TASK_DIR/update.headers&quot;); test -n &quot;$ETAG&quot;
+jq -e &#x27;.name==&quot;Office laptop verified&quot; and .serialNumber==null&#x27; &quot;$TASK_DIR/updated.json&quot; &gt; /dev/null
+# Walk all authorized pages; the cursor is opaque and is not a synchronization watermark.
+CURSOR=&#x27;&#x27;; FOUND=0
+while :; do
+ ARGS=(--data-urlencode &#x27;limit=20&#x27; --data-urlencode &#x27;sort=name&#x27; --data-urlencode &#x27;direction=ASC&#x27;
+       --data-urlencode &#x27;filters=[{&quot;field&quot;:&quot;location&quot;,&quot;operator&quot;:&quot;EQ&quot;,&quot;value&quot;:&quot;HQ&quot;}]&#x27;)
+ if test -n &quot;$CURSOR&quot;; then ARGS+=(--data-urlencode &quot;cursor=$CURSOR&quot;); fi
+ curl --fail-with-body -sS -G -H @&quot;$TASK_DIR/auth.headers&quot; &quot;${ARGS[@]}&quot; \
+  &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/page.json&quot;
+ if jq -e --arg pid &quot;$PID&quot; &#x27;.items | any(.pid==$pid)&#x27; &quot;$TASK_DIR/page.json&quot; &gt; /dev/null; then FOUND=1; fi
+ if test &quot;$(jq -r &#x27;.hasMore&#x27; &quot;$TASK_DIR/page.json&quot;)&quot; = false; then break; fi
+ NEXT=$(jq -er &#x27;.nextCursor | select(length&gt;0)&#x27; &quot;$TASK_DIR/page.json&quot;); test &quot;$NEXT&quot; != &quot;$CURSOR&quot;; CURSOR=$NEXT
+done
+test &quot;$FOUND&quot; = 1
+# Explicit business API: native assignment state transition, same resource ETag and grant.
+ASSIGN_KEY=$(new_key)
+jq -n --arg pid &quot;$PID&quot; --arg person &quot;${AURABOOT_ASSIGNED_TO:-External integration operator}&quot; \
+ &#x27;{targetPid:$pid,input:{assignedTo:$person}}&#x27; &gt; &quot;$TASK_DIR/assign.json&quot;
+curl --fail-with-body -sS -D &quot;$TASK_DIR/assign.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $ASSIGN_KEY&quot; -H &quot;If-Match: $ETAG&quot; --data-binary @&quot;$TASK_DIR/assign.json&quot; \
+ &quot;$BASE/api/open/v1/actions/office.devices.assign:execute&quot; &gt; &quot;$TASK_DIR/assigned.json&quot;
+jq -e &#x27;.resource.status==&quot;in_use&quot; and .idempotentReplay==false&#x27; &quot;$TASK_DIR/assigned.json&quot; &gt; /dev/null
+# A registered no-target, read-only handler counts only one authorized page, not total inventory.
+curl --fail-with-body -sS -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ --data &#x27;{&quot;input&quot;:{&quot;limit&quot;:20}}&#x27; &quot;$BASE/api/open/v1/actions/office.devices.page-summary:execute&quot; &gt; &quot;$TASK_DIR/summary.json&quot;
+jq -e &#x27;.countOnPage&gt;=1 and (.hasMore|type)==&quot;boolean&quot;&#x27; &quot;$TASK_DIR/summary.json&quot; &gt; /dev/null
+# Delete a separate AVAILABLE example; preserve the assigned device as a reviewable business trace.
+jq -n --arg code &quot;TEMP-$(new_key)&quot; &#x27;{assetCode:$code,name:&quot;Temporary office device&quot;,location:&quot;HQ&quot;}&#x27; &gt; &quot;$TASK_DIR/delete-example.json&quot;
+TEMP_KEY=$(new_key)
+curl --fail-with-body -sS -D &quot;$TASK_DIR/temp.headers&quot; -H @&quot;$TASK_DIR/auth.headers&quot; \
+ -H &#x27;Content-Type: application/json&#x27; -H &quot;Idempotency-Key: $TEMP_KEY&quot; \
+ --data-binary @&quot;$TASK_DIR/delete-example.json&quot; &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/temp.json&quot;
+TEMP_PID=$(jq -er &#x27;.pid&#x27; &quot;$TASK_DIR/temp.json&quot;); TEMP_ETAG=$(etag &quot;$TASK_DIR/temp.headers&quot;); test -n &quot;$TEMP_ETAG&quot;
+DELETE_KEY=$(new_key)
+STATUS=$(curl --fail-with-body -sS -X DELETE -o &quot;$TASK_DIR/delete.body&quot; -w &#x27;%{http_code}&#x27; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &quot;Idempotency-Key: $DELETE_KEY&quot; -H &quot;If-Match: $TEMP_ETAG&quot; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE/$TEMP_PID&quot;)
+test &quot;$STATUS&quot; = 204
+printf &#x27;Office CRUD/List, assignment and page summary completed.\n&#x27;
+</code></pre><p>接口对应关系：POST /resources/office.devices 登记；GET 同一路径查询列表；GET /resources/office.devices/{pid} 读取；PATCH 同一路径修改；DELETE 同一路径删除。所有路径前缀为 <code>/api/open/v1</code>。分配接口为 <code>POST /api/open/v1/actions/office.devices.assign:execute</code>，正文为 <code>{"targetPid":"设备PID","input":{"assignedTo":"员工姓名"}}</code>。</p><p><strong>并发与幂等：</strong>修改、删除、设备分配需带原样保留（含引号）的资源 ETag，作为 If-Match。每次写入前持久保存唯一 Idempotency-Key、精确正文和适用 ETag；超时且结果不明时重发同一次意图，不换 key。key 在安装/路由范围内保留 24 小时；不匹配或过期会冲突，成功重放返回 <code>Idempotent-Replay: true</code>。重放仍检查当前授权。412 必须重新读取并协调业务意图，不能直接换新 ETag 盲重试。PATCH 省略字段不修改，显式 null 只清空允许为空且可写的字段。</p><p><strong>分页边界：</strong>保持过滤、排序、方向和每页条数不变，使用不透明 nextCursor 继续；合同/策略变化或游标过期需重新开始。List 不是稳定全量快照，List 加事件不承诺无损同步；同步水位、增量补拉及快照边界不在本版范围。</p><p>业务接口为显式发布的 POST 合同，不是任意内部 Controller 或在线脚本。分配沿用绑定资源的 ETag、当前行字段权限、声明影响字段及原生状态规则。只读 Handler 不带 targetPid/If-Match/Idempotency-Key。另行发布的 NamedQuery 接受类型化参数，不接受 SQL。TypeScript SDK 支持直接 token 和资源 CRUD/List/query，本例业务接口使用 HTTP。</p></section>
+<section id="subscribe"><h2>4. 订阅模型事件</h2><ol><li>管理员发布设备事件，授予安装读取、行/字段权限和事件目录 scope。</li><li>外部部署有效 HTTPS 接收端，单独保管 Webhook 签名密钥，它不是 API token。</li><li>进入安装卡片的“模型通知”，选择事件/版本、HTTPS 接收地址和签名密钥，按需分别创建新增、修改和删除订阅。</li><li>触发真实 CRUD 或分配，检查投递记录及接收端持久 inbox。通用测试通知不能证明模型字段投影与授权正确。</li></ol><p><code>GET /api/open/v1/event-catalog</code> 返回当前事件合同（需要相应 scope）。本例为 <code>open.resource.office.devices.created</code>、<code>open.resource.office.devices.updated</code>、<code>open.resource.office.devices.deleted</code>，schemaVersion 为 1。每次投递/重放均检查当前发布、来源及安装授权。通知如下：</p><pre><code data-language="http">POST /webhooks/auraboot
+Content-Type: application/json
+X-Webhook-Event: open.resource.office.devices.updated
+X-Webhook-Event-Version: 1
+X-Webhook-Timestamp: 1792020000
+X-Webhook-Delivery: delivery_public_pid
+X-Webhook-Signature: sha256=LOWERCASE_HEX_HMAC
+
+{&quot;id&quot;:&quot;event_public_id&quot;,&quot;type&quot;:&quot;open.resource.office.devices.updated&quot;,&quot;schemaVersion&quot;:1,&quot;occurredAt&quot;:&quot;2026-10-15T00:00:00Z&quot;,&quot;subject&quot;:{&quot;type&quot;:&quot;office.devices&quot;,&quot;pid&quot;:&quot;record_public_pid&quot;},&quot;recordVersion&quot;:2,&quot;correlationId&quot;:&quot;request_correlation&quot;,&quot;data&quot;:{&quot;pid&quot;:&quot;record_public_pid&quot;,&quot;assetCode&quot;:&quot;LAPTOP-001&quot;,&quot;name&quot;:&quot;Office laptop&quot;,&quot;status&quot;:&quot;in_use&quot;,&quot;location&quot;:&quot;HQ&quot;,&quot;assignedTo&quot;:&quot;External integration operator&quot;}}</code></pre><p>正文只包含当前允许的公开字段，字段缺失不等于 null，也不表示清空下游值。删除事件含投影后的删除前记录和更新的版本。通知采用至少一次投递，可能重复、乱序；接收方保存事件 ID、每条记录版本和删除标记，版本不保证连续。经授权的 UI/导入/Command 变更也可能产生事件。权限收窄后，下游按自己的数据保留策略清理不再授权的数据；重放不恢复历史权限。</p></section>
+<section id="verify"><h2>5. 验签与可靠接收</h2><p>解析 JSON 前验证 <code>sha256=hex(HMAC-SHA256(UTF8(secret), ASCII(timestamp)+b"."+raw_body))</code>。使用常量时间比较并限制时间窗口（示例 ±300 秒），保持时钟同步；校验事件类型、schema、资源身份、版本及投影字段类型。下面的白名单针对办公设备，应按实际导出合同和授权调整。HTTPS 反向代理需限制请求体、请求/读取超时及并发。</p><p>保存为 <code>receiver.py</code>，设置稳定的 AURABOOT_CONSUMER_KEY、密钥管理中的 AURABOOT_WEBHOOK_SECRET 和绝对持久路径 INBOX_DB。反向代理仅将 /webhooks/auraboot 转发到 loopback 8099，运行 <code>python3 receiver.py</code>；另一个 worker 定期运行 <code>python3 receiver.py --drain</code>。可选旧签名密钥 AURABOOT_WEBHOOK_PREVIOUS_SECRET 必须配显式 Unix 截止 AURABOOT_WEBHOOK_PREVIOUS_UNTIL，到期移除旧密钥。</p><pre><code data-language="python" data-filename="receiver.py">#!/usr/bin/env python3
+&quot;&quot;&quot;Python 3 stdlib office-device receiver and atomic inbox worker; HTTPS proxy required.&quot;&quot;&quot;
+import hashlib, hmac, json, os, sqlite3, stat, sys, time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+DB = os.environ[&#x27;INBOX_DB&#x27;]
+CONSUMER = os.environ[&#x27;AURABOOT_CONSUMER_KEY&#x27;]
+SECRET = os.environ[&#x27;AURABOOT_WEBHOOK_SECRET&#x27;].encode(&#x27;utf-8&#x27;)
+assert os.path.isabs(DB) and CONSUMER and SECRET, &#x27;Persistent absolute DB path and secrets required&#x27;
+RESOURCE = &#x27;office.devices&#x27;
+TYPES = {f&#x27;open.resource.{RESOURCE}.{suffix}&#x27; for suffix in (&#x27;created&#x27;,&#x27;updated&#x27;,&#x27;deleted&#x27;)}
+FIELDS = {&#x27;pid&#x27;,&#x27;assetCode&#x27;,&#x27;name&#x27;,&#x27;status&#x27;,&#x27;location&#x27;,&#x27;serialNumber&#x27;,&#x27;assignedTo&#x27;}
+def connect():
+    # Create private storage and reject an unsafe existing path instead of changing its permissions.
+    try:
+        fd = os.open(DB, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600); os.close(fd)
+    except FileExistsError:
+        info = os.lstat(DB)
+        if not stat.S_ISREG(info.st_mode) or info.st_mode &amp; 0o077:
+            raise ValueError('Inbox storage must be a private regular file')
+    db = sqlite3.connect(DB, timeout=5)
+    db.execute(&#x27;PRAGMA journal_mode=WAL&#x27;)
+    db.execute(&#x27;CREATE TABLE IF NOT EXISTS inbox (consumer TEXT, id TEXT, body BLOB, done INTEGER DEFAULT 0, PRIMARY KEY(consumer,id))&#x27;)
+    db.execute(&#x27;CREATE TABLE IF NOT EXISTS projection (consumer TEXT, resource TEXT, pid TEXT, version INTEGER, deleted INTEGER, data TEXT, PRIMARY KEY(consumer,resource,pid))&#x27;)
+    return db
+
+def validate(event, headers):
+    if not isinstance(event, dict) or event.get(&#x27;type&#x27;) not in TYPES:
+        raise ValueError(&#x27;Unsubscribed event&#x27;)
+    if (headers.get(&#x27;X-Webhook-Event&#x27;) != event[&#x27;type&#x27;] or headers.get(&#x27;X-Webhook-Event-Version&#x27;) != &#x27;1&#x27;
+        or type(event.get(&#x27;schemaVersion&#x27;)) is not int or event[&#x27;schemaVersion&#x27;] != 1
+        or type(event.get(&#x27;recordVersion&#x27;)) is not int or not 1 &lt;= event[&#x27;recordVersion&#x27;] &lt;= 9223372036854775807):
+        raise ValueError(&#x27;Schema or version mismatch&#x27;)
+    subject, data = event.get(&#x27;subject&#x27;), event.get(&#x27;data&#x27;)
+    if not isinstance(subject, dict) or subject.get(&#x27;type&#x27;) != RESOURCE or not isinstance(data, dict):
+        raise ValueError(&#x27;Invalid resource&#x27;)
+    for identity in (event.get(&#x27;id&#x27;), subject.get(&#x27;pid&#x27;)):
+        if not isinstance(identity,str) or not 1 &lt;= len(identity) &lt;= 200 or any(ord(c)&lt;33 for c in identity):
+            raise ValueError(&#x27;Invalid identity&#x27;)
+    if set(data) - FIELDS or data.get(&#x27;pid&#x27;) != subject[&#x27;pid&#x27;]:
+        raise ValueError(&#x27;Unexpected field or identity&#x27;)
+    for key, value in data.items():
+        if value is not None and (not isinstance(value,str) or len(value)&gt;10000):
+            raise ValueError(&#x27;Invalid field type&#x27;)
+    # Adapt required fields to the actual projected contract and current installation policy.
+    if any(key in data and data[key] is None for key in (&#x27;pid&#x27;,&#x27;assetCode&#x27;,&#x27;name&#x27;)):
+        raise ValueError(&#x27;Required field cannot be null&#x27;)
+
+def drain():
+    db = connect()
+    try:
+        while True:
+            with db:
+                db.execute(&#x27;BEGIN IMMEDIATE&#x27;)
+                row = db.execute(&#x27;SELECT id,body FROM inbox WHERE consumer=? AND done=0 ORDER BY rowid LIMIT 1&#x27;, (CONSUMER,)).fetchone()
+                if row is None: return
+                event = json.loads(row[1]); subject = event[&#x27;subject&#x27;]
+                deleted = int(event[&#x27;type&#x27;].endswith(&#x27;.deleted&#x27;))
+                db.execute(&#x27;INSERT INTO projection VALUES (?,?,?,?,?,?) ON CONFLICT(consumer,resource,pid) DO UPDATE SET version=excluded.version,deleted=excluded.deleted,data=excluded.data WHERE excluded.version&gt;projection.version&#x27;,
+                    (CONSUMER,subject[&#x27;type&#x27;],subject[&#x27;pid&#x27;],event[&#x27;recordVersion&#x27;],deleted,json.dumps(event[&#x27;data&#x27;])))
+                db.execute(&#x27;UPDATE inbox SET done=1 WHERE consumer=? AND id=?&#x27;, (CONSUMER,row[0]))
+    finally: db.close()
+
+class Receiver(BaseHTTPRequestHandler):
+    def log_message(self, *_): pass  # Never log bodies, secrets or authorization headers.
+    def do_POST(self):
+        if self.path != &#x27;/webhooks/auraboot&#x27;: self.send_error(404); return
+        try:
+            length = int(self.headers.get(&#x27;Content-Length&#x27;,&#x27;0&#x27;))
+            if not 0 &lt; length &lt;= 1048576: self.send_error(413); return
+            raw = self.rfile.read(length)
+            if len(raw) != length: raise ValueError(&#x27;Incomplete body&#x27;)
+            stamp = self.headers.get(&#x27;X-Webhook-Timestamp&#x27;,&#x27;&#x27;)
+            if not stamp.isascii() or not stamp.isdecimal() or len(stamp)&gt;12 or abs(time.time()-int(stamp))&gt;300:
+                self.send_error(401); return
+            signature = self.headers.get(&#x27;X-Webhook-Signature&#x27;,&#x27;&#x27;)
+            if len(signature)!=71 or not signature.startswith(&#x27;sha256=&#x27;):
+                self.send_error(401); return
+            keys = [SECRET]
+            previous = os.environ.get(&#x27;AURABOOT_WEBHOOK_PREVIOUS_SECRET&#x27;)
+            # Previous signing key is accepted only until an explicit local Unix deadline.
+            if previous and time.time() &lt; int(os.environ[&#x27;AURABOOT_WEBHOOK_PREVIOUS_UNTIL&#x27;]): keys.append(previous.encode(&#x27;utf-8&#x27;))
+            if not any(hmac.compare_digest(signature, &#x27;sha256=&#x27;+hmac.new(k,stamp.encode(&#x27;ascii&#x27;)+b&#x27;.&#x27;+raw,hashlib.sha256).hexdigest()) for k in keys):
+                self.send_error(401); return
+            event = json.loads(raw); validate(event,self.headers)
+            db = connect()
+            try:
+                with db:
+                    old = db.execute(&#x27;SELECT body FROM inbox WHERE consumer=? AND id=?&#x27;, (CONSUMER,event[&#x27;id&#x27;])).fetchone()
+                    if old is not None:
+                        # Same event ID must retain its record identity and version. Projection may narrow on replay.
+                        prior = json.loads(old[0])
+                        if any(prior.get(k)!=event.get(k) for k in (&#x27;type&#x27;,&#x27;subject&#x27;,&#x27;recordVersion&#x27;,&#x27;schemaVersion&#x27;)):
+                            raise ValueError(&#x27;Conflicting duplicate event&#x27;)
+                    else: db.execute(&#x27;INSERT INTO inbox(consumer,id,body) VALUES(?,?,?)&#x27;, (CONSUMER,event[&#x27;id&#x27;],raw))
+            finally: db.close()
+            self.send_response(204); self.end_headers()  # Durable inbox committed before acknowledgement.
+        except (ValueError,UnicodeError,KeyError,TypeError): self.send_error(400)
+        except sqlite3.Error: self.send_error(503)
+
+if __name__==&#x27;__main__&#x27;:
+    if sys.argv[1:]==[&#x27;--drain&#x27;]: drain()
+    elif sys.argv[1:]: raise SystemExit(&#x27;Usage: receiver.py [--drain]&#x27;)
+    else: HTTPServer((&#x27;127.0.0.1&#x27;,int(os.environ.get(&#x27;PORT&#x27;,&#x27;8099&#x27;))),Receiver).serve_forever()
+</code></pre><p>提交 inbox 后才返回 204，存储失败返回 503 让平台重试。重复事件身份/版本只接受一次。worker 在同一事务中更新最新投影和 inbox 完成状态，保留删除标记并忽略旧版本。它是最近接收事件的本地视图，不是全量同步业务记录或数据擦除协议；外部业务副作用需要自己的事务 outbox/幂等机制。</p></section>
+<section id="retry"><h2>6. 失败重试、死信与重放</h2><table><thead><tr><th>结果</th><th>处理方式</th></tr></thead><tbody><tr><td>400</td><td>按导出合同修正输入，不重复发送相同错误数据。</td></tr><tr><td>401 / 403</td><td>请管理员检查到期、轮换截止、撤销、父状态及当前授权；集成 token 不通过 OAuth 换取恢复。</td></tr><tr><td>409 / 412</td><td>检查意图、来源或合同冲突；并发冲突需重新读取并协调，不静默换 key 或 ETag。</td></tr><tr><td>429</td><td>遵循返回的 Retry-After，做有界退避和抖动，保留原写入意图。</td></tr><tr><td>超时 / 5xx</td><td>有界重试且保持原写入意图；持续失败时提供 requestId 和脱敏元数据排查。</td></tr></tbody></table><p>Webhook 失败采用指数退避和抖动，间隔上限一小时。maxRetries 表示失败尝试总预算，不是额外重试次数；HTTP 4xx/5xx 和传输失败消耗预算，SSRF/配置错误或模型授权撤销可能立即进入死信。不跟随重定向。接收端可靠落盘后尽快返回 2xx。同一租户、同一接收端来源跨订阅限制在途请求，慢端隔离已有验证，但开发测量不是生产吞吐或延迟承诺。</p><ol><li>在安装投递日志中找到失败/死信，记录投递 ID、事件 ID、requestId、状态和时间，不保留密钥或敏感正文。</li><li>修复接收服务、数据库或 schema；来源/发布/授权问题由管理员处理。</li><li>有权限管理员点击“重放”，阅读可能重复产生下游副作用的提示并确认。机器 token 不能管理重放。</li><li>确认投递成功，接收方 inbox 对同一事件只处理一次。重放不生成新业务事件，也不绕过当前授权。</li></ol><p>管理员重放 API 为 <code>POST /api/open-platform/installations/{installationPid}/webhook-deliveries/{deliveryPid}/replay</code>，使用管理登录态和 CSRF 策略，返回管理包装。建议使用管理页。生产频率、延迟、支持方式和版本兼容需另外约定。</p></section>
+<section id="oauth"><h2>7. 既有 OAuth 接入</h2><p>既有 client-credentials 接入继续支持：向 <code>POST /oauth2/token</code> 提交表单 grant_type=client_credentials、client_id、client_secret 和已授予的空格分隔 scope，或使用 HTTP Basic 客户端认证且不重复表单凭据。安全缓存 access_token 并遵循 expires_in。没有 refresh-token 流程，到期重新换取；401 可换取一次并重试原意图，持续失败需管理员处理。安装 scope 修改会撤销已有 OAuth token，需重新换取。永久集成 token 不改变 OAuth 的有效期或请求 scope 上限。</p></section>
+<footer>参考：<a href="/swagger-ui/index.html?urls.primaryName=open-platform">开放平台 API 参考</a> · <a href="/docs/open-platform-integration.html" lang="en">English guide</a> · <a href="/settings/api-docs">返回开放平台管理页</a>。具体资源、查询和业务接口以管理员交付的租户合同为准。</footer></main></body></html>

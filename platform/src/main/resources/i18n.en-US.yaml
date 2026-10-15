@@ -1722,6 +1722,7 @@ openPlatform:
   badge: Machine-to-machine access
   subtitle: Create tenant-scoped applications, grant minimum scopes, rotate credentials, and inspect the unified public API contract.
   integrationGuide: Integration guide (English)
+  integrationGuideAlternate: 接入指南（中文）
   quickStep2: "Grant API authority and generate an expiring or permanent token"
   quickStep3: "Call APIs directly with the Bearer token"
   tokens:

@@ -2947,14 +2947,14 @@ test.describe('Public business API management journey', () => {
     try {
       const guidePopup = page.waitForEvent('popup');
       await page.getByTestId('open-platform-integration-guide').click();
-      const guidePage = await guidePopup; await expect(guidePage.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+      const guidePage = await guidePopup; await expect(guidePage.getByRole('heading', { name: publicationLocale === 'zh-CN' ? '外部系统接入指南' : 'External Integration Guide', exact: true })).toBeVisible();
       await expect(guidePage.locator('code[data-filename="crud.sh"]')).toContainText('AURABOOT_TOKEN');
       await expect(guidePage.locator('code[data-filename="receiver.py"]')).toContainText('BEGIN IMMEDIATE');
       await guidePage.screenshot({ path: path.join(evidence,'QAT-08-guide-entry.png'), fullPage: false });
       const anonymous = await page.context().browser()!.newContext({ storageState: { cookies: [], origins: [] } });
       try {
         const anonymousGuide = await anonymous.newPage(); const response = await anonymousGuide.goto(guidePage.url());
-        expect(response?.status()).toBe(200); await expect(anonymousGuide.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+        expect(response?.status()).toBe(200); await expect(anonymousGuide.getByRole('heading', { name: publicationLocale === 'zh-CN' ? '外部系统接入指南' : 'External Integration Guide', exact: true })).toBeVisible();
       } finally { await anonymous.close(); }
       await guidePage.close();
     } finally { await page.context().setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` }); }
