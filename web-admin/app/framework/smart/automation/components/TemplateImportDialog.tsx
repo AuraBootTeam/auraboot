@@ -24,7 +24,7 @@ function RecordInput({parameter, value, headers, onChange}: {
         return [{value: record.pid, label}];
       });
       options.forEach(option => knownOptions.current.set(option.value, option));
-      setError(options.length ? '' : st({zh: '没有可选择的记录，请先创建记录，或调整搜索条件。', en: 'No records available. Create a record or adjust the search.'}));
+      setError('');
       const selected = valueRef.current ? knownOptions.current.get(valueRef.current) : undefined;
       return selected && !options.some(option => option.value === selected.value) ? [selected, ...options] : options;
     } catch {
