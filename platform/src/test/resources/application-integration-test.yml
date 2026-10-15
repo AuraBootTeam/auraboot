@@ -54,7 +54,9 @@ aura:
 # MyBatis Plus配置
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 不要在此打开 log-impl: StdOutImpl —— 它把每条 SQL 的全行结果直写 stdout,
+    # 真实库集成测试单次即可产生 GB 级 JUnit 报告(2026-10 实测单文件 5.2G)。
+    # 临时排查 SQL 时请本地改完即还原,或用 JUnit 的 @SpringBootTest(properties=...) 按测试类覆盖。
     map-underscore-to-camel-case: true
   global-config:
     db-config:
@@ -112,12 +114,16 @@ database:
   id-type: long
     
 # 日志配置
+# 注意:DEBUG 级别在真实库集成测试里会把租户拦截器的每条 SQL 解析、MyBatis 的
+# SqlSession 获取/释放逐条写入 JUnit 报告,单次运行可膨胀到 GB 级(2026-10 实测)。
+# 排查时用 @SpringBootTest(properties="logging.level.com.auraboot.framework=DEBUG")
+# 按测试类临时覆盖,不要把 DEBUG 提交回这里。
 logging:
   level:
-    com.auraboot.framework: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.cache: DEBUG
-    org.mybatis: DEBUG
+    com.auraboot.framework: INFO
+    org.springframework.security: INFO
+    org.springframework.cache: INFO
+    org.mybatis: INFO
     
 # 测试专用配置
 test:
