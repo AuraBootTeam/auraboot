@@ -50,6 +50,21 @@ class ReportRenderClientTest {
     }
 
     @Test
+    void htmlExportFailsClosedWhenRendererIsNotConfigured() {
+        assertThatThrownBy(() -> client(List.of()).renderHtml(model, Map.of()))
+                .isInstanceOf(ReportRenderException.class).hasMessageContaining("requires the configured report renderer");
+    }
+
+    @Test
+    void htmlExportRequestsHtmlAndRejectsPdfBytes(@TempDir Path dir) throws IOException {
+        Path stub = executableScript(dir, "#!/bin/sh", "cat > /dev/null",
+                "test \"$1\" = --format || exit 8", "test \"$2\" = html || exit 9",
+                "echo '<!doctype html><html>Customer 120</html>' > \"$4\"");
+        byte[] html = client(List.of(stub.toString())).renderHtml(model, Map.of());
+        assertThat(new String(html)).contains("<!doctype html>", "Customer 120");
+    }
+
+    @Test
     void renderPdf_returnsPdfBytes_fromStubRenderer(@TempDir Path dir) throws IOException {
         Path stub = executableScript(dir,
                 "#!/bin/sh",

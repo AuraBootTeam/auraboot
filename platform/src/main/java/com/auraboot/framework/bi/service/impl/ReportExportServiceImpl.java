@@ -185,6 +185,53 @@ public class ReportExportServiceImpl implements ReportExportService {
         return file;
     }
 
+    @Override
+    public ReportExportFile exportMarkdown(ReportExportRequest request) {
+        return exportTextArtifact(request, false);
+    }
+
+    @Override
+    public ReportExportFile exportHtml(ReportExportRequest request) {
+        return exportTextArtifact(request, true);
+    }
+
+    private ReportExportFile exportTextArtifact(ReportExportRequest request, boolean html) {
+        if (request == null || !StringUtils.hasText(request.getReportPid())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "reportPid is required");
+        }
+        Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
+        Map<String, Object> appliedDsl = ReportParameterBindings.apply(reportDsl, request.getParameters());
+        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(appliedDsl);
+        String title = stringValue(reportDsl.get("title"), "report");
+        String format = html ? "html" : "markdown";
+        byte[] bytes;
+        if (html) {
+            bytes = reportRenderClient.renderHtml(reportDsl, dataSets);
+        } else {
+            StringBuilder document = new StringBuilder();
+            for (PdfLine line : renderPdfLines(reportDsl, dataSets, title)) {
+                document.append(line.bold() ? (line.fontSize() >= 16 ? "# " : "## ") : "");
+                document.append(escapeMarkdown(line.text())).append("\n\n");
+            }
+            document.append(escapeMarkdown(brandingProvider.current().generatedByText())).append("\n");
+            bytes = document.toString().getBytes(StandardCharsets.UTF_8);
+        }
+        ReportExportFile file = new ReportExportFile(bytes, safeFilename(title) + (html ? ".html" : ".md"),
+                html ? "text/html;charset=UTF-8" : "text/markdown;charset=UTF-8");
+        recordExportAudit(request.getReportPid(), html ? "EXPORT_HTML" : "EXPORT_MARKDOWN", format, file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(appliedDsl), request.getUsageId(), format);
+        return file;
+    }
+
+    private String escapeMarkdown(String value) {
+        // Source values are data, never executable HTML or model-authored links.
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\\", "\\\\").replace("`", "\\`").replace("*", "\\*")
+                .replace("_", "\\_").replace("[", "\\[").replace("]", "\\]")
+                .replace("#", "\\#").replace("!", "\\!").replace("|", "\\|")
+                .replace("\r", " ").replace("\n", " ");
+    }
+
     /**
      * Phase 3 (DDR-2026-06-21): render the report to a real WYSIWYG PDF (vector
      * charts + running header/footer/watermark) via the Node renderer, falling

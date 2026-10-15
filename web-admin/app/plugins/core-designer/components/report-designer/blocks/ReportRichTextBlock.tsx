@@ -33,6 +33,7 @@ export const ReportRichTextBlock: React.FC<ReportRichTextBlockProps> = ({ block,
 
   return (
     <div style={style} className="text-sm text-gray-700">
+      {block.title && <h2 className="mb-2 font-semibold text-gray-900">{block.title}</h2>}
       {paragraphs.map((p, i) => (
         <p key={i} className="mb-2 last:mb-0">
           {p}

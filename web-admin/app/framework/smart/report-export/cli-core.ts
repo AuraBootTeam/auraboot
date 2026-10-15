@@ -67,3 +67,16 @@ export async function renderRequestToPdf(
     format: request.options?.format,
   });
 }
+
+/** Self-contained HTML uses the identical print projection without launching a browser. */
+export function renderRequestToHtml(requestJson: string): Buffer {
+  const request = JSON.parse(requestJson) as RenderRequest;
+  const blocks = request?.model?.blocks ?? request?.model?.body;
+  if (!request?.model || !Array.isArray(blocks)) {
+    throw new Error('report-export CLI: request.model.blocks[] (or body[]) is required');
+  }
+  return Buffer.from(
+    renderReportToPrintDocument(request.model, request.dataSets ?? {}).html,
+    'utf8',
+  );
+}

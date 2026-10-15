@@ -111,6 +111,42 @@ class ReportExportServiceTest {
     }
 
     @Test
+    void markdownPreservesReportValuesEscapesUntrustedHtmlAndRecordsAudit() {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().valueToTree(Map.of("title", "Customer analysis",
+                "dataSources", Map.of(), "body", List.of(
+                        Map.of("blockType", "rich-text", "title", "Summary",
+                                "content", "Revenue 120 <script>alert(1)</script> [unsafe](https://evil.invalid)")))).toString());
+        when(reportStorageService.findByPid("md-report")).thenReturn(report);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("md-report");
+        ReportExportFile artifact = reportExportService.exportMarkdown(request);
+        String markdown = new String(artifact.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(artifact.getFilename()).isEqualTo("Customer analysis.md");
+        assertThat(artifact.getContentType()).startsWith("text/markdown");
+        assertThat(markdown).contains("# Customer analysis", "## Summary", "Revenue 120", "&lt;script&gt;")
+                .doesNotContain("<script>", "[unsafe](");
+        verify(analyticsReportUsage).exported(eq("md-report"), any(), eq(null), eq("markdown"));
+    }
+
+    @Test
+    void htmlUsesConfiguredRendererAndRecordsSuccessfulArtifactOnly() {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().valueToTree(Map.of("title", "Customer analysis",
+                "dataSources", Map.of(), "body", List.of())).toString());
+        when(reportStorageService.findByPid("html-report")).thenReturn(report);
+        when(reportRenderClient.renderHtml(any(), any())).thenReturn("<!doctype html><html>客户120</html>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("html-report");
+        ReportExportFile artifact = reportExportService.exportHtml(request);
+        assertThat(artifact.getFilename()).isEqualTo("Customer analysis.html");
+        assertThat(new String(artifact.getBytes(), java.nio.charset.StandardCharsets.UTF_8)).contains("客户120");
+        verify(analyticsReportUsage).exported(eq("html-report"), any(), eq(null), eq("html"));
+    }
+
+    @Test
     void unexpectedSourceErrorsDoNotLeakOrRecordSuccessfulExports() {
         ReportEntity report = new ReportEntity();
         report.setTenantId(MetaContext.getCurrentTenantId());
@@ -124,7 +160,8 @@ class ReportExportServiceTest {
         request.setReportPid("broken-report");
         for (java.util.function.Consumer<ReportExportRequest> export :
                 List.<java.util.function.Consumer<ReportExportRequest>>of(reportExportService::exportJson,
-                        reportExportService::exportExcel, reportExportService::exportPdf)) {
+                        reportExportService::exportExcel, reportExportService::exportPdf,
+                        reportExportService::exportMarkdown, reportExportService::exportHtml)) {
             assertThatThrownBy(() -> export.accept(request))
                     .isInstanceOf(com.auraboot.framework.exception.ValidationException.class)
                     .hasMessage("Report data could not be loaded");
