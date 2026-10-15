@@ -162,6 +162,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final SemanticPublishService semanticPublishService;
     private final JdbcTemplate jdbcTemplate;
     private final IdentifierMappingDataMigrator identifierMappingDataMigrator;
+    private final ModelFieldRenameMigrator modelFieldRenameMigrator;
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
@@ -765,15 +766,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             String pluginPid = createOrUpdatePlugin(manifest, tenantId);
             result.setPluginPid(pluginPid);
 
-            // Import resources in dependency order
-            importResources(context, request, result, pluginPid);
-
-            // Plugin rename upgrade contract: when the request carries an
-            // identifier mapping, migrate legacy-identifier physical-table rows
-            // into the freshly imported identifiers before the import commits.
-            // A migration failure fails the whole import so an upgrade is never
-            // half-applied silently.
-            applyIdentifierDataMigration(request, result, tenantId);
+            // V2 plans own only physical DDL deferral; logical required remains unchanged.
+            try (var migration = modelFieldRenameMigrator.prepare(request.getIdentifierMappingPath(),
+                    manifest, tenantId, pluginPid, importId)) {
+                importResources(context, request, result, pluginPid);
+                if (migration.isV2()) result.setFieldMigrations(migration.complete());
+                else applyIdentifierDataMigration(request, result, tenantId);
+            }
 
             // Mark as success
             result.setSuccess(true);
@@ -790,6 +789,9 @@ public class PluginImportServiceImpl implements PluginImportService {
             Map<String, Object> summary = new HashMap<>();
             result.getResourceCounts().forEach((k, v) -> summary.put(k, v));
             history.setResourceSummary(summary);
+            if (result.getFieldMigrations() != null && !result.getFieldMigrations().isEmpty()) {
+                history.setResult(Map.of("modelFieldRenames", result.getFieldMigrations()));
+            }
 
             // Compute plugin quality score
             try {
@@ -1425,6 +1427,8 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (!ImportStatus.SUCCESS.code().equals(history.getStatus())) {
             throw new PluginException("Can only rollback successful imports");
         }
+
+        modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
 
         ImportExecuteResult result = ImportExecuteResult.builder()
                 .importId(importId)

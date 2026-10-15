@@ -15,7 +15,7 @@ import java.util.Set;
 public final class ProductQuoteNativeInitialization {
     static final Map<String, List<String>> FIELDS = Map.of(
             "pr_supplier_common", List.of("pr_supplier_code", "pr_supplier_name", "pr_supplier_status"),
-            "pr_supplier_pcba_contact", List.of("pr_spc_supplier_id", "pr_spc_name", "qo_pr_contact_state"),
+            "pr_supplier_pcba_contact", List.of("pr_spc_supplier_id", "pr_spc_contact_name", "qo_pr_contact_state"),
             "qo_procurement_membership_common", List.of("qo_pr_membership_key", "qo_pr_membership_user_pid",
                     "qo_pr_membership_supplier_pid", "qo_pr_membership_contact_pid", "qo_pr_membership_state"),
             "s2p_sourcing_event", List.of("s2p_se_code", "s2p_se_title", "s2p_se_event_type", "s2p_se_status",

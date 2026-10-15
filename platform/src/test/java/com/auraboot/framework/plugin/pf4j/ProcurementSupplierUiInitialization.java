@@ -18,7 +18,7 @@ final class ProcurementSupplierUiInitialization {
     static final Map<String, List<String>> FIELDS = Map.ofEntries(
             Map.entry("prod_product", List.of("prod_code", "prod_name", "prod_type", "prod_unit", "prod_status")),
             Map.entry("pr_supplier_common", List.of("pr_supplier_code", "pr_supplier_name", "pr_supplier_status", "qo_pr_supplier_account_id")),
-            Map.entry("pr_supplier_pcba_contact", List.of("pr_spc_supplier_id", "pr_spc_name", "qo_pr_contact_state")),
+            Map.entry("pr_supplier_pcba_contact", List.of("pr_spc_supplier_id", "pr_spc_contact_name", "qo_pr_contact_state")),
             Map.entry("qo_procurement_membership_common", List.of("qo_pr_membership_key", "qo_pr_membership_user_pid", "qo_pr_membership_supplier_pid", "qo_pr_membership_contact_pid", "qo_pr_membership_state")),
             Map.entry("pr_spend_category", List.of("pr_spc_code", "pr_spc_name")),
             Map.entry("customer_pcba_int_kingdee_connection", List.of("customer_pcba_kd_profile_name", "customer_pcba_kd_status", "customer_pcba_kd_acct_id", "customer_pcba_kd_base_url", "customer_pcba_kd_app_id", "customer_pcba_kd_username", "customer_pcba_kd_app_secret_ref", "customer_pcba_kd_auth_type")),

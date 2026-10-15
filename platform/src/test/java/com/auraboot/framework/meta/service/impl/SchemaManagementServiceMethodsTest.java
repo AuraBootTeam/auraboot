@@ -522,7 +522,7 @@ class SchemaManagementServiceMethodsTest {
                 .code("corrected_bom_file").columnName("corrected_bom_file")
                 .dataType("string").required(true).virtualType("transient").build();
         String ddl = ReflectionTestUtils.invokeMethod(
-                schemaManagementService, "generateColumnDefinition", transientRequired);
+                schemaManagementService, "generateColumnDefinition", "tb_test", transientRequired);
         assertFalse(ddl.contains("NOT NULL"),
                 "transient required field must not be NOT NULL: " + ddl);
 
@@ -530,7 +530,7 @@ class SchemaManagementServiceMethodsTest {
         FieldDefinition normalRequired = FieldDefinition.builder()
                 .code("name").columnName("name").dataType("string").required(true).build();
         String ddl2 = ReflectionTestUtils.invokeMethod(
-                schemaManagementService, "generateColumnDefinition", normalRequired);
+                schemaManagementService, "generateColumnDefinition", "tb_test", normalRequired);
         assertTrue(ddl2.contains("NOT NULL"),
                 "normal required field must be NOT NULL: " + ddl2);
     }

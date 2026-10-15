@@ -175,7 +175,7 @@ class ProcurementSupplierUiFixtureContractTest {
         @SuppressWarnings("unchecked") var fields = (List<Map<String, Object>>) proof.get("exactFieldWriterAppendix");
         assertFalse(fields.isEmpty());
         for (Map<String, Object> field : fields) assertEquals(List.of("native:write"), json.convertValue(field.get("productionWriters"), List.class));
-        // Two real model owners legitimately reuse pr_spc_name; never grant the other model's writer.
+        // Category and contact fields have distinct codes; never grant the other model's writer.
         Path second = sources.get(1); Files.createDirectories(second.resolve("config/bindings"));
         var movedModels = json.createArrayNode(); var retainedModels = json.createArrayNode();
         for (var model : models) (model.path("code").asText().equals("pr_spend_category") ? movedModels : retainedModels).add(model);
@@ -212,11 +212,15 @@ class ProcurementSupplierUiFixtureContractTest {
         assertThrows(IllegalArgumentException.class, () -> ProcurementSupplierUiInitialization.prepare(sources, root.resolve("unregistered-copy"), json));
         Files.writeString(second.resolve("plugin.json"), json.writeValueAsString(flatManifest));
         @SuppressWarnings("unchecked") var scopedFields = (List<Map<String, Object>>) scoped.get("exactFieldWriterAppendix");
-        var sameCode = scopedFields.stream().filter(f -> f.get("field").equals("pr_spc_name")).toList();
-        assertEquals(2, sameCode.size());
-        for (var field : sameCode) {
+        var scopedNames = scopedFields.stream().filter(f -> Set.of("pr_spc_name", "pr_spc_contact_name").contains(f.get("field"))).toList();
+        assertEquals(2, scopedNames.size());
+        assertEquals(Set.of("pr_spc_name", "pr_spc_contact_name"), scopedNames.stream()
+                .map(field -> field.get("field")).collect(java.util.stream.Collectors.toSet()));
+        for (var field : scopedNames) {
             @SuppressWarnings("unchecked") var targetModels = (List<String>) field.get("models");
             assertEquals(1, targetModels.size());
+            assertEquals(field.get("field").equals("pr_spc_name") ? "pr_spend_category" : "pr_supplier_pcba_contact",
+                    targetModels.getFirst());
             assertEquals(List.of("native:write", ProcurementSupplierUiInitialization.command(targetModels.getFirst())),
                     json.convertValue(field.get("testWriters"), List.class));
         }

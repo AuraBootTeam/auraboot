@@ -562,7 +562,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
             var user=users.signUp(key+"@example.invalid",PASSWORD,"Explicit supplier fixture",key);
             var member=members.addMember(user.getId(),tenant,"active");
             String supplierToken=actorToken(user.getId(),user.getPid(),member.getId(),user.getEmail(),List.of("meta.command.execute","qo.srm.use"));
-            String contact=initializedCreate("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,"pr_spc_name","Order UI supplier","qo_pr_contact_state","active"));
+            String contact=initializedCreate("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,"pr_spc_contact_name","Order UI supplier","qo_pr_contact_state","active"));
             initializedCreate("qo_procurement_membership_common",Map.of("qo_pr_membership_key",key,"qo_pr_membership_user_pid",user.getPid(),
                     "qo_pr_membership_supplier_pid",supplier,"qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active"));
             var line=Map.<String,Object>of("sourcePid",source,"sourceRevision",currentRevision,"unitPrice","1.25","currency","CNY","unit","PCS",

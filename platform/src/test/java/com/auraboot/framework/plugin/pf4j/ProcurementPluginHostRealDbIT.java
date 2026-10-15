@@ -238,7 +238,7 @@ class ProcurementPluginHostRealDbIT {
         String supplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of(
                 "pr_supplier_code",provider,"pr_supplier_name","Verified phone binding fixture","pr_supplier_status","enabled")).get("pid"));
         String contact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",supplier,"pr_spc_name","Verified contact","qo_pr_contact_state","active",
+                "pr_spc_supplier_id",supplier,"pr_spc_contact_name","Verified contact","qo_pr_contact_state","active",
                 "qo_pr_contact_normalized_phone","+86"+phoneNational)).get("pid"));
         var bound=new TransactionTemplate(transactions).execute(status->scope("qo_procurement_membership_common:bind_verified_phone",
                 ()->bindNativeMembership(db,grant)));
@@ -292,7 +292,7 @@ class ProcurementPluginHostRealDbIT {
         String supplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
                 "pr_supplier_name","Binding rollback fixture","pr_supplier_status","enabled")).get("pid"));
         String contact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
-                "pr_spc_name","Binding rollback contact","qo_pr_contact_state","active","qo_pr_contact_normalized_phone",phone)).get("pid"));
+                "pr_spc_contact_name","Binding rollback contact","qo_pr_contact_state","active","qo_pr_contact_normalized_phone",phone)).get("pid"));
         var captured=new java.util.concurrent.atomic.AtomicReference<String>();
         DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
                 (proxy,method,args)->{try {
@@ -326,15 +326,15 @@ class ProcurementPluginHostRealDbIT {
         String localSupplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of(
                 "pr_supplier_code",provider,"pr_supplier_name","Local supplier","pr_supplier_status","enabled")).get("pid"));
         String localContact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",localSupplier,"pr_spc_name","Local same phone","qo_pr_contact_state","active",
+                "pr_spc_supplier_id",localSupplier,"pr_spc_contact_name","Local same phone","qo_pr_contact_state","active",
                 "qo_pr_contact_normalized_phone",phone)).get("pid"));
         // Independent foreign fixture rows use the physical table; they do not seed foreign metadata or enrollment.
         String foreignSupplier=cloneForeignNativeFixture("mt_pr_supplier_common",localSupplier,foreign.getId(),
                 Map.of("pr_supplier_code","foreign-"+provider,"pr_supplier_name","Foreign supplier"));
         String foreignContact=cloneForeignNativeFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
-                Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign same phone"));
+                Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_contact_name","Foreign same phone"));
         String foreignOnlyContact=cloneForeignNativeFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
-                Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign exclusive phone","qo_pr_contact_normalized_phone",foreignOnly));
+                Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_contact_name","Foreign exclusive phone","qo_pr_contact_normalized_phone",foreignOnly));
         try(var c=source.getConnection();var q=c.prepareStatement("SELECT count(*) FROM mt_pr_supplier_pcba_contact WHERE tenant_id=? AND qo_pr_contact_normalized_phone=? AND qo_pr_contact_state='active'")) {
             q.setLong(1,foreign.getId());q.setString(2,phone);
             try(var result=q.executeQuery()){assertTrue(result.next());assertEquals(1,result.getInt(1));}
@@ -563,13 +563,13 @@ class ProcurementPluginHostRealDbIT {
         String supplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of(
                 "pr_supplier_code",provider,"pr_supplier_name","Host phone fixture","pr_supplier_status","enabled")).get("pid"));
         String contact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",supplier,"pr_spc_name","Current contact","qo_pr_contact_state","active",
+                "pr_spc_supplier_id",supplier,"pr_spc_contact_name","Current contact","qo_pr_contact_state","active",
                 "qo_pr_contact_normalized_phone",phone)).get("pid"));
         scope(writer,()->db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
-                "pr_spc_name","Disabled history","qo_pr_contact_state","inactive","qo_pr_contact_normalized_phone",phone)));
+                "pr_spc_contact_name","Disabled history","qo_pr_contact_state","inactive","qo_pr_contact_normalized_phone",phone)));
         assertEquals(contact,scope(writer,()->matchPhone(phone)));
         scope(writer,()->db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
-                "pr_spc_name","Ambiguous active contact","qo_pr_contact_state","active","qo_pr_contact_normalized_phone",phone)));
+                "pr_spc_contact_name","Ambiguous active contact","qo_pr_contact_state","active","qo_pr_contact_normalized_phone",phone)));
         SecurityException conflict=assertThrows(SecurityException.class,()->scope(writer,()->matchPhone(phone)));
         assertEquals("PHONE_OWNERSHIP_CONFLICT",conflict.getMessage());
         scope(writer,()->db.update("pr_supplier_pcba_contact",contact,Map.of("qo_pr_contact_state","inactive")));
@@ -628,7 +628,7 @@ class ProcurementPluginHostRealDbIT {
         String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
                 "pr_supplier_name","Deadline fixture","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)).get("pid"));
         String contact=scope(directory,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",supplier,"pr_spc_name","Deadline contact","qo_pr_contact_state","active")).get("pid"));
+                "pr_spc_supplier_id",supplier,"pr_spc_contact_name","Deadline contact","qo_pr_contact_state","active")).get("pid"));
         // Synthetic bound membership and dispatched quote isolate the deadline/transaction seam.
         scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
                 "qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",supplier,
@@ -1116,7 +1116,7 @@ class ProcurementPluginHostRealDbIT {
         String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code","second-"+provider,
                 "pr_supplier_name","Second lock-order supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)).get("pid"));
         String contact=scope(directory,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",supplier,"pr_spc_name","Second contact","qo_pr_contact_state","active")).get("pid"));
+                "pr_spc_supplier_id",supplier,"pr_spc_contact_name","Second contact","qo_pr_contact_state","active")).get("pid"));
         // Synthetic already-bound membership, separate actual account; no enrollment-policy claim.
         scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
                 "qo_pr_membership_key","second-"+provider,"qo_pr_membership_user_pid",user.getPid(),"qo_pr_membership_supplier_pid",supplier,
@@ -1871,7 +1871,7 @@ class ProcurementPluginHostRealDbIT {
         String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
                 "pr_supplier_name","Shipment fixture","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)).get("pid"));
         String contact=scope(directory,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",supplier,"pr_spc_name","Shipment contact","qo_pr_contact_state","active")).get("pid"));
+                "pr_spc_supplier_id",supplier,"pr_spc_contact_name","Shipment contact","qo_pr_contact_state","active")).get("pid"));
         // Synthetic already-bound supplier fixture; this is not proof of WeChat phone-grant exchange.
         scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
                 "qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",supplier,
@@ -2020,7 +2020,7 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(1,dispatched.size());String quotePid=(String)dispatched.getFirst().get("pid");
         assertEquals(dispatch.supplier(),dispatched.getFirst().get("s2p_bid_supplier_id"));
         String contact=scope("pr_supplier_common:sync_directory",()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",dispatch.supplier(),"pr_spc_name","Buyer linked contact","qo_pr_contact_state","active")).get("pid"));
+                "pr_spc_supplier_id",dispatch.supplier(),"pr_spc_contact_name","Buyer linked contact","qo_pr_contact_state","active")).get("pid"));
         // Initial trusted binding does not prove WeChat identity/phone admission.
         scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
                 "qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",dispatch.supplier(),

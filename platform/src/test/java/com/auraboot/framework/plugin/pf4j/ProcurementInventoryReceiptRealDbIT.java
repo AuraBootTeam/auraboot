@@ -209,7 +209,7 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         var supplierMember=members.addMember(supplierUser.getId(),tenant,"active");
         String supplierToken=actorToken(supplierUser.getId(),supplierUser.getPid(),supplierMember.getId(),email,List.of("meta.command.execute","qo.srm.use"));
         String contact=directoryInitialize("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
-                "pr_spc_name","Local supplier contact","qo_pr_contact_state","active"));
+                "pr_spc_contact_name","Local supplier contact","qo_pr_contact_state","active"));
         directoryInitialize("qo_procurement_membership_common",Map.of("qo_pr_membership_key",provider,
                 "qo_pr_membership_user_pid",supplierUser.getPid(),"qo_pr_membership_supplier_pid",supplier,
                 "qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active"));

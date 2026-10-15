@@ -696,7 +696,7 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         var supplierMember = members.addMember(supplierUser.getId(), tenant, "active");
         String supplierJwt = actorToken(supplierUser.getId(), supplierUser.getPid(), supplierMember.getId(), email,
                 List.of("meta.command.execute", "qo.srm.use"), required("PROCUREMENT_PLAN_DISPATCH_UI_FIXTURE_PASSWORD"));
-        String contact = initialize("pr_supplier_pcba_contact", Map.of("pr_spc_supplier_id", supplier, "pr_spc_name", "Synthetic contact", "qo_pr_contact_state", "active"));
+        String contact = initialize("pr_supplier_pcba_contact", Map.of("pr_spc_supplier_id", supplier, "pr_spc_contact_name", "Synthetic contact", "qo_pr_contact_state", "active"));
         initialize("qo_procurement_membership_common", Map.of("qo_pr_membership_key", stage.get("namespace"),
                 "qo_pr_membership_user_pid", supplierUser.getPid(), "qo_pr_membership_supplier_pid", supplier,
                 "qo_pr_membership_contact_pid", contact, "qo_pr_membership_state", "active"));

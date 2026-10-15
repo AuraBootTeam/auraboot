@@ -165,7 +165,7 @@ class ProcurementSupplierUiFixtureProducerIT extends ProcurementPublicSourceNati
                 "customer_pcba_kd_auth_type", "app-secret"));
         supplierPid = initialize("pr_supplier_common", Map.of("pr_supplier_code", provider, "pr_supplier_name", "Synthetic UI Supplier", "pr_supplier_status", "enabled", "qo_pr_supplier_account_id", provider));
         categoryPid = initialize("pr_spend_category", Map.of("pr_spc_code", provider, "pr_spc_name", "Supplier UI category"));
-        contactPid = initialize("pr_supplier_pcba_contact", Map.of("pr_spc_supplier_id", supplierPid, "pr_spc_name", "Synthetic UI Contact", "qo_pr_contact_state", "active"));
+        contactPid = initialize("pr_supplier_pcba_contact", Map.of("pr_spc_supplier_id", supplierPid, "pr_spc_contact_name", "Synthetic UI Contact", "qo_pr_contact_state", "active"));
         var supplier = users.signUp(provider + "-supplier@example.invalid", password(), "Synthetic UI Contact", provider + "_supplier");
         var supplierMember = members.addMember(supplier.getId(), tenant, "active");
         initialize("qo_procurement_membership_common", Map.of("qo_pr_membership_key", provider, "qo_pr_membership_user_pid", supplier.getPid(), "qo_pr_membership_supplier_pid", supplierPid, "qo_pr_membership_contact_pid", contactPid, "qo_pr_membership_state", "active"));

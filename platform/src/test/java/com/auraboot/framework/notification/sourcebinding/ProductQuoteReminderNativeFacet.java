@@ -414,7 +414,7 @@ final class ProductQuoteReminderNativeFacet {
 
     private String contact(String supplier, String label) {
         return create("pr_supplier_pcba_contact", "pr_supplier_pcba_contact:sync_directory", Map.of(
-                "pr_spc_supplier_id", supplier, "pr_spc_name", "Synthetic " + label, "qo_pr_contact_state", "active"));
+                "pr_spc_supplier_id", supplier, "pr_spc_contact_name", "Synthetic " + label, "qo_pr_contact_state", "active"));
     }
 
     private void membership(User user, String supplier, String contact) {

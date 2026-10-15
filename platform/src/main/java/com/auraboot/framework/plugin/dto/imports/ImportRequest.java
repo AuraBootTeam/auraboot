@@ -121,7 +121,11 @@ public class ImportRequest {
      * When present, after the import's resources are persisted and its models
      * published, the import chain migrates legacy-identifier physical-table
      * rows into the freshly imported identifiers (plugin rename upgrade
-     * contract). See {@code IdentifierMappingDataMigrator}.
+     * contract). V2 uses {"schemaVersion":2,"modelFieldRenames":[{"modelCode":...,
+     * "fromField":...,"toField":...}]} for an explicitly owned same-model field rename.
+     * V2 preserves legacy physical columns and logical required, and records durable
+     * per-model/per-row receipts. See {@code IdentifierMappingDataMigrator} and
+     * {@code ModelFieldRenameMigrator}.
      */
     @JsonSetter(nulls = Nulls.SKIP)
     private String identifierMappingPath;
