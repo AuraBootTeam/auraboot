@@ -63,10 +63,16 @@ class OwnedTestDatabaseTest {
 
     @Test
     void requireThrowsExactlyTheGuardMessageWhenNotOwned() {
+        // Pure overload: the env-backed variant would silently pass under the CI runner
+        // (AURA_CI_JOB_ID set ⇒ owned), so the pin uses the deterministic decision core.
         assertThatThrownBy(() -> OwnedTestDatabase.require(
                 "jdbc:postgresql://127.0.0.1:5432/aura_boot", OwnedTestDatabase.AURA_BPM_SLOT_PATTERN,
-                "TEST_DATABASE_URL must identify an owned aura_bpm slot database"))
+                "TEST_DATABASE_URL must identify an owned aura_bpm slot database", false))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("TEST_DATABASE_URL must identify an owned aura_bpm slot database");
+        assertThatThrownBy(() -> OwnedTestDatabase.require(
+                null, OwnedTestDatabase.AURA_BPM_SLOT_PATTERN,
+                "TEST_DATABASE_URL must identify an owned aura_bpm slot database", true))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

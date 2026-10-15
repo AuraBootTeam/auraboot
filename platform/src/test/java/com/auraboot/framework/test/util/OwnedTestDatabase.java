@@ -47,7 +47,12 @@ public final class OwnedTestDatabase {
 
     /** Guard helper mirroring the slot ITs' fail-closed {@link IllegalStateException}. */
     public static void require(String url, String slotPattern, String message) {
-        if (!isOwned(url, slotPattern)) {
+        require(url, slotPattern, message, System.getenv("AURA_CI_JOB_ID") != null);
+    }
+
+    /** Pure decision core of {@link #require(String, String, String)} for deterministic pins. */
+    public static void require(String url, String slotPattern, String message, boolean ciOwnedRun) {
+        if (!isOwned(url, slotPattern, ciOwnedRun)) {
             throw new IllegalStateException(message);
         }
     }
