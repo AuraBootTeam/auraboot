@@ -40,7 +40,7 @@ export function parseAutomationTemplate(text: string): AutomationTemplateDocumen
   if (value.version !== undefined && value.version !== 1)
     throw new AutomationTemplateError('version');
   if (typeof value.name !== 'string' || !value.name.trim() || value.name.length > 200) invalid();
-  if (value.description !== undefined && (typeof value.description !== 'string' || value.description.length > 5000)) invalid();
+  if (value.description !== undefined && (typeof value.description !== 'string' || value.description.length > 1000)) invalid();
   const flow = value.flowConfig ?? value.flowData;
   if (!object(flow) || !Array.isArray(flow.nodes) || !Array.isArray(flow.edges)
       || flow.nodes.length > AUTOMATION_TEMPLATE_MAX_NODES || flow.edges.length > AUTOMATION_TEMPLATE_MAX_EDGES) invalid();
@@ -65,4 +65,3 @@ export function parseAutomationTemplate(text: string): AutomationTemplateDocumen
     flowConfig: {nodes: flow.nodes, edges: flow.edges} as FlowData,
   };
 }
-
