@@ -1,0 +1,13 @@
+
+Running 2 tests using 1 worker
+
+(node:73714) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73714) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [oss] › tests/e2e/showcase/oss-performance.spec.ts:55:1 › PERF journey: home, menu, search, pagination and persisted CRUD @critical (6.7s)
+  ✓  2 [oss] › tests/e2e/showcase/oss-performance.spec.ts:211:1 › PERF auth: anonymous home requires login (287ms)
+🧹 Running global teardown...
+✅ Global teardown complete
+
+  2 passed (7.6s)

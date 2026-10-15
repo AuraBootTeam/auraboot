@@ -1,0 +1,70 @@
+{
+  "publicDocGate": {
+    "exitCode": 1,
+    "matches": 11,
+    "files": 3
+  },
+  "repositoryGovernance": {
+    "exitCode": 1,
+    "errors": 0,
+    "warnings": 2
+  },
+  "scopedGovernance": {
+    "exitCode": 0,
+    "errors": 0,
+    "warnings": 0,
+    "files": 3
+  },
+  "baseline": "b14cf4870de3ef4df8537365163054622c75941b",
+  "files": [
+    {
+      "path": "docs/archive/handover/2026-05/HANDOVER-2026-05-29-designer-t4-b2c-complete.md",
+      "baseBlob": "e0951b97fcbd2edabdcc029d755e0f66a233fcc6",
+      "headBlob": "e0951b97fcbd2edabdcc029d755e0f66a233fcc6",
+      "worktreeBlob": "e0951b97fcbd2edabdcc029d755e0f66a233fcc6",
+      "unchanged": true
+    },
+    {
+      "path": "docs/archive/handover/2026-05/HANDOVER-2026-05-30-t4-closure-golden-e2e-reliability-spike.md",
+      "baseBlob": "d2f907aeb4042ef59e301814c45cea7ec859a60d",
+      "headBlob": "d2f907aeb4042ef59e301814c45cea7ec859a60d",
+      "worktreeBlob": "d2f907aeb4042ef59e301814c45cea7ec859a60d",
+      "unchanged": true
+    },
+    {
+      "path": "docs/archive/handover/2026-10/HANDOVER-2026-10-13-oss-gate-followups.md",
+      "baseBlob": "b50749c3832ca070d4b7d8d571c2136852c76786",
+      "headBlob": "b50749c3832ca070d4b7d8d571c2136852c76786",
+      "worktreeBlob": "b50749c3832ca070d4b7d8d571c2136852c76786",
+      "unchanged": true
+    },
+    {
+      "path": "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md",
+      "baseBlob": "c4e6f8d68f644ca88481e9b6c7b22af5c54d6e98",
+      "headBlob": "c4e6f8d68f644ca88481e9b6c7b22af5c54d6e98",
+      "worktreeBlob": "c4e6f8d68f644ca88481e9b6c7b22af5c54d6e98",
+      "unchanged": true
+    },
+    {
+      "path": "platform/platform-storage-cos/README.md",
+      "baseBlob": "68ea33f98bcb67b78ca245411677fa0b6fded183",
+      "headBlob": "68ea33f98bcb67b78ca245411677fa0b6fded183",
+      "worktreeBlob": "68ea33f98bcb67b78ca245411677fa0b6fded183",
+      "unchanged": true
+    }
+  ],
+  "logs": [
+    {
+      "name": "public-doc-gate.log",
+      "rawSha256": "f9ceef3f8be4ac6194a647acfae45d6c3d3db395b4bcfbee00513cca48dc33b7"
+    },
+    {
+      "name": "docs-repository-gate-after-closure.log",
+      "rawSha256": "b69777a2992b6c7624d8c3ae185c73b43ddae32869ae10f654a714f1339d1cd1"
+    },
+    {
+      "name": "docs-scoped.log",
+      "rawSha256": "c8d217e1467cf64cb1d582b6d0ebfa2a5a7b161bd86f8c651e52627c0c898f6f"
+    }
+  ]
+}

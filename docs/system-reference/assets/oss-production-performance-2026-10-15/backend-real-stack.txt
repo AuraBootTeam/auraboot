@@ -1,0 +1,121 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+Configuration on demand is an incubating feature.
+> Task :platform-storage-minio:processResources NO-SOURCE
+> Task :platform-storage-s3:processResources NO-SOURCE
+> Task :platform-storage-cos:processResources NO-SOURCE
+> Task :platform-mq-kafka:processResources NO-SOURCE
+> Task :platform-storage-oss:processResources NO-SOURCE
+> Task :bootBuildInfo UP-TO-DATE
+> Task :platform-plugin-api:compileJava UP-TO-DATE
+> Task :platform-plugin-api:processResources NO-SOURCE
+> Task :platform-plugin-api:classes UP-TO-DATE
+> Task :platform-plugin-api:jar UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :compileJava
+> Task :classes
+> Task :jar UP-TO-DATE
+> Task :platform-mq-kafka:compileJava UP-TO-DATE
+> Task :platform-mq-kafka:classes UP-TO-DATE
+> Task :platform-storage-oss:compileJava UP-TO-DATE
+> Task :platform-storage-oss:classes UP-TO-DATE
+> Task :platform-storage-s3:compileJava UP-TO-DATE
+> Task :platform-storage-s3:classes UP-TO-DATE
+> Task :platform-mq-kafka:jar UP-TO-DATE
+> Task :platform-storage-oss:jar UP-TO-DATE
+> Task :platform-storage-s3:jar UP-TO-DATE
+> Task :platform-storage-cos:compileJava UP-TO-DATE
+> Task :platform-storage-cos:classes UP-TO-DATE
+> Task :platform-storage-cos:jar UP-TO-DATE
+> Task :platform-storage-minio:compileJava UP-TO-DATE
+> Task :platform-storage-minio:classes UP-TO-DATE
+> Task :platform-storage-minio:jar UP-TO-DATE
+> Task :compileTestJava UP-TO-DATE
+> Task :instrumentMainOffline UP-TO-DATE
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+P5 command metadata mutations evict command cache projections > binding rule removal evicts cached binding rules PASSED
+
+P5 command metadata mutations evict command cache projections > command update evicts cached command definition PASSED
+
+P5 command metadata mutations evict command cache projections > command publish evicts cached command definition PASSED
+
+P5 metadata model mutations evict model definition caches > saveDefinition persists immutable and partial updates cannot unset it PASSED
+
+P5 metadata model mutations evict model definition caches > delete evicts cached current model definition PASSED
+
+P5 metadata model mutations evict model definition caches > saveDefinition evicts cached current model definition PASSED
+
+P5 metadata model mutations evict model definition caches > rollbackToVersion evicts cached current model definition PASSED
+
+P5 metadata model mutations evict model definition caches > model field projection reuses the cached assembled definition PASSED
+
+P5 metadata field version mutations refresh model definitions > field update moves bindings to the new current field version and evicts model definitions PASSED
+
+UserPermissionService Integration Tests > UP-01: getUserPermissionIds returns set containing bound permission PASSED
+
+UserPermissionService Integration Tests > UP-02: hasPermission by ID returns true for bound, false for unbound PASSED
+
+UserPermissionService Integration Tests > UP-02b: hasPermission by code returns true for bound code, false for unknown PASSED
+
+UserPermissionService Integration Tests > UP-03: evictUserPermissions does not throw and subsequent load still works PASSED
+
+UserPermissionService Integration Tests > UP-04: clearPermissionCodeCache does not throw PASSED
+
+UserPermissionService Integration Tests > UP-05: evictRoleUsers does not throw PASSED
+
+UserPermissionService Integration Tests > UP-06: hasAllPermissions returns correct AND logic result PASSED
+
+UserPermissionService Integration Tests > UP-07: hasAnyPermission returns correct OR logic result PASSED
+
+UserPermissionService Integration Tests > UP-08: batchGetUserPermissionIds returns correct map PASSED
+
+UserPermissionService Integration Tests > UP-09: batchGetUserPermissionIds with empty input returns empty map PASSED
+
+UserPermissionService Integration Tests > UP-10: hasPermission with null arguments returns false gracefully PASSED
+
+UserPermissionService Integration Tests > UP-11: repeated authorization checks load each database snapshot once PASSED
+
+UserPermissionService Integration Tests > UP-12: creating a permission invalidates a cached missing code PASSED
+
+UserPermissionService Integration Tests > UP-13: revoking a role grant invalidates an already cached authorization PASSED
+
+UserPermissionService Integration Tests > UP-14: future role grants remain unavailable until effective PASSED
+
+UserPermissionService Integration Tests > UP-15: revocation evicts after commit, while rollback keeps the valid grant PASSED
+
+-2026-10-15T12:19:26.940Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.s.s.impl.DatabaseSchedulerEngine   : Stopping scheduler engine...
+--2026-10-15T12:19:26.941Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.c.jdbc.service.JdbcDataSourcePool  : JdbcDataSourcePool shutdown
+--2026-10-15T12:19:26.956Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Shutting down plugin manager...
+--2026-10-15T12:19:26.956Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Plugin manager shutdown complete
+--2026-10-15T12:19:26.980Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown initiated...
+--2026-10-15T12:19:26.981Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown completed.
+--2026-10-15T12:19:29.094Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.s.s.impl.DatabaseSchedulerEngine   : Stopping scheduler engine...
+--2026-10-15T12:19:29.096Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.c.jdbc.service.JdbcDataSourcePool  : JdbcDataSourcePool shutdown
+--2026-10-15T12:19:29.134Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Shutting down plugin manager...
+--2026-10-15T12:19:29.134Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Plugin manager shutdown complete
+--2026-10-15T12:19:29.163Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown initiated...
+--2026-10-15T12:19:29.163Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown completed.
+--2026-10-15T12:19:31.273Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.s.s.impl.DatabaseSchedulerEngine   : Stopping scheduler engine...
+--2026-10-15T12:19:31.273Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.c.jdbc.service.JdbcDataSourcePool  : JdbcDataSourcePool shutdown
+--2026-10-15T12:19:31.278Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Shutting down plugin manager...
+--2026-10-15T12:19:31.278Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Plugin manager shutdown complete
+--2026-10-15T12:19:31.286Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown initiated...
+--2026-10-15T12:19:31.287Z - INFO 50248 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown completed.
+-
+> Task :jacocoTestReport
+
+[Incubating] Problems report is available at: file://$SOURCE_ROOT/platform/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 5s
+21 actionable tasks: 3 executed, 18 up-to-date

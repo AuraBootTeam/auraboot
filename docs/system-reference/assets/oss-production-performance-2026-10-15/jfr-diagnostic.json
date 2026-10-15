@@ -1,0 +1,18 @@
+{
+  "recordingSha256": "806be79e79db0667d9116f6d8494762537531d35793d64ff9005e86762f42ed9",
+  "comparisonDataset": false,
+  "garbageCollections": 8,
+  "compilations": 7,
+  "pauseDurations": [
+    "PT0.001495834S",
+    "PT0.019231583S",
+    "PT0.000089459S",
+    "PT0.001402583S",
+    "PT0.004995792S",
+    "PT0.00153S",
+    "PT0.001523833S",
+    "PT0.001448625S",
+    "PT0.001262792S"
+  ],
+  "interpretation": "GC and compilation were observed in a separate diagnostic workload. These events do not establish the cause of a percentile in the formal workload."
+}
