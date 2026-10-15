@@ -262,11 +262,13 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await expect(page.getByTestId('designer-toolbar')).toContainText(
     dashboardTitle,
   );
-  await page
-    .getByTestId('designer-canvas')
-    .getByText('自动归档', { exact: true })
-    .click();
-  await page.getByTestId('widget-prop-title-zh').fill('自动归档任务');
+  const archivedWidget = page.getByTestId('designer-canvas').locator('[data-widget-id="archived-tasks"]');
+  await expect(archivedWidget).toHaveCount(1);
+  await archivedWidget.click();
+  const inspector = page.getByTestId('widget-property-panel');
+  await expect(inspector).toHaveAttribute('data-widget-id', 'archived-tasks');
+  await expect(inspector.getByTestId('widget-prop-title-zh')).toHaveValue('自动归档');
+  await inspector.getByTestId('widget-prop-title-zh').fill('自动归档任务');
   await expect(page.getByTestId('designer-canvas')).toContainText(
     '自动归档任务',
   );
