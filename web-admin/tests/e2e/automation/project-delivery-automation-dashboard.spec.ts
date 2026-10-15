@@ -469,3 +469,62 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     contentType: 'application/json',
   });
 });
+
+
+test('portable archive template selects a task once and binds every reference before a disabled import', async ({page}, info) => {
+  const workspace = process.env.AURA_WORKSPACE_PROJECT_ROOT;
+  expect(workspace, 'Bind the owned workspace source containing the portable template').toBeTruthy();
+  const template = JSON.parse(fs.readFileSync(path.join(workspace!, 'docs/product-docs/strategy/enterprise-seven-scenario-assets/task-archive.automation.json'), 'utf8'));
+  const name = `导入参数归档-${run}`; const title = `【演示】参数选择-${run}`;
+  expect(process.env.DELIVERY_PROJECT_PID).toMatch(/^[0-9A-Z]{26}$/);
+  await page.goto('/');
+  const taskPid = await setupTask(page, title, process.env.DELIVERY_PROJECT_PID!);
+  await menu(page, ['系统管理', '自动化']);
+  const beforeRows = (await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()).data;
+  const upload = async () => page.getByTestId('input-import-automation').setInputFiles({name: '任务归档.automation.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(template))});
+  await upload();
+  const dialog = page.getByRole('dialog', {name: '配置导入参数'});
+  await expect(dialog).toBeVisible(); await expect(dialog.getByRole('button', {name: '导入停用副本'})).toBeDisabled();
+  await page.screenshot({path: info.outputPath('IMPORT01-任务参数必填.png')});
+  await dialog.getByRole('button', {name: '取消', exact: true}).click(); await expect(dialog).not.toBeVisible();
+  expect((await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()).data).toEqual(beforeRows);
+  await upload(); await dialog.getByLabel('副本名称').fill(name);
+  await dialog.locator('button#targetTask').click();
+  await dialog.getByPlaceholder('搜索记录名称').fill(title);
+  await dialog.getByRole('button', {name: title, exact: true}).click();
+  await expect(dialog.locator('button#targetTask')).toHaveText(title);
+  await expect(dialog).not.toContainText(taskPid);
+  await page.screenshot({path: info.outputPath('IMPORT02-选择具名演示任务.png')});
+  const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/automations' && response.request().method() === 'POST');
+  await dialog.getByRole('button', {name: '导入停用副本'}).click();
+  const response = await creating; expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON()).toMatchObject({enabled: false, templateValues: {targetTask: taskPid}});
+  const created = (await response.json()).data; expect(created.enabled).toBe(false);
+  await expect(dialog).not.toBeVisible(); await page.reload();
+  const imported = (await (await page.request.get(`/api/automations/${created.pid}`)).json()).data;
+  const bound = JSON.stringify(imported.flowConfig); expect(bound).not.toContain('{{template.'); expect(bound.split(taskPid)).toHaveLength(4);
+  expect((await record(page, taskPid)).tpm_ts_description).toBe(original);
+  await page.getByRole('link', {name, exact: true}).click();
+  const exported = page.waitForEvent('download'); await page.getByTestId('btn-export-automation').click();
+  const download = await exported; const file = info.outputPath('绑定后的任务归档.automation.json'); await download.saveAs(file);
+  expect(JSON.parse(fs.readFileSync(file, 'utf8')).flowConfig).toEqual(imported.flowConfig);
+  await menu(page, ['系统管理', '自动化']);
+  const toggled = page.waitForResponse(r => r.url().includes(`/api/automations/${created.pid}/toggle`) && r.request().method() === 'POST');
+  await page.getByTestId(`btn-toggle-${created.pid}`).click(); expect((await toggled).ok()).toBe(true);
+  await completeTaskViaUi(page, title, taskPid);
+  await expect.poll(async () => (await record(page, taskPid)).tpm_ts_description).toBe(marker);
+  await page.reload(); await expect(page.getByText(marker, {exact: true})).toBeVisible();
+  await page.screenshot({path: info.outputPath('IMPORT03-真实任务完成自动归档.png')});
+  const logs = (await (await page.request.get(`/api/automations/${created.pid}/logs`)).json()).data.filter((entry: any) => entry.triggerRecordPid === taskPid);
+  expect(logs).toHaveLength(1); expect(logs[0].status).toBe('success');
+  await menu(page, ['系统管理', '自动化']);
+  const stopped = page.waitForResponse(r => r.url().includes(`/api/automations/${created.pid}/toggle`) && r.request().method() === 'POST');
+  await page.getByTestId(`btn-toggle-${created.pid}`).click(); expect((await stopped).ok()).toBe(true);
+  expect((await (await page.request.get(`/api/automations/${created.pid}`)).json()).data.enabled).toBe(false);
+  // Direct submissions cannot use missing, unresolvable or expression-injecting references.
+  for (const templateValues of [{}, {targetTask: '01AAAAAAAAAAAAAAAAAAAAAAAA'}, {targetTask: "' OR true"}]) {
+    const denied = await page.request.post('/api/automations', {data: {...template, templateValues, enabled: true}});
+    const payload = await denied.json(); expect(String(payload.code)).not.toBe('0'); expect(denied.status()).toBeLessThan(500);
+  }
+  await info.attach('Template-binding-receipt', {body: JSON.stringify({automationPid: created.pid, taskPid, boundReferenceCount: 3, defaultDisabled: true, finalDisabled: true, executionCount: logs.length, executionStatus: logs[0].status}), contentType: 'application/json'});
+});

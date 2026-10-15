@@ -52,6 +52,7 @@ public class AutomationServiceImpl implements AutomationService {
     private final AutomationTriggerService automationTriggerService;
     private final ObjectProvider<com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime> automationProcessRuntimeProvider;
     private final AutomationFlowTriggerDeriver flowTriggerDeriver;
+    private final com.auraboot.framework.automation.service.AutomationTemplateBinder templateBinder;
     private final DecisionUsageIndexService usageIndexService;
 
     // ==================== Tenant isolation guards ====================
@@ -85,6 +86,8 @@ public class AutomationServiceImpl implements AutomationService {
         log.info("Creating automation: name={}, modelCode={}, triggerType={}",
                 request.getName(), request.getModelCode(), request.getTriggerType());
 
+        request.setFlowConfig(templateBinder.bind(request.getFlowConfig(), request.getTemplateParameters(), request.getTemplateValues()));
+        if (request.getTemplateParameters() != null && !request.getTemplateParameters().isEmpty()) request.setEnabled(false);
         validateCreateRequest(request);
 
         // Derive trigger fields from flowConfig when the designer saves the flow.
@@ -153,6 +156,7 @@ public class AutomationServiceImpl implements AutomationService {
     @Transactional
     @Override
     public AutomationDTO update(String pid, AutomationUpdateRequest request) {
+        templateBinder.rejectUnresolved(request.getFlowConfig());
         log.info("Updating automation: pid={}", pid);
 
         Automation automation = loadOwnedAutomation(pid);
@@ -300,6 +304,7 @@ public class AutomationServiceImpl implements AutomationService {
     @Transactional
     @Override
     public AutomationDTO enable(String pid) {
+        templateBinder.rejectUnresolved(loadOwnedAutomation(pid).getFlowConfig());
         log.info("Enabling automation: pid={}", pid);
 
         Automation automation = loadOwnedAutomation(pid);

@@ -13,6 +13,8 @@ import {
 import { useI18n } from '~/contexts/I18nContext';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
+import { TemplateImportDialog } from './TemplateImportDialog';
+import type { AutomationTemplateDocument } from '../services/automationTemplateIO';
 import { AUTOMATION_TEMPLATE_MAX_BYTES, AutomationTemplateError, parseAutomationTemplate } from '../services/automationTemplateIO';
 
 export interface AutomationListProps {
@@ -37,6 +39,7 @@ export function AutomationList({
   const [automations, setAutomations] = useState(initialAutomations);
   const [logDialogAutomation, setLogDialogAutomation] = useState<Automation | null>(null);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [pendingImport, setPendingImport] = useState<AutomationTemplateDocument | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const authHeaders: HeadersInit = token
@@ -174,6 +177,10 @@ export function AutomationList({
       if (file.size > AUTOMATION_TEMPLATE_MAX_BYTES) throw new AutomationTemplateError('size');
       const text = await file.text();
       const data = parseAutomationTemplate(text);
+      if (data.templateParameters?.length) {
+        setPendingImport(data);
+        return;
+      }
       const response = await fetch('/api/automations', {
         method: 'post',
         headers: authHeaders,
@@ -228,6 +235,9 @@ export function AutomationList({
 
   return (
     <div className={cn('rounded-lg bg-white shadow', className)}>
+      {pendingImport && <TemplateImportDialog document={pendingImport} headers={authHeaders}
+        onCancel={() => setPendingImport(null)}
+        onImported={() => { setPendingImport(null); revalidator.revalidate(); showSuccessToast(st({zh: '已导入停用副本，请检查后再启用。', en: 'Disabled copy imported. Review it before enabling.'})); }} />}
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h2 className="text-lg font-semibold text-gray-900" data-testid="page-title">

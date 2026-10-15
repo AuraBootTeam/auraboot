@@ -71,7 +71,9 @@ class AutomationServiceImplTenantIsolationTest {
                 runtimeProvider = org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
         org.mockito.Mockito.lenient().when(runtimeProvider.getIfAvailable()).thenReturn(automationProcessRuntime);
         service = new AutomationServiceImpl(automationMapper, automationLogMapper, automationTriggerService,
-                runtimeProvider, deriver, usageIndexService);
+                runtimeProvider, deriver, new com.auraboot.framework.automation.service.AutomationTemplateBinder(
+                        org.mockito.Mockito.mock(com.auraboot.framework.meta.service.DynamicDataService.class),
+                        org.mockito.Mockito.mock(com.auraboot.framework.permission.engine.PermissionEvaluator.class)), usageIndexService);
         MetaContext.setContext(CURRENT_TENANT, 10L, "user-1", "tester");
     }
 

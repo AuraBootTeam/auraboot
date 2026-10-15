@@ -42,4 +42,8 @@ public class AutomationCreateRequest {
      * Whether to enable immediately (default: false)
      */
     private Boolean enabled;
+
+    /** Portable template inputs. Bound and permission-checked before a disabled copy is created. */
+    private List<AutomationTemplateParameter> templateParameters;
+    private Map<String, String> templateValues;
 }

@@ -4,10 +4,20 @@ export const AUTOMATION_TEMPLATE_MAX_BYTES = 2 * 1024 * 1024;
 export const AUTOMATION_TEMPLATE_MAX_NODES = 500;
 export const AUTOMATION_TEMPLATE_MAX_EDGES = 1000;
 
+export interface AutomationTemplateParameter {
+  key: string;
+  kind: 'record';
+  modelCode: string;
+  displayField: string;
+  label: string;
+  helpText?: string;
+}
+
 export interface AutomationTemplateDocument {
   name: string;
   description?: string;
   flowConfig: FlowData;
+  templateParameters?: AutomationTemplateParameter[];
 }
 
 export class AutomationTemplateError extends Error {
@@ -59,8 +69,28 @@ export function parseAutomationTemplate(text: string): AutomationTemplateDocumen
         || typeof edge.target !== 'string' || !ids.has(edge.target)) invalid();
     edges.add(edge.id);
   }
+  const parameters = value.templateParameters;
+  if (parameters !== undefined) {
+    if (!Array.isArray(parameters) || parameters.length > 20) invalid();
+    const keys = new Set<string>();
+    for (const parameter of parameters) {
+      if (!object(parameter) || typeof parameter.key !== 'string'
+          || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(parameter.key) || keys.has(parameter.key)
+          || parameter.kind !== 'record' || typeof parameter.modelCode !== 'string'
+          || !/^[A-Za-z][A-Za-z0-9_]{0,127}$/.test(parameter.modelCode)
+          || typeof parameter.displayField !== 'string'
+          || !/^[A-Za-z][A-Za-z0-9_]{0,127}$/.test(parameter.displayField)
+          || typeof parameter.label !== 'string' || !parameter.label.trim() || parameter.label.length > 100
+          || (parameter.helpText !== undefined && (typeof parameter.helpText !== 'string' || parameter.helpText.length > 500))) invalid();
+      keys.add(parameter.key);
+      if (!JSON.stringify(flow).includes(`{{template.${parameter.key}}}`)) invalid();
+    }
+    const markers = JSON.stringify(flow).matchAll(/\{\{template\.([^}]+)\}\}/g);
+    for (const marker of markers) if (!keys.has(marker[1])) invalid();
+  } else if (JSON.stringify(flow).includes('{{template.')) invalid();
   return {
     name: value.name.trim(),
+    ...(parameters === undefined ? {} : {templateParameters: parameters as AutomationTemplateParameter[]}),
     ...(value.description === undefined ? {} : {description: value.description as string}),
     flowConfig: {nodes: flow.nodes, edges: flow.edges} as FlowData,
   };

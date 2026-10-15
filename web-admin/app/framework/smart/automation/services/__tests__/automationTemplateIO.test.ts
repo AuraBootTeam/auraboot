@@ -25,3 +25,25 @@ describe('Automation portable import boundary', () => {
     expect(() => parseAutomationTemplate(' '.repeat(2 * 1024 * 1024 + 1))).toThrow('size');
   });
 });
+
+
+const parameter = {key: 'target', kind: 'record', modelCode: 'demo_task', displayField: 'title', label: 'Target'};
+const parameterized = {...template, templateParameters: [parameter], flowConfig: {nodes: [{...node, data: {...node.data, config: {expression: "recordId == '{{template.target}}'"}}}], edges: []}};
+describe('Automation typed template parameters', () => {
+  it('preserves the declared input without importing identity, values or enablement', () => {
+    const result = parseAutomationTemplate(JSON.stringify({...parameterized, templateValues: {target: 'FOREIGN'}, enabled: true, tenantId: 55}));
+    expect(result.templateParameters).toEqual([parameter]);
+    expect(result).not.toHaveProperty('templateValues'); expect(result).not.toHaveProperty('enabled');
+  });
+  it.each([
+    {...parameterized, templateParameters: undefined},
+    {...parameterized, templateParameters: []},
+    {...parameterized, templateParameters: [parameter, parameter]},
+    {...parameterized, templateParameters: [{...parameter, kind: 'sql'}]},
+    {...parameterized, templateParameters: [{...parameter, modelCode: '../private'}]},
+    {...parameterized, templateParameters: [{...parameter, key: 'other'}]},
+    {...parameterized, templateParameters: [{...parameter, displayField: ''}]},
+  ])('rejects malformed, duplicate and unresolved parameter contracts', input => {
+    expect(() => parseAutomationTemplate(JSON.stringify(input))).toThrow();
+  });
+});
