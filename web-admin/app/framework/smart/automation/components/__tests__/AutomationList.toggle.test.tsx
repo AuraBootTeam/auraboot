@@ -60,6 +60,24 @@ describe('AutomationList import response contract', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+  it.each([
+    ['unknown version', JSON.stringify({version: 999, name: 'Unsafe', flowConfig: {nodes: [], edges: []}})],
+    ['broken JSON', '{broken'],
+    ['oversized file', ' '.repeat(2 * 1024 * 1024 + 1)],
+    ['invalid graph', JSON.stringify({name: 'Unsafe', flowConfig: {nodes: 'invalid', edges: []}})],
+  ])('rejects %s before any mutation and preserves the existing list', async (_, text) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<AutomationList initialAutomations={[automation]} token={null} />);
+    const file = new File([text], 'unsafe.json', {type: 'application/json'});
+    Object.defineProperty(file, 'text', {value: async () => text});
+    fireEvent.change(screen.getByTestId('input-import-automation'), {target: {files: [file]}});
+    await waitFor(() => expect(mocks.error).toHaveBeenCalledOnce());
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', {name: automation.name, exact: true})).toBeVisible();
+  });
+
   async function importFile(response: Response) {
     const fetchMock = vi.fn().mockResolvedValue(response);
     vi.stubGlobal('fetch', fetchMock);

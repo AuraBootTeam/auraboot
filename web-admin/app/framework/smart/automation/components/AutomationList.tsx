@@ -13,6 +13,7 @@ import {
 import { useI18n } from '~/contexts/I18nContext';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
+import { AUTOMATION_TEMPLATE_MAX_BYTES, AutomationTemplateError, parseAutomationTemplate } from '../services/automationTemplateIO';
 
 export interface AutomationListProps {
   className?: string;
@@ -170,15 +171,16 @@ export function AutomationList({
     if (!file) return;
     const errorMessage = st({ zh: '导入自动化失败，请检查文件及权限后重试。', en: 'Automation import failed. Check the file and your permissions, then retry.' });
     try {
+      if (file.size > AUTOMATION_TEMPLATE_MAX_BYTES) throw new AutomationTemplateError('size');
       const text = await file.text();
-      const data = JSON.parse(text);
+      const data = parseAutomationTemplate(text);
       const response = await fetch('/api/automations', {
         method: 'post',
         headers: authHeaders,
         body: JSON.stringify({
-          name: data.name || `Imported - ${file.name}`,
-          description: data.description || 'Imported automation',
-          flowConfig: data.flowConfig || data.flowData,
+          name: data.name,
+          description: data.description,
+          flowConfig: data.flowConfig,
           enabled: false,
         }),
       });
@@ -191,8 +193,13 @@ export function AutomationList({
       }
       showSuccessToast(st({ zh: `已导入“${created.name || file.name}”`, en: `Imported "${created.name || file.name}"` }));
       revalidator.revalidate();
-    } catch {
-      showErrorToast(errorMessage);
+    } catch (error) {
+      const labels = {
+        size: {zh: '自动化设计文件不能超过 2 MB。', en: 'Automation design files must be smaller than 2 MB.'},
+        version: {zh: '不支持此自动化设计文件版本，请使用版本 1。', en: 'Unsupported automation design version. Use version 1.'},
+        invalid: {zh: '自动化设计文件无效，请选择 AuraBoot 导出的 JSON 并检查节点和连线。', en: 'Invalid automation design file. Select an AuraBoot JSON export with valid nodes and connections.'},
+      };
+      showErrorToast(error instanceof AutomationTemplateError ? st(labels[error.reason]) : errorMessage);
     } finally {
       // Reset the input so re-importing the same file works
       if (importInputRef.current) importInputRef.current.value = '';
