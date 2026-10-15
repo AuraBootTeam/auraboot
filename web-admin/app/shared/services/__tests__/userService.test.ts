@@ -27,6 +27,7 @@ import {
 } from '../userService';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
+import { RouterContextProvider } from 'react-router';
 import type { UserPermissions } from '~/utils/type';
 
 const FAKE_REQUEST = new Request('http://localhost/');
@@ -352,20 +353,22 @@ describe('request scoped user info', () => {
   afterEach(() => vi.restoreAllMocks());
   it('deduplicates concurrent parent/child loaders but never reuses another request identity', async () => {
     getTokenMock.mockResolvedValue(TOKEN);
-    const fetchSpy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          code: '0',
-          data: { user: { id: 42 }, permissions: { roles: [], permissions: [] } },
-        }),
-      } as any);
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: { user: { id: 42 }, permissions: { roles: [], permissions: [] } },
+      }),
+    } as any);
     const request = new Request('http://localhost/home');
-    const [parent, child] = await Promise.all([getUserInfo(request), getUserInfo(request)]);
+    const loaderContext = new RouterContextProvider();
+    const [parent, child] = await Promise.all([
+      getUserInfo(request, loaderContext),
+      getUserInfo(request.clone(), loaderContext),
+    ]);
     expect(parent.user).toEqual(child.user);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    await getUserInfo(new Request('http://localhost/home'));
+    await getUserInfo(new Request('http://localhost/home'), new RouterContextProvider());
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

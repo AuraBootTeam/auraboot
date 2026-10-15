@@ -132,7 +132,10 @@ export async function resolveDeploymentBrandingFromBff(
   return payload.branding;
 }
 
-export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
+export async function loader({
+  request,
+  context,
+}: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const requestUrl = new URL(request.url);
@@ -220,7 +223,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const [{ user, permissions, preferences }, i18nData, spaces] = await Promise.all([
-    getUserInfo(request),
+    getUserInfo(request, context),
     getI18nData(locale, request),
     fetchSpaces(),
   ]);

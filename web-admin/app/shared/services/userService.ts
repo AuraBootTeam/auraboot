@@ -8,6 +8,7 @@
  * 4. ✅ 权限信息实时从API获取（避免过期）
  */
 
+import { createContext, type RouterContextProvider } from 'react-router';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import { ResultHelper, type User, type UserPermissions, type Preferences } from '~/utils/type';
 import { getTokenFromRequest } from '~/shared/services/session';
@@ -93,22 +94,27 @@ export async function fetchUserInfo(request: Request): Promise<{
  * - 始终从后端API获取（安全第一）
  * - 不解析JWT（零信任原则）
  */
-const userInfoRequests = new WeakMap<Request, ReturnType<typeof fetchUserInfo>>();
+const userInfoLoaderContext = createContext<ReturnType<typeof fetchUserInfo> | undefined>(
+  undefined,
+);
 
-export async function getUserInfo(request: Request): Promise<{
+export async function getUserInfo(
+  request: Request,
+  loaderContext?: RouterContextProvider,
+): Promise<{
   user: User | null;
   permissions: UserPermissions | null;
   preferences: Preferences | null;
 }> {
-  // Parent and child loaders share one incoming Request. Reuse its authoritative
-  // auth lookup, without sharing identity or cached authorization across requests.
-  let pending = userInfoRequests.get(request);
+  // React Router may clone Request objects for parent/child loaders. Its per-request
+  // RouterContext is the stable identity; it is never shared between HTTP requests.
+  let pending = loaderContext?.get(userInfoLoaderContext);
   if (!pending) {
     pending = fetchUserInfo(request).catch((error) => {
-      userInfoRequests.delete(request);
+      loaderContext?.set(userInfoLoaderContext, null);
       throw error;
     });
-    userInfoRequests.set(request, pending);
+    loaderContext?.set(userInfoLoaderContext, pending);
   }
   const fullInfo = await pending;
 
