@@ -100,7 +100,7 @@ report_template=json.loads((Path(__file__).parents[1]/'examples/customer-deliver
 report=req('/api/report-definitions','POST',{'code':'customer_delivery_brief','title':report_template['dsl']['title'],'dsl':report_template['dsl']},h)
 assert str(report['code'])=='0',report
 board_template=json.loads((Path(__file__).parents[1]/'examples/dashboard-customer-delivery.json').read_text())
-board=req('/api/dashboards','POST',{**board_template['dashboard'],'scope':'PERSONAL'},h)
+board=req('/api/dashboards','POST',board_template['dashboard'],h)
 assert str(board['code'])=='0',board
 published=req('/api/dashboards/'+board['data']['pid']+'/publish','POST',{},h)
 assert str(published['code'])=='0',published
