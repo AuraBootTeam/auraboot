@@ -3,7 +3,7 @@
   "version": 1,
   "dashboard": {
     "title": "客户项目交付总览",
-    "description": "项目数量、预算与交付阶段实时取自当前账号可见的客户项目，阶段名称读取项目状态字典。",
+    "description": "项目数量、预算与交付阶段实时取自当前账号可见的客户项目；客户名称读取项目关联记录。",
     "layoutConfig": {
       "columns": 12,
       "rowHeight": 100,
@@ -190,32 +190,31 @@
             "zh-CN": "客户项目交付清单",
             "en-US": "Customer project delivery"
           },
-          "modelCode": "tpm_project",
           "table": {
             "columns": [
               {
-                "field": "tpm_pj_name",
+                "field": "project_name",
                 "label": {
                   "zh-CN": "项目",
                   "en-US": "Project"
                 }
               },
               {
-                "field": "tpm_pj_customer",
+                "field": "customer_name",
                 "label": {
                   "zh-CN": "客户",
                   "en-US": "Customer"
                 }
               },
               {
-                "field": "tpm_pj_status",
+                "field": "delivery_stage",
                 "label": {
                   "zh-CN": "阶段",
                   "en-US": "Stage"
                 }
               },
               {
-                "field": "tpm_pj_end_date",
+                "field": "delivery_date",
                 "label": {
                   "zh-CN": "计划交付",
                   "en-US": "Target delivery"
@@ -223,7 +222,7 @@
                 "format": "date"
               },
               {
-                "field": "tpm_pj_budget",
+                "field": "budget",
                 "label": {
                   "zh-CN": "预算",
                   "en-US": "Budget"
@@ -236,11 +235,23 @@
             ]
           },
           "defaultSort": {
-            "field": "tpm_pj_end_date",
+            "field": "delivery_date",
             "order": "asc"
           },
-          "pageSize": 8,
-          "striped": false
+          "pageSize": 10,
+          "striped": false,
+          "dataSource": {
+            "type": "namedQuery",
+            "queryCode": "tpm_delivery_brief",
+            "dimensions": [
+              "project_name",
+              "customer_name",
+              "delivery_stage",
+              "delivery_date",
+              "budget"
+            ],
+            "limit": 100
+          }
         }
       }
     ]

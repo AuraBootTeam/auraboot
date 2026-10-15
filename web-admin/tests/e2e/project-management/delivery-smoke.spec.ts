@@ -186,6 +186,12 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(newRow).toContainText('林晓');
     await page.reload();
     await expect(newRow).toContainText('华辰制造');
+    const liveDelivery = await page.request.get('/api/datasource/list?datasourceId=nq%3Atpm_delivery_brief&format=records&maxItems=100');
+    expect(liveDelivery.status()).toBe(200);
+    const liveDeliveryBody = await liveDelivery.json();
+    expect(String(liveDeliveryBody.code)).toBe('0');
+    const liveRows = liveDeliveryBody.data.records ?? liveDeliveryBody.data;
+    expect(liveRows.find((row: any) => row.project_name === newProjectName)?.customer_name).toBe('华辰制造');
     await shot('P12');
     await newRow.getByRole('button', { name: '查看', exact: true }).click();
     await expect(page.getByTestId('attachment-download-0')).toHaveText(/delivery-notes.txt/);
