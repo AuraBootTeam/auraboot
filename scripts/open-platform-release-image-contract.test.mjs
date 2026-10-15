@@ -367,3 +367,7 @@ console.log('open-platform PostgreSQL TCP readiness: 2 executable cases PASS');
 
 assert.match(gate, /backend-tests\.log" 2>&1 \|\| BACKEND_RC=\$\?/);
 assert.ok(gate.indexOf('available JUnit evidence retained') > gate.indexOf('cp "$result" "$ARTIFACTS/backend-junit/"'));
+
+assert.match(probe, /run_integration_token_probe\(clients\["integrationTokens"\]\.request/);
+assert.match(probe, /run_office_probe\(clients\["officeGuide"\]\.request/);
+assert.match(probe, /protocol-request-counts\.json/);

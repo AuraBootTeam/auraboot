@@ -1190,9 +1190,23 @@ def run_sdk_consumer(fixture, command, *, base_url, evidence_path):
     return verify_sdk_report(safe)
 
 
+def verify_request_counts(counts):
+    limits = {"baseline": 1000, "integrationTokens": 64, "officeGuide": 512}
+    if not isinstance(counts, dict) or set(counts) != set(limits):
+        raise ProtocolError("release phase request counts missing")
+    for name, limit in limits.items():
+        row = counts[name]
+        if (not isinstance(row, dict) or set(row) != {"executed", "limit"}
+                or type(row.get("limit")) is not int or row["limit"] != limit
+                or type(row.get("executed")) is not int or not 0 < row["executed"] <= limit):
+            raise ProtocolError("release phase request budget invalid")
+    return counts
+
+
 def verify_release_report(report, *, model_event_secret=None):
     if not isinstance(report, dict):
         raise ProtocolError("release protocol report invalid")
+    verify_request_counts(report.get("requestCounts"))
     verify_report(report.get("dynamic"))
     verify_sdk_report(report.get("sdk"))
     verify_model_event_report(report.get("modelEvents"), secret=model_event_secret)

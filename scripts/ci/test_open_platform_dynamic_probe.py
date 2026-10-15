@@ -983,20 +983,31 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()}, model_event_secret=SECRET)
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
                                   model_event_secret=SECRET)
         measured = model_passed(); measured["loadMeasurement"] = load_passed(); measured["sustainedMeasurement"] = sustained_passed(); measured["receiverIsolation"] = isolation_passed(); measured["genericReplay"] = generic_replay_passed()
-        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()},
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
                                               model_event_secret=SECRET)["sdk"], sdk)
         for field in ['loadMeasurement', 'sustainedMeasurement', 'receiverIsolation', 'genericReplay']:
             omitted = dict(measured); omitted.pop(field)
             with self.assertRaises(ProtocolError):
                 verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": omitted,
-                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()}, model_event_secret=SECRET)
+                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}}, model_event_secret=SECRET)
         measured["loadMeasurement"]["metrics"]["accepted"] = 0
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
                                   model_event_secret=SECRET)
+
+    def test_release_phase_budgets_preserve_original_and_reject_missing_or_unbounded_counts(self):
+        from open_platform_dynamic_probe import verify_request_counts
+        good = {"baseline": {"executed": 999, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}
+        self.assertEqual(verify_request_counts(good), good)
+        for value in [None, {}, {**good, "unknown": {}}, {key: row for key, row in good.items() if key != "officeGuide"}]:
+            with self.assertRaises(ProtocolError): verify_request_counts(value)
+        for name in good:
+            for field, value in [("executed", 0), ("executed", True), ("executed", good[name]["limit"] + 1), ("limit", good[name]["limit"] + 1)]:
+                bad = {key: dict(row) for key, row in good.items()}; bad[name][field] = value
+                with self.assertRaises(ProtocolError): verify_request_counts(bad)
 
     def test_direct_token_release_denominator_rejects_omissions_and_fabricated_totals(self):
         from open_platform_integration_token_probe import verify_integration_token_report
