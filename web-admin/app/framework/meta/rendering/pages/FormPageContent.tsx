@@ -384,6 +384,28 @@ export function buildFormCommandPayload(
   );
 }
 
+/** Pure CRUD writes business inputs only; loaded audit fields are display data. */
+export function buildDynamicCrudFormPayload(
+  record: Record<string, any>,
+  modelFields: Record<string, Pick<FieldMetaInfo, 'dataType'>>,
+  dirtyFields: ReadonlySet<string>,
+  operation: 'create' | 'update',
+): Record<string, any> {
+  const systemFields = new Set([
+    'id', 'pid', 'tenant_id', 'created_at', 'created_by', 'updated_at', 'updated_by',
+    'deleted_flag', 'deleted_at', 'deleted_by', 'row_version',
+  ]);
+  const hasFieldMetadata = Object.keys(modelFields).length > 0;
+  return Object.fromEntries(Object.entries(record).flatMap(([key, rawValue]) => {
+    if (systemFields.has(key) || key.startsWith('_') ||
+        (operation === 'update' && !dirtyFields.has(key)) ||
+        (hasFieldMetadata && !modelFields[key])) return [];
+    const value = normalizePayloadValue(rawValue, modelFields[key]?.dataType);
+    if (isEmptySubmittedValue(value) && !(value === null && dirtyFields.has(key))) return [];
+    return [[key, value]];
+  }));
+}
+
 export function resolveAsyncCommandDispatch(
   responseData: any,
   submitMode?: unknown,
@@ -2010,7 +2032,6 @@ export function FormPageContent(props: PageContentProps) {
       }
       setFieldErrors({});
       setSummaryErrors([]);
-      const modelFieldEntries = Object.entries(modelFields);
       const commandPayload = buildFormCommandPayload(
         dispatchActionRecord,
         modelFields,
@@ -2160,45 +2181,12 @@ export function FormPageContent(props: PageContentProps) {
             ? `/api/dynamic/${targetModelCode}/${recordPid}`
             : `/api/dynamic/${targetModelCode}`;
         const method = dynamicCrudOperation === 'update' ? 'put' : 'post';
-        const payload =
-          modelFieldEntries.length > 0
-            ? Object.fromEntries(
-                Object.entries(actionRecord).flatMap(([key, rawValue]) => {
-                  if (!modelFields[key]) return [];
-                  const value = normalizePayloadValue(rawValue, modelFields[key].dataType);
-                  if (Array.isArray(value) && value.length === 0) return [];
-                  if (
-                    value &&
-                    typeof value === 'object' &&
-                    !Array.isArray(value) &&
-                    Object.keys(value).length === 0
-                  )
-                    return [];
-                  return [[key, value]];
-                }),
-              )
-            : Object.fromEntries(
-                Object.entries(actionRecord).filter(
-                  ([key]) =>
-                    key !== 'id' &&
-                    key !== 'pid' &&
-                    key !== 'tenant_id' &&
-                    key !== 'created_at' &&
-                    key !== 'created_by' &&
-                    key !== 'updated_at' &&
-                    key !== 'updated_by' &&
-                    !key.startsWith('_'),
-                ),
-              );
-        const normalizedPayload =
-          dynamicCrudOperation === 'update' && initialFormData
-            ? Object.fromEntries(
-                Object.entries(payload).filter(([key, value]) => {
-                  const initialValue = initialFormData[key];
-                  return JSON.stringify(value) !== JSON.stringify(initialValue);
-                }),
-              )
-            : payload;
+        const normalizedPayload = buildDynamicCrudFormPayload(
+          actionRecord,
+          modelFields,
+          dirtyFieldsRef.current,
+          dynamicCrudOperation,
+        );
 
         setSubmitting(true);
         return fetchResult(endpoint, {
