@@ -954,6 +954,16 @@ function replaceSubmitEndpointPlaceholders(
   return template.replace(/\/+$/, '');
 }
 
+/** Pure model forms use public record identity to resolve save/submit into CRUD. */
+export function resolveDynamicCrudFormOperation(
+  actionType: string,
+  recordPid: string | null | undefined,
+): 'create' | 'update' | null {
+  if (actionType === 'create' || actionType === 'update') return actionType;
+  if (actionType === 'save' || actionType === 'submit') return recordPid ? 'update' : 'create';
+  return null;
+}
+
 export function resolveFormSubmitEndpoint(
   schema: any,
   recordPid: string | null | undefined,
@@ -2142,16 +2152,14 @@ export function FormPageContent(props: PageContentProps) {
       }
 
       // MODEL form path: when no commandCode is provided, persist via dynamic CRUD API.
-      if (
-        !effectiveButton.commandCode &&
-        (effectiveActionType === 'create' || effectiveActionType === 'update')
-      ) {
+      const dynamicCrudOperation = resolveDynamicCrudFormOperation(effectiveActionType, recordPid);
+      if (!effectiveButton.commandCode && dynamicCrudOperation) {
         const targetModelCode = schema?.modelCode || tableName;
         const endpoint =
-          effectiveActionType === 'update'
+          dynamicCrudOperation === 'update'
             ? `/api/dynamic/${targetModelCode}/${recordPid}`
             : `/api/dynamic/${targetModelCode}`;
-        const method = effectiveActionType === 'update' ? 'put' : 'post';
+        const method = dynamicCrudOperation === 'update' ? 'put' : 'post';
         const payload =
           modelFieldEntries.length > 0
             ? Object.fromEntries(
@@ -2183,7 +2191,7 @@ export function FormPageContent(props: PageContentProps) {
                 ),
               );
         const normalizedPayload =
-          effectiveActionType === 'update' && initialFormData
+          dynamicCrudOperation === 'update' && initialFormData
             ? Object.fromEntries(
                 Object.entries(payload).filter(([key, value]) => {
                   const initialValue = initialFormData[key];

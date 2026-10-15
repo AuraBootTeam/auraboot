@@ -216,6 +216,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await screenshot(page, info, 'SC02-customer-followup-form');
   const createRecord = page.waitForResponse(
     (r) => new URL(r.url()).pathname === `/api/dynamic/${code}` && r.request().method() === 'POST',
+    { timeout: 15000 },
   );
   await expect(page.getByTestId('form-btn-submit')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('form-btn-submit').click();
@@ -242,6 +243,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     (r) =>
       new URL(r.url()).pathname === `/api/dynamic/${code}/${recordPid}` &&
       r.request().method() === 'PUT',
+    { timeout: 15000 },
   );
   await expect(page.getByTestId('form-btn-submit')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('form-btn-submit').click();

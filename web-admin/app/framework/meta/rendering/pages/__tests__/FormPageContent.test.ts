@@ -20,6 +20,7 @@ import {
   resolveFormBackLink,
   resolveValidationToastMessage,
   resolveFormSubmitEndpoint,
+  resolveDynamicCrudFormOperation,
   resolveCreateSubTableEmptyState,
   resolveSubmitCommandCode,
   shouldBypassFormSubmit,
@@ -798,5 +799,22 @@ describe('attachment sharing serialization contract', () => {
   it('rejects missing identifiers and malformed collections rather than skipping sharing', () => {
     expect(() => collectAttachmentRelationIds('[{"name":"unlinked.txt"}]')).toThrow();
     expect(() => collectAttachmentRelationIds('{}')).toThrow();
+  });
+});
+
+describe('resolveDynamicCrudFormOperation', () => {
+  it.each(['save', 'submit'])('persists %s as create when no public record PID exists', action => {
+    expect(resolveDynamicCrudFormOperation(action, null)).toBe('create');
+    expect(resolveDynamicCrudFormOperation(action, undefined)).toBe('create');
+  });
+  it.each(['save', 'submit'])('persists %s as update only when editing a public record', action => {
+    expect(resolveDynamicCrudFormOperation(action, '01M4YQEBRTMX5TE0X9N9BS38NG')).toBe('update');
+  });
+  it('retains explicit create and update semantics', () => {
+    expect(resolveDynamicCrudFormOperation('create', '01M4YQEBRTMX5TE0X9N9BS38NG')).toBe('create');
+    expect(resolveDynamicCrudFormOperation('update', null)).toBe('update');
+  });
+  it.each(['command', 'navigate', 'cancel', 'reset', 'delete', ''])('does not route %s through dynamic CRUD', action => {
+    expect(resolveDynamicCrudFormOperation(action, '01M4YQEBRTMX5TE0X9N9BS38NG')).toBeNull();
   });
 });

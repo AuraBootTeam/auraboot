@@ -38,6 +38,12 @@ class DslGeneratorPermissionContractTest {
         var permissionCodes = blocks.findValues("permissionCode");
         var expressions = blocks.findValues("visibleWhen");
         if ("form".equals(kind)) {
+            for (String code : List.of("submit", "reset", "cancel")) {
+                var buttons = blocks.findParents("code").stream()
+                        .filter(button -> code.equals(button.path("code").asText())).toList();
+                assertThat(buttons).hasSize(1);
+                assertThat(buttons.getFirst().has("events")).isFalse();
+            }
             // A shared create/edit form has a real authenticated expression context.
             assertThat(expressions).anySatisfy(expression -> assertThat(expression.asText())
                     .isEqualTo("${hasPermission('model.customer.create') || hasPermission('model.customer.update')}"));

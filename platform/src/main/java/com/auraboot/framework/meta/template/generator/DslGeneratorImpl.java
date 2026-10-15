@@ -804,15 +804,11 @@ public class DslGeneratorImpl implements DslGenerator {
         Map<String, Object> submitBtn = new LinkedHashMap<>();
         submitBtn.put("code", "submit");
         submitBtn.put("action", "save");
+        submitBtn.put("label", Map.of("zh-CN", "保存", "en", "Save"));
         // Label resolved by frontend: action.save.label
         submitBtn.put("primary", true);
         // 权限码格式: model.{modelCode}.create/update
         submitBtn.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".create') || hasPermission('model." + model.getCode() + ".update')}");
-        Map<String, Object> submitEvents = new LinkedHashMap<>();
-        Map<String, Object> submitOnClick = new LinkedHashMap<>();
-        submitOnClick.put("handler", "submitForm");
-        submitEvents.put("onClick", submitOnClick);
-        submitBtn.put("events", submitEvents);
         buttons.add(submitBtn);
 
         // Reset button
@@ -820,11 +816,6 @@ public class DslGeneratorImpl implements DslGenerator {
         resetBtn.put("code", "reset");
         resetBtn.put("action", "reset");
         // Label resolved by frontend: action.reset.label
-        Map<String, Object> resetEvents = new LinkedHashMap<>();
-        Map<String, Object> resetOnClick = new LinkedHashMap<>();
-        resetOnClick.put("handler", "resetForm");
-        resetEvents.put("onClick", resetOnClick);
-        resetBtn.put("events", resetEvents);
         buttons.add(resetBtn);
 
         // Cancel button
@@ -832,11 +823,6 @@ public class DslGeneratorImpl implements DslGenerator {
         cancelBtn.put("code", "cancel");
         cancelBtn.put("action", "cancel");
         // Label resolved by frontend: action.cancel.label
-        Map<String, Object> cancelEvents = new LinkedHashMap<>();
-        Map<String, Object> cancelOnClick = new LinkedHashMap<>();
-        cancelOnClick.put("handler", "cancelForm");
-        cancelEvents.put("onClick", cancelOnClick);
-        cancelBtn.put("events", cancelEvents);
         buttons.add(cancelBtn);
 
         buttonsBlock.put("buttons", buttons);
