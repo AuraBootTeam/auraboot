@@ -18,7 +18,7 @@ test('delivery brief imports through the designer and exports the same governed 
  await expect(page.getByTestId('report-template-import')).toBeVisible();
  const chooser=page.waitForEvent('filechooser');await page.getByTestId('report-template-import').click();await(await chooser).setFiles(templatePath);
  await expect(page.getByTestId('report-template-imported')).toBeVisible();
- const title='客户项目交付简报 · 验证副本';await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);
+ const title=`客户项目交付简报 · 验证 ${Date.now()}`;await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);
  const save=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/report-definitions'&&r.request().method()==='POST');
  await page.getByTestId('report-designer-toolbar-btn-save').click();const saved=await save;expect(saved.status()).toBe(200);
  const body=await saved.json();expect(String(body.code)).toBe('0');const pid=body.data.pid;
@@ -27,6 +27,7 @@ test('delivery brief imports through the designer and exports the same governed 
  await navigateToMenuByClick(page,['元数据管理','报表管理']);
  await page.getByRole('row').filter({hasText:title}).getByText('打开',{exact:true}).click();
  await expect(page).toHaveURL(new RegExp(`/report-designer/${pid}$`));
+ await expect(page.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(title);
  await page.reload();await expect(page.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(title);
  const toolbar=page.getByTestId('report-designer-toolbar');
  const query=page.waitForResponse(r=>r.url().includes('tpm_delivery_brief')&&r.request().method()==='GET');
