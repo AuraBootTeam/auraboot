@@ -132,23 +132,24 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     body: JSON.stringify({ ...published, readback: publishedBody }), contentType: 'application/json',
   });
   await expect(page.getByTestId('model-publish-dialog')).toBeHidden();
-  await page.getByTestId('model-primary-page-action').click();
-  await expect(page.getByTestId('crud-generate-list')).toBeChecked();
-  await expect(page.getByTestId('crud-generate-form')).toBeChecked();
-  await expect(page.getByTestId('crud-generate-detail')).toBeChecked();
-  const generate = page.waitForResponse(
-    (r) => r.url().includes('/api/templates/crud/generate') && r.request().method() === 'POST',
-  );
-  await page.getByTestId('crud-generate-submit').click();
-  const generated = await (await generate).json();
-  expect(String(generated.code)).toBe('0');
-  expect(generated.data.generatedResources.pages).toHaveLength(3);
-  await page.reload();
-  await expect(page.locator('body')).not.toContainText(
-    /Page Unavailable|Page not found|Access forbidden/,
-  );
-  await screenshot(page, info, 'SC02-generated-page-reopened');
-  await page.goBack();
+  // Model publication already creates published standard pages, idempotently.
+  // The primary action therefore opens an existing designer, not the CRUD wizard.
+  const pagesResponse = await page.request.get(`/api/meta/models/${pid}/pages`);
+  expect(pagesResponse.ok()).toBe(true);
+  const pagesBody = await pagesResponse.json();
+  expect(String(pagesBody.code)).toBe('0');
+  expect(pagesBody.data).toHaveLength(3);
+  expect(pagesBody.data.map((item: { kind: string }) => item.kind).sort())
+    .toEqual(['detail', 'form', 'list']);
+  for (const generatedPage of pagesBody.data) {
+    expect(generatedPage).toMatchObject({
+      modelCode: code, pageKey: `${code}_${generatedPage.kind}`, status: 'published',
+    });
+    expect(generatedPage.pid).toMatch(/^[0-9A-Z]{26}$/);
+  }
+  await info.attach('SC02-publish-generated-standard-pages', {
+    body: JSON.stringify(pagesBody), contentType: 'application/json',
+  });
   await expect(page.getByTestId('model-primary-page-preview')).toBeVisible();
   await page.getByTestId('model-primary-page-preview').click();
   await expect(page.getByRole('columnheader', { name: '客户名称', exact: true })).toBeVisible();
