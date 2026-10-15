@@ -309,7 +309,11 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             .pid(page.getPid())
             .pageName(page.getName())
             .kind(kind)
-            .route("/dynamic/" + modelCode)
+            .route(switch (kind) {
+                case "form" -> "/p/" + modelCode + "/new";
+                case "detail" -> "/p/" + modelCode + "/view/:recordPid";
+                default -> "/p/" + modelCode;
+            })
             .createdAt(page.getCreatedAt() != null ? page.getCreatedAt().toString() : Instant.now().toString())
             .build();
     }
@@ -320,7 +324,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         Menu menu = new Menu();
         menu.setPid(UniqueIdGenerator.generate());
         menu.setName(config.getMenuName());
-        menu.setPath("/dynamic/" + model.getCode());
+        menu.setPath("/p/" + model.getCode());
         menu.setIcon(config.getMenuIcon());
         menu.setType(1); // MENU = 1
         menu.setOrderNo(100);
@@ -358,7 +362,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         String[] actions = {"read", "create", "update", "delete"};
         for (String action : actions) {
             PermissionCreateRequest request = new PermissionCreateRequest();
-            request.setCode("dynamic." + resourceCode + "." + action);
+            request.setCode("model." + resourceCode + "." + action);
             request.setName(model.getDisplayName() + " - " + action);
             request.setResourceType(resourceType);
             request.setResourceCode(resourceCode);
@@ -380,7 +384,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         // Export permission
         if (config.isEnableExport()) {
             PermissionCreateRequest request = new PermissionCreateRequest();
-            request.setCode("dynamic." + resourceCode + ".export");
+            request.setCode("model." + resourceCode + ".export");
             request.setName(model.getDisplayName() + " - export");
             request.setResourceType(resourceType);
             request.setResourceCode(resourceCode);
@@ -402,7 +406,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         // Import permission
         if (config.isEnableImport()) {
             PermissionCreateRequest request = new PermissionCreateRequest();
-            request.setCode("dynamic." + resourceCode + ".import");
+            request.setCode("model." + resourceCode + ".import");
             request.setName(model.getDisplayName() + " - import");
             request.setResourceType(resourceType);
             request.setResourceCode(resourceCode);
@@ -491,9 +495,9 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
     ) {
         // Build access links
         AccessLinks accessLinks = AccessLinks.builder()
-            .listPage("/dynamic/" + model.getCode())
-            .formPage("/dynamic/" + model.getCode() + "/new")
-            .detailPage("/dynamic/" + model.getCode() + "/:id")
+            .listPage("/p/" + model.getCode())
+            .formPage("/p/" + model.getCode() + "/new")
+            .detailPage("/p/" + model.getCode() + "/view/:recordPid")
             .build();
         
         // Build generated resources

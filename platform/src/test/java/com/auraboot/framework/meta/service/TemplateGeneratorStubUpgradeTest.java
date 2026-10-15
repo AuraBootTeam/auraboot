@@ -87,7 +87,17 @@ class TemplateGeneratorStubUpgradeTest {
         assertThat(update.getValue().getExtension()).containsExactlyEntriesOf(Map.of("source", "platform"));
         assertThat(update.getValue().getBlocks()).isNotEmpty();
         assertThat(update.getValue().getModelCode()).isEqualTo("customer");
+        assertThat(update.getValue().getTitle()).isEqualTo("{\"en\":\"Customer\"}");
         assertThat(result.getGeneratedResources().getPages().getFirst().getPid()).isEqualTo(existing.getPid());
+        String expectedRoute = switch (kind) {
+            case "form" -> "/p/customer/new";
+            case "detail" -> "/p/customer/view/:recordPid";
+            default -> "/p/customer";
+        };
+        assertThat(result.getGeneratedResources().getPages().getFirst().getRoute()).isEqualTo(expectedRoute);
+        assertThat(result.getAccessLinks().getListPage()).isEqualTo("/p/customer");
+        assertThat(result.getAccessLinks().getFormPage()).isEqualTo("/p/customer/new");
+        assertThat(result.getAccessLinks().getDetailPage()).isEqualTo("/p/customer/view/:recordPid");
         verify(pages, never()).create(any());
         InOrder order = inOrder(pageMapper, pages);
         order.verify(pageMapper).lockAutoCreatedPage(existing.getPid(), 7L, "customer", kind, "customer_" + kind, 7);

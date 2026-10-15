@@ -192,10 +192,15 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await expect(page.getByTestId('model-primary-page-preview')).toBeVisible();
   await page.getByTestId('model-primary-page-preview').click();
   await expect(page).toHaveURL(new RegExp(`/p/${code}(?:\\?.*)?$`));
-  await expect(page.getByRole('columnheader', { name: '客户名称', exact: true })).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: '商机金额', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '客户跟进列表', exact: true })).toBeVisible();
+  const customerHeader = page.getByRole('columnheader').filter({ has: page.getByText('客户名称', { exact: true }) });
+  const amountHeader = page.getByRole('columnheader').filter({ has: page.getByText('商机金额', { exact: true }) });
+  await expect(customerHeader).toHaveCount(1);
+  await expect(customerHeader).toHaveText('客户名称');
+  await expect(amountHeader).toHaveCount(1);
+  await expect(amountHeader).toHaveText('商机金额');
   await page.reload();
-  await expect(page.getByRole('columnheader', { name: '客户名称', exact: true })).toBeVisible();
+  await expect(customerHeader).toHaveText('客户名称');
   await screenshot(page, info, 'SC02-runtime-business-labels');
   const listUrl = page.url();
   const customerField = `${code}_customer_name`;
