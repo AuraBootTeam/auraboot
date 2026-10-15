@@ -314,9 +314,11 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     `/api/automations/${automationPid}/logs`,
   );
   const logs = (await logResponse.json()).data;
-  const activeLog = logs.find(
+  const activeLogs = logs.filter(
     (entry: any) => entry.triggerRecordPid === active,
   );
+  expect(activeLogs, 'One command event must produce one target execution').toHaveLength(1);
+  const activeLog = activeLogs[0];
   expect(activeLog.status).toBe('success');
   const nodeResponse = await page.request.get(
     `/api/automation/executions/by-log/${activeLog.id}/node-statuses`,
@@ -374,6 +376,13 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
       { intervals: [250], timeout: 5000 },
     )
     .toBe(5);
+
+  const finalLogs = (
+    await (await page.request.get(`/api/automations/${automationPid}/logs`)).json()
+  ).data;
+  expect(finalLogs.filter((entry: any) => entry.triggerRecordPid === active)).toHaveLength(1);
+  expect(finalLogs.filter((entry: any) => entry.triggerRecordPid === other)).toHaveLength(1);
+  expect(finalLogs.filter((entry: any) => entry.triggerRecordPid === disabled)).toHaveLength(0);
 
   await menu(page, ['元数据管理', '仪表盘管理']);
   await page
