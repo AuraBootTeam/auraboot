@@ -257,6 +257,9 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const updatedRecordBody = await updatedRecordResponse.json();
   expect(String(updatedRecordBody.code)).toBe('0');
   expect(updatedRecordBody.data).toMatchObject({ [customerField]: customerName, [amountField]: 68000 });
+  // The response precedes React's success redirect; reload only after its real navigation completes.
+  await expect(page).toHaveURL(listUrl);
+  await expect(row).toBeVisible();
   await page.reload();
   await expect(row).toBeVisible();
   const persistedRecord = await page.request.get(`/api/dynamic/${code}/${recordPid}`);
