@@ -47,6 +47,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private OpenPlatformManagementService managementService;
     @Autowired private OpenPlatformTokenService tokenService;
+    @Autowired private IntegrationTokenService integrationTokens;
     @Autowired private OpenPlatformAuthMapper authMapper;
     @Autowired private OpenApiRateLimitMapper rateLimitMapper;
     @Autowired private OpenPlatformBearerAuthenticator authenticator;
@@ -64,6 +65,138 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     void grantOpenPlatformAdministration() {
         grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update",
                 "Manage Open Platform");
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentPermanentTokenRotationCreatesExactlyOneReplacement() throws Exception {
+        var app = managementService.createApplication(new CreateApplicationRequest("Concurrent token rotation", "Serialized replacement"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        var old = integrationTokens.create(installation.pid(), new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "initial-concurrent-1");
+        var membership = tenantMemberService.findByTenantIdAndUserId(getTestTenant().getId(), getTestUser().getId());
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> rotateIntegrationAsOwner(installation.pid(), old.metadata().pid(), "rotation-concurrent-a", membership, start));
+            var second = executor.submit(() -> rotateIntegrationAsOwner(installation.pid(), old.metadata().pid(), "rotation-concurrent-b", membership, start));
+            start.countDown();
+            assertEquals(1, java.util.stream.Stream.of(first.get(), second.get()).filter(Boolean.TRUE::equals).count());
+        }
+        assertEquals(2, integrationTokens.list(installation.pid()).size());
+        assertEquals(1, integrationTokens.list(installation.pid()).stream().filter(t -> "active".equals(t.status())).count());
+        assertEquals(1, integrationTokens.list(installation.pid()).stream().filter(t -> "replaced".equals(t.status())).count());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(old.token(), "/api/open/v1/whoami"));
+    }
+
+    private boolean rotateIntegrationAsOwner(String installationPid, String oldPid, String key,
+                                              TenantMember membership, CountDownLatch start) throws InterruptedException {
+        start.await();
+        MetaContext.setContext(getTestTenant().getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
+        MetaContext.setMemberId(membership.getId());
+        try {
+            integrationTokens.rotate(installationPid, oldPid, new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), key);
+            return true;
+        } catch (org.springframework.web.server.ResponseStatusException conflict) {
+            assertEquals(409, conflict.getStatusCode().value());
+            return false;
+        } finally { MetaContext.clear(); }
+    }
+
+    @Test
+    void integrationTokensCannotBeManagedThroughAnotherInstallationOrAfterDisable() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Token parent scope", "Cross-parent refusal"));
+        var one = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        var two = managementService.install(app.pid(), new InstallApplicationRequest("staging", Set.of("openapi.profile.read"), 600));
+        var permanent = integrationTokens.create(one.pid(), new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "cross-parent-create");
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.revoke(two.pid(), permanent.metadata().pid()));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.rotate(two.pid(), permanent.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "cross-parent-rotate"));
+        authenticateIntegration(permanent.token(), "/api/open/v1/whoami");
+        assertEquals(1, integrationTokens.list(one.pid()).size());
+        assertTrue(integrationTokens.list(two.pid()).isEmpty());
+        managementService.disableInstallation(one.pid());
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.create(one.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "disabled-create-1"));
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(permanent.token(), "/api/open/v1/whoami"));
+    }
+
+    @Test
+    void integrationTokenKeepsItsIdentityWhileCurrentInstallationGrantsChange() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Quick access", "Current authority"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        var permanent = integrationTokens.create(installation.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "create-permanent-1");
+        assertEquals(app.pid(), permanent.appId());
+        assertEquals("never", permanent.metadata().expirationMode());
+        assertNull(permanent.metadata().expiresAt());
+        assertFalse(permanent.toString().contains(permanent.token()));
+        var first = authenticateIntegration(permanent.token(), "/api/open/v1/whoami");
+        assertEquals(installation.pid(), first.installationPid());
+        assertEquals(Set.of("openapi.profile.read"), first.scopes());
+        assertEquals(secretCodec.sha256(permanent.token()), jdbcTemplate.queryForObject(
+                "SELECT token_hash FROM ab_application_access_token WHERE pid=?", String.class, permanent.metadata().pid()));
+        assertNull(jdbcTemplate.queryForObject("SELECT credential_id FROM ab_application_access_token WHERE pid=?", Long.class, permanent.metadata().pid()));
+        var credential = managementService.createCredential(installation.pid());
+        var oauth = tokenService.issue("client_credentials", credential.clientId(), credential.clientSecret(), "openapi.profile.read");
+        managementService.updateScopes(installation.pid(), new UpdateInstallationScopesRequest(Set.of("openapi.events.read")));
+        var removed = assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(permanent.token(), "/api/open/v1/whoami"));
+        assertEquals(403, removed.status());
+        assertEquals(Set.of("openapi.events.read"), authenticateIntegration(permanent.token(), "/api/open/v1/event-catalog").scopes());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(oauth.accessToken(), "/api/open/v1/whoami"));
+        assertNull(jdbcTemplate.queryForObject("SELECT revoked_at FROM ab_application_access_token WHERE pid=?", java.sql.Timestamp.class, permanent.metadata().pid()));
+        assertEquals(1, integrationTokens.list(installation.pid()).size());
+        assertFalse(new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                .valueToTree(integrationTokens.list(installation.pid())).toString().contains(permanent.token()));
+    }
+
+    @Test
+    void permanentRotationHasFiniteCutoffAndRevocationDoesNotRevokeSiblings() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Rotation", "Permanent cutoff"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("staging", Set.of("openapi.profile.read"), 600));
+        var request = new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null);
+        var old = integrationTokens.create(installation.pid(), request, "create-rotation-1");
+        var sibling = integrationTokens.create(installation.pid(), request, "create-sibling-1");
+        var rotated = integrationTokens.rotate(installation.pid(), old.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "rotate-permanent-1");
+        assertEquals(old.appId(), rotated.credential().appId());
+        assertNull(rotated.credential().metadata().expiresAt());
+        assertTrue(rotated.replacedTokenAcceptUntil().isBefore(Instant.now().plusSeconds(1)));
+        assertEquals("replaced", integrationTokens.list(installation.pid()).stream().filter(t -> t.pid().equals(old.metadata().pid())).findFirst().orElseThrow().status());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(old.token(), "/api/open/v1/whoami"));
+        authenticateIntegration(rotated.credential().token(), "/api/open/v1/whoami");
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.rotate(installation.pid(), old.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "rotate-permanent-1"));
+        assertEquals(3, integrationTokens.list(installation.pid()).size());
+        integrationTokens.revoke(installation.pid(), rotated.credential().metadata().pid());
+        integrationTokens.revoke(installation.pid(), rotated.credential().metadata().pid());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(rotated.credential().token(), "/api/open/v1/whoami"));
+        authenticateIntegration(sibling.token(), "/api/open/v1/whoami");
+        managementService.disableInstallation(installation.pid());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(sibling.token(), "/api/open/v1/whoami"));
+    }
+
+    @Test
+    void fixedRotationCannotExtendOriginalExpiryAndCreateRetryNeverRevealsAnotherSecret() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Fixed lifetime", "Idempotent administration"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        Instant until = Instant.now().plusSeconds(7200).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var request = new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "fixed", until);
+        var old = integrationTokens.create(installation.pid(), request, "create-fixed-token-1");
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.create(installation.pid(), request, "create-fixed-token-1"));
+        assertEquals(1, integrationTokens.list(installation.pid()).size());
+        var rotated = integrationTokens.rotate(installation.pid(), old.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 10080), "rotate-fixed-token-1");
+        assertEquals(until, rotated.replacedTokenAcceptUntil());
+        authenticateIntegration(old.token(), "/api/open/v1/whoami");
+        jdbcTemplate.update("UPDATE ab_application_access_token SET expires_at=?, issued_at=? WHERE pid=?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(1)), java.sql.Timestamp.from(Instant.now().minusSeconds(3600)), old.metadata().pid());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(old.token(), "/api/open/v1/whoami"));
+        authenticateIntegration(rotated.credential().token(), "/api/open/v1/whoami");
+    }
+
+    private com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal authenticateIntegration(String token, String path) {
+        var request = new MockHttpServletRequest("GET", path);
+        request.addHeader("Authorization", "Bearer " + token);
+        return authenticator.authenticate(request);
     }
 
     @Test
@@ -95,12 +228,21 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         var installation = managementService.install(application.pid(),
                 new InstallApplicationRequest("production", Set.of("openapi.profile.read"), 600));
         managementService.createCredential(installation.pid());
+        var managedToken = integrationTokens.create(installation.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Managed token", "never", null), "role-create-token");
 
         switchActor(viewer, viewerMembership);
         assertEquals(1, managementService.listApplications().size());
         assertEquals(0, managementService.getOperationsOverview(installation.pid(), 24).totalCalls());
         assertThrows(AccessDeniedException.class,
                 () -> managementService.createCredential(installation.pid()));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.list(installation.pid()));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.create(installation.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Denied", "never", null), "role-create-denied"));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.rotate(installation.pid(), managedToken.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "role-rotate-denied"));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.revoke(installation.pid(), managedToken.metadata().pid()));
+
 
         TenantMember outsiderMembership = tenantMemberService.findByTenantIdAndUserId(
                 getTestTenant().getId(), outsider.getId());
