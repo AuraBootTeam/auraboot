@@ -59,7 +59,8 @@ test('project delivery opt-in imports the template with a business-space session
   const result = await runQuickstart([business], ['--project-delivery']);
   assert.equal(result.code, 0, result.output);
   const imports = result.calls.filter(call => call.path === '/api/plugins/import/import-directory-sync');
-  assert.equal(imports.length, 9);
+  assert.equal(imports.length, 5);
+  assert.ok(!imports.some(call => call.body.path.endsWith('/agent-control-plane')));
   assert.ok(imports.some(call => call.body.path.endsWith('/project-management')));
   assert.ok(imports.every(call => call.authorization === 'Bearer fixture-business-token'));
 });

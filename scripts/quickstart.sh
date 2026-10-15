@@ -75,7 +75,10 @@ PLUGINS=(
   showcase
   agent-control-plane
 )
-if [[ "$PROJECT_DELIVERY" == 1 ]]; then PLUGINS+=(project-management); fi
+if [[ "$PROJECT_DELIVERY" == 1 ]]; then
+  # Keep the first-use journey scoped to its actual platform dependencies.
+  PLUGINS=(core-meta platform-admin page-manager org-management project-management)
+fi
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; DIM='\033[2m'; NC='\033[0m'
 say() { printf '%b\n' "$*"; }
