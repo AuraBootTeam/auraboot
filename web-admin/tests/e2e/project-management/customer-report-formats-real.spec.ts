@@ -8,7 +8,6 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { navigateToMenuByClick } from '../helpers';
 
 // Existing integrated fixture, intentionally shared with SC05; not AI-generated.
@@ -17,7 +16,6 @@ const templatePath = fileURLToPath(
 );
 const compact = (value: string) => value.normalize('NFKC').replace(/\s+/g, '');
 test.use({
-  storageState: { cookies: [], origins: [] },
   locale: 'zh-CN',
   viewport: { width: 1440, height: 1000 },
 });
@@ -43,10 +41,8 @@ test('SC06-FORMATS manual customer template persists and exports real Chinese da
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/ai/aurabot/chat/stream') modelRequestCount++;
   });
-  await page.goto('/login');
-  await page.locator('input#identifier, input#email').fill(DEFAULT_TEST_ACCOUNT.email);
-  await page.locator('input#password').fill(DEFAULT_TEST_ACCOUNT.password);
-  await page.getByRole('button', { name: '立即登录', exact: true }).click();
+  expect(process.env.PW_ADMIN_STORAGE_STATE, 'reuse the private state created by the real S1 browser login').toBeTruthy();
+  await page.goto('/home');
   await expect(page.getByTestId('sidebar')).toBeVisible();
 
   // Independent read-only oracle. Every mutation below uses the actual UI.
