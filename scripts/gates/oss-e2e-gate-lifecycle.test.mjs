@@ -55,12 +55,13 @@ if(!collection && process.env.MODE==='test-failure')process.exit(1);
 if(!collection && process.env.MODE==='signal'){process.kill(process.ppid,'SIGTERM');process.exit(0);}
 const profile=JSON.parse(fs.readFileSync('../scripts/gates/oss-e2e-gate-profile.json','utf8'));
 const report={errors:[],stats:{expected:profile.tests.length,unexpected:0,skipped:0,flaky:0},config:{projects:[{name:"oss",retries:0}]},suites:[{specs:profile.tests.map(t=>({file:t.file,title:t.title,tests:[{
-projectName:t.project,expectedStatus:'passed',status:'expected',results:collection?[]:[{status:'passed',retry:0}]}]}))}]};
+projectName:t.project,expectedStatus:'passed',status:'expected',results:collection?[]:[{status:'passed',retry:0,
+attachments:(t.requiredEvidence??[]).map(evidence=>({name:evidence.name,contentType:'application/json',body:Buffer.from(JSON.stringify(evidence.fields)).toString('base64')}))}]}]}))}]};
 if(process.env.MODE==='zero-tests')report.suites[0].specs=[];
 if(!collection && process.env.MODE==='missing-result')report.suites[0].specs.pop();
 if(!collection && process.env.MODE==='skipped-result')report.suites[0].specs[0].tests[0].results[0].status='skipped';
 if(!collection && process.env.MODE==='retried-result')report.suites[0].specs[0].tests[0].results.push({status:'passed',retry:1});
-if(collection)console.log(JSON.stringify(report));else{if(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE)fs.writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,JSON.stringify(report));console.log('12 passed');}
+if(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE){fs.mkdirSync(require('node:path').dirname(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE),{recursive:true});fs.writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,JSON.stringify(report));console.log(collection?'Listing tests:':'12 passed');}else console.log(JSON.stringify(report));
 `, { mode: 0o755 });
   registerFixtureWorkspace(root, repo);
   const env = { ...process.env, AURA_WORKSPACE_ROOT: root, AURA_WORKSPACE_STATE_DIR: path.join(root, 'state'),
@@ -91,16 +92,15 @@ for (const [mode, status] of [['', 0], ['up-failure', 2], ['verify-failure', 2],
     assert.equal(r.status, status, r.stdout + r.stderr);
     assert.match(r.stdout, /runtime status must be inspected/);
     const calls = fs.readFileSync(f.calls, 'utf8');
-    assert.doesNotMatch(calls, /destroy|down|stop|--fresh-db/);
+    assert.doesNotMatch(calls, /^(?:stack|aura runtime) (?:destroy|down|stop)(?: |$)|--fresh-db/m);
     assert.match(calls, /stack up owned-run --slot 900 .*--require-new-db/);
     if (mode === 'up-failure' || mode === 'verify-failure') assert.doesNotMatch(calls, /pnpm /);
     if (status === 0) {
       assert.match(calls, /aura runtime verify owned-run/);
       const execution = calls.split('\n').find(line => line.startsWith('pnpm ') && !line.includes('--list'));
       const paths = execution.match(/tests\/e2e\/[^\s]+/g);
-      assert.deepEqual(paths, ['tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts',
-        'tests/e2e/showcase/runtime-rendering-e2e.spec.ts', 'tests/e2e/saved-view/saved-view-gantt.spec.ts',
-        'tests/e2e/saved-view/saved-view-kanban.spec.ts']);
+      const profile = JSON.parse(fs.readFileSync(new URL('./oss-e2e-gate-profile.json', import.meta.url), 'utf8'));
+      assert.deepEqual(paths, [...new Set(profile.tests.map(row => row.file))]);
     }
   });
 }
@@ -178,6 +178,6 @@ for (const mode of ['zero-tests', 'missing-result', 'skipped-result', 'retried-r
     const f = fixture(t, mode); const result = f.run();
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.doesNotMatch(result.stdout, /OSS E2E GATE: PASS/);
-    assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /destroy|down|stop/);
+    assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /^(?:stack|aura runtime) (?:destroy|down|stop)(?: |$)/m);
   });
 }

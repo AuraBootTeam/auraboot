@@ -4,6 +4,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CriticalPathService;
 import com.auraboot.framework.meta.service.impl.CriticalPathService.CriticalPathResult;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/meta/schedule")
 @RequiredArgsConstructor
+@AuthenticatedAccess("read-only critical path computation over a project's WBS nodes")
 public class ScheduleController {
 
     private final CriticalPathService criticalPathService;

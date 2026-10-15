@@ -17,6 +17,16 @@ each before upgrading.
 - (entries here are folded into the next release)
 
 ### Changed
+- **BREAKING**: the platform authorization interceptor is now default-deny for un-annotated
+  handlers — `aura.security.authz.unannotated-mode` ships as `deny` (previously `shadow`).
+  Any `@RestController`/`@Controller` handler carrying neither `@RequirePermission` nor
+  `@AuthenticatedAccess` is rejected with HTTP 403. The entire first-party write/sensitive
+  controller surface now carries explicit authz decisions (authz sweep, SEC-20260723-00).
+  Downstream embedders who still need the legacy fail-open behavior for their own
+  controllers can set `AURA_AUTHZ_UNANNOTATED_MODE=shadow` (or `allow`) in their
+  environment for one upgrade cycle, then annotate and return to `deny`. A new un-annotated
+  write/sensitive controller also fails the build via the `controllerAuthzCheck` Gradle
+  task (wired into `check`).
 
 ### Fixed
 

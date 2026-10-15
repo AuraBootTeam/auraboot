@@ -72,6 +72,7 @@ class NamedQueryServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void configureFieldProtection() {
+        MetaContext.clear();
         org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
         when(fieldProtection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         when(fieldProtection.apply(any(), org.mockito.ArgumentMatchers.anyList()))

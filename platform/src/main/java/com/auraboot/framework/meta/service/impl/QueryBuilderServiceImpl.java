@@ -409,6 +409,31 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
             }
             return this;
         }
+
+        @Override
+        public QueryBuilder addKeysetCondition(String field, String direction, Object value, String pid) {
+            com.auraboot.framework.meta.security.SqlSafetyUtils.requireIdentifier(field, "keyset column");
+            if (!Set.of("ASC", "DESC").contains(direction) || pid == null || pid.isBlank()) {
+                throw new IllegalArgumentException("Validated keyset direction and PID required");
+            }
+            String pidKey = "param" + parameters.size();
+            parameters.add(pid);
+            String afterPid = "pid > #{params." + pidKey + "}";
+            if (value == null) {
+                conditions.add("(" + field + " IS NULL AND " + afterPid
+                        + ("DESC".equals(direction) ? " OR " + field + " IS NOT NULL" : "") + ")");
+            } else {
+                String valueKey = "param" + parameters.size();
+                parameters.add(value);
+                String bound = "#{params." + valueKey + "}";
+                String equalityKey = "param" + parameters.size();
+                parameters.add(value);
+                conditions.add("(" + field + ("ASC".equals(direction) ? " > " : " < ") + bound
+                        + ("ASC".equals(direction) ? " OR " + field + " IS NULL" : "")
+                        + " OR (" + field + " = #{params." + equalityKey + "} AND " + afterPid + "))");
+            }
+            return this;
+        }
         
         /**
          * 处理IN和NOT_IN操作符
@@ -665,8 +690,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         // row_version is a platform-owned physical column, not a business MetaField binding.
         // Always project it so every list/detail record can supply the exact optimistic token
         // required by high-risk commands. PublicRecordSanitizer intentionally preserves it.
-        if (modelDefinition.getTableName() != null
-                && modelDefinition.getTableName().startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)
+        if (PhysicalRowVersionSupport.isVersioned(modelDefinition, dynamicDataMapper)
                 && !selectFields.contains("row_version")) {
             selectFields.add("row_version");
         }

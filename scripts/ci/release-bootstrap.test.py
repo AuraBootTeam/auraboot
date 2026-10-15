@@ -11,6 +11,26 @@ spec.loader.exec_module(module)
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_replay_actor_dependencies_require_success_and_published_command(self):
+        for fault in (None, "import", "envelope", "command"):
+            calls = []
+            def request(path, **kwargs):
+                calls.append((path, kwargs))
+                if "import-directory-sync" in path:
+                    result = {"success": fault != "import"}
+                    return 200, {"code": "0", "data": result} if fault == "envelope" else result, {}
+                return 200, {"code": "0", "data": [] if fault == "command" else [{"code": "admin:create_member"}]}, {}
+            if fault:
+                with self.assertRaises(RuntimeError):
+                    module.provision_replay_actor_commands(request, {"Authorization": "fixture"})
+            else:
+                module.provision_replay_actor_commands(request, {"Authorization": "fixture"})
+                self.assertEqual([row[1]["body"]["path"] for row in calls[:3]],
+                                 ["/plugins/core-meta", "/plugins/org-management", "/plugins/platform-admin"])
+                self.assertTrue(all(row[1]["body"]["autoPublishCommands"] for row in calls[:3]))
+                self.assertTrue(all(row[1]["body"]["validateReferences"] for row in calls[:3]))
+                self.assertEqual(calls[-1][0], "/api/meta/commands?modelCode=tenant_member")
+
     def run_probe(self, changes=None):
         responses = [
             {"initialized": False, "inProgress": False},

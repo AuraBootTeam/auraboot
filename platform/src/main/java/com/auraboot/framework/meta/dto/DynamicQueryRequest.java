@@ -63,4 +63,10 @@ public class DynamicQueryRequest {
      * The value is the last record's public pid from the previous page.
      */
     private String cursor;
+
+    /** Server-validated composite continuation; never bound from an internal HTTP payload. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private KeysetContinuation keysetContinuation;
+
+    public record KeysetContinuation(String field, String direction, Object value, String pid) { }
 }

@@ -5,6 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.RecordCapabilities;
 import com.auraboot.framework.meta.service.RecordCapabilityService;
 import com.auraboot.framework.meta.service.RecordRelatedCountsService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/records")
 @RequiredArgsConstructor
 @Tag(name = "Record Capabilities", description = "Dynamic action and tab resolution for record detail/list/inbox")
+@AuthenticatedAccess("record capability and related-count reads resolved against the caller's permissions (MetaContext userId)")
 public class RecordCapabilityController {
 
     private final RecordCapabilityService recordCapabilityService;

@@ -5,6 +5,7 @@ import com.auraboot.framework.bi.dto.PivotQueryRequest;
 import com.auraboot.framework.bi.dto.PivotQueryResponse;
 import com.auraboot.framework.bi.service.PivotQueryService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
 @Tag(name = "Pivot Query", description = "Cross-tabulation / pivot table query API")
+@AuthenticatedAccess("read-only cross-tabulation queries executed against the caller's tenant (MetaContext tenantId) with dimensions/fields validated against the model definition")
 public class PivotQueryController {
 
     private final PivotQueryService pivotQueryService;

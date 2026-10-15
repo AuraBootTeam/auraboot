@@ -2,6 +2,7 @@ package com.auraboot.framework.observability.clienterror;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/client-errors")
 @RequiredArgsConstructor
+@AuthenticatedAccess("browser error report intake is scoped by tenant and reporter identity taken from the authenticated session, not the payload")
 public class WebClientErrorController {
 
     private final WebClientErrorService webClientErrorService;

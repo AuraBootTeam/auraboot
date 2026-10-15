@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.ai;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/meta/ai")
 @RequiredArgsConstructor
+@AuthenticatedAccess("stateless AI model-structure suggestion from a caller-supplied natural-language description; returns a proposal without touching stored data")
 public class AiModelSuggestionController {
 
     private final AiModelSuggestionService aiModelSuggestionService;

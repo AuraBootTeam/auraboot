@@ -77,8 +77,18 @@ class PermissionInterceptorUnannotatedModeTest {
     }
 
     @Test
-    @DisplayName("default mode (shadow): un-annotated handler is allowed without touching permission service")
+    @DisplayName("default mode (deny): un-annotated handler is rejected without touching permission service")
+    void defaultIsDeny() throws Exception {
+        HandlerMethod handler = hm("unannotated");
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, handler))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(userPermissionService);
+    }
+
+    @Test
+    @DisplayName("shadow mode: un-annotated handler is allowed and logged (migration mode)")
     void shadowAllows() throws Exception {
+        interceptor.setUnannotatedMode("shadow");
         HandlerMethod handler = hm("unannotated");
         boolean ok = interceptor.preHandle(request, response, handler);
         assertThat(ok).isTrue();

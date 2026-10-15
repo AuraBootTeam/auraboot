@@ -3,6 +3,7 @@ package com.auraboot.framework.dashboard.controller;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.dashboard.dto.WorkbenchStatsDTO;
 import com.auraboot.framework.dashboard.service.WorkbenchStatsService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,7 @@ import java.util.List;
 @RequestMapping("/api/workbench")
 @RequiredArgsConstructor
 @Tag(name = "Workbench", description = "Workbench dashboard statistics")
+@AuthenticatedAccess("read-only aggregated statistics for the authenticated workbench dashboard")
 public class WorkbenchStatsController {
 
     private final WorkbenchStatsService workbenchStatsService;

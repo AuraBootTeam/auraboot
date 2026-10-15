@@ -47,11 +47,15 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private OpenPlatformManagementService managementService;
     @Autowired private OpenPlatformTokenService tokenService;
+    @Autowired private IntegrationTokenService integrationTokens;
     @Autowired private OpenPlatformAuthMapper authMapper;
     @Autowired private OpenApiRateLimitMapper rateLimitMapper;
     @Autowired private OpenPlatformBearerAuthenticator authenticator;
     @Autowired private OpenPlatformSecretCodec secretCodec;
+    @Autowired private OpenApiEventPublisher eventPublisher;
+    @Autowired private OpenPlatformRetentionWorker retentionWorker;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSessionTemplate;
     @Autowired private WebhookService webhookService;
     @Autowired private WebhookDispatcher webhookDispatcher;
     @Autowired private UserService userService;
@@ -61,6 +65,138 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     void grantOpenPlatformAdministration() {
         grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update",
                 "Manage Open Platform");
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentPermanentTokenRotationCreatesExactlyOneReplacement() throws Exception {
+        var app = managementService.createApplication(new CreateApplicationRequest("Concurrent token rotation", "Serialized replacement"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        var old = integrationTokens.create(installation.pid(), new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "initial-concurrent-1");
+        var membership = tenantMemberService.findByTenantIdAndUserId(getTestTenant().getId(), getTestUser().getId());
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> rotateIntegrationAsOwner(installation.pid(), old.metadata().pid(), "rotation-concurrent-a", membership, start));
+            var second = executor.submit(() -> rotateIntegrationAsOwner(installation.pid(), old.metadata().pid(), "rotation-concurrent-b", membership, start));
+            start.countDown();
+            assertEquals(1, java.util.stream.Stream.of(first.get(), second.get()).filter(Boolean.TRUE::equals).count());
+        }
+        assertEquals(2, integrationTokens.list(installation.pid()).size());
+        assertEquals(1, integrationTokens.list(installation.pid()).stream().filter(t -> "active".equals(t.status())).count());
+        assertEquals(1, integrationTokens.list(installation.pid()).stream().filter(t -> "replaced".equals(t.status())).count());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(old.token(), "/api/open/v1/whoami"));
+    }
+
+    private boolean rotateIntegrationAsOwner(String installationPid, String oldPid, String key,
+                                              TenantMember membership, CountDownLatch start) throws InterruptedException {
+        start.await();
+        MetaContext.setContext(getTestTenant().getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
+        MetaContext.setMemberId(membership.getId());
+        try {
+            integrationTokens.rotate(installationPid, oldPid, new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), key);
+            return true;
+        } catch (org.springframework.web.server.ResponseStatusException conflict) {
+            assertEquals(409, conflict.getStatusCode().value());
+            return false;
+        } finally { MetaContext.clear(); }
+    }
+
+    @Test
+    void integrationTokensCannotBeManagedThroughAnotherInstallationOrAfterDisable() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Token parent scope", "Cross-parent refusal"));
+        var one = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        var two = managementService.install(app.pid(), new InstallApplicationRequest("staging", Set.of("openapi.profile.read"), 600));
+        var permanent = integrationTokens.create(one.pid(), new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "cross-parent-create");
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.revoke(two.pid(), permanent.metadata().pid()));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.rotate(two.pid(), permanent.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "cross-parent-rotate"));
+        authenticateIntegration(permanent.token(), "/api/open/v1/whoami");
+        assertEquals(1, integrationTokens.list(one.pid()).size());
+        assertTrue(integrationTokens.list(two.pid()).isEmpty());
+        managementService.disableInstallation(one.pid());
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.create(one.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "disabled-create-1"));
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(permanent.token(), "/api/open/v1/whoami"));
+    }
+
+    @Test
+    void integrationTokenKeepsItsIdentityWhileCurrentInstallationGrantsChange() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Quick access", "Current authority"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        var permanent = integrationTokens.create(installation.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null), "create-permanent-1");
+        assertEquals(app.pid(), permanent.appId());
+        assertEquals("never", permanent.metadata().expirationMode());
+        assertNull(permanent.metadata().expiresAt());
+        assertFalse(permanent.toString().contains(permanent.token()));
+        var first = authenticateIntegration(permanent.token(), "/api/open/v1/whoami");
+        assertEquals(installation.pid(), first.installationPid());
+        assertEquals(Set.of("openapi.profile.read"), first.scopes());
+        assertEquals(secretCodec.sha256(permanent.token()), jdbcTemplate.queryForObject(
+                "SELECT token_hash FROM ab_application_access_token WHERE pid=?", String.class, permanent.metadata().pid()));
+        assertNull(jdbcTemplate.queryForObject("SELECT credential_id FROM ab_application_access_token WHERE pid=?", Long.class, permanent.metadata().pid()));
+        var credential = managementService.createCredential(installation.pid());
+        var oauth = tokenService.issue("client_credentials", credential.clientId(), credential.clientSecret(), "openapi.profile.read");
+        managementService.updateScopes(installation.pid(), new UpdateInstallationScopesRequest(Set.of("openapi.events.read")));
+        var removed = assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(permanent.token(), "/api/open/v1/whoami"));
+        assertEquals(403, removed.status());
+        assertEquals(Set.of("openapi.events.read"), authenticateIntegration(permanent.token(), "/api/open/v1/event-catalog").scopes());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(oauth.accessToken(), "/api/open/v1/whoami"));
+        assertNull(jdbcTemplate.queryForObject("SELECT revoked_at FROM ab_application_access_token WHERE pid=?", java.sql.Timestamp.class, permanent.metadata().pid()));
+        assertEquals(1, integrationTokens.list(installation.pid()).size());
+        assertFalse(new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                .valueToTree(integrationTokens.list(installation.pid())).toString().contains(permanent.token()));
+    }
+
+    @Test
+    void permanentRotationHasFiniteCutoffAndRevocationDoesNotRevokeSiblings() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Rotation", "Permanent cutoff"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("staging", Set.of("openapi.profile.read"), 600));
+        var request = new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "never", null);
+        var old = integrationTokens.create(installation.pid(), request, "create-rotation-1");
+        var sibling = integrationTokens.create(installation.pid(), request, "create-sibling-1");
+        var rotated = integrationTokens.rotate(installation.pid(), old.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "rotate-permanent-1");
+        assertEquals(old.appId(), rotated.credential().appId());
+        assertNull(rotated.credential().metadata().expiresAt());
+        assertTrue(rotated.replacedTokenAcceptUntil().isBefore(Instant.now().plusSeconds(1)));
+        assertEquals("replaced", integrationTokens.list(installation.pid()).stream().filter(t -> t.pid().equals(old.metadata().pid())).findFirst().orElseThrow().status());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(old.token(), "/api/open/v1/whoami"));
+        authenticateIntegration(rotated.credential().token(), "/api/open/v1/whoami");
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.rotate(installation.pid(), old.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "rotate-permanent-1"));
+        assertEquals(3, integrationTokens.list(installation.pid()).size());
+        integrationTokens.revoke(installation.pid(), rotated.credential().metadata().pid());
+        integrationTokens.revoke(installation.pid(), rotated.credential().metadata().pid());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(rotated.credential().token(), "/api/open/v1/whoami"));
+        authenticateIntegration(sibling.token(), "/api/open/v1/whoami");
+        managementService.disableInstallation(installation.pid());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(sibling.token(), "/api/open/v1/whoami"));
+    }
+
+    @Test
+    void fixedRotationCannotExtendOriginalExpiryAndCreateRetryNeverRevealsAnotherSecret() {
+        var app = managementService.createApplication(new CreateApplicationRequest("Fixed lifetime", "Idempotent administration"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest("development", Set.of("openapi.profile.read"), 600));
+        Instant until = Instant.now().plusSeconds(7200).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var request = new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("ERP", "fixed", until);
+        var old = integrationTokens.create(installation.pid(), request, "create-fixed-token-1");
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> integrationTokens.create(installation.pid(), request, "create-fixed-token-1"));
+        assertEquals(1, integrationTokens.list(installation.pid()).size());
+        var rotated = integrationTokens.rotate(installation.pid(), old.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 10080), "rotate-fixed-token-1");
+        assertEquals(until, rotated.replacedTokenAcceptUntil());
+        authenticateIntegration(old.token(), "/api/open/v1/whoami");
+        jdbcTemplate.update("UPDATE ab_application_access_token SET expires_at=?, issued_at=? WHERE pid=?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(1)), java.sql.Timestamp.from(Instant.now().minusSeconds(3600)), old.metadata().pid());
+        assertThrows(ExternalMachineAuthException.class, () -> authenticateIntegration(old.token(), "/api/open/v1/whoami"));
+        authenticateIntegration(rotated.credential().token(), "/api/open/v1/whoami");
+    }
+
+    private com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal authenticateIntegration(String token, String path) {
+        var request = new MockHttpServletRequest("GET", path);
+        request.addHeader("Authorization", "Bearer " + token);
+        return authenticator.authenticate(request);
     }
 
     @Test
@@ -92,12 +228,21 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         var installation = managementService.install(application.pid(),
                 new InstallApplicationRequest("production", Set.of("openapi.profile.read"), 600));
         managementService.createCredential(installation.pid());
+        var managedToken = integrationTokens.create(installation.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Managed token", "never", null), "role-create-token");
 
         switchActor(viewer, viewerMembership);
         assertEquals(1, managementService.listApplications().size());
         assertEquals(0, managementService.getOperationsOverview(installation.pid(), 24).totalCalls());
         assertThrows(AccessDeniedException.class,
                 () -> managementService.createCredential(installation.pid()));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.list(installation.pid()));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.create(installation.pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Denied", "never", null), "role-create-denied"));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.rotate(installation.pid(), managedToken.metadata().pid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Rotate("never", null, 0), "role-rotate-denied"));
+        assertThrows(AccessDeniedException.class, () -> integrationTokens.revoke(installation.pid(), managedToken.metadata().pid()));
+
 
         TenantMember outsiderMembership = tenantMemberService.findByTenantIdAndUserId(
                 getTestTenant().getId(), outsider.getId());
@@ -403,6 +548,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertThrows(OpenPlatformTokenService.InvalidClientException.class, () -> tokenService.issue(
                 "client_credentials", credential.clientId(), credential.clientSecret(),
                 "automation.events.write"));
+        verifyDisabledCredentialWritesAreNotFoundAndLeaveStateUnchanged(installation.pid(), credential.credentialPid());
     }
 
     @Test
@@ -424,6 +570,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         var secondToken = tokenService.issue("client_credentials", secondCredential.clientId(),
                 secondCredential.clientSecret(), "openapi.profile.read");
         managementService.disableApplication(application.pid());
+        verifyDisabledCredentialWritesAreNotFoundAndLeaveStateUnchanged(secondInstallation.pid(), secondCredential.credentialPid());
 
         assertNull(authMapper.findToken(secretCodec.sha256(secondToken.accessToken()),
                 OpenPlatformTokenService.AUDIENCE, Instant.now()));
@@ -467,10 +614,71 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertEquals(0, overview.deadLetterCount());
         assertTrue(managementService.listCallAudits(installation.pid(), null, null, 50).isEmpty());
         assertTrue(managementService.listWebhookDeliveries(installation.pid(), null, 50).isEmpty());
+        verifyRetentionKeepsValidInstallationData(application.pid(), installation.pid(), rotation.credential());
+    }
+
+    private void verifyDisabledCredentialWritesAreNotFoundAndLeaveStateUnchanged(
+            String installationPid, String credentialPid) {
+        var before = credentialLifecycleState(installationPid);
+        assertTrue(((Number) before.get("credentials")).intValue() > 0);
+        org.junit.jupiter.api.Assertions.assertAll(
+                () -> assertEquals(ResponseCode.NOT_FOUND, assertThrows(BusinessException.class,
+                        () -> managementService.createCredential(installationPid)).getResponseCode()),
+                () -> assertEquals(ResponseCode.NOT_FOUND, assertThrows(BusinessException.class,
+                        () -> managementService.rotateCredential(installationPid, credentialPid,
+                                new RotateCredentialRequest(15))).getResponseCode()),
+                () -> assertEquals(before, credentialLifecycleState(installationPid)));
+    }
+
+    private Map<String, Object> credentialLifecycleState(String installationPid) {
+        Long installationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ab_application_installation WHERE tenant_id=? AND pid=?",
+                Long.class, getTestTenant().getId(), installationPid);
+        var state = new java.util.LinkedHashMap<String, Object>();
+        state.put("credentials", jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_application_credential WHERE installation_id=?", Integer.class, installationId));
+        state.put("credentialHash", jdbcTemplate.queryForObject(
+                "SELECT md5(COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.id)::text, '[]')) "
+                        + "FROM ab_application_credential c WHERE installation_id=?", String.class, installationId));
+        state.put("tokenHash", jdbcTemplate.queryForObject(
+                "SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.id)::text, '[]')) "
+                        + "FROM ab_application_access_token t WHERE installation_id=?", String.class, installationId));
+        return state;
+    }
+
+    private void verifyRetentionKeepsValidInstallationData(String applicationPid, String installationPid,
+            com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialSecret credential) {
+        Long installationId = jdbcTemplate.queryForObject("SELECT id FROM ab_application_installation WHERE pid=?", Long.class, installationPid);
+        Long tenantId = getTestTenant().getId();
+        String oldToken = tokenService.issue("client_credentials", credential.clientId(), credential.clientSecret(), "assets.read").accessToken();
+        String oldHash = secretCodec.sha256(oldToken);
+        jdbcTemplate.update("UPDATE ab_application_access_token SET expires_at=NOW()-INTERVAL '8 days' WHERE token_hash=?", oldHash);
+        jdbcTemplate.update("INSERT INTO ab_open_api_rate_window(installation_id,window_start,request_count) VALUES (?,NOW()-INTERVAL '3 days',1),(?,NOW()-INTERVAL '1 day',1)", installationId, installationId);
+        String oldAudit = UniqueIdGenerator.generate(), keptAudit = UniqueIdGenerator.generate();
+        jdbcTemplate.update("INSERT INTO ab_open_api_call_audit(pid,tenant_id,application_pid,installation_pid,http_method,request_path,response_status,duration_ms,occurred_at) "
+                + "VALUES (?,?,?,?,'GET','/api/open/v1/whoami',200,1,NOW()-INTERVAL '91 days'),(?,?,?,?,'GET','/api/open/v1/whoami',200,1,NOW()-INTERVAL '89 days')",
+                oldAudit, tenantId, applicationPid, installationPid, keptAudit, tenantId, applicationPid, installationPid);
+        jdbcTemplate.update("INSERT INTO ab_open_api_idempotency(tenant_id,installation_id,route_code,idempotency_key,request_hash,expires_at) "
+                + "VALUES (?,?,'retention','older-retention-key',?,NOW()-INTERVAL '8 days'),(?,?,'retention','grace-retention-key',?,NOW()-INTERVAL '6 days')",
+                tenantId, installationId, secretCodec.sha256("old"), tenantId, installationId, secretCodec.sha256("grace"));
+        int auditDays = (Integer) org.springframework.test.util.ReflectionTestUtils.getField(retentionWorker, "auditDays");
+        try {
+            org.springframework.test.util.ReflectionTestUtils.setField(retentionWorker, "auditDays", 0);
+            assertThrows(IllegalStateException.class, retentionWorker::purge);
+            assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_call_audit WHERE pid=?", Integer.class, oldAudit));
+        } finally { org.springframework.test.util.ReflectionTestUtils.setField(retentionWorker, "auditDays", auditDays); }
+        retentionWorker.purge();
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE token_hash=?", Integer.class, oldHash));
+        assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE installation_id=?", Integer.class, installationId));
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_rate_window WHERE installation_id=?", Integer.class, installationId));
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_call_audit WHERE pid=?", Integer.class, oldAudit));
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_call_audit WHERE pid=?", Integer.class, keptAudit));
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_idempotency WHERE installation_id=? AND idempotency_key='older-retention-key'", Integer.class, installationId));
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_idempotency WHERE installation_id=? AND idempotency_key='grace-retention-key'", Integer.class, installationId));
     }
 
     @Test
-    void populatedOperationsQueriesAggregateSafelyAndReplayOnlyWithinInstallation() {
+    void populatedOperationsQueriesAggregateSafelyAndReplayOnlyWithinInstallation() throws Exception {
         var application = managementService.createApplication(
                 new CreateApplicationRequest("Operations fixture", null));
         var installation = managementService.install(application.pid(),
@@ -507,11 +715,15 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                 INSERT INTO ab_webhook_delivery_log
                   (pid, tenant_id, subscription_pid, installation_pid, event_id, request_url,
                    request_body, response_status, response_body, delivery_status, retry_count,
-                   max_retries, error_message, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'dead_letter', 3, 3, ?, NOW(), NOW())
+                   max_retries, error_message, receiver_key, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'dead_letter', 3, 3, ?, 'https://example.invalid:443', NOW(), NOW())
                 """, "delivery-ops-1", tenantId, "subscription-ops-1", installation.pid(), "event-ops-1",
                 "https://secret.example.invalid/hook", "{\"secret\":\"must-not-leak\"}", 503,
                 "private response body", "upstream https://secret.example.invalid failed");
+
+        jdbcTemplate.update("INSERT INTO ab_webhook_receiver_lane(tenant_id,receiver_key) VALUES (?,?) ON CONFLICT DO NOTHING",
+                tenantId, "https://example.invalid:443");
+
 
         var overview = managementService.getOperationsOverview(installation.pid(), 24);
         assertEquals(3, overview.totalCalls());
@@ -528,15 +740,101 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertEquals("HTTP 503", deliveries.getFirst().failureReason());
         assertFalse(deliveries.getFirst().toString().contains("must-not-leak"));
         assertFalse(deliveries.getFirst().toString().contains("secret.example.invalid"));
+        jdbcTemplate.update("""
+                UPDATE ab_webhook_delivery_log SET response_status = NULL, error_message = ?
+                WHERE tenant_id = ? AND pid = ?
+                """, "Published model event authority revoked or unavailable", tenantId, "delivery-ops-1");
+        // Fixture JDBC writes bypass MyBatis; production attempts and reads use separate requests.
+        sqlSessionTemplate.clearCache();
+        assertEquals("authority_revoked", managementService.listWebhookDeliveries(
+                installation.pid(), "dead_letter", 50).getFirst().failureReason());
 
         var otherInstallation = managementService.install(application.pid(),
                 new InstallApplicationRequest("staging", Set.of("assets.read"), 600));
         assertThrows(IllegalStateException.class,
                 () -> managementService.replayWebhookDelivery(otherInstallation.pid(), "delivery-ops-1"));
+        // Manual replay overrides the receiver cooldown, but must preserve another in-flight lease.
+        Instant future = Instant.now().plusSeconds(3600);
+        jdbcTemplate.update("""
+                UPDATE ab_webhook_receiver_lane SET ready_at=?,lease_token=?,lease_until=?
+                WHERE tenant_id=? AND receiver_key=?
+                """, java.sql.Timestamp.from(future), "other-active-attempt", java.sql.Timestamp.from(future),
+                tenantId, "https://example.invalid:443");
+        assertThrows(IllegalStateException.class,
+                () -> managementService.replayWebhookDelivery(otherInstallation.pid(), "delivery-ops-1"));
+        assertEquals(future.toEpochMilli(), jdbcTemplate.queryForObject(
+                "SELECT ready_at FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                java.sql.Timestamp.class, tenantId, "https://example.invalid:443").toInstant().toEpochMilli());
         managementService.replayWebhookDelivery(installation.pid(), "delivery-ops-1");
+        assertReplayClearsCooldownAndPreservesLease(tenantId, future);
         assertTrue(managementService.listWebhookDeliveries(installation.pid(), "dead_letter", 50).isEmpty());
         assertEquals("pending", managementService.listWebhookDeliveries(installation.pid(), null, 50)
                 .getFirst().status());
+        jdbcTemplate.update("UPDATE ab_webhook_delivery_log SET delivery_status='dead_letter' WHERE tenant_id=? AND pid=?",
+                tenantId, "delivery-ops-1");
+        jdbcTemplate.update("UPDATE ab_webhook_receiver_lane SET ready_at=? WHERE tenant_id=? AND receiver_key=?",
+                java.sql.Timestamp.from(future), tenantId, "https://example.invalid:443");
+        sqlSessionTemplate.clearCache();
+        assertTrue(webhookService.replayDelivery("delivery-ops-1"));
+        assertReplayClearsCooldownAndPreservesLease(tenantId, future);
+        assertFalse(webhookService.replayDelivery("delivery-ops-1"));
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT replay_count FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?",
+                Integer.class, tenantId, "delivery-ops-1"));
+        var otherRequest = new WebhookCreateRequest();
+        otherRequest.setName("Wrong replay parent");
+        otherRequest.setTargetUrl("https://other.example.invalid/hook");
+        otherRequest.setEventType("fixture.replay-parent");
+        var otherSubscription = webhookService.create(otherRequest);
+        jdbcTemplate.update("UPDATE ab_webhook_delivery_log SET delivery_status='dead_letter' WHERE tenant_id=? AND pid=?",
+                tenantId, "delivery-ops-1");
+        jdbcTemplate.update("UPDATE ab_webhook_receiver_lane SET ready_at=? WHERE tenant_id=? AND receiver_key=?",
+                java.sql.Timestamp.from(future), tenantId, "https://example.invalid:443");
+        sqlSessionTemplate.clearCache();
+        var beforeWrongParent = jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?", tenantId, "delivery-ops-1");
+        var beforeWrongLane = jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                tenantId, "https://example.invalid:443");
+        // Real controller/service/PG with a trusted fixture context; this does not exercise authentication filters.
+        var replayHttp = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new com.auraboot.framework.webhook.controller.WebhookController(webhookService,
+                        applicationContext.getBean(com.auraboot.framework.common.crypto.FieldEncryptionService.class)))
+                .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(
+                        applicationContext.getBean(com.fasterxml.jackson.databind.ObjectMapper.class))).build();
+        replayHttp.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/api/webhooks/" + otherSubscription.getPid() + "/deliveries/delivery-ops-1/replay"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value(org.hamcrest.Matchers.not("0")));
+        assertEquals(beforeWrongParent, jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?", tenantId, "delivery-ops-1"));
+        assertEquals(beforeWrongLane, jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                tenantId, "https://example.invalid:443"));
+        String correctRoute = "/api/webhooks/subscription-ops-1/deliveries/delivery-ops-1/replay";
+        replayHttp.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(correctRoute))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("0"));
+        assertReplayClearsCooldownAndPreservesLease(tenantId, future);
+        assertEquals("pending", jdbcTemplate.queryForObject(
+                "SELECT delivery_status FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?",
+                String.class, tenantId, "delivery-ops-1"));
+        replayHttp.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(correctRoute))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value(org.hamcrest.Matchers.not("0")));
+        assertEquals(3, jdbcTemplate.queryForObject(
+                "SELECT replay_count FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?",
+                Integer.class, tenantId, "delivery-ops-1"));
+    }
+
+    private void assertReplayClearsCooldownAndPreservesLease(Long tenantId, Instant leaseUntil) {
+        var lane = jdbcTemplate.queryForMap(
+                "SELECT ready_at,lease_token,lease_until FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                tenantId, "https://example.invalid:443");
+        assertTrue(((java.sql.Timestamp) lane.get("ready_at")).toInstant().isBefore(Instant.now()));
+        assertEquals("other-active-attempt", lane.get("lease_token"));
+        assertEquals(leaseUntil.toEpochMilli(), ((java.sql.Timestamp) lane.get("lease_until")).toInstant().toEpochMilli());
     }
 
     @Test
@@ -602,6 +900,15 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertTrue(rejected.receipts().isEmpty());
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE event_id = 'evt_invalid'", Integer.class));
+        eventPublisher.publish("assets.assignment.changed", 1, "asset-public-pid",
+                Map.of("pid", "asset-public-pid", "assetCode", "A-001", "secret", "never-publish"), tenantId);
+        var publishedBodies = jdbcTemplate.queryForList("SELECT request_body FROM ab_webhook_delivery_log WHERE installation_pid=?", String.class, installation.pid());
+        assertFalse(publishedBodies.isEmpty());
+        assertTrue(publishedBodies.stream().allMatch(body -> body.contains("asset-public-pid") && body.contains("A-001")));
+        assertFalse(publishedBodies.stream().anyMatch(body -> body.contains("never-publish") || body.contains("secret")));
+        assertThrows(IllegalArgumentException.class, () -> eventPublisher.publish("platform.command.executed", 1,
+                "asset-public-pid", Map.of(), tenantId));
+        assertEquals(publishedBodies.size(), jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE installation_pid=?", Integer.class, installation.pid()));
     }
 
     private void insertWebhookHealthRow(Long tenantId, String installationPid, String pid, String name,

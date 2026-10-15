@@ -12,6 +12,7 @@ public enum StorageType {
     LOCAL("local", "本地存储"),
     MINIO("minio", "MinIO Object Storage"),
     OSS("oss", "阿里云OSS"),
+    COS("cos", "腾讯云COS"),
     S3("s3", "AWS S3");
 
     @EnumValue

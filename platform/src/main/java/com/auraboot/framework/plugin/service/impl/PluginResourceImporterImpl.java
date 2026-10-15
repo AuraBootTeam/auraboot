@@ -186,6 +186,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final MetaFieldMapper metaFieldMapper;
     private final ExtensionConverter extensionConverter;
     private final PluginResourceMapper pluginResourceMapper;
+    private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
 
     // Optional dependency - may not be configured in all environments
@@ -706,6 +707,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private Map<String, Object> buildFieldFeature(FieldDefinitionDTO dto) {
         Map<String, Object> feature = dto.getFeature() != null ? new LinkedHashMap<>(dto.getFeature()) : new LinkedHashMap<>();
+        // The DSL's top-level default is persisted in the canonical field feature used by DDL.
+        if (dto.getDefaultValue() != null) feature.put("defaultValue", dto.getDefaultValue());
         if (dto.getConstraints() == null) return feature.isEmpty() ? null : feature;
 
         // GAP-259 regression guard: field-level `constraints.required` MUST NOT propagate to
@@ -2632,6 +2635,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         ResourceType type = resource.getResourceTypeEnum();
 
         switch (type) {
+            case PUBLIC_RESOURCE, PUBLIC_QUERY -> publicPublicationLifecycle.restore(resource);
             case MODEL -> {
                 if (resource.getResourcePid() != null) {
                     try {
@@ -2750,6 +2754,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public void restoreResource(PluginResource resource) {
         log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
         ResourceType type = resource.getResourceTypeEnum();
+        if (type.isPublicPublication()) {
+            publicPublicationLifecycle.restore(resource);
+            return;
+        }
         if (type == ResourceType.AGENT_DEFINITION) {
             if (resource.getResourcePid() != null) {
                 jdbcTemplate.update("""

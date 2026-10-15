@@ -7,6 +7,7 @@ import com.auraboot.framework.party.dto.CreatePartyRequest;
 import com.auraboot.framework.party.dto.CreatePartyResponse;
 import com.auraboot.framework.party.dto.PartyActorOption;
 import com.auraboot.framework.party.service.PartyActorService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/actors")
 @RequiredArgsConstructor
+@AuthenticatedAccess("self-service actor list, party creation, and actor switch are scoped to the caller's own active tenant membership and validated membership candidates")
 public class PartyActorController {
     private final PartyActorService partyActorService;
 

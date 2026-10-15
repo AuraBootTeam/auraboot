@@ -1,0 +1,481 @@
+{
+  "run": {
+    "id": "oss-performance-2026-10-15",
+    "target": "OSS home/menu/showcase list and CRUD performance slice",
+    "sot": "../../oss-web-performance-and-tracing.md",
+    "runtime": "oss-performance / 281",
+    "commit": "0e89bbbe3a0f43b73fb166fc6217faf50064e3e5",
+    "fix_rounds": 3
+  },
+  "groups": [
+    {
+      "id": "performance-slice",
+      "title": "Executed journeys, visual review and explicit limits",
+      "rows": [
+        {
+          "id": "PERF-01",
+          "action": "render workbench from SSR",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "home-ready.png"
+          ],
+          "assertion": "inbox empty result, shortcuts and numeric stats visible; no browser workbench config request",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-01-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "home-ready.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "partial",
+          "verdict_by": "agent-vision",
+          "vision_check": "Data-ready inbox, shortcut names and both numeric zeros verified. Existing recent-visits secondary labels expose technical paths and record IDs; partial visual result, no full UI-golden claim."
+        },
+        {
+          "id": "PERF-02",
+          "action": "navigate through sidebar",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "menu-list.png"
+          ],
+          "assertion": "fixture records and 1000 total",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-02-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "menu-list.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Sidebar selection and list title agree; readable fixture names, aligned columns, actions remain visible. Scrollable list extends below viewport."
+        },
+        {
+          "id": "PERF-03",
+          "action": "search",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "list-empty.png"
+          ],
+          "assertion": "no matching rows, total=0",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-03-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "list-empty.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "partial",
+          "verdict_by": "agent-vision",
+          "vision_check": "Search value and empty rows agree. Existing copy says there are no records and suggests first creation, although this is a filtered result; partial visual result."
+        },
+        {
+          "id": "PERF-04",
+          "action": "next page",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "list-page2.png"
+          ],
+          "assertion": "different record identities",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-04-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "list-page2.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Second-page fixture identities differ; consistent column widths, sidebar and search state retained."
+        },
+        {
+          "id": "PERF-05",
+          "action": "empty submit",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "form-required.png"
+          ],
+          "assertion": "required name rejects without command",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-05-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "form-required.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Required name marked red with inline guidance, save/cancel distinct, no overlapping errors or raw identifiers."
+        },
+        {
+          "id": "PERF-06",
+          "action": "save new record",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "create-saved.png"
+          ],
+          "assertion": "command response and persisted name/quantity",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-06-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "create-saved.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "One named record and quantity 37 visible, success toast consistent with persisted save; date cell truncates within its column."
+        },
+        {
+          "id": "PERF-07",
+          "action": "open created record",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "record-detail.png"
+          ],
+          "assertion": "exact created name visible",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-07-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "record-detail.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Named record, generated business number and quantity 37 readable; section and tab hierarchy intact. Prior save toast remains briefly visible."
+        },
+        {
+          "id": "PERF-08",
+          "action": "edit created record",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "form-edit.png"
+          ],
+          "assertion": "persisted values in form",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-08-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "form-edit.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Name, business number and quantity 37 prefilled; form groups aligned and save/cancel visible. Prior save toast remains briefly visible."
+        },
+        {
+          "id": "PERF-09",
+          "action": "save and reload",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "update-saved.png"
+          ],
+          "assertion": "exact edited name persists",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-09-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "update-saved.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Edited name visible in search and one persisted row after reload; longer row name truncates within its column."
+        },
+        {
+          "id": "PERF-10",
+          "action": "request delete",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "delete-confirm.png"
+          ],
+          "assertion": "confirm dialog before deletion",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-10-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "delete-confirm.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Centered confirmation over dimmed background; destructive red confirm and neutral cancel visually distinct, no clipping."
+        },
+        {
+          "id": "PERF-11",
+          "action": "confirm deletion",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "delete-removed.png"
+          ],
+          "assertion": "record absent after reload",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-11-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "delete-removed.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "partial",
+          "verdict_by": "agent-vision",
+          "vision_check": "Edited-record search retained and row removed after reload. Same existing filtered-empty wording issue as PERF-03; partial visual result."
+        },
+        {
+          "id": "PERF-12",
+          "action": "open home without session",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "anonymous-login.png"
+          ],
+          "assertion": "login required",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-12-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "anonymous-login.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Anonymous private home shows coherent login form; no admin shell or retained session identity."
+        },
+        {
+          "id": "PERF-13",
+          "action": "open row actions",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "browser-results.json",
+            "row-menu.png"
+          ],
+          "assertion": "edit and delete are available through the real overflow menu",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PERF-13-visual",
+          "action": "Review original screenshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "row-menu.png"
+          ],
+          "assertion": "Hierarchy, spacing, typography, color, state, feedback, overlay, density and raw-code exposure reviewed individually",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Overflow anchored to the selected row; edit and red delete visible, no portal clipping or unrelated-row menu."
+        },
+        {
+          "id": "TRACE-01",
+          "action": "Follow parent IDs from SSR document through browser, SSR proxy, BFF, Java and MyBatis",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "trace-chain.json"
+          ],
+          "assertion": "Four services, all 166 SQL spans have observed parents, 344 of 345 spans linked, connected example path present",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "API-01",
+          "action": "Measure API and persisted CRUD before/after",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "http",
+          "evidence": [
+            "baseline-api.json",
+            "control-api.json",
+            "after-api.json",
+            "control-crud.json",
+            "after-crud.json"
+          ],
+          "assertion": "40 reads and 20 CRUD samples, warmups excluded; reduced MyBatis executions, mixed latency; no general speedup threshold",
+          "verdict": "partial",
+          "verdict_by": "metric-threshold"
+        },
+        {
+          "id": "REDIS-01",
+          "action": "Run without configured Redis host and perform real persisted CRUD",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "live-config.json",
+            "after-crud.json",
+            "cache-and-deny.json"
+          ],
+          "assertion": "Redis host empty, create/update/delete persisted; Caffeine and pool metrics readable",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "DENY-01",
+          "action": "Request menu and list without credentials",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "cache-and-deny.json"
+          ],
+          "assertion": "Both anonymous endpoints return 401",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "PROD-01",
+          "action": "Production capacity, cold mobile loads, LCP/INP/CLS, multi-node cache invalidation and collector outage load test",
+          "surface": "journey",
+          "dependencies": "deployed",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not executed; dev timing and build success cannot establish these claims",
+          "verdict": "untested"
+        }
+      ]
+    }
+  ]
+}

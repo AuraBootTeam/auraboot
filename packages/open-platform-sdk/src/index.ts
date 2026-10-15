@@ -41,6 +41,51 @@ export interface ResourcePage<T> {
   nextCursor: string | null;
 }
 
+export type PublicFilter =
+  | { field: string; operator: "IS_NULL" }
+  | { field: string; operator: "EQ" | "NE" | "GT" | "GE" | "LT" | "LE" | "LIKE"; value: string | number | boolean }
+  | { field: string; operator: "IN"; value: readonly (string | number | boolean)[] };
+
+export interface ResourceListOptions {
+  limit?: number;
+  cursor?: string;
+  filters?: readonly PublicFilter[];
+  sort?: string;
+  direction?: "ASC" | "DESC";
+}
+
+export interface WriteMetadata {
+  idempotentReplay: boolean;
+  requestId?: string;
+}
+
+export interface ResourceMutation<T> extends VersionedResource<T>, WriteMetadata {
+  location?: string;
+}
+
+export interface QueryRequest<P = Record<string, unknown>> {
+  parameters?: P;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface QueryPage<T> extends ResourcePage<T> {
+  total: number;
+  schemaVersion: number;
+}
+
+/** Parsed, authenticated Webhook body; verify the raw bytes before parsing. */
+export interface ModelEvent<T> {
+  id: string;
+  type: `open.resource.${string}.${"created" | "updated" | "deleted"}`;
+  schemaVersion: number;
+  occurredAt: string;
+  subject: { type: string; pid: string };
+  recordVersion: number;
+  correlationId: string | null;
+  data: T;
+}
+
 export class OpenPlatformError extends Error {
   constructor(
     public readonly status: number,
@@ -135,14 +180,96 @@ export class OpenPlatformClient {
 
   async listResources<T>(
     resourceCode: string,
-    limit = 50,
+    options: number | ResourceListOptions = 50,
     cursor?: string,
   ): Promise<ResourcePage<T>> {
-    const query = new URLSearchParams({ limit: String(limit) });
-    if (cursor) query.set("cursor", cursor);
+    const settings = typeof options === "number" ? { limit: options, cursor } : options;
+    const query = new URLSearchParams({ limit: String(settings.limit ?? 50) });
+    if (settings.cursor) query.set("cursor", settings.cursor);
+    if (settings.filters) query.set("filters", JSON.stringify(settings.filters));
+    if (settings.sort) query.set("sort", settings.sort);
+    if (settings.direction) query.set("direction", settings.direction);
     return this.request(
       `/api/open/v1/resources/${encodeURIComponent(resourceCode)}?${query}`,
     );
+  }
+
+  async createResource<T>(
+    resourceCode: string,
+    input: object,
+    idempotencyKey: string,
+  ): Promise<ResourceMutation<T>> {
+    return this.mutateResource(resourceCode, undefined, "POST", input, idempotencyKey);
+  }
+
+  async updateResource<T>(
+    resourceCode: string,
+    pid: string,
+    input: object,
+    idempotencyKey: string,
+    etag: string,
+  ): Promise<ResourceMutation<T>> {
+    return this.mutateResource(resourceCode, pid, "PATCH", input, idempotencyKey, etag);
+  }
+
+  async deleteResource(
+    resourceCode: string,
+    pid: string,
+    idempotencyKey: string,
+    etag: string,
+  ): Promise<WriteMetadata> {
+    const { response } = await this.requestWithResponse<void>(
+      `/api/open/v1/resources/${encodeURIComponent(resourceCode)}/${encodeURIComponent(pid)}`,
+      { method: "DELETE", headers: { "Idempotency-Key": idempotencyKey, "If-Match": etag } },
+    );
+    return this.writeMetadata(response);
+  }
+
+  async executeQuery<T, P = Record<string, unknown>>(
+    queryCode: string,
+    request: QueryRequest<P> = {},
+  ): Promise<QueryPage<T>> {
+    return this.request(`/api/open/v1/queries/${encodeURIComponent(queryCode)}:execute`, {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+  }
+
+  private async mutateResource<T>(
+    resourceCode: string,
+    pid: string | undefined,
+    method: "POST" | "PATCH",
+    input: object,
+    idempotencyKey: string,
+    etag?: string,
+  ): Promise<ResourceMutation<T>> {
+    const path = `/api/open/v1/resources/${encodeURIComponent(resourceCode)}`
+      + (pid === undefined ? "" : `/${encodeURIComponent(pid)}`);
+    const { body, response } = await this.requestWithResponse<T>(path, {
+      method,
+      headers: { "Idempotency-Key": idempotencyKey, ...(etag === undefined ? {} : { "If-Match": etag }) },
+      body: JSON.stringify(input),
+    });
+    return {
+      resource: body,
+      etag: this.requireEtag(response),
+      ...this.writeMetadata(response),
+      location: response.headers.get("Location") ?? undefined,
+    };
+  }
+
+  private writeMetadata(response: Response): WriteMetadata {
+    return {
+      idempotentReplay: response.headers.get("Idempotent-Replay") === "true",
+      requestId: response.headers.get("X-Request-Id") ?? undefined,
+    };
+  }
+
+  private requireEtag(response: Response): string {
+    const etag = response.headers.get("ETag");
+    if (!etag) throw new OpenPlatformError(response.status, "missing_etag", "Resource response omitted ETag",
+      response.headers.get("X-Request-Id") ?? undefined);
+    return etag;
   }
 
   async getResource<T>(
@@ -152,14 +279,7 @@ export class OpenPlatformClient {
     const { body, response } = await this.requestWithResponse<T>(
       `/api/open/v1/resources/${encodeURIComponent(resourceCode)}/${encodeURIComponent(pid)}`,
     );
-    const etag = response.headers.get("ETag");
-    if (!etag)
-      throw new OpenPlatformError(
-        response.status,
-        "missing_etag",
-        "Resource response omitted ETag",
-      );
-    return { resource: body, etag };
+    return { resource: body, etag: this.requireEtag(response) };
   }
 
   private async accessToken(forceRefresh = false): Promise<string> {
@@ -214,13 +334,22 @@ export class OpenPlatformClient {
           ...init.headers,
         },
       });
-      const body = (await response.json().catch(() => ({}))) as T & {
+      let parsed: unknown;
+      if (response.status !== 204) {
+        try { parsed = await response.json(); }
+        catch {
+          if (response.ok) throw new OpenPlatformError(response.status, "invalid_response", "Expected a JSON response",
+            response.headers.get("X-Request-Id") ?? undefined);
+          parsed = {};
+        }
+      }
+      const body = parsed as T & {
         code?: string;
         message?: string;
       };
       if (response.ok) return { body, response };
       if (response.status !== 401 || attempt === attempts - 1)
-        throw this.error(response, body);
+        throw this.error(response, body ?? {});
       this.token = undefined;
     }
     throw new Error("Unreachable Open Platform request state");

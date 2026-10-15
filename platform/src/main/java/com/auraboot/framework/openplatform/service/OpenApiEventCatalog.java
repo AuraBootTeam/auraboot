@@ -15,6 +15,37 @@ import java.util.Set;
 public class OpenApiEventCatalog {
     public static final String PARTNER = "partner";
     public static final String INTERNAL = "internal";
+    private final org.springframework.beans.factory.ObjectProvider<OpenApiPublicationService> publications;
+
+    public OpenApiEventCatalog() { this.publications = null; }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpenApiEventCatalog(org.springframework.beans.factory.ObjectProvider<OpenApiPublicationService> publications) {
+        this.publications = publications;
+    }
+
+    public static boolean isModelEvent(String type) {
+        return type != null && type.startsWith("open.resource.");
+    }
+
+    private Optional<OpenApiResourceContract> dynamic(Long tenant, String type) {
+        if (tenant == null || publications == null || !isModelEvent(type)) return Optional.empty();
+        int delimiter = type.lastIndexOf('.');
+        if (delimiter <= "open.resource.".length()) return Optional.empty();
+        String operation = type.substring(delimiter + 1);
+        String code = type.substring("open.resource.".length(), delimiter);
+        return publications.getObject().active(tenant, code).filter(contract -> contract.events().contains(operation));
+    }
+
+    private EventDescriptor descriptor(Long tenant, String type, OpenApiResourceContract contract) {
+        String operation = type.substring(type.lastIndexOf('.') + 1);
+        Set<Integer> versions = publications.getObject().snapshots(tenant, contract.code()).stream()
+                .filter(snapshot -> snapshot.events().contains(operation))
+                .map(OpenApiResourceContract::schemaVersion).collect(java.util.stream.Collectors.toSet());
+        Set<String> fields = contract.fields().entrySet().stream().filter(entry -> entry.getValue().readable())
+                .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toSet());
+        return new EventDescriptor(type, contract.schemaVersion(), versions, PARTNER, contract.code(), fields);
+    }
 
     private final Map<String, EventDescriptor> events = Map.of(
             "assets.assignment.changed", new EventDescriptor(
@@ -29,12 +60,35 @@ public class OpenApiEventCatalog {
                     "internal-command", Set.of()));
 
     public List<EventDescriptor> externallyPublished() {
-        return events.values().stream().filter(EventDescriptor::externallyDeliverable)
+        java.util.ArrayList<EventDescriptor> descriptors = new java.util.ArrayList<>(events.values());
+        Long tenant = com.auraboot.framework.application.tenant.MetaContext.exists()
+                ? com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId() : null;
+        if (tenant != null && publications != null) {
+            for (var contract : publications.getObject().publishedContracts(tenant)) {
+                contract.events().forEach(operation -> descriptors.add(descriptor(tenant,
+                        "open.resource." + contract.code() + "." + operation, contract)));
+            }
+        }
+        return descriptors.stream().filter(EventDescriptor::externallyDeliverable)
                 .sorted(java.util.Comparator.comparing(EventDescriptor::type)).toList();
     }
 
     public Optional<EventDescriptor> event(String type) {
-        return Optional.ofNullable(events.get(type));
+        var fixed = events.get(type);
+        if (fixed != null) return Optional.of(fixed);
+        Long tenant = com.auraboot.framework.application.tenant.MetaContext.exists()
+                ? com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId() : null;
+        return dynamic(tenant, type).map(contract -> descriptor(tenant, type, contract));
+    }
+
+    public EventDescriptor requireExternal(Long tenant, String type, int version) {
+        if (!isModelEvent(type)) return requireExternal(type, version);
+        var current = dynamic(tenant, type)
+                .orElseThrow(() -> new IllegalArgumentException("Event is not published for external delivery"));
+        var snapshot = publications.getObject().snapshot(tenant, current.code(), version)
+                .filter(contract -> contract.events().contains(type.substring(type.lastIndexOf('.') + 1)))
+                .orElseThrow(() -> new IllegalArgumentException("Webhook event schema version is not supported"));
+        return descriptor(tenant, type, snapshot);
     }
 
     public EventDescriptor requireExternal(String type, int version) {

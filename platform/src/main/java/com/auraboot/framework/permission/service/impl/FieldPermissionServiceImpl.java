@@ -57,10 +57,6 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
     }
 
     private FieldPermissionSet loadFieldPermissions(Long memberId, String modelCode, Long tenantId) {
-        // Get member's role codes
-        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
-        Set<String> memberRoleCodes = resolveRoleCodes(roleIds);
-
         // Get model field definitions
         List<FieldDefinition> fields = metaModelService.getModelFields(modelCode);
         if (fields == null || fields.isEmpty()) {
@@ -70,6 +66,14 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
         Set<String> allFieldCodes = fields.stream()
                 .map(FieldDefinition::getCode)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        // Roles cannot affect fields without a permission declaration. Avoid role IO entirely
+        // for the common unrestricted model, while retaining the same evaluator for restricted fields.
+        boolean hasFieldPermissions = fields.stream().map(this::extractFieldPermission)
+                .anyMatch(permission -> permission != null && !permission.isEmpty());
+        Set<String> memberRoleCodes = hasFieldPermissions
+                ? resolveRoleCodes(userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId))
+                : Set.of();
 
         Set<String> viewableFields = new LinkedHashSet<>();
         Set<String> editableFields = new LinkedHashSet<>();
@@ -113,11 +117,8 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
         if (roleIds == null || roleIds.isEmpty()) {
             return Set.of();
         }
-        return roleIds.stream()
-                .map(id -> {
-                    Role role = roleService.getById(id);
-                    return role != null ? role.getCode() : null;
-                })
+        return roleService.listByIds(roleIds).stream()
+                .map(Role::getCode)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }

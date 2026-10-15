@@ -5,6 +5,7 @@ import com.auraboot.framework.intent.dto.*;
 import com.auraboot.framework.intent.service.IntentAnalyzerService;
 import com.auraboot.framework.intent.service.PluginDeployService;
 import com.auraboot.framework.intent.service.PluginGeneratorService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/agent/intent")
+@AuthenticatedAccess("AI intent-driven development tooling (analyze, generate, deploy) run from the authenticated developer session")
 public class IntentController {
 
     private static final Logger log = LoggerFactory.getLogger(IntentController.class);

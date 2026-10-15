@@ -18,9 +18,11 @@ RELEASE_MUTATION="${AURA_OPEN_PLATFORM_RELEASE_MUTATION:-}"
 : "${AURA_CI_JOB_ID:?AURA_CI_JOB_ID is required}"
 : "${AURA_CI_BUILDER_ID:?AURA_CI_BUILDER_ID is required}"
 : "${AURA_REGRESSION_ARTIFACTS:?AURA_REGRESSION_ARTIFACTS is required}"
+[[ "${AURA_CI_SOURCE_SET_DIGEST:-}" =~ ^[0-9a-f]{64}$ ]] \
+  || fatal "exact frozen source-set digest is required"
 [[ "$(uname -s)" == "Linux" ]] || fatal "release images must be verified on the admitted Linux CI host"
 [[ "$(uname -m)" == "x86_64" ]] || fatal "release image builder must be x86_64"
-for command_name in docker git openssl python3 timeout; do need "$command_name"; done
+for command_name in docker git openssl python3 timeout bash curl jq; do need "$command_name"; done
 RUNNER_UID="$(id -u)"
 RUNNER_GID="$(id -g)"
 [[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all)" ]] || fatal "CI checkout is dirty"
@@ -32,10 +34,17 @@ EXPECTED_REF="${AURA_CI_EXPECTED_REF:-$REF_SHA}"
 ARTIFACTS="$(cd "$AURA_REGRESSION_ARTIFACTS" && pwd)"
 mkdir -p "$ARTIFACTS/logs"
 CREDENTIAL_ARTIFACT="$ARTIFACTS/open-platform-credentials.json"
+MODEL_EVENT_SECRET_FILE="$ARTIFACTS/model-event-secret.key"
+SLO_FIXTURE_ARTIFACT="$ARTIFACTS/slo-fixture.json"
+[[ ! -e "$SLO_FIXTURE_ARTIFACT" && ! -L "$SLO_FIXTURE_ARTIFACT" ]] \
+  || fatal "SLO private fixture path already exists"
+[[ ! -e "$MODEL_EVENT_SECRET_FILE" && ! -L "$MODEL_EVENT_SECRET_FILE" ]] \
+  || fatal "model event private key path already exists"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
 LOCK_PARENT="${AURA_CI_RELEASE_LOCK_ROOT:-/opt/aura-ci/state/locks}"
 mkdir -p "$WORK_PARENT" "$LOCK_PARENT"
 WORK_ROOT="$WORK_PARENT/$AURA_CI_JOB_ID"
+APP_SECRET_ENV="$WORK_ROOT/app-secrets.env"
 LOCK_DIR="$LOCK_PARENT/open-platform-release-images.lock"
 [[ ! -e "$WORK_ROOT" ]] || fatal "stale work root exists: $WORK_ROOT"
 mkdir "$LOCK_DIR" 2>/dev/null || fatal "another Open Platform release-image build owns the lock"
@@ -49,11 +58,17 @@ PG="open-platform-$SAFE_JOB-pg"
 REDIS="open-platform-$SAFE_JOB-redis"
 APP="open-platform-$SAFE_JOB-app"
 IMAGE="auraboot-platform-open-api:ci-${REF_SHA:0:12}"
-FLYWAY_IMAGE="${AURA_CI_RELEASE_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
-K6_IMAGE="${AURA_CI_K6_IMAGE:-grafana/k6:1.3.0}"
-PYTHON_IMAGE="${AURA_CI_PYTHON_IMAGE:-python:3.13-alpine}"
-BUILD_JDK_IMAGE="eclipse-temurin:21-jdk"
-RUNTIME_JRE_IMAGE="eclipse-temurin:21-jre-alpine"
+# Exact amd64 identities from the admitted qualification baseline. Prewarmed
+# mutable aliases can disappear independently of the retained digest references.
+PGVECTOR_SOURCE="docker.io/pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a"
+REDIS_SOURCE="docker.io/library/redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+FLYWAY_IMAGE="${AURA_CI_RELEASE_FLYWAY_IMAGE:-docker.io/flyway/flyway@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb}"
+K6_IMAGE="${AURA_CI_K6_IMAGE:-docker.io/grafana/k6@sha256:3ddc8b1a33a2c3d8edc6e99b6a762ae36cba08788463458f5e6a7703e14eb77d}"
+SDK_NODE_IMAGE="${AURA_CI_NODE_IMAGE:-docker.io/library/node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402}"
+# Dockerfile frontend 1.20.0; digest verified against Docker Hub official tag metadata.
+DOCKERFILE_FRONTEND_SOURCE="docker.io/docker/dockerfile@sha256:26147acbda4f14c5add9946e2fd2ed543fc402884fd75146bd342a7f6271dc1d"
+BUILD_JDK_IMAGE="docker.io/library/eclipse-temurin@sha256:3e3c176ffed168beb42c607be9bc1639b466cf00261a0fb04425562c9d0c5c2b"
+RUNTIME_JRE_IMAGE="docker.io/library/eclipse-temurin@sha256:51ab5e3302e7141ce665ca3ea85e8b5cd648eafbc3c0c90dd79d6537684e4555"
 PULL_TIMEOUT="${AURA_CI_RELEASE_PULL_TIMEOUT:-300}"
 GRADLE_VERSION="8.14.5"
 GRADLE_DISTRIBUTION_SHA256="6f74b601422d6d6fc4e1f9a1ab6522f642c2fdcbc15ae33ebd30ba3d7198e854"
@@ -71,6 +86,9 @@ cleanup() {
     wait "$DB_SAMPLE_PID" || true
   fi
   rm -f "$CREDENTIAL_ARTIFACT"
+  if [[ -n "${APP_SECRET_ENV:-}" ]]; then rm -f "$APP_SECRET_ENV"; fi
+  if [[ -n "${SLO_FIXTURE_ARTIFACT:-}" ]]; then rm -f "$SLO_FIXTURE_ARTIFACT"; fi
+  if [[ -n "${MODEL_EVENT_SECRET_FILE:-}" ]]; then rm -f "$MODEL_EVENT_SECRET_FILE"; fi
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
   fi
@@ -98,29 +116,31 @@ trap 'exit 143' TERM
 BASE_IMAGE_MANIFEST="$ARTIFACTS/base-images.json"
 # The admitted host prewarms these images. Freeze only digests belonging to each
 # configured source repository; public mirror aliases are never source authority.
+# Explicit transport mappings retain that source digest and are recorded in the manifest.
 python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py" "$BASE_IMAGE_MANIFEST" \
-  pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$PYTHON_IMAGE" \
-  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" \
+  "$PGVECTOR_SOURCE" "$REDIS_SOURCE" "$FLYWAY_IMAGE" "$K6_IMAGE" "$SDK_NODE_IMAGE" \
+  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" "$DOCKERFILE_FRONTEND_SOURCE" \
   || fatal "unable to freeze prewarmed base image identities"
 base_ref() {
-  python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print(next(row["reference"] for row in rows if row["tag"]==sys.argv[2]))' \
+  python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print(next(row["transportReference"] for row in rows if row["tag"]==sys.argv[2]))' \
     "$BASE_IMAGE_MANIFEST" "$1"
 }
-PINNED_BASES="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print("\n".join(row["reference"]+"\t"+row["imageId"] for row in rows))' "$BASE_IMAGE_MANIFEST")" \
+PINNED_BASES="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print("\n".join(row["transportReference"]+"\t"+row["imageId"] for row in rows))' "$BASE_IMAGE_MANIFEST")" \
   || fatal "invalid frozen base image manifest"
 while IFS=$'\t' read -r base_image expected_image_id; do
-  timeout "$PULL_TIMEOUT" docker pull "$base_image" > "$ARTIFACTS/logs/base-pull-${expected_image_id#sha256:}.log" 2>&1 \
+  timeout "$PULL_TIMEOUT" docker pull --platform linux/amd64 "$base_image" > "$ARTIFACTS/logs/base-pull-${expected_image_id#sha256:}.log" 2>&1 \
     || fatal "bounded pull failed for $base_image; mirror it by immutable digest in the controlled registry"
   [[ "$(docker image inspect "$base_image" --format '{{.Id}}')" == "$expected_image_id" ]] \
     || fatal "pulled image identity differs from frozen manifest: $base_image"
 done <<< "$PINNED_BASES"
-PGVECTOR_IMAGE="$(base_ref pgvector/pgvector:pg16)"
-REDIS_IMAGE="$(base_ref redis:7.4-alpine)"
+PGVECTOR_IMAGE="$(base_ref "$PGVECTOR_SOURCE")"
+REDIS_IMAGE="$(base_ref "$REDIS_SOURCE")"
 FLYWAY_IMAGE="$(base_ref "$FLYWAY_IMAGE")"
 K6_IMAGE="$(base_ref "$K6_IMAGE")"
-PYTHON_IMAGE="$(base_ref "$PYTHON_IMAGE")"
+SDK_NODE_IMAGE="$(base_ref "$SDK_NODE_IMAGE")"
 BUILD_JDK_IMAGE="$(base_ref "$BUILD_JDK_IMAGE")"
 RUNTIME_JRE_IMAGE="$(base_ref "$RUNTIME_JRE_IMAGE")"
+DOCKERFILE_FRONTEND_IMAGE="$(base_ref "$DOCKERFILE_FRONTEND_SOURCE")"
 
 # The admitted host installer prewarms this distribution from the configured transport mirror and
 # verifies it against Gradle's fixed official SHA-256. Seed the BuildKit cache from that verified
@@ -136,13 +156,13 @@ printf '%s  %s\n' "$GRADLE_DISTRIBUTION_SHA256" "$GRADLE_ZIP" | sha256sum --chec
   || fatal "host Gradle wrapper distribution checksum mismatch"
 info "seeding BuildKit Gradle wrapper cache from verified host distribution"
 {
-  printf '# syntax=docker/dockerfile:1\n'
+  printf '# syntax=%s\n' "$DOCKERFILE_FRONTEND_IMAGE"
   printf 'FROM %s\n' "$BUILD_JDK_IMAGE"
   printf 'COPY dists/gradle-%s-bin/%s /tmp/gradle-dist\n' \
     "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH"
   printf 'RUN --mount=type=cache,target=/root/.gradle/wrapper mkdir -p /root/.gradle/wrapper/dists/gradle-%s-bin/%s && cp -a /tmp/gradle-dist/. /root/.gradle/wrapper/dists/gradle-%s-bin/%s/\n' \
     "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH" "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH"
-} | docker build -f - "$GRADLE_WRAPPER_HOME" \
+} | docker build -f - "$GRADLE_WRAPPER_HOME" --build-arg "BUILDKIT_SYNTAX=$DOCKERFILE_FRONTEND_IMAGE" \
   > "$ARTIFACTS/logs/gradle-wrapper-cache-seed.log" 2>&1 \
   || fatal "failed to seed BuildKit Gradle wrapper cache"
 
@@ -153,8 +173,22 @@ git -C "$REPO_ROOT" archive --format=tar HEAD | tar -x -C "$STAGE"
 # the immutable public plugin staging copy so the test-profile app can consume the read-only bind
 # mount without running as root or changing permissions in the source checkout.
 chmod -R a+rX "$STAGE/plugins"
+SDK_ROOT="$WORK_ROOT/sdk"
+info "building and installing the exact-ref SDK tarball"
+timeout 600 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" \
+  -v "$STAGE":/source:ro -v "$WORK_ROOT":/work \
+  "$SDK_NODE_IMAGE" sh /source/scripts/ci/prepare-open-platform-sdk.sh /source /work/sdk \
+  > "$ARTIFACTS/logs/sdk-prepare.log" 2>&1 || fail "fresh SDK preparation failed"
+python3 "$STAGE/scripts/ci/verify-open-platform-sdk.py" "$STAGE" "$SDK_ROOT" "$ARTIFACTS/sdk-archive.json" \
+  || fail "fresh SDK archive reconciliation failed"
+OPENAPI_VERIFIER="$WORK_ROOT/openapi-verifier"
+OPENAPI_WHEEL_LOCK="$(sha256sum "$STAGE/scripts/fixtures/open-platform-openapi/requirements.txt" | cut -d ' ' -f1)"
+AURA_OPENAPI_WHEELHOUSE="${AURA_CI_OPENAPI_WHEELHOUSE:-/opt/aura-ci/cache/open-platform-openapi-wheels/$OPENAPI_WHEEL_LOCK}" \
+  timeout 180 sh "$STAGE/scripts/ci/prepare_openapi_verifier.sh" "$STAGE" "$OPENAPI_VERIFIER" \
+  > "$ARTIFACTS/logs/openapi-bootstrap.log" 2>&1 || fatal "OpenAPI verifier bootstrap unavailable"
 info "building exact-ref image $IMAGE"
 docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
+  --build-arg "BUILDKIT_SYNTAX=$DOCKERFILE_FRONTEND_IMAGE" \
   --build-arg "BUILD_JDK_IMAGE=$BUILD_JDK_IMAGE" --build-arg "RUNTIME_JRE_IMAGE=$RUNTIME_JRE_IMAGE" "$STAGE" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 || fail "image build failed"
 DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
@@ -162,40 +196,130 @@ DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 source "$SCRIPT_DIR/ci/isolated-release-network.sh"
 create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
   || fatal "isolated release network unavailable"
-docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
+NETWORK_GATEWAY="$(docker network inspect "$NET" --format '{{(index .IPAM.Config 0).Gateway}}')"
+python3 -c 'import ipaddress,sys; a=ipaddress.ip_address(sys.argv[1]); assert a.version == 4 and a in ipaddress.ip_network("10.247.0.0/16")' "$NETWORK_GATEWAY" \
+  || fatal "model receiver gateway outside owned release pool"
+docker run -d --name "$PG" --network "$NET" --network-alias pg \
+  --label "aura.job-id=$AURA_CI_JOB_ID" --label "aura.source-ref=$REF_SHA" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" \
   -c shared_preload_libraries=pg_stat_statements \
   -c track_io_timing=on -c track_wal_io_timing=on >/dev/null
-docker run -d --name "$REDIS" --network "$NET" "$REDIS_IMAGE" >/dev/null
+docker run -d --name "$REDIS" --network "$NET" --network-alias redis "$REDIS_IMAGE" >/dev/null
 for attempt in $(seq 1 30); do
   # The temporary initialization server accepts sockets before the final TCP listener starts.
-  docker exec "$PG" pg_isready -h "$PG" -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
+  docker exec "$PG" pg_isready -h pg -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
   [[ "$attempt" != 30 ]] || fatal "PostgreSQL did not become ready"
   sleep 1
 done
 docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migration/core":/flyway/sql:ro \
-  "$FLYWAY_IMAGE" -url="jdbc:postgresql://$PG:5432/open_platform_ci" -user=auraboot \
+  "$FLYWAY_IMAGE" -url="jdbc:postgresql://pg:5432/open_platform_ci" -user=auraboot \
   -password=open_platform_ci -locations=filesystem:/flyway/sql -table=ab_flyway_schema_history \
   -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   > "$ARTIFACTS/logs/flyway.log" 2>&1 || fail "Flyway migration failed"
 
-PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
-JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
+info "running the fixed backend profile against a separate freshly migrated database"
+BACKEND_DB="open_platform_backend_ci"
+docker exec "$PG" createdb -U auraboot "$BACKEND_DB" \
+  || fatal "backend test database creation failed"
+docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migration/core":/flyway/sql:ro \
+  "$FLYWAY_IMAGE" -url="jdbc:postgresql://pg:5432/$BACKEND_DB" -user=auraboot \
+  -password=open_platform_ci -locations=filesystem:/flyway/sql -table=ab_flyway_schema_history \
+  -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
+  > "$ARTIFACTS/logs/backend-flyway.log" 2>&1 || fail "backend test migration failed"
+python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" plan --root "$STAGE" \
+  --plan "$ARTIFACTS/backend-plan.json" --selectors "$ARTIFACTS/backend-selectors.txt" \
+  || fail "backend blocking profile expansion failed"
+BACKEND_GRADLE_HOME="$WORK_ROOT/backend-gradle"
+mkdir -p "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
+cp -a "$GRADLE_DISTRIBUTION_DIR" "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin/"
+BACKEND_RC=0
+timeout 1200 docker run --rm --memory=4g --network "$NET" \
+  -v "$STAGE":/source -v "$ARTIFACTS":/artifacts \
+  -v "$BACKEND_GRADLE_HOME":/gradle-home -w /source/platform \
+  -e GRADLE_USER_HOME=/gradle-home \
+  -e TEST_DATABASE_URL="jdbc:postgresql://pg:5432/$BACKEND_DB" \
+  -e TEST_DATABASE_USERNAME=auraboot -e TEST_DATABASE_PASSWORD=open_platform_ci \
+  -e TEST_EXPECTED_DATABASE="$BACKEND_DB" -e SPRING_DATA_REDIS_HOST=redis \
+  "$BUILD_JDK_IMAGE" bash -c '
+    set -Eeuo pipefail
+    mapfile -t classes < /artifacts/backend-selectors.txt
+    args=()
+    for class in "${classes[@]}"; do args+=(--tests "$class"); done
+    # This backend container explicitly requests 4 GiB. Bound both JVMs and context
+    # retention without changing the fixed case denominator or coverage policy.
+    ./gradlew :test "${args[@]}" :jacocoTestReport --no-daemon --no-parallel \
+      -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" \
+      -Dorg.gradle.workers.max=1 -PauraTestMaxHeap=1024m -PauraTestMinHeap=128m \
+      -PauraTestMaxMetaspace=384m -PspringTestContextCacheMaxSize=1
+  ' > "$ARTIFACTS/logs/backend-tests.log" 2>&1 || BACKEND_RC=$?
+mkdir -p "$ARTIFACTS/backend-junit"
+for result in "$STAGE/platform/build/test-results/test/"TEST-*.xml; do
+  [[ -f "$result" ]] || continue
+  cp "$result" "$ARTIFACTS/backend-junit/"
+  chmod 0600 "$ARTIFACTS/backend-junit/$(basename "$result")"
+done
+[[ "$BACKEND_RC" == 0 ]] || fail "backend blocking tests failed (exit $BACKEND_RC); available JUnit evidence retained"
+cp "$STAGE/platform/build/reports/jacoco/test/jacocoTestReport.xml" "$ARTIFACTS/backend-jacoco.xml"
+python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" verify --root "$STAGE" \
+  --plan "$ARTIFACTS/backend-plan.json" --results "$ARTIFACTS/backend-junit" \
+  --coverage "$ARTIFACTS/backend-jacoco.xml" \
+  --receipt "$ARTIFACTS/backend-receipt.json" || fail "backend case reconciliation failed"
+
+info "validating actual generated OpenAPI contracts and declarations"
+OPENAPI_ARTIFACTS="$ARTIFACTS/openapi-contract"
+mkdir -p "$OPENAPI_ARTIFACTS"
+cp "$STAGE/platform/build/test-artifacts/open-api-contract/"*.json "$OPENAPI_ARTIFACTS/"
+cp "$STAGE/platform/build/test-artifacts/open-api-contract/"*.d.ts "$OPENAPI_ARTIFACTS/"
+cp "$STAGE/scripts/fixtures/open-platform-openapi/types-consumer.ts" "$OPENAPI_ARTIFACTS/"
+"$OPENAPI_VERIFIER/bin/python" "$STAGE/scripts/ci/verify_openapi_artifacts.py" \
+  "$OPENAPI_ARTIFACTS" "$ARTIFACTS/openapi-receipt.json" \
+  > "$ARTIFACTS/logs/openapi-validation.log" 2>&1 || fail "OpenAPI contract validation failed"
+timeout 60 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" \
+  -v "$OPENAPI_ARTIFACTS":/consumer:ro -v "$SDK_ROOT":/sdk:ro \
+  "$SDK_NODE_IMAGE" node /sdk/toolchain/node_modules/typescript/bin/tsc \
+  --strict --noEmit --module nodenext --target es2022 /consumer/types-consumer.ts \
+  > "$ARTIFACTS/logs/openapi-types.log" 2>&1 || fail "Generated OpenAPI declaration consumer failed"
+
+# Each isolated application keeps the same keys across its crash/restart proof.
+# The private handoff is outside report artifacts and never passed as key-valued argv.
+python3 - "$APP_SECRET_ENV" <<'PYAPPSECRETS'
+import base64, os, secrets, sys
+fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w") as output:
+    for name, size in [("FIELD_ENCRYPTION_KEY", 32),
+                       ("OPEN_PLATFORM_PROTOCOL_SIGNING_KEY", 48), ("JWT_SECRET", 64)]:
+        output.write(name + "=" + base64.b64encode(secrets.token_bytes(size)).decode() + "\n")
+PYAPPSECRETS
 # AURA_PLUGINS_DIR is the PF4J jar-plugin root and must NOT share
 # AURA_BUILTIN_PLUGINS_DIR: the baked /app/plugins tree holds the DSL
 # builtin-import plugins (plugin.json + config/, no PF4J descriptor), and
 # since #2037 AuraPluginManager fails fast on undescribed paths instead of
 # skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
-docker run -d --name "$APP" --network "$NET" \
+APP_HOST_PORT="$(python3 - <<'PYAPPPORT'
+import socket
+with socket.socket() as listener:
+    listener.bind(("127.0.0.1", 0))
+    print(listener.getsockname()[1])
+PYAPPPORT
+)"
+docker run -d --name "$APP" --network "$NET" --network-alias app --memory=4g \
+  --env-file "$APP_SECRET_ENV" \
+  --label "aura.job-id=$AURA_CI_JOB_ID" --label "aura.source-ref=$REF_SHA" \
+  -p "127.0.0.1:$APP_HOST_PORT:6443" \
   -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
-  -e JWT_SECRET="$JWT_KEY" \
-  -e DATABASE_URL="jdbc:postgresql://$PG:5432/open_platform_ci" \
+  -e DATABASE_URL="jdbc:postgresql://pg:5432/open_platform_ci" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=open_platform_ci \
-  -e REDIS_HOST="$REDIS" -e REDIS_PORT=6379 \
+  -e REDIS_HOST=redis -e REDIS_PORT=6379 \
   -e AURA_BUILTIN_PLUGINS_DIR=/app/plugins \
   -e AURA_PLUGINS_DIR=/app/pf4j-plugins \
-  -e OPEN_PLATFORM_PROTOCOL_SIGNING_KEY="$PROTOCOL_KEY" "$IMAGE" >/dev/null
+  -e AURA_SSRF_ALLOWED_PRIVATE_HOSTS="$NETWORK_GATEWAY" \
+  "$IMAGE" >/dev/null || fatal "application container could not bind its selected loopback port"
+docker inspect "$APP" --format '{{json .HostConfig.Memory}}' > "$ARTIFACTS/app-memory-limit.json"
+python3 - "$ARTIFACTS/app-memory-limit.json" <<'PYAPPMEMORY'
+import json, sys
+assert json.load(open(sys.argv[1])) == 4 * 1024 ** 3, "application memory limit differs from 4 GiB"
+PYAPPMEMORY
 for attempt in $(seq 1 90); do
   HEALTH="$(docker exec "$APP" wget -q -O - http://localhost:6443/actuator/health 2>/dev/null || true)"
   printf '%s' "$HEALTH" | grep -q '"status":"UP"' && break
@@ -203,17 +327,35 @@ for attempt in $(seq 1 90); do
   sleep 2
 done
 
+info "reconciling frozen quick-access browser and original-image evidence"
+: "${OPEN_PLATFORM_UI_EVIDENCE:?immutable quick-access UI archive is required}"
+[[ -f "$OPEN_PLATFORM_UI_EVIDENCE" && ! -L "$OPEN_PLATFORM_UI_EVIDENCE" ]] || fatal "quick-access UI input must be a regular archive"
+python3 "$STAGE/scripts/ci/open_platform_quick_ui.py" verify --archive "$OPEN_PLATFORM_UI_EVIDENCE" \
+  --root "$STAGE" --expected-ref "$REF_SHA" > "$ARTIFACTS/quick-ui-receipt.json" \
+  2> "$ARTIFACTS/logs/quick-ui.log" || fail "quick-access UI evidence incomplete or from another candidate"
+
 info "running two-domain HTTP protocol probe"
 # Create the secret handoff as the unprivileged host runner before the rootful helper container
 # writes it. Opening an existing file preserves host ownership; the EXIT trap removes it on every
 # success or failure path so a failed probe cannot leave client credentials in CI artifacts.
 : > "$CREDENTIAL_ARTIFACT"
 chmod 0600 "$CREDENTIAL_ARTIFACT"
-docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
-  -v "$STAGE/scripts/ci":/probe:ro -v "$ARTIFACTS":/artifacts \
-  -e BASE_URL="http://$APP:6443" "$PYTHON_IMAGE" python /probe/open-platform-release-probe.py \
+APP_BIND="$(docker port "$APP" 6443/tcp)"
+[[ "$APP_BIND" =~ ^127\.0\.0\.1:[0-9]+$ ]] || fatal "release app protocol binding is not loopback-only"
+BASE_URL="http://$APP_BIND" CREDENTIAL_ARTIFACT="$CREDENTIAL_ARTIFACT" \
+SDK_RUNNER_USER="$RUNNER_UID:$RUNNER_GID" SDK_NETWORK="$NET" SDK_CONSUMER_ROOT="$SDK_ROOT/consumer" \
+SDK_NODE_IMAGE="$SDK_NODE_IMAGE" SDK_BASE_URL="http://app:6443" \
+MODEL_APP="$APP" MODEL_POSTGRES="$PG" MODEL_SOURCE_REF="$REF_SHA" MODEL_IMAGE_DIGEST="$DIGEST" \
+AURA_CI_JOB_ID="$AURA_CI_JOB_ID" \
+MODEL_RECEIVER_HOST="$NETWORK_GATEWAY" \
+MODEL_EVENT_SECRET_FILE="$MODEL_EVENT_SECRET_FILE" SLO_FIXTURE_ARTIFACT="$SLO_FIXTURE_ARTIFACT" \
+python3 "$STAGE/scripts/ci/open-platform-release-probe.py" \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
+python3 "$STAGE/scripts/ci/open_platform_dynamic_probe.py" --verify-release-report "$ARTIFACTS/protocol-probe.json" \
+  --model-event-secret-file "$MODEL_EVENT_SECRET_FILE" \
+  || fail "dynamic business case reconciliation failed"
+rm -f "$MODEL_EVENT_SECRET_FILE"
 CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$CREDENTIAL_ARTIFACT")"
 CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
 
@@ -231,16 +373,22 @@ DB_SAMPLE_PID=$!
 cat /proc/loadavg > "$ARTIFACTS/host-load-before.txt"
 
 info "running production-threshold k6 profile inside the CI network"
+bash "$SCRIPT_DIR/ci/collect-open-platform-jfr.sh" start "$APP" "$SAFE_JOB" "$REF_SHA" \
+  "$BUILD_JDK_IMAGE" "$ARTIFACTS" || fatal "Java SLO diagnostics could not start"
 SLO_RC=0
 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -v "$STAGE/tests/load/k6":/scripts:ro \
-  -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://$APP:6443" \
+  -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://app:6443" \
   -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" \
+  -e BUSINESS_FIXTURE_PATH=/artifacts/slo-fixture.json \
   -e SUMMARY_PATH=/artifacts/slo-summary.json "$K6_IMAGE" run /scripts/open-platform-slo.js \
   > "$ARTIFACTS/logs/k6.log" 2>&1 || SLO_RC=$?
 # Preserve normalized statements (no bound credential values) on both red and
 # green exits. Diagnostic collection must not hide an already-failed SLO.
 PROFILE_RC=0
+JFR_RC=0
+bash "$SCRIPT_DIR/ci/collect-open-platform-jfr.sh" collect "$APP" "$SAFE_JOB" "$REF_SHA" \
+  "$BUILD_JDK_IMAGE" "$ARTIFACTS" || JFR_RC=$?
 : > "$DB_SAMPLE_STOP"
 wait "$DB_SAMPLE_PID" || PROFILE_RC=$?
 DB_SAMPLE_PID=""
@@ -254,8 +402,11 @@ cat /proc/loadavg > "$ARTIFACTS/host-load-after.txt"
 docker stats --no-stream --format '{{json .}}' "$APP" "$PG" "$REDIS" \
   > "$ARTIFACTS/container-resources.jsonl" 2> "$ARTIFACTS/logs/container-resources.log" || true
 [[ "$SLO_RC" == 0 ]] || fail "Open Platform production SLO thresholds failed (k6 exit=$SLO_RC, SQL profile exit=$PROFILE_RC)"
+python3 "$STAGE/scripts/ci/verify-open-platform-slo.py" "$ARTIFACTS/slo-summary.json" production \
+  || fail "Open Platform business SLO sample reconciliation failed"
 [[ "$PROFILE_RC" == 0 ]] || fatal "SQL profile could not be collected"
-rm -f "$CREDENTIAL_ARTIFACT"
+[[ "$JFR_RC" == 0 ]] || fatal "Java SLO diagnostics could not be collected"
+rm -f "$CREDENTIAL_ARTIFACT" "$SLO_FIXTURE_ARTIFACT"
 
 info "waiting for Webhook queue drain"
 if [[ "$RELEASE_MUTATION" == "webhook-backlog" ]]; then
@@ -263,9 +414,12 @@ if [[ "$RELEASE_MUTATION" == "webhook-backlog" ]]; then
     "INSERT INTO ab_webhook_subscription (tenant_id,pid,name,target_url,event_type)
        SELECT id,'ci-drain-mutation','CI drain mutation','https://example.invalid/hook','ci.mutation'
        FROM ab_tenant ORDER BY id LIMIT 1;
+     INSERT INTO ab_webhook_receiver_lane (tenant_id,receiver_key)
+       SELECT tenant_id,'https://example.invalid:443'
+       FROM ab_webhook_subscription WHERE pid='ci-drain-mutation';
      INSERT INTO ab_webhook_delivery_log
-       (pid,tenant_id,subscription_pid,request_url,delivery_status,retry_count,max_retries,next_retry_at,created_at,updated_at)
-       SELECT 'ci-drain-delivery',tenant_id,pid,target_url,'pending',0,3,NOW(),NOW(),NOW()
+       (pid,tenant_id,subscription_pid,receiver_key,request_url,delivery_status,retry_count,max_retries,next_retry_at,created_at,updated_at)
+       SELECT 'ci-drain-delivery',tenant_id,pid,'https://example.invalid:443',target_url,'pending',0,3,NOW(),NOW(),NOW()
        FROM ab_webhook_subscription WHERE pid='ci-drain-mutation';" >/dev/null
 fi
 DRAINED=0
@@ -281,6 +435,7 @@ if [[ "$DRAINED" != 1 && "$RELEASE_MUTATION" == "webhook-backlog" ]]; then
   python3 - "$ARTIFACTS/mutation-receipt.json" <<PY
 import json, sys
 json.dump({"mutation": "webhook-backlog", "verdict": "EXPECTED_RED", "backlog": int("$BACKLOG"),
+           "guard": "webhook-queue-drain", "sourceSetDigest": "$AURA_CI_SOURCE_SET_DIGEST",
            "ref": "$REF_SHA", "releaseReceiptCreated": False}, open(sys.argv[1], "w"), indent=2)
 PY
   fail "EXPECTED_RED: Webhook backlog mutation was rejected; backlog=$BACKLOG"
@@ -292,7 +447,13 @@ python3 - "$ARTIFACTS/release-image-receipt.json" <<PY
 import json, sys
 json.dump({
   "ref": "$REF_SHA", "image": "$IMAGE", "digest": "$DIGEST", "health": "UP",
-  "protocolProbe": "assets+inventory+cursor+etag+catalog", "slo": "production-thresholds-ok",
+  "sourceSetDigest": "$AURA_CI_SOURCE_SET_DIGEST",
+  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 18, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
+  "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
+  "backend": json.load(open("$ARTIFACTS/backend-receipt.json")),
+  "quickAccessUi": json.load(open("$ARTIFACTS/quick-ui-receipt.json")),
+  "officeGuide": json.load(open("$ARTIFACTS/office-guide/result.json")),
+  "openapi": json.load(open("$ARTIFACTS/openapi-receipt.json")), "openapiTypes": "strict-positive-negative-ok",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"
 }, open(sys.argv[1], "w"), indent=2, sort_keys=True)

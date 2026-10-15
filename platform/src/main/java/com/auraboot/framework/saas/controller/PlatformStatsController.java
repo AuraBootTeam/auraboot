@@ -3,6 +3,7 @@ package com.auraboot.framework.saas.controller;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.enums.RoleCodes;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ import java.util.Map;
 @SuppressWarnings("java/spring-disabled-csrf-protection")
 @RequestMapping("/api/platform")
 @RequiredArgsConstructor
+@AuthenticatedAccess("platform-wide tenant/user/plugin statistics; every endpoint enforces an in-code platform_admin guard, not public stats")
 public class PlatformStatsController {
 
     private final JdbcTemplate jdbcTemplate;

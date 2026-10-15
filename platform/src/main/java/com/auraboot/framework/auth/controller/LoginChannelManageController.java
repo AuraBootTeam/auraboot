@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.service.TenantLoginChannelService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/login-channels")
 @RequiredArgsConstructor
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; manages the tenant's login channel enablement and ordering")
 public class LoginChannelManageController {
 
     private final TenantLoginChannelService channelService;

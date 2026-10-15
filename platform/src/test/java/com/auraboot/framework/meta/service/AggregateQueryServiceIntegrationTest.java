@@ -26,6 +26,10 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private NamedQueryService namedQueryService;
 
+    @Autowired private MetaModelService models;
+    @Autowired private SchemaManagementService schemas;
+    @Autowired private DynamicDataService data;
+
     // ==================== Helper Methods ====================
 
     private String generateQueryCode() {
@@ -166,6 +170,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         // Then: should return filtered results
         assertThat(response).isNotNull();
         assertThat(response.getRows()).isNotEmpty();
+        verifyDynamicKeywordAndRowScope();
     }
 
     @Test
@@ -346,6 +351,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         // Then: should return filtered results
         assertThat(response).isNotNull();
         assertThat(response.getRows()).isNotEmpty();
+        verifyNamedQueryFilterResults();
     }
 
     @Test
@@ -492,12 +498,10 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(((Number) response.getRows().get(0).get("a")).intValue()).isEqualTo(42);
         assertThat(response.getRows().get(0).get("b")).isEqualTo("foo");
 
-        // And: meta.metrics derived from named query outputFields
+        // Passthrough preserves raw rows while chart metadata follows declared field types.
         assertThat(response.getMeta()).isNotNull();
-        assertThat(response.getMeta().getMetrics())
-                .as("meta.metrics should be derived from named query outputFields")
-                .containsExactlyInAnyOrder("a", "b");
-        assertThat(response.getMeta().getDimensions()).isEmpty();
+        assertThat(response.getMeta().getMetrics()).as("numeric outputs are metrics").containsExactly("a");
+        assertThat(response.getMeta().getDimensions()).as("string outputs are dimensions").containsExactly("b");
     }
 
     @Test
@@ -699,4 +703,120 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("Invalid group by field");
     }
+    private AggregateQueryRequest.FilterConfig leaf(String field, String operator, Object value) {
+        var filter = new AggregateQueryRequest.FilterConfig();
+        filter.setField(field); filter.setOperator(operator); filter.setValue(value);
+        return filter;
+    }
+
+    private AggregateQueryRequest.FilterConfig group(String logic, AggregateQueryRequest.FilterConfig... children) {
+        var group = new AggregateQueryRequest.FilterConfig();
+        group.setLogic(logic); group.setChildren(List.of(children));
+        return group;
+    }
+
+    private AggregateQueryRequest countRequest(String model) {
+        var metric = new MetricConfig(); metric.setField("amount"); metric.setAggregation("count"); metric.setAlias("matches");
+        var request = new AggregateQueryRequest(); request.setModelCode(model); request.setMetrics(List.of(metric));
+        return request;
+    }
+
+    private long count(AggregateQueryRequest request) {
+        var result = aggregateQueryService.execute(request);
+        assertThat(result.getRows()).hasSize(1);
+        return ((Number) result.getRows().getFirst().get("matches")).longValue();
+    }
+
+    private NamedQueryFieldRequest queryField(String name, String type) {
+        var field = new NamedQueryFieldRequest(); field.setFieldCode(name); field.setColumnExpr(name); field.setDataType(type);
+        field.setSortable(true); field.setOperators(List.of("eq", "ne", "gt", "gte", "lt", "lte", "like", "in", "not_in", "relative", "is_null", "is_not_null"));
+        return field;
+    }
+
+    private void verifyNamedQueryFilterResults() {
+        String code = generateQueryCode();
+        var definition = new NamedQueryCreateRequest(); definition.setCode(code); definition.setTitle("Bound aggregate filter fixture");
+        definition.setStatus("published");
+        definition.setFromSql("SELECT * FROM (VALUES (DATE '2026-07-15',10,'today'),(DATE '2026-07-14',20,'yesterday'),"
+                + "(DATE '2026-07-09',30,'seven-day-boundary'),(DATE '2026-07-08',40,'outside-seven'),"
+                + "(DATE '2026-06-30',50,'previous-month'),(DATE '2026-07-31',60,'month-end'),"
+                + "(DATE '2026-08-01',70,'next-month'),(DATE '2027-01-01',80,'next-year')) AS fixture(occurred_on,amount,tag)");
+        definition.setFields(List.of(queryField("occurred_on", "date"), queryField("amount", "number"), queryField("tag", "string")));
+        namedQueryService.create(definition);
+        var request = countRequest(null); request.setType("namedQuery"); request.setQueryCode(code);
+        java.time.Clock previous = (java.time.Clock) org.springframework.test.util.ReflectionTestUtils.getField(aggregateQueryService, "clock");
+        try {
+            org.springframework.test.util.ReflectionTestUtils.setField(aggregateQueryService, "clock",
+                    java.time.Clock.fixed(java.time.Instant.parse("2026-07-15T12:00:00Z"), java.time.ZoneOffset.UTC));
+            assertThat(count(request)).isEqualTo(8);
+            var windows = java.util.Map.of("today", 1L, "yesterday", 1L, "last_7_days", 3L, "last_30_days", 5L,
+                    "this_week", 2L, "this_month", 5L, "this_quarter", 6L, "this_year", 7L);
+            windows.forEach((token, expected) -> {
+                request.setFilters(List.of(leaf("occurred_on", "relative", token)));
+                assertThat(count(request)).as("actual PG window %s", token).isEqualTo(expected);
+            });
+            for (Object n : List.of(7, "7")) {
+                request.setFilters(List.of(leaf("occurred_on", "relative", java.util.Map.of("relative", "last_n_days", "n", n))));
+                assertThat(count(request)).isEqualTo(3);
+            }
+            for (Object invalid : List.of("unknown", " ", 7, java.util.Map.of("relative", "last_n_days"),
+                    java.util.Map.of("relative", "last_n_days", "n", 0), java.util.Map.of("relative", "last_n_days", "n", "bad"), java.util.Map.of("n", 7))) {
+                request.setFilters(List.of(leaf("occurred_on", "relative", invalid)));
+                assertThatThrownBy(() -> count(request)).isInstanceOf(MetaServiceException.class);
+            }
+            for (Object values : List.of(List.of(10, 30), new Object[]{10, 30})) {
+                request.setFilters(List.of(leaf("amount", "in", values))); assertThat(count(request)).isEqualTo(2);
+                request.setFilters(List.of(leaf("amount", "not_in", values))); assertThat(count(request)).isEqualTo(6);
+            }
+            request.setFilters(List.of(leaf("amount", "in", 20))); assertThat(count(request)).isEqualTo(1);
+            for (Object empty : new Object[]{null, List.of()}) {
+                request.setFilters(List.of(leaf("amount", "in", empty))); assertThat(count(request)).isZero();
+                request.setFilters(List.of(leaf("amount", "not_in", empty))); assertThat(count(request)).isEqualTo(8);
+            }
+            request.setFilters(List.of(group("or", leaf("amount", "eq", 10), leaf("amount", "eq", 80))));
+            request.setDrillFilters(List.of(leaf("amount", "not_in", List.of(10)))); assertThat(count(request)).isEqualTo(1);
+            request.setDrillFilters(null);
+            request.setFilters(List.of(group("and", leaf("amount", "gte", 20),
+                    group("or", leaf("amount", "lt", 40), leaf("amount", "eq", 60))))); assertThat(count(request)).isEqualTo(3);
+            request.setFilters(List.of(leaf("tag", "like", "' OR 1=1 --"))); assertThat(count(request)).isZero();
+            request.setFilters(List.of(leaf("tag", "like", "today"))); assertThat(count(request)).isEqualTo(1);
+            request.setFilters(List.of(leaf("tag", "is_null", null))); assertThat(count(request)).isZero();
+            request.setFilters(List.of(leaf("tag", "is_not_null", null))); assertThat(count(request)).isEqualTo(8);
+        } finally { org.springframework.test.util.ReflectionTestUtils.setField(aggregateQueryService, "clock", previous); }
+    }
+
+    private void verifyDynamicKeywordAndRowScope() {
+        String code = "agg_keyword_" + com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
+        var definition = ModelDefinition.builder().code(code).tableName("mt_" + code).displayName("Aggregate keyword fixture")
+                .status("published").sourceType("physical").primaryKey("id")
+                .capabilities(ModelCapabilities.fullPhysical()).fields(List.of(
+                        FieldDefinition.builder().code("name").columnName("name").dataType("STRING").displayName("Name").searchable(true).build(),
+                        FieldDefinition.builder().code("amount").columnName("amount").dataType("INTEGER").displayName("Amount").searchable(true).build(),
+                        FieldDefinition.builder().code("notes").columnName("notes").dataType("TEXT").displayName("Notes").searchable(false).build())).build();
+        models.saveDefinition(definition);
+        assertThat(schemas.createTableByModel(code).isSuccess()).isTrue();
+        try {
+            var rows = com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope("ALL", () -> List.of(
+                    data.create(code, new java.util.HashMap<>(java.util.Map.of("name", "north_50%", "amount", 10, "notes", "never-note"))),
+                    data.create(code, new java.util.HashMap<>(java.util.Map.of("name", "northX50z", "amount", 20, "notes", "north_50%"))),
+                    data.create(code, new java.util.HashMap<>(java.util.Map.of("name", "south", "amount", 50, "notes", "other")))));
+            var request = countRequest(code);
+            java.util.function.LongSupplier all = () -> com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope("ALL", () -> count(request));
+            assertThat(all.getAsLong()).isEqualTo(3);
+            request.setKeyword("north_50%"); assertThat(all.getAsLong()).isEqualTo(1);
+            request.setKeyword("20"); assertThat(all.getAsLong()).isEqualTo(1);
+            request.setKeyword("never-note"); assertThat(all.getAsLong()).isZero();
+            request.setKeyword("' OR 1=1 --"); assertThat(all.getAsLong()).isZero();
+            request.setKeyword(" "); assertThat(all.getAsLong()).isEqualTo(3);
+            String target = rows.getFirst().get("pid").toString();
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET", null, code, target, () -> count(request))).isEqualTo(1);
+            request.setKeyword("south");
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET", null, code, target, () -> count(request))).isZero();
+            request.setKeyword(null);
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("NONE", null, code, null, () -> count(request))).isZero();
+            request.setFilters(List.of(group("or", leaf("amount", "eq", 10), leaf("amount", "eq", 50)))); assertThat(all.getAsLong()).isEqualTo(2);
+            request.setDrillFilters(List.of(leaf("amount", "not_in", List.of(10)))); assertThat(all.getAsLong()).isEqualTo(1);
+        } finally { assertThat(schemas.dropTableByModel(code).isSuccess()).isTrue(); }
+    }
+
 }

@@ -1,0 +1,18 @@
+[
+  {
+    "runtime": "oss-performance",
+    "sourceCommit": "0e89bbbe3a0f43b73fb166fc6217faf50064e3e5",
+    "backendPid": 50508,
+    "redisHostEmpty": true,
+    "tracingEnabled": "true",
+    "tracingSampleRate": "1"
+  },
+  {
+    "runtime": "oss-performance-control",
+    "sourceCommit": "700d77b54e539b1c2ad5eec3f420d72fc331b3eb",
+    "backendPid": 57207,
+    "redisHostEmpty": true,
+    "tracingEnabled": "true",
+    "tracingSampleRate": "1"
+  }
+]

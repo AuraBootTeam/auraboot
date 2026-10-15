@@ -52,6 +52,7 @@ public class CommandSideEffectExecutor {
     private final ObjectMapper objectMapper;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
+    private final CommandModelMutationSupport modelMutations;
 
     @Autowired
     public CommandSideEffectExecutor(
@@ -62,7 +63,7 @@ public class CommandSideEffectExecutor {
             DocumentFlowService documentFlowService,
             ObjectMapper objectMapper,
             DataPermissionEngine dataPermissionEngine,
-            DataDomainService dataDomainService) {
+            DataDomainService dataDomainService, CommandModelMutationSupport modelMutations) {
         this.dynamicDataMapper = dynamicDataMapper;
         this.dynamicDataService = dynamicDataService;
         this.metaModelService = metaModelService;
@@ -71,6 +72,7 @@ public class CommandSideEffectExecutor {
         this.objectMapper = objectMapper;
         this.dataPermissionEngine = dataPermissionEngine;
         this.dataDomainService = dataDomainService;
+        this.modelMutations = modelMutations;
     }
 
     CommandSideEffectExecutor(
@@ -79,9 +81,9 @@ public class CommandSideEffectExecutor {
             MetaModelService metaModelService,
             CommandSpelEvaluator spelEvaluator,
             DocumentFlowService documentFlowService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper, CommandModelMutationSupport modelMutations) {
         this(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator,
-                documentFlowService, objectMapper, null, null);
+                documentFlowService, objectMapper, null, null, modelMutations);
     }
 
     /**
@@ -306,7 +308,7 @@ public class CommandSideEffectExecutor {
             String tableName = metaModelService.getTableName(targetModel);
             String recordIdVal = targetRecordIdObj.toString();
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdVal);
-            Map<String, Object> targetRecord = loadTargetRecord(tableName, idEntry.getKey(), idEntry.getValue(), tenantId);
+            Map<String, Object> targetRecord = loadTargetRecord(targetModel, tableName, idEntry.getKey(), idEntry.getValue(), tenantId);
             Map<String, Object> evaluationContext = new HashMap<>();
             if (targetRecord != null) {
                 evaluationContext.putAll(targetRecord);
@@ -327,6 +329,8 @@ public class CommandSideEffectExecutor {
                 log.warn("SIDE_EFFECT UPDATE_RECORD: no record found to update in {} with {}={}", targetModel, idEntry.getKey(), recordIdVal);
             }
             log.info("SIDE_EFFECT UPDATE_RECORD: updated {} record(s) in {} ({}={})", updated, targetModel, idEntry.getKey(), recordIdVal);
+        } catch (org.springframework.security.access.AccessDeniedException | com.auraboot.framework.exception.ConflictException e) {
+            throw e;
         } catch (Exception e) {
             log.error("SIDE_EFFECT UPDATE_RECORD failed for {}: {}",
                     targetModel, e.getMessage());
@@ -335,7 +339,10 @@ public class CommandSideEffectExecutor {
         }
     }
 
-    private Map<String, Object> loadTargetRecord(String tableName, String idColumn, Object recordId, Long tenantId) {
+    private Map<String, Object> loadTargetRecord(String modelCode, String tableName, String idColumn, Object recordId, Long tenantId) {
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            return dynamicDataService.getById(modelCode, String.valueOf(recordId));
+        }
         CommandExecutorUtils.validateSqlIdentifier(tableName, "SIDE_EFFECT UPDATE_RECORD table");
         CommandExecutorUtils.validateSqlIdentifier(idColumn, "SIDE_EFFECT UPDATE_RECORD id column");
         String sql = "SELECT * FROM " + tableName
@@ -358,6 +365,33 @@ public class CommandSideEffectExecutor {
             Long tenantId,
             Set<String> jsonbColumns,
             Map<String, Object> legacyConditions) {
+        if (data == null || data.isEmpty()) return 0;
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            // Reuse the complete machine boundary, including field grants and prospective row policy.
+            dynamicDataService.update(modelCode, String.valueOf(idEntry.getValue()), new LinkedHashMap<>(data));
+            return 1;
+        }
+        ModelDefinition model = metaModelService.getModelDefinition(modelCode).orElse(null);
+        if (model != null) {
+            Long expectedVersion = com.auraboot.framework.application.security.MachineDataAccessContext
+                    .expectedVersion(modelCode, String.valueOf(idEntry.getValue()));
+            if (expectedVersion == null) expectedVersion = MetaContext.getCommandExpectedVersion(modelCode, String.valueOf(idEntry.getValue()));
+            Map<String, Object> updateData = new LinkedHashMap<>(data);
+            updateData.remove("row_version");
+            updateData.put("updated_at", java.time.Instant.now());
+            int affected = new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService)
+                    .executeScopedUpdate(model, modelCode, idEntry.getKey(), idEntry.getValue(), updateData, jsonbColumns, expectedVersion);
+            if (affected == 0 && expectedVersion != null) {
+                throw new com.auraboot.framework.exception.ConflictException("Side effect target changed after authorization");
+            }
+            if (affected > 1) throw new IllegalStateException("Side effect identity affected more than one row");
+            if (affected == 1) {
+                modelMutations.observe(modelCode, idEntry, tenantId,
+                        com.auraboot.framework.meta.service.ModelMutationObserver.Operation.UPDATED);
+                MetaContext.advanceCommandExpectedVersion(modelCode, String.valueOf(idEntry.getValue()));
+            }
+            return affected;
+        }
         if (!shouldUseScopedWrite()) {
             return jsonbColumns == null || jsonbColumns.isEmpty()
                     ? dynamicDataMapper.update(tableName, data, legacyConditions)
@@ -730,6 +764,8 @@ public class CommandSideEffectExecutor {
                             targetModel, idEntry.getKey(), recordIdVal, i);
                 }
                 totalUpdated += count;
+            } catch (org.springframework.security.access.AccessDeniedException | com.auraboot.framework.exception.ConflictException e) {
+                throw e;
             } catch (Exception e) {
                 log.error("BATCH_UPDATE_RECORD failed for {} at index {}: {}", targetModel, i, e.getMessage());
                 throw new BusinessException(ResponseCode.BadParam,

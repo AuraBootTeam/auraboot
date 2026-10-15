@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.service.AgentCardService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
@@ -32,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@AuthenticatedAccess("read-only A2A agent discovery metadata scoped to the caller's tenant")
 public class AgentDiscoveryController {
 
     private final AgentCardService agentCardService;

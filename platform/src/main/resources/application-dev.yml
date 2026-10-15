@@ -69,7 +69,7 @@ agent:
 # Dev-mode: enable all actuator endpoints for debugging; disable tracing (no OTLP collector in local dev)
 management:
   tracing:
-    enabled: false
+    enabled: ${MANAGEMENT_TRACING_ENABLED:false}
   endpoints:
     web:
       exposure:

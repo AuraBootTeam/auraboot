@@ -1,0 +1,108 @@
+{
+  "backendTargetedSuites": [
+    {
+      "name": "com.auraboot.framework.observability.SqlObservationInterceptorTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.auraboot.framework.permission.service.impl.FieldPermissionServiceImplTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "SubjectPermissionEvaluator Unit Tests",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.auraboot.framework.menu.service.impl.MenuServiceImplTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.auraboot.framework.meta.service.impl.DynamicDataListingSupportTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "frontend": {
+    "files": 4,
+    "passed": 63
+  },
+  "launcher": {
+    "optimizationPassed": 60,
+    "tracingPassed": 52,
+    "overlap": "Different runs with overlapping tests, do not sum as unique coverage"
+  },
+  "browser": {
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "scenarios": 13
+  },
+  "build": "client + SSR + typecheck + production React runtime passed; forbiddenCount=0",
+  "rawLogDigests": [
+    {
+      "file": "optimization-backend-tests.log",
+      "bytes": 6185,
+      "sha256": "5dc7c940c5960e98b4a27032aa58cb89cd4a803446cfa054a9ca8db09541ae06"
+    },
+    {
+      "file": "final-frontend-tests.log",
+      "bytes": 10818,
+      "sha256": "fca0e8ad89c79c3d64d50d21170687df5075a99c47ef6d92ccf45030177da259"
+    },
+    {
+      "file": "optimization-launcher-tests.log",
+      "bytes": 4945,
+      "sha256": "a47b2d345eaaeeb13f079692d3316c9b6d5a33f9069882a2cbf7989684bff125"
+    },
+    {
+      "file": "tracing-launcher-tests.log",
+      "bytes": 4547,
+      "sha256": "bca6a93e847b710884752ffa597fa788ba7d01798fbae9badb9d4e5ee78a2667"
+    },
+    {
+      "file": "production-build.log",
+      "bytes": 113480,
+      "sha256": "16392c5a3b69bf1cb4b46b90fcb8333866a51faabed0c5980d04b93617328875"
+    },
+    {
+      "file": "final-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "spec-registration.log",
+      "bytes": 143,
+      "sha256": "5c3f64061d9e88615b0b5b7869a4a88625f74b37d3efd2e9519342b4d1303060"
+    },
+    {
+      "file": "optimization-red-tests.log",
+      "bytes": 5661,
+      "sha256": "09bc4cfcc636281a6ab48f425a2d054f21538f7192cef5c5f856f3e85c64b220"
+    },
+    {
+      "file": "root-parallel-mutation-red.log",
+      "bytes": 3770,
+      "sha256": "5083554a73366cc007771dd06fb78638e9ad3b80d582b85b9d200079ca8c2450"
+    },
+    {
+      "file": "cloned-request-mutation-red.log",
+      "bytes": 4978,
+      "sha256": "d0776fa243c36d2aa1635df829c7780144a88813289ce5b244b07e607d292150"
+    }
+  ]
+}

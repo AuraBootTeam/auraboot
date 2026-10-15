@@ -48,6 +48,13 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PluginImportService pluginImportService;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService models;
+    @Autowired private com.auraboot.framework.openplatform.service.OpenApiPublicationService publications;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper resources;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginRecordMapper plugins;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginImportHistoryMapper histories;
+    @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private String dirOf(String resourcePath) throws Exception {
         URL resource = getClass().getClassLoader().getResource(resourcePath);
@@ -191,4 +198,178 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
                 .hasMessageContaining("tpc_dangling_menu")
                 .hasMessageContaining("tp_nonexistent_menu");
     }
+    @org.junit.jupiter.params.ParameterizedTest(name = "public publication import and rollback via {0}")
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "zip", "source"})
+    void publicResourcePublishesOnlyAfterImportedModelAndBindingsAreReady(String entry,
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update", "Manage public publications");
+        String suffix = com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
+        String namespace = "pub" + suffix;
+        String modelCode = namespace + "_record", fieldCode = namespace + "_name", publicCode = "import." + suffix;
+        var manifest = json.createObjectNode().put("pluginId", "com.example.public-import-" + suffix)
+                .put("namespace", namespace).put("version", "1.0.0").put("displayName", "Public import order fixture");
+        manifest.putArray("models").addObject().put("code", modelCode).put("displayName", "Publication source")
+                .put("modelType", "entity").putObject("capabilities").put("list", true).put("detail", true);
+        manifest.putArray("fields").addObject().put("code", fieldCode).put("displayName", "Name").put("dataType", "string");
+        manifest.putArray("modelFieldBindings").addObject().put("modelCode", modelCode).put("fieldCode", fieldCode).put("sequence", 10);
+        try (var fixture = getClass().getResourceAsStream("/plugin/public-resource-contract.json")) {
+            var contract = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(java.util.Objects.requireNonNull(fixture));
+            contract.put("code", publicCode).put("modelCode", modelCode);
+            manifest.putArray("publicResources").add(contract);
+        }
+        writePublicFixture(dir, manifest);
+        var preview = parsePublicFixture(dir, entry);
+        assertThat(preview.isValid()).as("public import preview errors: %s", preview.getErrors()).isTrue();
+        assertThat(histories.findByImportId(preview.getImportId()).getSourceType()).isEqualTo(entry);
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.setContext(testTenant.getId() + 1_000_000L,
+                    testUser.getId(), testUser.getPid(), testUser.getUserName());
+            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.execute(preview.getImportId(), new ImportRequest())))
+                    .as("cached preview cannot execute under a different tenant")
+                    .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                    .hasMessageContaining("tenant does not match preview owner");
+        } finally {
+            applyTestMetaContext();
+        }
+        assertThat(histories.findByImportId(preview.getImportId()).getStatus()).isEqualTo("previewing");
+        assertThat(plugins.findByTenantAndPluginId(manifest.get("pluginId").asText())).isNull();
+        var result = pluginImportService.execute(preview.getImportId(), new ImportRequest());
+        assertThat(result.isSuccess()).as("public import failed: %s", result.getErrorMessage()).isTrue();
+        var originalPluginManifest = json.readTree(jdbc.queryForObject("SELECT manifest::text FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid()));
+        var active = publications.active(testTenant.getId(), publicCode).orElseThrow();
+        assertThat(active.modelCode()).isEqualTo(modelCode);
+        assertThat(active.schemaVersion()).isEqualTo(1);
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getStatus()).isEqualTo("published");
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getCapabilities().isList()).isTrue();
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getCapabilities().isCreate()).isFalse();
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getFields()).extracting("code").contains(fieldCode);
+        var owned = resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode);
+        assertThat(owned.getImportId()).isEqualTo(preview.getImportId());
+        assertThat(owned.getLastSyncVersion()).isEqualTo("1.0.0");
+        assertThat(owned.getImportSnapshot()).containsEntry("status", "published");
+        assertThat(result.getResourceCounts()).containsKey("PUBLIC_RESOURCE");
+        assertThat(result.getResourceCounts().get("PUBLIC_RESOURCE")).containsEntry("CREATE", 1);
+
+        var originalSources = resources.findByPluginPid(result.getPluginPid()).stream()
+                .filter(resource -> !resource.getResourceTypeEnum().isPublicPublication()).toList();
+        assertThat(originalSources).hasSize(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_meta_model WHERE code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)", Long.class, modelCode)).isEqualTo(1L);
+        manifest.remove(java.util.List.of("models", "fields", "modelFieldBindings"));
+        manifest.put("version", "2.0.0").put("displayName", "Changed public import metadata").put("description", "Upgrade description");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
+                .put("schemaVersion", 2).put("maxPageSize", 30);
+        writePublicFixture(dir, manifest);
+        var upgradePreview = parsePublicFixture(dir, entry);
+        assertThat(upgradePreview.isValid()).isTrue();
+        var upgraded = pluginImportService.execute(upgradePreview.getImportId(), new ImportRequest());
+        assertThat(upgraded.isSuccess()).as("public upgrade failed: %s", upgraded.getErrorMessage()).isTrue();
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(2);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.rollback(preview.getImportId())))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class).hasMessageContaining("latest successful");
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(2);
+        assertThat(pluginImportService.rollback(upgradePreview.getImportId()).isSuccess()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT version FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).as("publication rollback restores plugin metadata version").isEqualTo("1.0.0");
+        assertThat(jdbc.queryForObject("SELECT display_name FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).isEqualTo("Public import order fixture");
+        assertThat(jdbc.queryForObject("SELECT description FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).isNull();
+        assertThat(json.readTree(jdbc.queryForObject("SELECT manifest::text FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid()))).isEqualTo(originalPluginManifest);
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        for (var original : originalSources) {
+            var retained = resources.findByTypeAndCode(testTenant.getId(), original.getResourceType(), original.getResourceCode());
+            assertThat(retained).as("prior source ownership must survive a publication-only rollback: %s", original.getResourceCode()).isNotNull();
+            assertThat(retained.getPid()).isEqualTo(original.getPid());
+            assertThat(retained.getImportId()).isEqualTo(preview.getImportId());
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_meta_model WHERE code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)", Long.class, modelCode)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_meta_field WHERE code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)", Long.class, fieldCode)).isEqualTo(1L);
+        assertThat(resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode).getLastSyncVersion())
+                .isEqualTo("1.0.0");
+
+        manifest.put("version", "3.0.0");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
+                .put("schemaVersion", 1).put("maxPageSize", 25);
+        writePublicFixture(dir, manifest);
+        var unchangedPreview = parsePublicFixture(dir, entry);
+        assertThat(unchangedPreview.isValid()).isTrue();
+        var unchanged = pluginImportService.execute(unchangedPreview.getImportId(), new ImportRequest());
+        assertThat(unchanged.isSuccess()).isTrue();
+        assertThat(unchanged.getResourceCounts().get("PUBLIC_RESOURCE")).containsEntry("SKIP", 1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+
+        var installed = plugins.selectById(plugins.findByPid(result.getPluginPid()).getId());
+        installed.setDisplayName("User edited metadata");
+        installed.setSettings(java.util.Map.of("retainedSetting", "user-setting"));
+        assertThat(plugins.updateById(installed)).isEqualTo(1);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.rollback(unchangedPreview.getImportId())))
+                .as("rollback must not overwrite metadata edited after import")
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("metadata changed after import");
+        assertThat(plugins.selectById(installed.getId()).getDisplayName()).isEqualTo("User edited metadata");
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        assertThat(resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode).getImportId())
+                .isEqualTo(unchangedPreview.getImportId());
+        installed.setDisplayName("Changed public import metadata");
+        assertThat(plugins.updateById(installed)).isEqualTo(1);
+
+        var history = histories.findByImportId(unchangedPreview.getImportId());
+        var persistedSnapshot = history.getManifestSnapshot();
+        assertThat(persistedSnapshot).containsKeys("schemaVersion", "before", "after");
+        assertThat(histories.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.auraboot.framework.plugin.entity.PluginImportHistory>()
+                .eq(com.auraboot.framework.plugin.entity.PluginImportHistory::getId, history.getId())
+                .set(com.auraboot.framework.plugin.entity.PluginImportHistory::getManifestSnapshot, null))).isEqualTo(1);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.rollback(unchangedPreview.getImportId())))
+                .as("legacy public upgrade without a metadata snapshot must fail closed")
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("rollback snapshot is missing");
+        assertThat(plugins.selectById(installed.getId()).getVersion()).isEqualTo("3.0.0");
+        assertThat(resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode).getImportId())
+                .isEqualTo(unchangedPreview.getImportId());
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        history.setManifestSnapshot(persistedSnapshot);
+        assertThat(histories.updateById(history)).isEqualTo(1);
+        assertThat(pluginImportService.rollback(unchangedPreview.getImportId()).isSuccess()).isTrue();
+        assertThat(plugins.selectById(installed.getId()).getSettings()).containsEntry("retainedSetting", "user-setting");
+        assertThat(jdbc.queryForObject("SELECT version FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).as("unchanged publication rollback restores plugin metadata version").isEqualTo("1.0.0");
+        assertThat(json.readTree(jdbc.queryForObject("SELECT manifest::text FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid()))).isEqualTo(originalPluginManifest);
+        var restoredOwner = resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode);
+        assertThat(restoredOwner.getImportId()).as("unchanged import rollback restores earlier ownership").isEqualTo(preview.getImportId());
+        assertThat(restoredOwner.getLastSyncVersion()).isEqualTo("1.0.0");
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+    }
+
+    private void writePublicFixture(java.nio.file.Path dir, com.fasterxml.jackson.databind.node.ObjectNode manifest) throws Exception {
+        var fileManifest = manifest.deepCopy();
+        var contracts = fileManifest.remove("publicResources");
+        fileManifest.putObject("resourceDirs").put("publicResources", "config/public-resources.json");
+        java.nio.file.Files.createDirectories(dir.resolve("config"));
+        java.nio.file.Files.writeString(dir.resolve("config/public-resources.json"), json.writeValueAsString(contracts));
+        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(fileManifest));
+    }
+
+    private ImportPreviewResult parsePublicFixture(java.nio.file.Path dir, String entry) throws Exception {
+        return switch (entry) {
+            case "directory" -> pluginImportService.parseDirectory(dir.toString());
+            case "source" -> pluginImportService.parseSource(new com.auraboot.framework.plugin.source.FileSystemPluginSource(dir));
+            case "zip" -> {
+                var bytes = new java.io.ByteArrayOutputStream();
+                try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+                    for (String file : java.util.List.of("plugin.json", "config/public-resources.json")) {
+                        zip.putNextEntry(new java.util.zip.ZipEntry(file));
+                        zip.write(java.nio.file.Files.readAllBytes(dir.resolve(file)));
+                        zip.closeEntry();
+                    }
+                }
+                yield pluginImportService.parse(new java.io.ByteArrayInputStream(bytes.toByteArray()), "public-import.zip");
+            }
+            default -> throw new IllegalArgumentException("Unknown fixture import entry: " + entry);
+        };
+    }
+
 }

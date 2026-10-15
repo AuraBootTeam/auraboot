@@ -10,14 +10,14 @@ import java.lang.annotation.Target;
  * no specific {@link RequirePermission} is needed.
  *
  * <p>This is the explicit, reviewed counterpart to leaving an endpoint un-annotated. It exists for
- * the staged migration to a default-deny authorization model (see {@code PermissionInterceptor} and
- * {@code aura.security.authz.unannotated-mode}):
+ * the default-deny authorization model (see {@code PermissionInterceptor} and
+ * {@code aura.security.authz.unannotated-mode}, default {@code deny}):
  * <ul>
+ *   <li>In {@code deny} mode (default), handlers marked with this annotation are still allowed;
+ *       only truly un-annotated handlers (neither {@code @RequirePermission} nor
+ *       {@code @AuthenticatedAccess}) are denied.</li>
  *   <li>In {@code shadow} mode, handlers marked with this annotation are NOT reported as
  *       "unannotated reached" — they are an acknowledged, self-scoped / authenticated-only surface.</li>
- *   <li>In {@code deny} mode, handlers marked with this annotation are still allowed; only truly
- *       un-annotated handlers (neither {@code @RequirePermission} nor {@code @AuthenticatedAccess})
- *       are denied.</li>
  * </ul>
  *
  * <p>Use it for endpoints that operate only on the caller's own data (preferences, sessions, own

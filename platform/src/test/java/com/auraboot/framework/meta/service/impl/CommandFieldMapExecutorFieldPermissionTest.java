@@ -57,6 +57,9 @@ class CommandFieldMapExecutorFieldPermissionTest {
     @Mock
     private DataDomainService dataDomainService;
 
+    @Mock
+    private CommandModelMutationSupport modelMutations;
+
     @InjectMocks
     private CommandFieldMapExecutor executor;
 
