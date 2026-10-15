@@ -2780,3 +2780,96 @@ test.describe('Open Platform golden journey', () => {
     expect(preservedPids).toEqual(expect.arrayContaining(existingPids));
   });
 });
+
+// Explicit masked captures replace automatic trace/video/screenshots for one-time secrets.
+test.describe('Quick integration token journey', () => {
+  test.setTimeout(120_000);
+  test.use({ storageState: { cookies: [], origins: [] }, locale: 'en-US', viewport: publicationViewport,
+    trace: 'off', video: 'off', screenshot: 'off' });
+  test('generates expiring and permanent tokens, rotates and revokes through the installation UI', async ({ page }) => {
+    await authenticate(page, 'en-US');
+    const name = `Office token acceptance ${Date.now()}`;
+    const created = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications`, { data: { name } });
+    expect(created.status()).toBe(200); const app = (await created.json()).data;
+    const installed = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications/${app.pid}/installations`,
+      { data: { environment: 'development', scopes: ['openapi.profile.read'], rateLimitPerMinute: 10000 } });
+    expect(installed.status()).toBe(200); const installation = (await installed.json()).data;
+    const evidence = path.join(EVIDENCE_DIR, `quick-token-${PUBLICATION_VIEWPORT}`); await mkdir(evidence, { recursive: true });
+    const captureToken = async (id: string) => {
+      await page.screenshot({ path: path.join(evidence, `${id}.png`), fullPage: true,
+        mask: [page.getByTestId('integration-token-secret').locator('textarea')] });
+    };
+    const machineStatus = async (token: string, status: number) => {
+      const result = await page.request.get(`${BACKEND_URL}/api/open/v1/whoami`, { headers: { Authorization: `Bearer ${token}` } });
+      expect(result.status()).toBe(status);
+      if (status === 200) { const identity = await result.json(); expect(identity.applicationPid).toBe(app.pid); expect(identity.installationPid).toBe(installation.pid); }
+    };
+    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    const appCard = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: name });
+    await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
+    let panel = page.getByTestId('integration-token-panel');
+    await expect(panel.getByText('No integration tokens yet.', { exact: true })).toBeVisible();
+    await captureToken('QAT-07-empty');
+    await panel.getByRole('button', { name: 'Generate token', exact: true }).click();
+    await panel.getByLabel('Token name', { exact: true }).fill('Office expiring');
+    await expect(panel.getByLabel('Expiration mode', { exact: true })).toHaveValue('fixed');
+    await expect(panel.getByLabel('Valid for days', { exact: true })).toHaveValue('30');
+    await captureToken('QAT-07-fixed-form');
+    await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(panel.getByTestId('integration-token-row')).toHaveCount(0);
+    await panel.getByRole('button', { name: 'Generate token', exact: true }).click();
+    await panel.getByLabel('Token name', { exact: true }).fill('Office expiring');
+    const issuedFixed = page.waitForResponse(r => r.url().endsWith(`/installations/${installation.pid}/integration-tokens`) && r.request().method() === 'POST');
+    await panel.getByRole('button', { name: 'Confirm', exact: true }).click();
+    const fixedResponse = await issuedFixed; expect(fixedResponse.status()).toBe(200);
+    expect(fixedResponse.headers()['cache-control']).toContain('no-store');
+    await expect(panel.getByLabel('New token', { exact: true })).toBeVisible();
+    const fixed = await panel.getByLabel('New token', { exact: true }).inputValue();
+    expect(fixed.startsWith('ab_at_')).toBe(true); await machineStatus(fixed, 200);
+    await captureToken('QAT-07-fixed-secret');
+    await panel.getByRole('button', { name: 'Saved; close secret', exact: true }).click();
+    await page.reload(); await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
+    panel = page.getByTestId('integration-token-panel');
+    await expect(panel.getByTestId('integration-token-row')).toHaveCount(1);
+    await expect(panel.getByLabel('New token', { exact: true })).toHaveCount(0);
+    await panel.getByRole('button', { name: 'Generate token', exact: true }).click();
+    await panel.getByLabel('Token name', { exact: true }).fill('Office permanent');
+    await panel.getByLabel('Expiration mode', { exact: true }).selectOption('never');
+    await expect(panel.getByLabel('Valid for days', { exact: true })).toHaveCount(0);
+    await captureToken('QAT-07-permanent-form');
+    await panel.getByRole('button', { name: 'Confirm', exact: true }).click();
+    await expect(panel.getByLabel('New token', { exact: true })).toBeVisible();
+    const permanent = await panel.getByLabel('New token', { exact: true }).inputValue();
+    expect(permanent.startsWith('ab_at_')).toBe(true); await machineStatus(permanent, 200);
+    await panel.getByRole('button', { name: 'Saved; close secret', exact: true }).click();
+    const permanentRow = panel.getByTestId('integration-token-row').filter({ hasText: 'Office permanent' });
+    await permanentRow.getByRole('button', { name: 'Rotate token', exact: true }).click();
+    await panel.getByLabel('Expiration mode', { exact: true }).selectOption('never');
+    await panel.getByLabel('Old token grace minutes', { exact: true }).fill('0');
+    await captureToken('QAT-07-rotation-form');
+    await panel.getByRole('button', { name: 'Confirm', exact: true }).click();
+    await expect(panel.getByLabel('New token', { exact: true })).toBeVisible();
+    const replacement = await panel.getByLabel('New token', { exact: true }).inputValue();
+    expect(replacement.startsWith('ab_at_')).toBe(true);
+    await machineStatus(permanent, 401); await machineStatus(replacement, 200); await machineStatus(fixed, 200);
+    await expect(panel.getByTestId('integration-token-secret')).toContainText('Old token accepted until');
+    await captureToken('QAT-07-rotation-secret');
+    await panel.getByRole('button', { name: 'Saved; close secret', exact: true }).click();
+    const active = panel.getByTestId('integration-token-row').filter({ hasText: 'Office permanent' }).filter({ has: page.getByText('Active', { exact: true }) });
+    await active.getByRole('button', { name: 'Revoke token', exact: true }).click();
+    await captureToken('QAT-07-revoke-confirmation');
+    await panel.getByRole('button', { name: 'Cancel', exact: true }).click(); await machineStatus(replacement, 200);
+    await active.getByRole('button', { name: 'Revoke token', exact: true }).click();
+    await panel.getByRole('button', { name: 'Confirm', exact: true }).click();
+    await expect(panel.getByText('Token revoked. Subsequent requests are rejected.', { exact: true })).toBeVisible();
+    await machineStatus(replacement, 401); await machineStatus(fixed, 200);
+    await captureToken('QAT-07-revoked');
+    await panel.getByRole('button', { name: 'Close token manager', exact: true }).click();
+    await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
+    await expect(page.getByTestId('integration-token-panel').getByLabel('New token', { exact: true })).toHaveCount(0);
+    await writeFile(path.join(evidence, 'result.json'), JSON.stringify({ profile: 'quick-token-browser-v1',
+      executed: ['empty', 'fixed-cancel', 'fixed-create-and-bearer', 'reload-redaction', 'permanent-create-and-bearer',
+        'rotate-immediate-and-bearer', 'revoke-cancel', 'revoke-and-bearer', 'sibling-preserved', 'reopen-redaction'],
+      viewport: PUBLICATION_VIEWPORT, passed: true }, null, 2));
+  });
+});

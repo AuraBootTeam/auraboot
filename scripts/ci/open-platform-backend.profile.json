@@ -10,7 +10,11 @@
     "DOP-06",
     "DOP-07",
     "DOP-10",
-    "DOP-11"
+    "DOP-11",
+    "QAT-02",
+    "QAT-03",
+    "QAT-04",
+    "QAT-05"
   ],
   "packages": [
     "com.auraboot.framework.openplatform"

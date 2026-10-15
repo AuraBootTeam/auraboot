@@ -11,6 +11,12 @@ from open_platform_http import ProtocolError, bind_physical_fixture_fields
 from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent, run_claimed_query_rollback, verify_virtual_resource
 
 
+def integration_tokens_passed():
+    from open_platform_integration_token_probe import CASES
+    return {'profile': 'integration-token-http-v1', 'cases': list(CASES), 'executed': len(CASES),
+            'passed': len(CASES), 'failed': 0, 'skipped': 0}
+
+
 def passed():
     audits = []
     fixtures = [("resource-row-field-projection", "list", 200, None, None),
@@ -939,20 +945,32 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()}, model_event_secret=SECRET)
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()},
                                   model_event_secret=SECRET)
         measured = model_passed(); measured["loadMeasurement"] = load_passed(); measured["sustainedMeasurement"] = sustained_passed(); measured["receiverIsolation"] = isolation_passed(); measured["genericReplay"] = generic_replay_passed()
-        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed()},
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()},
                                               model_event_secret=SECRET)["sdk"], sdk)
         for field in ['loadMeasurement', 'sustainedMeasurement', 'receiverIsolation', 'genericReplay']:
             omitted = dict(measured); omitted.pop(field)
             with self.assertRaises(ProtocolError):
                 verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": omitted,
-                    "commandAudits": command_passed()}, model_event_secret=SECRET)
+                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()}, model_event_secret=SECRET)
         measured["loadMeasurement"]["metrics"]["accepted"] = 0
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()},
                                   model_event_secret=SECRET)
+
+    def test_direct_token_release_denominator_rejects_omissions_and_fabricated_totals(self):
+        from open_platform_integration_token_probe import verify_integration_token_report
+        valid = integration_tokens_passed()
+        self.assertEqual(verify_integration_token_report(valid), valid)
+        for omitted in valid:
+            incomplete = dict(valid); incomplete.pop(omitted)
+            with self.assertRaises(ProtocolError): verify_integration_token_report(incomplete)
+        for field, value in [('executed', 0), ('passed', True), ('failed', 1), ('skipped', 1), ('cases', []),
+                             ('cases', valid['cases'][:-1]), ('cases', list(reversed(valid['cases']))), ('secret', 'must-not-be-reported')]:
+            invalid = dict(valid); invalid[field] = value
+            with self.assertRaises(ProtocolError): verify_integration_token_report(invalid)
 
     def test_consumer_private_stdin_and_fixed_safe_ledger(self):
         import subprocess

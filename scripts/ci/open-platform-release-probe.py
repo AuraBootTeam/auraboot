@@ -12,6 +12,7 @@ from open_platform_http import Client, data
 from open_platform_dynamic_probe import run_dynamic_probe, run_sdk_consumer, audited_command, verify_command_audits, prepare_slo_fixture
 from open_platform_model_event_probe import run_model_event_probe
 from open_platform_model_event_runtime import DockerInfrastructure
+from open_platform_integration_token_probe import run_integration_token_probe
 
 bootstrap_spec = importlib.util.spec_from_file_location(
     "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
@@ -139,6 +140,7 @@ def main():
     admin = bootstrap_module.bootstrap_admin(request)
     bootstrap_module.provision_replay_actor_commands(request, admin)
     static = run_static_probe(request, admin)
+    integration_tokens = run_integration_token_probe(request, admin)
     credential = static["credential"]
 
     sdk_command = ["docker", "run", "--rm", "-i", "--user", os.environ["SDK_RUNNER_USER"],
@@ -172,7 +174,7 @@ def main():
     with open(ARTIFACT, "w", encoding="utf-8") as handle:
         json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
     os.chmod(ARTIFACT, 0o600)
-    print(json.dumps(dict(static["public"], dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
+    print(json.dumps(dict(static["public"], integrationTokens=integration_tokens, dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import OpenPlatformOperationsPanel from './OpenPlatformOperationsPanel';
 import { OpenApiInstallationGrantEditor } from '~/ui/smart/admin/OpenApiInstallationGrantEditor';
+import { IntegrationTokenPanel } from '~/ui/smart/admin/IntegrationTokenPanel';
 import { OpenApiInstallationNotificationEditor } from '~/ui/smart/admin/OpenApiInstallationNotificationEditor';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
@@ -113,6 +114,7 @@ export default function OpenPlatformPage() {
   const [secret, setSecret] = useState<CredentialSecret | null>(null);
   const [operationsInstallation, setOperationsInstallation] = useState<string | null>(null);
   const [grantInstallation, setGrantInstallation] = useState<string | null>(null);
+  const [tokenInstallation, setTokenInstallation] = useState<string | null>(null);
   const grantTrigger = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!grantInstallation && grantTrigger.current?.isConnected && !grantTrigger.current.matches(':disabled')) {
@@ -497,8 +499,8 @@ export default function OpenPlatformPage() {
       >
         {[
           ['1', t('openPlatform.step1', undefined, 'Create an application and installation')],
-          ['2', t('openPlatform.step2', undefined, 'Grant explicit scopes and create a secret')],
-          ['3', t('openPlatform.step3', undefined, 'Exchange credentials for a short-lived token')],
+          ['2', t('openPlatform.quickStep2', undefined, locale.startsWith('zh') ? '配置接口权限，生成定期或永久 Token' : 'Grant API authority and generate an expiring or permanent token')],
+          ['3', t('openPlatform.quickStep3', undefined, locale.startsWith('zh') ? '直接用 Bearer Token 调用接口' : 'Call APIs directly with the Bearer token')],
         ].map(([step, label]) => (
           <div
             key={step}
@@ -700,6 +702,18 @@ export default function OpenPlatformPage() {
                           {application.permissions.manageRuntime && (
                             <button
                               type="button"
+                              onClick={() => setTokenInstallation(installation.pid)}
+                              disabled={tokenInstallation !== null}
+                              aria-expanded={tokenInstallation === installation.pid}
+                              className="min-w-0 rounded-md border border-indigo-200 px-2.5 py-1.5 text-xs font-medium text-indigo-700 disabled:opacity-40 dark:border-indigo-800 dark:text-indigo-300"
+                              data-testid={`open-platform-tokens-${installation.pid}`}
+                            >
+                              {t('openPlatform.tokens.open', undefined, locale.startsWith('zh') ? '快捷接入 Token' : 'Quick integration tokens')}
+                            </button>
+                          )}
+                          {application.permissions.manageRuntime && (
+                            <button
+                              type="button"
                               onClick={() => void loadCredentials(installation.pid)}
                               className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
                             >
@@ -768,6 +782,11 @@ export default function OpenPlatformPage() {
                           </span>
                         ))}
                       </div>
+                      {application.permissions.manageRuntime && tokenInstallation === installation.pid && (
+                        <IntegrationTokenPanel key={installation.pid} installationPid={installation.pid} appId={application.pid}
+                          active={application.status === 'active' && installation.status === 'active'}
+                          onClose={() => setTokenInstallation(null)} />
+                      )}
                       {application.permissions.manageRuntime && credentials[installation.pid] && (
                         <CredentialList
                           installationPid={installation.pid}

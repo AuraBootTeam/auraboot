@@ -1205,6 +1205,8 @@ def verify_release_report(report, *, model_event_secret=None):
     if "genericReplay" not in report["modelEvents"]:
         raise ProtocolError("fixed generic replay authentication and tuple proof missing")
     verify_command_audits(report.get("commandAudits"))
+    from open_platform_integration_token_probe import verify_integration_token_report
+    verify_integration_token_report(report.get("integrationTokens"))
     return report
 
 
