@@ -38,7 +38,8 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Opt-in product artifact seam: actual CloudConfig/DynamicDataService/PG, synthetic external HTTP only. */
 @SpringBootTest(classes=TestApplication.class,properties={
         "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
-        "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
+        "security.field-encryption.key=${PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY}",
+        "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}"})
 @ActiveProfiles("integration-test")
 @org.springframework.context.annotation.Import(ProcurementPluginHostRealDbIT.PollerIsolation.class)
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_PLUGIN_JAR",matches=".+")
@@ -48,6 +49,11 @@ class ProcurementPluginHostRealDbIT {
     @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
             "T(java.lang.System).getenv('PROCUREMENT_BUYER_ORDER_FIXTURE') == 'true' || T(java.lang.System).getenv('PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE') == 'true'")
     static class PollerIsolation {
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        ProcurementPublicSourceNativeFixture.SourceWriteObservation linkedSourceObservation() {
+            return new ProcurementPublicSourceNativeFixture.SourceWriteObservation();
+        }
         @org.springframework.context.annotation.Bean
         static org.springframework.beans.factory.config.BeanFactoryPostProcessor preventFixturePollers() {
             return factory -> {
@@ -76,6 +82,7 @@ class ProcurementPluginHostRealDbIT {
     @Autowired com.auraboot.framework.permission.service.UserPermissionService userPermissions;
     @Autowired com.auraboot.framework.auth.service.AuthService authentication;
     @Autowired com.auraboot.framework.auth.util.JwtUtil fixtureJwt;
+    private ProcurementLinkedForeignNativeFixture modernFixture;
     private Map<String,Object> fixtureBinding;
     private Path fixtureReceipt;
     private static final String SYNC="qo_procurement_task_common:sync_sources";
@@ -99,9 +106,18 @@ class ProcurementPluginHostRealDbIT {
     private List<String> logins,queries,cookies;
     private CommandHandlerExtension.CommandContext context;
 
-    @BeforeEach void fixture() throws Exception {
+    @BeforeEach void fixture(org.junit.jupiter.api.TestInfo info) throws Exception {
+        if ("true".equals(System.getenv("PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE"))
+                || "true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE"))) {
+            assertFalse("true".equals(System.getenv("PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE"))
+                    && "true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE")),"Exactly one retained fixture mode required");
+            modernFixture=application.getAutowireCapableBeanFactory().createBean(ProcurementLinkedForeignNativeFixture.class);
+            modernFixture.prepare(info);return;
+        }
+        fixture();
+    }
+    private void fixture() throws Exception {
         if ("true".equals(System.getenv("PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE"))) prepareForeignDirectoryBinding();
-        if ("true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE"))) prepareBuyerFixtureBinding();
         tenantId=Long.valueOf(System.getenv("TEST_TENANT_ID"));assertTrue(tenantId>0);
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));assertNotNull(System.getenv("TEST_DATABASE_URL"));
         try(var connection=source.getConnection()){assertEquals("enterprise_22",connection.getCatalog());}
@@ -159,7 +175,7 @@ class ProcurementPluginHostRealDbIT {
         context=new CommandHandlerExtension.CommandContext(tenantId,"com.auraboot.quote-engine","qoe",SYNC,"s2p_sourcing_event",task,
                 Map.of("eligible",true,"appSecret","untrusted-payload"),settings,false);
     }
-    @AfterEach void close() throws Exception {if(server!=null)server.stop(0);if(plugin!=null)plugin.close();MetaContext.clear();}
+    @AfterEach void close() throws Exception {if(modernFixture!=null){modernFixture.close();return;}if(server!=null)server.stop(0);if(plugin!=null)plugin.close();MetaContext.clear();}
     private static RuntimeException unwrap(ReflectiveOperationException error){
         Throwable cause=error instanceof InvocationTargetException invocation?invocation.getCause():error;
         return cause instanceof RuntimeException runtime?runtime:new IllegalStateException(cause);
@@ -316,6 +332,7 @@ class ProcurementPluginHostRealDbIT {
     }
 
     @Test void nativePhoneBindingIgnoresActualForeignTenantDirectory() throws Exception {
+        if(modernFixture!=null){modernFixture.produceForeign();return;}
         String writer="pr_supplier_pcba_contact:sync_directory",bind="qo_procurement_membership_common:bind_verified_phone";
         String phone="+8613"+String.format(Locale.ROOT,"%09d",Math.floorMod(actorId,1_000_000_000L));
         String foreignOnly="+8614"+String.format(Locale.ROOT,"%09d",Math.floorMod(actorId,1_000_000_000L));
@@ -1955,199 +1972,12 @@ class ProcurementPluginHostRealDbIT {
         return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
     }
     /** Fail before creating any fixture user. The source receipt is an attempt-owned immutable input. */
-    private void prepareBuyerFixtureBinding() throws Exception {
-        assertTrue(application.getBeansOfType(org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor.class).isEmpty());
-        fixtureEnv("PROCUREMENT_BUYER_FIXTURE_PASSWORD");
-        fixtureEnv("PROCUREMENT_SUPPLIER_FIXTURE_PASSWORD");
-        fixtureReceipt=Path.of(fixtureEnv("PROCUREMENT_BUYER_FIXTURE_RECEIPT")).toAbsolutePath();
-        assertFalse(Files.exists(fixtureReceipt),"Never overwrite a prior fixture receipt");
-        assertTrue(Files.isDirectory(fixtureReceipt.getParent()));
-        Path binding=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_SOURCE_BINDING")).toRealPath();
-        assertEquals(fixtureEnv("PROCUREMENT_FIXTURE_SOURCE_BINDING_SHA256"),fixtureSha(binding));
-        var node=json.readTree(Files.readAllBytes(binding));
-        assertEquals("procurement-web-stack-20261010",node.path("runtime").asText());
-        assertEquals("enterprise_22",node.path("database").asText());
-        assertEquals(fixtureEnv("TEST_TENANT_ID"),node.path("tenantId").asText());
-        for(String component:List.of("core","product","enterprise","crm","plugins"))
-            assertTrue(node.path("sourceSet").path(component).asText().matches("[a-f0-9]{40}"),"Missing source identity: "+component);
-        Path jar=Path.of(fixtureEnv("PROCUREMENT_PLUGIN_JAR")).toRealPath();
-        assertEquals(node.path("productJarSha256").asText(),fixtureSha(jar));
-        assertTrue(node.path("productJarSha256").asText().matches("[a-f0-9]{64}"));
-        Path testSource=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_TEST_SOURCE")).toRealPath();
-        assertEquals(node.path("nativeHostTestSha256").asText(),fixtureSha(testSource));
-        assertEquals("1210c6e2ce89ed2ec28b9fc2120bd86051eb043e",node.path("nativeHostBaseCommit").asText());
-        // Copy only declared nonsecret identity fields, never arbitrary input diagnostic/configuration data.
-        fixtureBinding=new LinkedHashMap<>();
-        for(String key:List.of("runtime","database","tenantId","productJarSha256","nativeHostTestSha256","nativeHostBaseCommit"))
-            fixtureBinding.put(key,node.path(key).asText());
-        var sourceSet=new LinkedHashMap<String,String>();
-        for(String component:List.of("core","product","enterprise","crm","plugins")) sourceSet.put(component,node.path("sourceSet").path(component).asText());
-        fixtureBinding.put("sourceSet",sourceSet);fixtureBinding.put("sourceBindingSha256",fixtureSha(binding));
-    }
-
     /** Retained local P14 producer, never an ERP admission or receipt-writer acceptance case. */
     @Test
     @EnabledIfEnvironmentVariable(named="PROCUREMENT_BUYER_ORDER_FIXTURE",matches="true")
     void produceBuyerOrderLinkedFixture() throws Exception {
-        var open=produceLinkedFixtureStage(false);
-        // Close only the first local server/classloader. Its PG facts and authenticated users remain.
-        close();fixture();
-        var closed=produceLinkedFixtureStage(true);
-        assertNotEquals(open.get("namespace"),closed.get("namespace"));
-        assertNotEquals(open.get("taskPid"),closed.get("taskPid"));
-        assertNotEquals(open.get("sourcePid"),closed.get("sourcePid"));
-        assertNotEquals(open.get("executionPid"),closed.get("executionPid"));
-        assertNotEquals(open.get("accountId"),closed.get("accountId"));
-        assertNotEquals(open.get("orderPid"),closed.get("orderPid"));
-        // The second account's complete close observation cannot close the first account's order.
-        scope("qo_procurement_order_common:sync_orders",()->{
-            assertEquals("open",db.getById("pr_purchase_order",(String)open.get("orderPid")).get("qo_pr_order_state"));return null;
-        });
-        var receipt=new LinkedHashMap<String,Object>();receipt.put("schemaVersion",1);receipt.putAll(fixtureBinding);
-        receipt.putAll(open);receipt.put("closedStage",closed);
-        receipt.put("externalERPOutcomeSynthetic",true);receipt.put("nativeTrustedPermit",true);receipt.put("publicERPAdmissionVerified",false);
-        receipt.put("receiptWriterVerified",false);receipt.put("retainedAfterTest",true);
-        Files.writeString(fixtureReceipt,json.writerWithDefaultPrettyPrinter().writeValueAsString(receipt)+"\n",StandardOpenOption.CREATE_NEW);
-    }
-
-    private Map<String,Object> produceLinkedFixtureStage(boolean closed) throws Exception {
-        var dispatch=nativeDispatchFixture();var tx=new TransactionTemplate(transactions);
-        tx.execute(status->scope("qo_procurement_task_common:dispatch",()->dispatchWith(db,dispatch)));
-        String sourcePid=(String)rows().getFirst().get("pid");
-        var sourceRow=scope(SYNC,()->db.getById("pr_purchase_request",sourcePid));
-        Object revision=sourceRow.get("qo_pr_source_revision");
-        var dispatched=scope("qo_procurement_task_common:dispatch",()->nativeRows("s2p_bid","s2p_bid_sourcing_event_id",task));
-        assertEquals(1,dispatched.size());String quotePid=(String)dispatched.getFirst().get("pid");
-        assertEquals(dispatch.supplier(),dispatched.getFirst().get("s2p_bid_supplier_id"));
-        String contact=scope("pr_supplier_common:sync_directory",()->(String)db.create("pr_supplier_pcba_contact",Map.of(
-                "pr_spc_supplier_id",dispatch.supplier(),"pr_spc_contact_name","Buyer linked contact","qo_pr_contact_state","active")).get("pid"));
-        // Initial trusted binding does not prove WeChat identity/phone admission.
-        scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
-                "qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",dispatch.supplier(),
-                "qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active")));
-        var line=Map.<String,Object>of("sourcePid",sourcePid,"sourceRevision",revision,"unitPrice","1.250001",
-                "currency","CNY","unit","PCS","taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2026-12-01");
-        tx.execute(status->scope("qo_procurement_quote_common:save_draft",()->quoteAt(dispatch.clock(),"save_draft",quotePid,
-                Map.of("revision",0,"lines",List.of(line),"paymentTerms","Net 30"))));
-        var formal=(Map<?,?>)tx.execute(status->scope("qo_procurement_quote_common:submit",()->quoteAt(dispatch.clock(),"submit",quotePid,Map.of("revision",1))));
-        tx.execute(status->scope("qo_procurement_task_common:allocate",()->allocateNative(Map.of(
-                "sourceDemands",List.of(Map.of("sourcePid",sourcePid,"sourceRevision",revision,"quantity","300.000001")),
-                "allocations",List.of(Map.of("quotePid",quotePid,"sourcePid",sourcePid,"submissionPid",formal.get("submissionPid"),"quantity","300.000001"))))));
-        String execution=scope(EXECUTE_ORDER,()->{
-            var rows=nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task);
-            assertEquals(1,rows.size());assertEquals("pending",rows.getFirst().get("qo_pr_execution_state"));return (String)rows.getFirst().get("pid");
-        });
-        String erpId="local-order-"+provider,bill="LOCAL-"+provider;
-        var creates=new java.util.concurrent.atomic.AtomicInteger();
-        var service=nativeExecutionService(new IndependentTransactionAccessorImpl(transactions,data),(method,args)->{
-            assertEquals("create",method);creates.incrementAndGet();return executionResult("succeeded",erpId,bill,"");
-        });
-        scope(EXECUTE_ORDER,()->executeNativeOrder(service,execution));
-        scope(EXECUTE_ORDER,()->executeNativeOrder(service,execution));assertEquals(1,creates.get());
-        scope(EXECUTE_ORDER,()->{var ledger=db.getById("qo_procurement_execution_common",execution);
-            assertEquals("succeeded",ledger.get("qo_pr_execution_state"));assertEquals(erpId,ledger.get("qo_pr_execution_erp_order_id"));
-            assertEquals(bill,ledger.get("qo_pr_execution_erp_bill_no"));assertEquals(dispatch.supplier(),ledger.get("qo_pr_execution_supplier_pid"));
-            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_reserved_qty","300.000001");return null;});
-        String publish="qo_procurement_order_common:sync_orders";
-        var header=Map.<String,Object>of("account_id",provider,"erp_id",erpId,"supplier_pid",dispatch.supplier(),
-                "bill_no",bill,"order_date","2026-10-13","business_status","approved");
-        // Closed-stage initial balances are trusted synthetic reader fixtures, not receipt-writer proof.
-        String initialBalance=closed?"250":"0";
-        var materialFacts=new LinkedHashMap<String,String>();
-        for(String field:List.of("material_code","material_name","specification","unit")) {
-            Object fact=sourceRow.get("qo_pr_source_"+field);assertNotNull(fact,"Native source material snapshot required: "+field);
-            assertFalse(fact.toString().isBlank(),"Native source material snapshot must be visible: "+field);materialFacts.put(field,fact.toString());
-        }
-        var orderLines=List.of(Map.<String,Object>of("erp_entry_id","1","product_pid",product,"source_pid",sourcePid,
-                "ordered_qty","300.000001","submitted_qty",initialBalance,"received_qty",initialBalance,
-                "material_code",materialFacts.get("material_code"),"material_name",materialFacts.get("material_name"),
-                "specification",materialFacts.get("specification"),"unit",materialFacts.get("unit")));
-        assertEquals("published",tx.execute(status->scope(publish,()->invokeService("ProcurementOrderService","publish",new Class<?>[]{Map.class,List.class},header,orderLines))));
-        var orders=scope(publish,()->nativeRows("pr_purchase_order","qo_pr_order_erp_id",erpId));assertEquals(1,orders.size());
-        String order=(String)orders.getFirst().get("pid");
-        assertEquals(provider,orders.getFirst().get("qo_pr_order_account_id"));
-        assertEquals(dispatch.supplier(),orders.getFirst().get("pr_po_supplier"));
-        var nativeLines=scope(publish,()->nativeRows("pr_purchase_order_line","pr_pol_order_id",order));assertEquals(1,nativeLines.size());
-        String orderLine=(String)nativeLines.getFirst().get("pid");
-        assertEquals(sourcePid,nativeLines.getFirst().get("qo_pr_order_line_source_pid"));
-        for(var fact:materialFacts.entrySet()) assertEquals(fact.getValue(),nativeLines.getFirst().get("qo_pr_order_line_"+fact.getKey()),"Formal line preserves actual native source fact: "+fact.getKey());
-        var addresses=new ArrayList<String>();
-        for(String label:List.of("A","B")) addresses.add(scope("qo_procurement_address_common:maintain",()->(String)db.create("qo_procurement_address_common",Map.of(
-                "qo_pr_address_supplier_pid",dispatch.supplier(),"qo_pr_address_state","active","qo_pr_address_address","Buyer fixture warehouse "+label,
-                "qo_pr_address_manager_name","Fixture manager "+label,"qo_pr_address_manager_phone","+8613800000000")).get("pid")));
-        if(closed) {
-            Object closedCount=tx.execute(status->scope(publish,()->invokeService("ProcurementOrderService","syncClosures",
-                    new Class<?>[]{String.class,Map.class,boolean.class},provider,Map.of(erpId,true),true)));
-            assertEquals(Integer.valueOf(1),closedCount);
-        }
-        scope(publish,()->{
-            assertEquals(closed?"closed":"open",db.getById("pr_purchase_order",order).get("qo_pr_order_state"));
-            assertNativeQuantity("pr_purchase_order_line",orderLine,"pr_pol_qty","300.000001");
-            assertNativeQuantity("pr_purchase_order_line",orderLine,"qo_pr_order_line_submitted_qty",initialBalance);
-            assertNativeQuantity("pr_purchase_order_line",orderLine,"pr_pol_received_qty",initialBalance);
-            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_reserved_qty","300.000001");return null;
-        });
-        Map<String,Object> supplierActor=authenticateFixtureActor(actorId,actor,fixtureActorMemberId,fixtureActorMemberPid,
-                provider+"@example.invalid",provider+"_supplier",List.of("qo.srm.use","meta.command.execute"),"PROCUREMENT_SUPPLIER_FIXTURE_PASSWORD");
-        Map<String,Object> buyer=closed?Map.of():createAuthenticatedFixtureBuyer(false);
-        Map<String,Object> buyerMissingSupplierRead=closed?Map.of():createAuthenticatedFixtureBuyer(true);
-        var receipt=new LinkedHashMap<String,Object>();
-        receipt.put("namespace",provider);receipt.put("taskPid",task);receipt.put("sourcePid",sourcePid);receipt.put("quotePid",quotePid);
-        receipt.put("submissionPid",formal.get("submissionPid"));receipt.put("executionPid",execution);receipt.put("accountId",provider);
-        receipt.put("supplierPid",dispatch.supplier());receipt.put("orderPid",order);receipt.put("orderLinePid",orderLine);
-        receipt.put("erpOrderId",erpId);receipt.put("erpBillNo",bill);receipt.put("addressPids",addresses);
-        if(!closed){receipt.put("buyer",buyer);receipt.put("buyerMissingSupplierRead",buyerMissingSupplierRead);
-            assertNotEquals(buyer.get("userPid"),buyerMissingSupplierRead.get("userPid"));
-            assertNotEquals(buyer.get("memberPid"),buyerMissingSupplierRead.get("memberPid"));}
-        receipt.put("supplierActor",supplierActor);receipt.put("orderState",closed?"closed":"open");
-        receipt.put("orderLineMaterialFacts",materialFacts);
-        receipt.put("orderLineMaterialFactsOrigin","Synthetic loopback source read persisted by native domain lifecycle; copied into formal order-line snapshot, not customer ERP006/007 evidence");
-        receipt.put("orderedQty","300.000001");receipt.put("submittedQty",initialBalance);receipt.put("receivedQty",initialBalance);
-        receipt.put("initialReceivedSynthetic",closed);receipt.put("receiptWriterVerified",false);
-        return receipt;
-    }
-
-    private Map<String,Object> createAuthenticatedFixtureBuyer(boolean missingSupplierRead) {
-        String suffix=missingSupplierRead?"-buyer-no-supplier":"-buyer";
-        String email=provider+suffix+"@example.invalid",name=provider+suffix.replace('-','_');
-        var buyer=users.signUp(email,fixtureEnv("PROCUREMENT_BUYER_FIXTURE_PASSWORD"),"Linked buyer fixture",name);
-        MetaContext.setContext(tenantId,actorId,actor,"Host fixture");
-        var member=members.addMember(buyer.getId(),tenantId,"active");
-        var codes=new ArrayList<>(List.of("qo.procurement.manage","meta.command.execute","page.page.read",
-                "model.s2p_sourcing_event.read","model.qo_procurement_execution_common.read",
-                "model.pr_supplier_common.read","model.pr_purchase_order.read","model.pr_purchase_order_line.read",
-                "model.qo_procurement_shipment_common.read","model.qo_procurement_shipment_line_common.read",
-                "model.pr_purchase_request.read","model.pr_spend_category.read"));
-        if(missingSupplierRead)assertTrue(codes.remove("model.pr_supplier_common.read"));
-        assertEquals(missingSupplierRead?11:12,codes.size());
-        return authenticateFixtureActor(buyer.getId(),buyer.getPid(),member.getId(),member.getPid(),email,name,
-                List.copyOf(codes),"PROCUREMENT_BUYER_FIXTURE_PASSWORD");
-    }
-    private Map<String,Object> authenticateFixtureActor(Long userId,String userPid,Long memberId,String memberPid,
-            String email,String roleCode,List<String> codes,String credentialEnvironment) {
-        var role=new com.auraboot.framework.rbac.entity.Role();
-        role.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());role.setCode(roleCode);role.setName(roleCode);
-        role.setDescription("Opt-in local procurement fixture");role.setType("custom");role.setScopeType("tenant");role.setStatus("active");
-        role.setTenantId(tenantId);role.setIsDefault(false);role.setIsSystem(false);role.setDeletedFlag(false);role.setPriority(100);
-        role.setCreatedAt(java.time.Instant.now());role.setUpdatedAt(java.time.Instant.now());role=roles.createRole(role);
-        var permissionIds=new ArrayList<Long>();
-        for(String code:codes){var permission=permissions.findByCode(code);assertNotNull(permission,"Missing actual imported permission: "+code);permissionIds.add(permission.getId());}
-        assertTrue(roles.assignPermissions(role.getId(),permissionIds));roles.setDefaultDataScopeType(role.getId(),"all");
-        assertTrue(userRoles.assignRolesToMember(memberId,List.of(role.getId()),tenantId,actorId));
-        try {
-            MetaContext.setContext(tenantId,userId,userPid,"Linked procurement fixture");
-            userPermissions.evictUserPermissions(tenantId,userId);
-            for(String code:codes) assertTrue(userPermissions.hasPermission(tenantId,userId,memberId,code),"Actual member role must grant "+code);
-            var request=new com.auraboot.framework.auth.dto.AuthenticationRequest();request.setEmail(email);request.setPassword(fixtureEnv(credentialEnvironment));
-            var authenticated=authentication.authenticate(request);
-            assertEquals(tenantId,authenticated.getTenantId());assertEquals(userId,authenticated.getUserId());assertEquals(userPid,authenticated.getUserPid());
-            assertNotNull(authenticated.getJwt());assertFalse(authenticated.getJwt().isBlank());
-            assertEquals(memberId,fixtureJwt.extractMemberId(authenticated.getJwt()));
-            assertEquals(tenantId,fixtureJwt.extractTenantId(authenticated.getJwt()));
-            assertEquals(userPid,fixtureJwt.extractUserPid(authenticated.getJwt()));
-            return Map.of("email",email,"userPid",userPid,"memberPid",memberPid,"roleCode",roleCode,"tenantId",tenantId.toString(),
-                    "permissionCodes",codes,"credentialEnvironment",credentialEnvironment,"authenticationVerified",true);
-        } finally {MetaContext.setContext(tenantId,actorId,actor,"Host fixture");}
+        assertNotNull(modernFixture,"Retained producer requires modern artifact/crypto/Auth admission");
+        modernFixture.produceLinked();
     }
 
 }

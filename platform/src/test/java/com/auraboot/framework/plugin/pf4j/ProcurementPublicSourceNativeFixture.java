@@ -416,7 +416,7 @@ abstract class ProcurementPublicSourceNativeFixture {
     /** Controlled ERP read fixture seam; default rows preserve all original source/order cases. */
     protected List<List<Object>> orderReadRows() {
         var line=savedOrder.path("Lines").get(0);
-        return List.of(List.of("local-order-1","LOCAL-PO-1","local-entry-1",savedOrder.path("Supplier").path("Id").asText(),line.path("Material").path("Id").asText(),savedOrder.path("Date").asText(),"LOCAL_APPROVED",readClosedStatus,readQuantity,"0",readReceivedQuantity,"LOCAL-MATERIAL","Local material","local","PCS",line.path("DeliveryDate").asText(),line.path("Source").path("Head").asText(),line.path("Source").path("Entry").asText()));
+        return List.of(List.of("local-order-1","LOCAL-PO-1","local-entry-1",savedOrder.path("Supplier").path("Id").asText(),line.path("Material").path("Id").asText(),savedOrder.path("Date").asText(),"LOCAL_APPROVED",readClosedStatus,readQuantity,"0",readReceivedQuantity,"LOCAL-MATERIAL","Local material","local","PCS",line.path("DeliveryDate").asText(),line.path("Lines_Link").get(0).path("Lines_Link_Bill").asText(),line.path("Lines_Link").get(0).path("Lines_Link_Entry").asText()));
     }
     protected final AtomicInteger orderReadCount=new AtomicInteger();
     protected void verifyPublicOrderSynchronization(PreparedOrder order,Map<String,Object> source,List<Map<String,Object>> allocations,Map<String,Object> formal) throws Exception {
@@ -521,7 +521,13 @@ abstract class ProcurementPublicSourceNativeFixture {
         var row=new LinkedHashMap<String,Object>();row.put("connectionPid",connection);row.put("accountId",provider);row.put("formId","FixturePurchase");
         row.put("markerField","Marker");row.put("orderIdField","OrderId");row.put("billNoField","BillNo");row.put("linesField","Lines");
         row.put("headerFields",Map.of("supplierExternalId","Supplier.Id","organization","Organization.Id","currency","Currency.Id","paymentTerms","Payment.Id","orderDate","Date"));
-        row.put("lineFields",Map.of("materialExternalId","Material.Id","quantity","Quantity","unitPrice","Price","unit","Unit.Id","taxRate","TaxRate","taxIncluded","TaxIncluded","deliveryDate","DeliveryDate","requisitionId","Source.Head","entryId","Source.Entry"));
+        row.put("lineFields",Map.of("materialExternalId","Material.Id","quantity","Quantity","unitPrice","Price","unit","Unit.Id","taxRate","TaxRate","taxIncluded","TaxIncluded","deliveryDate","DeliveryDate"));
+        row.put("saveOptions",Map.of("fixedHeaderFields",Map.of("BillType.Number","CONTROLLED-PO"),
+            "fixedLineFields",Map.of("SourceType","CONTROLLED-SOURCE"),"sourceLink",Map.of(
+                "entityKey","Lines_Link","ruleId","controlled-rule","sourceTableNumber","CONTROLLED_SOURCE_ENTRY",
+                "fieldKeys",Map.of("ruleId","Lines_Link_Rule","sourceTableNumber","Lines_Link_Table","sourceBillId","Lines_Link_Bill",
+                    "sourceEntryId","Lines_Link_Entry","originalBaseQty","Lines_Link_OldQty","baseQty","Lines_Link_Qty"),
+                "baseUnitRatios",Map.of("unit-local","2.5"),"originalQuantityMode","allocatedBaseQuantity")));
         row.put("supplierReferenceFormId","FixtureSupplier");row.put("organizationValues",Map.of("LOCAL-ORG","org-local"));row.put("currencyValues",Map.of("CNY","currency-local"));
         row.put("paymentTermValues",Map.of("Net 30","payment-local"));row.put("unitValues",Map.of("PCS","unit-local"));row.put("lookupAbsenceAuthoritative",true);row.put("saveCreatesOrder",true);return row;
     }

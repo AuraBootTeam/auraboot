@@ -9,6 +9,63 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Fixture contracts only: actual preparation and browser business behavior remain unexecuted. */
 class ProcurementOrderUiFixtureContractTest {
+    @Test void managedProviderCredentialUpdatesOnlyExactExistingTenantTuple() {
+        var existing = new com.auraboot.framework.cloudconfig.entity.CloudConfig();
+        existing.setPid("owned-config"); existing.setTenantId(73L); existing.setConfigLevel("tenant");
+        existing.setServiceType("integration"); existing.setProviderCode("fixture-provider");
+        existing.setConfig("original-controlled-secret");
+        var request = ProcurementOrderUiFixtureProducerIT.managedSecretUpdateRequest(existing, 73L,
+                "fixture-provider", "replacement-controlled-secret");
+        assertThat(request.getPid()).isEqualTo("owned-config");
+        assertThat(request.getConfig()).isEqualTo("replacement-controlled-secret");
+        assertThat(existing.getConfig()).isEqualTo("original-controlled-secret");
+        assertThat(request.getConfigLevel()).isEqualTo("tenant");
+        assertThat(request.getServiceType()).isEqualTo("integration");
+        assertThat(request.getProviderCode()).isEqualTo("fixture-provider");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                ProcurementOrderUiFixtureProducerIT.managedSecretUpdateRequest(null, 73L, "fixture-provider", "{}"))
+                .isInstanceOf(AssertionError.class);
+        for (Long foreign : java.util.Arrays.asList(null, 74L)) {
+            existing.setTenantId(foreign);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                    ProcurementOrderUiFixtureProducerIT.managedSecretUpdateRequest(existing, 73L, "fixture-provider", "{}"))
+                    .isInstanceOf(AssertionError.class);
+        }
+        existing.setTenantId(73L); existing.setConfigLevel("platform");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                ProcurementOrderUiFixtureProducerIT.managedSecretUpdateRequest(existing, 73L, "fixture-provider", "{}"))
+                .isInstanceOf(AssertionError.class);
+        existing.setConfigLevel("tenant"); existing.setServiceType("oauth");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                ProcurementOrderUiFixtureProducerIT.managedSecretUpdateRequest(existing, 73L, "fixture-provider", "{}"))
+                .isInstanceOf(AssertionError.class);
+        existing.setServiceType("integration"); existing.setProviderCode("other-provider");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                ProcurementOrderUiFixtureProducerIT.managedSecretUpdateRequest(existing, 73L, "fixture-provider", "{}"))
+                .isInstanceOf(AssertionError.class);
+        existing.setProviderCode("fixture-provider"); existing.setPid(" ");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                ProcurementOrderUiFixtureProducerIT.managedSecretUpdateRequest(existing, 73L, "fixture-provider", "{}"))
+                .isInstanceOf(AssertionError.class);
+    }
+
+    @Test void executionConfigDigestUsesOrderedUtf8ObjectSerializationRatherThanStorageWhitespace() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        String raw = "{\"z\": \"中文\", \"a\": {\"decimal\": \"300.000001\", \"enabled\": true}}";
+        var execution = json.readTree(raw);
+        String compact = "{\"z\":\"中文\",\"a\":{\"decimal\":\"300.000001\",\"enabled\":true}}";
+        String expected = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(compact.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        String stored = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertThat(ProcurementOrderUiFixtureProducerIT.executionConfigObjectSha256(json, execution))
+                .isEqualTo(expected).isNotEqualTo(stored);
+        var changed = execution.deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) changed.path("a")).put("decimal", "300.000002");
+        assertThat(ProcurementOrderUiFixtureProducerIT.executionConfigObjectSha256(json, changed)).isNotEqualTo(expected);
+        assertThat(json.writeValueAsString(execution)).isEqualTo(compact);
+    }
+
     @Test void composedPolicyRetainsImmutableFormalCommandBytes(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
         var original=root.resolve("formal.json");var copy=root.resolve("composed.json");
         String commands="[{\"code\":\"qo_procurement_execution_common:generate_orders\",\"handlerParams\":{\"procurementOrderWriteContracts\":[]}}]";

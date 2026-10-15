@@ -64,6 +64,20 @@ final class ProcurementSupplierUiInitialization {
     }
 
     static Map<String, Object> prepare(List<Path> sources, Path destination, ObjectMapper json) throws Exception {
+        return prepareOwned(sources, destination, json, FIELDS, ProcurementSupplierUiInitialization::command);
+    }
+
+    /** Test-owned families share the exact canonical owner resolver and immutable copy checks. */
+    static Map<String, Object> prepareOwned(List<Path> sources, Path destination, ObjectMapper json,
+            Map<String, List<String>> fields, java.util.function.Function<String, String> command) throws Exception {
+        if (fields.isEmpty() || fields.size() > 16) throw new IllegalArgumentException("Bounded initializer models required");
+        var codes = new java.util.HashSet<String>();
+        for (var model : fields.entrySet()) {
+            String code = command.apply(model.getKey());
+            if (!code.startsWith(model.getKey() + ":") || code.length() > 64 || !codes.add(code)
+                    || model.getValue().isEmpty() || new java.util.HashSet<>(model.getValue()).size() != model.getValue().size())
+                throw new IllegalArgumentException("Exact bounded initializer identity required");
+        }
         if (sources.size() != 23 || sources.stream().distinct().count() != 23 || Files.exists(destination))
             throw new IllegalArgumentException("Fresh full twenty-three-owner roster required");
         Files.createDirectory(destination);
@@ -93,7 +107,7 @@ final class ProcurementSupplierUiInitialization {
                 JsonNode raw = json.readTree(models.toFile());
                 for (ObjectNode model : objects(raw)) {
                     String code = model.path("code").asText();
-                    if (!FIELDS.containsKey(code)) continue;
+                    if (!fields.containsKey(code)) continue;
                     if ("pr_purchase_order_line".equals(code)) {
                         JsonNode extension = model.path("extension");
                         if (!"pr_purchase_order".equals(extension.path("parentModel").asText())
@@ -108,11 +122,11 @@ final class ProcurementSupplierUiInitialization {
                                 || !Set.of("create", "update", "delete").equals(json.convertValue(operations, Map.class).keySet()))
                             throw new IllegalArgumentException("Exact model writer policy required");
                         JsonNode production = policy.deepCopy();
-                        operations.set("create", append(operations.path("create"), command(code)));
+                        operations.set("create", append(operations.path("create"), command.apply(code)));
                         // The canonical child create guard locks/checks its marked parent as update.
                         // Grant only this synthetic child initializer, never the header initializer.
                         if ("pr_purchase_order".equals(code))
-                            operations.set("update", append(operations.path("update"), command("pr_purchase_order_line")));
+                            operations.set("update", append(operations.path("update"), command.apply("pr_purchase_order_line")));
                         modelProofs.add(Map.of("model", code, "ownerPluginId", pluginId,
                                 "productionPolicy", production, "testPolicy", policy.deepCopy()));
                     }
@@ -126,7 +140,7 @@ final class ProcurementSupplierUiInitialization {
                 for (ObjectNode binding : objects(json.readTree(file.toFile()))) {
                     String model = binding.path("modelCode").asText();
                     String field = binding.path("fieldCode").asText();
-                    if (FIELDS.containsKey(model) && FIELDS.get(model).contains(field))
+                    if (fields.containsKey(model) && fields.get(model).contains(field))
                         bindingsByField.computeIfAbsent(field, ignored -> new LinkedHashSet<>()).add(model);
                 }
             }
@@ -144,7 +158,7 @@ final class ProcurementSupplierUiInitialization {
                     if (!field.has("allowedWriterCommands")) continue;
                     JsonNode beforeWriters = field.path("allowedWriterCommands").deepCopy();
                     JsonNode next = beforeWriters;
-                    for (String model : targets) next = append(next, command(model));
+                    for (String model : targets) next = append(next, command.apply(model));
                     field.set("allowedWriterCommands", next);
                     fieldProofs.add(Map.of("field", code, "models", targets, "ownerPluginId", pluginId,
                             "productionWriters", beforeWriters, "testWriters", next));
@@ -155,12 +169,12 @@ final class ProcurementSupplierUiInitialization {
             copies.add(Map.of("sourceDirectory", original.toString(), "testDirectory", copy.toString(),
                     "pluginId", pluginId, "sourceResourceHashes", before));
         }
-        if (!exactOrderParentDeclared) throw new IllegalArgumentException("Exact order-line parent declaration missing");
-        if (!owners.keySet().equals(FIELDS.keySet())) throw new IllegalArgumentException("All exact model owners required");
-        for (var model : FIELDS.entrySet()) for (String field : model.getValue())
+        if (fields.containsKey("pr_purchase_order_line") && !exactOrderParentDeclared) throw new IllegalArgumentException("Exact order-line parent declaration missing");
+        if (!owners.keySet().equals(fields.keySet())) throw new IllegalArgumentException("All exact model owners required");
+        for (var model : fields.entrySet()) for (String field : model.getValue())
             if (!fieldDefinitions.containsKey(model.getKey() + "::" + field))
                 throw new IllegalArgumentException("Exact model-bound physical field contribution missing: " + model.getKey() + "::" + field);
-        for (var model : FIELDS.entrySet()) {
+        for (var model : fields.entrySet()) {
             Path owner = owners.get(model.getKey());
             var manifest = json.readTree(owner.resolve("plugin.json").toFile());
             JsonNode registered = manifest.path("resourceDirs").path("commands");
@@ -171,14 +185,14 @@ final class ProcurementSupplierUiInitialization {
             if (relative.isAbsolute() || !resource.startsWith(owner) || resource.equals(owner))
                 throw new IllegalArgumentException("Owner command resource escapes the copied plugin");
             var definition = json.valueToTree(Map.of(
-                    "code", command(model.getKey()), "modelCode", model.getKey(), "displayName", "Synthetic supplier UI initialization",
+                    "code", command.apply(model.getKey()), "modelCode", model.getKey(), "displayName", "Synthetic supplier UI initialization",
                     "type", "create", "inputFields", model.getValue(), "permissions", List.of("qo.procurement.integrate"), "cmd_risk_level", "L1"));
             if (Files.isRegularFile(resource) && resource.getFileName().toString().endsWith(".json")) {
                 JsonNode current = json.readTree(resource.toFile());
                 if (!(current instanceof ArrayNode registeredCommands))
                     throw new IllegalArgumentException("Explicit flat command array required");
                 for (JsonNode previous : registeredCommands)
-                    if (command(model.getKey()).equals(previous.path("code").asText()))
+                    if (command.apply(model.getKey()).equals(previous.path("code").asText()))
                         throw new IllegalArgumentException("Initialization cannot replace a production command");
                 registeredCommands.add(definition);
                 Files.writeString(resource, json.writerWithDefaultPrettyPrinter().writeValueAsString(registeredCommands));
@@ -199,7 +213,7 @@ final class ProcurementSupplierUiInitialization {
             sealed.add(proof);
         }
         return Map.of("ownerDirectories", sealed, "exactFieldWriterAppendix", fieldProofs,
-                "exactModelCreateWriterAppendix", modelProofs, "initializationFields", FIELDS,
+                "exactModelCreateWriterAppendix", modelProofs, "initializationFields", fields,
                 "productionSourceModified", false, "productionUpdateDeleteUnchanged", true);
     }
 

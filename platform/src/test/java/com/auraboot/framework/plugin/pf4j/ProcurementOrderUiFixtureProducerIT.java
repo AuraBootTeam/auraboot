@@ -84,7 +84,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         Path app = Path.of(binding.path("applicationCoreRoot").asText()).toRealPath();
         assertEquals(binding.path("applicationCoreCommit").asText(), gitRead(app, "rev-parse", "HEAD").strip());
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        assertEquals("", gitRead(app, "diff", "1210c6e2ce89ed2ec28b9fc2120bd86051eb043e", "HEAD", "--", "platform/src/main").strip());
+        assertEquals("", gitRead(app, "diff", "50924063538e4181cb601300f0c26c6bbfcce2f0", "HEAD", "--", "platform/src/main").strip());
         Path loaded = Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(), loaded);
         Path packageRoot = app.resolve("platform/src/test/java/com/auraboot/framework");
@@ -147,6 +147,29 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         }
     }
 
+    /** Update only the exact tenant credential created by the shared loopback prerequisites. */
+    static CloudConfigSaveRequest managedSecretUpdateRequest(
+            com.auraboot.framework.cloudconfig.entity.CloudConfig existing, Long tenantId,
+            String providerCode, String configuration) {
+        assertNotNull(existing, "Existing test-owned integration credential required");
+        assertNotNull(tenantId);
+        assertEquals(tenantId, existing.getTenantId(), "Cannot borrow a foreign/platform credential");
+        assertEquals("tenant", existing.getConfigLevel());
+        assertEquals("integration", existing.getServiceType());
+        assertEquals(providerCode, existing.getProviderCode());
+        assertNotNull(existing.getPid());
+        assertFalse(existing.getPid().isBlank());
+        var request = new CloudConfigSaveRequest();
+        request.setPid(existing.getPid());
+        request.setConfigLevel("tenant");
+        request.setServiceType("integration");
+        request.setProviderCode(providerCode);
+        request.setEnabled(true);
+        request.setPriority(1);
+        request.setConfig(configuration);
+        return request;
+    }
+
     private void prepareExecutionFixture() throws Exception {
         preparationStage = "managed-provider-admission";
         admitManagedProvider();
@@ -168,14 +191,15 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         initializedConnectionUpdate(Map.of("customer_pcba_kd_base_url",control.toString(),
                 "customer_pcba_kd_username",erpUsername,"customer_pcba_kd_app_id",erpAppId));
         context();
-        var secret = new CloudConfigSaveRequest();
-        secret.setConfigLevel("tenant");
-        secret.setServiceType("integration");
-        secret.setProviderCode(provider);
-        secret.setEnabled(true);
-        secret.setPriority(1);
-        secret.setConfig(json.writeValueAsString(Map.of("appSecret", erpSecret)));
+        var existingSecret = configs.getEffectiveConfig(tenant, "integration", provider);
+        var secret = managedSecretUpdateRequest(existingSecret, tenant, provider,
+                json.writeValueAsString(Map.of("appSecret", erpSecret)));
         configs.saveConfig(secret);
+        var updatedSecret = configs.getEffectiveConfig(tenant, "integration", provider);
+        assertEquals(secret.getPid(), managedSecretUpdateRequest(updatedSecret, tenant, provider, "{}").getPid());
+        writeArtifact("managed-provider-secret-update.json", Map.of("configPid", secret.getPid(),
+                "tenantId", tenant.toString(), "configLevel", "tenant", "serviceType", "integration",
+                "providerCode", provider, "existingConfigUpdated", true, "secretValuePersistedInEvidence", false));
         preparationStage = "combined-server-policy-import";
         configureCombinedPolicy();
         List<Map<String, Object>> markerSpecs = new ArrayList<>();
@@ -265,7 +289,7 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         String actualHead = gitRead(app, "rev-parse", "HEAD").strip();
         assertEquals(binding.path("applicationCoreCommit").asText(), actualHead);
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        String mainBase = "1210c6e2ce89ed2ec28b9fc2120bd86051eb043e";
+        String mainBase = "50924063538e4181cb601300f0c26c6bbfcce2f0";
         assertEquals("", gitRead(app, "diff", mainBase, "HEAD", "--", "platform/src/main").strip());
         Path test = app.resolve("platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java").toRealPath();
         Path shared = test.resolveSibling("ProcurementPublicSourceNativeFixture.java");
@@ -460,7 +484,8 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
             proof.put("originalDefinitionSha256", digest(json.writeValueAsBytes(rawOriginal)));
             proof.put("configuredDefinitionSha256", digest(json.writeValueAsBytes(configuredDefinition)));
             proof.put("actualExecutionConfig", execution);
-            proof.put("actualExecutionConfigSha256", digest(command.getExecutionConfig().getBytes(StandardCharsets.UTF_8)));
+            proof.put("actualExecutionConfigSha256", executionConfigObjectSha256(json, execution));
+            proof.put("rawExecutionConfigSha256", digest(command.getExecutionConfig().getBytes(StandardCharsets.UTF_8)));
             commandProofs.add(proof);
         }
         var policy = new LinkedHashMap<String, Object>();
@@ -875,6 +900,10 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         assertEquals(provider, state.path("namespace").asText());
         assertEquals(managedReceipt.get("scriptSha256"), state.path("scriptSha256").asText());
         return state;
+    }
+
+    static String executionConfigObjectSha256(com.fasterxml.jackson.databind.ObjectMapper mapper, JsonNode execution) throws Exception {
+        return digest(mapper.writeValueAsBytes(execution));
     }
 
     private static String digest(byte[] bytes) throws Exception {

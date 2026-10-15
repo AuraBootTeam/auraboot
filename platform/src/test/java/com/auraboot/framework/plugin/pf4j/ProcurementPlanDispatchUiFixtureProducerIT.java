@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -112,7 +113,7 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         Path app = Path.of(input.path("applicationCoreRoot").asText()).toRealPath();
         assertEquals(input.path("applicationCoreCommit").asText(), gitRead(app, "rev-parse", "HEAD").strip());
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        assertEquals("", gitRead(app, "diff", "1210c6e2ce89ed2ec28b9fc2120bd86051eb043e", "HEAD", "--", "platform/src/main").strip());
+        assertEquals("", gitRead(app, "diff", "50924063538e4181cb601300f0c26c6bbfcce2f0", "HEAD", "--", "platform/src/main").strip());
         Path loaded = Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(), loaded);
         Path testRoot = app.resolve("platform/src/test/java/com/auraboot/framework");
@@ -257,8 +258,8 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
                         .filter(row -> ownPolicyPids.contains(row.get("qo_pr_category_supplier_policy_pid"))).toList());
                 stage.put("externalReferences", references());
                 stage.put("expectedQuantities", sources().stream().map(row -> Map.of("sourcePid", pid(row),
-                        "requestedQty", row.get("pr_preq_qty").toString(), "remainingQty", row.get("qo_pr_source_remaining_qty").toString(),
-                        "reservedQty", row.get("qo_pr_source_reserved_qty").toString(), "unreservedQty",
+                        "requestedQty", quantityText(row.get("pr_preq_qty")), "remainingQty", quantityText(row.get("qo_pr_source_remaining_qty")),
+                        "reservedQty", quantityText(row.get("qo_pr_source_reserved_qty")), "unreservedQty",
                         new BigDecimal(row.get("qo_pr_source_remaining_qty").toString()).subtract(new BigDecimal(row.get("qo_pr_source_reserved_qty").toString())).toPlainString())).toList());
             }
             stages.sort(java.util.Comparator.comparingInt(stage -> STAGES.indexOf(stage.get("stage"))));
@@ -293,9 +294,11 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
             receipt.put("initializationActions", initializationActions);
             receipt.put("categorySupplierMetadataPath", caseEvidence.resolve("category-supplier-metadata.json").toString());
             receipt.put("categorySupplierMetadataSha256", sha(caseEvidence.resolve("category-supplier-metadata.json")));
-            receipt.put("businessSnapshotTables", tableMap());
-            receipt.put("businessSnapshot", snapshot());
-            receipt.put("immutableBusinessBefore", snapshot());
+            var validatedTables = tableMap();
+            var rawSnapshot = rawBusinessSnapshot(validatedTables);
+            receipt.put("businessSnapshotTables", validatedTables);
+            receipt.put("businessSnapshot", rawSnapshot);
+            receipt.put("immutableBusinessBefore", rawSnapshot);
             receipt.put("testInitializationAppendixPath", caseEvidence.resolve("source-ui-initialization-appendix.json").toString());
             receipt.put("testInitializationAppendixSha256", sha(caseEvidence.resolve("source-ui-initialization-appendix.json")));
             receipt.put("membershipInitialFactsSynthetic", true);
@@ -315,6 +318,8 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         assertTrue(STAGES.contains(stage));
         return List.of("draftPlan", "classificationHappy").contains(stage) ? 2 : 1;
     }
+
+    static String quantityText(Object value) { return new BigDecimal(value.toString()).toPlainString(); }
 
     static List<Object> stageRow(String stage, String head, String entry) {
         assertTrue(STAGES.contains(stage));
@@ -644,9 +649,11 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
 
     private JsonNode action(String jwt, String code, String target, Map<String, Object> payload) throws Exception {
         var request = new LinkedHashMap<String, Object>();
+        Object targetVersion=null;
         if (target != null) {
             request.put("targetRecordPid", target);
-            request.put("expectedVersion", fixture(SYNC, () -> db.getById(commands.findByCode(code).getModelCode(), target).get("row_version")));
+            targetVersion=fixture(SYNC, () -> db.getById(commands.findByCode(code).getModelCode(), target).get("row_version"));
+            request.put("expectedVersion",targetVersion);
         }
         request.put("clientRequestId", fixtureRequestKey("public"));
         request.put("payload", payload);
@@ -656,14 +663,44 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
             result = mvc.perform(post("/api/meta/commands/execute/" + code).header("Authorization", "Bearer " + jwt)
                     .contentType("application/json").content(json.writeValueAsBytes(request))).andReturn();
         } finally { context(); }
+        JsonNode body=null;
+        try {body=json.readTree(result.getResponse().getContentAsByteArray());}
+        catch(java.io.IOException malformed) {
+            writeArtifact("public-action-"+(++publicRequestSequence)+".json",safePublicResponse(result.getResponse().getStatus(),code,targetVersion,null));
+            throw malformed;
+        }
+        writeArtifact("public-action-"+(++publicRequestSequence)+".json",safePublicResponse(result.getResponse().getStatus(),code,targetVersion,body));
         assertEquals(200, result.getResponse().getStatus(), "Actual public command " + code);
-        var body = json.readTree(result.getResponse().getContentAsByteArray());
         var completedData=requireCompletedCommandResponse(body);
         publicActions.add(Map.of("command", code, "target", target == null ? "create" : target,
                 "httpStatus", 200, "payload", payload));
         return completedData;
     }
 
+    static Map<String,Object> safePublicResponse(int status,String command,Object version,JsonNode body) {
+        var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("httpStatus",status);
+        diagnostic.put("command",command);diagnostic.put("responseObject",body!=null && body.isObject());
+        diagnostic.put("rawResponsePersisted",false);
+        String versionType=version==null?"absent":version.getClass().getSimpleName();
+        diagnostic.put("targetVersionType",List.of("absent","Integer","Long","BigInteger","BigDecimal","String").contains(versionType)?versionType:"other");
+        if(body==null || !body.isObject())return diagnostic;
+        for(String key:List.of("code","contextCode")) {
+            JsonNode value=key.equals("code")?body.path("code"):body.path("context").path("code");
+            if((value.isTextual() || value.isIntegralNumber()) && value.asText().matches("[0-9]{1,8}"))diagnostic.put(key,value.asText());
+        }
+        JsonNode messageKey=body.path("context").path("messageKey");
+        if(messageKey.isTextual() && messageKey.asText().matches("\\$i18n:qo_pr\\.error\\.[a-z0-9_]{1,80}"))diagnostic.put("messageKey",messageKey.asText());
+        String phase=body.path("data").path("phaseReached").asText();
+        if(Set.of("completed","handler","validation","authorization","target_scope","assert","auto_set","field_map","computed_fields").contains(phase))diagnostic.put("phaseReached",phase);
+        for(String key:List.of("fieldCode","fieldName","field")) {
+            JsonNode field=body.path("context").path(key);
+            if(field.isTextual() && Set.of("row_version","s2p_se_collaboration_managed","s2p_se_kingdee_connection_pid",
+                    "customer_pcba_kd_acct_id","customer_pcba_kd_base_url","customer_pcba_kd_username",
+                    "customer_pcba_kd_app_id","customer_pcba_kd_app_secret_ref").contains(field.asText()))
+                diagnostic.put("knownContextField",field.asText());
+        }
+        return diagnostic;
+    }
     static JsonNode requireCompletedCommandResponse(JsonNode body) {
         assertTrue(body!=null && body.isObject(),"Public command response must be an object");
         assertTrue(body.path("code").isTextual() && "0".equals(body.path("code").textValue()),
@@ -739,6 +776,49 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
         var response = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build().send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, response.statusCode());
         return json.readTree(response.body());
+    }
+
+    /** Capture database JSON without JDBC Timestamp or JSONB map serialization loss. */
+    private com.fasterxml.jackson.databind.JsonNode rawBusinessSnapshot(Map<String, Object> tables) throws Exception {
+        var result = json.createObjectNode();
+        try (var connection = postgres.getConnection()) {
+            String previousZone;
+            try (var statement = connection.createStatement(); var rows = statement.executeQuery("SHOW TIME ZONE")) {
+                assertTrue(rows.next()); previousZone = rows.getString(1);
+            }
+            try {
+                try (var statement = connection.prepareStatement("SELECT set_config('TimeZone', ?, false)")) {
+                    statement.setString(1, "UTC"); statement.execute();
+                }
+                for (var entity : tables.entrySet()) {
+                    var binding = (Map<?, ?>) entity.getValue();
+                    String table = binding.get("physicalTable").toString();
+                    assertTrue(table.matches("[A-Za-z_][A-Za-z0-9_]{0,62}"));
+                    String sql = "SELECT COALESCE(json_agg(t ORDER BY t.pid), '[]'::json)::text FROM "
+                            + table + " t WHERE tenant_id=?";
+                    try (var statement = connection.prepareStatement(sql)) {
+                        statement.setLong(1, tenant);
+                        try (var rows = statement.executeQuery()) {
+                            assertTrue(rows.next()); result.set(entity.getKey(), readLosslessDatabaseJson(rows.getString(1)));
+                            assertFalse(rows.next());
+                        }
+                    }
+                }
+            } finally {
+                try (var statement = connection.prepareStatement("SELECT set_config('TimeZone', ?, false)")) {
+                    statement.setString(1, previousZone); statement.execute();
+                }
+            }
+        }
+        return result;
+    }
+
+    static com.fasterxml.jackson.databind.JsonNode readLosslessDatabaseJson(String value) throws Exception {
+        return new com.fasterxml.jackson.databind.ObjectMapper()
+                .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
+                .setNodeFactory(com.fasterxml.jackson.databind.node.JsonNodeFactory.withExactBigDecimals(true))
+                .readTree(value);
     }
 
     private Map<String, Object> tableMap() {

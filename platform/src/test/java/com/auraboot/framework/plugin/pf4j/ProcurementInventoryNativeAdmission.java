@@ -13,13 +13,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Test-only immutable admission for the four trusted receipt Native methods. */
 final class ProcurementInventoryNativeAdmission {
-    static final String MAIN_BASE="1210c6e2ce89ed2ec28b9fc2120bd86051eb043e";
+    static final String MAIN_BASE="50924063538e4181cb601300f0c26c6bbfcce2f0";
     static final Set<String> PLUGINS=Set.of("com.auraboot.inventory","com.auraboot.procurement");
     static final List<String> SOURCES=List.of(
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementInventoryReceiptRealDbIT.java",
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementInventoryNativeAdmission.java",
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementPublicSourceNativeFixture.java",
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java",
+        "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementSourceUiFixtureProducerIT.java",
         "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/ProductQuoteNativeInitialization.java");
     static void validate(JsonNode input,Path attempt,Path app,FieldEncryptionService encryption,String matchingKey,
                          AuraPluginManager plugins,ObjectMapper json) throws Exception {
@@ -27,15 +28,29 @@ final class ProcurementInventoryNativeAdmission {
         assertEquals("procurement-inventory-native-admission-v1",input.path("kind").asText());
         assertEquals(1,input.path("schemaVersion").asInt(-1));
         assertEquals(MAIN_BASE,input.path("productionMainBase").asText());
-        assertEquals(input.path("applicationCoreCommit").asText(),ProcurementPublicSourceNativeFixture.gitRead(app,"rev-parse","HEAD").strip());
-        assertEquals(input.path("sourceSet").path("oss").asText(),input.path("applicationCoreCommit").asText());
-        assertEquals("",ProcurementPublicSourceNativeFixture.gitRead(app,"status","--porcelain").strip());
-        assertEquals("",ProcurementPublicSourceNativeFixture.gitRead(app,"diff",MAIN_BASE,"HEAD","--","platform/src/main").strip());
+        validateApplicationIdentity(input,ProcurementPublicSourceNativeFixture.gitRead(app,"rev-parse","HEAD").strip(),
+                ProcurementPublicSourceNativeFixture.gitRead(app,"status","--porcelain").strip(),
+                ProcurementPublicSourceNativeFixture.gitRead(app,"diff",MAIN_BASE,"HEAD","--","platform/src/main").strip());
+        Path runtimeRoot=Path.of(input.path("verifiedSourceIdentities").path("oss").path("root").asText()).toRealPath();
+        assertEquals(input.path("runtimeCoreCommit").asText(),ProcurementPublicSourceNativeFixture.gitRead(runtimeRoot,"rev-parse","HEAD").strip());
+        assertEquals("",ProcurementPublicSourceNativeFixture.gitRead(runtimeRoot,"status","--porcelain").strip());
+        assertEquals("",ProcurementPublicSourceNativeFixture.gitRead(runtimeRoot,"diff",MAIN_BASE,"HEAD","--","platform/src/main").strip());
         Path loaded=Path.of(ProcurementInventoryReceiptRealDbIT.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(),loaded);
+        for(Class<?> dependency:List.of(ProcurementInventoryNativeAdmission.class,ProcurementPublicSourceNativeFixture.class,
+                ProcurementOrderUiFixtureProducerIT.class,ProcurementSourceUiFixtureProducerIT.class,
+                com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.class))
+            assertEquals(loaded,Path.of(dependency.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath());
+        String resource="com/auraboot/framework/common/crypto/FieldEncryptionService.class";
+        var resources=java.util.Collections.list(FieldEncryptionService.class.getClassLoader().getResources(resource));
+        validateProductionClasses(input.path("productionClassAdmission"),app,
+                Path.of(FieldEncryptionService.class.getProtectionDomain().getCodeSource().getLocation().toURI()),
+                java.util.Arrays.stream(FieldEncryptionService.class.getDeclaredMethods()).anyMatch(m->"$jacocoInit".equals(m.getName())),
+                resources.stream().map(url->{try{return Path.of(url.toURI());}catch(Exception e){throw new IllegalStateException(e);}}).toList(),json);
         assertEquals(Set.copyOf(SOURCES),keys(input.path("nativeSourceSha256")));
         for(String source:SOURCES)assertEquals(input.path("nativeSourceSha256").path(source).asText(),sha(app.resolve(source)));
         JsonNode classes=input.path("classSha256");assertTrue(classes.isObject() && !classes.isEmpty());
+        assertEquals(classInventory(loaded),json.convertValue(classes,new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,String>>(){}));
         for(var entry:classes.properties()){
             Path file=Path.of(entry.getKey()).toRealPath();assertTrue(file.startsWith(loaded));
             assertEquals(entry.getValue().asText(),sha(file));
@@ -77,6 +92,58 @@ final class ProcurementInventoryNativeAdmission {
             var locked=StreamSupport.stream(lock.path("jars").spliterator(),false).filter(n->path.getFileName().toString().equals(n.path("file").asText())).toList();
             assertEquals(1,locked.size());assertEquals(digest,locked.getFirst().path("sha256").asText());
         }
+    }
+    static void validateProductionClasses(JsonNode proof,Path app,Path loaded,boolean instrumented,List<Path> resources,ObjectMapper json) throws Exception {
+        assertEquals(Set.of("mode","gradlePath","gradleSha256","originalRoot","instrumentedRoot","originalClassesSha256","instrumentedClassesSha256"),keys(proof));
+        assertEquals("jacoco-offline",proof.path("mode").asText());
+        Path original=app.resolve("platform/build/classes/java/main"),offline=app.resolve("platform/build/classes-instrumented-main"),gradle=app.resolve("platform/build.gradle");
+        for(var pair:java.util.Map.of("originalRoot",original,"instrumentedRoot",offline,"gradlePath",gradle).entrySet()){
+            assertFalse(Files.isSymbolicLink(pair.getValue()));assertEquals(pair.getValue().toRealPath().toString(),proof.path(pair.getKey()).asText());
+        }
+        assertEquals(sha(gradle),proof.path("gradleSha256").asText());
+        var before=productionClassInventory(original);var after=productionClassInventory(offline);
+        assertEquals(before.keySet(),after.keySet());assertFalse(before.isEmpty());
+        var type=new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,String>>(){};
+        assertEquals(before,json.convertValue(proof.path("originalClassesSha256"),type));
+        assertEquals(after,json.convertValue(proof.path("instrumentedClassesSha256"),type));
+        assertEquals(offline.toRealPath(),loaded.toRealPath());assertTrue(instrumented,"Actual production class must contain $jacocoInit");
+        assertEquals(List.of(offline.resolve("com/auraboot/framework/common/crypto/FieldEncryptionService.class").toRealPath()),
+                resources.stream().map(path->{try{return path.toRealPath();}catch(Exception e){throw new IllegalStateException(e);}}).toList());
+    }
+    static java.util.Map<String,String> productionClassInventory(Path root) throws Exception {
+        assertFalse(Files.isSymbolicLink(root));Path real=root.toRealPath();var result=new java.util.TreeMap<String,String>();
+        try(var paths=Files.walk(root)){
+            for(Path path:paths.toList()){
+                assertFalse(Files.isSymbolicLink(path));
+                if(Files.isRegularFile(path) && path.toString().endsWith(".class")){
+                    assertTrue(path.toRealPath().startsWith(real));result.put(root.relativize(path).toString(),sha(path));
+                }
+            }
+        }
+        assertFalse(result.isEmpty());return java.util.Map.copyOf(result);
+    }
+    static void validateApplicationIdentity(JsonNode input,String actualAppCommit,String dirty,String mainDiff) {
+        String app=input.path("applicationCoreCommit").asText(),runtime=input.path("runtimeCoreCommit").asText();
+        assertTrue(app.matches("[a-f0-9]{40}"));assertTrue(runtime.matches("[a-f0-9]{40}"));
+        assertEquals(Set.of("oss","quote","enterprise","crm","plugins"),keys(input.path("sourceSet")));
+        for(var pin:input.path("sourceSet"))assertTrue(pin.isTextual() && pin.asText().matches("[a-f0-9]{40}"));
+        assertEquals(runtime,input.path("sourceSet").path("oss").asText());
+        assertEquals(app,actualAppCommit);assertEquals("",dirty);assertEquals("",mainDiff);
+    }
+    static java.util.Map<String,String> classInventory(Path loaded) throws Exception {
+        var result=new java.util.TreeMap<String,String>();
+        for(String source:SOURCES){
+            String relative=source.replace("platform/src/test/java/","").replace(".java","");
+            Path outer=loaded.resolve(relative+".class");assertTrue(Files.isRegularFile(outer));
+            String name=outer.getFileName().toString().replace(".class","");
+            try(var files=Files.list(outer.getParent())){
+                for(Path file:files.filter(path->path.getFileName().toString().equals(name+".class")
+                        || path.getFileName().toString().startsWith(name+"$") && path.getFileName().toString().endsWith(".class")).toList()){
+                    assertFalse(Files.isSymbolicLink(file));result.put(file.toRealPath().toString(),sha(file));
+                }
+            }
+        }
+        return java.util.Map.copyOf(result);
     }
     static Set<String> keys(JsonNode node){assertTrue(node.isObject());var keys=new java.util.HashSet<String>();node.fieldNames().forEachRemaining(keys::add);return Set.copyOf(keys);}
     private static String sha(Path path) throws Exception{return ProcurementPublicSourceNativeFixture.sha(path);}

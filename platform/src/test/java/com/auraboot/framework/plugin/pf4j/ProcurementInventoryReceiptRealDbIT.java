@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,7 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 /** Actual Auth/registered commands/PF4J/T01/PG; only upstream ERP is controlled loopback.
  * This fixture has no inherited business @Test methods and does not replace Source5/Order3.
  */
-@SpringBootTest(classes=TestApplication.class,properties={
+@SpringBootTest(classes=ProcurementInventoryReceiptRealDbIT.InventoryApplication.class,properties={
     "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
     "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
     "security.field-encryption.key=${PROCUREMENT_RECEIPT_FIELD_ENCRYPTION_KEY}"})
@@ -42,6 +43,37 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_TRUSTED_RECEIPT_IT",matches="true")
 @org.junit.jupiter.api.TestInstance(org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS)
 class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeFixture {
+    /** Inventory-only test context: explicit fixture imports survive, unrelated test configurations cannot become Core consumers. */
+    @org.springframework.boot.autoconfigure.SpringBootApplication
+    @org.springframework.context.annotation.ComponentScan(basePackages={"com.auraboot.framework","com.auraboot.module"},excludeFilters={
+        @org.springframework.context.annotation.ComponentScan.Filter(type=org.springframework.context.annotation.FilterType.CUSTOM,classes=org.springframework.boot.context.TypeExcludeFilter.class),
+        @org.springframework.context.annotation.ComponentScan.Filter(type=org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,classes=TestApplication.class),
+        @org.springframework.context.annotation.ComponentScan.Filter(type=org.springframework.context.annotation.FilterType.ANNOTATION,classes=org.springframework.boot.SpringBootConfiguration.class)})
+    @org.springframework.boot.autoconfigure.AutoConfigurationPackage(basePackageClasses=TestApplication.class)
+    @org.mybatis.spring.annotation.MapperScan({
+        "com.auraboot.framework.**.mapper",
+        "com.auraboot.framework.*.dao",
+        "com.auraboot.framework.*.dao.mapper",
+        "com.auraboot.framework.*.mapper",
+        "com.auraboot.framework.application.release",
+        "com.auraboot.framework.aurabot.skill.mapper",
+        "com.auraboot.framework.billing.account.mapper",
+        "com.auraboot.framework.billing.catalog.mapper",
+        "com.auraboot.framework.billing.metering.mapper",
+        "com.auraboot.framework.billing.quota.mapper",
+        "com.auraboot.framework.connector.airflow.mapper",
+        "com.auraboot.framework.connector.airflow.secret.mapper",
+        "com.auraboot.framework.connector.saas.oauth.mapper",
+        "com.auraboot.framework.rag.mapper",
+        "com.auraboot.framework.saas.account.mapper",
+        "com.auraboot.framework.saas.config.mapper",
+        "com.auraboot.framework.saas.license.mapper",
+        "com.auraboot.module.*.mapper",
+        "com.auraboot.module.meta.excel.mapper",
+        "com.auraboot.smart.framework.engine.persister.database"})
+    @org.springframework.transaction.annotation.EnableTransactionManagement
+    static class InventoryApplication {}
+    private int consumerDiagnosticSequence;
     private static final String INITIALIZE_LINE="pr:fixture_initialize_receipt_line",COMPETE_LINE="pr:fixture_compete_receipt_line";
     private static final String REQUEST="pr:confirm_purchase_receipt",CONFIRM="inv:confirm_warehouse_in";
     private static final String POSTED="inventory.receipt.confirmed.v1";
@@ -57,7 +89,10 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @Autowired MetaModelService models;
 
     @Autowired ReceiptCasObservation casObservation;
+    @Autowired ReceiptDiscoveryObservation receiptDiscoveryObservation;
     @Autowired ReceiptReadOnlyObservation receiptReadOnlyObservation;
+    @Autowired ReceiptTargetVersionObservation receiptTargetVersionObservation;
+    private ReceiptOutcome lastReceiptOutcome;
     @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualReceiptEncryption;
     private final Map<Long,com.auraboot.framework.application.tenant.MetaContext.Snapshot> formalImportPrincipals=new LinkedHashMap<>();
     private int formalImportSequence;
@@ -320,14 +355,24 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         for(var original:originalLines){var after=record("pr_purchase_order_line",pid(original));assertDecimal(receiptQuantity,after.get("pr_pol_received_qty"));
             long extra=scenario==Scenario.LATE_CAS && pid(original).equals(pid(originalLines.getLast()))?2:1;
             assertEquals(new BigDecimal(original.get("row_version").toString()).longValueExact()+extra,new BigDecimal(after.get("row_version").toString()).longValueExact());
-            assertLineBusinessRetained(original,after);
+            assertReceiptCounterLineRetained(original,after,receiptQuantity,extra);
         }assertEquals(immutableRequest,record("pr_inventory_operation_request",pid(request)));
         assertEquals(formal,formalSnapshot(order.quote().submission()));assertUpstreamRetained(upstream,snapshot());
         dispatchActualWorker(postedClaim);assertEquals(received,record("pr_purchase_order_line",linePid));assertApplied(postedEvent,COUNTER,1);
         finishClaim(postedClaim);
         if(scenario==Scenario.HAPPY)assertMissingCapabilityAndForeignTarget(prReceipt,requestPayload,invReceipt);
-        assertEquals(200,receiptCommand(inventoryActor,CONFIRM,invReceipt,confirmed,postKey,Map.of()));
+        var currentConfirmed=record("inv_inbound",invReceipt);
+        var replayBefore=receiptReplayFacts(prReceipt,invReceipt,warehouse,requestEvent,postedEvent);
+        assertEquals(200,receiptCommand(inventoryActor,CONFIRM,invReceipt,originalConfirmIntent(invBefore,currentConfirmed),postKey,Map.of()));
+        assertReceiptOutcome(lastReceiptOutcome,200,"0",true);
+        assertEquals(replayBefore,receiptReplayFacts(prReceipt,invReceipt,warehouse,requestEvent,postedEvent));
+        assertEquals(409,receiptCommand(inventoryActor,CONFIRM,invReceipt,currentConfirmed,postKey,Map.of()));
+        assertReceiptOutcome(lastReceiptOutcome,409,"41002",false);
+        assertEquals(replayBefore,receiptReplayFacts(prReceipt,invReceipt,warehouse,requestEvent,postedEvent));
         assertEquals(stockBefore,stockSnapshot(warehouse));assertEquals(received,record("pr_purchase_order_line",linePid));
+        assertApplied(requestEvent,"inventory.public-command-adapter.v1",1);assertApplied(postedEvent,COUNTER,1);
+        writeArtifact("receipt-exact-command-replay.json",Map.of("sameKeyOriginalVersionReplay",true,
+                "sameKeyChangedVersionHttpStatus",409,"sameKeyChangedVersionBusinessCode","41002","businessStockEventsAndVersionsUnchanged",true));
         writeArtifact("trusted-receipt-result.json",Map.of("tenantId",tenant.toString(),"orderPid",poPid,"orderLinePid",linePid,
             "prReceiptPid",prReceipt,"inventoryReceiptPid",invReceipt,"requestEventId",requestEvent,"postedEventId",postedEvent,
             "receivedQtyPerLine",receiptQuantity,"nativeExecuted",true,"externalErpSynthetic",true));
@@ -342,7 +387,65 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
     static class CasObservationConfiguration {
         @org.springframework.context.annotation.Bean ReceiptCasObservation receiptCasObservation(){return new ReceiptCasObservation();}
+        @org.springframework.context.annotation.Bean ReceiptDiscoveryObservation receiptDiscoveryObservation(){return new ReceiptDiscoveryObservation();}
         @org.springframework.context.annotation.Bean ReceiptReadOnlyObservation receiptReadOnlyObservation(){return new ReceiptReadOnlyObservation();}
+        @org.springframework.context.annotation.Bean ReceiptTargetVersionObservation receiptTargetVersionObservation(){return new ReceiptTargetVersionObservation();}
+    }
+    record ReceiptOutcome(int status,String code,boolean idempotentReplay,String phaseReached) {}
+    static void assertReceiptOutcome(ReceiptOutcome outcome,int status,String code,boolean replay) {
+        assertNotNull(outcome);assertEquals(status,outcome.status());assertEquals(code,outcome.code());
+        assertEquals(replay,outcome.idempotentReplay());if(replay)assertEquals("completed",outcome.phaseReached());
+    }
+    static Map<String,Object> originalConfirmIntent(Map<String,Object> original,Map<String,Object> confirmed) {
+        assertEquals(original.get("pid"),confirmed.get("pid"));assertNotNull(original.get("pid"));
+        assertEquals("draft",original.get("inv_in_status"));assertEquals("confirmed",confirmed.get("inv_in_status"));
+        long before=new BigDecimal(assertInstanceOf(Number.class,original.get("row_version")).toString()).longValueExact();
+        long after=new BigDecimal(assertInstanceOf(Number.class,confirmed.get("row_version")).toString()).longValueExact();
+        assertTrue(before>=0 && after>before,"Confirmation must advance the stored version");
+        return new LinkedHashMap<>(original);
+    }
+    /** Observes the real command CAS mapper return, without replacing its arguments or result. */
+    @org.aspectj.lang.annotation.Aspect static class ReceiptTargetVersionObservation {
+        private static final class Capture {
+            final Long tenant;final String table,key,pid;int calls;Map<String,Object> fact;
+            Capture(Long tenant,String table,String key,String pid){this.tenant=tenant;this.table=table;this.key=key;this.pid=pid;}
+        }
+        private final ThreadLocal<Capture> current=new ThreadLocal<>();
+        void begin(Long tenant,String table,String key,String pid){assertNull(current.get());current.set(new Capture(tenant,table,key,pid));}
+        Map<String,Object> finish(){var capture=current.get();assertNotNull(capture);try{assertEquals(1,capture.calls);assertNotNull(capture.fact);return capture.fact;}finally{current.remove();}}
+        void clear(){current.remove();}
+        @org.aspectj.lang.annotation.AfterReturning(pointcut="execution(* com.auraboot.framework.meta.mapper.DynamicDataMapper.selectTargetVersionForUpdate(..)) && args(table,key,tenant,pid)",returning="result",argNames="table,key,tenant,pid,result")
+        public void returned(String table,String key,Long tenant,String pid,Object result){
+            var capture=current.get();if(capture==null)return;capture.calls++;
+            assertEquals(capture.tenant,tenant);assertEquals(tenant,com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId());
+            assertEquals(capture.table,table);assertEquals(capture.key,key);assertEquals(capture.pid,pid);
+            assertInstanceOf(List.class,result);assertTrue(((List<?>)result).isEmpty(),"Foreign target must be absent in caller tenant CAS scope");
+            capture.fact=Map.of("actualTenantId",tenant.toString(),"actualTable",table,"actualPrimaryKey",key,"targetRecordPid",pid,"rowCount",0,"originalMapperObserved",true);
+        }
+    }
+    /** Captures the original manager return within the real Registry call; never discovers a second instance. */
+    @org.aspectj.lang.annotation.Aspect static class ReceiptDiscoveryObservation {
+        private static final class Capture {
+            int calls;
+            List<com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension> instances;
+        }
+        private final ThreadLocal<Capture> current=new ThreadLocal<>();
+        void begin(){assertNull(current.get(),"Discovery observation cannot nest");current.set(new Capture());}
+        List<com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension> finish(){
+            var capture=current.get();assertNotNull(capture,"Discovery observation must be active");
+            try {assertEquals(1,capture.calls,"Registry must discover exactly once");return capture.instances;}
+            finally {current.remove();}
+        }
+        void clear(){current.remove();}
+        @org.aspectj.lang.annotation.AfterReturning(pointcut="execution(* com.auraboot.framework.plugin.pf4j.AuraPluginManager.getExtensionsOfType(java.lang.Class)) && args(type)",returning="result",argNames="type,result")
+        public void returned(Class<?> type,Object result){
+            var capture=current.get();if(capture==null)return;
+            assertSame(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,type);
+            assertInstanceOf(List.class,result);capture.calls++;
+            var instances=new ArrayList<com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension>();
+            for(Object instance:(List<?>)result)instances.add(assertInstanceOf(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,instance));
+            capture.instances=List.copyOf(instances);
+        }
     }
     /** The legacy synthetic permit is observation-only in this inventory subclass. */
     @org.aspectj.lang.annotation.Aspect static class ReceiptReadOnlyObservation {
@@ -421,18 +524,23 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         }fail("Owned exact lease did not expire within its bounded native interval");
     }
     private void assertMissingCapabilityAndForeignTarget(String receipt,Map<String,Object> payload,String inventoryReceipt) throws Exception {
-        var before=snapshot();var receiptBefore=record("pr_purchase_receipt",receipt);var inventoryBefore=record("inv_inbound",inventoryReceipt);
+        var before=receiptBoundaryFacts(tenant);var receiptBefore=record("pr_purchase_receipt",receipt);var inventoryBefore=record("inv_inbound",inventoryReceipt);
         String missing=receiptActor("missing",null,PR_READS);assertEquals(403,receiptCommand(missing,REQUEST,receipt,receiptBefore,provider+"-missing",payload));
-        assertEquals(before,snapshot());assertEquals(receiptBefore,record("pr_purchase_receipt",receipt));assertEquals(inventoryBefore,record("inv_inbound",inventoryReceipt));
+        assertEquals(before,receiptBoundaryFacts(tenant));assertEquals(receiptBefore,record("pr_purchase_receipt",receipt));assertEquals(inventoryBefore,record("inv_inbound",inventoryReceipt));
         String foreign=prepareForeignActor();observed.tenant=foreignTenant;observed.missingTargetModel="pr_purchase_receipt";observed.missingTargetPid=receipt;observed.targetNotFound.set(false);
-        try {assertEquals(400,receiptCommand(foreign,REQUEST,receipt,receiptBefore,provider+"-foreign",payload));assertTrue(observed.targetNotFound.get(),"Exact foreign public target must produce typed MetaRecordNotFound observation");}
-        finally {observed.tenant=tenant;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";}
-        assertEquals(before,snapshot());assertEquals(foreignBefore,snapshotTenant(foreignTenant));
+        Map<String,Object> targetLock;
+        receiptTargetVersionObservation.begin(foreignTenant,foreignReceiptTable,foreignReceiptPrimaryKey,receipt);
+        try {assertEquals(409,receiptCommand(foreign,REQUEST,receipt,receiptBefore,provider+"-foreign",payload));
+            assertReceiptOutcome(lastReceiptOutcome,409,"41001",false);targetLock=receiptTargetVersionObservation.finish();}
+        finally {receiptTargetVersionObservation.clear();observed.tenant=tenant;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";}
+        writeArtifact("receipt-foreign-target-cas-observation.json",targetLock);
+        assertEquals(before,receiptBoundaryFacts(tenant));assertEquals(foreignBefore,receiptBoundaryFacts(foreignTenant));
         assertEquals(receiptBefore,record("pr_purchase_receipt",receipt));assertEquals(inventoryBefore,record("inv_inbound",inventoryReceipt));
-        writeArtifact("receipt-public-denials.json",Map.of("missingBusinessCapabilityHttpStatus",403,"foreignPublicTargetHttpStatus",400,
-            "foreignTenantId",foreignTenant.toString(),"typedForeignTargetObserved",true,"bothTenantDomainSnapshotsUnchanged",true));
+        writeArtifact("receipt-public-denials.json",Map.of("missingBusinessCapabilityHttpStatus",403,"foreignPublicTargetHttpStatus",409,"foreignPublicTargetBusinessCode","41001",
+            "foreignTenantId",foreignTenant.toString(),"tenantScopedCasTargetObserved",true,"bothTenantDomainSnapshotsUnchanged",true));
     }
     private Long foreignTenant;private Map<String,Object> foreignBefore;
+    private String foreignReceiptTable,foreignReceiptPrimaryKey;
     private String prepareForeignActor() throws Exception {
         Long ownTenant=tenant,ownUser=userId,ownMember=memberId;String ownActor=actor;context();
         var organization=new com.auraboot.framework.tenant.dao.entity.Tenant();organization.setName(provider+"_foreign");organization.setDisplayName(provider);organization.setStatus("active");
@@ -445,7 +553,10 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
             assertTrue(tenantBootstrap.bootstrapTenant(tenant,userId).isSuccess());context();
             var directories=json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES"));assertEquals(23,directories.size());
             for(var directory:directories)importDirectory(Path.of(directory.asText()));imports.verifyImportReferenceIntegrity();
-            String bearer=receiptActor("foreign","pr.purchase.manage",PR_READS);foreignBefore=snapshot();
+            foreignReceiptTable=models.getTableName("pr_purchase_receipt");
+            var primaryKey=models.getPrimaryKeyField("pr_purchase_receipt");assertNotNull(primaryKey);
+            foreignReceiptPrimaryKey=primaryKey.getColumnName()==null?primaryKey.getCode():primaryKey.getColumnName();
+            String bearer=receiptActor("foreign","pr.purchase.manage",PR_READS);foreignBefore=receiptBoundaryFacts(foreignTenant);
             writeArtifact("foreign-receipt-tenant.json",Map.of("tenantId",foreignTenant.toString(),"formalImportDirectoryCount",23,"bootstrapPrincipalUsedForPublicRequest",false,"bootstrapUserPid",bootstrap.getPid(),"bootstrapMemberPid",bootstrapMember.getPid()));return bearer;
         } finally {tenant=ownTenant;userId=ownUser;actor=ownActor;memberId=ownMember;context();}
     }
@@ -461,15 +572,7 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         try(var files=java.nio.file.Files.walk(original)){for(Path source:files.toList()){
             Path target=copy.resolve(original.relativize(source));if(java.nio.file.Files.isDirectory(source))java.nio.file.Files.createDirectories(target);else java.nio.file.Files.copy(source,target);}}
         String originalModelsSha=sha(original.resolve("config/models.json"));
-        var modelRows=json.readTree(copy.resolve("config/models.json").toFile());var originalModelRows=modelRows.deepCopy();int matches=0;
-        for(var definition:modelRows)if("pr_purchase_order_line".equals(definition.path("code").asText())){
-            var updates=(com.fasterxml.jackson.databind.node.ArrayNode)definition.path("extension").path("recordCommandWriters").path("commands").path("update");
-            assertFalse(updates.toString().contains(COMPETE_LINE));updates.add(COMPETE_LINE);matches++;}
-        assertEquals(1,matches);
-        var restoredModelRows=modelRows.deepCopy();
-        for(var definition:restoredModelRows)if("pr_purchase_order_line".equals(definition.path("code").asText())){
-            var updates=(com.fasterxml.jackson.databind.node.ArrayNode)definition.path("extension").path("recordCommandWriters").path("commands").path("update");updates.remove(updates.size()-1);}
-        assertEquals(originalModelRows,restoredModelRows,"Only the exact test-owned writer may be appended; model owner/table and all production operations remain unchanged");
+        var modelRows=appendReceiptCompetitorWriters(json.readTree(copy.resolve("config/models.json").toFile()));
         java.nio.file.Files.write(copy.resolve("config/models.json"),json.writerWithDefaultPrettyPrinter().writeValueAsBytes(modelRows));
         var initialize=Map.of("code",INITIALIZE_LINE,"displayName:en","Native Receipt Line Initializer","type","create","modelCode","pr_purchase_receipt_line",
             "inputFields",List.of("pr_rcptl_receipt_id","pr_rcptl_po_line_id","pr_rcptl_product_id","pr_rcptl_qty","pr_rcptl_price","pr_rcptl_amount"),"permissions",List.of("pr.purchase.manage"));
@@ -487,6 +590,28 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
             "canonicalPluginId","com.auraboot.procurement","originalModelsSha256",originalModelsSha,
             "configuredModelsSha256",sha(copy.resolve("config/models.json")),"initializerSha256",sha(initializerFile),"competitorSha256",sha(competitorFile),
             "productionWriterListChanged",false,"fixtureManagedUpdateWriterAppended",COMPETE_LINE));
+    }
+
+    /** Evidence-owned RF copy only: no parent mutation or production command gets this fixture authority. */
+    static com.fasterxml.jackson.databind.JsonNode appendReceiptCompetitorWriters(com.fasterxml.jackson.databind.JsonNode original) {
+        assertTrue(original.isArray());
+        var changed=original.deepCopy();var expected=Set.of("pr_purchase_order","pr_purchase_order_line");
+        var seen=new java.util.HashSet<String>();
+        for(var definition:changed)if(expected.contains(definition.path("code").asText())) {
+            assertTrue(seen.add(definition.path("code").asText()),"Duplicate fixture writer model");
+            var updates=assertInstanceOf(com.fasterxml.jackson.databind.node.ArrayNode.class,
+                    definition.path("extension").path("recordCommandWriters").path("commands").path("update"));
+            for(var command:updates)assertNotEquals(COMPETE_LINE,command.asText(),"Fixture writer must not exist in original source");
+            updates.add(COMPETE_LINE);
+        }
+        assertEquals(expected,seen,"Exactly the same-owner parent and child require the fixed competitor writer");
+        var restored=changed.deepCopy();
+        for(var definition:restored)if(expected.contains(definition.path("code").asText())) {
+            var updates=(com.fasterxml.jackson.databind.node.ArrayNode)definition.path("extension").path("recordCommandWriters").path("commands").path("update");
+            assertEquals(COMPETE_LINE,updates.get(updates.size()-1).asText());updates.remove(updates.size()-1);
+        }
+        assertEquals(original,restored,"Only two fixed update-writer appends allowed; original prefixes/create/delete/fields/models remain exact");
+        return changed;
     }
 
     /** Exact functional three-code/self fixture actor. No bootstrap, buyer or ALL authority. */
@@ -519,6 +644,9 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
             .contentType("application/json").content(json.writeValueAsBytes(Map.of("payload",payload,"clientRequestId",provider+"-create-"+(++publicRequestSequence))))).andReturn();}
         finally {context();}
         var response=json.readTree(result.getResponse().getContentAsByteArray());
+        lastReceiptOutcome=new ReceiptOutcome(result.getResponse().getStatus(),safeNumericCode(response.path("code")),
+                response.path("data").path("idempotentReplay").isBoolean() && response.path("data").path("idempotentReplay").booleanValue(),
+                response.path("data").path("phaseReached").asText(""));
         writeArtifact("receipt-public-create-"+publicRequestSequence+".json",Map.of("commandCode",code,"httpStatus",result.getResponse().getStatus(),
             "businessCode",safeNumericCode(response.path("code")),"rawResponseOrCredentialsPersisted",false));
         assertEquals(200,result.getResponse().getStatus());assertEquals("0",response.path("code").asText());
@@ -542,10 +670,43 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
             .contentType("application/json").content(json.writeValueAsBytes(input))).andReturn();}
         finally {observed.publicRequestActive=false;}context();
         var response=json.readTree(result.getResponse().getContentAsByteArray());
+        lastReceiptOutcome=new ReceiptOutcome(result.getResponse().getStatus(),safeNumericCode(response.path("code")),
+                response.path("data").path("idempotentReplay").isBoolean() && response.path("data").path("idempotentReplay").booleanValue(),
+                response.path("data").path("phaseReached").asText(""));
         writeArtifact("receipt-public-request-"+(++publicRequestSequence)+".json",Map.of("commandCode",code,"targetRecordPid",target,
-            "httpStatus",result.getResponse().getStatus(),"businessCode",safeNumericCode(response.path("code")),"rawResponseOrCredentialsPersisted",false));
+            "httpStatus",result.getResponse().getStatus(),"businessCode",safeNumericCode(response.path("code")),
+            "diagnostics",safeReceiptResponseDiagnostics(response),"rawResponseOrCredentialsPersisted",false));
         return result.getResponse().getStatus();
     }
+    /** Persist only bounded classifications, never arbitrary exception detail, SQL, payload or credentials. */
+    static Map<String,Object> safeReceiptResponseDiagnostics(com.fasterxml.jackson.databind.JsonNode response) {
+        var diagnostics=new LinkedHashMap<String,Object>();
+        var context=response.path("context");
+        String key=context.path("messageKey").isTextual()?context.path("messageKey").textValue():null;
+        if(key!=null && key.matches("\\$i18n:[A-Za-z][A-Za-z0-9_.-]{0,127}"))diagnostics.put("messageKey",key);
+        String exception=context.path("exception").isTextual()?context.path("exception").textValue():null;
+        if(exception!=null && List.of("BusinessException","IllegalArgumentException","IllegalStateException",
+                "AccessDeniedException","ConflictException").contains(exception))diagnostics.put("exceptionType",exception);
+        String phase=response.path("data").path("phaseReached").asText("");
+        if(List.of("init","handler","completed","completed_dry_run").contains(phase))diagnostics.put("phaseReached",phase);
+        var messages=new ArrayList<String>();
+        for(String field:List.of("messageKey","detail","cause"))if(context.path(field).isTextual())messages.add(context.path(field).textValue());
+        if(context.isTextual())messages.add(context.textValue());
+        var signals=new ArrayList<String>();
+        for(String signal:List.of("FIELD_WRITER_DENIED","RECORD_WRITER_DENIED","PERMISSION_DENIED"))
+            if(messages.stream().anyMatch(message->message.matches("(?s).*(?<![A-Z0-9_])"+signal+"(?![A-Z0-9_]).*")))signals.add(signal);
+        diagnostics.put("authoritySignals",signals);
+        var guards=Map.of("Managed purchase-order line unit is required","MANAGED_UNIT_REQUIRED",
+                "Purchase order must be approved or receiving","ORDER_STATUS_REJECTED",
+                "Receipt quantity exceeds remaining purchase-order quantity","QUANTITY_EXCEEDS_REMAINING",
+                "Inventory operation requires at least one line","RECEIPT_LINES_MISSING");
+        for(var guard:guards.entrySet())if(messages.stream().anyMatch(message->message.equals(guard.getKey())
+                || message.equals("Plugin handler execution failed: "+guard.getKey())))diagnostics.put("businessGuard",guard.getValue());
+        diagnostics.put("opaqueDiagnosticPresent",context.isObject()||context.isTextual());
+        diagnostics.put("rawResponseOrCredentialsPersisted",false);
+        return Map.copyOf(diagnostics);
+    }
+
     private OutboxEvent claimExact(String eventId) {return claimExact(eventId,java.time.Instant.now().plusSeconds(120));}
     private OutboxEvent claimExact(String eventId,java.time.Instant until) {
         assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive(),"No outer event lock/transaction");
@@ -556,12 +717,51 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     }
     private void dispatchActualWorker(OutboxEvent event) throws Exception {
         assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());context();
-        var registered=consumers.consumersFor(event.getEventType());assertFalse(registered.isEmpty());
-        for(var consumer:registered)assertTrue(plugins.isDiscoveredExtensionInstance(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,consumer));
+        List<com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension> registered,discovered;
+        receiptDiscoveryObservation.begin();
+        try {registered=consumers.consumersFor(event.getEventType());discovered=receiptDiscoveryObservation.finish();}
+        finally {receiptDiscoveryObservation.clear();}
+        assertFalse(registered.isEmpty());
+        var diagnostics=new ArrayList<Map<String,Object>>();
+        for(var consumer:registered){
+            var artifact=plugins.observeLoadedArtifact(consumer.getClass());
+            diagnostics.add(Map.of("class",consumer.getClass().getName(),"consumerCode",consumer.consumerCode(),
+                "ownerArtifactSha256",artifact.map(AuraPluginManager.LoadedPluginArtifact::digest).orElse(""),
+                "isDiscoveredExtensionInstance",plugins.isDiscoveredExtensionInstance(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,consumer)));
+        }
+        writeArtifact("receipt-consumer-discovery-"+(++consumerDiagnosticSequence)+".json",Map.of("eventType",event.getEventType(),"consumers",diagnostics,"invokedBeforeEvidence",false));
+        var admission=json.readTree(java.nio.file.Files.readAllBytes(Path.of(required("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"))));
+        assertConsumerOwnership(event.getEventType(),registered,discovered,plugins,admission.path("receiptPluginArtifacts"));
         var method=OutboxWorkerImpl.class.getDeclaredMethod("dispatchReliable",OutboxEvent.class,String.class);method.setAccessible(true);
         try {method.invoke(worker,event,event.getLeaseToken());}catch(InvocationTargetException failure){
             if(failure.getCause() instanceof Exception actual)throw actual;throw failure;
         }finally {context();}
+    }
+    static void assertConsumerOwnership(String eventType,
+            List<com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension> registered,
+            List<com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension> discovered,
+            AuraPluginManager plugins,com.fasterxml.jackson.databind.JsonNode admitted) throws Exception {
+        String inventory="com.auraboot.plugins.inventory.ReliableInventoryEventConsumer",counter="com.auraboot.plugins.procurement.ReliableProcurementReceiptConsumer",
+                trace="com.auraboot.plugins.inventory.ReliableReceiptTraceAdapter";
+        Map<String,String> expected;
+        if("procurement.purchase-order.receipt-requested.v1".equals(eventType))expected=Map.of(inventory,"inventory.public-command-adapter.v1");
+        else {assertEquals(POSTED,eventType);expected=Map.of(counter,COUNTER,trace,"inventory.receipt-trace-adapter.v1");}
+        assertEquals(expected.size(),registered.size());
+        assertEquals(expected.keySet(),registered.stream().map(c->c.getClass().getName()).collect(java.util.stream.Collectors.toSet()));
+        for(var consumer:registered){
+            String name=consumer.getClass().getName(),owner=name.equals(counter)?"com.auraboot.procurement":"com.auraboot.inventory";
+            assertEquals(expected.get(name),consumer.consumerCode());assertTrue(consumer.supports(eventType));
+            assertTrue(discovered.stream().anyMatch(actual->actual==consumer),"Exact object must come from current PF4J discovery");
+            var artifact=plugins.observeLoadedArtifact(consumer.getClass()).orElseThrow();assertEquals(owner,artifact.pluginId());
+            var wrapper=plugins.getPlugin(owner);assertNotNull(wrapper);assertEquals(PluginState.STARTED,wrapper.getPluginState());
+            assertSame(wrapper.getPluginClassLoader(),consumer.getClass().getClassLoader());
+            Path actual=artifact.path().toRealPath();assertEquals(actual,wrapper.getPluginPath().toRealPath());
+            assertEquals(admitted.path(owner).path("path").asText(),actual.toString());
+            String admittedSha=admitted.path(owner).path("sha256").asText();
+            assertTrue(admittedSha.matches("[a-f0-9]{64}"),"Admission requires a physical lowercase SHA-256");
+            assertEquals(admittedSha,sha(actual));assertEquals("sha256:"+admittedSha,artifact.digest());
+            if(!name.equals(trace))assertTrue(plugins.isDiscoveredExtensionInstance(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,consumer));
+        }
     }
     private void finishClaim(OutboxEvent event) {context();Integer changed=new TransactionTemplate(transactions).execute(status->outbox.markDeliveredFenced(event.getId(),event.getLeaseToken()));assertEquals(Integer.valueOf(1),changed);}
     private void assertApplied(String event,String consumer,int expected) {
@@ -578,8 +778,47 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         assertDecimal("250",balances.stream().map(row->new BigDecimal(row.get("inv_bal_qty").toString())).reduce(BigDecimal.ZERO,BigDecimal::add));
         assertDecimal("250",ledger.stream().map(row->new BigDecimal(row.get("inv_bl_qty_delta").toString())).reduce(BigDecimal.ZERO,BigDecimal::add));
     }
+    private Map<String,Object> receiptBoundaryFacts(Long requestedTenant) {
+        Long previous=tenant;
+        try {
+            tenant=requestedTenant;context();var facts=new LinkedHashMap<String,Object>(snapshot());
+            for(String model:List.of("pr_purchase_receipt","pr_purchase_receipt_line","pr_inventory_operation_request",
+                    "inv_inbound","inv_inbound_line","inv_warehouse","inv_warehouse_location","prod_product","inv_balance","inv_balance_ledger"))
+                facts.put(model,records(model,Map.of()));
+            var jdbc=new JdbcTemplate(postgres);
+            facts.put("outbox",jdbc.queryForList("SELECT row_to_json(o)::text AS data FROM ab_outbox o WHERE tenant_id=? ORDER BY event_id",requestedTenant));
+            facts.put("integrationReceipts",jdbc.queryForList("SELECT row_to_json(r)::text AS data FROM ab_integration_receipt r WHERE tenant_id=? ORDER BY event_id,consumer_code",requestedTenant));
+            return facts;
+        } finally {tenant=previous;context();}
+    }
+    private Map<String,Object> receiptReplayFacts(String procurementReceipt,String inventoryReceipt,String warehouse,String requestEvent,String postedEvent) {
+        context();var jdbc=new JdbcTemplate(postgres);
+        return Map.of("domain",snapshot(),"stock",stockSnapshot(warehouse),
+                "procurementReceipt",record("pr_purchase_receipt",procurementReceipt),
+                "procurementLines",records("pr_purchase_receipt_line",Map.of("pr_rcptl_receipt_id",procurementReceipt)),
+                "inventoryReceipt",record("inv_inbound",inventoryReceipt),
+                "inventoryLines",records("inv_inbound_line",Map.of("inv_in_line_receipt_id",inventoryReceipt)),
+                "events",jdbc.queryForList("SELECT row_to_json(o)::text AS data FROM ab_outbox o WHERE tenant_id=? AND event_id IN (?,?) ORDER BY event_id",tenant,requestEvent,postedEvent),
+                "receipts",jdbc.queryForList("SELECT row_to_json(r)::text AS data FROM ab_integration_receipt r WHERE tenant_id=? AND event_id IN (?,?) ORDER BY event_id,consumer_code",tenant,requestEvent,postedEvent));
+    }
     private Map<String,Object> stockSnapshot(String warehouse){return Map.of("balance",records("inv_balance",Map.of("inv_bal_warehouse_id",warehouse)),"ledger",records("inv_balance_ledger",Map.of("inv_bl_warehouse_id",warehouse)));}
     private static void assertDecimal(String expected,Object actual){assertNotNull(actual);assertEquals(0,new BigDecimal(expected).compareTo(new BigDecimal(actual.toString())));}
+    /** Counter delivery is authored by the real host SYSTEM0, not the original fixture creator. */
+    static void assertReceiptCounterLineRetained(Map<String,Object> before,Map<String,Object> after,
+            String expectedReceived,long versionDelta) {
+        assertInstanceOf(Number.class,after.get("updated_by"));
+        assertEquals(0,new BigDecimal(after.get("updated_by").toString()).compareTo(BigDecimal.ZERO),
+                "Receipt counter audit must identify the actual host SYSTEM0");
+        assertDecimal(expectedReceived,after.get("pr_pol_received_qty"));
+        assertEquals(new BigDecimal(before.get("row_version").toString()).longValueExact()+versionDelta,
+                new BigDecimal(after.get("row_version").toString()).longValueExact());
+        assertFalse(java.time.LocalDateTime.parse(after.get("updated_at").toString().replace(' ','T'))
+                .isBefore(java.time.LocalDateTime.parse(before.get("updated_at").toString().replace(' ','T'))));
+        var normalized=new LinkedHashMap<>(after);
+        normalized.put("updated_by",before.get("updated_by"));
+        assertLineBusinessRetained(before,normalized);
+    }
+
     private static void assertLineBusinessRetained(Map<String,Object> before,Map<String,Object> after){
         var normalized=new LinkedHashMap<>(after);for(String audit:List.of("row_version","updated_at"))normalized.put(audit,before.get(audit));
         normalized.put("pr_pol_received_qty",before.get("pr_pol_received_qty"));assertEquals(before,normalized);

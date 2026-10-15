@@ -37,12 +37,20 @@ class ProcurementPublicSourceNativeFixtureReadRowsTest {
         assertEquals("300.000001", original.orderReadRows().getFirst().get(8));
     }
 
+    @Test void legacySourceObjectCannotSubstituteForTheSavedLink() throws Exception {
+        var fixture = fixture();
+        var line = (com.fasterxml.jackson.databind.node.ObjectNode) fixture.savedOrder.path("Lines").get(0);
+        line.remove("Lines_Link");
+        line.putObject("Source").put("Head", "source-head").put("Entry", "source-entry");
+        assertThrows(NullPointerException.class, fixture::orderReadRows);
+    }
+
     private ProcurementPublicSourceNativeFixture fixture() throws Exception {
         var fixture = new ProcurementPublicSourceNativeFixture() {};
         fixture.savedOrder = new ObjectMapper().readTree("""
                 {"Supplier":{"Id":"supplier-1"},"Date":"2026-10-14","Lines":[
                  {"Material":{"Id":"material-1"},"DeliveryDate":"2026-10-21",
-                  "Source":{"Head":"source-head","Entry":"source-entry"}}]}
+                  "Lines_Link":[{"Lines_Link_Bill":"source-head","Lines_Link_Entry":"source-entry"}]}]}
                 """);
         return fixture;
     }
