@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, type ResourceGrantView, type QueryGrantView,
-  type InstallationResourcePolicy, type InstallationQueryPolicy, type PublicOperation } from '~/services/open-api-publications';
+  type InstallationResourcePolicy, type InstallationQueryPolicy, type PublicOperation, type ActionGrantView, type InstallationActionPolicy } from '~/services/open-api-publications';
 import { usePublicationConfirmation, PublicationField } from './PublicationControls';
 
 const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
@@ -16,26 +16,29 @@ export function OpenApiInstallationGrantEditor({ installationPid, active, scopes
 }) {
   const { t, locale } = useI18n();
   const label = (key: string, cn: string, en: string) => t(`openPlatform.installationGrants.${key}`, undefined, locale.startsWith('zh') ? cn : en);
-  const [resources, setResources] = useState<ResourceGrantView[]>([]); const [queries, setQueries] = useState<QueryGrantView[]>([]);
+  const [resources, setResources] = useState<ResourceGrantView[]>([]); const [queries, setQueries] = useState<QueryGrantView[]>([]); const [actions, setActions] = useState<ActionGrantView[]>([]);
   const [selection, setSelection] = useState(''); const [resourcePolicy, setResourcePolicy] = useState<InstallationResourcePolicy>(emptyResource);
   const [queryPolicy, setQueryPolicy] = useState<InstallationQueryPolicy>({ readableFields: [] });
+  const [actionPolicy, setActionPolicy] = useState<InstallationActionPolicy>({ execute: false, effectFields: [] });
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [dirty, setDirty] = useState(false);
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [denied, setDenied] = useState(false);
   const [confirmation, setConfirmation] = useState<'revoke' | 'discard' | null>(null); const confirmationRef = useRef<HTMLDivElement>(null);
   const requestId = useRef(0);
-  const isQuery = selection.startsWith('query:'); const code = selection.slice(selection.indexOf(':') + 1);
-  const resource = isQuery ? undefined : resources.find(view => view.code === code);
+  const isQuery = selection.startsWith('query:'); const isAction = selection.startsWith('action:'); const code = selection.slice(selection.indexOf(':') + 1);
+  const resource = isQuery || isAction ? undefined : resources.find(view => view.code === code);
   const query = isQuery ? queries.find(view => view.code === code) : undefined;
-  const selected = query ?? resource; const editable = active && selected?.status === 'published' && !busy && !loading && !denied;
+  const action = isAction ? actions.find(view => view.code === code) : undefined;
+  const selected = query ?? action ?? resource; const editable = active && selected?.status === 'published' && !busy && !loading && !denied;
   const fail = (cause: unknown) => {
     if (cause instanceof PublicationApiError && cause.status === 403) { setDenied(true); setError(label('denied', '需要当前租户的开放平台管理权限。', 'Open Platform administrator permission in this tenant is required.')); }
     else setError(cause instanceof Error ? cause.message : label('failed', '授权请求失败。', 'Authority request failed.'));
   };
   const load = async () => { const id = ++requestId.current; setLoading(true); setError(''); setDenied(false);
-    try { const [nextResources, nextQueries] = await Promise.all([
+    try { const [nextResources, nextQueries, nextActions] = await Promise.all([
       publicationRequest<ResourceGrantView[]>(`/api/open-platform/installations/${encodeURIComponent(installationPid)}/resources`),
       publicationRequest<QueryGrantView[]>(`/api/open-platform/installations/${encodeURIComponent(installationPid)}/queries`),
-    ]); if (id === requestId.current) { setResources(nextResources); setQueries(nextQueries); } }
+      publicationRequest<ActionGrantView[]>(`/api/open-platform/installations/${encodeURIComponent(installationPid)}/actions`),
+    ]); if (id === requestId.current) { setResources(nextResources); setQueries(nextQueries); setActions(nextActions); } }
     catch (cause) { if (id === requestId.current) fail(cause); } finally { if (id === requestId.current) setLoading(false); }
   };
   useEffect(() => { void load(); return () => { requestId.current++; }; }, [installationPid]);
@@ -44,20 +47,21 @@ export function OpenApiInstallationGrantEditor({ installationPid, active, scopes
   }, [dirty]);
   const confirmationKeyDown = usePublicationConfirmation(confirmation, confirmationRef, () => setConfirmation(null), busy);
   const select = (key: string) => { setSelection(key); setDirty(false); setError(''); setNotice(''); setConfirmation(null);
-    if (key.startsWith('query:')) setQueryPolicy(structuredClone(queries.find(view => view.code === key.slice(6))?.policy ?? { readableFields: [] }));
+    if (key.startsWith('action:')) setActionPolicy(structuredClone(actions.find(view => view.code === key.slice(7))?.policy ?? { execute: false, effectFields: [] }));
+    else if (key.startsWith('query:')) setQueryPolicy(structuredClone(queries.find(view => view.code === key.slice(6))?.policy ?? { readableFields: [] }));
     else setResourcePolicy(structuredClone(resources.find(view => view.code === key.slice(9))?.policy ?? emptyResource()));
   };
   const changeResource = (next: InstallationResourcePolicy) => { setResourcePolicy(next); setDirty(true); setError(''); setNotice(''); };
   const changeQuery = (next: InstallationQueryPolicy) => { setQueryPolicy(next); setDirty(true); setError(''); setNotice(''); };
   const save = async (event: FormEvent) => { event.preventDefault(); if (!editable) return; setBusy(true); setError('');
-    try { await publicationRequest(`/api/open-platform/installations/${encodeURIComponent(installationPid)}/${isQuery ? 'queries' : 'resources'}/${encodeURIComponent(code)}`,
-      { method: 'PUT', body: JSON.stringify(isQuery ? queryPolicy : resourcePolicy) }); setDirty(false); await load();
+    try { await publicationRequest(`/api/open-platform/installations/${encodeURIComponent(installationPid)}/${isAction ? 'actions' : isQuery ? 'queries' : 'resources'}/${encodeURIComponent(code)}`,
+      { method: 'PUT', body: JSON.stringify(isAction ? actionPolicy : isQuery ? queryPolicy : resourcePolicy) }); setDirty(false); await load();
       setNotice(label('saved', '授权已保存。实际调用仍受 Scope、当前合同及全部来源授权约束。', 'Authority saved. Calls remain subject to scopes, current contracts and every source grant.'));
     } catch (cause) { fail(cause); } finally { setBusy(false); }
   };
   const revoke = async () => { setBusy(true); setError('');
-    try { await publicationRequest(`/api/open-platform/installations/${encodeURIComponent(installationPid)}/${isQuery ? 'queries' : 'resources'}/${encodeURIComponent(code)}`, { method: 'DELETE' });
-      setDirty(false); setConfirmation(null); if (isQuery) setQueryPolicy({ readableFields: [] }); else setResourcePolicy(emptyResource()); await load();
+    try { await publicationRequest(`/api/open-platform/installations/${encodeURIComponent(installationPid)}/${isAction ? 'actions' : isQuery ? 'queries' : 'resources'}/${encodeURIComponent(code)}`, { method: 'DELETE' });
+      setDirty(false); setConfirmation(null); if (isAction) setActionPolicy({ execute: false, effectFields: [] }); else if (isQuery) setQueryPolicy({ readableFields: [] }); else setResourcePolicy(emptyResource()); await load();
       setNotice(label('revoked', '授权已撤销，后续调用及通知重新按当前权限裁决。', 'Authority revoked. Subsequent calls and notifications recheck current authority.'));
     } catch (cause) { fail(cause); } finally { setBusy(false); }
   };
@@ -67,11 +71,12 @@ export function OpenApiInstallationGrantEditor({ installationPid, active, scopes
       <button type="button" className={BUTTON} disabled={busy} onClick={() => dirty ? setConfirmation('discard') : onClose()}>{label('close', '关闭授权编辑', 'Close authority editor')}</button></div>
     <p className="text-sm text-text-secondary">{label('help', '选择已发布合同，明确收窄操作、字段及行范围。安装 Scope 与数据授权共同决定外部访问；草稿不参与授权。', 'Choose a published contract and narrow operations, fields and rows. Installation scopes and data grants jointly control access; drafts cannot grant authority.')}</p>
     {loading && <p role="status">{label('loading', '正在读取安装授权…', 'Loading installation authority…')}</p>}
-    {!loading && !denied && !resources.length && !queries.length && <p>{label('empty', '暂无已发布合同，请先完成资源或查询发布。', 'No published contracts. Publish a resource or query first.')}</p>}
+    {!loading && !denied && !resources.length && !queries.length && !actions.length && <p>{label('empty', '暂无已发布合同，请先完成资源或查询发布。', 'No published contracts. Publish a resource or query first.')}</p>}
     {!denied && <PublicationField name={label('contract', '授权合同', 'Authority contract')} child={<select className={CONTROL} value={selection} disabled={loading || busy || dirty} onChange={event => select(event.target.value)}>
       <option value="">{label('choose', '选择公共资源或查询', 'Choose a public resource or query')}</option>
       <optgroup label={label('resources', '公共资源', 'Public resources')}>{resources.map(view => <option key={view.code} value={`resource:${view.code}`}>{view.code} · v{view.contract.schemaVersion}{view.status === 'published' ? '' : ` · ${label('withdrawn', '已停用', 'Withdrawn')}`}</option>)}</optgroup>
       <optgroup label={label('queries', '公共查询', 'Public queries')}>{queries.map(view => <option key={view.code} value={`query:${view.code}`}>{view.code} · v{view.contract.schemaVersion}{view.status === 'published' ? '' : ` · ${label('withdrawn', '已停用', 'Withdrawn')}`}</option>)}</optgroup>
+      <optgroup label={label('actions', '公共业务接口', 'Public business APIs')}>{actions.map(view => <option key={view.code} value={`action:${view.code}`}>{view.code} · v{view.contract.schemaVersion}{view.status === 'published' ? '' : ` · ${label('withdrawn', '已停用', 'Withdrawn')}`}</option>)}</optgroup>
     </select>} />}
     {!denied && selected && <form onSubmit={event => void save(event)} className="space-y-4">
       <p className="text-sm">{selected.policy ? label('existing', '此安装已配置数据授权。', 'This installation has data authority.') : label('absent', '此安装尚未获此合同的数据授权。', 'This installation has no authority for this contract.')}</p>
@@ -96,6 +101,17 @@ export function OpenApiInstallationGrantEditor({ installationPid, active, scopes
         {query && <><fieldset className="space-y-2"><legend className="font-medium">{label('queryFields', '查询输出字段', 'Query output fields')}</legend>{Object.keys(query.contract.fields).map(alias => <label key={alias} className="flex items-center gap-2"><input type="checkbox" checked={queryPolicy.readableFields.includes(alias)} onChange={() => changeQuery({ readableFields: toggle(queryPolicy.readableFields, alias) })} />{alias}</label>)}</fieldset>
           {!scopes.includes(query.contract.scopes.execute) && <p>{label('queryScope', '安装缺少查询执行 Scope。', 'Installation lacks the query execution scope.')}</p>}
           <div><h4 className="font-medium">{label('sources', '查询来源授权', 'Query source authority')}</h4>{Object.values(query.contract.sourceResources).map(source => { const authority = resources.find(view => view.code === source); return <p key={source} className="text-sm">{source}: {authority?.status === 'published' && authority.policy?.operations.includes('list') ? label('sourceGranted', '已有列表授权；字段和行范围仍参与查询裁决。', 'List granted; fields and rows remain enforced.') : label('sourceMissing', '缺少当前列表授权，查询调用将被拒绝。', 'Current list authority is missing; query calls will be denied.')}</p>; })}</div></>}
+        {action && <><label className="flex items-center gap-2"><input type="checkbox" checked={actionPolicy.execute} onChange={event => { setActionPolicy({ ...actionPolicy, execute: event.target.checked }); setDirty(true); setError(''); setNotice(''); }} />{label('actionExecute', '允许调用此业务接口', 'Allow this business API')}</label>
+          {!!action.contract.effectFields.length && <fieldset className="space-y-2"><legend className="font-medium">{label('actionEffects', '允许的受控变更字段', 'Allowed controlled effects')}</legend>
+            <p className="text-sm text-text-secondary">{label('actionEffectsHelp', '命令需要全部声明字段。状态字段的受控变更不会开放通用修改；资源当前的输入、可读字段与行范围仍生效。', 'The command requires every declared effect. Controlled state effects do not enable generic writes; current resource input, readable field and row authority still applies.')}</p>
+            {action.contract.effectFields.map(alias => <label key={alias} className="flex items-center gap-2"><input type="checkbox" checked={actionPolicy.effectFields.includes(alias)} onChange={() => { setActionPolicy({ ...actionPolicy, effectFields: toggle(actionPolicy.effectFields, alias) }); setDirty(true); setError(''); setNotice(''); }} />{alias}</label>)}</fieldset>}
+          {!scopes.includes(action.contract.scopes.execute) && <p>{label('actionScope', '安装缺少此业务接口的调用 Scope。', 'Installation lacks this business API execution scope.')}</p>}
+          <p className="text-sm">{label('actionResource', '绑定资源', 'Bound resource')}: {action.contract.resourceCode}</p>
+          {(() => { const source = resources.find(view => view.code === action.contract.resourceCode); const operation = action.contract.sourceKind === 'command' ? 'update' : 'list';
+            return <p className="text-sm text-text-secondary">{source?.status === 'published' && source.policy?.operations.includes(operation)
+              ? label('actionResourceGranted', '已有所需资源操作授权；调用仍会复核字段、行范围及 Scope。', 'Required resource operation granted. Calls still recheck fields, rows and scopes.')
+              : label('actionResourceMissing', '缺少绑定资源的当前操作授权，接口调用将被拒绝。', 'Current bound-resource operation authority is missing; calls will be denied.')}</p>; })()}
+        </>}
       </fieldset>
       <div className="sticky bottom-0 space-y-3 border-t border-border bg-panel py-3">
         {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}

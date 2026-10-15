@@ -39,6 +39,10 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private CommandService commands;
     @Autowired private CommandExecutor executor;
     @Autowired private OpenApiLegacyAuthority legacy;
+    @Autowired private OpenApiActionPublicationService actionPublications;
+    @Autowired private OpenApiActionValidator actionValidator;
+    @Autowired private OpenApiActionService publicActions;
+    @Autowired private IntegrationTokenService integrationTokens;
     @Autowired private com.auraboot.framework.meta.controller.config.ModelController modelAdministration;
 
     @Autowired private org.springframework.jdbc.core.JdbcTemplate eventJdbc;
@@ -2044,6 +2048,222 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     private int conditionalWrite(String etag, String key, String name) {
         try { return resources.write(principal, contract.code(), Operation.UPDATE, allowedPid, key, etag, Map.of("name", name)).status(); }
         catch (OpenApiPreconditionException conflict) { return 412; }
+    }
+
+    private OpenApiActionContract publishBusinessAction(String kind) {
+        String code = "business." + UniqueIdGenerator.generate().toLowerCase();
+        String source = "core.visible-page";
+        if ("command".equals(kind)) {
+            var request = new CommandDefinitionCreateRequest();
+            source = "fixture_transition_" + UniqueIdGenerator.generate().toLowerCase();
+            request.setCode(source); request.setDisplayName("Controlled installed transition"); request.setModelCode(contract.modelCode());
+            request.setCmdRiskLevel("L1"); request.setInputSchema("{\"type\":\"object\",\"properties\":{\"zone\":{\"type\":\"string\"}}}");
+            request.setExecutionConfig("{\"type\":\"state_transition\",\"stateField\":\"name\",\"fromStates\":[\"Visible\"],\"toState\":\"Assigned\",\"inputFields\":[\"zone\"],\"permissions\":[\"fixture.action.manage\"]}");
+            var draft = commands.create(request); commands.publish(draft.getPid());
+            publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                    contract.fields().keySet(), Set.of("zone"), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        }
+        var descriptor = actionValidator.describe(principal.tenantId(), contract.code(), kind, source);
+        var action = new OpenApiActionContract(code, kind, source, contract.code(), 1, descriptor.fingerprint(), descriptor.permission(),
+                Map.of("execute", code + ".execute"), descriptor.parameters(), descriptor.inputFields(), descriptor.effectFields(), descriptor.outputFields(), 5000, 2);
+        actionPublications.saveDraft(code, new OpenApiActionPublicationService.DraftRequest(0, action)); actionPublications.publish(code, 1);
+        actionPublications.grant(principal.installationPid(), code, new OpenApiActionPolicy(true, action.effectFields()));
+        var scopes = new HashSet<>(principal.scopes()); scopes.add(code + ".execute");
+        management.updateScopes(principal.installationPid(), new UpdateInstallationScopesRequest(scopes));
+        var issued = integrationTokens.create(principal.installationPid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Business interface", "never", null), "business-token-" + code);
+        rawToken = issued.token();
+        var identity = auth.findToken(secrets.sha256(rawToken), OpenPlatformTokenService.AUDIENCE, Instant.now());
+        principal = new MachinePrincipal(identity.tenantId(), identity.tokenPid(), "machine", scopes,
+                identity.applicationPid(), identity.installationPid(), identity.environment(), identity.tokenPid());
+        return action;
+    }
+
+    private <T> T installedBusinessCall(java.util.function.Supplier<T> call) {
+        var human = MetaContext.snapshot(); MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal)) { return call.get(); }
+        finally { MetaContext.restore(human); }
+    }
+
+    @Test void readOnlyHandlerExecutesRealGrantedRowsAndRejectsUnknownInputsAndTargets() throws Exception {
+        var action = publishBusinessAction("handler");
+        var result = installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 10)));
+        assertThat(result.body()).containsOnlyKeys("countOnPage", "hasMore").containsEntry("hasMore", false);
+        assertThat(((Number) result.body().get("countOnPage")).intValue()).isEqualTo(1);
+        String route = "/api/open/v1/actions/" + action.code() + ":execute";
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)
+                .header("Authorization", "Bearer " + rawToken).contentType("application/json").content("{\"input\":{\"limit\":10}}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.countOnPage").value(1));
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("tenantId", 1))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), "unneeded-write-key", null, allowedPid, Map.of("limit", 10))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 1000))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void publicBusinessCommandUsesCurrentResourceEtagAndPersistentReplayWithoutAllAuthority() {
+        publishEvents();
+        var action = publishBusinessAction("command");
+        try {
+            String etag = installedBusinessCall(() -> resources.get(principal, contract.code(), allowedPid)).headers().get("ETag");
+            var result = installedBusinessCall(() -> publicActions.execute(principal, action.code(), "business-command-once", etag, allowedPid, Map.of("zone", "A")));
+            assertThat(((Map<?, ?>) result.body().get("resource")).get("name")).isEqualTo("Assigned");
+            assertThat(result.body()).containsEntry("idempotentReplay", false);
+            assertThat(result.headers().get("ETag")).isNotBlank().isNotEqualTo(etag);
+            var row = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid));
+            assertThat(row).containsEntry("name", "Assigned").containsEntry("zone", "A");
+            long version = ((Number) row.get("row_version")).longValue();
+            assertThat(version).isGreaterThan(1);
+            var events = sourceEvents();
+            assertThat(events).hasSize(Math.toIntExact(version - 1));
+            for (int index = 0; index < events.size(); index++) {
+                try {
+                    var payload = json.readTree(events.get(index).get("payload").toString());
+                    assertThat(payload.path("recordVersion").asLong()).isEqualTo(index + 2L);
+                    assertThat(payload.path("data").has("secret")).isFalse();
+                } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) { throw new AssertionError("Invalid model event artifact", invalid); }
+            }
+            var replay = installedBusinessCall(() -> publicActions.execute(principal, action.code(), "business-command-once", etag, allowedPid, Map.of("zone", "A")));
+            assertThat(replay.replay()).isTrue(); assertThat(replay.body()).containsEntry("idempotentReplay", true);
+            assertThat(sourceEvents()).isEqualTo(events);
+            assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid)).get("row_version")).isEqualTo((int) version);
+            assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), "business-command-stale", etag, allowedPid, Map.of("zone", "A"))))
+                    .isInstanceOf(OpenApiPreconditionException.class);
+            assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), "business-command-once", etag, allowedPid, Map.of("zone", "B"))))
+                    .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            assertThat(row.get("secret")).isEqualTo("Private");
+            assertThat(((Map<?, ?>) result.body().get("resource")).containsKey("secret")).isFalse();
+        } finally {
+            actionPublications.withdraw(action.code(), 1);
+            try { commands.delete(commands.findByCode(action.sourceCode()).getPid()); }
+            finally { cleanupCommittedFixture(); }
+        }
+    }
+
+    @Test void businessActionRequiresBothItsEffectGrantAndCurrentResourceAuthority() {
+        var action = publishBusinessAction("command");
+        String etag = installedBusinessCall(() -> resources.get(principal, contract.code(), allowedPid)).headers().get("ETag");
+        actionPublications.grant(principal.installationPid(), action.code(), new OpenApiActionPolicy(true, Set.of("zone")));
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), "denied-action-effects", etag, allowedPid, Map.of("zone", "A"))))
+                .isInstanceOf(AccessDeniedException.class);
+        actionPublications.grant(principal.installationPid(), action.code(), new OpenApiActionPolicy(true, action.effectFields()));
+        publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(), Set.of("pid", "zone"), Set.of("zone"),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), "denied-resource-effects", null, allowedPid, Map.of("zone", "A"))))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid))).containsEntry("name", "Visible");
+    }
+
+    @Test void businessHandlerRechecksResourceRevocationTokenRevocationAndWithdrawal() {
+        var action = publishBusinessAction("handler");
+        assertThat(installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 10))).status()).isEqualTo(200);
+        publications.revoke(principal.installationPid(), contract.code());
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 10))))
+                .isInstanceOf(AccessDeniedException.class);
+        publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(), contract.fields().keySet(), Set.of("name", "zone"),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        assertThat(installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 10))).status()).isEqualTo(200);
+        integrationTokens.revoke(principal.installationPid(), principal.tokenPid());
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 10))))
+                .isInstanceOf(AccessDeniedException.class);
+        actionPublications.withdraw(action.code(), 1);
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 10))))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
+    @Test void businessPublicationArtifactsDescribeDirectBearerAndHidePrivateSourceAndModel() {
+        var action = publishBusinessAction("handler");
+        var document = OpenApiContractArtifacts.action(action, contract);
+        var encoded = json.valueToTree(document).toString();
+        assertThat(encoded).contains("integrationToken", "bearer", "countOnPage", "/actions/" + action.code())
+                .doesNotContain(action.sourceCode(), contract.modelCode(), action.sourceFingerprint());
+        assertThat(OpenApiContractArtifacts.actionTypes(action, contract)).contains("ActionRequest", "ActionResult", "countOnPage", "number").doesNotContain(action.sourceCode());
+        assertThatThrownBy(() -> actionPublications.publish(action.code(), 99)).isInstanceOf(OpenApiPublicationService.PublicationConflictException.class);
+        var human = MetaContext.snapshot();
+        try {
+            MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+            assertThatThrownBy(() -> actionPublications.list()).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(() -> actionPublications.grant(principal.installationPid(), action.code(), new OpenApiActionPolicy(true, Set.of())))
+                    .isInstanceOf(AccessDeniedException.class);
+        } finally { MetaContext.restore(human); }
+    }
+
+    @Test void businessPublicationLifecycleListsSourcesGrantsSnapshotsAndExplicitRevocation() {
+        var action = publishBusinessAction("handler");
+        assertThat(actionPublications.sources(contract.code())).extracting(OpenApiActionValidator.SourceView::sourceCode).contains("core.visible-page");
+        assertThat(actionPublications.list()).extracting(OpenApiActionPublicationService.View::code).contains(action.code());
+        assertThat(actionPublications.installationGrants(principal.installationPid())).filteredOn(row -> row.code().equals(action.code()))
+                .singleElement().satisfies(row -> assertThat(row.policy().execute()).isTrue());
+        actionPublications.revoke(principal.installationPid(), action.code());
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), null, null, null, Map.of("limit", 10))))
+                .isInstanceOf(AccessDeniedException.class);
+        actionPublications.grant(principal.installationPid(), action.code(), new OpenApiActionPolicy(true, Set.of()));
+        var next = new OpenApiActionContract(action.code(), action.sourceKind(), action.sourceCode(), action.resourceCode(), 2,
+                action.sourceFingerprint(), action.permission(), action.scopes(), action.parameters(), action.inputFields(), action.effectFields(), action.outputFields(), 6000, 3);
+        assertThat(actionPublications.saveDraft(action.code(), new OpenApiActionPublicationService.DraftRequest(1, next)).draftRevision()).isEqualTo(2);
+        assertThat(actionPublications.publish(action.code(), 2).activeVersion()).isEqualTo(2);
+        assertThat(actionPublications.publishedForAdministration(action.code())).isEqualTo(next);
+        assertThat(actionPublications.published(principal.tenantId())).contains(next);
+        actionPublications.withdraw(action.code(), 2);
+        assertThat(actionPublications.active(principal.tenantId(), action.code())).isEmpty();
+    }
+
+    @Test void unsupportedCommandCandidateRemainsVisibleAndCannotBlockARegisteredReadOnlyHandler() {
+        var request = new CommandDefinitionCreateRequest();
+        request.setCode("private_input_" + UniqueIdGenerator.generate().toLowerCase()); request.setDisplayName("Unpublished private input");
+        request.setModelCode(contract.modelCode()); request.setCmdRiskLevel("L1");
+        request.setExecutionConfig("{\"type\":\"state_transition\",\"stateField\":\"name\",\"fromStates\":[\"Visible\"],\"toState\":\"Assigned\",\"inputFields\":[\"secret\"],\"permissions\":[\"fixture.action.manage\"]}");
+        var created = commands.create(request); commands.publish(created.getPid());
+        var sources = actionPublications.sources(contract.code());
+        assertThat(sources).filteredOn(row -> row.sourceCode().equals(request.getCode())).singleElement().satisfies(row -> {
+            assertThat(row.available()).isFalse(); assertThat(row.reason()).contains("writable public resource field");
+        });
+        assertThat(sources).filteredOn(row -> row.sourceCode().equals("core.visible-page")).singleElement().satisfies(row -> {
+            assertThat(row.available()).isTrue(); assertThat(row.minTimeoutMs()).isEqualTo(contract.timeoutMs());
+        });
+        assertThatThrownBy(() -> actionValidator.describe(principal.tenantId(), contract.code(), "command", request.getCode()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void publicCommandSourceRejectsAdditionalSideEffectsBeforeExecution() {
+        var request = new CommandDefinitionCreateRequest();
+        request.setCode("side_effect_" + UniqueIdGenerator.generate().toLowerCase()); request.setDisplayName("Additional effect source");
+        request.setModelCode(contract.modelCode()); request.setCmdRiskLevel("L1");
+        request.setExecutionConfig("{\"type\":\"state_transition\",\"stateField\":\"name\",\"fromStates\":[\"Visible\"],\"toState\":\"Assigned\",\"permissions\":[\"fixture.action.manage\"],\"sideEffects\":[{\"action\":\"create_record\",\"targetModel\":\"another_model\"}]}");
+        var created = commands.create(request); commands.publish(created.getPid());
+        assertThatThrownBy(() -> actionValidator.describe(principal.tenantId(), contract.code(), "command", request.getCode()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("additional side effects");
+        assertThat(actionPublications.sources(contract.code())).filteredOn(row -> row.sourceCode().equals(request.getCode()))
+                .singleElement().satisfies(row -> assertThat(row.available()).isFalse());
+    }
+
+    @Test void publishedBusinessSourceCannotFloatAndDisabledApplicationsCannotReceiveNewGrants() {
+        var action = publishBusinessAction("command"); var source = commands.findByCode(action.sourceCode());
+        var changed = new CommandDefinitionCreateRequest(); changed.setCode(source.getCode()); changed.setDisplayName(source.getDisplayName());
+        changed.setModelCode(source.getModelCode()); changed.setCmdRiskLevel(source.getCmdRiskLevel()); changed.setInputSchema(source.getInputSchema());
+        changed.setExecutionConfig(source.getExecutionConfig().replace("Assigned", "Changed"));
+        // Reinstalling a source can replace its configuration while retaining its public identity.
+        commands.delete(source.getPid());
+        var replaced = commands.create(changed);
+        assertThat(replaced.getPid()).isEqualTo(source.getPid());
+        assertThat(replaced.getStatus()).isEqualTo(source.getStatus());
+        assertThat(commands.findByCode(action.sourceCode()).getExecutionConfig()).contains("Changed");
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), "changed-source-denied", null, allowedPid, Map.of("zone", "A"))))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .satisfies(error -> assertThat(((org.springframework.web.server.ResponseStatusException) error).getStatusCode().value()).isEqualTo(409));
+        assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid))).containsEntry("name", "Visible");
+        management.disableApplication(principal.applicationPid());
+        assertThatThrownBy(() -> actionPublications.grant(principal.installationPid(), action.code(), new OpenApiActionPolicy(true, action.effectFields())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Active application installation");
+        assertThat(actionPublications.installationGrants(principal.installationPid())).filteredOn(row -> row.code().equals(action.code()))
+                .singleElement().satisfies(row -> assertThat(row.policy()).isNotNull());
+        actionPublications.revoke(principal.installationPid(), action.code());
+        assertThat(actionPublications.installationGrants(principal.installationPid())).filteredOn(row -> row.code().equals(action.code()))
+                .singleElement().satisfies(row -> assertThat(row.policy()).isNull());
     }
 
     @Test

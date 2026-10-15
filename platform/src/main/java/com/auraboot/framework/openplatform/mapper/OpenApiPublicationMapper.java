@@ -125,6 +125,26 @@ public interface OpenApiPublicationMapper {
     List<PublicationRow> listQueries(@Param("tenantId") Long tenantId);
 
     @Select("""
+        SELECT code, draft::text, draft_revision, active_version, status
+        FROM ab_open_api_publication WHERE tenant_id = #{tenantId} AND jsonb_exists(draft, 'sourceKind') ORDER BY code
+        """)
+    List<PublicationRow> listActions(@Param("tenantId") Long tenantId);
+
+    @Select("""
+        SELECT s.definition::text FROM ab_open_api_publication p
+        JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
+            AND s.code = p.code AND s.schema_version = p.active_version
+        WHERE p.tenant_id = #{tenantId} AND p.status = 'published' AND jsonb_exists(s.definition, 'sourceKind') ORDER BY p.code
+        """)
+    List<String> activeActionDefinitions(@Param("tenantId") Long tenantId);
+
+    @Select("""
+        SELECT policy::text FROM ab_open_api_resource_grant
+        WHERE tenant_id = #{tenantId} AND installation_id = #{installationId} AND resource_code = #{code}
+        """)
+    String storedPolicy(@Param("tenantId") Long tenantId, @Param("installationId") Long installationId, @Param("code") String code);
+
+    @Select("""
         SELECT s.definition::text FROM ab_open_api_publication p
         JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
             AND s.code = p.code AND s.schema_version = p.active_version

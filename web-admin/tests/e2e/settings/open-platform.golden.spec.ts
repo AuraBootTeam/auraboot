@@ -2798,8 +2798,14 @@ test.describe('Quick integration token journey', () => {
     expect(installed.status()).toBe(200); const installation = (await installed.json()).data;
     const evidence = path.join(EVIDENCE_DIR, `quick-token-${PUBLICATION_VIEWPORT}`); await mkdir(evidence, { recursive: true });
     const captureToken = async (id: string) => {
-      await page.screenshot({ path: path.join(evidence, `${id}.png`), fullPage: true,
-        mask: [page.getByTestId('integration-token-secret').locator('textarea')] });
+      const panel = page.getByTestId('integration-token-panel');
+      const region = id.includes('secret') ? panel.getByTestId('integration-token-secret')
+        : id.includes('fixed-form') || id.includes('permanent-form') ? panel.getByTestId('integration-token-create')
+        : id.includes('rotation-form') ? panel.getByTestId('integration-token-rotate')
+        : id.includes('revoke-confirmation') ? panel.getByTestId('integration-token-revoke') : panel;
+      await region.scrollIntoViewIfNeeded();
+      await region.screenshot({ path: path.join(evidence, `${id}.png`),
+        mask: [panel.getByTestId('integration-token-secret').locator('textarea')] });
     };
     const machineStatus = async (token: string, status: number) => {
       const result = await page.request.get(`${BACKEND_URL}/api/open/v1/whoami`, { headers: { Authorization: `Bearer ${token}` } });

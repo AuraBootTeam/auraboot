@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Human administration uses the host envelope and explicit recoverable HTTP statuses. */
 @Order(0)
-@RestControllerAdvice(assignableTypes = {OpenApiPublicationController.class, OpenApiQueryPublicationController.class})
+@RestControllerAdvice(assignableTypes = {OpenApiPublicationController.class, OpenApiQueryPublicationController.class, OpenApiActionPublicationController.class})
 public class OpenApiPublicationErrorHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> invalid(IllegalArgumentException error) {

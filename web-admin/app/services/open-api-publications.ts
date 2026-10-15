@@ -71,3 +71,18 @@ export interface InstallationResourcePolicy { operations: PublicOperation[]; rea
 export interface InstallationQueryPolicy { readableFields: string[] }
 export interface ResourceGrantView { code: string; status: string; contract: PublicResource; policy: InstallationResourcePolicy | null }
 export interface QueryGrantView { code: string; status: string; contract: PublicQuery; policy: InstallationQueryPolicy | null }
+
+export interface PublicAction {
+  code: string; sourceKind: 'command' | 'handler'; sourceCode: string; resourceCode: string;
+  schemaVersion: number; sourceFingerprint: string; permission: string | null; scopes: { execute: string };
+  parameters: Record<string, QueryParameter>; inputFields: Record<string, string>; effectFields: string[];
+  outputFields: Record<string, PublicType>; timeoutMs: number; maxConcurrent: number;
+}
+export interface ActionSource {
+  sourceKind: PublicAction['sourceKind']; sourceCode: string; name: string; fingerprint: string; permission: string | null;
+  parameters: PublicAction['parameters']; inputFields: Record<string, string>; effectFields: string[]; outputFields: Record<string, PublicType>;
+  minTimeoutMs: number; available: boolean; reason: string | null;
+}
+export interface ActionPublicationView { code: string; draft: PublicAction; draftRevision: number; activeVersion: number | null; status: string }
+export interface InstallationActionPolicy { execute: boolean; effectFields: string[] }
+export interface ActionGrantView { code: string; status: string; contract: PublicAction; policy: InstallationActionPolicy | null }

@@ -447,5 +447,24 @@
       "web"
     ]
   }
+},
+{
+  "code": "open_platform_actions",
+  "parentCode": "system_management",
+  "name:zh-CN": "公共业务接口",
+  "name:en": "Public Business APIs",
+  "path": "/p/c/open_platform_actions",
+  "pageKey": "open_platform_actions",
+  "component": null,
+  "icon": "globe",
+  "type": 1,
+  "permissionCode": "sys.connector.update",
+  "orderNo": 61,
+  "visible": true,
+  "extension": {
+    "platforms": [
+      "web"
+    ]
+  }
 }
 ]

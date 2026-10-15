@@ -42,7 +42,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     @Override
     public MachinePrincipal authenticate(HttpServletRequest request) {
         OpenApiCapabilityRegistry.Capability capability = capabilityRegistry.resolve(request.getMethod(), request.getRequestURI()).orElse(null);
-        if (capability == null && !request.getRequestURI().matches("/api/open/v1/(?:resources/[a-z][a-z0-9.-]{1,99}(?:/[^/]+)?|queries/[a-z][a-z0-9.-]{1,93}:execute)")) {
+        if (capability == null && !request.getRequestURI().matches("/api/open/v1/(?:resources/[a-z][a-z0-9.-]{1,99}(?:/[^/]+)?|queries/[a-z][a-z0-9.-]{1,93}:execute|actions/[a-z][a-z0-9.-]{1,92}:execute)")) {
             throw new ExternalMachineAuthException(404, "open_api_capability_not_found");
         }
         String authorization = request.getHeader("Authorization");
@@ -148,6 +148,8 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
             return "/api/open/v1/resources/{resource}";
         if (request.getRequestURI().matches("/api/open/v1/queries/[^/]+:execute"))
             return "/api/open/v1/queries/{query}:execute";
+        if (request.getRequestURI().matches("/api/open/v1/actions/[^/]+:execute"))
+            return "/api/open/v1/actions/{action}:execute";
         return "/api/open/v1/{unpublished}";
     }
 

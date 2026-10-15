@@ -11,6 +11,8 @@ export interface IntegrationTokenView {
 interface TokenSecret { appId: string; installationPid: string; token: string; metadata: IntegrationTokenView }
 interface Rotation { credential: TokenSecret; replacedTokenAcceptUntil: string }
 const BUTTON = 'rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text hover:bg-hover disabled:opacity-50';
+const PRIMARY = BUTTON.replace('bg-panel', 'bg-accent').replace('hover:bg-hover', 'hover:bg-accent-hover').replace('text-text', 'text-white');
+const DANGER = BUTTON.replace('text-text', 'text-danger');
 const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text disabled:opacity-50';
 
 /** Human-only token operations. Secret material is held only in this mounted panel. */
@@ -79,7 +81,7 @@ export function IntegrationTokenPanel({ installationPid, appId, active, onClose 
     <p className="text-sm text-text-secondary">{text('help', '直接用 Bearer Token 调用已授权接口，无需换取 OAuth Token。权限始终以安装当前授权为准。', 'Call authorized APIs directly with a Bearer token, without OAuth exchange. Current installation authority always applies.')}</p>
     <PublicationField name="appId" help={text('appIdHelp', '应用标识保持不变；认证使用 Token，不需要额外的 appId 请求头。', 'Stable application identity. Authenticate with the token; an extra appId header is unnecessary.')} child={<input className={CONTROL} value={appId} readOnly />} />
     <div className="flex flex-wrap gap-2"><button className={BUTTON} type="button" disabled={busy || loading} onClick={() => void load()}>{text('refresh', '刷新清单', 'Refresh token list')}</button>
-      <button className={BUTTON} type="button" disabled={!active || busy || loading || denied || !!operation || !!secret} onClick={() => begin('create')}>{text('create', '生成 Token', 'Generate token')}</button></div>
+      <button className={PRIMARY} type="button" disabled={!active || busy || loading || denied || !!operation || !!secret} onClick={() => begin('create')}>{text('create', '生成 Token', 'Generate token')}</button></div>
     {!active && <p role="status">{text('inactive', '应用或安装已停用，只能查看或撤销。', 'Application or installation is inactive. View or revoke existing tokens only.')}</p>}
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}{notice && <p role="status" className="text-sm">{notice}</p>}
     {loading && <p role="status">{text('loading', '正在读取 Token…', 'Loading tokens…')}</p>}
@@ -89,7 +91,7 @@ export function IntegrationTokenPanel({ installationPid, appId, active, onClose 
       <PublicationField name={text('secret', '新 Token', 'New token')} child={<textarea className={`${CONTROL} font-mono break-all`} rows={3} readOnly value={secret.token} spellCheck={false} autoComplete="off" />} />
       <p>{secret.metadata.expirationMode === 'never' ? text('permanent', '永久有效（仍可撤销和轮换）', 'Never expires (revocation and rotation still apply)') : `${text('expiresAt', '到期时间', 'Expires at')}: ${date(secret.metadata.expiresAt)}`}</p>
       {cutoff && <p>{text('oldCutoff', '旧 Token 接受截止', 'Old token accepted until')}: {date(cutoff)}</p>}
-      <div className="flex flex-wrap gap-2"><button className={BUTTON} type="button" onClick={async () => {
+      <div className="flex flex-wrap gap-2"><button className={PRIMARY} type="button" onClick={async () => {
         try { await navigator.clipboard.writeText(secret.token); setCopied(true); }
         catch { setError(text('copyFailed', '复制失败，请手动选择并保存 Token。', 'Copy failed. Select and save the token manually.')); }
       }}>{text('copy', '复制 Token', 'Copy token')}</button><button className={BUTTON} type="button" onClick={() => { setSecret(null); setCopied(false); setCutoff(null); }}>{text('saved', '已保存，关闭原文', 'Saved; close secret')}</button></div>
@@ -103,7 +105,7 @@ export function IntegrationTokenPanel({ installationPid, appId, active, onClose 
         {mode === 'fixed' ? <PublicationField name={text('days', '有效天数', 'Valid for days')} help={text('daysHelp', '默认 30 天，可选 1–90 天；服务端校验并返回实际到期时间。', 'Default 30 days; choose 1–90 days. The server validates and returns the authoritative expiry.')} child={<input className={CONTROL} type="number" min={1} max={90} step={1} required value={days} disabled={busy} onChange={event => setDays(event.target.valueAsNumber)} />} /> : <p>{text('neverWarning', '永久 Token 不会自然到期；请妥善保存，定期轮换，泄漏时立即撤销。', 'Permanent tokens have no natural expiry. Store securely, rotate periodically and revoke immediately if exposed.')}</p>}
         {operation.kind === 'rotate' && <PublicationField name={text('grace', '旧 Token 宽限分钟数', 'Old token grace minutes')} help={text('graceHelp', '0 为立即切换，默认 1440，最多 10080；不会延长原到期时间。', '0 switches immediately; default 1440, maximum 10080. Original expiry is never extended.')} child={<input className={CONTROL} type="number" min={0} max={10080} step={1} required value={grace} disabled={busy} onChange={event => setGrace(event.target.valueAsNumber)} />} />}
       </>}
-      <div className="flex flex-wrap gap-2"><button className={BUTTON} type="button" disabled={busy} onClick={() => { setOperation(null); setError(''); }}>{text('cancel', '取消', 'Cancel')}</button><button className={BUTTON} type="submit" disabled={busy || denied || (operation.kind !== 'revoke' && !active)}>{busy ? text('working', '处理中…', 'Working…') : text('confirm', '确认', 'Confirm')}</button></div>
+      <div className="flex flex-wrap gap-2"><button className={BUTTON} type="button" disabled={busy} onClick={() => { setOperation(null); setError(''); }}>{text('cancel', '取消', 'Cancel')}</button><button className={operation.kind === 'revoke' ? DANGER : PRIMARY} type="submit" disabled={busy || denied || (operation.kind !== 'revoke' && !active)}>{busy ? text('working', '处理中…', 'Working…') : text('confirm', '确认', 'Confirm')}</button></div>
     </form>}
     {!denied && <ul className="space-y-3">{rows.map(row => <li key={row.pid} className="space-y-2 rounded-control border border-border p-3" data-testid="integration-token-row">
       <div className="flex flex-wrap justify-between gap-2"><strong className="break-words">{row.name}</strong><span>{status(row.status)}</span></div>
@@ -111,7 +113,7 @@ export function IntegrationTokenPanel({ installationPid, appId, active, onClose 
       {row.acceptUntil && <p className="text-sm">{text('oldCutoff', '旧 Token 接受截止', 'Old token accepted until')}: {date(row.acceptUntil)}</p>}
       <p className="text-sm text-text-secondary">{text('lastUsed', '最近使用', 'Last used')}: {date(row.lastUsedAt)}</p>
       <div className="flex flex-wrap gap-2"><button className={BUTTON} type="button" disabled={!active || row.status !== 'active' || busy || !!operation || !!secret} onClick={() => begin('rotate', row)}>{text('rotate', '轮换 Token', 'Rotate token')}</button>
-        <button className={BUTTON} type="button" disabled={row.status === 'revoked' || busy || !!operation || !!secret} onClick={() => begin('revoke', row)}>{text('revoke', '撤销 Token', 'Revoke token')}</button></div>
+        <button className={DANGER} type="button" disabled={row.status === 'revoked' || busy || !!operation || !!secret} onClick={() => begin('revoke', row)}>{text('revoke', '撤销 Token', 'Revoke token')}</button></div>
     </li>)}</ul>}
   </section>;
 }

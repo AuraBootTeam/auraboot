@@ -51,7 +51,8 @@
     "com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest",
     "com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest",
     "com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest",
-    "com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT"
+    "com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT",
+    "com.auraboot.framework.meta.service.impl.MetaModelServiceCustomColumnMappingTest"
   ],
   "coverage": {
     "minimumLinePercent": 80,

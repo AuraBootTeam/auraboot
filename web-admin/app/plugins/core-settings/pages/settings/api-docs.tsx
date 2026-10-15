@@ -453,6 +453,10 @@ export default function OpenPlatformPage() {
               )}
             </Link>
           )}
+          {access.platformAdmin && <Link to="/p/c/open_platform_actions" data-testid="open-platform-actions-link"
+            className="rounded-control border-border-strong bg-panel text-text inline-flex items-center gap-2 border px-3 py-2 text-sm">
+            {t('openPlatform.actions.title', undefined, locale.startsWith('zh') ? '公共业务接口' : 'Public business APIs')}
+          </Link>}
           <a
             href="/docs/open-platform-integration.html"
             target="_blank"
