@@ -1,5 +1,13 @@
 import type { RelatedPage } from '~/shared/services/modelService';
 
+/** Publication placeholders are not authored/generated runnable CRUD pages. */
+export function isModelPageStub(page: RelatedPage): boolean {
+  const extension = page.extension;
+  if (!extension || typeof extension !== 'object' || Array.isArray(extension)) return false;
+  const flag = (extension as Record<string, unknown>).auto_created;
+  return flag === true || flag === 'true';
+}
+
 /** CRUD routes take a model code; custom routes take an exact stored page key. */
 export function resolveModelPageRoute(page: RelatedPage): string {
   if (typeof page.route === 'string' && page.route.startsWith('/')) return page.route;

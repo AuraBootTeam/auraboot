@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { primaryModelPreview, resolveModelPageRoute } from '../modelPageNavigation';
+import { isModelPageStub, primaryModelPreview, resolveModelPageRoute } from '../modelPageNavigation';
 
 describe('model page navigation uses actual dynamic route contracts', () => {
   const list = { pid: 'list', kind: 'list', modelCode: 'customer', pageKey: 'customer_list' };
@@ -37,5 +37,13 @@ describe('model page navigation uses actual dynamic route contracts', () => {
   it('reports no primary preview for an empty page set', () => {
     expect(primaryModelPreview({})).toBeUndefined();
     expect(resolveModelPageRoute({ pid: 'missing', kind: 'list' })).toBe('/p/page_schema');
+  });
+
+  it('identifies both supported placeholder markers without treating authored content as a stub', () => {
+    expect(isModelPageStub({ ...list, extension: { auto_created: true } })).toBe(true);
+    expect(isModelPageStub({ ...list, extension: { auto_created: 'true' } })).toBe(true);
+    expect(isModelPageStub({ ...list, extension: { auto_created: false } })).toBe(false);
+    expect(isModelPageStub({ ...list, extension: { auto_created: 'false' } })).toBe(false);
+    expect(isModelPageStub(list)).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { getPublishText, buildPermissionReplayContext, buildSlaNodeReplayContext
 import { getPolicyHeading, getMigrationPlanMessage, getHistoricalPolicyMessage } from './modelPublishPolicyMessages';
 import { useModelDetailText, type ModelDetailTextFn, type ModelDetailTextKey } from './modelDetailText';
 import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
-import { primaryModelPreview, resolveModelPageRoute } from './modelPageNavigation';
+import { isModelPageStub, primaryModelPreview, resolveModelPageRoute } from './modelPageNavigation';
 /**
  * Model详情页面
  *
@@ -293,6 +293,7 @@ export default function ModelDetailPage() {
       form: null,
     };
     for (const page of pages as RelatedPage[]) {
+      if (isModelPageStub(page)) continue;
       const kind = normalizePageKind(page);
       if (kind !== 'custom' && !grouped[kind]) {
         grouped[kind] = page;
@@ -351,7 +352,7 @@ export default function ModelDetailPage() {
     return sorted[0] ?? null;
   }, [pages]);
 
-  const hasGeneratedPages = pages.length > 0;
+  const hasGeneratedPages = (pages as RelatedPage[]).some((page) => !isModelPageStub(page));
   const hasStandardPages = Boolean(
     standardPages.list || standardPages.detail || standardPages.form,
   );

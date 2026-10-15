@@ -132,8 +132,8 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     body: JSON.stringify({ ...published, readback: publishedBody }), contentType: 'application/json',
   });
   await expect(page.getByTestId('model-publish-dialog')).toBeHidden();
-  // Model publication already creates published standard pages, idempotently.
-  // The primary action therefore opens an existing designer, not the CRUD wizard.
+  // Publication creates three marked placeholders; the wizard must upgrade them
+  // through its actual UI before these pages become runnable CRUD surfaces.
   const pagesResponse = await page.request.get(`/api/meta/models/${pid}/pages`);
   expect(pagesResponse.ok()).toBe(true);
   const pagesBody = await pagesResponse.json();
@@ -146,9 +146,48 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
       modelCode: code, pageKey: `${code}_${generatedPage.kind}`, status: 'published',
     });
     expect(generatedPage.pid).toMatch(/^[0-9A-Z]{26}$/);
+    expect(generatedPage.extension.auto_created).toBe(true);
   }
   await info.attach('SC02-publish-generated-standard-pages', {
     body: JSON.stringify(pagesBody), contentType: 'application/json',
+  });
+  await expect(page.getByTestId('model-primary-page-action')).toHaveText('生成基础 CRUD');
+  await page.getByTestId('model-primary-page-action').click();
+  await expect(page.getByTestId('crud-template-dialog')).toBeVisible();
+  for (const kind of ['list', 'form', 'detail']) {
+    await expect(page.getByTestId(`crud-generate-${kind}`)).toBeChecked();
+  }
+  await page.getByTestId('crud-open-designer').uncheck();
+  await screenshot(page, info, 'SC02-crud-generation-confirmation');
+  const generation = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/templates/crud/generate'
+      && response.request().method() === 'POST');
+  await page.getByTestId('crud-generate-submit').click();
+  const generationResponse = await generation;
+  const generationBody = await generationResponse.json();
+  expect(generationResponse.ok(), JSON.stringify(generationBody)).toBe(true);
+  expect(String(generationBody.code)).toBe('0');
+  expect(generationResponse.request().postDataJSON()).toMatchObject({
+    modelCode: code, config: { generateList: true, generateForm: true, generateDetail: true },
+  });
+  expect(generationBody.data.generatedResources.pages).toHaveLength(3);
+  await page.getByTestId('crud-complete').click();
+  const configuredResponse = await page.request.get(`/api/meta/models/${pid}/pages`);
+  expect(configuredResponse.ok()).toBe(true);
+  const configured = (await configuredResponse.json()).data;
+  expect(configured).toHaveLength(3);
+  for (const originalPage of pagesBody.data) {
+    const upgraded = configured.filter((item: { pid: string }) => item.pid === originalPage.pid);
+    expect(upgraded).toHaveLength(1);
+    expect(upgraded[0]).toMatchObject({ modelCode: code, kind: originalPage.kind, status: 'published' });
+    expect(upgraded[0].extension?.auto_created).not.toBe(true);
+    expect(upgraded[0].extension?.auto_created).not.toBe('true');
+    expect(upgraded[0].blocks.length).toBeGreaterThan(0);
+    if (originalPage.kind === 'form') expect(JSON.stringify(upgraded[0].blocks)).not.toContain('ai-fill-banner');
+  }
+  await info.attach('SC02-ui-stub-upgrade-and-persisted-pages', {
+    body: JSON.stringify({ request: generationResponse.request().postDataJSON(), generationBody, configured }),
+    contentType: 'application/json',
   });
   await expect(page.getByTestId('model-primary-page-preview')).toBeVisible();
   await page.getByTestId('model-primary-page-preview').click();
@@ -165,6 +204,8 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('toolbar-btn-create').click();
   await page.getByTestId(`form-field-${customerField}`).locator('input').fill(customerName);
   await page.getByTestId(`form-field-${amountField}`).locator('input').fill('42000');
+  await expect(page.getByTestId('ai-fill-banner')).toHaveCount(0);
+  await expect(page.getByTestId('ai-fill-trigger')).toHaveCount(0);
   await screenshot(page, info, 'SC02-customer-followup-form');
   const createRecord = page.waitForResponse(
     (r) => new URL(r.url()).pathname === `/api/dynamic/${code}` && r.request().method() === 'POST',
