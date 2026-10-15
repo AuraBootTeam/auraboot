@@ -233,8 +233,11 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(recordPid).toMatch(/^[0-9A-Z]{26}$/);
   const row = page.locator('tr').filter({ hasText: customerName });
   await expect(row).toBeVisible();
-  await expect(row.getByTestId('row-action-edit')).toBeVisible({ timeout: 10000 });
-  await row.getByTestId('row-action-edit').click();
+  await expect(row.getByTestId('row-action-more')).toBeVisible({ timeout: 10000 });
+  await row.getByTestId('row-action-more').click();
+  const editMenuAction = page.getByRole('menu').getByTestId('row-action-edit');
+  await expect(editMenuAction).toBeVisible({ timeout: 10000 });
+  await editMenuAction.click();
   await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(
     customerName,
   );
@@ -262,8 +265,10 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     [customerField]: customerName,
     [amountField]: 68000,
   });
-  await expect(row.getByTestId('row-action-edit')).toBeVisible({ timeout: 10000 });
-  await row.getByTestId('row-action-edit').click();
+  await expect(row.getByTestId('row-action-more')).toBeVisible({ timeout: 10000 });
+  await row.getByTestId('row-action-more').click();
+  await expect(editMenuAction).toBeVisible({ timeout: 10000 });
+  await editMenuAction.click();
   await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('68000');
   await screenshot(page, info, 'SC02-customer-followup-saved-reopened');
   await expect(page.getByTestId('form-btn-cancel')).toBeVisible({ timeout: 10000 });
@@ -320,6 +325,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     await expect(readerRow).toBeVisible();
     await expect(reader.page.getByTestId('toolbar-btn-create')).not.toBeVisible();
     await expect(readerRow.getByTestId('row-action-edit')).not.toBeVisible();
+    await expect(readerRow.getByTestId('row-action-more')).not.toBeVisible();
     const recordUrl = new URL(`/api/dynamic/${code}/${recordPid}`, listUrl);
     const readRecord = await reader.page.request.get(recordUrl.toString());
     expect(readRecord.ok()).toBe(true);
