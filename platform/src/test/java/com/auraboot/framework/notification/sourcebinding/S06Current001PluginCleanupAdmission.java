@@ -22,12 +22,12 @@ final class S06Current001PluginCleanupAdmission {
     static final Path EVIDENCE = Path.of("/Users/ghj/work/auraboot/.workspace/evidence/" + RUNTIME);
     static final Path ORIGINAL = EVIDENCE.resolve("managed-fixture-integration-20261015/s06-native-main509-attempt-001");
     static final Map<String, String> TRACES = Map.ofEntries(
-            Map.entry("sn5ee4edb1e3b8", "440974bb3b76002cccbce9e49bc6a778d46e0fdf7fc171b2fb86d1259006afb0"), 
-            Map.entry("sn6034b1b0e7ae", "7233cac44fe9b9782aa6c4af729d81f89e35e3b03d82ef4da21bae9036550f27"), 
-            Map.entry("sn6974f573678c", "75904a219ebaabe0bc9dd7c91b69de6f4ee1e0e8cef56a68ebd4bfb6ff8b3374"), 
-            Map.entry("sna3a52a325740", "d6ceb6cc2086b4099cea07926a62a75b76d41daa85d773ebb98a65bdf1092146"), 
-            Map.entry("sna96e1a1e265b", "899e4ace3185df5939b07675664b312ea83e0142bc52c79ff4757df5f29598b5"), 
-            Map.entry("snbeb258572b14", "ba0ab9f32c601e64c3014570a352ecd6b9382bbddeb4bc2f110e1d620f46deee"), 
+            Map.entry("sn5ee4edb1e3b8", "440974bb3b76002cccbce9e49bc6a778d46e0fdf7fc171b2fb86d1259006afb0"),
+            Map.entry("sn6034b1b0e7ae", "7233cac44fe9b9782aa6c4af729d81f89e35e3b03d82ef4da21bae9036550f27"),
+            Map.entry("sn6974f573678c", "75904a219ebaabe0bc9dd7c91b69de6f4ee1e0e8cef56a68ebd4bfb6ff8b3374"),
+            Map.entry("sna3a52a325740", "d6ceb6cc2086b4099cea07926a62a75b76d41daa85d773ebb98a65bdf1092146"),
+            Map.entry("sna96e1a1e265b", "899e4ace3185df5939b07675664b312ea83e0142bc52c79ff4757df5f29598b5"),
+            Map.entry("snbeb258572b14", "ba0ab9f32c601e64c3014570a352ecd6b9382bbddeb4bc2f110e1d620f46deee"),
             Map.entry("sndbd811184b46", "21ac7ee459d25ec549653732ac75bd36d6005367e5cb2a1575eba9f1093119fe"));
     static final Set<String> METHODS = Set.of(
             "actualImportedMetadataExplicitRecipientsReplayAndConsumePersistExactlyOnce",
