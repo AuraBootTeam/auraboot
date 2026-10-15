@@ -20,7 +20,8 @@ from open_platform_http import ProtocolError, data
 
 CASES = ('real-asset-source', 'resource-and-business-publication', 'invalid-scope-rejected',
          'current-installation-grants', 'permanent-direct-token', 'packaged-guide-execution',
-         'real-signed-office-events', 'durable-inbox-and-tombstone', 'tampered-proof-rejected')
+         'real-signed-office-events', 'accepted-then-retry-deduplicated', 'office-dead-letter',
+         'operator-replay-and-machine-denial', 'durable-inbox-and-tombstone', 'tampered-proof-rejected')
 
 
 def require(condition, message):
@@ -65,14 +66,14 @@ def verify_office_report(report, *, secret):
             and report.get('sourceKinds') == ['command','handler'], 'real source binding')
     rows = report.get('receipts')
     require(isinstance(rows,list) and len(rows)>=5, 'real notification receipts')
-    types, records = set(), {}
+    types, records, deliveries, events = set(), {}, {}, set()
     for row in rows:
-        require(isinstance(row,dict) and type(row.get('status')) is int and row['status']==204, 'receiver status')
+        require(isinstance(row,dict) and type(row.get('status')) is int and row['status'] in (204,503), 'receiver status')
         try:
             raw = base64.b64decode(row.get('raw'),validate=True)
             stamp = row['timestamp']
             received = row['receivedAt']
-            require(type(received) in (float,int) and math.isfinite(received) and stamp.isascii() and stamp.isdecimal()
+            require(type(received) in (float,int) and math.isfinite(received) and isinstance(stamp,str) and stamp.isascii() and stamp.isdecimal()
                     and abs(received-int(stamp))<=300, 'notification timestamp window')
             expected = 'sha256='+hmac.new(secret,stamp.encode('ascii')+b'.'+raw,hashlib.sha256).hexdigest()
             require(hmac.compare_digest(row['signature'],expected), 'signed raw bytes')
@@ -83,6 +84,10 @@ def verify_office_report(report, *, secret):
                     and event['schemaVersion']==1 and event['data']['pid']==event['subject']['pid']
                     and type(event['recordVersion']) is int and event['recordVersion']>=1, 'event schema')
             require(set(event['data']) <= {'pid','assetCode','name','status','location','serialNumber','assignedTo'}, 'projected fields')
+            delivery = row['deliveryPid']
+            require(isinstance(delivery,str) and bool(delivery), 'delivery identity')
+            deliveries.setdefault(delivery,[]).append((row['status'],event))
+            events.add(event['id'])
             types.add(event['type'].rsplit('.',1)[1])
             pid = event['subject']['pid']
             if pid not in records or records[pid]['recordVersion']<event['recordVersion']:
@@ -90,6 +95,23 @@ def verify_office_report(report, *, secret):
         except (KeyError,ValueError,TypeError,UnicodeError):
             raise ProtocolError('office integration: malformed raw notification proof') from None
     require(types=={'created','updated','deleted'} and len(records)==2, 'CRUD notification coverage')
+    replay = report.get('replayProof')
+    require(isinstance(replay,dict) and replay.get('machineStatus')==401, 'machine replay denial')
+    before, after = replay.get('before',{}), replay.get('after',{})
+    require(all(type(row.get(key)) is int for row in (before,after) for key in ('retryCount','maxRetries','replayCount')), 'delivery counters')
+    require(before.get('status')=='dead_letter' and before.get('retryCount')==before.get('maxRetries')==1
+            and before.get('replayCount')==0 and after.get('status')=='success' and after.get('replayCount')==1
+            and before.get('pid')==after.get('pid') and before.get('eventId')==after.get('eventId'), 'bounded dead letter and operator replay')
+    groups = [[status for status,_ in rows] for rows in deliveries.values()]
+    require(groups.count([503,204])==2 and all(group in ([204],[503,204]) for group in groups), 'accepted acknowledgement failure retry')
+    require(before['pid'] in deliveries and [status for status,_ in deliveries[before['pid']]]==[503,204]
+            and all(event['id']==before['eventId'] and event['type'].endswith('.deleted') for _,event in deliveries[before['pid']]), 'replay exact source binding')
+    require(all(len(rows)==1 or rows[0][1]==rows[1][1] for rows in deliveries.values()), 'retry source identity and data')
+    require(type(report.get('inboxRows')) is int and report['inboxRows']==len(events)
+            and type(report.get('pendingInboxRows')) is int and report['pendingInboxRows']==0, 'inbox duplicate cardinality')
+    require(report.get('subscriptionsDisabled') is True and isinstance(report.get('subscriptionPids'),list)
+            and len(set(report['subscriptionPids']))==len(report['subscriptionPids'])==3
+            and all(isinstance(v,str) and v for v in report['subscriptionPids']), 'owned subscription terminal state')
     projected = report.get('projection')
     expected = sorted([{'pid':pid,'version':event['recordVersion'],'deleted':int(event['type'].endswith('.deleted')),
                         'data':event['data']} for pid,event in records.items()],key=lambda row:row['pid'])
@@ -178,43 +200,75 @@ def run_office_probe(request, admin, *, base_url, guide, evidence, receiver_host
         for key,value in saved_env.items():
             if value is None: os.environ.pop(key,None)
             else: os.environ[key]=value
-    receipts = []
+    receipts, subscriptions = [], []
+    faults = {"retry":True,"deleted":True}
     class ObservedReceiver(module.Receiver):
         def do_POST(self):
             received = time.time()
             raw = self.rfile.read(int(self.headers.get('Content-Length','0')))
             self.rfile = io.BytesIO(raw)
             self.response_status = None
+            self.event_type = self.headers.get("X-Webhook-Event", "")
             super().do_POST()
             receipts.append({'receivedAt':received,'raw':base64.b64encode(raw).decode(),'timestamp':self.headers.get('X-Webhook-Timestamp'),
                 'signature':self.headers.get('X-Webhook-Signature'),'eventType':self.headers.get('X-Webhook-Event'),
-                'eventVersion':self.headers.get('X-Webhook-Event-Version'),'status':self.response_status})
+                'eventVersion':self.headers.get('X-Webhook-Event-Version'),'deliveryPid':self.headers.get('X-Webhook-Delivery'),'status':self.response_status})
         def send_response(self,code,message=None):
+            # Fault injection: durable acceptance succeeds, but the sender sees a lost acknowledgement.
+            if code==204:
+                if self.event_type.endswith('.deleted') and faults['deleted']: code=503
+                elif not self.event_type.endswith('.deleted') and faults['retry']:
+                    faults['retry']=False; code=503
             self.response_status = code
             return super().send_response(code,message)
     server = HTTPServer((receiver_host,0),ObservedReceiver)
     thread = threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     try:
         for suffix in ('created','updated','deleted'):
-            human('/api/webhooks','POST',{'name':'Office guide '+suffix,'installationPid':installation['pid'],'eventType':'open.resource.office.devices.'+suffix,
+            subscription,_ = human('/api/webhooks','POST',{'name':'Office guide '+suffix,'installationPid':installation['pid'],'eventType':'open.resource.office.devices.'+suffix,
                 'eventVersion':1,'targetUrl':f'http://{receiver_host}:{server.server_port}/webhooks/auraboot',
-                'secret':secret.decode(),'maxRetries':3,'timeoutMs':5000})
+                'secret':secret.decode(),'maxRetries':1 if suffix=='deleted' else 3,'timeoutMs':5000})
+            subscriptions.append(subscription['pid'])
         result = subprocess.run(['bash',str(evidence/'crud.sh')],env=private_env,capture_output=True,timeout=90)
         require(result.returncode==0 and result.stdout==b'Office CRUD/List, assignment and page summary completed.\n',
                 'packaged CRUD example exit '+str(result.returncode))
         record('packaged-guide-execution',True)
         deadline = time.monotonic()+45
-        projection = []
+        dead = None
+        while time.monotonic()<deadline:
+            logs,_ = human(root+'/webhook-deliveries')
+            found = [row for row in logs if row['status']=='dead_letter']
+            if len(found)==1:
+                dead = found[0]; break
+            time.sleep(.2)
+        require(dead is not None and dead['maxRetries']==dead['retryCount']==1 and dead['replayCount']==0,'actual bounded dead letter')
+        machine_status,_,_ = request(root+'/webhook-deliveries/'+dead['pid']+'/replay',method='POST',body={},
+            headers={'Authorization':'Bearer '+token['token']},expected=(401,))
+        faults['deleted']=False
+        human(root+'/webhook-deliveries/'+dead['pid']+'/replay','POST',{})
+        projection, completed = [], None
         while time.monotonic()<deadline:
             module.drain()
             with sqlite3.connect(private_env['INBOX_DB']) as db:
                 projection = [{'pid':row[0],'version':row[1],'deleted':row[2],'data':json.loads(row[3])} for row in db.execute(
                     'SELECT pid,version,deleted,data FROM projection WHERE consumer=? ORDER BY pid',(installation['pid'],))]
-            if len(receipts)>=5 and len(projection)==2 and sorted(row['deleted'] for row in projection)==[0,1] and any(row['data'].get('status')=='in_use' and row['data'].get('assignedTo')=='External integration operator' for row in projection if not row['deleted']): break
+            logs,_ = human(root+'/webhook-deliveries')
+            current = [row for row in logs if row['pid']==dead['pid']]
+            completed = current[0] if len(current)==1 and current[0]['status']=='success' else None
+            if completed and all(row['status']=='success' for row in logs) and len(receipts)>=7 and len(projection)==2 and sorted(row['deleted'] for row in projection)==[0,1] and any(row['data'].get('status')=='in_use' and row['data'].get('assignedTo')=='External integration operator' for row in projection if not row['deleted']): break
             time.sleep(.1)
-        record('real-signed-office-events',len(receipts)>=5 and all(row['status']==204 for row in receipts))
+        record('real-signed-office-events',len(receipts)>=7 and all(row['status'] in (204,503) for row in receipts))
+        by_delivery = {}
+        for row in receipts: by_delivery.setdefault(row['deliveryPid'],[]).append(row['status'])
+        record('accepted-then-retry-deduplicated',list(by_delivery.values()).count([503,204])==2)
+        record('office-dead-letter',dead['status']=='dead_letter' and dead['retryCount']==dead['maxRetries']==1)
+        record('operator-replay-and-machine-denial',machine_status==401 and completed is not None and completed['replayCount']==1)
         record('durable-inbox-and-tombstone',len(projection)==2 and sorted(row['deleted'] for row in projection)==[0,1])
-        report = dict(profile='office-guide-http-v1',cases=list(CASES),executed=len(CASES),passed=len(CASES),failed=0,skipped=0,
+        with sqlite3.connect(private_env['INBOX_DB']) as db:
+            inbox_count,pending_count = db.execute('SELECT COUNT(*),COUNT(*) FILTER(WHERE done=0) FROM inbox WHERE consumer=?',(installation['pid'],)).fetchone()
+        for subscription in subscriptions: human('/api/webhooks/'+subscription+'/disable','PUT',{})
+        report = dict(applicationPid=app['pid'],installationPid=installation['pid'],subscriptionPids=subscriptions,subscriptionsDisabled=True,
+            inboxRows=inbox_count,pendingInboxRows=pending_count,replayProof={'before':dead,'after':completed,'machineStatus':machine_status},profile='office-guide-http-v1',cases=list(CASES),executed=len(CASES),passed=len(CASES),failed=0,skipped=0,
             sourceModel='tasset_asset',resource='office.devices',sourceKinds=['command','handler'],
             guideSha256=hashlib.sha256(guide.read_bytes()).hexdigest(),
             examples={name:hashlib.sha256(content.encode()).hexdigest() for name,content in parsed.files.items()},

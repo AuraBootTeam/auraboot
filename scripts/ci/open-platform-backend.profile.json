@@ -14,7 +14,11 @@
     "QAT-02",
     "QAT-03",
     "QAT-04",
-    "QAT-05"
+    "QAT-05",
+    "QAT-01",
+    "QAT-06",
+    "QAT-08",
+    "QAT-09"
   ],
   "packages": [
     "com.auraboot.framework.openplatform"

@@ -76,5 +76,5 @@ export function PublicationField({ name, child, help }: { name: string; child: L
     {cloneElement(child, { id, 'aria-describedby': describedBy, 'aria-invalid': validationError ? true : child.props['aria-invalid'],
       onInvalid: invalid, onChange: changed })}
     {help && <p id={`${id}-help`} className="text-xs text-text-2">{help}</p>}
-    {validationError && <p id={`${id}-error`} role="alert" className="text-sm text-danger">{validationError}</p>}</div>;
+    {validationError && <p id={`${id}-error`} role="alert" className="text-sm text-status-red">{validationError}</p>}</div>;
 }

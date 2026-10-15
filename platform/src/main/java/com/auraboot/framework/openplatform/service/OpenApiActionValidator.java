@@ -20,7 +20,7 @@ public class OpenApiActionValidator {
     private final OpenApiProtocolHash protocolHash;
     private final List<OpenApiCapabilityContributor> contributors;
 
-    public record SourceView(String sourceKind, String sourceCode, String name, String fingerprint, String permission,
+    public record SourceView(String sourceKind, String sourceCode, String name, Map<String, String> localizedDisplayNames, String fingerprint, String permission,
             Map<String, OpenApiQueryContract.Parameter> parameters, Map<String, String> inputFields,
             Set<String> effectFields, Map<String, OpenApiResourceContract.Type> outputFields,
             int minTimeoutMs, boolean available, String reason) { }
@@ -34,7 +34,7 @@ public class OpenApiActionValidator {
                 try { result.add(describe(tenant, resourceCode, "command", source.getCode())); }
                 catch (IllegalArgumentException unsupported) {
                     // CATCH: a visible disabled candidate preserves the source failure; publication still rejects it.
-                    result.add(new SourceView("command", source.getCode(), source.getDisplayName(), null, null,
+                    result.add(new SourceView("command", source.getCode(), source.getDisplayName(), source.getLocalizedDisplayNames(), null, null,
                             Map.of(), Map.of(), Set.of(), Map.of(), 1, false, unsupported.getMessage()));
                 }
             }
@@ -55,7 +55,7 @@ public class OpenApiActionValidator {
                     new OpenApiQueryContract.Parameter(type(type), definition.required().contains(alias), false, null)));
             Map<String, OpenApiResourceContract.Type> output = new TreeMap<>();
             definition.output().forEach((alias, type) -> output.put(alias, type(type)));
-            return new SourceView(kind, code, definition.name(), hash(Map.of("code", definition.code(), "version", definition.version(), "parameters", definition.parameters(), "required", List.copyOf(new TreeSet<>(definition.required())),
+            return new SourceView(kind, code, definition.name(), Map.copyOf(handler.localizedDisplayNames()), hash(Map.of("code", definition.code(), "version", definition.version(), "parameters", definition.parameters(), "required", List.copyOf(new TreeSet<>(definition.required())),
                     "output", definition.output())), null, Map.copyOf(parameters), Map.of(), Set.of(), Map.copyOf(output),
                     resource.timeoutMs(), true, null);
         }
@@ -109,7 +109,7 @@ public class OpenApiActionValidator {
         }
         String fingerprint = hash(Map.of("model", source.getModelCode(), "type", source.getType(), "config", config,
                 "inputSchema", Objects.toString(source.getInputSchema(), ""), "targets", Objects.toString(source.getTargetModels(), "")));
-        return new SourceView(kind, code, source.getDisplayName(), fingerprint, config.path("permissions").get(0).asText(),
+        return new SourceView(kind, code, source.getDisplayName(), source.getLocalizedDisplayNames(), fingerprint, config.path("permissions").get(0).asText(),
                 Map.copyOf(parameters), Map.copyOf(inputs), Set.copyOf(effects), Map.of(), 1, true, null);
     }
 

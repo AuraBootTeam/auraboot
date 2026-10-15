@@ -79,7 +79,7 @@ export interface PublicAction {
   outputFields: Record<string, PublicType>; timeoutMs: number; maxConcurrent: number;
 }
 export interface ActionSource {
-  sourceKind: PublicAction['sourceKind']; sourceCode: string; name: string; fingerprint: string; permission: string | null;
+  sourceKind: PublicAction['sourceKind']; sourceCode: string; name: string; localizedDisplayNames?: Record<string, string>; fingerprint: string; permission: string | null;
   parameters: PublicAction['parameters']; inputFields: Record<string, string>; effectFields: string[]; outputFields: Record<string, PublicType>;
   minTimeoutMs: number; available: boolean; reason: string | null;
 }

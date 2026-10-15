@@ -1637,6 +1637,7 @@ openPlatform:
     conflict: "Configuration changed. Your edits are retained; discard them and reopen before continuing."
     console: "Back to Open Platform"
     contract: "Business API contract"
+    endpoint: "External endpoint"
     denied: "Open Platform administrator permission in this tenant is required."
     discardHelp: "Discard unsaved edits and close?"
     draft: "Draft"

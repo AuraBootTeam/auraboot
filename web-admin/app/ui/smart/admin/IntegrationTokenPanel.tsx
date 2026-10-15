@@ -12,7 +12,7 @@ interface TokenSecret { appId: string; installationPid: string; token: string; m
 interface Rotation { credential: TokenSecret; replacedTokenAcceptUntil: string }
 const BUTTON = 'rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text hover:bg-hover disabled:opacity-50';
 const PRIMARY = BUTTON.replace('bg-panel', 'bg-accent').replace('hover:bg-hover', 'hover:bg-accent-hover').replace('text-text', 'text-white');
-const DANGER = BUTTON.replace('text-text', 'text-danger');
+const DANGER = BUTTON.replace('text-text', 'text-status-red');
 const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text disabled:opacity-50';
 
 /** Human-only token operations. Secret material is held only in this mounted panel. */
@@ -78,12 +78,12 @@ export function IntegrationTokenPanel({ installationPid, appId, active, onClose 
   return <section className="mt-4 space-y-4 rounded-card border border-border bg-panel p-4 text-text" data-testid="integration-token-panel">
     <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{text('title', '快捷接入 Token', 'Quick integration tokens')}</h3>
       <button className={BUTTON} type="button" disabled={busy} onClick={() => { setSecret(null); onClose(); }}>{text('close', '关闭 Token 管理', 'Close token manager')}</button></div>
-    <p className="text-sm text-text-secondary">{text('help', '直接用 Bearer Token 调用已授权接口，无需换取 OAuth Token。权限始终以安装当前授权为准。', 'Call authorized APIs directly with a Bearer token, without OAuth exchange. Current installation authority always applies.')}</p>
+    <p className="text-sm text-text-2">{text('help', '直接用 Bearer Token 调用已授权接口，无需换取 OAuth Token。权限始终以安装当前授权为准。', 'Call authorized APIs directly with a Bearer token, without OAuth exchange. Current installation authority always applies.')}</p>
     <PublicationField name="appId" help={text('appIdHelp', '应用标识保持不变；认证使用 Token，不需要额外的 appId 请求头。', 'Stable application identity. Authenticate with the token; an extra appId header is unnecessary.')} child={<input className={CONTROL} value={appId} readOnly />} />
     <div className="flex flex-wrap gap-2"><button className={BUTTON} type="button" disabled={busy || loading} onClick={() => void load()}>{text('refresh', '刷新清单', 'Refresh token list')}</button>
       <button className={PRIMARY} type="button" disabled={!active || busy || loading || denied || !!operation || !!secret} onClick={() => begin('create')}>{text('create', '生成 Token', 'Generate token')}</button></div>
     {!active && <p role="status">{text('inactive', '应用或安装已停用，只能查看或撤销。', 'Application or installation is inactive. View or revoke existing tokens only.')}</p>}
-    {error && <p role="alert" className="text-sm text-danger">{error}</p>}{notice && <p role="status" className="text-sm">{notice}</p>}
+    {error && <p role="alert" className="text-sm text-status-red">{error}</p>}{notice && <p role="status" className="text-sm">{notice}</p>}
     {loading && <p role="status">{text('loading', '正在读取 Token…', 'Loading tokens…')}</p>}
     {!loading && !denied && !rows.length && <p>{text('empty', '还没有快捷接入 Token。', 'No integration tokens yet.')}</p>}
     {secret && <div className="space-y-3 rounded-control border border-border-strong p-4" data-testid="integration-token-secret">
@@ -111,7 +111,7 @@ export function IntegrationTokenPanel({ installationPid, appId, active, onClose 
       <div className="flex flex-wrap justify-between gap-2"><strong className="break-words">{row.name}</strong><span>{status(row.status)}</span></div>
       <p className="text-sm">{row.expirationMode === 'never' ? text('permanent', '永久有效（仍可撤销和轮换）', 'Never expires (revocation and rotation still apply)') : `${text('expiresAt', '到期时间', 'Expires at')}: ${date(row.expiresAt)}`}</p>
       {row.acceptUntil && <p className="text-sm">{text('oldCutoff', '旧 Token 接受截止', 'Old token accepted until')}: {date(row.acceptUntil)}</p>}
-      <p className="text-sm text-text-secondary">{text('lastUsed', '最近使用', 'Last used')}: {date(row.lastUsedAt)}</p>
+      <p className="text-sm text-text-2">{text('lastUsed', '最近使用', 'Last used')}: {date(row.lastUsedAt)}</p>
       <div className="flex flex-wrap gap-2"><button className={BUTTON} type="button" disabled={!active || row.status !== 'active' || busy || !!operation || !!secret} onClick={() => begin('rotate', row)}>{text('rotate', '轮换 Token', 'Rotate token')}</button>
         <button className={DANGER} type="button" disabled={row.status === 'revoked' || busy || !!operation || !!secret} onClick={() => begin('revoke', row)}>{text('revoke', '撤销 Token', 'Revoke token')}</button></div>
     </li>)}</ul>}

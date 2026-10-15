@@ -22,6 +22,7 @@ public interface PublicApiHandlerExtension extends ExtensionPoint {
     }
     /** Reads the bound public resource, preserving current row, field, page and SQL budgets. */
     @FunctionalInterface interface ResourceReader { Map<String, Object> page(int limit); }
+    default Map<String, String> localizedDisplayNames() { return Map.of(); }
     Definition definition();
     Map<String, Object> execute(Map<String, Object> parameters, ResourceReader resource);
 }

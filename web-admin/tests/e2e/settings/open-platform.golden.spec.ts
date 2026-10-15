@@ -2927,7 +2927,19 @@ test.describe('Public business API management journey', () => {
       await region.screenshot({ path: path.join(evidence, `${name}.png`) });
     };
     await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
-    await page.getByRole('link', { name: text('Public business APIs'), exact: true }).click();
+    const guidePopup = page.waitForEvent('popup');
+    await page.getByTestId('open-platform-integration-guide').click();
+    const guidePage = await guidePopup; await expect(guidePage.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+    await expect(guidePage.locator('code[data-filename="crud.sh"]')).toContainText('AURABOOT_TOKEN');
+    await expect(guidePage.locator('code[data-filename="receiver.py"]')).toContainText('BEGIN IMMEDIATE');
+    await guidePage.screenshot({ path: path.join(evidence,'QAT-08-guide-entry.png'), fullPage: false });
+    const anonymous = await page.context().browser()!.newContext({ storageState: { cookies: [], origins: [] } });
+    try {
+      const anonymousGuide = await anonymous.newPage(); const response = await anonymousGuide.goto(guidePage.url());
+      expect(response?.status()).toBe(200); await expect(anonymousGuide.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+    } finally { await anonymous.close(); }
+    await guidePage.close();
+    await page.getByTestId('open-platform-actions-link').click();
     const editor = page.getByTestId('action-publication-editor'); await expect(editor).toBeVisible();
     await editor.getByRole('button', { name: text('New business API'), exact: true }).click();
     const form = editor.getByTestId('action-publication-form');
@@ -3007,7 +3019,7 @@ test.describe('Public business API management journey', () => {
     const revoke = page.waitForResponse(r => r.url().endsWith(`/installations/${installation.pid}/actions/${code}`) && r.request().method() === 'DELETE');
     await revokeGroup.getByRole('button', { name: text('Confirm'), exact: true }).click(); expect((await revoke).status()).toBe(200); expect((await invoke()).status()).toBe(403);
     await grants.getByRole('button', { name: text('Close authority editor'), exact: true }).click();
-    await page.getByRole('link', { name: text('Public business APIs'), exact: true }).click();
+    await page.getByTestId('open-platform-actions-link').click();
     await editor.locator('li').filter({ hasText: code }).getByRole('button', { name: text('Edit business contract'), exact: true }).click();
     await form.getByRole('button', { name: text('Withdraw business API'), exact: true }).click();
     confirmation = editor.getByRole('group', { name: text('Business API operation confirmation'), exact: true });
@@ -3017,6 +3029,6 @@ test.describe('Public business API management journey', () => {
     const withdraw = page.waitForResponse(r => r.url().endsWith(`/action-publications/${code}/withdraw`) && r.request().method() === 'POST');
     await confirmation.getByRole('button', { name: text('Confirm'), exact: true }).click(); expect((await withdraw).status()).toBe(200); expect((await invoke()).status()).toBe(404);
     await writeFile(path.join(evidence, 'result.json'), JSON.stringify({ profile: 'business-api-browser-v1', locale: publicationLocale, viewport: PUBLICATION_VIEWPORT, kind,
-      executed: ['menu-entry','source-contract-save','publication-cancel-confirm','openapi-types-download','ungranted-denial','authority-save-call','reload-persistence','revoke-cancel-confirm-denial','withdraw-cancel-confirm-denial'], passed: true }, null, 2));
+      executed: ['menu-entry','packaged-guide-entry-and-anonymous-read','source-contract-save','publication-cancel-confirm','openapi-types-download','ungranted-denial','authority-save-call','reload-persistence','revoke-cancel-confirm-denial','withdraw-cancel-confirm-denial'], passed: true }, null, 2));
   });
 });

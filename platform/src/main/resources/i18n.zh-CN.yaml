@@ -1934,6 +1934,7 @@ openPlatform:
     conflict: "配置已改变，你的修改已保留。放弃本地修改并重新打开后再继续。"
     console: "返回开放平台"
     contract: "业务接口合同"
+    endpoint: "外部调用地址"
     denied: "需要当前租户的开放平台管理权限。"
     discardHelp: "放弃未保存的修改并关闭？"
     draft: "草稿"

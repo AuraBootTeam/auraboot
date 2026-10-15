@@ -322,6 +322,13 @@ for attempt in $(seq 1 90); do
   sleep 2
 done
 
+info "reconciling frozen quick-access browser and original-image evidence"
+: "${OPEN_PLATFORM_UI_EVIDENCE:?immutable quick-access UI archive is required}"
+[[ -f "$OPEN_PLATFORM_UI_EVIDENCE" && ! -L "$OPEN_PLATFORM_UI_EVIDENCE" ]] || fatal "quick-access UI input must be a regular archive"
+python3 "$STAGE/scripts/ci/open_platform_quick_ui.py" verify --archive "$OPEN_PLATFORM_UI_EVIDENCE" \
+  --root "$STAGE" --expected-ref "$REF_SHA" > "$ARTIFACTS/quick-ui-receipt.json" \
+  2> "$ARTIFACTS/logs/quick-ui.log" || fail "quick-access UI evidence incomplete or from another candidate"
+
 info "running two-domain HTTP protocol probe"
 # Create the secret handoff as the unprivileged host runner before the rootful helper container
 # writes it. Opening an existing file preserves host ownership; the EXIT trap removes it on every
@@ -439,6 +446,8 @@ json.dump({
   "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 18, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
   "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
   "backend": json.load(open("$ARTIFACTS/backend-receipt.json")),
+  "quickAccessUi": json.load(open("$ARTIFACTS/quick-ui-receipt.json")),
+  "officeGuide": json.load(open("$ARTIFACTS/office-guide/result.json")),
   "openapi": json.load(open("$ARTIFACTS/openapi-receipt.json")), "openapiTypes": "strict-positive-negative-ok",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"
