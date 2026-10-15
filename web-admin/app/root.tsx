@@ -10,6 +10,7 @@ import {
   useLoaderData,
   type LoaderFunctionArgs,
 } from 'react-router';
+import { context as traceContext, propagation as tracePropagation } from '@opentelemetry/api';
 import React, { useEffect, useState } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
 
@@ -255,7 +256,10 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const edition = process.env.EDITION || 'enterprise';
+  const traceCarrier: Record<string, string> = {};
+  tracePropagation.inject(traceContext.active(), traceCarrier);
   const rootData: RootLoaderData = {
+    traceparent: traceCarrier.traceparent,
     runtimeProfile,
     user,
     permissions,
@@ -318,13 +322,15 @@ export function resolveBrandingDocumentLinks(branding: BrandingConfig) {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
+  const rootData = useRootLoaderData();
+  const branding = rootData?.branding ?? COMMUNITY_BRANDING;
   return (
     <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
+        {rootData?.traceparent && <meta name="traceparent" content={rootData.traceparent} />}
         <Meta />
         <Links />
         {resolveBrandingDocumentLinks(branding).map((link) => (

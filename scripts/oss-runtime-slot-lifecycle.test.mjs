@@ -140,8 +140,8 @@ test('default Bash handles empty source arrays and preserves incomplete-operatio
   const fixture = mkdtempSync(join(tmpdir(), 'oss-bash-contract-'));
   try {
     const prefix = `set -euo pipefail\nREPO_ROOT="$1"\nTMPDIR="$1"\n${lockFunctions}\nacquire_stack_lock\n`;
-    const arrayLoop = source.slice(source.indexOf('  local runtime_source_args='), source.indexOf('  local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass', source.indexOf('  local runtime_source_args=')));
-    const normal = spawnSync('/bin/bash', ['-c', `${prefix}\ndeclare -a extra_plugin_roots=() product_migration_roots=()\nWORKSPACE="$1"\nname=sample\ngolden_runtime_bind_sources() { :; }\nfreeze_sources() {\n${arrayLoop}\n}\nfreeze_sources\nprintf 'freeze-reached'\nSTACK_OPERATION_COMPLETE=1`, 'fixture', fixture], { encoding: 'utf8' });
+    const arrayLoop = source.slice(source.indexOf('  local binding_args='), source.indexOf('  local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass', source.indexOf('  local binding_args=')));
+    const normal = spawnSync('/bin/bash', ['-c', `${prefix}\ndeclare -a source_specs=("core=/fixture")\nWORKSPACE="$1"\nname=sample\nSCRIPT_DIR=/fixture\nDEV=true\ndie() { echo "$*" >&2; exit 1; }\nfreeze_sources() {\n${arrayLoop}\n}\nfreeze_sources\nprintf 'freeze-reached'\nSTACK_OPERATION_COMPLETE=1`, 'fixture', fixture], { encoding: 'utf8' });
     assert.equal(normal.status, 0, normal.stderr);
     assert.equal(normal.stdout, 'freeze-reached');
     const red = spawnSync('/bin/bash', ['-c', `${prefix}\nprintf '%s' "$MISSING_REQUIRED_VALUE"`, 'fixture', fixture], { encoding: 'utf8' });
