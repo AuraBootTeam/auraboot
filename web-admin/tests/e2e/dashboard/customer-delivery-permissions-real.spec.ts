@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { test, expect, type Response } from '@playwright/test';
 
 // API calls provision the global shared artifact and roles only. Source queries
@@ -138,8 +139,8 @@ test('SC04-PERMISSIONS global dashboard viewing does not grant customer-project 
         .map(id => template.dashboard.widgets.find((widget: { id: string }) => widget.id === id).config.dataSource);
       await expect.poll(() => metricSources.every(source => chartResponses.some(response => {
         const request = response.request().postDataJSON();
-        return JSON.stringify(request.metrics) === JSON.stringify(source.metrics)
-          && JSON.stringify(request.filters || []) === JSON.stringify(source.filters || []);
+        return isDeepStrictEqual(request.metrics, source.metrics)
+          && isDeepStrictEqual(request.filters || [], source.filters || []);
       }))).toBe(true);
       const queries = await Promise.all(chartResponses.map(async response => ({
         status: response.status(), request: response.request().postDataJSON(),
@@ -177,8 +178,8 @@ test('SC04-PERMISSIONS global dashboard viewing does not grant customer-project 
           await expect(actor.getByTestId('dashboard-block-delivery-projects').getByText(project.name, { exact: true })).toBeVisible();
         for (const [id, value] of [['project-count', expected.count], ['project-budget', expected.budget], ['awaiting-acceptance', expected.acceptance], ['delivered-projects', expected.completed]] as const) {
           const source = template.dashboard.widgets.find((widget: { id: string }) => widget.id === id).config.dataSource;
-          expect(queries.some(query => JSON.stringify(query.request.metrics) === JSON.stringify(source.metrics)
-            && JSON.stringify(query.request.filters || []) === JSON.stringify(source.filters || [])
+          expect(queries.some(query => isDeepStrictEqual(query.request.metrics, source.metrics)
+            && isDeepStrictEqual(query.request.filters || [], source.filters || [])
             && Number(query.body.data.rows?.[0]?.value) === value)).toBe(true);
         }
       }
