@@ -22,6 +22,7 @@ import {
   ensurePageConfig,
 } from './state/ReportDocumentProvider';
 import { ReportToolbar } from './components/ReportToolbar';
+import { ReportTemplateActions } from './components/ReportTemplateActions';
 import { BlockPalette } from './components/BlockPalette';
 import { ReportTableBlock } from './blocks/ReportTableBlock';
 import { ReportGroupedTableBlock } from './blocks/ReportGroupedTableBlock';
@@ -458,6 +459,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         onToggleVersionHistory={versioning.togglePanel}
         versionCount={versioning.versions.length}
       />
+      <ReportTemplateActions disabled={!canManage || isSaving || isLoading} />
       <div className="flex flex-1 overflow-hidden">
         <BlockPalette />
         <ReportCanvas />
