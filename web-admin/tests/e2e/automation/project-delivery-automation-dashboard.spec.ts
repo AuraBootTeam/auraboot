@@ -374,7 +374,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   const dataResponses: any[] = [];
   page.on('response', async (response) => {
     if (
-      response.url().includes(`/api/dashboards/${dashboardPid}/widgets/`) &&
+      new URL(response.url()).pathname === '/api/meta/chart-data' &&
       response.request().method() === 'POST'
     ) {
       const body = await response.json();
@@ -391,6 +391,12 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   ).toHaveCount(3);
   await expect.poll(() => dataResponses.length).toBeGreaterThanOrEqual(3);
   for (const evidence of dataResponses) {
+    expect(evidence.request.modelCode).toBe('tpm_task');
+    expect(evidence.request.filters).toContainEqual({
+      field: 'pid',
+      operator: 'eq',
+      value: active,
+    });
     expect(String(evidence.body.code)).toBe('0');
     expect(evidence.body.data.rows).toHaveLength(1);
     expect(Number(evidence.body.data.rows[0].n)).toBe(1);
