@@ -11,8 +11,8 @@ test('delivery brief imports through the designer and exports the same governed 
  const evidence=process.env.AURA_EVIDENCE_DIR!;expect(evidence).toBeTruthy();await mkdir(evidence,{recursive:true});
  const context=JSON.parse(await readFile(contextsPath,'utf8')).customers;
  await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
- await page.locator('#identifier').fill('admin@auraboot.com');await page.locator('#password').fill('Test2026x');
- await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(url=>!url.pathname.includes('/login'));
+ await page.locator('#identifier').fill(process.env.ADMIN_EMAIL!);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
+ await page.locator('form button[type=submit]').click();await page.waitForURL(url=>!url.pathname.includes('/login'));
  await navigateToMenuByClick(page,['元数据管理','报表管理']);
  await page.getByRole('button',{name:'新建报表',exact:true}).click();
  await expect(page.getByTestId('report-template-import')).toBeVisible();
