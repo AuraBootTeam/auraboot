@@ -407,6 +407,9 @@ async function fillOneField(
       await opt.waitFor({ state: 'visible', timeout: 5_000 });
       await opt.click();
     }
+    // Multi-select stays open after choosing a value. Click its visible label
+    // outside the popup before moving to the next field, which may sit below it.
+    await field.locator('label').first().click({ timeout: 5_000 });
     return;
   }
 
