@@ -2,7 +2,7 @@
  * Hand-authored SC05 template + current tenant data. No LLM invocation or substitute.
  * This proves report persistence and real exports, never AI interpretation/integration.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Request } from '@playwright/test';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -124,19 +124,36 @@ test('SC06-FORMATS manual customer template persists and exports real Chinese da
   // Complete the initial UI read before navigating away. Response headers alone
   // do not mean Chrome has retained its body across a subsequent full reload.
   await expect(page.getByRole('textbox', { name: '报表标题', exact: true })).toHaveValue(title);
-  const reload = page
-    .waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === definitionPath &&
-        response.request().method() === 'GET',
+  // Reopen may issue parallel reads. A late response from that old document
+  // must not satisfy the refresh assertion after Chrome discards its body.
+  let refreshNavigationStarted = false;
+  const refreshReads = new Set<Request>();
+  const observeRefresh = (request: Request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+      refreshNavigationStarted = true;
+    }
+    if (
+      refreshNavigationStarted &&
+      new URL(request.url()).pathname === definitionPath &&
+      request.method() === 'GET'
     )
+      refreshReads.add(request);
+  };
+  page.on('request', observeRefresh);
+  const reload = page
+    .waitForResponse((response) => refreshReads.has(response.request()))
     .then(async (response) => {
       expect(response.status()).toBe(200);
       expect(await response.finished()).toBeNull();
       return response.json();
     });
-  await page.reload();
-  const definition = await reload;
+  let definition;
+  try {
+    await page.reload();
+    definition = await reload;
+  } finally {
+    page.off('request', observeRefresh);
+  }
   expect(String(definition.code)).toBe('0');
   expect(definition.data.pid).toBe(reportPid);
   expect(definition.data.dsl.title).toBe(title);
