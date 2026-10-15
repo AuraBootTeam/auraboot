@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
@@ -10,6 +11,8 @@ import { verifyModelNotifications } from '../../helpers/open-platform-notificati
 
 // Secrets are captured only by explicit masked screenshots, never worker recordings.
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+// Playwright also records an automatic ARIA page snapshot on failure; it may contain one-time token values.
+process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
 
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
 const PUBLICATION_VIEWPORT = process.env.AURA_OPEN_PLATFORM_PUBLICATION_VIEWPORT || 'desktop';
@@ -130,7 +133,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak', 'editor-tab-order'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak', 'editor-tab-order', 'token-artifact-failure'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -2853,6 +2856,18 @@ test.describe('Quick integration token journey', () => {
     await expect(panel.getByLabel(tokenText("New token"), { exact: true })).toBeVisible();
     const fixed = await panel.getByLabel(tokenText("New token"), { exact: true }).inputValue();
     expect(fixed.startsWith('ab_at_')).toBe(true); await machineStatus(fixed, 200);
+    if (UI_MUTATION === 'token-artifact-failure') {
+      // Keep the secret visible while deliberately failing, but revoke the disposable credential first.
+      const issued = (await fixedResponse.json()).data;
+      expect((await page.request.delete(`${WEB_BASE_URL}/api/open-platform/installations/${installation.pid}/integration-tokens/${issued.metadata.pid}`)).status()).toBe(200);
+      await writeFile(path.join(evidence, 'token-artifact-mutation.json'), JSON.stringify({
+        mutation: 'token-artifact-failure', guard: 'token-artifact-redaction',
+        secretSha256: createHash('sha256').update(fixed).digest('hex'),
+        tokenRevoked: true, secretWidgetVisible: await panel.getByLabel(tokenText("New token"), { exact: true }).isVisible(),
+        automaticAriaCaptureDisabled: process.env.PLAYWRIGHT_NO_COPY_PROMPT === '1',
+      }, null, 2));
+      throw new Error('EXPECTED_RED: token artifact redaction probe with the one-time secret still visible');
+    }
     await captureToken('QAT-07-fixed-secret');
     await panel.getByRole('button', { name: tokenText("Saved; close secret"), exact: true }).click();
     await page.reload(); await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
