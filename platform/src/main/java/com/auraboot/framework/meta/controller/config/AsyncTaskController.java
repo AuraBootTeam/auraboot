@@ -5,6 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/async-tasks")
 @RequiredArgsConstructor
+@AuthenticatedAccess("async task submit/track/cancel/delete driven by the caller's tenant and user context (MetaContext)")
 public class AsyncTaskController {
 
     private final AsyncTaskServiceImpl asyncTaskService;

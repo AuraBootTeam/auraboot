@@ -1,6 +1,7 @@
 package com.auraboot.framework.datasync;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/data-sync")
 @RequiredArgsConstructor
+@AuthenticatedAccess("SSE push-channel subscription bookkeeping (binds an existing SSE connection id to model codes); no tenant records are read or returned by this endpoint")
 public class DataSyncController {
 
     private final DataSyncSseRegistry sseRegistry;

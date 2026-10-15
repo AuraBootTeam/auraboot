@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.service.AiActionAuditService;
 import com.auraboot.framework.agent.service.AiActionRiskAssessor;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/mobile/ai")
 @RequiredArgsConstructor
+@AuthenticatedAccess("mobile AI-action risk/audit endpoints scoped to the caller's tenant and user via MetaContext; the audit-log query is intentionally tenant-wide for admin/compliance review")
 public class AiActionAuditController {
 
     private final AiActionRiskAssessor riskAssessor;

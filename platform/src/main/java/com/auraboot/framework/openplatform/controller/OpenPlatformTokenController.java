@@ -1,5 +1,6 @@
 package com.auraboot.framework.openplatform.controller;
 
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.TokenResponse;
 import com.auraboot.framework.openplatform.service.OpenPlatformTokenService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequiredArgsConstructor
+@AuthenticatedAccess("standard OAuth2 /oauth2/token endpoint; the client is authenticated in-controller from HTTP Basic credentials or form client_id/client_secret before any token is issued")
 public class OpenPlatformTokenController {
     private final OpenPlatformTokenService tokenService;
     private final com.auraboot.framework.openplatform.service.OpenPlatformOAuthFailureAudit failureAudit;

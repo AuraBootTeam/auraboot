@@ -31,10 +31,11 @@ const WRITE = process.argv.includes('--write-baseline');
 const JSON_OUT = process.argv.includes('--json');
 
 const WRITE_MAPPING = /@(Post|Put|Delete|Patch)Mapping/;
-// A controller is "decided" once it carries either an RBAC guard (@RequirePermission) or an
-// explicit acknowledged authenticated-only marker (@AuthenticatedAccess). Both drop it out of the
+// A controller is "decided" once it carries either an RBAC guard (@RequirePermission), an
+// explicit acknowledged authenticated-only marker (@AuthenticatedAccess), or the strictly
+// stronger platform-admin contract (@RequirePlatformAdmin). All three drop it out of the
 // undecided baseline.
-const GUARD = /@RequirePermission|@AuthenticatedAccess/;
+const GUARD = /@RequirePermission|@AuthenticatedAccess|@RequirePlatformAdmin/;
 // Controllers annotated @Profile("test") are only wired into the test profile and
 // are never registered in a production context, so they carry no fail-open risk.
 const TEST_PROFILE = /@Profile\(\s*\{?\s*['"]test['"]/;
