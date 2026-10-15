@@ -48,7 +48,7 @@ describe('AI draft changes persist through the pure CRUD edit path', () => {
     act(() => { result.current.ai.target.apply({ name: 'Wrong company', contact: '张经理' }); });
     expect(result.current.ai.receipt?.conflicts).toContain('name');
     expect(result.current.values.name).toBe('华辰制造');
-    act(() => { result.current.setValues(current => ({ ...current, contact: '人工核对联系人' })); });
+    act(() => { result.current.setValues((current: Record<string, unknown>) => ({ ...current, contact: '人工核对联系人' })); });
     act(() => { result.current.ai.undo(); });
     expect(result.current.values.contact).toBe('人工核对联系人');
     expect(result.current.payload).toEqual({ contact: '人工核对联系人' });
@@ -59,15 +59,15 @@ describe('AI draft changes persist through the pure CRUD edit path', () => {
 
   it('persists an explicit string clear from the real form setter, leaving required validation to the caller', () => {
     const { result } = renderHook(() => useEditForm({ name: '华辰制造', contact: '张经理' }));
-    act(() => { result.current.setValues(current => ({ ...current, contact: '' })); });
+    act(() => { result.current.setValues((current: Record<string, unknown>) => ({ ...current, contact: '' })); });
     expect(result.current.payload).toEqual({ contact: '' });
-    act(() => { result.current.setValues(current => ({ ...current, name: '' })); });
+    act(() => { result.current.setValues((current: Record<string, unknown>) => ({ ...current, name: '' })); });
     expect(result.current.payload).toEqual({ name: '', contact: '' });
   });
 
   it('never submits an undefined field even if the real setter changed a loaded value', () => {
     const { result } = renderHook(() => useEditForm({ name: '华辰制造', contact: '张经理' }));
-    act(() => { result.current.setValues(current => ({ ...current, contact: undefined })); });
+    act(() => { result.current.setValues((current: Record<string, unknown>) => ({ ...current, contact: undefined })); });
     expect(result.current.payload).toEqual({});
   });
 
