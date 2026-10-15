@@ -5,6 +5,7 @@ import com.auraboot.framework.application.security.ExternalMachineAuthentication
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
+import com.auraboot.framework.auth.service.UnifiedUserDetailsService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -25,7 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
@@ -41,7 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final AntPathMatcher ANT_PATH_MATCHER = new AntPathMatcher();
 
     private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
+    private final UnifiedUserDetailsService userDetailsService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @org.springframework.beans.factory.annotation.Value("${spring.profiles.active:}")
@@ -72,7 +72,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired(required = false)
     private io.micrometer.tracing.Tracer tracer;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, UnifiedUserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
     }
@@ -120,7 +120,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (userPid != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             CustomUserDetails userDetails;
             try {
-                userDetails = (CustomUserDetails) this.userDetailsService.loadUserByUsername(userPid);
+                userDetails = this.userDetailsService.loadUserByPid(userPid);
             } catch (UsernameNotFoundException e) {
                 // A correctly signed, unexpired token whose user no longer exists —
                 // deactivated, deleted, or issued against a database that has since been
@@ -140,18 +140,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (jwtUtil.validateToken(jwt, userDetails)) {
                 // Verify security version — invalidate token if password changed
                 int tokenSv = jwtUtil.extractSecurityVersion(jwt);
-                User user = userService.findByPid(userPid);
-                if (user == null || !user.isEnabled()) {
+                // One fresh PID lookup supplies both identity and revocation state for this request.
+                if (!userDetails.isEnabled()) {
                     reject(request, response, ApiResponse.errorWithContext(ResponseCode.Unauthorized, request.getRequestURI()));
                     return;
                 }
-                if (user != null) {
-                    int dbSv = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
-                    if (tokenSv < dbSv) {
-                        ApiResponse<?> apiResponse = ApiResponse.errorWithContext(ResponseCode.SecurityVersionMismatch, request.getRequestURI());
-                        reject(request, response, apiResponse);
-                        return;
-                    }
+                if (tokenSv < userDetails.getSecurityVersion()) {
+                    ApiResponse<?> apiResponse = ApiResponse.errorWithContext(ResponseCode.SecurityVersionMismatch, request.getRequestURI());
+                    reject(request, response, apiResponse);
+                    return;
                 }
 
                 // Check session validity (if session management is available)

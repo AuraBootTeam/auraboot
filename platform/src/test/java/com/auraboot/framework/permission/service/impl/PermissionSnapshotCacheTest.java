@@ -49,6 +49,7 @@ class PermissionSnapshotCacheTest {
     private RoleMapper roleMapper;
 
     private PermissionSnapshotCache cache;
+    private final java.util.concurrent.atomic.AtomicLong ticker = new java.util.concurrent.atomic.AtomicLong();
 
     @BeforeEach
     void setUp() {
@@ -60,10 +61,25 @@ class PermissionSnapshotCacheTest {
                 PermissionSnapshotCache.EFFECTIVE_PERMISSION_CACHE);
         manager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(1_000)
+                .ticker(ticker::get)
                 .expireAfterWrite(Duration.ofMinutes(5)));
         manager.setAllowNullValues(false);
         cache = new PermissionSnapshotCache(
                 permissionMapper, userRoleMapper, rolePermissionMapper, roleMapper, List.of(), manager);
+    }
+
+    @Test
+    void passiveExpiryRefreshesNegativeCatalogWithoutAnEvent() {
+        when(permissionMapper.findResolvableDefinitions(100L))
+                .thenReturn(List.of())
+                .thenReturn(List.of(permission(50L, "new.permission")));
+        assertThat(cache.resolvePermissionId(100L, "new.permission")).isNull();
+        ticker.set(Duration.ofMinutes(5).minusNanos(1).toNanos());
+        assertThat(cache.resolvePermissionId(100L, "new.permission")).isNull();
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
+        ticker.incrementAndGet();
+        assertThat(cache.resolvePermissionId(100L, "new.permission")).isEqualTo(50L);
+        verify(permissionMapper, times(2)).findResolvableDefinitions(100L);
     }
 
     @Test
