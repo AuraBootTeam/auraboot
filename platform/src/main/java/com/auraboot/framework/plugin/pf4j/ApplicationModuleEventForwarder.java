@@ -3,11 +3,9 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ApplicationEventMulticaster;
+import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.stereotype.Component;
-
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Set;
 
 /**
  * Forward selected host-context application events into every registered
@@ -21,9 +19,9 @@ import java.util.Set;
  * This forwarder closes that gap for the events plugins are documented to
  * consume.
  *
- * <p>Re-publishing in a child propagates the event back UP to the host
- * (Spring parent chain), which would loop. Each forwarded event instance is
- * tracked so the host-side listener ignores its own re-publications.
+ * <p>Dispatch directly through each child's local event multicaster. Calling
+ * {@code child.publishEvent} would bubble the same event back to the host and
+ * invoke every host listener again, including transactional registrations.
  *
  * <p>Forwarding happens synchronously at publish time — inside the host
  * transaction when one is active — so child-side
@@ -35,8 +33,6 @@ import java.util.Set;
 public class ApplicationModuleEventForwarder implements ApplicationListener<CommandCompletedEvent> {
 
     private final ApplicationModuleRegistry moduleRegistry;
-    private final Set<CommandCompletedEvent> forwarded =
-            Collections.synchronizedSet(Collections.newSetFromMap(new IdentityHashMap<>()));
 
     public ApplicationModuleEventForwarder(ApplicationModuleRegistry moduleRegistry) {
         this.moduleRegistry = moduleRegistry;
@@ -44,12 +40,13 @@ public class ApplicationModuleEventForwarder implements ApplicationListener<Comm
 
     @Override
     public void onApplicationEvent(CommandCompletedEvent event) {
-        if (forwarded.remove(event)) {
-            return; // our own child re-publication bubbled back up — stop the cycle
-        }
-        forwarded.add(event);
         for (ApplicationContext child : moduleRegistry.childContexts()) {
-            child.publishEvent(event);
+            String beanName = AbstractApplicationContext.APPLICATION_EVENT_MULTICASTER_BEAN_NAME;
+            if (!child.containsLocalBean(beanName)) {
+                throw new IllegalStateException("Application module requires a local event multicaster: "
+                        + child.getId());
+            }
+            child.getBean(beanName, ApplicationEventMulticaster.class).multicastEvent(event);
         }
     }
 }
