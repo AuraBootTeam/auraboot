@@ -22,7 +22,7 @@ RELEASE_MUTATION="${AURA_OPEN_PLATFORM_RELEASE_MUTATION:-}"
   || fatal "exact frozen source-set digest is required"
 [[ "$(uname -s)" == "Linux" ]] || fatal "release images must be verified on the admitted Linux CI host"
 [[ "$(uname -m)" == "x86_64" ]] || fatal "release image builder must be x86_64"
-for command_name in docker git openssl python3 timeout; do need "$command_name"; done
+for command_name in docker git openssl python3 timeout bash curl jq; do need "$command_name"; done
 RUNNER_UID="$(id -u)"
 RUNNER_GID="$(id -g)"
 [[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all)" ]] || fatal "CI checkout is dirty"

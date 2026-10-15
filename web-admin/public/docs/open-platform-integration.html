@@ -101,7 +101,7 @@ X-Webhook-Signature: sha256=LOWERCASE_HEX_HMAC
 {&quot;id&quot;:&quot;event_public_id&quot;,&quot;type&quot;:&quot;open.resource.office.devices.updated&quot;,&quot;schemaVersion&quot;:1,&quot;occurredAt&quot;:&quot;2026-10-15T00:00:00Z&quot;,&quot;subject&quot;:{&quot;type&quot;:&quot;office.devices&quot;,&quot;pid&quot;:&quot;record_public_pid&quot;},&quot;recordVersion&quot;:2,&quot;correlationId&quot;:&quot;request_correlation&quot;,&quot;data&quot;:{&quot;pid&quot;:&quot;record_public_pid&quot;,&quot;assetCode&quot;:&quot;LAPTOP-001&quot;,&quot;name&quot;:&quot;Office laptop&quot;,&quot;status&quot;:&quot;in_use&quot;,&quot;location&quot;:&quot;HQ&quot;,&quot;assignedTo&quot;:&quot;External integration operator&quot;}}</code></pre><p>Payload contains only currently visible published fields. An omitted field is not a null or an instruction to erase an existing business value. Deleted events contain the projected pre-delete record with a newer version. Delivery is at least once, with possible duplicates and reordering. Retain event IDs and per-record versions/tombstones; versions need not be contiguous. Authorized UI/import/command changes can also produce events. When grants shrink, your own retention policy must remove no-longer-authorized stored data; replay is not a historical permission snapshot.</p></section>
 <section id="verify"><h2>5. Verify and persist notifications</h2><p>Verify <code>sha256=hex(HMAC-SHA256(UTF8(secret), ASCII(timestamp)+b"."+raw_body))</code> before JSON parsing. Compare in constant time and enforce a clock window (sample ±300 seconds). Validate event type, schema, resource identity, version and projected field types. The example below targets the office contract; adapt the whitelist and required fields to your actual export/grants. Keep clocks synchronized. Configure request/body/read timeouts and concurrency at the HTTPS reverse proxy.</p><p>Save as <code>receiver.py</code>. Set stable AURABOOT_CONSUMER_KEY, secret-manager AURABOOT_WEBHOOK_SECRET and an absolute persistent INBOX_DB path. Run <code>python3 receiver.py</code> behind the proxy forwarding only /webhooks/auraboot to loopback 8099, and periodically run <code>python3 receiver.py --drain</code> as a separate worker. Optional AURABOOT_WEBHOOK_PREVIOUS_SECRET requires an explicit Unix AURABOOT_WEBHOOK_PREVIOUS_UNTIL cutoff; remove the old key after rotation.</p><pre><code data-language="python" data-filename="receiver.py">#!/usr/bin/env python3
 &quot;&quot;&quot;Python 3 stdlib office-device receiver and atomic inbox worker; HTTPS proxy required.&quot;&quot;&quot;
-import hashlib, hmac, json, os, sqlite3, sys, time
+import hashlib, hmac, json, os, sqlite3, stat, sys, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 DB = os.environ[&#x27;INBOX_DB&#x27;]
 CONSUMER = os.environ[&#x27;AURABOOT_CONSUMER_KEY&#x27;]
@@ -111,6 +111,13 @@ RESOURCE = &#x27;office.devices&#x27;
 TYPES = {f&#x27;open.resource.{RESOURCE}.{suffix}&#x27; for suffix in (&#x27;created&#x27;,&#x27;updated&#x27;,&#x27;deleted&#x27;)}
 FIELDS = {&#x27;pid&#x27;,&#x27;assetCode&#x27;,&#x27;name&#x27;,&#x27;status&#x27;,&#x27;location&#x27;,&#x27;serialNumber&#x27;,&#x27;assignedTo&#x27;}
 def connect():
+    # Create private storage and reject an unsafe existing path instead of changing its permissions.
+    try:
+        fd = os.open(DB, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600); os.close(fd)
+    except FileExistsError:
+        info = os.lstat(DB)
+        if not stat.S_ISREG(info.st_mode) or info.st_mode &amp; 0o077:
+            raise ValueError('Inbox storage must be a private regular file')
     db = sqlite3.connect(DB, timeout=5)
     db.execute(&#x27;PRAGMA journal_mode=WAL&#x27;)
     db.execute(&#x27;CREATE TABLE IF NOT EXISTS inbox (consumer TEXT, id TEXT, body BLOB, done INTEGER DEFAULT 0, PRIMARY KEY(consumer,id))&#x27;)

@@ -2229,6 +2229,18 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"handler", "postActions", "preActions", "stateTransitionRules", "bpmTrigger", "computedFields"})
+    void publicCommandSourceRejectsUndeclaredExecutionPaths(String option) {
+        var request = new CommandDefinitionCreateRequest();
+        request.setCode("unsupported_path_" + UniqueIdGenerator.generate().toLowerCase()); request.setDisplayName("Undeclared execution path");
+        request.setModelCode(contract.modelCode()); request.setCmdRiskLevel("L1");
+        request.setExecutionConfig("{\"type\":\"state_transition\",\"stateField\":\"name\",\"toState\":\"Assigned\",\"permissions\":[\"fixture.action.manage\"],\"" + option + "\":\"unexpected\"}");
+        var created = commands.create(request); commands.publish(created.getPid());
+        assertThatThrownBy(() -> actionValidator.describe(principal.tenantId(), contract.code(), "command", request.getCode()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unsupported public state-transition configuration");
+    }
+
     @Test void publicCommandSourceRejectsAdditionalSideEffectsBeforeExecution() {
         var request = new CommandDefinitionCreateRequest();
         request.setCode("side_effect_" + UniqueIdGenerator.generate().toLowerCase()); request.setDisplayName("Additional effect source");

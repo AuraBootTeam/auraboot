@@ -15,6 +15,7 @@ public class OpenApiActionValidator {
     private final OpenApiPublicationService resources;
     private final CommandService commands;
     private final PublicApiHandlerRegistry handlers;
+    private final com.auraboot.framework.plugin.pf4j.ExtensionRegistry nativeExtensions;
     private final ObjectMapper json;
     private final OpenApiProtocolHash protocolHash;
     private final List<OpenApiCapabilityContributor> contributors;
@@ -66,6 +67,11 @@ public class OpenApiActionValidator {
                 "Published local state-transition command on the bound model required");
         require(source.getBindingRules() == null || source.getBindingRules().isEmpty(), "Public command binding rules require an explicit supported source contract");
         var config = parse(source.getExecutionConfig());
+        Set<String> supported = Set.of("type", "stateField", "fromStates", "toState", "inputFields", "permissions",
+                "autoSetFields", "preconditions", "requireIdempotencyKey", "concurrencyKey", "lockTimeoutMs", "sideEffects");
+        config.fieldNames().forEachRemaining(key -> require(supported.contains(key), "Unsupported public state-transition configuration: " + key));
+        require(nativeExtensions.getCommandHandler(code).isEmpty(), "Native plugin handlers require their own explicit public source contract");
+        require(config.path("toState").isTextual() && !config.path("toState").asText().isBlank(), "Explicit target state required");
         require(!config.has("sideEffects") || config.path("sideEffects").isArray() && config.path("sideEffects").isEmpty(),
                 "Public state transitions cannot declare additional side effects");
         require(config.path("permissions").isArray() && config.path("permissions").size() == 1
@@ -90,7 +96,12 @@ public class OpenApiActionValidator {
         }
         Set<String> generated = new HashSet<>(); generated.add(config.path("stateField").asText());
         require(!config.has("autoSetFields") || config.get("autoSetFields").isObject(), "Invalid source command effects");
-        if (config.has("autoSetFields")) config.path("autoSetFields").fieldNames().forEachRemaining(generated::add);
+        if (config.has("autoSetFields")) config.path("autoSetFields").fields().forEachRemaining(entry -> {
+            var effect = entry.getValue();
+            require(effect.isObject() && effect.size() == 2 && "fixed_value".equals(effect.path("strategy").asText())
+                    && effect.has("value") && effect.get("value").isValueNode(), "Only fixed scalar public command auto-set effects are supported");
+            generated.add(entry.getKey());
+        });
         for (String internal : generated) {
             String alias = aliases.get(internal);
             require(alias != null && resource.fields().get(alias).readable(), "Every controlled command effect requires an explicit readable public field");

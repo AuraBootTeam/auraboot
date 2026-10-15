@@ -7,7 +7,7 @@ const CLIENT_ID = __ENV.CLIENT_ID || "";
 const CLIENT_SECRET = __ENV.CLIENT_SECRET || "";
 const PROFILE = __ENV.PROFILE || "smoke";
 const fixture = __ENV.BUSINESS_FIXTURE_PATH ? JSON.parse(open(__ENV.BUSINESS_FIXTURE_PATH)) : null;
-const operations = ["create", "replay", "get", "list", "query", "update", "delete"];
+const operations = ["create", "replay", "get", "list", "query", "update", "command", "commandReplay", "handler", "delete"];
 const apiErrors = new Rate("open_api_errors");
 const apiDuration = new Trend("open_api_duration", true);
 const businessErrors = new Rate("business_errors");
@@ -47,12 +47,13 @@ export function setup() {
   if (PROFILE === "production" && !fixture) throw new Error("Production SLO requires the dynamic business fixture");
   if (fixture && (fixture.schemaVersion !== 1 || fixture.profile !== "open-platform-dynamic-slo-v1"
       || fixture.resourceCode !== "release.dynamic.parts" || fixture.queryCode !== "release.slo.by-zone"
+      || !fixture.integrationToken || fixture.commandCode !== "release.slo.command" || fixture.handlerCode !== "release.slo.handler"
       || !fixture.clientId || !fixture.clientSecret || !fixture.allowedPid || !fixture.hiddenPid
       || fixture.allowedPid === fixture.hiddenPid || !/^slo-[a-f0-9]{20}$/.test(fixture.runId))) {
     throw new Error("Invalid dynamic business fixture");
   }
   return { token: token(CLIENT_ID, CLIENT_SECRET),
-    businessToken: fixture ? token(fixture.clientId, fixture.clientSecret) : null,
+    businessToken: fixture ? fixture.integrationToken : null,
     runId: fixture ? `${fixture.runId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : null };
 }
 
@@ -121,8 +122,23 @@ export function business(data) {
     { "Idempotency-Key": key + "-update", "If-Match": etag }, 200,
     r => record(body(r), name + "-updated", pid) && strongEtag(header(r, "ETag")) && header(r, "ETag") !== etag);
   if (!updated) return;
+  const commandPath = `/api/open/v1/actions/${fixture.commandCode}:execute`;
+  const commandIntent = { targetPid: pid, input: { zone: "A" } };
+  const commandHeaders = { "Idempotency-Key": key + "-command", "If-Match": header(updated, "ETag") };
+  const command = businessCall(data, "command", "POST", commandPath, commandIntent, commandHeaders, 200,
+    r => body(r) && body(r).action === fixture.commandCode && record(body(r).resource, "Business API qualified", pid)
+      && body(r).idempotentReplay === false && strongEtag(header(r, "ETag")) && header(r, "ETag") !== header(updated, "ETag"));
+  if (!command) return;
+  const commandReplay = businessCall(data, "commandReplay", "POST", commandPath, commandIntent, commandHeaders, 200,
+    r => body(r) && body(r).action === fixture.commandCode && record(body(r).resource, "Business API qualified", pid)
+      && body(r).idempotentReplay === true && header(r, "Idempotent-Replay") === "true" && header(r, "ETag") === header(command, "ETag"));
+  if (!commandReplay) return;
+  const handler = businessCall(data, "handler", "POST", `/api/open/v1/actions/${fixture.handlerCode}:execute`, { input: { limit: 10 } }, {}, 200,
+    r => body(r) && Object.keys(body(r)).sort().join(",") === "countOnPage,hasMore" && Number.isInteger(body(r).countOnPage)
+      && body(r).countOnPage > 0 && body(r).countOnPage <= 10 && typeof body(r).hasMore === "boolean");
+  if (!handler) return;
   businessCall(data, "delete", "DELETE", path + "/" + pid, null,
-    { "Idempotency-Key": key + "-delete", "If-Match": header(updated, "ETag") }, 204,
+    { "Idempotency-Key": key + "-delete", "If-Match": header(command, "ETag") }, 204,
     r => r.body === "" || r.body === null);
 }
 

@@ -1207,6 +1207,8 @@ def verify_release_report(report, *, model_event_secret=None):
     verify_command_audits(report.get("commandAudits"))
     from open_platform_integration_token_probe import verify_integration_token_report
     verify_integration_token_report(report.get("integrationTokens"))
+    from open_platform_office_probe import verify_office_report
+    verify_office_report(report.get("officeGuide"), secret=model_event_secret)
     return report
 
 
@@ -1242,8 +1244,27 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
     query.update(code="release.slo.by-zone", scopes={"execute": "release.slo:query"}, maxConcurrent=20)
     human("/api/open-platform/query-publications/release.slo.by-zone/draft", "PUT", {"expectedRevision": 0, "definition": query})
     human("/api/open-platform/query-publications/release.slo.by-zone/publish", "POST", {"expectedRevision": 1})
+    command = human("/api/meta/commands", "POST", {
+        "code": "release_slo_assign", "displayName": "SLO controlled assignment", "modelCode": "release_dynamic_parts", "cmdRiskLevel": "L1",
+        "inputSchema": json.dumps({"type":"object","properties":{"rel_zone":{"type":"string"}}}),
+        "executionConfig": json.dumps({"type":"state_transition","stateField":"rel_name","toState":"Business API qualified",
+            "inputFields":["rel_zone"],"permissions":["release.slo.manage"]})})
+    human("/api/meta/commands/" + command["pid"] + "/publish", "POST", {})
+    sources = human("/api/open-platform/action-sources?resourceCode=release.dynamic.parts")
+    business_actions = []
+    for code, kind, internal in [("release.slo.command","command","release_slo_assign"), ("release.slo.handler","handler","core.visible-page")]:
+        candidates = [row for row in sources if row["sourceKind"]==kind and row["sourceCode"]==internal]
+        if len(candidates)!=1 or not candidates[0]["available"]: raise ProtocolError("SLO business source unavailable")
+        descriptor = candidates[0]
+        action = dict(code=code,sourceKind=kind,sourceCode=internal,resourceCode="release.dynamic.parts",schemaVersion=1,
+            sourceFingerprint=descriptor["fingerprint"],permission=descriptor["permission"],scopes={"execute":code+".execute"},
+            parameters=descriptor["parameters"],inputFields=descriptor["inputFields"],effectFields=descriptor["effectFields"],outputFields=descriptor["outputFields"],
+            timeoutMs=max(5000,descriptor["minTimeoutMs"]),maxConcurrent=32)
+        human("/api/open-platform/action-publications/"+code+"/draft","PUT",{"expectedRevision":0,"definition":action})
+        human("/api/open-platform/action-publications/"+code+"/publish","POST",{"expectedRevision":1})
+        business_actions.append(action)
     scopes = ["release.dynamic:" + operation for operation in ["list", "get", "create", "update", "delete"]]
-    scopes += ["release.slo:query", "openapi.profile.read"]
+    scopes += ["release.slo:query", "openapi.profile.read"] + [action["scopes"]["execute"] for action in business_actions]
     application = human("/api/open-platform/applications", "POST",
                         {"name": "Dynamic SLO consumer", "description": "Exact-image business capacity qualification only"})
     installation = human(f"/api/open-platform/applications/{application['pid']}/installations", "POST",
@@ -1253,17 +1274,27 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
           "readableFields": ["pid", "name", "zone"], "writableFields": ["name", "zone"],
           "rowConstraints": [{"field": "zone", "values": ["A"]}]})
     human(prefix + "/queries/release.slo.by-zone", "PUT", {"readableFields": ["pid", "name"]})
+    for action in business_actions:
+        human(prefix+"/actions/"+action["code"],"PUT",{"execute":True,"effectFields":action["effectFields"]})
+    _, token_body, _ = request(prefix+"/integration-tokens",method="POST",headers=dict(admin,**{"Idempotency-Key":"slo-"+uuid.uuid4().hex}),
+        body={"name":"Direct-token SLO caller","expirationMode":"never"})
+    if not isinstance(token_body,dict) or str(token_body.get("code"))!="0": raise ProtocolError("SLO integration token issuance failed")
+    direct = token_body["data"]
+    if direct.get("metadata",{}).get("expirationMode")!="never" or direct["metadata"].get("expiresAt") is not None:
+        raise ProtocolError("SLO permanent token missing")
     credential = human(prefix + "/credentials", "POST", {})
     fixture = {"schemaVersion": 1, "profile": "open-platform-dynamic-slo-v1", "runId": "slo-" + uuid.uuid4().hex[:20],
         "resourceCode": consumer_fixture["resourceCode"], "queryCode": query["code"],
         "allowedPid": consumer_fixture["allowedPid"], "hiddenPid": consumer_fixture["hiddenPid"],
-        "clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}
+        "clientId": credential["clientId"], "clientSecret": credential["clientSecret"],
+        "integrationToken": direct["token"], "commandCode": "release.slo.command", "handlerCode": "release.slo.handler"}
     descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(fixture, handle)
     return {"profile": fixture["profile"], "applicationPid": application["pid"], "installationPid": installation["pid"],
             "resourceCode": fixture["resourceCode"], "queryCode": fixture["queryCode"], "maxConcurrent": 20,
             "sourceQueryMaxConcurrent": 2, "sourceQueryRateLimitPerMinute": source["policy"]["rateLimitPerMinute"],
+            "authentication": "integration-token", "businessActions": [action["code"] for action in business_actions],
             "rateLimitPerMinute": 100000}
 
 

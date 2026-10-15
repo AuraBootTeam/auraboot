@@ -13,6 +13,7 @@ from open_platform_dynamic_probe import run_dynamic_probe, run_sdk_consumer, aud
 from open_platform_model_event_probe import run_model_event_probe
 from open_platform_model_event_runtime import DockerInfrastructure
 from open_platform_integration_token_probe import run_integration_token_probe
+from open_platform_office_probe import run_office_probe
 
 bootstrap_spec = importlib.util.spec_from_file_location(
     "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
@@ -168,13 +169,20 @@ def main():
         evidence_path=Path(ARTIFACT).parent / "model-events" / "result.json",
         receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"], measure_load=True, measure_sustained=True, measure_isolation=True, qualify_replay_scope=True)
 
+    infrastructure.identity()
+    office = run_office_probe(request, admin, base_url=BASE,
+        guide=Path(__file__).resolve().parents[2] / "web-admin/public/docs/open-platform-integration.html",
+        evidence=Path(ARTIFACT).parent / "office-guide", receiver_host=os.environ["MODEL_RECEIVER_HOST"],
+        secret=Path(os.environ["MODEL_EVENT_SECRET_FILE"]).read_bytes().rstrip(b"\r\n"))
+    infrastructure.identity()
+
     slo_fixture = prepare_slo_fixture(request, admin, dynamic, load_input,
         fixture_path=os.environ.get("SLO_FIXTURE_ARTIFACT", str(Path(ARTIFACT).with_name("slo-fixture.json"))))
 
     with open(ARTIFACT, "w", encoding="utf-8") as handle:
         json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
     os.chmod(ARTIFACT, 0o600)
-    print(json.dumps(dict(static["public"], integrationTokens=integration_tokens, dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
+    print(json.dumps(dict(static["public"], integrationTokens=integration_tokens, officeGuide=office, dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
 
 
 if __name__ == "__main__":

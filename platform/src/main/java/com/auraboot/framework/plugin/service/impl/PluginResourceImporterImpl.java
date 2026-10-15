@@ -707,6 +707,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private Map<String, Object> buildFieldFeature(FieldDefinitionDTO dto) {
         Map<String, Object> feature = dto.getFeature() != null ? new LinkedHashMap<>(dto.getFeature()) : new LinkedHashMap<>();
+        // The DSL's top-level default is persisted in the canonical field feature used by DDL.
+        if (dto.getDefaultValue() != null) feature.put("defaultValue", dto.getDefaultValue());
         if (dto.getConstraints() == null) return feature.isEmpty() ? null : feature;
 
         // GAP-259 regression guard: field-level `constraints.required` MUST NOT propagate to

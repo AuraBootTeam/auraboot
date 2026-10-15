@@ -52,7 +52,8 @@
     "com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest",
     "com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest",
     "com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT",
-    "com.auraboot.framework.meta.service.impl.MetaModelServiceCustomColumnMappingTest"
+    "com.auraboot.framework.meta.service.impl.MetaModelServiceCustomColumnMappingTest",
+    "com.auraboot.framework.plugin.service.impl.PluginResourceImporterFieldReimportTest"
   ],
   "coverage": {
     "minimumLinePercent": 80,

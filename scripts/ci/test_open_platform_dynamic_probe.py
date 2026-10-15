@@ -17,6 +17,28 @@ def integration_tokens_passed():
             'passed': len(CASES), 'failed': 0, 'skipped': 0}
 
 
+def office_passed():
+    import base64, hashlib, hmac
+    from open_platform_office_probe import CASES as OFFICE_CASES, Examples
+    from test_open_platform_model_event_probe import SECRET
+    guide = Path(__file__).resolve().parents[2] / 'web-admin/public/docs/open-platform-integration.html'
+    examples = Examples(); examples.feed(guide.read_text())
+    receipts, records = [], {}
+    for pid,version,kind,status in [('assigned-pid',1,'created','available'),('assigned-pid',2,'updated','available'),
+                                   ('assigned-pid',3,'updated','in_use'),('deleted-pid',1,'created','available'),('deleted-pid',2,'deleted','available')]:
+        event = {'id':pid+'-'+str(version),'subject':{'type':'office.devices','pid':pid},'type':'open.resource.office.devices.'+kind,
+                 'schemaVersion':1,'recordVersion':version,'data':{'pid':pid,'assetCode':pid,'name':'Office device','location':'HQ','status':status}}
+        if status=='in_use': event['data']['assignedTo']='External integration operator'
+        raw = json.dumps(event).encode(); stamp='1792036800'
+        receipts.append({'raw':base64.b64encode(raw).decode(),'timestamp':stamp,'receivedAt':1792036800.5,'status':204,
+            'eventType':event['type'],'eventVersion':'1','signature':'sha256='+hmac.new(SECRET,stamp.encode()+b'.'+raw,hashlib.sha256).hexdigest()})
+        records[pid] = {'pid':pid,'version':version,'deleted':int(kind=='deleted'),'data':event['data']}
+    return dict(profile='office-guide-http-v1',cases=list(OFFICE_CASES),executed=len(OFFICE_CASES),passed=len(OFFICE_CASES),failed=0,skipped=0,
+        sourceModel='tasset_asset',resource='office.devices',sourceKinds=['command','handler'],guideSha256=hashlib.sha256(guide.read_bytes()).hexdigest(),
+        examples={name:hashlib.sha256(content.encode()).hexdigest() for name,content in examples.files.items()},receipts=receipts,
+        projection=sorted(records.values(),key=lambda row:row['pid']))
+
+
 def passed():
     audits = []
     fixtures = [("resource-row-field-projection", "list", 200, None, None),
@@ -666,6 +688,12 @@ class DynamicProbeTests(unittest.TestCase):
             if path.startswith("/api/meta/named-queries/by-code/"): result = {"policy": {"rateLimitPerMinute": 100000}}
             if path.endswith("/installations"): result = {"pid": "load-install"}
             if path.endswith("/credentials"): result = {"clientId": "private-client", "clientSecret": "private-secret"}
+            if path == "/api/meta/commands": result = {"pid":"load-command"}
+            if path.startswith("/api/open-platform/action-sources?"):
+                result = [dict(sourceKind=kind,sourceCode=code,available=True,fingerprint="a"*64,permission="release.slo.manage" if kind=="command" else None,
+                    parameters={},inputFields={},effectFields=["name","zone"] if kind=="command" else [],outputFields={},minTimeoutMs=5000)
+                    for kind,code in [("command","release_slo_assign"),("handler","core.visible-page")]]
+            if path.endswith("/integration-tokens"): result = {"token":"private-direct-token","metadata":{"expirationMode":"never","expiresAt":None}}
             return 200, {"code": 0, "data": result}, {}
         consumer = {"resourceCode": "release.dynamic.parts", "queryCode": "release.dynamic.by-zone", "allowedPid": "allowed-pid", "hiddenPid": "hidden-pid"}
         with tempfile.TemporaryDirectory() as directory:
@@ -678,8 +706,12 @@ class DynamicProbeTests(unittest.TestCase):
             self.assertEqual(contract["maxConcurrent"], 2)
             self.assertEqual(calls[2][2]["definition"]["maxConcurrent"], 20)
             self.assertEqual(public["applicationPid"], "load-app")
-            self.assertEqual(calls[5][0], "/api/open-platform/applications/load-app/installations")
-            self.assertEqual(calls[5][2]["rateLimitPerMinute"], 100000)
+            installed = next(row for row in calls if row[0]=="/api/open-platform/applications/load-app/installations")
+            self.assertEqual(installed[2]["rateLimitPerMinute"],100000)
+            self.assertEqual(private["integrationToken"],"private-direct-token")
+            self.assertNotIn("private-direct-token",json.dumps(public))
+            self.assertEqual(public["authentication"],"integration-token")
+            self.assertEqual(public["businessActions"],["release.slo.command","release.slo.handler"])
             calls.clear()
             with self.assertRaises(ProtocolError): prepare_slo_fixture(request, {}, passed(), consumer, fixture_path=path)
             self.assertEqual(calls, [])
@@ -945,19 +977,19 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()}, model_event_secret=SECRET)
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()},
                                   model_event_secret=SECRET)
         measured = model_passed(); measured["loadMeasurement"] = load_passed(); measured["sustainedMeasurement"] = sustained_passed(); measured["receiverIsolation"] = isolation_passed(); measured["genericReplay"] = generic_replay_passed()
-        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()},
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()},
                                               model_event_secret=SECRET)["sdk"], sdk)
         for field in ['loadMeasurement', 'sustainedMeasurement', 'receiverIsolation', 'genericReplay']:
             omitted = dict(measured); omitted.pop(field)
             with self.assertRaises(ProtocolError):
                 verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": omitted,
-                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()}, model_event_secret=SECRET)
+                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()}, model_event_secret=SECRET)
         measured["loadMeasurement"]["metrics"]["accepted"] = 0
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed()},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed()},
                                   model_event_secret=SECRET)
 
     def test_direct_token_release_denominator_rejects_omissions_and_fabricated_totals(self):
@@ -1020,6 +1052,28 @@ class SdkReportTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     run_sdk_consumer({}, [], base_url="http://backend", evidence_path=evidence)
             self.assertEqual(json.loads(evidence.read_text())["cases"], report["cases"])
+
+
+class OfficeGuideVerifierTest(unittest.TestCase):
+    def verify(self, report):
+        from open_platform_office_probe import verify_office_report
+        from test_open_platform_model_event_probe import SECRET
+        return verify_office_report(report,secret=SECRET)
+
+    def test_complete_guide_receipts_are_independently_reconciled(self):
+        report=office_passed(); self.assertEqual(self.verify(report),report)
+
+    def test_omitted_cases_skips_hashes_raw_receipts_and_projection_are_rejected(self):
+        mutations=[lambda r:r.pop('cases'),lambda r:r.update(executed=True),lambda r:r.update(skipped=1),
+            lambda r:r['cases'].pop(),lambda r:r.update(guideSha256='0'*64),lambda r:r['examples'].update({'crud.sh':'0'*64}),
+            lambda r:r['receipts'].pop(),lambda r:r['receipts'][0].update(raw='e30='),
+            lambda r:r['receipts'][0].update(signature='sha256='+'0'*64),lambda r:r['receipts'][0].update(status=503),
+            lambda r:r['receipts'][0].update(receivedAt=0),lambda r:r['projection'][0].update(version=99),
+            lambda r:r['projection'][1].update(deleted=0),lambda r:r.update(sourceKinds=['handler'])]
+        for mutate in mutations:
+            with self.subTest(mutation=mutations.index(mutate)):
+                report=office_passed(); mutate(report)
+                with self.assertRaises(ProtocolError):self.verify(report)
 
 
 if __name__ == "__main__":
