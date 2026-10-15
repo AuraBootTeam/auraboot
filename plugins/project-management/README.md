@@ -77,3 +77,15 @@ These business pages remain list/form/detail DSL. The platform components contai
 - Field auditing is a platform configuration. `scripts/field-audit-config.json` is applied explicitly by the local initialization script through `/api/audit/field-config/bulk`; enabling audit is not an automatic application-start side effect. An existing tenant must configure the declared audit fields through the same authorized platform surface. History permissions are separate from project read permission and are not granted implicitly by the template.
 
 The fixture uploads actual small PDF documents, preserves their real sizes and timestamps, and records an actual 60 → 68 progress command before visual review. Every sample project and customer is fictional. The browser journey then reports 72, completes a milestone, creates and edits another project, uploads and downloads a file, and verifies member and observer behavior. A fresh owned fixture is required for a full rerun.
+
+### Optional AI customer intake
+
+The separate **AI整理客户资料 / AI customer intake** menu opens `/p/c/tpm_customer_ai_intake`. Standard customer/project forms keep their existing behavior and do not receive a default AI banner.
+
+| Page | Role and task | Primary action | Fields and guidance | States / evidence |
+| --- | --- | --- | --- | --- |
+| `tpm_customer_ai_intake` | A project manager turns pasted customer notes into a reviewed customer draft | Extract, review/edit, then Save customer | Customer name (required), contact (optional); business examples and help text; source and save guidance beside the form | Blank input, extracting, supported/conflicting/ambiguous evidence, undo, manual correction, provider error, save and reload; each real state requires a screenshot |
+
+This page is configuration-only: `tpm_customer` → explicit `ai-fill-banner` without an endpoint → the existing `form_draft_fill` conversation skill → review/undo in the current draft → existing `tpm:create_customer` command. Extraction never substitutes for the user's Save action. The page does not grant permissions or add a provider configuration. Its menu requires the existing `tpm.project.manage` permission; backend command and model checks still apply.
+
+The live browser scenario is `web-admin/tests/e2e/project-management/customer-ai-intake-live.spec.ts`. It requires `PW_REQUIRE_LIVE_LLM=1`, the exact `PW_EXPECT_LIVE_PROVIDER` and `PW_EXPECT_LIVE_MODEL`, and a genuinely configured live provider. The browser starts with empty storage and signs in through the real login form. Persisted trace metadata must match the expected provider and model. It contains no stub directives, network mocks or skips. Missing/failed providers fail the test; an unexecuted live test must be reported as `did_not_run`. The pre-existing `form-draft-fill.spec.ts` uses an explicit external-provider stub for plumbing and must not be used as live extraction-quality evidence.
