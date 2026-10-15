@@ -94,13 +94,11 @@ export async function fetchUserInfo(request: Request): Promise<{
  * - 始终从后端API获取（安全第一）
  * - 不解析JWT（零信任原则）
  */
-const userInfoLoaderContext = createContext<ReturnType<typeof fetchUserInfo> | undefined>(
-  undefined,
-);
+const userInfoLoaderContext = createContext<ReturnType<typeof fetchUserInfo> | null>(null);
 
 export async function getUserInfo(
   request: Request,
-  loaderContext?: RouterContextProvider,
+  loaderContext?: Readonly<RouterContextProvider>,
 ): Promise<{
   user: User | null;
   permissions: UserPermissions | null;
