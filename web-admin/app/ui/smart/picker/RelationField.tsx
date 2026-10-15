@@ -263,7 +263,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
             {loading ? (
               <div className="text-text-2 p-4 text-center">{st({zh: '正在读取…', en: 'Loading...'})}</div>
             ) : options.length === 0 ? (
-              <div className="text-text-2 p-4 text-center">{st({zh: '暂无可选记录', en: 'No records available'})}</div>
+              <div role={error ? 'alert' : undefined} className={cn('p-4 text-center text-sm', error ? 'text-status-red' : 'text-text-2')}>{error || st({zh: '暂无可选记录', en: 'No records available'})}</div>
             ) : (
               options.map((option) => {
                 const optValue = String(option[valueField]);
@@ -293,7 +293,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
         )}
       </div>
 
-      {error && <p className="text-status-red text-sm">{error}</p>}
+      {error && !isOpen && <p role="alert" className="text-status-red text-sm">{error}</p>}
 
     </div>
   );
