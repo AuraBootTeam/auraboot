@@ -490,7 +490,13 @@ test('portable archive template selects a task once and binds every reference be
   expect((await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()).data).toEqual(beforeRows);
   await upload(); await dialog.getByLabel('副本名称').fill(name);
   await dialog.locator('button#targetTask').click();
+  await dialog.getByPlaceholder('搜索记录名称').fill(`__no_task_${run}__`);
+  await expect(dialog.getByText('暂无可选记录', {exact: true})).toBeVisible();
+  await expect(dialog.getByRole('button', {name: '导入停用副本'})).toBeDisabled();
+  await page.screenshot({path: info.outputPath('IMPORT01b-搜索无结果与恢复.png')});
   await dialog.getByPlaceholder('搜索记录名称').fill(title);
+  await expect(dialog.getByRole('button', {name: title, exact: true})).toBeVisible();
+  await page.screenshot({path: info.outputPath('IMPORT01c-具名任务选择器.png')});
   await dialog.getByRole('button', {name: title, exact: true}).click();
   await expect(dialog.locator('button#targetTask')).toHaveText(title);
   await expect(dialog).not.toContainText(taskPid);
@@ -524,7 +530,7 @@ test('portable archive template selects a task once and binds every reference be
   // Direct submissions cannot use missing, unresolvable or expression-injecting references.
   for (const templateValues of [{}, {targetTask: '01AAAAAAAAAAAAAAAAAAAAAAAA'}, {targetTask: "' OR true"}]) {
     const denied = await page.request.post('/api/automations', {data: {...template, templateValues, enabled: true}});
-    const payload = await denied.json(); expect(String(payload.code)).not.toBe('0'); expect(denied.status()).toBeLessThan(500);
+    const payload = await denied.json(); expect(String(payload.code)).not.toBe('0'); expect(denied.status()).toBe(422);
   }
   await info.attach('Template-binding-receipt', {body: JSON.stringify({automationPid: created.pid, taskPid, boundReferenceCount: 3, defaultDisabled: true, finalDisabled: true, executionCount: logs.length, executionStatus: logs[0].status}), contentType: 'application/json'});
 });

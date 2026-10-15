@@ -73,7 +73,8 @@ class AutomationServiceImplTenantIsolationTest {
         service = new AutomationServiceImpl(automationMapper, automationLogMapper, automationTriggerService,
                 runtimeProvider, deriver, new com.auraboot.framework.automation.service.AutomationTemplateBinder(
                         org.mockito.Mockito.mock(com.auraboot.framework.meta.service.DynamicDataService.class),
-                        org.mockito.Mockito.mock(com.auraboot.framework.permission.engine.PermissionEvaluator.class)), usageIndexService);
+                        org.mockito.Mockito.mock(com.auraboot.framework.permission.engine.PermissionEvaluator.class),
+                        org.mockito.Mockito.mock(com.auraboot.framework.meta.service.MetaModelService.class)), usageIndexService);
         MetaContext.setContext(CURRENT_TENANT, 10L, "user-1", "tester");
     }
 
