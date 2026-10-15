@@ -384,12 +384,13 @@ export function buildFormCommandPayload(
   );
 }
 
-/** Pure CRUD writes business inputs only; loaded audit fields are display data. */
+/** Pure CRUD writes business changes, including reviewed AI drafts; audit data stays display-only. */
 export function buildDynamicCrudFormPayload(
   record: Record<string, any>,
   modelFields: Record<string, Pick<FieldMetaInfo, 'dataType'>>,
   dirtyFields: ReadonlySet<string>,
   operation: 'create' | 'update',
+  initialRecord?: Record<string, any> | null,
 ): Record<string, any> {
   const systemFields = new Set([
     'id', 'pid', 'tenant_id', 'created_at', 'created_by', 'updated_at', 'updated_by',
@@ -398,10 +399,18 @@ export function buildDynamicCrudFormPayload(
   const hasFieldMetadata = Object.keys(modelFields).length > 0;
   return Object.fromEntries(Object.entries(record).flatMap(([key, rawValue]) => {
     if (systemFields.has(key) || key.startsWith('_') ||
-        (operation === 'update' && !dirtyFields.has(key)) ||
         (hasFieldMetadata && !modelFields[key])) return [];
-    const value = normalizePayloadValue(rawValue, modelFields[key]?.dataType);
-    if (isEmptySubmittedValue(value) && !(value === null && dirtyFields.has(key))) return [];
+    const dataType = modelFields[key]?.dataType;
+    const value = normalizePayloadValue(rawValue, dataType);
+    // Persistence tracks changed business values independently of manual-edit
+    // protection. AI apply/undo uses setFormData and must not acquire a manual lock.
+    const hasInitialRecord = initialRecord != null;
+    const changed = hasInitialRecord
+      ? JSON.stringify(value) !== JSON.stringify(normalizePayloadValue(initialRecord[key], dataType))
+      : dirtyFields.has(key);
+    if (operation === 'update' && !changed) return [];
+    const explicitNull = value === null && (dirtyFields.has(key) || (operation === 'update' && hasInitialRecord && changed));
+    if (isEmptySubmittedValue(value) && !explicitNull) return [];
     return [[key, value]];
   }));
 }
@@ -2186,6 +2195,7 @@ export function FormPageContent(props: PageContentProps) {
           modelFields,
           dirtyFieldsRef.current,
           dynamicCrudOperation,
+          initialFormData,
         );
 
         setSubmitting(true);
