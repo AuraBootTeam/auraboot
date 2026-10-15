@@ -1671,6 +1671,7 @@ openPlatform:
   memberRole: Role
   manageMembers: Manage members
   removeMember: Remove member
+  lastOwnerGuidance: Add another owner before removing the last owner.
   memberSaved: Application member saved
   memberSaveFailed: Unable to save application member
   memberRemoved: Application member removed
@@ -1707,12 +1708,14 @@ openPlatform:
   rotateTitle: Rotate credential
   rotateWarning: A new secret is created now. The previous credential can issue tokens until its grace period ends; issued tokens expire at their normal short TTL.
   graceMinutes: Grace period (minutes)
+  graceRange: Enter a whole number from 5 to 10080 minutes.
   rotate: Rotate
   noCredentials: No credentials
   secretTitle: Save this credential now
   secretWarning: The client secret is shown once. AuraBoot stores only its hash.
   saved: I saved it
   lastUsed: Last used
+  credentialExpires: Expires
   revoke: Revoke
   revokeTitle: Revoke credential?
   revokeWarning: Existing access tokens issued by this credential will stop working immediately.
@@ -1760,9 +1763,7 @@ openPlatform:
   compatible: Compatible
   actionRequired: Action required
   eventSchema: Schema
-  catalogVersion: Catalog
   signing: Signing
-  rotateBy: Rotate by
   chooseSupportedEventVersion: Choose a supported event version.
   rotateSigningSecretNow: Rotate the signing secret now.
   addSigningSecretBeforeDelivery: Add a signing secret before enabling delivery.

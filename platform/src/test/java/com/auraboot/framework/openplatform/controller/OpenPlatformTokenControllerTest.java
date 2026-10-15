@@ -11,7 +11,8 @@ import static org.mockito.Mockito.*;
 
 class OpenPlatformTokenControllerTest {
     private final OpenPlatformTokenService service = mock(OpenPlatformTokenService.class);
-    private final OpenPlatformTokenController controller = new OpenPlatformTokenController(service);
+    private final OpenPlatformTokenController controller = new OpenPlatformTokenController(service,
+            mock(com.auraboot.framework.openplatform.service.OpenPlatformOAuthFailureAudit.class));
 
     private static String basic(String credentials) {
         return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));

@@ -20,12 +20,14 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
      * Find resources by plugin PID.
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} ORDER BY sequence")
+    @ResultMap("mybatis-plus_PluginResource")
     List<PluginResource> findByPluginPid(@Param("pluginPid") String pluginPid);
 
     /**
      * Find resources by import ID.
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE import_id = #{importId} ORDER BY sequence")
+    @ResultMap("mybatis-plus_PluginResource")
     List<PluginResource> findByImportId(@Param("importId") String importId);
 
     /**
@@ -50,13 +52,20 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
      * Find resources by type for a plugin.
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} AND resource_type = #{resourceType} ORDER BY sequence")
+    @ResultMap("mybatis-plus_PluginResource")
     List<PluginResource> findByPluginPidAndType(@Param("pluginPid") String pluginPid, @Param("resourceType") String resourceType);
 
     /**
      * Find resource by type and code.
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode}")
+    @ResultMap("mybatis-plus_PluginResource")
     PluginResource findByTypeAndCode(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
+
+    /** Serialize publication import/rollback with user ownership changes. */
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode} FOR UPDATE")
+    @ResultMap("mybatis-plus_PluginResource")
+    PluginResource lockByTypeAndCode(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
 
     /**
      * Check if a resource exists for a plugin.
@@ -91,19 +100,22 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
     /**
      * Find resources in reverse order for rollback.
      */
-    @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} AND action = 'create' ORDER BY sequence DESC")
-    List<PluginResource> findCreatedResourcesForRollback(@Param("pluginPid") String pluginPid);
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND plugin_pid = #{pluginPid} AND import_id = #{importId} AND action = 'create' ORDER BY sequence DESC")
+    @ResultMap("mybatis-plus_PluginResource")
+    List<PluginResource> findCreatedResourcesForRollback(@Param("tenantId") Long tenantId, @Param("pluginPid") String pluginPid, @Param("importId") String importId);
 
     /**
-     * Find resources with previous state for rollback.
+     * Find changed ownership records with previous state for rollback.
      */
-    @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} AND action = 'update' AND previous_state IS NOT NULL ORDER BY sequence DESC")
-    List<PluginResource> findUpdatedResourcesForRollback(@Param("pluginPid") String pluginPid);
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND plugin_pid = #{pluginPid} AND import_id = #{importId} AND (action = 'update' OR (action = 'skip' AND resource_type IN ('public_resource', 'public_query'))) AND previous_state IS NOT NULL ORDER BY sequence DESC")
+    @ResultMap("mybatis-plus_PluginResource")
+    List<PluginResource> findUpdatedResourcesForRollback(@Param("tenantId") Long tenantId, @Param("pluginPid") String pluginPid, @Param("importId") String importId);
 
     /**
      * Find existing resource by tenant, plugin, type and code.
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND plugin_pid = #{pluginPid} AND resource_type = #{resourceType} AND resource_code = #{resourceCode}")
+    @ResultMap("mybatis-plus_PluginResource")
     PluginResource findByTenantPluginAndResource(@Param("tenantId") Long tenantId, @Param("pluginPid") String pluginPid,
                                                   @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
 
@@ -117,11 +129,13 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
      * Find user-modified resources for a plugin.
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} AND user_modified = TRUE ORDER BY sequence")
+    @ResultMap("mybatis-plus_PluginResource")
     List<PluginResource> findModifiedByPluginPid(@Param("pluginPid") String pluginPid);
 
     /**
      * Find user-claimed resources for a plugin.
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} AND ownership_type = 'user_claimed' ORDER BY sequence")
+    @ResultMap("mybatis-plus_PluginResource")
     List<PluginResource> findUserClaimedByPluginPid(@Param("pluginPid") String pluginPid);
 }

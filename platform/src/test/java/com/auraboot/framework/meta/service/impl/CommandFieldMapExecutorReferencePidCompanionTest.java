@@ -232,7 +232,7 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
                 metaModelService,
                 fieldPermissionService,
                 dataPermissionEngine,
-                dataDomainService);
+                dataDomainService, org.mockito.Mockito.mock(CommandModelMutationSupport.class));
     }
 
     private void withScopedUser() {

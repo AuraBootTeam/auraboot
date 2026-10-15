@@ -3,6 +3,24 @@
 import secrets
 
 
+def provision_replay_actor_commands(request, admin):
+    """Install the declared DSL dependencies for the restricted replay actor."""
+    for plugin in ("core-meta", "org-management", "platform-admin"):
+        _, body, _ = request("/api/plugins/import/import-directory-sync", method="POST", headers=admin,
+                             body={"path": "/plugins/" + plugin, "conflictStrategy": "OVERWRITE",
+                                   "validateReferences": True, "autoDeployProcesses": True,
+                                   "autoPublishModels": True, "autoPublishFields": True,
+                                   "autoPublishCommands": True, "autoPublishPages": True,
+                                   "createResourcePermissions": True})
+        if not isinstance(body, dict) or body.get("success") is not True:
+            raise RuntimeError("Replay actor plugin import did not succeed: " + plugin)
+    _, body, _ = request("/api/meta/commands?modelCode=tenant_member", headers=admin)
+    commands = response_data(body, "replay actor command catalog")
+    if not isinstance(commands, list) or not any(isinstance(row, dict) and row.get("code") == "admin:create_member"
+                                               for row in commands):
+        raise RuntimeError("Replay actor member command was not published")
+
+
 def response_data(body, stage):
     if not isinstance(body, dict) or str(body.get("code")) != "0":
         raise RuntimeError(f"{stage}: unsuccessful API envelope")

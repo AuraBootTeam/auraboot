@@ -186,6 +186,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final MetaFieldMapper metaFieldMapper;
     private final ExtensionConverter extensionConverter;
     private final PluginResourceMapper pluginResourceMapper;
+    private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
 
     // Optional dependency - may not be configured in all environments
@@ -2632,6 +2633,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         ResourceType type = resource.getResourceTypeEnum();
 
         switch (type) {
+            case PUBLIC_RESOURCE, PUBLIC_QUERY -> publicPublicationLifecycle.restore(resource);
             case MODEL -> {
                 if (resource.getResourcePid() != null) {
                     try {
@@ -2750,6 +2752,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public void restoreResource(PluginResource resource) {
         log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
         ResourceType type = resource.getResourceTypeEnum();
+        if (type.isPublicPublication()) {
+            publicPublicationLifecycle.restore(resource);
+            return;
+        }
         if (type == ResourceType.AGENT_DEFINITION) {
             if (resource.getResourcePid() != null) {
                 jdbcTemplate.update("""

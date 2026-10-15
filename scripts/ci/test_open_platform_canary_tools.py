@@ -76,6 +76,30 @@ class TransportTests(unittest.TestCase):
             client.request("/api")
         self.assertEqual(len(opener.requests), 1)
 
+    def test_private_fixture_can_observe_exact_expected_429_once_without_retry(self):
+        opener = Opener(urllib.error.HTTPError("https://example.test", 429, "limited",
+            {"Retry-After": "60"}, io.BytesIO(b'{"code":"open_api_query_rate_limited"}')))
+        client = Client("https://example.test", opener=opener, allow_expected_rate_limit=True)
+        status, body, headers = client.request("/quota", expected=(429,))
+        self.assertEqual((status, body["code"], headers["Retry-After"]), (429, "open_api_query_rate_limited", "60"))
+        self.assertEqual(len(opener.requests), 1)
+        self.assertFalse(client.stopped)
+        opener.response = Response(b'{"code":0}')
+        self.assertEqual(client.request("/audit")[0], 200)
+        self.assertEqual(client.request_count, 2)
+
+    def test_fixture_opt_in_does_not_accept_unexpected_or_mixed_429(self):
+        for expected in [(200,), (200, 429)]:
+            with self.subTest(expected=expected):
+                opener = Opener(urllib.error.HTTPError("https://example.test", 429, "limited", {}, io.BytesIO(b"{}")))
+                client = Client("https://example.test", opener=opener, allow_expected_rate_limit=True)
+                with self.assertRaisesRegex(ProtocolError, "429"):
+                    client.request("/api", expected=expected)
+                self.assertTrue(client.stopped)
+                self.assertEqual(len(opener.requests), 1)
+        with self.assertRaises(ValueError):
+            Client("https://example.test", allow_expected_rate_limit="true")
+
     def test_budget_and_path_boundaries(self):
         opener = Opener(Response(b"{}"))
         client = Client("https://example.test", max_requests=1, opener=opener)

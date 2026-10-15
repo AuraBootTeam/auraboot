@@ -269,6 +269,29 @@ receiver, requires an invalid-signature mutation to fail, and verifies restorati
 
 | script | refs | updated | purpose |
 |---|---|---|---|
-| `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Nine consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |
+| `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Fourteen consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |
+| `fixtures/open-platform-consumer/real-backend.mjs` | 1 | 2026-10-13 | Run the fixed thirteen real-backend SDK cases against the verified fresh installation; accept credentials only on private stdin. |
+| `ci/prepare-open-platform-sdk.sh` | 1 | 2026-10-13 | Fresh-build, pack and install the SDK outside the checkout; execute the original fourteen loopback consumers and type positive/expected-error fixture. Never publishes. |
 
 T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/path/to/aura --runtime OWNED_RUNTIME --database-url jdbc:postgresql://127.0.0.1:5432/OWNED_TEST_DB --database-user TEST_USER --out /absolute/fresh/evidence-directory`. The executor supplies owned dependency homes. The database must already be migrated; this runner never resets or migrates it. `TEST_DATABASE_PASSWORD` is inherited without being recorded. Test skips are reported explicitly; a coverage pass proves the fixed family line target, not execution of skipped scenarios. Gate self-tests: `node --test scripts/check-oss-remediation-t3.test.mjs`.
+
+## Runtime and release gate support (2026-10-10 reconciliation)
+
+| script | refs | updated | purpose |
+|---|---:|---|---|
+| `application/dynamic-publication-role-policy.mjs` | 0 | 2026-10-10 | Build the isolated operator role policy for dynamic model publication. |
+| `application/verify-release-registration-payload.mjs` | 0 | 2026-10-10 | Verify the release registration payload and its image copy. |
+| `ci/isolated-release-network.sh` | 0 | 2026-10-10 | Allocate an isolated release-image network and record its subnet. |
+| `ci/sample-open-platform-db.sh` | 0 | 2026-10-10 | Sample job-scoped database waits without exporting query text. |
+| `db/snapshot-schema-contract.mjs` | 0 | 2026-10-10 | Validate deparsed snapshot schema resource-type constraints. |
+| `dev/oss-disk-preflight.mjs` | 0 | 2026-10-10 | Check the filesystem space floor before verification allocation. |
+| `dev/oss-gate-catalog-results.mjs` | 0 | 2026-10-10 | Reconcile collected test identities with the fixed gate catalog. |
+| `dev/oss-gate-results.mjs` | 0 | 2026-10-10 | Reject missing, failed, skipped or retried browser gate results. |
+| `dev/oss-runtime-contract.mjs` | 0 | 2026-10-10 | Bind and validate the OSS runtime source and artifact contract. |
+| `lib/oss-stack-identity.mjs` | 0 | 2026-10-10 | Verify runtime artifacts and listener ownership for the OSS stack. |
+| `lib/oss-stack-lifecycle.mjs` | 0 | 2026-10-10 | Manage registered OSS source mappings and stack lifecycle. |
+| `lib/web-admin-lock-contract.mjs` | 0 | 2026-10-10 | Compare installed Web dependency locks with the frozen source lock. |
+| `oss-e2e-fixture-backend.sh` | 0 | 2026-10-10 | Launch the unchanged backend with separately hashed E2E fixture artifacts. |
+
+| `ci/prepare_openapi_verifier.sh` | 1 | 2026-10-14 | Bootstrap exact hashed dependencies for the isolated OpenAPI verifier. |
+| `ci/verify_openapi_artifacts.py` | 1 | 2026-10-14 | Validate actual generated OpenAPI structure, component schemas, payloads and formats with a fixed case receipt. |

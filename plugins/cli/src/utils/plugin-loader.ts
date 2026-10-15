@@ -1,10 +1,11 @@
-import { readFileSync, existsSync, readdirSync } from 'fs';
-import { join, resolve } from 'path';
+import { readFileSync, existsSync, readdirSync, statSync, realpathSync } from 'fs';
+import { join, resolve, relative, isAbsolute } from 'path';
 
 export interface PluginManifest {
   pluginId: string;
   namespace: string;
   version: string;
+  resourceDirs?: Record<string, string>;
   displayName?: string;
   description?: string;
   author?: string;
@@ -81,6 +82,43 @@ export function loadPlugin(dir: string): PluginFiles {
         }
       }
     }
+  }
+
+  // Public declarations follow explicit manifest paths rather than conventional config filenames.
+  for (const resourceType of ['publicResources', 'publicQueries']) {
+    const declaredPath = manifest.resourceDirs?.[resourceType];
+    if (declaredPath === undefined) continue;
+    if (typeof declaredPath !== 'string' || !declaredPath) {
+      throw new Error(`Invalid public publication path: ${resourceType}`);
+    }
+    const resourcePath = resolve(pluginDir, declaredPath);
+    if (!existsSync(resourcePath)) throw new Error(`Required public publication path missing: ${declaredPath}`);
+    const root = realpathSync(pluginDir);
+    const assertContained = (path: string) => {
+      const diff = relative(root, realpathSync(path));
+      if (diff === '..' || diff.startsWith('../') || isAbsolute(diff)) {
+        throw new Error(`Public publication path escapes plugin: ${declaredPath}`);
+      }
+    };
+    assertContained(resourcePath);
+    const isDirectory = statSync(resourcePath).isDirectory();
+    const files = isDirectory
+      ? readdirSync(resourcePath, { withFileTypes: true })
+        .filter(file => file.isFile() && file.name.endsWith('.json'))
+        .map(file => join(resourcePath, file.name)).sort()
+      : [resourcePath];
+    const resources: unknown[] = [];
+    for (const file of files) {
+      assertContained(file);
+      try {
+        const content = JSON.parse(readFileSync(file, 'utf-8'));
+        if (!isDirectory && !Array.isArray(content)) throw new Error('Single-file public declarations require an array');
+        resources.push(...(Array.isArray(content) ? content : [content]));
+      } catch (error) {
+        throw new Error(`Invalid public publication file ${relative(pluginDir, file)}: ${(error as Error).message}`);
+      }
+    }
+    resourceFiles.set(resourceType, resources);
   }
 
   return { dir: pluginDir, manifest, configDir, resourceFiles };

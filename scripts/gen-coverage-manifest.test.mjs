@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  buildManifest,
   buildModelRouteIndex,
   buildPageIndex,
   manifestTarget,
@@ -215,5 +216,31 @@ test('a parameterised route is credited when a spec interpolates it', () => {
     assert.equal(hits('/aurabot/knowledge').length, 1, 'the prefix is genuinely present here');
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A collected reference is not proof of execution, even when the spec contains assertions.
+test('static browser references cannot emit a passing coverage verdict', () => {
+  const repoRoot = mkdtempSync(path.join(tmpdir(), 'coverage-registration-'));
+  try {
+    const pluginDir = path.join(repoRoot, 'plugins', 'fixture');
+    mkdirSync(path.join(pluginDir, 'config'), { recursive: true });
+    mkdirSync(path.join(repoRoot, 'tests'), { recursive: true });
+    writeFileSync(path.join(pluginDir, 'config', 'pages.json'), JSON.stringify([
+      { pageKey: 'fixture_list', pageType: 'LIST', entityCode: 'fixture' },
+    ]));
+    writeFileSync(path.join(repoRoot, 'tests', 'fixture.spec.ts'),
+      `await page.goto('/p/c/fixture_list'); expect(page).toBeDefined();`);
+    const manifest = buildManifest({ repoRoot, pluginRoot: path.join(repoRoot, 'plugins'),
+      specRoots: ['tests'], runId: 'static', target: 'plugins' });
+    const row = manifest.groups.flatMap(group => group.rows).find(row => row.id === 'page:fixture_list');
+    assert(row, 'declared page must remain in the denominator');
+    assert.equal(row.evidence.length, 1);
+    assert.equal(row.verdict, 'partial');
+    assert.equal(manifest.run.evidenceKind, 'static-registration');
+    assert.equal(manifest.run.executed, 0);
+    assert(!manifest.groups.flatMap(group => group.rows).some(row => row.verdict === 'pass'));
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
   }
 });

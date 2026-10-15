@@ -6046,5 +6046,19 @@
     "en-US": "Other source",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "page.open_platform_publications.title",
+    "zh-CN": "公共资源发布",
+    "en-US": "Public Resource Publications",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "page.open_platform_queries.title",
+    "zh-CN": "公共查询发布",
+    "en-US": "Public Query Publications",
+    "source": "import",
+    "refType": "ui"
   }
 ]

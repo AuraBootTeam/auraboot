@@ -2829,5 +2829,39 @@
         "component": "AuthAppearanceEditor"
       }
     ]
-  }
+  },
+{
+  "pageKey": "open_platform_publications",
+  "name:zh-CN": "公共资源发布",
+  "name:en": "Public Resource Publications",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "open_api_publication_editor",
+      "blockType": "custom",
+      "component": "OpenApiPublicationEditor"
+    }
+  ]
+},
+{
+  "pageKey": "open_platform_queries",
+  "name:zh-CN": "公共查询发布",
+  "name:en": "Public Query Publications",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "open_api_query_publication_editor",
+      "blockType": "custom",
+      "component": "OpenApiQueryPublicationEditor"
+    }
+  ]
+}
 ]

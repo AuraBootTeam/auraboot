@@ -237,6 +237,7 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("Dispatch to blocked internal URL enters durable dead letter")
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void testDispatchBlockedUrlCreatesFailedLog() {
         WebhookCreateRequest request = new WebhookCreateRequest();
         request.setName("Blocked URL Webhook");
@@ -328,6 +329,7 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("Dispatch with secret and invalid headers enters durable dead letter")
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void testDispatchInvalidHeadersRecordsFailure() {
         WebhookCreateRequest request = new WebhookCreateRequest();
         request.setName("Invalid Headers Webhook");
@@ -383,21 +385,18 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     private WebhookDeliveryLog waitForLatestLog(String subscriptionPid) {
-        for (int i = 0; i < 20; i++) {
-            List<WebhookDeliveryLog> logs = deliveryLogMapper.selectList(new QueryWrapper<WebhookDeliveryLog>()
-                    .eq("subscription_pid", subscriptionPid)
-                    .orderByDesc("created_at"));
-            if (!logs.isEmpty()) {
-                return logs.get(0);
-            }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                fail("Interrupted while waiting for webhook delivery log");
-            }
-        }
-        return null;
+        WebhookDeliveryLog[] terminal = new WebhookDeliveryLog[1];
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(10))
+                .until(() -> {
+                    List<WebhookDeliveryLog> logs = deliveryLogMapper.selectList(new QueryWrapper<WebhookDeliveryLog>()
+                            .eq("subscription_pid", subscriptionPid).orderByDesc("created_at"));
+                    if (logs.isEmpty()) return false;
+                    String state = logs.get(0).getDeliveryStatus();
+                    if ("pending".equals(state) || "processing".equals(state)) return false;
+                    terminal[0] = logs.get(0);
+                    return true;
+                });
+        return terminal[0];
     }
 
     private Tenant createAdditionalTenant() {

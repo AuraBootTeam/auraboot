@@ -56,7 +56,7 @@ class CommandSideEffectAggregateTest {
 
     @BeforeEach
     void setUp() {
-        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
+        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper, org.mockito.Mockito.mock(CommandModelMutationSupport.class));
     }
 
     // ── Helper to run AGGREGATE through the full sideEffect pipeline ──────────

@@ -1968,6 +1968,7 @@ openPlatform:
   memberRole: 角色
   manageMembers: 管理成员
   removeMember: 移除成员
+  lastOwnerGuidance: 先添加另一位所有者，再移除最后一位所有者。
   memberSaved: 应用成员已保存
   memberSaveFailed: 应用成员保存失败
   memberRemoved: 应用成员已移除
@@ -2004,12 +2005,14 @@ openPlatform:
   rotateTitle: 轮换凭据
   rotateWarning: 现在创建新密钥。旧凭据可在宽限期结束前签发 Token；已签发的 Token 按自身短期 TTL 失效。
   graceMinutes: 宽限期（分钟）
+  graceRange: 请输入 5 至 10080 的整数分钟。
   rotate: 轮换
   noCredentials: 暂无凭据
   secretTitle: 立即保存此凭据
   secretWarning: Client Secret 仅显示一次；AuraBoot 只保存它的哈希值。
   saved: 我已保存
   lastUsed: 最近使用
+  credentialExpires: 到期时间
   revoke: 吊销
   revokeTitle: 确认吊销凭据？
   revokeWarning: 此凭据签发的现有 Access Token 将立即失效。
@@ -2057,9 +2060,7 @@ openPlatform:
   compatible: 兼容
   actionRequired: 需要处理
   eventSchema: 事件版本
-  catalogVersion: 目录版本
   signing: 签名状态
-  rotateBy: 轮换截止时间
   chooseSupportedEventVersion: 请选择受支持的事件版本。
   rotateSigningSecretNow: 请立即轮换签名密钥。
   addSigningSecretBeforeDelivery: 启用投递前请添加签名密钥。

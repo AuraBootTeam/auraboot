@@ -104,14 +104,18 @@ export function validateStructural(plugin: PluginFiles): ValidationResult {
 
   // 3. Validate resource files against their schemas
   for (const [resourceType, resources] of plugin.resourceFiles) {
-    const schemaFile = RESOURCE_SCHEMAS[resourceType];
+    const publicDefinition = resourceType === 'publicResources' ? 'publicResourceContract'
+      : resourceType === 'publicQueries' ? 'publicQueryContract' : undefined;
+    const schemaFile = publicDefinition ? 'plugin-manifest.schema.json' : RESOURCE_SCHEMAS[resourceType];
     if (!schemaFile) continue;
 
     const schemaPath = join(SCHEMA_DIR, schemaFile);
     if (!existsSync(schemaPath)) continue;
 
     try {
-      const schema = JSON.parse(readFileSync(schemaPath, 'utf-8'));
+      const schema = publicDefinition
+        ? { type: 'array', items: { $ref: `plugin-manifest.schema.json#/$defs/${publicDefinition}` } }
+        : JSON.parse(readFileSync(schemaPath, 'utf-8'));
       const validate = ajv.compile(schema);
 
       // Resource files are arrays wrapped
@@ -131,7 +135,7 @@ export function validateStructural(plugin: PluginFiles): ValidationResult {
       addMessage(result, {
         code: 'L1-RESOURCE-SCHEMA',
         category: 'structural',
-        severity: 'warning',
+        severity: publicDefinition ? 'error' : 'warning',
         message: `Could not validate ${resourceType}: ${(e as Error).message}`,
       });
     }
