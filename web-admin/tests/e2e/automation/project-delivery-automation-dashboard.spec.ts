@@ -167,6 +167,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     path: info.outputPath('AD01-explicit-archive-scope.png'),
   });
   const { pid: automationPid } = await saveAutomation(page);
+  await expect(page).toHaveURL(new RegExp(`/automation/${automationPid}$`));
   await page.reload();
   await expect(page.getByTestId('automation-editor-name-input')).toHaveValue(
     automationName,
