@@ -172,7 +172,8 @@
             ]
           },
           "showLabel": true,
-          "ring": true
+          "ring": true,
+          "labelPosition": "inside"
         }
       },
       {

@@ -422,7 +422,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           : undefined
       }
     >
-      <div className="flex h-full flex-col p-5">
+      <div className="flex h-full min-w-0 flex-col p-5" style={{ containerType: 'inline-size' }}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="block truncate text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400">
@@ -452,7 +452,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </div>
           ) : isEmpty ? (
             <div className="space-y-3">
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem] dark:text-slate-50">
+              <div className="font-semibold tracking-tight text-slate-950 tabular-nums dark:text-slate-50" style={{ fontSize: 'clamp(1rem, 14cqw, 2.65rem)', overflowWrap: 'anywhere' }}>
                 —
               </div>
               <div className="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
@@ -465,7 +465,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </div>
           ) : (
             <>
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem] dark:text-slate-50">
+              <div className="font-semibold tracking-tight text-slate-950 tabular-nums dark:text-slate-50" style={{ fontSize: 'clamp(1rem, 14cqw, 2.65rem)', overflowWrap: 'anywhere' }}>
                 {formattedValue}
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">

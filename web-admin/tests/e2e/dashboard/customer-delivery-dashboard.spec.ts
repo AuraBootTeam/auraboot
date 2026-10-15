@@ -25,7 +25,7 @@ async function title(page: Page, value: string) {
   await expect(dialog).toBeHidden();
 }
 async function detail(page: Page, pid: string) {
-  const response = await page.request.get(`/api/dashboards/${pid}`);
+  const response = await page.request.get(`/api/dashboards/${pid}`, { timeout: 15000 });
   expect(response.ok()).toBe(true);
   const body = await response.json();
   expect(String(body.code)).toBe('0');
@@ -143,5 +143,21 @@ test('builds a live project metric in the UI and publishes a portable six-widget
   expect(exported.dashboard.title).toBe(boardTitle);
   expect(exported.dashboard).not.toHaveProperty('pid');
   expect((await detail(page, authoredPid)).widgets).toHaveLength(1);
+  // The designer is an editing state. Capture the published business viewer
+  // through its real presentation entry, at the same viewport, for visual review.
+  await page.getByTestId('toolbar-btn-presentation').click();
+  const presentation = page.getByTestId('big-screen-mode');
+  await expect(presentation).toBeVisible();
+  await expect(presentation.getByText(fixture.projects[0].name, { exact: true })).toBeVisible();
+  await expect(presentation.locator('[data-card-style="metric"]')).toHaveCount(4);
+  await expect(presentation.locator('[data-chart-ready="true"]')).toBeVisible();
+  await page.screenshot({ path: info.outputPath('CD03-published-customer-delivery-viewer.png'), fullPage: true });
+  const overflow = await presentation.locator('[data-card-style="metric"]').evaluateAll(cards => cards.flatMap(card =>
+    [...card.querySelectorAll('div')].filter(element => element.scrollWidth > element.clientWidth + 1)
+      .map(element => ({ text: element.textContent, width: element.clientWidth, scrollWidth: element.scrollWidth })),
+  ));
+  expect(overflow).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(presentation).toBeHidden();
   await info.attach('customer-delivery-dashboard-ledger', { body: Buffer.from(JSON.stringify({ fixturePath, authoredPid, boardPid, expected, aggregateEvidence }, null, 2)), contentType: 'application/json' });
 });
