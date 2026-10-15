@@ -2,6 +2,7 @@ import { getPublishText, buildPermissionReplayContext, buildSlaNodeReplayContext
 import { getPolicyHeading, getMigrationPlanMessage, getHistoricalPolicyMessage } from './modelPublishPolicyMessages';
 import { useModelDetailText, type ModelDetailTextFn, type ModelDetailTextKey } from './modelDetailText';
 import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
+import { primaryModelPreview, resolveModelPageRoute } from './modelPageNavigation';
 /**
  * Model详情页面
  *
@@ -154,17 +155,6 @@ function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
   if (raw.includes('detail') || raw.includes('view')) return 'detail';
   if (raw.includes('form') || raw.includes('edit') || raw.includes('new')) return 'form';
   return 'custom';
-}
-
-function resolvePageRoute(page: RelatedPage): string {
-  if (typeof page.route === 'string' && page.route.startsWith('/')) {
-    return page.route;
-  }
-  const pageKey = page.pageKey || page.code || page.name;
-  if (pageKey) {
-    return `/p/${pageKey}`;
-  }
-  return '/p/page_schema';
 }
 
 /**
@@ -875,7 +865,7 @@ export default function ModelDetailPage() {
 
   const handleOpenPage = useCallback(
     (page: RelatedPage) => {
-      const destination = resolvePageRoute(page);
+      const destination = resolveModelPageRoute(page);
       if (typeof window !== 'undefined' && destination.startsWith('/')) {
         window.location.assign(destination);
         return;
@@ -901,16 +891,9 @@ export default function ModelDetailPage() {
   }, [handleOpenCrudWizard, handleOpenPageDesigner, hasGeneratedPages]);
 
   const handlePrimaryPreview = useCallback(() => {
-    if (standardPages.detail) {
-      handleOpenPage(standardPages.detail);
-      return;
-    }
-    if (standardPages.list) {
-      handleOpenPage(standardPages.list);
-      return;
-    }
-    if (standardPages.form) {
-      handleOpenPage(standardPages.form);
+    const primary = primaryModelPreview(standardPages);
+    if (primary) {
+      handleOpenPage(primary);
       return;
     }
     showSuccessToast(text('noPreviewablePage'));

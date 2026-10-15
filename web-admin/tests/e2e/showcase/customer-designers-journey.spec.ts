@@ -152,6 +152,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   });
   await expect(page.getByTestId('model-primary-page-preview')).toBeVisible();
   await page.getByTestId('model-primary-page-preview').click();
+  await expect(page).toHaveURL(new RegExp(`/p/${code}(?:\\?.*)?$`));
   await expect(page.getByRole('columnheader', { name: '客户名称', exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '商机金额', exact: true })).toBeVisible();
   await page.reload();
