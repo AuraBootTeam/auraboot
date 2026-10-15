@@ -470,6 +470,9 @@ Repair the shell environment (e.g. export PATH=\"\$JAVA_HOME/bin:\$PATH\") and r
   [ -z "$parallel_reason" ] || allocation_args+=(--parallel-reason "$parallel_reason")
   AURA_RUNTIME_AUTO_GC_BEFORE_ALLOCATE=false "$DEV" runtime ensure auraboot "$name" "${allocation_args[@]}" >/dev/null
   sd="$(prepare_state_dir "$name")" || die "cannot prepare stable stack state"
+  if [ "$web_mode" = production ]; then
+    printf '%s\n' "$SESSION_SECRET_FILE" >"$sd/session-secret.path"
+  fi
   local evidence_root
   evidence_root="$("$DEV" runtime evidence begin "$name" --purpose "OSS golden stack rebuild")" \
     || die "cannot create a separate evidence round"
@@ -1000,6 +1003,10 @@ export PG_DB=${pg_db:-aura_boot}
 #       'up' is therefore reliable. Fallback if a brand-new route ever cold-reopts:
 #       curl --noproxy '*' -s \$PLAYWRIGHT_BASE_URL/<route> once before running.
 EOF
+  if [ -f "$sd/session-secret.path" ]; then
+    printf 'export SESSION_SECRET_FILE=%q\n' "$(cat "$sd/session-secret.path")"
+    printf '%s\n' 'export SESSION_SECRET="$(cat "$SESSION_SECRET_FILE")"'
+  fi
 }
 
 # ---- status --------------------------------------------------------------------------

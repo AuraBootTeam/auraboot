@@ -210,3 +210,25 @@ test('OSS gate includes the independent deep project instead of silently droppin
   assert.ok(args.includes('--no-deps'), 'canonical setup is already audited separately');
   assert.ok(args.includes('--retries=0'));
 });
+
+test('production auth fixtures receive the exact session key through a file reference without printing its value', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'oss-production-auth-env-'));
+  try {
+    const state = join(fixture, 'state'), evidence = join(fixture, 'evidence');
+    const stack = join(state, 'golden', 'sample');
+    mkdirSync(stack, { recursive: true }); mkdirSync(join(state, 'env'));
+    writeFileSync(join(fixture, 'dev.sh'), '#!/bin/bash\n');
+    writeFileSync(join(fixture, 'aura'), '#!/bin/bash\nexit 1\n', { mode: 0o755 });
+    const secret = join(fixture, 'session key');
+    writeFileSync(secret, 'fixture-private-session-key', { mode: 0o600 });
+    writeFileSync(join(stack, 'session-secret.path'), secret + '\n');
+    writeFileSync(join(stack, 'ports'), '6683 5383 6383\n');
+    writeFileSync(join(state, 'env/sample.env'), `AURA_EVIDENCE_ROOT=${evidence}\n`);
+    registerFixtureWorkspace(fixture, join(fixture, 'product'));
+    const result = spawnSync('/bin/bash', [stackPath, 'env', 'sample'], { encoding: 'utf8', env: { ...process.env, AURA_WORKSPACE_ROOT: fixture, AURA_WORKSPACE_STATE_DIR: state } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, /fixture-private-session-key/);
+    const check = spawnSync('/bin/bash', ['-c', `${result.stdout}\ntest "$SESSION_SECRET" = fixture-private-session-key`], { encoding: 'utf8' });
+    assert.equal(check.status, 0, check.stderr);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
