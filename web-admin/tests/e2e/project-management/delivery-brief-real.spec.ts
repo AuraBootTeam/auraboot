@@ -47,7 +47,7 @@ test('delivery brief imports through the designer and exports the same governed 
   const file=await download;expect(await file.failure()).toBeNull();expect(file.suggestedFilename()).toMatch(new RegExp(`\\.${ext}$`));
   const output=join(evidence,`客户项目交付简报.${ext}`);await file.saveAs(output);const bytes=await readFile(output);expect(bytes.length).toBeGreaterThan(100);
   let text=bytes.toString('utf8');
-  if(format==='pdf'){expect(bytes.subarray(0,5).toString()).toBe('%PDF-');text=execFileSync('pdftotext',['-layout',output,'-'],{encoding:'utf8'});}
+  if(format==='pdf'){expect(bytes.subarray(0,5).toString()).toBe('%PDF-');const metadata=execFileSync('pdfinfo',[output],{encoding:'utf8'});const dimensions=metadata.match(/Page size:\s+([\d.]+) x ([\d.]+)/);expect(dimensions).not.toBeNull();expect(Number(dimensions![1])).toBeGreaterThan(Number(dimensions![2]));text=execFileSync('pdftotext',['-raw',output,'-'],{encoding:'utf8'});}
   if(format==='html'){const parsed=await page.evaluate(source=>{const doc=new DOMParser().parseFromString(source,'text/html');return {text:doc.body.textContent||'',tables:doc.querySelectorAll('table').length,scripts:doc.querySelectorAll('script').length};},text);expect(parsed.tables).toBe(3);expect(parsed.scripts).toBe(0);text=parsed.text;}
   if(format==='markdown'){expect(text).toMatch(/^# /);expect(text.match(/\| 客户名称 \| 客户联系人 \|/g)).toHaveLength(1);}
   const compact=(s:string)=>s.normalize('NFKC').replace(/\s+/g,'');

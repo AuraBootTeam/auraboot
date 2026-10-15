@@ -64,7 +64,16 @@ export async function renderRequestToPdf(
   const chromium = await loadBrowser();
   return renderHtmlToPdf(doc, {
     launchBrowser: () => chromium.launch(),
-    format: request.options?.format,
+    format: request.options?.format ?? request.model.page?.size,
+    landscape: request.model.page?.orientation === 'landscape',
+    margin: request.model.page?.margin
+      ? Object.fromEntries(Object.entries(request.model.page.margin).map(([side, value]) => {
+          if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+            throw new Error(`report-export CLI: invalid ${side} page margin`);
+          }
+          return [side, `${value}mm`];
+        }))
+      : undefined,
   });
 }
 
