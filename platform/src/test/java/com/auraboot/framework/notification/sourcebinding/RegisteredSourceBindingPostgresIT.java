@@ -16,6 +16,7 @@ import com.auraboot.framework.notification.service.NotificationTemplateService;
 import com.auraboot.framework.notification.service.impl.PluginNotificationDeliveryAccessorImpl;
 import com.auraboot.framework.notification.service.impl.StrictInAppDeliveryWriter;
 import com.auraboot.framework.notification.wechat.WechatSubscriptionProperties;
+import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.extension.DataPage;
 import com.auraboot.framework.plugin.extension.NotificationDeliveryAccessor;
@@ -110,14 +111,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "logging.level.org.mybatis=INFO",
         "logging.level.org.springframework.security=WARN",
         "logging.level.org.springframework.cache=WARN",
-        "s06.native.product-quote-facet.enabled=${S06_NATIVE_PRODUCT_QUOTE_FACET:false}",
-        "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
+        "s06.native.product-quote-facet.enabled=${S06_NATIVE_PRODUCT_QUOTE_FACET:false}"})
 @ActiveProfiles("integration-test")
 @Import(RegisteredSourceBindingPostgresIT.PollerIsolation.class)
 @EnabledIfEnvironmentVariable(named = "S06_NATIVE_SOURCE_BINDING", matches = "true")
 class RegisteredSourceBindingPostgresIT {
     @DynamicPropertySource
     static void productPluginDirectory(DynamicPropertyRegistry properties) {
+        String matchingKey = S06NativeEncryptionAdmission.requiredKey(System.getenv());
+        properties.add("security.field-encryption.key", () -> matchingKey);
         boolean selected = "true".equals(System.getenv("S06_NATIVE_PRODUCT_QUOTE_FACET"));
         String file = System.getenv("S06_NATIVE_PRODUCT_INPUT");
         String directory = System.getenv("S06_NATIVE_PRODUCT_PLUGIN_DIR");
@@ -172,6 +174,7 @@ class RegisteredSourceBindingPostgresIT {
     @Autowired StrictInAppDeliveryWriter writer;
     @Autowired PluginNotificationDeliveryAccessorImpl defaultHost;
     @Autowired WechatSubscriptionProperties wechat;
+    @Autowired FieldEncryptionService encryption;
     // Scheduling entry point only. No domain service, mapper, authority reader, writer or transport is mocked.
     @MockitoBean SchedulerEngine scheduler;
 
@@ -213,6 +216,8 @@ class RegisteredSourceBindingPostgresIT {
         assertThat(defaultProperties.getWorker().isEnabled()).isFalse();
         assertThat(ReflectionTestUtils.getField(defaultAdapter, "scheduler")).isNull();
         assertThat(ReflectionTestUtils.getField(defaultAdapter, "settings")).isNull();
+        trace.put("matchingEncryptionAdmission", S06NativeEncryptionAdmission.admit(
+                System.getenv(), json, encryption, getClass(), context.getEnvironment().getActiveProfiles()));
         trace.put("defaultPollingResourceAdmission", Map.of("workerEnabled", false,
                 "schedulerCreated", false, "settingsAdmitted", false));
         referenceRelationFixture = info.getTestMethod().orElseThrow().getName()
