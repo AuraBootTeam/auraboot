@@ -23,6 +23,14 @@ async function screenshot(page: Page, info: TestInfo, name: string) {
   });
 }
 
+type PageTreeBlock = { id?: string; title?: unknown; blocks?: PageTreeBlock[] };
+function blocksWithId(blocks: PageTreeBlock[], id: string): PageTreeBlock[] {
+  return blocks.flatMap((block) => [
+    ...(block.id === id ? [block] : []),
+    ...blocksWithId(block.blocks ?? [], id),
+  ]);
+}
+
 test('SC02: create a model, bind fields, publish and generate CRUD from the real menus', async ({
   page,
   browser,
@@ -103,12 +111,26 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await expect(page.getByTestId('model-publish-dialog')).toBeVisible();
   await screenshot(page, info, 'SC02-publish-confirmation');
   const acknowledgement = page.getByTestId('model-publish-impact-ack');
-  if (await acknowledgement.count()) await acknowledgement.check();
+  const impactAcknowledged = (await acknowledgement.count()) > 0;
+  if (impactAcknowledged) await acknowledgement.check();
   const publish = page.waitForResponse(
-    (r) => r.url().includes(`/api/meta/models/${pid}/publish`) && r.request().method() === 'POST',
-  );
+    (r) => r.url().endsWith(`/api/meta/models/${pid}/publish`) && r.request().method() === 'POST',
+  ).then((response) => ({
+    status: response.status(), url: response.url(), payload: response.request().postDataJSON(),
+  }));
   await page.getByTestId('model-publish-confirm').click();
-  expect(String((await (await publish).json()).code)).toBe('0');
+  // The successful UI action hard-reloads, invalidating the old CDP response body.
+  const published = await publish;
+  expect(published.status).toBe(200);
+  expect(published.payload.impactAcknowledged).toBe(impactAcknowledged);
+  const publishReadback = await page.request.get(`/api/meta/models/${pid}`);
+  expect(publishReadback.ok()).toBe(true);
+  const publishedBody = await publishReadback.json();
+  expect(String(publishedBody.code)).toBe('0');
+  expect(publishedBody.data).toMatchObject({ pid, code, status: 'published' });
+  await info.attach('SC02-ui-publish-and-persisted-state', {
+    body: JSON.stringify({ ...published, readback: publishedBody }), contentType: 'application/json',
+  });
   await expect(page.getByTestId('model-publish-dialog')).toBeHidden();
   await page.getByTestId('model-primary-page-action').click();
   await expect(page.getByTestId('crud-generate-list')).toBeChecked();
@@ -343,8 +365,15 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
   await page.getByTestId('designer-export').click();
   const download = await downloadEvent;
   expect(download.suggestedFilename()).toMatch(/\.page\.json$/);
-  const exported = JSON.parse(await readFile((await download.path())!, 'utf8'));
-  expect(exported.blocks.find((block: { id: string }) => block.id === 'customer_section_imported').title)
+  const exportedBytes = await readFile((await download.path())!);
+  await info.attach('SC05-page-exported-editor-tree', {
+    body: exportedBytes, contentType: 'application/json',
+  });
+  const exported = JSON.parse(exportedBytes.toString('utf8'));
+  // Export retains the V3 editor tree; persistence serializes its synthetic root to flat V4.
+  const exportedSections = blocksWithId(exported.blocks, 'customer_section_imported');
+  expect(exportedSections).toHaveLength(1);
+  expect(exportedSections[0].title)
     .toEqual({ 'zh-CN': '客户经营与交付信息', en: 'Customer follow-up information' });
   const save = page.waitForResponse(
     (r) => r.url().includes(`/api/pages/${pid}`) && r.request().method() === 'PUT',
@@ -354,9 +383,15 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
   await page.reload();
   await expect(page.getByTestId('outline-item-customer_section_imported')).toBeVisible();
   const persisted = await page.request.get(`/api/pages/${pid}`);
-  const persistedBlocks = (await persisted.json()).data.blocks;
-  expect(persistedBlocks.find((block: { id: string }) => block.id === 'customer_section_imported').title)
+  const persistedPage = (await persisted.json()).data;
+  expect(persistedPage.schemaVersion).toBe(4);
+  const persistedSections = persistedPage.blocks.filter((block: { id: string }) => block.id === 'customer_section_imported');
+  expect(persistedSections).toHaveLength(1);
+  expect(persistedSections[0].title)
     .toEqual({ 'zh-CN': '客户经营与交付信息', en: 'Customer follow-up information' });
+  await info.attach('SC05-page-persisted-flat-v4', {
+    body: JSON.stringify(persistedPage), contentType: 'application/json',
+  });
   await screenshot(page, info, 'SC05-page-template-reopened');
 });
 
