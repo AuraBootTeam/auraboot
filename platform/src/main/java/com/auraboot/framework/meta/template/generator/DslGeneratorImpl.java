@@ -417,7 +417,7 @@ public class DslGeneratorImpl implements DslGenerator {
         // Label resolved by frontend: action.create.label
         button.put("primary", true);
         // 权限码格式: model.{modelCode}.create
-        button.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".create')}");
+        button.put("permissionCode", "model." + model.getCode() + ".create");
 
         return button;
     }
@@ -428,7 +428,7 @@ public class DslGeneratorImpl implements DslGenerator {
         button.put("action", "export");
         // Label resolved by frontend: action.export.label
         // 权限码格式: model.{modelCode}.export
-        button.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".export')}");
+        button.put("permissionCode", "model." + model.getCode() + ".export");
 
         Map<String, Object> events = new LinkedHashMap<>();
         Map<String, Object> onClick = new LinkedHashMap<>();
@@ -445,7 +445,7 @@ public class DslGeneratorImpl implements DslGenerator {
         button.put("action", "import");
         // Label resolved by frontend: action.import.label
         // 权限码格式: model.{modelCode}.import
-        button.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".import')}");
+        button.put("permissionCode", "model." + model.getCode() + ".import");
 
         Map<String, Object> events = new LinkedHashMap<>();
         Map<String, Object> onClick = new LinkedHashMap<>();
@@ -463,7 +463,7 @@ public class DslGeneratorImpl implements DslGenerator {
         // Label resolved by frontend: action.deleteSelected
         button.put("danger", true);
         // 权限码格式: model.{modelCode}.delete
-        button.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".delete')}");
+        button.put("permissionCode", "model." + model.getCode() + ".delete");
         button.put("enableWhen", "${state.selectedIds.length > 0}");
 
         Map<String, Object> events = new LinkedHashMap<>();
@@ -614,7 +614,7 @@ public class DslGeneratorImpl implements DslGenerator {
         viewBtn.put("code", "view");
         viewBtn.put("action", Map.of("type", "builtin", "name", "view"));
         viewBtn.put("label", Map.of("zh-CN", "查看", "en", "View"));
-        viewBtn.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".read')}");
+        viewBtn.put("permissionCode", "model." + model.getCode() + ".read");
         // Label resolved by frontend: action.view.label
         buttons.add(viewBtn);
 
@@ -625,7 +625,7 @@ public class DslGeneratorImpl implements DslGenerator {
         editBtn.put("label", Map.of("zh-CN", "编辑", "en", "Edit"));
         // Label resolved by frontend: action.update
         // 权限码格式: model.{modelCode}.update
-        editBtn.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".update')}");
+        editBtn.put("permissionCode", "model." + model.getCode() + ".update");
         buttons.add(editBtn);
 
         // Delete button
@@ -635,7 +635,7 @@ public class DslGeneratorImpl implements DslGenerator {
         // Label resolved by frontend: action.delete.label
         deleteBtn.put("danger", true);
         // 权限码格式: model.{modelCode}.delete
-        deleteBtn.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".delete')}");
+        deleteBtn.put("permissionCode", "model." + model.getCode() + ".delete");
         Map<String, Object> deleteEvents = new LinkedHashMap<>();
         Map<String, Object> deleteOnClick = new LinkedHashMap<>();
         deleteOnClick.put("handler", "deleteSingle");
@@ -967,7 +967,7 @@ public class DslGeneratorImpl implements DslGenerator {
         // Label resolved by frontend: action.update
         editBtn.put("primary", true);
         // 权限码格式: model.{modelCode}.update
-        editBtn.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".update')}");
+        editBtn.put("permissionCode", "model." + model.getCode() + ".update");
         Map<String, Object> editEvents = new LinkedHashMap<>();
         Map<String, Object> editOnClick = new LinkedHashMap<>();
         editOnClick.put("handler", "openEditForm");

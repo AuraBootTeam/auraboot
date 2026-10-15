@@ -38,6 +38,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const code = `launch_followup_${Date.now().toString(36)}`;
   await page.goto('/home');
   await menu(page, '模型管理');
+  await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('toolbar-btn-create').click();
   await page.getByTestId('model-type-physical').click();
   await page.getByTestId('model-code-input').fill(code);
@@ -206,6 +207,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const customerField = `${code}_customer_name`;
   const amountField = `${code}_opportunity_amount`;
   const customerName = `华辰客户跟进 ${Date.now()}`;
+  await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('toolbar-btn-create').click();
   await page.getByTestId(`form-field-${customerField}`).locator('input').fill(customerName);
   await page.getByTestId(`form-field-${amountField}`).locator('input').fill('42000');
@@ -215,6 +217,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const createRecord = page.waitForResponse(
     (r) => new URL(r.url()).pathname === `/api/dynamic/${code}` && r.request().method() === 'POST',
   );
+  await expect(page.getByTestId('form-btn-submit')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('form-btn-submit').click();
   const createdRecordResponse = await createRecord;
   expect(createdRecordResponse.ok()).toBe(true);
@@ -228,6 +231,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(recordPid).toMatch(/^[0-9A-Z]{26}$/);
   const row = page.locator('tr').filter({ hasText: customerName });
   await expect(row).toBeVisible();
+  await expect(row.getByTestId('row-action-edit')).toBeVisible({ timeout: 10000 });
   await row.getByTestId('row-action-edit').click();
   await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(
     customerName,
@@ -239,6 +243,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
       new URL(r.url()).pathname === `/api/dynamic/${code}/${recordPid}` &&
       r.request().method() === 'PUT',
   );
+  await expect(page.getByTestId('form-btn-submit')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('form-btn-submit').click();
   const updatedRecordResponse = await updateRecord;
   expect(updatedRecordResponse.ok()).toBe(true);
@@ -252,9 +257,11 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     [customerField]: customerName,
     [amountField]: 68000,
   });
+  await expect(row.getByTestId('row-action-edit')).toBeVisible({ timeout: 10000 });
   await row.getByTestId('row-action-edit').click();
   await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('68000');
   await screenshot(page, info, 'SC02-customer-followup-saved-reopened');
+  await expect(page.getByTestId('form-btn-cancel')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('form-btn-cancel').click();
 
   // Provision a task-owned read-only role. API use here is setup and a negative

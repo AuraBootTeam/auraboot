@@ -35,14 +35,19 @@ class DslGeneratorPermissionContractTest {
             default -> generator.generateDetailPage(model, List.of(), List.of(), config);
         };
         var blocks = json.readTree(page.getBlocks());
-        var guards = blocks.findValues("visibleWhen").stream()
-                .filter(guard -> guard.asText().contains("hasPermission(")).toList();
-        assertThat(guards).isNotEmpty();
-        assertThat(guards).allSatisfy(guard -> {
-            assertThat(guard.asText()).contains("hasPermission('model.customer.").doesNotContain("DYNAMIC.");
-            assertThat(guard.asText()).isNotEqualTo("true");
-        });
-        String all = guards.toString();
+        var permissionCodes = blocks.findValues("permissionCode");
+        var expressions = blocks.findValues("visibleWhen");
+        if ("form".equals(kind)) {
+            // A shared create/edit form has a real authenticated expression context.
+            assertThat(expressions).anySatisfy(expression -> assertThat(expression.asText())
+                    .isEqualTo("${hasPermission('model.customer.create') || hasPermission('model.customer.update')}"));
+        } else {
+            assertThat(permissionCodes).isNotEmpty().allSatisfy(permission ->
+                    assertThat(permission.asText()).startsWith("model.customer."));
+            assertThat(expressions).noneSatisfy(expression ->
+                    assertThat(expression.asText()).contains("hasPermission("));
+        }
+        String all = permissionCodes.toString() + expressions;
         if ("list".equals(kind)) {
             assertThat(all).contains("model.customer.read", "model.customer.create", "model.customer.update", "model.customer.delete");
             var expected = java.util.Map.of("create", "new", "edit", "edit", "view", "view");
