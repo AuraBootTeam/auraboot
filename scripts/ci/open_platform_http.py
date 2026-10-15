@@ -96,7 +96,9 @@ class Client:
         self.stopped = False
         self.opener = opener or urllib.request.build_opener(NoRedirect())
 
-    def request(self, path, method="GET", body=None, headers=None, form=None, raw=None, expected=(200,)):
+    def request(self, path, method="GET", body=None, headers=None, form=None, raw=None, expected=(200,), response_type="json"):
+        if response_type not in {"json", "text"}:
+            raise ValueError("response type must be explicitly JSON or text")
         if not path.startswith("/") or path.startswith("//") or "#" in path:
             raise ValueError("request path must be origin-relative")
         if self.stopped or self.request_count >= self.max_requests:
@@ -136,7 +138,13 @@ class Client:
         if len(raw) > 4 * 1024 * 1024:
             raise ProtocolError("response exceeds byte budget")
         try:
-            parsed = json.loads(raw) if raw else None
+            if response_type == "text":
+                content_type = next((value for key,value in response_headers.items() if key.lower()=="content-type"), "")
+                if not content_type.lower().startswith("text/plain"):
+                    raise ProtocolError("expected bounded plain-text artifact")
+                parsed = raw.decode("utf-8")
+            else:
+                parsed = json.loads(raw) if raw else None
         except (ValueError, UnicodeError):
             raise ProtocolError(f"{method}: HTTP {status} response is not JSON") from None
         return status, parsed, response_headers

@@ -86,3 +86,16 @@ export interface ActionSource {
 export interface ActionPublicationView { code: string; draft: PublicAction; draftRevision: number; activeVersion: number | null; status: string }
 export interface InstallationActionPolicy { execute: boolean; effectFields: string[] }
 export interface ActionGrantView { code: string; status: string; contract: PublicAction; policy: InstallationActionPolicy | null }
+
+
+export interface PublicEndpoint {
+  code: string; candidateCode: string; adapterCode: string; bindingCode: string; schemaVersion: number;
+  sourceFingerprint: string; scopes: { invoke: string }; timeoutMs: number; maxConcurrent: number;
+}
+export interface EndpointCandidate {
+  code: string | null; name: string; localizedDisplayNames: Record<string, string>; internalMethod: string; internalPath: string;
+  adapterCode: string | null; actionSourceKind: string | null; externalMethod: string | null; targetRequired: boolean; fingerprint: string | null; available: boolean; reason: string | null;
+}
+export interface EndpointDescription { candidate: EndpointCandidate; bindingCode: string; fingerprint: string; minTimeoutMs: number }
+export interface EndpointPublicationView { code: string; draft: PublicEndpoint; draftRevision: number; activeVersion: number | null; status: string }
+export interface EndpointGrantView { code: string; status: string; contract: PublicEndpoint; policy: { invoke: boolean } | null }

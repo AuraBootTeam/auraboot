@@ -14,6 +14,7 @@ from open_platform_model_event_probe import run_model_event_probe
 from open_platform_model_event_runtime import DockerInfrastructure
 from open_platform_integration_token_probe import run_integration_token_probe
 from open_platform_office_probe import run_office_probe
+from open_platform_endpoint_probe import run_endpoint_probe
 
 bootstrap_spec = importlib.util.spec_from_file_location(
     "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
@@ -140,7 +141,8 @@ def main():
     # Preserve the original qualification budget; new independent journeys own bounded budgets.
     clients = {"baseline": Client(BASE, max_requests=1000, allow_expected_rate_limit=True),
                "integrationTokens": Client(BASE, max_requests=64),
-               "officeGuide": Client(BASE, max_requests=512)}
+               "officeGuide": Client(BASE, max_requests=512),
+               "controllerEndpoints": Client(BASE, max_requests=256)}
 
     def request_counts():
         return {name: {"executed": client.request_count, "limit": client.max_requests}
@@ -186,13 +188,16 @@ def main():
             secret=Path(os.environ["MODEL_EVENT_SECRET_FILE"]).read_bytes().rstrip(b"\r\n"))
         infrastructure.identity()
 
+        endpoints = run_endpoint_probe(clients["controllerEndpoints"].request, admin, evidence=Path(ARTIFACT).parent / "controller-endpoints")
+        infrastructure.identity()
+
         slo_fixture = prepare_slo_fixture(request, admin, dynamic, load_input,
             fixture_path=os.environ.get("SLO_FIXTURE_ARTIFACT", str(Path(ARTIFACT).with_name("slo-fixture.json"))))
 
         with open(ARTIFACT, "w", encoding="utf-8") as handle:
             json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
         os.chmod(ARTIFACT, 0o600)
-        print(json.dumps(dict(static["public"], requestCounts=request_counts(), integrationTokens=integration_tokens, officeGuide=office, dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
+        print(json.dumps(dict(static["public"], requestCounts=request_counts(), integrationTokens=integration_tokens, officeGuide=office, controllerEndpoints=endpoints, dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
     finally:
         with open(Path(ARTIFACT).with_name("protocol-request-counts.json"), "x") as output:
             json.dump(request_counts(), output, sort_keys=True)

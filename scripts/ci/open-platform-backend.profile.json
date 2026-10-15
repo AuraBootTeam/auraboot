@@ -18,7 +18,13 @@
     "QAT-01",
     "QAT-06",
     "QAT-08",
-    "QAT-09"
+    "QAT-09",
+    "CEP-01",
+    "CEP-02",
+    "CEP-03",
+    "CEP-04",
+    "CEP-06",
+    "CEP-07"
   ],
   "packages": [
     "com.auraboot.framework.openplatform"

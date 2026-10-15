@@ -10,7 +10,7 @@ import java.util.Map;
 
 /** Public resource-specific status contracts; common authentication errors retain the host handler. */
 @Order(0)
-@RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class, OpenApiActionController.class})
+@RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class, OpenApiActionController.class, OpenApiEndpointController.class})
 public class OpenApiResourceErrorHandler {
     // Match the root denial before Spring can select its validation cause as a 400.
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)

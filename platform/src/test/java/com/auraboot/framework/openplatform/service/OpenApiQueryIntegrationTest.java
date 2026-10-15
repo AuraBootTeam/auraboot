@@ -35,6 +35,9 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenApiPublicationService resources;
     @Autowired private OpenApiQueryPublicationService publications;
     @Autowired private OpenApiQueryService publicQueries;
+    @Autowired private OpenApiEndpointPublicationService endpointPublications;
+    @Autowired private OpenApiEndpointService publicEndpoints;
+
     @Autowired private OpenApiResourceService publicResources;
     @Autowired private OpenPlatformManagementService management;
     @Autowired private OpenPlatformTokenService tokens;
@@ -52,6 +55,30 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     private MachinePrincipal principalA,principalB;
     private String tokenA, tokenB;
     private Set<String> scopes;
+
+    @Test void controllerQueryEndpointKeepsTypedMultiSourceRowsAndExplicitFixedOrPermanentAuthority() throws Exception {
+        String code = "endpoint.query." + UniqueIdGenerator.generate().toLowerCase();
+        var source = endpointPublications.source("query.execute", rows.code());
+        var endpoint = new OpenApiEndpointContract(code, "query.execute", "query.execute", rows.code(), 1,
+                source.fingerprint(), Map.of("invoke", code + ".invoke"), Math.max(5000, source.minTimeoutMs()), 2);
+        endpointPublications.saveDraft(code, new OpenApiEndpointPublicationService.DraftRequest(0, endpoint)); endpointPublications.publish(code, 1);
+        endpointPublications.grant(principalA.installationPid(), code, new OpenApiEndpointPolicy(true));
+        var allowed = new HashSet<>(scopes); allowed.add(code + ".invoke");
+        management.updateScopes(principalA.installationPid(),new UpdateInstallationScopesRequest(allowed));
+        var human = MetaContext.snapshot();
+        for (String mode : List.of("fixed", "never")) {
+            MetaContext.restore(human);
+            var issued = integrationTokens.create(principalA.installationPid(),new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Endpoint query",mode,null),"controller-query-"+mode);
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint.path()).header("Authorization","Bearer "+issued.token())
+                    .contentType("application/json").content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].childName").value("Child A"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].secret").doesNotExist());
+        }
+        MetaContext.restore(human);
+        assertThat(endpointPublications.types(code)).contains("EndpointRequest","QueryParameters","EndpointResult");
+        assertThat(json.valueToTree(endpointPublications.document(code)).toString()).contains(endpoint.path()).doesNotContain("/api/meta",rows.queryCode());
+    }
 
     @Test void fixedAndPermanentIntegrationTokensUseRealResourceAndQueryAuthority() throws Exception {
         var human = MetaContext.snapshot();

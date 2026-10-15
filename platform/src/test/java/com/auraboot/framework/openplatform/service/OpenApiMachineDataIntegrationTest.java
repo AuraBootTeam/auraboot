@@ -40,6 +40,10 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private CommandExecutor executor;
     @Autowired private OpenApiLegacyAuthority legacy;
     @Autowired private OpenApiActionPublicationService actionPublications;
+    @Autowired private OpenApiEndpointPublicationService endpointPublications;
+    @Autowired private OpenApiEndpointValidator endpointValidator;
+    @Autowired private OpenApiEndpointService publicEndpoints;
+
     @Autowired private OpenApiActionValidator actionValidator;
     @Autowired private OpenApiActionService publicActions;
     @Autowired private IntegrationTokenService integrationTokens;
@@ -2324,4 +2328,114 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             } finally { MetaContext.clear(); }
         });
     }
+    private OpenApiEndpointContract publishControllerEndpoint(String candidate, String binding) {
+        String code = "endpoint." + UniqueIdGenerator.generate().toLowerCase();
+        var source = endpointPublications.source(candidate, binding);
+        var endpoint = new OpenApiEndpointContract(code, candidate, source.candidate().adapterCode(), binding, 1,
+                source.fingerprint(), Map.of("invoke", code + ".invoke"), Math.max(5000, source.minTimeoutMs()), 2);
+        endpointPublications.saveDraft(code, new OpenApiEndpointPublicationService.DraftRequest(0, endpoint));
+        endpointPublications.publish(code, 1);
+        endpointPublications.grant(principal.installationPid(), code, new OpenApiEndpointPolicy(true));
+        var scopes = new HashSet<>(principal.scopes()); scopes.add(code + ".invoke");
+        management.updateScopes(principal.installationPid(), new UpdateInstallationScopesRequest(scopes));
+        var issued = integrationTokens.create(principal.installationPid(),
+                new com.auraboot.framework.openplatform.dto.IntegrationTokenDtos.Create("Controller endpoint", "never", null), "endpoint-token-" + code);
+        rawToken = issued.token();
+        var identity = auth.findToken(secrets.sha256(rawToken), OpenPlatformTokenService.AUDIENCE, Instant.now());
+        principal = new MachinePrincipal(identity.tenantId(), identity.tokenPid(), "machine", scopes,
+                identity.applicationPid(), identity.installationPid(), identity.environment(), identity.tokenPid());
+        return endpoint;
+    }
+
+    @Test void controllerEndpointsUseActualRoutesCurrentRowsAndDirectPermanentTokenOverHttp() throws Exception {
+        var get = publishControllerEndpoint("dynamic.get", contract.code());
+        var list = publishControllerEndpoint("dynamic.list", contract.code());
+        assertThat(endpointPublications.candidates("/api/dynamic")).anySatisfy(candidate -> {
+            assertThat(candidate.code()).isEqualTo("dynamic.get");
+            assertThat(candidate.internalPath()).isEqualTo("/api/dynamic/{pageKey}/{recordPid}");
+        });
+        String path = get.path().replace("{recordPid}", allowedPid);
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Visible"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.secret").doesNotExist())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists("ETag"));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(get.path().replace("{recordPid}", deniedPid)).header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(list.path()).param("limit","10")
+                .param("filters", "[{\"field\":\"zone\",\"operator\":\"EQ\",\"value\":\"A\"}]").header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+    }
+
+    @Test void controllerEndpointsPreserveWriteEtagReplayAndIndependentExternalRouteKeys() {
+        var create = publishControllerEndpoint("dynamic.create", contract.code());
+        var other = publishControllerEndpoint("dynamic.create", contract.code());
+        var update = publishControllerEndpoint("dynamic.update", contract.code());
+        var delete = publishControllerEndpoint("dynamic.delete", contract.code());
+        var first = installedBusinessCall(() -> publicEndpoints.invoke(principal, create.code(), "POST", null, Map.of(),
+                Map.of("name", "Created by endpoint", "zone", "A"), "same-client-key", null));
+        var replay = installedBusinessCall(() -> publicEndpoints.invoke(principal, create.code(), "POST", null, Map.of(),
+                Map.of("zone", "A", "name", "Created by endpoint"), "same-client-key", null));
+        var separate = installedBusinessCall(() -> publicEndpoints.invoke(principal, other.code(), "POST", null, Map.of(),
+                Map.of("name", "Created by endpoint", "zone", "A"), "same-client-key", null));
+        assertThat(first.status()).isEqualTo(201); assertThat(replay.replay()).isTrue(); assertThat(replay.body()).isEqualTo(first.body());
+        assertThat(separate.body().get("pid")).isNotEqualTo(first.body().get("pid"));
+        String pid = first.body().get("pid").toString();
+        var changed = installedBusinessCall(() -> publicEndpoints.invoke(principal, update.code(), "PATCH", pid, Map.of(), Map.of("name", "Updated endpoint"),
+                "update-endpoint-key", first.headers().get("ETag")));
+        assertThat(changed.body()).containsEntry("name", "Updated endpoint");
+        var removed = installedBusinessCall(() -> publicEndpoints.invoke(principal, delete.code(), "DELETE", pid, Map.of(), null,
+                "delete-endpoint-key", changed.headers().get("ETag")));
+        assertThat(removed.status()).isEqualTo(204);
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicEndpoints.invoke(principal, update.code(), "PATCH", allowedPid, Map.of(), Map.of("name","Stale"),
+                "stale-endpoint-key", first.headers().get("ETag")))).isInstanceOf(OpenApiPreconditionException.class);
+    }
+
+    @Test void controllerEndpointAuthorityNeverReplacesResourceGrantsAndRevocationIsImmediate() {
+        var get = publishControllerEndpoint("dynamic.get", contract.code());
+        assertThat(installedBusinessCall(() -> publicEndpoints.invoke(principal,get.code(),"GET",allowedPid,Map.of(),null,null,null)).body()).containsEntry("name","Visible");
+        endpointPublications.revoke(principal.installationPid(), get.code());
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicEndpoints.invoke(principal,get.code(),"GET",allowedPid,Map.of(),null,null,null))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void controllerEndpointRejectsResourceRevocationEvenWithItsOwnGrant() {
+        var get = publishControllerEndpoint("dynamic.get", contract.code()); publications.revoke(principal.installationPid(), contract.code());
+        assertThatThrownBy(() -> installedBusinessCall(() -> publicEndpoints.invoke(principal,get.code(),"GET",allowedPid,Map.of(),null,null,null))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void controllerEndpointPublicationLifecycleExportsPublicContractsWithoutInternalRoutes() {
+        var endpoint = publishControllerEndpoint("dynamic.get", contract.code());
+        assertThat(endpointPublications.list()).extracting(OpenApiEndpointPublicationService.View::code).contains(endpoint.code());
+        assertThat(endpointPublications.installationGrants(principal.installationPid())).filteredOn(row -> row.code().equals(endpoint.code())).singleElement().satisfies(row -> assertThat(row.policy().invoke()).isTrue());
+        assertThat(json.valueToTree(endpointPublications.document(endpoint.code())).toString()).contains(endpoint.path(),"integrationToken","oauth2ClientCredentials")
+                .doesNotContain("/api/dynamic",contract.modelCode(),endpoint.sourceFingerprint());
+        assertThat(endpointPublications.types(endpoint.code())).contains("EndpointRequest", "EndpointResult", "Resource").doesNotContain("/api/dynamic");
+        var next = new OpenApiEndpointContract(endpoint.code(),endpoint.candidateCode(),endpoint.adapterCode(),endpoint.bindingCode(),2,endpoint.sourceFingerprint(),endpoint.scopes(),6000,3);
+        endpointPublications.saveDraft(endpoint.code(),new OpenApiEndpointPublicationService.DraftRequest(1,next)); endpointPublications.publish(endpoint.code(),2);
+        assertThat(endpointPublications.active(principal.tenantId(),endpoint.code())).contains(next);
+        endpointPublications.withdraw(endpoint.code(),2); assertThat(endpointPublications.active(principal.tenantId(),endpoint.code())).isEmpty();
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void controllerEndpointDelegatesRegisteredBusinessCommandWithItsSeparateDataAuthority() {
+        var action = publishBusinessAction("command"); var endpoint = publishControllerEndpoint("command.execute", action.code());
+        try {
+        String etag = installedBusinessCall(() -> resources.get(principal,contract.code(),allowedPid)).headers().get("ETag");
+        var result = installedBusinessCall(() -> publicEndpoints.invoke(principal,endpoint.code(),"POST",null,Map.of(),Map.of("targetPid",allowedPid,"input",Map.of("zone","A")),"controller-command-key",etag));
+        assertThat(((Map<?, ?>) result.body().get("resource")).get("name")).isEqualTo("Assigned");
+        assertThat(endpointPublications.types(endpoint.code())).contains("ActionRequest","EndpointResult");
+        assertThat(endpointPublications.document(endpoint.code()).get("paths").toString()).contains(endpoint.path());
+        } finally {
+            endpointPublications.withdraw(endpoint.code(),1); actionPublications.withdraw(action.code(),1);
+            try { commands.delete(commands.findByCode(action.sourceCode()).getPid()); }
+            finally { cleanupCommittedFixture(); }
+        }
+    }
+
 }

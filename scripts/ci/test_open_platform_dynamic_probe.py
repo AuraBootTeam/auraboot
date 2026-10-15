@@ -45,6 +45,20 @@ def office_passed():
         projection=sorted(records.values(),key=lambda row:row['pid']))
 
 
+
+def endpoints_passed():
+    # Hermetic verifier fixture, never release qualification evidence.
+    from open_platform_endpoint_probe import DEFINITIONS, STATUSES
+    created={'pid':'record-pid','location':'HQ','name':'Endpoint device'}
+    updated=dict(created,name='Endpoint updated')
+    return dict(profile='controller-endpoints-http-v1',observations=dict(STATUSES),executed=len(STATUSES),failed=0,skipped=0,
+        contracts=[dict(code='office.endpoint.'+name,candidateCode=d[0],adapterCode=d[1],bindingCode=d[2],method=d[3],target=d[4],
+            fingerprint='a'*64,openapiSha256='b'*64,typesSha256='c'*64) for name,d in DEFINITIONS.items()],
+        resourceProof=dict(pid='record-pid',created=created,replayed=dict(created),updated=updated,stalePersisted=dict(updated),
+            assigned=dict(updated,status='in_use',assignedTo='Endpoint operator'),createReplayHeader='true',commandReplayHeader='true',createdEtag='"v1"',updatedEtag='"v2"'),
+        queryProjection=[{'pid':'allowed-pid','name':'Visible'}],hiddenQueryItems=[],unadaptedBlocked=True,expirationModes=['fixed','never'],publishedVersion=1)
+
+
 def passed():
     audits = []
     fixtures = [("resource-row-field-projection", "list", 200, None, None),
@@ -699,6 +713,7 @@ class DynamicProbeTests(unittest.TestCase):
                 result = [dict(sourceKind=kind,sourceCode=code,available=True,fingerprint="a"*64,permission="release.slo.manage" if kind=="command" else None,
                     parameters={},inputFields={},effectFields=["name","zone"] if kind=="command" else [],outputFields={},minTimeoutMs=5000)
                     for kind,code in [("command","release_slo_assign"),("handler","core.visible-page")]]
+            if path.startswith("/api/open-platform/endpoint-source?"): result = {"fingerprint":"a"*64,"minTimeoutMs":5000}
             if path.endswith("/integration-tokens"): result = {"token":"private-direct-token","metadata":{"expirationMode":"never","expiresAt":None}}
             return 200, {"code": 0, "data": result}, {}
         consumer = {"resourceCode": "release.dynamic.parts", "queryCode": "release.dynamic.by-zone", "allowedPid": "allowed-pid", "hiddenPid": "hidden-pid"}
@@ -983,24 +998,24 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()}, model_event_secret=SECRET)
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "controllerEndpoints": endpoints_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}, "controllerEndpoints": {"executed": 100, "limit": 256}}},
                                   model_event_secret=SECRET)
         measured = model_passed(); measured["loadMeasurement"] = load_passed(); measured["sustainedMeasurement"] = sustained_passed(); measured["receiverIsolation"] = isolation_passed(); measured["genericReplay"] = generic_replay_passed()
-        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "controllerEndpoints": endpoints_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}, "controllerEndpoints": {"executed": 100, "limit": 256}}},
                                               model_event_secret=SECRET)["sdk"], sdk)
         for field in ['loadMeasurement', 'sustainedMeasurement', 'receiverIsolation', 'genericReplay']:
             omitted = dict(measured); omitted.pop(field)
             with self.assertRaises(ProtocolError):
                 verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": omitted,
-                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}}, model_event_secret=SECRET)
+                    "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "controllerEndpoints": endpoints_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}, "controllerEndpoints": {"executed": 100, "limit": 256}}}, model_event_secret=SECRET)
         measured["loadMeasurement"]["metrics"]["accepted"] = 0
         with self.assertRaises(ProtocolError):
-            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}},
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed(), "integrationTokens": integration_tokens_passed(), "officeGuide": office_passed(), "controllerEndpoints": endpoints_passed(), "requestCounts": {"baseline": {"executed": 850, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}, "controllerEndpoints": {"executed": 100, "limit": 256}}},
                                   model_event_secret=SECRET)
 
     def test_release_phase_budgets_preserve_original_and_reject_missing_or_unbounded_counts(self):
         from open_platform_dynamic_probe import verify_request_counts
-        good = {"baseline": {"executed": 999, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}}
+        good = {"baseline": {"executed": 999, "limit": 1000}, "integrationTokens": {"executed": 32, "limit": 64}, "officeGuide": {"executed": 40, "limit": 512}, "controllerEndpoints": {"executed": 100, "limit": 256}}
         self.assertEqual(verify_request_counts(good), good)
         for value in [None, {}, {**good, "unknown": {}}, {key: row for key, row in good.items() if key != "officeGuide"}]:
             with self.assertRaises(ProtocolError): verify_request_counts(value)
@@ -1096,10 +1111,26 @@ class OfficeGuideVerifierTest(unittest.TestCase):
                 with self.assertRaises(ProtocolError):self.verify(report)
 
 
+class EndpointVerifierTest(unittest.TestCase):
+    def test_missing_status_false_green_source_mismatch_and_missing_artifact_are_rejected(self):
+        from open_platform_endpoint_probe import verify_endpoint_report
+        self.assertEqual(verify_endpoint_report(endpoints_passed()),endpoints_passed())
+        mutations=[lambda r:r['observations'].pop('endpoint-revoked'),lambda r:r['observations'].update(**{'underlying-revoked':200}),
+            lambda r:r.update(executed=0),lambda r:r.update(skipped=1),lambda r:r['contracts'].pop(),
+            lambda r:r['contracts'][0].update(candidateCode='unregistered'),lambda r:r['contracts'][0].update(typesSha256=''),
+            lambda r:r['resourceProof']['replayed'].update(pid='different'),lambda r:r['resourceProof'].update(updatedEtag='"v1"'),
+            lambda r:r['resourceProof']['assigned'].update(status='available'),lambda r:r['queryProjection'][0].update(secret='private'),
+            lambda r:r.update(hiddenQueryItems=[{'pid':'hidden'}]),lambda r:r.update(unadaptedBlocked=False)]
+        for index,mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                report=endpoints_passed();mutate(report)
+                with self.assertRaises(ProtocolError):verify_endpoint_report(report)
+
+
 class QuickAccessUiVerifierTest(unittest.TestCase):
     def fixture(self, directory, mutate=None):
         import hashlib, struct, zlib, zipfile
-        from open_platform_quick_ui import SOURCE_FILES, TITLES, TOKEN_IMAGES, BUSINESS_IMAGES, TOKEN_STATES, BUSINESS_STATES
+        from open_platform_quick_ui import SOURCE_FILES, TITLES, TOKEN_IMAGES, BUSINESS_IMAGES, TOKEN_STATES, BUSINESS_STATES, ENDPOINT_IMAGES, ENDPOINT_STATES
         root=Path(directory)/'source';root.mkdir()
         for name in SOURCE_FILES:
             target=root/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_text('Hermetic source fixture '+name)
@@ -1109,24 +1140,24 @@ class QuickAccessUiVerifierTest(unittest.TestCase):
         files={};runs=[]
         for locale in ('zh-CN','en-US'):
             for viewport in ('desktop','narrow'):
-                report={'stats':{'expected':3,'unexpected':0,'flaky':0,'skipped':0},'errors':[],
+                report={'stats':{'expected':4,'unexpected':0,'flaky':0,'skipped':0},'errors':[],
                     'suites':[{'specs':[{'title':title,'ok':True,'tests':[{'expectedStatus':'passed','status':'expected','annotations':[],
                         'results':[{'status':'passed','retry':0}]}]} for title in sorted(TITLES)]}]}
                 filename=locale+'-'+viewport+'.json';raw=json.dumps(report).encode();files[filename]=raw
                 run={'locale':locale,'viewport':viewport,'report':filename,'reportSha256':digest(raw),'journeys':[],'images':[],'artifacts':[]}
                 base='ui-golden-20260914/'
-                for kind in ('token','command','handler'):
-                    prefix=base+(f'quick-token-{locale}-{viewport}' if kind=='token' else f'business-api-{locale}-{viewport}-{kind}')+'/'
-                    journey={'profile':'quick-token-browser-v1' if kind=='token' else 'business-api-browser-v1','locale':locale,'viewport':viewport,
-                        'passed':True,'executed':TOKEN_STATES if kind=='token' else BUSINESS_STATES}
-                    if kind!='token':journey['kind']=kind
+                for kind in ('token','command','handler','endpoint'):
+                    prefix=base+(f'quick-token-{locale}-{viewport}' if kind=='token' else f'controller-endpoint-{locale}-{viewport}' if kind=='endpoint' else f'business-api-{locale}-{viewport}-{kind}')+'/'
+                    journey={'profile':'quick-token-browser-v1' if kind=='token' else 'controller-endpoint-browser-v1' if kind=='endpoint' else 'business-api-browser-v1','locale':locale,'viewport':viewport,
+                        'passed':True,'executed':TOKEN_STATES if kind=='token' else ENDPOINT_STATES if kind=='endpoint' else BUSINESS_STATES}
+                    if kind in ('command','handler'):journey['kind']=kind
                     name=prefix+'result.json';raw=json.dumps(journey).encode();files[name]=raw;run['journeys'].append({'path':name,'sha256':digest(raw)})
-                    for leaf in (['QAT-07-'+name for name in TOKEN_IMAGES] if kind=='token' else BUSINESS_IMAGES):
+                    for leaf in (['QAT-07-'+name for name in TOKEN_IMAGES] if kind=='token' else ENDPOINT_IMAGES if kind=='endpoint' else BUSINESS_IMAGES):
                         name=prefix+leaf+'.png';files[name]=png;run['images'].append({'path':name,'sha256':digest(png),
                             'review':{'verdict':'passed','notes':'Hermetic parser fixture; not real visual evidence.'}})
                     if kind!='token':
-                        name=prefix+'fixture.openapi.json';raw=json.dumps({'openapi':'3.1.0','paths':{'/api/open/v1/actions/fixture:execute':{'post':{}}},'description':'Hermetic artifact fixture'}).encode();files[name]=raw;run['artifacts'].append({'path':name,'sha256':digest(raw)})
-                        name=prefix+'fixture.d.ts';raw=b'export type ActionRequest = {input: {limit: number}}; export type ActionResult = {countOnPage:number,hasMore:boolean};';files[name]=raw;run['artifacts'].append({'path':name,'sha256':digest(raw)})
+                        name=prefix+'fixture.openapi.json';raw=json.dumps({'openapi':'3.1.0','paths':{('/api/open/v1/endpoints/fixture' if kind=='endpoint' else '/api/open/v1/actions/fixture:execute'):{'post':{}}},'description':'Hermetic artifact fixture'}).encode();files[name]=raw;run['artifacts'].append({'path':name,'sha256':digest(raw)})
+                        name=prefix+'fixture.d.ts';raw=(b'export type EndpointRequest = {limit: number}; export type EndpointResult = {countOnPage:number,hasMore:boolean};' if kind=='endpoint' else b'export type ActionRequest = {input: {limit: number}}; export type ActionResult = {countOnPage:number,hasMore:boolean};');files[name]=raw;run['artifacts'].append({'path':name,'sha256':digest(raw)})
                 runs.append(run)
         receipt={'profile':'open-platform-quick-ui-v1','coreCommit':'a'*40,'sourceHashes':{name:digest((root/name).read_bytes()) for name in SOURCE_FILES},'runs':runs}
         if mutate:mutate(receipt,files)
@@ -1140,7 +1171,7 @@ class QuickAccessUiVerifierTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root,archive=self.fixture(directory)
             result=verify_archive(archive,root=root,expected_ref='a'*40)
-            self.assertEqual((result['browserCases'],result['reviewedOriginalImages'],result['downloadedArtifacts']),(12,80,16))
+            self.assertEqual((result['browserCases'],result['reviewedOriginalImages'],result['downloadedArtifacts']),(16,104,24))
             with self.assertRaises(ProtocolError):verify_archive(archive,root=root,expected_ref='b'*40)
         mutations=[lambda r,f:r['runs'].pop(),lambda r,f:r['sourceHashes'].update({next(iter(r['sourceHashes'])):'0'*64}),
             lambda r,f:r['runs'][0]['images'].pop(),lambda r,f:r['runs'][0]['images'][0]['review'].update(verdict='pending'),
@@ -1153,7 +1184,7 @@ class QuickAccessUiVerifierTest(unittest.TestCase):
 
     def test_actual_browser_result_rejects_skip_retry_missing_actions_and_false_green(self):
         from open_platform_quick_ui import parse_browser, TITLES
-        report={'stats':{'expected':3,'unexpected':0,'flaky':0,'skipped':0},'errors':[],
+        report={'stats':{'expected':4,'unexpected':0,'flaky':0,'skipped':0},'errors':[],
             'suites':[{'specs':[{'title':title,'ok':True,'tests':[{'expectedStatus':'passed','status':'expected','annotations':[],
                 'results':[{'status':'passed','retry':0}]}]} for title in TITLES]}]}
         self.assertEqual(parse_browser(json.dumps(report).encode()),report)
