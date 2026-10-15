@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.registry.DslRegistryExporter;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.Map;
 @RequestMapping("/api/dsl")
 @RequiredArgsConstructor
 @Tag(name = "DSL Registry", description = "DSL capability registry export")
+@AuthenticatedAccess("read-only DSL capability registry export for tooling and documentation")
 public class DslRegistryController {
 
     private final DslRegistryExporter exporter;

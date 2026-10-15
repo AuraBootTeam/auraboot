@@ -2,6 +2,7 @@ package com.auraboot.framework.timezone.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.tenant.service.TenantPreferenceService;
 import com.auraboot.framework.timezone.service.TimezoneMigrationService;
 import com.auraboot.framework.timezone.service.TimezoneMigrationService.MigrationAssessment;
@@ -21,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/tenants/timezone")
 @RequiredArgsConstructor
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; assesses and applies tenant display-timezone changes")
 public class TenantTimezoneController {
 
     private static final String TIMEZONE_PREF_KEY = "ui.timezone";

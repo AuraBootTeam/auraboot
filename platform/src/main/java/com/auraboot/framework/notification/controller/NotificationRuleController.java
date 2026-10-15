@@ -2,6 +2,7 @@ package com.auraboot.framework.notification.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 // BusinessException is handled by the global exception handler
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.notification.dto.NotificationRuleDTO;
@@ -36,6 +37,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/notification-rules")
 @RequiredArgsConstructor
+@AuthenticatedAccess("rule list/get/test-evaluate are tenant-scoped read-only operations for any authenticated user")
 public class NotificationRuleController {
 
     private final NotificationRuleService ruleService;

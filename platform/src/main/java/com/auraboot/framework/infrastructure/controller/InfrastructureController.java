@@ -5,6 +5,7 @@ import com.auraboot.framework.infrastructure.mq.MqProperties;
 import com.auraboot.framework.infrastructure.mq.MqProvider;
 import com.auraboot.framework.infrastructure.storage.StorageProperties;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ import java.util.Properties;
 @RestController
 @RequestMapping("/api/admin/infrastructure")
 @RequiredArgsConstructor
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; reports storage/MQ/Redis/database status and runs connectivity self-tests")
 public class InfrastructureController {
 
     private final StorageProvider storageProvider;

@@ -1,20 +1,25 @@
 #!/usr/bin/env node
 /**
  * check-controller-authz.mjs — regression guard for the deep-review fail-open finding
- * (DR-20260618-D1-perm-004/005).
+ * (DR-20260618-D1-perm-004/005), upgraded for the default-deny flip.
  *
- * The PermissionInterceptor fail-opens for handlers with no @RequirePermission
- * (annotation == null -> allow). Controllers that expose a write mapping
- * (@PostMapping/@PutMapping/@DeleteMapping/@PatchMapping), have no @RequirePermission,
- * and are NOT under /api/admin/** (which AdminRoleInterceptor covers) are therefore
- * reachable by any authenticated user.
+ * PermissionInterceptor (default `aura.security.authz.unannotated-mode=deny`) rejects ANY
+ * handler with no explicit decision: a class-level OR method-level @RequirePermission,
+ * @AuthenticatedAccess, or @RequirePlatformAdmin. Decision is per handler — a method-level
+ * @RequirePermission on the write methods of a controller does NOT decide its un-annotated
+ * GETs (MenuController was the live example), and /api/admin paths are NOT exempt (the
+ * AdminRoleInterceptor runs alongside the PermissionInterceptor, not instead of it).
  *
- * This script does NOT try to decide which of those are legitimately self-scoped vs
- * which need an admin guard — that classification needs domain judgment. Instead it
- * pins the CURRENT set as a baseline and FAILS only when a NEW unguarded write
- * controller appears, so the fail-open surface cannot silently grow. To intentionally
- * accept a new one (e.g. a genuinely self-scoped endpoint), regenerate the baseline
- * with --write-baseline and note why in the PR.
+ * This script mirrors that per-handler semantics statically: a controller file passes when
+ * a class-level guard decides all handlers; otherwise every mapping annotation must have a
+ * guard in its own annotation block (window: previous statement terminator → method body
+ * brace). String literals are masked before segmenting so justification text containing
+ * ';' cannot corrupt the cut points. Controllers annotated @Profile("test") are never
+ * wired in production and stay out of scope.
+ *
+ * The baseline pins files that are intentionally left undecided; it must currently be
+ * empty, and any NEW undecided controller fails the build. To intentionally accept one,
+ * regenerate the baseline with --write-baseline and note why in the PR.
  *
  * Usage:
  *   node scripts/check-controller-authz.mjs              # compare to baseline, exit 1 on new drift
@@ -30,31 +35,87 @@ const BASELINE = path.join(REPO, 'scripts/controller-authz-baseline.json');
 const WRITE = process.argv.includes('--write-baseline');
 const JSON_OUT = process.argv.includes('--json');
 
-const WRITE_MAPPING = /@(Post|Put|Delete|Patch)Mapping/;
-// A controller is "decided" once it carries either an RBAC guard (@RequirePermission), an
-// explicit acknowledged authenticated-only marker (@AuthenticatedAccess), or the strictly
-// stronger platform-admin contract (@RequirePlatformAdmin). All three drop it out of the
-// undecided baseline.
-const GUARD = /@RequirePermission|@AuthenticatedAccess|@RequirePlatformAdmin/;
+// A handler is "decided" by a class-level OR method-level RBAC guard (@RequirePermission),
+// acknowledged authenticated-only marker (@AuthenticatedAccess), or the strictly stronger
+// platform-admin contract (@RequirePlatformAdmin).
+const GUARD = /@(?:RequirePermission|AuthenticatedAccess|RequirePlatformAdmin)\b/;
 // Controllers annotated @Profile("test") are only wired into the test profile and
 // are never registered in a production context, so they carry no fail-open risk.
 const TEST_PROFILE = /@Profile\(\s*\{?\s*['"]test['"]/;
-const ADMIN_PATH = /["(]\s*"?\/api\/admin\//;
-// High-sensitivity READ surfaces: AI observability (/api/ai/**) and IM (/api/im/**).
-// A GET-only controller here that shadow-allows any logged-in user can leak other
-// users' data (raw prompts, agent activity, tenant spend). Read endpoints used to be
-// out of scope entirely (SEC-002); they now also need an explicit @RequirePermission
-// or @AuthenticatedAccess decision.
-const READ_MAPPING = /@GetMapping/;
-const SENSITIVE_READ_PATH = /["'`]\/api\/(ai|im)\//;
 
-// Strip block + line comments so a javadoc that merely MENTIONS an annotation
-// ({@link RequirePermission}, "// gated by @AuthenticatedAccess") can never satisfy the
-// guard/mapping regexes — only real code counts. The [^:] guard avoids eating http://.
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+// Single-pass scanner that removes comments and masks string/char literals AT THE SAME
+// TIME. Order matters and neither transform alone is safe:
+//  - stripping comments first lets `/*` inside a string literal ("/api/admin/**") open a
+//    bogus block comment that swallows the rest of the file;
+//  - masking strings first lets a quote inside a comment pair with a later quote in code.
+// The combined pass also fixes pairing for char literals like '"'.
+function stripCommentsAndLiterals(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const ch = src[i], next = src[i + 1];
+    if (ch === '/' && next === '/') {                       // line comment → drop
+      while (i < n && src[i] !== '\n') i++;
+    } else if (ch === '/' && next === '*') {                // block comment → one space
+      i += 2;
+      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i = Math.min(n, i + 2);
+      out += ' ';
+    } else if (ch === '"' || ch === "'") {                  // string/char literal → masked
+      const quote = ch;
+      out += quote === '"' ? '""' : "''";
+      i++;
+      while (i < n && src[i] !== quote) {
+        if (src[i] === '\\') i++;
+        i++;
+      }
+      i++;
+    } else {
+      out += ch;
+      i++;
+    }
+  }
+  return out;
+}
+
+/**
+ * True when at least one mapped handler in this controller has no class-level or
+ * method-level guard annotation. Class-declaration-aware: class-level @RequestMapping and
+ * the class-level guard are handled before per-handler scanning.
+ */
+function hasUndecidedHandler(rawText) {
+  const src = stripCommentsAndLiterals(rawText);
+  if (!/@RestController|@Controller/.test(src)) return false;
+  const classDecl = src.match(/\n\s*(?:public\s+|final\s+|abstract\s+)*class\s+\w+/);
+  if (!classDecl) return true; // unrecognized shape — be conservative, flag it
+  const classStart = classDecl.index;
+  const classEnd = classStart + classDecl[0].length;
+  const before = src.slice(0, classStart);
+  const classCut = Math.max(before.lastIndexOf(';'), before.lastIndexOf('}'));
+  if (GUARD.test(src.slice(classCut + 1, classStart))) return false; // class-level guard decides all
+  const mapping = /@(?:Get|Post|Put|Delete|Patch|Request)Mapping/g;
+  let m;
+  while ((m = mapping.exec(src)) !== null) {
+    if (m.index < classEnd) continue; // class-level @RequestMapping
+    const segStart = Math.max(src.lastIndexOf(';', m.index), src.lastIndexOf('}', m.index), classEnd);
+    // Extend the window to the method body brace: scan the mapping's balanced parens, the
+    // next '{' at depth 0 is the body brace — this covers guard annotations that sit AFTER
+    // the mapping annotation (e.g. @PostMapping(...) \n @RequirePermission).
+    let depth = 0, parenEnd = m.index;
+    for (let i = m.index; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '(') depth++;
+      else if (ch === ')' && --depth === 0) { parenEnd = i + 1; break; }
+    }
+    let windowEnd = src.indexOf('{', parenEnd);
+    if (windowEnd < 0) {
+      const semi = src.indexOf(';', parenEnd);
+      windowEnd = semi >= 0 ? semi : src.length;
+    }
+    if (!GUARD.test(src.slice(segStart, windowEnd))) return true;
+  }
+  return false;
 }
 
 function walk(dir, out = []) {
@@ -70,14 +131,9 @@ function walk(dir, out = []) {
 
 const unguarded = [];
 for (const file of walk(SRC)) {
-  const text = stripComments(fs.readFileSync(file, 'utf8'));
-  if (!/@RestController|@Controller/.test(text)) continue;
-  if (GUARD.test(text)) continue;                 // has a real @RequirePermission/@AuthenticatedAccess
-  if (ADMIN_PATH.test(text)) continue;            // AdminRoleInterceptor covers /api/admin/**
-  if (TEST_PROFILE.test(text)) continue;          // @Profile("test") controller — never wired in prod
-  const hasWrite = WRITE_MAPPING.test(text);      // @Post/@Put/@Delete/@Patch surface
-  const hasSensitiveRead = READ_MAPPING.test(text) && SENSITIVE_READ_PATH.test(text);
-  if (!hasWrite && !hasSensitiveRead) continue;   // no surface that requires a decision
+  const text = fs.readFileSync(file, 'utf8');
+  if (TEST_PROFILE.test(text)) continue; // @Profile("test") — never wired in prod
+  if (!hasUndecidedHandler(text)) continue;
   unguarded.push(path.relative(REPO, file));
 }
 unguarded.sort();
@@ -160,14 +216,14 @@ if (JSON_OUT) {
   console.log(JSON.stringify({ total: unguarded.length, baseline: baseline.length, added, removed }, null, 2));
 }
 
-console.log(`[controller-authz] unguarded write/sensitive-read controllers: ${unguarded.length} (baseline ${baseline.length})`);
+console.log(`[controller-authz] unguarded mapped controllers: ${unguarded.length} (baseline ${baseline.length})`);
 if (removed.length) {
   console.log(`[controller-authz] ${removed.length} baselined controller(s) now guarded/removed (good — prune baseline):`);
   removed.forEach((f) => console.log(`   - ${f}`));
 }
 if (added.length) {
-  console.error(`\n❌ ${added.length} NEW unguarded write or sensitive-read (/api/ai|/api/im) controller(s) — add @RequirePermission/@AuthenticatedAccess/@RequirePlatformAdmin, move under /api/admin, or (if intentionally accepted) --write-baseline with justification:`);
+  console.error(`\n❌ ${added.length} NEW unguarded mapped controller(s) — add @RequirePermission/@AuthenticatedAccess/@RequirePlatformAdmin (class level decides all handlers), or (for @Profile("test")-only fixtures) exclude via that annotation, or --write-baseline with justification:`);
   added.forEach((f) => console.error(`   + ${f}`));
   process.exit(1);
 }
-console.log('✅ controller-authz check passed (no new fail-open write/sensitive-read controllers).');
+console.log('✅ controller-authz check passed (every mapped controller carries an explicit authz decision).');

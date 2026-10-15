@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.controller;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.DictItemData;
 import com.auraboot.framework.meta.service.DictCascadeService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/meta/cascade")
 @RequiredArgsConstructor
+@AuthenticatedAccess("read-only cascading dictionary options for form select controls")
 public class CascadeController {
 
     private final DictCascadeService dictCascadeService;

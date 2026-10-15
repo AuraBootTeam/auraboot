@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.controller.config;
 
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.PageResult;
@@ -46,6 +47,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "字典管理", description = "字典数据的增删改查、版本管理和级联查询")
+@AuthenticatedAccess("render-time dict data and cascade reads for form dropdowns are baseline-readable application structure for any authenticated user")
 public class DictController {
 
     private final DictService dictService;

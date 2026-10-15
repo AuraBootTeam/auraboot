@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.dto.SubjectPermissionCreateRequest;
@@ -51,6 +52,7 @@ import java.util.Map;
 @RequestMapping("/api/subject-permissions")
 @RequiredArgsConstructor
 @Validated
+@AuthenticatedAccess("unguarded handlers are read-only declaration listings, UI visibility evaluations, and logic-group validation")
 public class SubjectPermissionController {
     
     private final SubjectPermissionService subjectPermissionService;

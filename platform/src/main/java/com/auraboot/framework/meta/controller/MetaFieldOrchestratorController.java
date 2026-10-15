@@ -27,10 +27,10 @@ import org.springframework.web.bind.annotation.RestController;
  * holds no business logic. Both endpoints trigger physical schema DDL
  * ({@code ADD}/{@code DROP COLUMN}) on a model-level shared table, so each is
  * explicitly gated with {@link MetaPermission#MODEL_MANAGE} — matching the
- * sibling {@code ModelFieldBindingController}. Relying on the central
- * {@code PermissionInterceptor} alone is unsafe: its default
- * {@code unannotated-mode} is {@code shadow} (fail-open), so an un-annotated
- * write endpoint is reachable by any authenticated user (SEC-20260723-01).
+ * sibling {@code ModelFieldBindingController}. The central
+ * {@code PermissionInterceptor} now fail-closes un-annotated handlers
+ * (default-deny), but structural DDL endpoints carry an explicit permission
+ * instead of leaning on the un-annotated contract (SEC-20260723-01).
  *
  * <p><b>Path note (deviation from Spec §4 / Plan §Task 5):</b> the spec calls
  * for {@code /api/meta/models/{modelCode}/fields}, but

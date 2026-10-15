@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 
@@ -30,6 +31,7 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 @RestController
 @RequestMapping("/api/learning")
 @RequiredArgsConstructor
+@AuthenticatedAccess("tenant-scoped skill-draft and shadow-run reads for the authenticated caller; review and promotion mutations carry method-level @RequirePermission")
 public class LearningLoopController {
 
     private final JdbcTemplate jdbcTemplate;

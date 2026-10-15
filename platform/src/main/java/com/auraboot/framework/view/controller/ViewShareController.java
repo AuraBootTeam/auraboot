@@ -1,6 +1,7 @@
 package com.auraboot.framework.view.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.view.service.ViewShareService;
@@ -23,6 +24,7 @@ import java.util.Map;
 @RequestMapping("/api/views")
 @RequiredArgsConstructor
 @Tag(name = "View Sharing", description = "Public sharing and embedding of saved views")
+@AuthenticatedAccess("unguarded handler is the share-link access endpoint scoped by the share token and optional password")
 public class ViewShareController {
 
     private final ViewShareService viewShareService;
