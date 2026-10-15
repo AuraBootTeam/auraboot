@@ -76,7 +76,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].secret").doesNotExist());
         }
         MetaContext.restore(human);
-        assertThat(endpointPublications.types(code)).contains("EndpointRequest","QueryParameters","EndpointResult");
+        assertThat(endpointPublications.types(code)).contains("EndpointRequest","QueryParameters","EndpointResult", "parameters: QueryParameters").doesNotContain("parameters?: QueryParameters");
         assertThat(json.valueToTree(endpointPublications.document(code)).toString()).contains(endpoint.path()).doesNotContain("/api/meta",rows.queryCode());
     }
 

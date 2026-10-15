@@ -17,6 +17,11 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class OpenApiEndpointService {
+    public static final class SourceChangedException extends ResponseStatusException {
+        public SourceChangedException(IllegalArgumentException cause) {
+            super(HttpStatus.CONFLICT, "open_api_endpoint_source_changed", cause);
+        }
+    }
     private final OpenApiEndpointPublicationService publications;
     private final OpenApiEndpointValidator validator;
     private final OpenApiResourceService resources;
@@ -44,7 +49,7 @@ public class OpenApiEndpointService {
         if (recordPid != null && !recordPid.matches("[A-Za-z0-9_-]{1,100}")) throw new IllegalArgumentException("Public record PID required");
         // CATCH: explicit pre-execution source validation; no business transaction has been invoked yet.
         try { validator.validate(principal.tenantId(), contract); }
-        catch (IllegalArgumentException changed) { throw new ResponseStatusException(HttpStatus.CONFLICT, "open_api_endpoint_source_changed", changed); }
+        catch (IllegalArgumentException changed) { throw new SourceChangedException(changed); }
         if (query == null || query.size() > 6 || query.values().stream().anyMatch(values -> values == null || values.size() != 1))
             throw new IllegalArgumentException("Endpoint query parameters must be singular and bounded");
         if (kind != OpenApiEndpointKind.RESOURCE_LIST && !query.isEmpty()) throw new IllegalArgumentException("Query parameters are not declared by this endpoint");

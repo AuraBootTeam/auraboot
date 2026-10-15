@@ -106,8 +106,9 @@ public class OpenApiEndpointValidator {
             var action = actions.active(tenant, contract.bindingCode()).orElseThrow();
             base = OpenApiContractArtifacts.actionTypes(action, resource(tenant, action.resourceCode())); request = "ActionRequest"; result = "ActionResult";
         } else {
-            base = OpenApiContractArtifacts.queryTypes(queries.active(tenant, contract.bindingCode()).orElseThrow());
-            request = "{ parameters?: QueryParameters; limit?: number; cursor?: string }";
+            var query = queries.active(tenant, contract.bindingCode()).orElseThrow();
+            base = OpenApiContractArtifacts.queryTypes(query);
+            request = "{ parameters" + (query.parameters().values().stream().anyMatch(OpenApiQueryContract.Parameter::required) ? "" : "?") + ": QueryParameters; limit?: number; cursor?: string }";
             result = "{ items: QueryItem[]; hasMore: boolean; nextCursor: string | null }";
         }
         return base + "\n// " + contract.kind().method() + " " + contract.path() + "\nexport type EndpointRequest = " + request

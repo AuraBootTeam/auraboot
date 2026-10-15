@@ -83,7 +83,7 @@ public class OpenApiEndpointPublicationService {
         mapper.audit(tenant(), key(code), installation.getId(), "revoke", actor(), 0);
     }
     public OpenApiEndpointContract publishedForAdministration(String code) {
-        requireAdmin(); return active(tenant(), code).orElseThrow(() -> new IllegalArgumentException("Published endpoint required"));
+        requireAdmin(); return active(tenant(), code).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "open_api_endpoint_not_published"));
     }
     public Optional<OpenApiEndpointContract> active(Long tenant, String code) {
         String value = mapper.active(tenant, key(code)); return value == null ? Optional.empty() : Optional.of(decode(value, OpenApiEndpointContract.class));

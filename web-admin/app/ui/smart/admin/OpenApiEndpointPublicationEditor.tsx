@@ -100,7 +100,7 @@ export function OpenApiEndpointPublicationEditor({ onClose }: { onClose: () => v
       <button className={BUTTON} type="button" disabled={busy || dirty} onClick={onClose}>{text('back', '返回业务接口', 'Back to business APIs')}</button></header>
     <div className="flex flex-wrap items-end gap-2"><PublicationField name={text('search', '查找内部接口', 'Find internal endpoint')} child={<input className={CONTROL} maxLength={200} value={search} disabled={busy || loading || dirty} placeholder="/api/dynamic" onChange={event => setSearch(event.target.value)} />} />
       <button className={BUTTON} type="button" disabled={busy || loading || dirty && !denied} onClick={() => void load()}>{text('refresh', '刷新接口目录', 'Refresh endpoint catalog')}</button>
-      <button className={BUTTON} type="button" disabled={busy || loading || dirty || denied} onClick={() => open()}>{text('new', '新建外部接口', 'New external endpoint')}</button></div>
+      <button className={BUTTON} type="button" disabled={busy || loading || dirty || denied || catalogFailed} onClick={() => open()}>{text('new', '新建外部接口', 'New external endpoint')}</button></div>
     {loading && <p role="status">{text('loading', '正在读取接口目录…', 'Loading endpoint catalog…')}</p>}
     {error && <p role="alert" className="rounded-control border border-status-red p-3 text-sm text-status-red">{error}</p>}
     {notice && <p role="status" className="text-sm text-status-green">{notice}</p>}

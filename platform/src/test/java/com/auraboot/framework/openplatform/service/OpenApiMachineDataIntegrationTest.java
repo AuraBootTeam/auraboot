@@ -2408,6 +2408,18 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> installedBusinessCall(() -> publicEndpoints.invoke(principal,get.code(),"GET",allowedPid,Map.of(),null,null,null))).isInstanceOf(AccessDeniedException.class);
     }
 
+    @Test void controllerEndpointChangedSourceReturns409OverHttpWithoutLeakingStorageOrFingerprint() throws Exception {
+        var endpoint = publishControllerEndpoint("dynamic.get", contract.code());
+        publishEvents();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(endpoint.path().replace("{recordPid}", allowedPid))
+                        .header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("open_api_endpoint_source_changed"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(
+                        org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(contract.modelCode())),
+                                org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(endpoint.sourceFingerprint())))));
+    }
+
     @Test void controllerEndpointPublicationLifecycleExportsPublicContractsWithoutInternalRoutes() {
         var endpoint = publishControllerEndpoint("dynamic.get", contract.code());
         assertThat(endpointPublications.list()).extracting(OpenApiEndpointPublicationService.View::code).contains(endpoint.code());
@@ -2419,6 +2431,10 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         endpointPublications.saveDraft(endpoint.code(),new OpenApiEndpointPublicationService.DraftRequest(1,next)); endpointPublications.publish(endpoint.code(),2);
         assertThat(endpointPublications.active(principal.tenantId(),endpoint.code())).contains(next);
         endpointPublications.withdraw(endpoint.code(),2); assertThat(endpointPublications.active(principal.tenantId(),endpoint.code())).isEmpty();
+        for (String artifact : List.of("openapi", "types")) assertThatThrownBy(() -> {
+            if ("openapi".equals(artifact)) endpointPublications.document(endpoint.code()); else endpointPublications.types(endpoint.code());
+        }).isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .satisfies(error -> assertThat(((org.springframework.web.server.ResponseStatusException) error).getStatusCode().value()).isEqualTo(404));
     }
 
     @Test
