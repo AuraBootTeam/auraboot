@@ -379,8 +379,10 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await page
     .getByRole('row')
     .filter({ has: page.getByText(dashboardTitle, { exact: true }) })
-    .getByText(dashboardTitle, { exact: true })
+    .getByRole('button', { name: '编辑', exact: true })
     .click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard-designer/${dashboardPid}$`));
+  await expect(page.getByTestId('designer-canvas')).toBeVisible();
   await page.reload();
   await expect(
     page.getByTestId('designer-canvas').getByText('1', { exact: true }),
