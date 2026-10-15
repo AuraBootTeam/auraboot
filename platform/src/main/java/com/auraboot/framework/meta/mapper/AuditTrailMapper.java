@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.mapper;
 
 import com.auraboot.framework.meta.entity.AuditTrail;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -15,12 +16,24 @@ import java.util.List;
  * Provides standard CRUD via BaseMapper and custom query methods for
  * chain hashing, integrity verification, and audit trail lookups.
  *
+ * <p>Every custom method scopes rows <em>explicitly</em> by its {@code tenantId}
+ * parameter: the audit chain is appended and verified on behalf of the tenant that
+ * owns the audited entity, which is not always the thread's {@link
+ * com.auraboot.framework.application.tenant.MetaContext} tenant (system jobs, admin
+ * tooling, and cross-tenant writes such as B6 report seeding). The tenant-line
+ * interceptor must therefore stay OFF for these statements — a second implicit
+ * {@code tenant_id = <context>} predicate contradicts the explicit one, makes every
+ * chain read look empty, and restarts sequence allocation at 1 (duplicate-key
+ * corruption of {@code uq_audit_trail_tenant_seq}). Same contract as
+ * {@code CloudConfigMapper.findByPid}.
+ *
  * @since 6.1.0
  */
 @Mapper
 public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
 
     /** Serialize the entire tenant chain append, including an empty chain. */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT 1 FROM pg_advisory_xact_lock(" +
             "hashtextextended('ab_audit_trail:' || CAST(#{tenantId} AS text), 0))")
     Integer lockTenantChain(@Param("tenantId") Long tenantId);
@@ -29,6 +42,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
      * Get the maximum sequence number for a given tenant.
      * Returns null if no records exist yet (genesis case).
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT MAX(sequence_no) FROM ab_audit_trail WHERE tenant_id = #{tenantId}")
     Long getMaxSequenceNo(@Param("tenantId") Long tenantId);
 
@@ -36,8 +50,9 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
      * Get the latest audit record for a tenant (by highest sequence_no).
      * Used to retrieve the previous hash for chain linking.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT id, tenant_id, sequence_no, event_type, entity_type, entity_id, entity_pid, " +
-            "command_code, operation_type, actor_id, actor_name, actor_ip, timestamp, " +
+            "command_code, operation_type, actor_id, actor_name, timestamp, " +
             "previous_hash, record_hash " +
             "FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "ORDER BY sequence_no DESC LIMIT 1")
@@ -48,6 +63,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
      * Get audit records within a sequence range for chain verification.
      * Ordered by sequence_no ascending for sequential hash checking.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND sequence_no >= #{fromSeq} AND sequence_no <= #{toSeq} " +
             "ORDER BY sequence_no ASC")
@@ -59,6 +75,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     /**
      * Get audit trail for a specific entity (model + record).
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND entity_type = #{entityType} AND entity_id = #{entityId} " +
             "ORDER BY sequence_no ASC")
@@ -70,6 +87,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     /**
      * Get audit trail for a specific entity PID (model + public record PID).
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND entity_type = #{entityType} AND entity_pid = #{entityPid} " +
             "ORDER BY sequence_no ASC")
@@ -81,6 +99,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     /**
      * Get audit records by actor within a time range.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND actor_id = #{actorId} " +
             "AND timestamp >= #{startTime} AND timestamp <= #{endTime} " +
@@ -94,6 +113,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     /**
      * Get audit records by command code.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND command_code = #{commandCode} " +
             "ORDER BY sequence_no ASC")
@@ -104,6 +124,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     /**
      * Get audit records within a time range for compliance reports.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND timestamp >= #{startTime} AND timestamp <= #{endTime} " +
             "ORDER BY sequence_no ASC")
@@ -115,6 +136,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     /**
      * Count records in a time range (for compliance summary).
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT COUNT(*) FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND timestamp >= #{startTime} AND timestamp <= #{endTime}")
     long countByTimeRange(@Param("tenantId") Long tenantId,
@@ -124,6 +146,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     /**
      * Get the record immediately before a given sequence (for verification boundary).
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT id, tenant_id, sequence_no, record_hash " +
             "FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND sequence_no = #{seqNo} - 1")
@@ -135,6 +158,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
      * Get recent activity feed (lightweight — no snapshots/hashes).
      * Supports cursor-based pagination via beforeId.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
         <script>
         SELECT id, tenant_id, event_type, entity_type, entity_id, entity_pid,
