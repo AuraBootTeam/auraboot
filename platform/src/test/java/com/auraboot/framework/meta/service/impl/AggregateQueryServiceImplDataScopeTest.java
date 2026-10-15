@@ -14,6 +14,7 @@ import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import org.junit.jupiter.api.AfterEach;
 import com.auraboot.framework.semantic.service.SemanticQueryService;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
@@ -21,6 +22,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -53,6 +56,7 @@ class AggregateQueryServiceImplDataScopeTest {
     @Mock private MetaModelService metaModelService;
     @Mock private DataPermissionEngine dataPermissionEngine;
     @Mock private DataDomainService dataDomainService;
+    @Mock private PermissionEvaluator permissionEvaluator;
     @Mock private NamedQueryFieldProtection fieldProtection;
     @Mock private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog releaseCatalog;
 
@@ -61,6 +65,9 @@ class AggregateQueryServiceImplDataScopeTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(permissionEvaluator.canAction(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("read"))).thenReturn(true);
         org.mockito.Mockito.lenient().when(fieldProtection.rewrite(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
         org.mockito.Mockito.lenient().when(fieldProtection.prepare(org.mockito.ArgumentMatchers.any(),
@@ -75,6 +82,69 @@ class AggregateQueryServiceImplDataScopeTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+    }
+
+    @Test
+    void missingSourceReadIsDeniedBeforeMetadataOrSql() {
+        when(permissionEvaluator.canAction(MEMBER_ID, MODEL_CODE, "read")).thenReturn(false);
+        assertThatThrownBy(() -> service.execute(countRequest()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                .hasMessageContaining("permissionCode: model." + MODEL_CODE + ".read");
+        org.mockito.Mockito.verifyNoInteractions(metaModelService, dynamicDataMapper,
+                dataPermissionEngine, dataDomainService);
+    }
+
+    @Test
+    void anonymousAggregateIsDeniedWithoutPermissionLookupOrSql() {
+        MetaContext.clear();
+        assertThatThrownBy(() -> service.execute(countRequest()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(permissionEvaluator, metaModelService,
+                dynamicDataMapper, dataPermissionEngine, dataDomainService);
+    }
+
+    @Test
+    void sourcePermissionIsRecheckedAfterRevocation() {
+        when(metaModelService.getTableName(MODEL_CODE)).thenReturn("mt_phase_one_model");
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of(Map.of("total", 1L)));
+        service.execute(countRequest());
+        when(permissionEvaluator.canAction(MEMBER_ID, MODEL_CODE, "read")).thenReturn(false);
+        assertThatThrownBy(() -> service.execute(countRequest()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(dynamicDataMapper, org.mockito.Mockito.times(1)).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void currentUserIdentityIsUsedWhenMemberIdentityIsAbsent() {
+        MetaContext.setMemberId(null);
+        when(metaModelService.getTableName(MODEL_CODE)).thenReturn("mt_phase_one_model");
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of(Map.of("total", 1L)));
+        service.execute(countRequest());
+        verify(permissionEvaluator).canAction(USER_ID, MODEL_CODE, "read");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"phase_one_model:read", "phase_one_model.read", "model.phase_one_model.read"})
+    void canonicalEvaluatorPreservesRegisteredReadPermissionAliases(String permissionCode) {
+        var grants = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.UserPermissionService.class);
+        when(grants.hasPermission(USER_ID, permissionCode)).thenReturn(true);
+        var roles = new com.auraboot.framework.permission.engine.evaluator.RolePermissionEvaluator(grants);
+        var evaluator = new com.auraboot.framework.permission.engine.impl.PermissionEvaluatorImpl(
+                roles, null, null, null, null, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "permissionEvaluator", evaluator);
+        when(metaModelService.getTableName(MODEL_CODE)).thenReturn("mt_phase_one_model");
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of(Map.of("total", 1L)));
+        assertThat(service.execute(countRequest()).getRows()).hasSize(1);
+        verify(grants).hasPermission(USER_ID, permissionCode);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).selectByQuery(sql.capture(), anyMap());
+        assertThat(sql.getValue()).contains("created_by = 20");
     }
 
     @Test
@@ -94,6 +164,7 @@ class AggregateQueryServiceImplDataScopeTest {
         verify(dynamicDataMapper).selectByQuery(sqlCaptor.capture(), anyMap());
         assertThat(sqlCaptor.getValue()).contains("created_by = 20");
         verify(dataPermissionEngine).buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID);
+        verify(permissionEvaluator).canAction(MEMBER_ID, MODEL_CODE, "read");
     }
 
     @Test
@@ -144,6 +215,7 @@ class AggregateQueryServiceImplDataScopeTest {
         verify(dynamicDataMapper).selectByQueryWithoutTenant(sqlCaptor.capture(), anyMap());
         assertThat(sqlCaptor.getValue()).contains("created_by = 20");
         verify(dataPermissionEngine).buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID);
+        org.mockito.Mockito.verifyNoInteractions(permissionEvaluator);
     }
 
     @Test
@@ -156,6 +228,7 @@ class AggregateQueryServiceImplDataScopeTest {
         assertThatThrownBy(() -> service.execute(request))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("SEMANTIC_ADAPTER_UNAVAILABLE");
+        org.mockito.Mockito.verifyNoInteractions(permissionEvaluator);
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
