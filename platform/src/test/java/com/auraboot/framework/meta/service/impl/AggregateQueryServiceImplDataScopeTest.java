@@ -131,7 +131,8 @@ class AggregateQueryServiceImplDataScopeTest {
     @ValueSource(strings = {"phase_one_model:read", "phase_one_model.read", "model.phase_one_model.read"})
     void canonicalEvaluatorPreservesRegisteredReadPermissionAliases(String permissionCode) {
         var grants = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.UserPermissionService.class);
-        when(grants.hasPermission(USER_ID, permissionCode)).thenReturn(true);
+        when(grants.hasPermission(org.mockito.ArgumentMatchers.eq(USER_ID), anyString()))
+                .thenAnswer(invocation -> permissionCode.equals(invocation.getArgument(1, String.class)));
         var roles = new com.auraboot.framework.permission.engine.evaluator.RolePermissionEvaluator(grants);
         var evaluator = new com.auraboot.framework.permission.engine.impl.PermissionEvaluatorImpl(
                 roles, null, null, null, null, null);
