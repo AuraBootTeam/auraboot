@@ -263,7 +263,7 @@ export function FieldSelectionDialog({
     <div data-testid="field-selection-dialog" className="fixed inset-0 z-50 overflow-y-auto">
       {/* Overlay */}
       <div
-        className="bg-opacity-50 fixed inset-0 bg-black transition-opacity"
+        className="fixed inset-0 bg-black/50 transition-opacity"
         onClick={handleClose}
       />
 
