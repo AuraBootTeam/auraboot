@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const base = process.env.PERF_API_BASE;
 const output = process.env.PERF_OUTPUT;
@@ -12,13 +13,15 @@ const auth = await login.json();
 if (!login.ok || auth.code !== '0' || !auth.data?.jwt) throw new Error('Login failed');
 const headers = {Authorization:`Bearer ${auth.data.jwt}`};
 const paths = ['/api/menu/user','/api/auth/me','/api/dashboards/workbench','/api/workbench/stats','/api/dynamic/showcase_all_fields_list/list?pageNum=1&pageSize=20','/api/dynamic/showcase_all_fields_list/list?pageNum=2&pageSize=20','/api/dynamic/showcase_all_fields_list/list?pageNum=1&pageSize=20&keyword=PERF'];
-const report = {commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),base,samples,at:new Date().toISOString(),conditions:{concurrency:1,warmup:5},endpoints:[]};
+const report = {commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8',cwd:fileURLToPath(new URL('../..',import.meta.url))}).trim(),base,samples,at:new Date().toISOString(),conditions:{concurrency:1,warmup:5},endpoints:[]};
 writeFileSync(output,JSON.stringify({...report,status:'running'},null,2));
 for (const path of paths) {
  const rows=[];
  for (let i=0;i<samples+5;i++) {
   const start=performance.now(); const response=await fetch(base+path,{headers}); const body=await response.json(); const ms=performance.now()-start;
   if (!response.ok || body.code!=='0') throw new Error(`Failed ${path}: ${response.status} ${body.code}`);
+  if(response.headers.get('x-sql-count')===null)throw new Error('Missing SQL count header');
+  if(path.includes('/dynamic/') && (body.data?.total!==1000 || body.data?.records?.length!==20)) throw new Error('Expected exactly 1000 fixture records and 20 rows');
   const row={ms,sqlCount:Number(response.headers.get('x-sql-count')),traceId:response.headers.get('x-trace-id'),total:body.data?.total,records:body.data?.records?.length};
   if(i>=5) rows.push(row);
  }
