@@ -69,7 +69,7 @@ class InventoryReceiptEnqueueProvenanceTest {
         loader = new URLClassLoader(new java.net.URL[]{directory.toUri().toURL()},getClass().getClassLoader());
         producer = (CommandHandlerExtension) loader.loadClass("com.auraboot.plugins.inventory.handler.ConfirmWarehouseInHandler")
                 .getConstructor(Runnable.class).newInstance((Runnable) () -> effect.run());
-        artifact = new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory",directory,"a".repeat(64));
+        artifact = new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory",directory,"sha256:"+"a".repeat(64));
         when(plugins.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(producer));
         when(plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class,producer)).thenReturn(true);
         when(plugins.observeLoadedArtifact(producer.getClass())).thenReturn(Optional.of(artifact));
@@ -107,6 +107,23 @@ class InventoryReceiptEnqueueProvenanceTest {
         assertThat(MetaContext.getAuthorizedCommandCode()).isNull();
     }
 
+    @Test void canonicalManagerDigestUsesExactTypedPrefixAndPhysicalBytes() throws Exception {
+        Path physical=directory.resolve("physical.jar");Files.write(physical,new byte[]{1,2,3,4});
+        var method=AuraPluginManager.class.getDeclaredMethod("pluginArtifactDigest",Path.class);method.setAccessible(true);
+        String actual=(String)method.invoke(null,physical);
+        String sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(physical)));
+        assertThat(actual).isEqualTo("sha256:"+sha);
+    }
+
+    @Test void untypedOrMalformedLoadedDigestCannotStampOrPersist() {
+        effect=()->accessor.enqueue(event(Map.of()));
+        for(String invalid:List.of("a".repeat(64),"SHA256:"+"a".repeat(64),"sha256:"+"A".repeat(64),"sha256:"+"a".repeat(63),"sha256:sha256:"+"a".repeat(64))){
+            when(plugins.observeLoadedArtifact(producer.getClass())).thenReturn(Optional.of(new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory",directory,invalid)));
+            assertThatThrownBy(()->invoke(producer)).isInstanceOf(SecurityException.class);
+        }
+        verify(outbox,never()).insertEnvelope(any());
+    }
+
     @Test void sameClassNewInstanceUnregisteredOrMissingPermitCannotCreateProvenance() throws Exception {
         effect = () -> accessor.enqueue(event(Map.of()));
         var duplicate = (CommandHandlerExtension) producer.getClass().getConstructor(Runnable.class).newInstance(effect);
@@ -131,7 +148,7 @@ class InventoryReceiptEnqueueProvenanceTest {
                 MetaContext.runWithAuthorizedCommandCode("inv:confirm_warehouse_in", () ->
                     assertThatThrownBy(() -> provenance.invoke(producer,context)).isInstanceOf(SecurityException.class)));
         when(plugins.observeLoadedArtifact(producer.getClass())).thenReturn(Optional.of(artifact),Optional.of(
-                new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory",directory,"b".repeat(64))));
+                new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory",directory,"sha256:"+"b".repeat(64))));
         assertThatThrownBy(() -> invoke(producer)).isInstanceOf(SecurityException.class);
         when(plugins.observeLoadedArtifact(producer.getClass())).thenReturn(Optional.of(artifact));
         effect = () -> { model.setRowVersion(2); accessor.enqueue(event(Map.of())); };
@@ -171,7 +188,7 @@ class InventoryReceiptEnqueueProvenanceTest {
         try (var foreignLoader = new URLClassLoader(new java.net.URL[]{directory.toUri().toURL()},getClass().getClassLoader())) {
             var type = foreignLoader.loadClass("example.foreign.ForeignPoster");
             when(plugins.observeLoadedArtifact(type)).thenReturn(Optional.of(
-                    new AuraPluginManager.LoadedPluginArtifact("different.plugin",directory,"b".repeat(64))));
+                    new AuraPluginManager.LoadedPluginArtifact("different.plugin",directory,"sha256:"+"b".repeat(64))));
             var foreign = (Runnable) type.getConstructor(Runnable.class).newInstance((Runnable) () -> accessor.enqueue(event(Map.of())));
             effect = foreign::run;
             assertThatThrownBy(() -> invoke(producer)).isInstanceOf(SecurityException.class);

@@ -72,11 +72,11 @@ public final class InventoryReceiptEnqueueProvenance {
                 || !invocation.context().recordId().equals(MetaContext.getCommandPermitTargetFor("inv_inbound"))
                 || !Long.valueOf(event.tenantId()).equals(MetaContext.getCurrentTenantId())) throw denied();
         var artifact = plugins.observeLoadedArtifact(invocation.handler().getClass()).orElseThrow(InventoryReceiptEnqueueProvenance::denied);
-        if (!artifact.equals(invocation.artifact()) || !artifact.digest().matches("[a-f0-9]{64}")) throw denied();
+        if (!artifact.equals(invocation.artifact()) || !artifact.digest().matches("sha256:[a-f0-9]{64}")) throw denied();
         InventoryOwnerModelAuthority.assertUnchanged(invocation.model(), models.resolve(event.tenantId(), "inv_inbound", true));
         Map<String,String> headers = new HashMap<>(event.headers());
         headers.put(PREFIX + "schema", "1"); headers.put(PREFIX + "plugin", artifact.pluginId());
-        headers.put(PREFIX + "artifact", artifact.digest()); headers.put(PREFIX + "command", COMMAND);
+        headers.put(PREFIX + "artifact", artifact.digest().substring("sha256:".length())); headers.put(PREFIX + "command", COMMAND);
         headers.put(PREFIX + "implementation", IMPLEMENTATION);
         return copy(event, headers);
     }
