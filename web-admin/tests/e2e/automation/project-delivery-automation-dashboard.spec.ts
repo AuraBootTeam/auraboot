@@ -209,12 +209,23 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   const importResponse = await importing;
   expect(importResponse.ok()).toBe(true);
   expect(importResponse.request().postDataJSON().enabled).toBe(false);
-  const copy = (await importResponse.json()).data;
-  expect(copy.pid).not.toBe(automationPid);
+  // Observe the actual imported row, then read back that exact public PID.
+  // Do not depend on the old browser/CDP response body to establish persistence.
+  const copyLink = page.getByRole('link', { name: `${automationName}-导入副本`, exact: true });
+  await expect(copyLink).toBeVisible();
+  const copyHref = await copyLink.getAttribute('href');
+  expect(copyHref).toMatch(/^\/automation\/[0-9A-Z]{26}$/);
+  const copyPid = copyHref!.split('/').pop()!;
+  expect(copyPid).not.toBe(automationPid);
+  const copyResponse = await page.request.get(`/api/automations/${copyPid}`, { timeout: 15000 });
+  expect(copyResponse.ok()).toBe(true);
+  const copyResult = await copyResponse.json();
+  expect(String(copyResult.code)).toBe('0');
+  const copy = copyResult.data;
+  expect(copy.pid).toBe(copyPid);
   expect(copy.enabled).toBe(false);
-  await page
-    .getByRole('link', { name: `${automationName}-导入副本`, exact: true })
-    .click();
+  expect(copy.flowConfig).toEqual(automationExport.flowConfig);
+  await copyLink.click();
   await page
     .getByTestId('automation-editor-name-input')
     .fill(`${automationName}-副本微调`);

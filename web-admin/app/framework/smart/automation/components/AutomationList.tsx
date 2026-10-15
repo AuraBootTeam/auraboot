@@ -168,6 +168,7 @@ export function AutomationList({
   const handleImportAutomation = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const errorMessage = st({ zh: '导入自动化失败，请检查文件及权限后重试。', en: 'Automation import failed. Check the file and your permissions, then retry.' });
     try {
       const text = await file.text();
       const data = JSON.parse(text);
@@ -181,11 +182,17 @@ export function AutomationList({
           enabled: false,
         }),
       });
-      if (!response.ok) throw new Error('Failed to import automation');
-      showSuccessToast(`Imported "${data.name || file.name}"`);
+      if (!response.ok) throw new Error(errorMessage);
+      const result = await response.json();
+      const created = result?.data as Automation | undefined;
+      if (String(result?.code) !== '0' || typeof created?.pid !== 'string'
+        || !created.pid.trim() || created.enabled !== false) {
+        throw new Error(errorMessage);
+      }
+      showSuccessToast(st({ zh: `已导入“${created.name || file.name}”`, en: `Imported "${created.name || file.name}"` }));
       revalidator.revalidate();
-    } catch (err) {
-      showErrorToast(err instanceof Error ? err.message : 'Import failed. Check JSON format.');
+    } catch {
+      showErrorToast(errorMessage);
     } finally {
       // Reset the input so re-importing the same file works
       if (importInputRef.current) importInputRef.current.value = '';
