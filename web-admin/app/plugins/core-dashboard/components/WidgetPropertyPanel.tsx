@@ -288,6 +288,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
   return (
     <div
       data-testid="widget-property-panel"
+      data-widget-id={widget.id}
       className={`flex w-72 shrink-0 flex-col border-l border-gray-200 bg-white ${className}`}
     >
       <div className="border-b border-gray-200 p-4">

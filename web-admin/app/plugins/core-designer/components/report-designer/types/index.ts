@@ -151,6 +151,7 @@ export interface StatCardBlock {
 
 export interface RichTextBlock {
   id: string;
+  title?: string;
   blockType: 'rich-text';
   content: string;
   align?: 'left' | 'center' | 'right';

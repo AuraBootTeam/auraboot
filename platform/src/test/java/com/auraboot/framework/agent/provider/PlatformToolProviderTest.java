@@ -161,10 +161,9 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
     /**
      * SEC-001: the SQL is authored by the LLM from a tool-call param, so a
      * caller-declared {@code tenant_id = <foreign>} must never stand alone. The
-     * server-side current-tenant predicate is injected unconditionally and AND-ed
-     * onto the caller's condition, intersecting the result down to the current
-     * tenant. Falsifiable against the old "already mentions tenant_id → skip
-     * injection" behaviour: that path would leave the foreign literal unqualified.
+     * server-side current-tenant predicate scopes the physical source before
+     * applying the caller's condition, so foreign literals cannot widen access.
+     * The actual query must return no records for a foreign tenant.
      */
     @Test
     void execute_executeSql_injectsServerTenantEvenWhenSqlDeclaresForeignTenant() {
@@ -176,9 +175,9 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
         String rewritten = result.getData().get("sql").toString();
         // Server-side current-tenant predicate is ALWAYS present...
         assertThat(rewritten).contains("tenant_id = #{params.tenantId}");
-        // ...AND-ed with the caller-declared literal, so it cannot stand alone.
         assertThat(rewritten).contains(String.valueOf(foreignTenant));
-        assertThat(rewritten.toLowerCase()).contains(" and ");
+        assertThat(rewritten.toLowerCase()).contains(
+                "from (select * from \"public\".\"ab_meta_model\" where (tenant_id = #{params.tenantid})) as ab_meta_model");
         // The foreign tenant is intersected with the current tenant → no rows leak.
         assertThat(result.getData().get("records")).isInstanceOf(java.util.List.class);
         assertThat((java.util.List<?>) result.getData().get("records")).isEmpty();

@@ -54,8 +54,12 @@ public class ApplicationModuleEventForwarder implements ApplicationListener<Comm
         }
         try {
             for (ApplicationContext child : moduleRegistry.childContexts()) {
-                child.getBean(AbstractApplicationContext.APPLICATION_EVENT_MULTICASTER_BEAN_NAME,
-                        ApplicationEventMulticaster.class).multicastEvent(event);
+                String beanName = AbstractApplicationContext.APPLICATION_EVENT_MULTICASTER_BEAN_NAME;
+                if (!child.containsLocalBean(beanName)) {
+                    throw new IllegalStateException("Application module requires a local event multicaster: "
+                            + child.getId());
+                }
+                child.getBean(beanName, ApplicationEventMulticaster.class).multicastEvent(event);
             }
         } finally {
             currentRound.remove(event);

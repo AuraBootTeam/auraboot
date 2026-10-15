@@ -18,6 +18,8 @@ import com.auraboot.framework.meta.service.AggregateQueryService;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
+import org.springframework.security.access.AccessDeniedException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +55,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private final com.auraboot.framework.meta.service.MetaModelService metaModelService;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
+    private final PermissionEvaluator permissionEvaluator;
 
     @org.springframework.beans.factory.annotation.Autowired
     private NamedQueryFieldProtection fieldProtection;
@@ -162,6 +165,14 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
      * Execute a dynamic aggregate query.
      */
     private AggregateQueryResponse executeAggregateQuery(AggregateQueryRequest request) {
+        // Artifact visibility and row-level scope do not grant model read access.
+        // Check the same source permission as dynamic reads before metadata or SQL.
+        String permission = "model." + request.getModelCode() + ".read";
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null && MetaContext.exists()) memberId = MetaContext.getCurrentUserId();
+        if (memberId == null || !permissionEvaluator.canAction(memberId, request.getModelCode(), "read")) {
+            throw new AccessDeniedException("Aggregate source read access denied,permissionCode: " + permission);
+        }
         String tableName = resolveTableName(request.getModelCode());
         List<String> accessClauses = buildDataAccessClauses(request.getModelCode());
         // Filter (incl. nested OR groups + relative-time) params are bound during SQL build

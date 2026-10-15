@@ -42,6 +42,12 @@ import java.util.regex.Pattern;
 @Service
 public class SecureSqlRewriter {
 
+    /** Scope every physical source, including subqueries and joins, before evaluating caller predicates. */
+    public String rewriteForTenant(String sql) {
+        return new com.auraboot.framework.meta.service.impl.NamedQuerySourceScopeRewriter()
+                .forTenant(sql, referencedTables(sql));
+    }
+
     private static final Pattern MYBATIS_PARAM_PATTERN =
             Pattern.compile("#\\{params\\.([a-zA-Z0-9_]+)\\}");
 

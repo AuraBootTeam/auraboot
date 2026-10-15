@@ -173,9 +173,20 @@ public class CompletionPhase implements CommandPhase {
         try {
             String recordId = ctx.getRequest() != null ? ctx.getRequest().getTargetRecordId() : null;
             String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
-            Map<String, Object> extraMeta = null;
+            Map<String, Object> extraMeta = new HashMap<>();
             if (ctx.getBeforeSnapshot() != null) {
-                extraMeta = Map.of("beforeSnapshot", ctx.getBeforeSnapshot());
+                extraMeta.put("beforeSnapshot", ctx.getBeforeSnapshot());
+            }
+            // Preserve the public operation type while conveying the server-executed
+            // transition. The request may say UPDATE and omit the configured state.
+            Map<String, Object> execution = ctx.getExecConfig();
+            if (execution != null && "state_transition".equalsIgnoreCase(
+                    String.valueOf(execution.get("type")))
+                    && execution.get("stateField") instanceof String stateField
+                    && StringUtils.hasText(stateField)
+                    && execution.get("toState") instanceof String toState
+                    && StringUtils.hasText(toState)) {
+                extraMeta.put("commandStateTransition", Map.of("stateField", stateField, "toState", toState));
             }
             domainEventPublisher.publishCommandCompleted(
                     ctx.getCommand().getCode(),

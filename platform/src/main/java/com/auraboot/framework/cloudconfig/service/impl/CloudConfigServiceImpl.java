@@ -43,7 +43,8 @@ public class CloudConfigServiceImpl implements CloudConfigService {
     private static final Set<String> SENSITIVE_FIELDS = Set.of(
             "apiKey",
             "secretId", "secretKey", "appSecret", "clientSecret",
-            "privateKey", "password", "accessKey", "accessToken", "refreshToken"
+            "privateKey", "password", "accessKey", "accessToken", "refreshToken",
+            "encryptKey", "verificationToken"
     );
 
     private final CloudConfigMapper cloudConfigMapper;

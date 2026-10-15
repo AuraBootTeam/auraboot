@@ -165,6 +165,9 @@ public class MetaFieldDTO {
      * @return 显示名称
      */
     public String getDisplayName() {
+        if (uiSchema != null && uiSchema.get("label") instanceof String label && !label.isBlank()) {
+            return label.trim();
+        }
         if (extension != null) {
             Object name = extension.get("displayName");
             return name != null ? name.toString() : code;

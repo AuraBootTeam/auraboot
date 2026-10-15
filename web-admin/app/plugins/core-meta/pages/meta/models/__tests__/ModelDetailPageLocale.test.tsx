@@ -73,6 +73,10 @@ const showSuccessToast = vi.hoisted(() => vi.fn());
 const showErrorToast = vi.hoisted(() => vi.fn());
 
 vi.mock('~/utils/confirmDialog', () => ({ confirmDialog }));
+// Positive page-state rendering fixture; real permissions are exercised by the browser journey.
+vi.mock('~/ui/PermissionGuard', () => ({
+  PermissionGuard: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showSuccessToast, showErrorToast }),
 }));
@@ -122,6 +126,27 @@ describe('ModelDetailPage locale contracts', () => {
 
   afterEach(() => {
     language.locale = 'zh-CN';
+    loaderData.pages.length = 0;
+  });
+
+  it('offers CRUD generation when published pages are only unconfigured placeholders', () => {
+    loaderData.pages.push(...['list', 'form', 'detail'].map((kind) => ({
+      pid: `placeholder-${kind}`, pageKey: `leave_request_${kind}`, modelCode: 'leave_request',
+      kind, extension: { auto_created: true },
+    } as never)));
+    renderPage();
+    expect(screen.getByTestId('model-primary-page-action')).toHaveTextContent('生成基础 CRUD');
+    expect(screen.queryByTestId('model-primary-page-preview')).not.toBeInTheDocument();
+  });
+
+  it('offers the configured page designer and preview after placeholder upgrade', () => {
+    loaderData.pages.push({
+      pid: 'configured-list', pageKey: 'leave_request_list', modelCode: 'leave_request',
+      kind: 'list', extension: {},
+    } as never);
+    renderPage();
+    expect(screen.getByTestId('model-primary-page-action')).toHaveTextContent('打开页面设计');
+    expect(screen.getByTestId('model-primary-page-preview')).toBeVisible();
   });
 
   it('keeps the default zh-CN chrome byte-identical to the previous literals', () => {

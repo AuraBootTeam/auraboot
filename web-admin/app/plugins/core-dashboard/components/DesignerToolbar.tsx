@@ -13,6 +13,7 @@ import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportP
 import { DashboardExportExcel } from './DashboardExportExcel';
 import { DesignerToolbar as SharedDesignerToolbar } from '~/shared/designer/DesignerToolbar';
 import { Clock, Maximize2 } from 'lucide-react';
+import { DashboardDocumentActions } from './DashboardDocumentActions';
 
 interface DashboardToolbarProps {
   onSave?: () => void;
@@ -76,6 +77,7 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
       canRedo={canRedo()}
       onSave={onSave}
     >
+      <DashboardDocumentActions />
       {/* Validate */}
       <button
         onClick={handleValidate}

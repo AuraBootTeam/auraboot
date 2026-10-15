@@ -725,19 +725,23 @@ function InspectorField({
     );
   }
 
+  const InputControl = type === 'textarea' ? 'textarea' : 'input';
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
         {validation?.required ? <span className="ml-1 text-red-500">*</span> : null}
       </span>
-      <input
+      <InputControl
         data-testid={id}
         type={type === 'number' ? 'number' : 'text'}
-        value={toInspectorInputValue(value)}
+        value={toInspectorInputValue(value, locale)}
         aria-invalid={Boolean(validationError)}
         onChange={(event) =>
-          onChange(path, type === 'number' ? Number(event.target.value) : event.target.value)
+          // Editing translated DSL must retain its locale map for backend i18n validation.
+          onChange(path, type === 'number' ? Number(event.target.value)
+            : isLocalizedTextObject(value) ? { ...value, [locale]: event.target.value }
+              : event.target.value)
         }
         className={`w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 ${
           validationError
@@ -754,11 +758,11 @@ function InspectorField({
   );
 }
 
-function toInspectorInputValue(value: unknown): string | number {
+function toInspectorInputValue(value: unknown, locale: string): string | number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') return value;
   if (isLocalizedTextObject(value)) {
-    return value.en || value['zh-CN'] || Object.values(value)[0] || '';
+    return value[locale] ?? value.en ?? value['zh-CN'] ?? Object.values(value)[0] ?? '';
   }
   if (value === undefined || value === null) return '';
   return String(value);

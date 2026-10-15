@@ -13,10 +13,16 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /** Applies row scopes at physical sources, preserving join null-extension semantics. */
-final class NamedQuerySourceScopeRewriter {
+public final class NamedQuerySourceScopeRewriter {
+    public String forTenant(String sql, Set<String> tables) {
+        Map<String, String> scopes = new LinkedHashMap<>();
+        tables.forEach(table -> scopes.put(NamedQuerySourceModels.identity(table),
+                "tenant_id = #{params.tenantId}"));
+        return rewrite(sql, scopes);
+    }
     private static final Pattern PARAMETER = Pattern.compile("#\\{params\\.[A-Za-z0-9_]+\\}");
 
-    String rewrite(String sql, Map<String, String> scopes) {
+    public String rewrite(String sql, Map<String, String> scopes) {
         return rewrite(sql, scopes, Map.of());
     }
 
