@@ -53,6 +53,11 @@ public class ObservabilityConfig implements WebMvcConfigurer {
      * enabling per-request SQL count tracking via {@link SqlCountFilter}.
      */
     @Bean
+    public SqlObservationInterceptor sqlObservationInterceptor(ObservationRegistry registry) {
+        return new SqlObservationInterceptor(registry);
+    }
+
+    @Bean
     public SqlCountInterceptor sqlCountInterceptor() {
         return new SqlCountInterceptor();
     }

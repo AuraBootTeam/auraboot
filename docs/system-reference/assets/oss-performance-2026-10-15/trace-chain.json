@@ -1,0 +1,4818 @@
+{
+  "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+  "services": [
+    "auraboot-bff",
+    "auraboot-platform",
+    "auraboot-ssr",
+    "auraboot-web"
+  ],
+  "spanCount": 345,
+  "linkedParentEdges": 344,
+  "sqlSpans": 166,
+  "connectedExample": [
+    {
+      "service": "auraboot-ssr",
+      "name": "GET",
+      "spanId": "84fac5f03b43dbd3",
+      "parentSpanId": null
+    },
+    {
+      "service": "auraboot-web",
+      "name": "ui.page",
+      "spanId": "a739d7728771cc7c",
+      "parentSpanId": "84fac5f03b43dbd3"
+    },
+    {
+      "service": "auraboot-web",
+      "name": "http.client",
+      "spanId": "71cf8f816eceb1df",
+      "parentSpanId": "a739d7728771cc7c"
+    },
+    {
+      "service": "auraboot-ssr",
+      "name": "GET",
+      "spanId": "5cc36a4086c0e140",
+      "parentSpanId": "71cf8f816eceb1df"
+    },
+    {
+      "service": "auraboot-ssr",
+      "name": "GET",
+      "spanId": "16cf6d99653bd5ea",
+      "parentSpanId": "5cc36a4086c0e140"
+    },
+    {
+      "service": "auraboot-bff",
+      "name": "GET",
+      "spanId": "6f853c896f6aa70a",
+      "parentSpanId": "16cf6d99653bd5ea"
+    },
+    {
+      "service": "auraboot-bff",
+      "name": "GET",
+      "spanId": "40084526d9bbd237",
+      "parentSpanId": "6f853c896f6aa70a"
+    },
+    {
+      "service": "auraboot-platform",
+      "name": "http get /api/tenant-preferences/{key}",
+      "spanId": "6e214e4e0c4fbc0d",
+      "parentSpanId": "40084526d9bbd237"
+    },
+    {
+      "service": "auraboot-platform",
+      "name": "secured request",
+      "spanId": "dd8714e816440bca",
+      "parentSpanId": "6e214e4e0c4fbc0d"
+    },
+    {
+      "service": "auraboot-platform",
+      "name": "mybatis -s-e-l-e-c-t",
+      "spanId": "662a24cc902e010f",
+      "parentSpanId": "dd8714e816440bca"
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d01210fc333c9dad",
+      "parentSpanId": "9fd28afd45ea255a",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350215554000",
+      "endTimeUnixNano": "1792061350216156667",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "662a24cc902e010f",
+      "parentSpanId": "dd8714e816440bca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351281934459",
+      "endTimeUnixNano": "1792061351295485709",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantPreferenceMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "bc023c10f3cbf0fa",
+      "parentSpanId": "63c6f3e0e052ef0c",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351040005958",
+      "endTimeUnixNano": "1792061351041669708",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "692b94661b57dba1",
+      "parentSpanId": "1e4e79e0f01c04a7",
+      "name": "http get /api/workbench/stats",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351285304000",
+      "endTimeUnixNano": "1792061351319261541",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f34812af736d7fb6",
+      "parentSpanId": "a3ec7aa00abf268d",
+      "name": "http get /api/tenant-preferences/{key}",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351184122000",
+      "endTimeUnixNano": "1792061351259695542",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b059f46496274f34",
+      "parentSpanId": "24a3a4c5d7ef2015",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351027264792",
+      "endTimeUnixNano": "1792061351032316292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "acb1ca02db012196",
+      "parentSpanId": "338bdd82f58966d9",
+      "name": "http get /api/i18n/{locale}",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350214181000",
+      "endTimeUnixNano": "1792061350226161958",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "80a6db805fbb433c",
+      "parentSpanId": "5429915bb01a42cd",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217874250",
+      "endTimeUnixNano": "1792061350218344334",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "cd5f646e9bf1c88f",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350221160708",
+      "endTimeUnixNano": "1792061350221957708",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.getTenantIdsByUserId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6cd56c995ecfc86c",
+      "parentSpanId": "efe8422313650477",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219168167",
+      "endTimeUnixNano": "1792061350220637792",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectById"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "684e3f2a7e4e1bd1",
+      "parentSpanId": "845dbe370d96bc79",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351327391000",
+      "endTimeUnixNano": "1792061351329259875",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.engagement.mapper.UserEngagementMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "cf3180f783ad298f",
+      "parentSpanId": "df059d415b399b12",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351309489292",
+      "endTimeUnixNano": "1792061351316614458",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4b2b6766948bebc0",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351112490375",
+      "endTimeUnixNano": "1792061351114827375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMapper.selectById"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8922751084955d16",
+      "parentSpanId": "ab86d0afdedfd2b1",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351221335167",
+      "endTimeUnixNano": "1792061351223476417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4140d8dfb738c244",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351118795708",
+      "endTimeUnixNano": "1792061351119892833",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "def52f5790fde532",
+      "parentSpanId": "fa814f7975698de6",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351042834583",
+      "endTimeUnixNano": "1792061351042886083",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b9fabc8bdfb1ef36",
+      "parentSpanId": "9fd28afd45ea255a",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350214720042",
+      "endTimeUnixNano": "1792061350215455167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0f51face471a6fb6",
+      "parentSpanId": "ab86d0afdedfd2b1",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351235803375",
+      "endTimeUnixNano": "1792061351242511500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e83b7f2cccea39fe",
+      "parentSpanId": "f610f5e80c0cc562",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351165253708",
+      "endTimeUnixNano": "1792061351165325500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fb95c710b06dfb0d",
+      "parentSpanId": "120d21d7768a3571",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351232997958",
+      "endTimeUnixNano": "1792061351238109000",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f1baa6db87ab7f6a",
+      "parentSpanId": "692b94661b57dba1",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351319015458",
+      "endTimeUnixNano": "1792061351319155208",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6fe20d298421d574",
+      "parentSpanId": "71855c2cba492ac9",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210464708",
+      "endTimeUnixNano": "1792061350211740167",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "671cd6ea205af07b",
+      "parentSpanId": "0a0432e813f2064d",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351236526542",
+      "endTimeUnixNano": "1792061351237037458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "be7c58feefb1f978",
+      "parentSpanId": "9f0c0119ce99b00d",
+      "name": "http get /api/auth/access-policy",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350209872000",
+      "endTimeUnixNano": "1792061350211487334",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b244b9391d6533a1",
+      "parentSpanId": "0a0432e813f2064d",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351242070750",
+      "endTimeUnixNano": "1792061351242154375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5d42a630e3f2ee0f",
+      "parentSpanId": "ab86d0afdedfd2b1",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351242679959",
+      "endTimeUnixNano": "1792061351242717875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b94a4458d3ee821f",
+      "parentSpanId": "efe8422313650477",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350224195167",
+      "endTimeUnixNano": "1792061350225285292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantPreferenceMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a6118b4ae3cb0649",
+      "parentSpanId": "22ba0dc91a7edd9a",
+      "name": "http get /api/auth/me",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350214196000",
+      "endTimeUnixNano": "1792061350226447458",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "dd2749c379c65c78",
+      "parentSpanId": "0a0432e813f2064d",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351228774333",
+      "endTimeUnixNano": "1792061351236333667",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "81ad80624365506a",
+      "parentSpanId": "0985b3b481b7c6d8",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351327142125",
+      "endTimeUnixNano": "1792061351328227084",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fc7d57a7a9acdd4a",
+      "parentSpanId": "fa814f7975698de6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351006338166",
+      "endTimeUnixNano": "1792061351018089250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "413907acccb70be0",
+      "parentSpanId": "f26ce057ee5c8320",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351291448875",
+      "endTimeUnixNano": "1792061351291881083",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d705ea714007359e",
+      "parentSpanId": "be7c58feefb1f978",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210177709",
+      "endTimeUnixNano": "1792061350210444084",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9b34e4c199944c69",
+      "parentSpanId": "c81979ae0041a6da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350264794459",
+      "endTimeUnixNano": "1792061350265471625",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "89cb2a9b464dc705",
+      "parentSpanId": "0985b3b481b7c6d8",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351326223750",
+      "endTimeUnixNano": "1792061351326918917",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "760014f89e95ef1e",
+      "parentSpanId": "0985b3b481b7c6d8",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351334211042",
+      "endTimeUnixNano": "1792061351334289750",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b4d145f02f6175a7",
+      "parentSpanId": "fc25891c4fdbb78e",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350218080000",
+      "endTimeUnixNano": "1792061350218754708",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0ec0df659a2cb9cc",
+      "parentSpanId": "fc25891c4fdbb78e",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350216431625",
+      "endTimeUnixNano": "1792061350216882417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c81979ae0041a6da",
+      "parentSpanId": "447a1e575738aac9",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350261788625",
+      "endTimeUnixNano": "1792061350267657917",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "53c750da92ff2da3",
+      "parentSpanId": "9fd28afd45ea255a",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217788958",
+      "endTimeUnixNano": "1792061350218323458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3f4785dcdb14d0ed",
+      "parentSpanId": "03da8d07f9161e00",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351318255584",
+      "endTimeUnixNano": "1792061351319321709",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e302599630e1b70a",
+      "parentSpanId": "a431c09845cad593",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351330543084",
+      "endTimeUnixNano": "1792061351330768709",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c1f25a0fff764f89",
+      "parentSpanId": "5429915bb01a42cd",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219421500",
+      "endTimeUnixNano": "1792061350222204334",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.dashboard.mapper.DashboardMapper.findWorkbench"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "02404ee41524066a",
+      "parentSpanId": "dfbc880a13205234",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351307665958",
+      "endTimeUnixNano": "1792061351308338750",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b438d3a8f21e7a3c",
+      "parentSpanId": "ed3aebba2c3401e6",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351336681542",
+      "endTimeUnixNano": "1792061351336734542",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "169497e124ad2446",
+      "parentSpanId": "fa814f7975698de6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351021793625",
+      "endTimeUnixNano": "1792061351023746083",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "cc54152c8a62222e",
+      "parentSpanId": "f33477c83276aa2c",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351166040708",
+      "endTimeUnixNano": "1792061351166155000",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0da78f0b218da3ec",
+      "parentSpanId": "0c18e1f926c58b44",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351226547250",
+      "endTimeUnixNano": "1792061351227635333",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3e57a670464b7fee",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351131326625",
+      "endTimeUnixNano": "1792061351136419083",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMapper.selectById"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "957f89939bfb497c",
+      "parentSpanId": "f26ce057ee5c8320",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351302836250",
+      "endTimeUnixNano": "1792061351307223917",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ed3aebba2c3401e6",
+      "parentSpanId": "f7bd053d4b101f62",
+      "name": "http get /api/inbox",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351325434000",
+      "endTimeUnixNano": "1792061351336791500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "07c3c50d4ee55fa6",
+      "parentSpanId": "f33477c83276aa2c",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351042901833",
+      "endTimeUnixNano": "1792061351166027125",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8e20ea6df47fadda",
+      "parentSpanId": "07c3c50d4ee55fa6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351137062041",
+      "endTimeUnixNano": "1792061351147896500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.party.mapper.PartyMembershipMapper.findActorOptions"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a774b23c027de067",
+      "parentSpanId": "0985b3b481b7c6d8",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351331590334",
+      "endTimeUnixNano": "1792061351332578250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d2c12d2e6738d33b",
+      "parentSpanId": "ae35d6a46c851c88",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351233250917",
+      "endTimeUnixNano": "1792061351236187209",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a579cb3a7ce7d94a",
+      "parentSpanId": "efe8422313650477",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350223541875",
+      "endTimeUnixNano": "1792061350224126708",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserPreferenceMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "22f427fadba25eca",
+      "parentSpanId": "03da8d07f9161e00",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351319453000",
+      "endTimeUnixNano": "1792061351320518209",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "dfbc880a13205234",
+      "parentSpanId": "692b94661b57dba1",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351285595958",
+      "endTimeUnixNano": "1792061351308733000",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4330cb47ebbd68a7",
+      "parentSpanId": "ae35d6a46c851c88",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351211061625",
+      "endTimeUnixNano": "1792061351227487417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0a0432e813f2064d",
+      "parentSpanId": "f34812af736d7fb6",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351184608750",
+      "endTimeUnixNano": "1792061351242182250",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "aa5c092968759b5a",
+      "parentSpanId": "a8ba54402433245b",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351219106000",
+      "endTimeUnixNano": "1792061351221962833",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "142422a36611e963",
+      "parentSpanId": "63c6f3e0e052ef0c",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351011529292",
+      "endTimeUnixNano": "1792061351020016583",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "005c5a795025e99d",
+      "parentSpanId": "ac75bd9fadc57482",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350215101459",
+      "endTimeUnixNano": "1792061350215597167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d50b7fa92b5cc577",
+      "parentSpanId": "fc25891c4fdbb78e",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217062208",
+      "endTimeUnixNano": "1792061350217703417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "1f8314f4370d2bff",
+      "parentSpanId": "c81979ae0041a6da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350265630417",
+      "endTimeUnixNano": "1792061350266157167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d2e2a7c48a618c9f",
+      "parentSpanId": "fc25891c4fdbb78e",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350218901917",
+      "endTimeUnixNano": "1792061350218944042",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c6644a89cc08a489",
+      "parentSpanId": "c81979ae0041a6da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350262064209",
+      "endTimeUnixNano": "1792061350262615250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3897943f04e36ee7",
+      "parentSpanId": "07c3c50d4ee55fa6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351131862708",
+      "endTimeUnixNano": "1792061351136874291",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper.findAllowedPartyCapabilities"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8c197207f33716e7",
+      "parentSpanId": "fa814f7975698de6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351018328916",
+      "endTimeUnixNano": "1792061351020082250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "1a50f43897b734e5",
+      "parentSpanId": "7f86979137cc53da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351291887250",
+      "endTimeUnixNano": "1792061351293293958",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2054d45facb95b97",
+      "parentSpanId": "ae35d6a46c851c88",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351253475500",
+      "endTimeUnixNano": "1792061351256073750",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b3ae448fbe94c69d",
+      "parentSpanId": "d705ea714007359e",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210326625",
+      "endTimeUnixNano": "1792061350210428375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0d3434edabb470a3",
+      "parentSpanId": "63c6f3e0e052ef0c",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351020196208",
+      "endTimeUnixNano": "1792061351023632958",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f0fd897199e6f880",
+      "parentSpanId": "c94c480619f793b8",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351242731292",
+      "endTimeUnixNano": "1792061351259685500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ade53c9b3f2d101c",
+      "parentSpanId": "dfbc880a13205234",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351297861708",
+      "endTimeUnixNano": "1792061351304895375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "95bcaede9d51fe28",
+      "parentSpanId": "3e31b01dbbd50ce6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219500958",
+      "endTimeUnixNano": "1792061350220733292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e6423930936ffe7b",
+      "parentSpanId": "a8ba54402433245b",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351222140625",
+      "endTimeUnixNano": "1792061351224576417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "57116490a67f4179",
+      "parentSpanId": "6e214e4e0c4fbc0d",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351296138084",
+      "endTimeUnixNano": "1792061351296195792",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ca590423eb1f0204",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350225209208",
+      "endTimeUnixNano": "1792061350225946916",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMapper.selectById"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f72621edb473167d",
+      "parentSpanId": "dfbc880a13205234",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351305100833",
+      "endTimeUnixNano": "1792061351307455375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fa3eb1b309b2596d",
+      "parentSpanId": "f26ce057ee5c8320",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351309457333",
+      "endTimeUnixNano": "1792061351309480625",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6bd7948ed94e510c",
+      "parentSpanId": "71855c2cba492ac9",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350211743750",
+      "endTimeUnixNano": "1792061350211763375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5e863e812a82b4b2",
+      "parentSpanId": "c81979ae0041a6da",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350267558125",
+      "endTimeUnixNano": "1792061350267638875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "03ab63ab1bf959cd",
+      "parentSpanId": "ab86d0afdedfd2b1",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351189974625",
+      "endTimeUnixNano": "1792061351221185500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3b1a1297819248bf",
+      "parentSpanId": "ac75bd9fadc57482",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210440417",
+      "endTimeUnixNano": "1792061350211155375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "aed34a0918487953",
+      "parentSpanId": "845dbe370d96bc79",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351326363750",
+      "endTimeUnixNano": "1792061351326881625",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "138f7d8b9468d322",
+      "parentSpanId": "98d7c31b8166ba40",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351044973292",
+      "endTimeUnixNano": "1792061351054142167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3d415c517387911e",
+      "parentSpanId": "023a92e066740653",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351309108250",
+      "endTimeUnixNano": "1792061351311488500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fa814f7975698de6",
+      "parentSpanId": "f33477c83276aa2c",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351004832375",
+      "endTimeUnixNano": "1792061351042899958",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9c44bf5601fab1dd",
+      "parentSpanId": "f0fd897199e6f880",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351243207792",
+      "endTimeUnixNano": "1792061351252718000",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8eea155c630eec4a",
+      "parentSpanId": "9fd28afd45ea255a",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217171583",
+      "endTimeUnixNano": "1792061350217619708",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "24a3a4c5d7ef2015",
+      "parentSpanId": "f610f5e80c0cc562",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351006306542",
+      "endTimeUnixNano": "1792061351050440500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "67f33f622a77dc59",
+      "parentSpanId": "ac75bd9fadc57482",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350216533167",
+      "endTimeUnixNano": "1792061350217217084",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "31930a1c96b9cb65",
+      "parentSpanId": "13c192412493b230",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350268675542",
+      "endTimeUnixNano": "1792061350269645209",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.menu.mapper.MenuMapper.findVisibleDirectoriesAndMenus"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a82c89cf335fadbb",
+      "parentSpanId": "99038c3b7c989b16",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351235855208",
+      "endTimeUnixNano": "1792061351240358250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d95952ced3dba5ab",
+      "parentSpanId": "a6118b4ae3cb0649",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350226385708",
+      "endTimeUnixNano": "1792061350226419875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "63c6f3e0e052ef0c",
+      "parentSpanId": "9725fc3bd52fc9c9",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351009927958",
+      "endTimeUnixNano": "1792061351042254583",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "023a92e066740653",
+      "parentSpanId": "692b94661b57dba1",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351308734541",
+      "endTimeUnixNano": "1792061351319001791",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ea1cedac955549b6",
+      "parentSpanId": "f26ce057ee5c8320",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351290304125",
+      "endTimeUnixNano": "1792061351291338417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "00f5efd18d0307c7",
+      "parentSpanId": "6b7d8560e4253dfa",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351243286000",
+      "endTimeUnixNano": "1792061351252943667",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c157ade2bb088aad",
+      "parentSpanId": "9fd28afd45ea255a",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350216279375",
+      "endTimeUnixNano": "1792061350217022167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "73ddcc0956a449eb",
+      "parentSpanId": "acb1ca02db012196",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350225959792",
+      "endTimeUnixNano": "1792061350226020833",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "13c192412493b230",
+      "parentSpanId": "447a1e575738aac9",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350267660167",
+      "endTimeUnixNano": "1792061350274577792",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2fe0cf4e8e8fd953",
+      "parentSpanId": "0d8fa738c890d53b",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210325625",
+      "endTimeUnixNano": "1792061350210422625",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0d8fa738c890d53b",
+      "parentSpanId": "71855c2cba492ac9",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210177292",
+      "endTimeUnixNano": "1792061350210461125",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "44895b892ad9ffee",
+      "parentSpanId": "efe8422313650477",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350220668292",
+      "endTimeUnixNano": "1792061350221996667",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.getTenantNameById"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "91b156d84a576ebe",
+      "parentSpanId": "f26ce057ee5c8320",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351297464792",
+      "endTimeUnixNano": "1792061351302716333",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2cd1a11cd6c63d6d",
+      "parentSpanId": "ac75bd9fadc57482",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350215668334",
+      "endTimeUnixNano": "1792061350216210834",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "efe8422313650477",
+      "parentSpanId": "a6118b4ae3cb0649",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350218961792",
+      "endTimeUnixNano": "1792061350226382208",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "50f3409aa60204d3",
+      "parentSpanId": "fa814f7975698de6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351023995583",
+      "endTimeUnixNano": "1792061351033205458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f33477c83276aa2c",
+      "parentSpanId": "74b39ca8b3713899",
+      "name": "http get /api/actors",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351004512000",
+      "endTimeUnixNano": "1792061351166246000",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7f86979137cc53da",
+      "parentSpanId": "f065dd2f8398e2cb",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351287133667",
+      "endTimeUnixNano": "1792061351309297625",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4dd0cd6c5762f8db",
+      "parentSpanId": "03da8d07f9161e00",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351316982000",
+      "endTimeUnixNano": "1792061351318023709",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "76ef002f54a651eb",
+      "parentSpanId": "f34812af736d7fb6",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351259550583",
+      "endTimeUnixNano": "1792061351259610375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "1c6b705f11e6ee5f",
+      "parentSpanId": "c94c480619f793b8",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351259697500",
+      "endTimeUnixNano": "1792061351259790625",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3717dcd6837a597c",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351137824250",
+      "endTimeUnixNano": "1792061351147900417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "42d2372089e960c1",
+      "parentSpanId": "f9ab8b849ab40de2",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217788541",
+      "endTimeUnixNano": "1792061350218486666",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e410b64da4b70272",
+      "parentSpanId": "c81979ae0041a6da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350263438792",
+      "endTimeUnixNano": "1792061350264550417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5101fc654f4d7686",
+      "parentSpanId": "ac75bd9fadc57482",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217454875",
+      "endTimeUnixNano": "1792061350217533625",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "1f07aa270930596c",
+      "parentSpanId": "0c18e1f926c58b44",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351222344500",
+      "endTimeUnixNano": "1792061351224576500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "cea1cbfe3cd88024",
+      "parentSpanId": "a8ba54402433245b",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351235477833",
+      "endTimeUnixNano": "1792061351235542875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "eb75bf313743ffee",
+      "parentSpanId": "0a0432e813f2064d",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351237163792",
+      "endTimeUnixNano": "1792061351237763458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2dde9640d370cd6d",
+      "parentSpanId": "f675335532123e12",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351263156042",
+      "endTimeUnixNano": "1792061351263227958",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "98d7c31b8166ba40",
+      "parentSpanId": "9725fc3bd52fc9c9",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351042257833",
+      "endTimeUnixNano": "1792061351055336375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3c9b4c71c00f6032",
+      "parentSpanId": "f065dd2f8398e2cb",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351309299292",
+      "endTimeUnixNano": "1792061351317634958",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f8002aa5541a8673",
+      "parentSpanId": "f065dd2f8398e2cb",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351317638750",
+      "endTimeUnixNano": "1792061351317686667",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "03da8d07f9161e00",
+      "parentSpanId": "a431c09845cad593",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351316766875",
+      "endTimeUnixNano": "1792061351325913042",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6eab485630654058",
+      "parentSpanId": "24a3a4c5d7ef2015",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351033639792",
+      "endTimeUnixNano": "1792061351039136292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "15488ebb8876c68c",
+      "parentSpanId": "5429915bb01a42cd",
+      "name": "permission-check",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350218834917",
+      "endTimeUnixNano": "1792061350218961959",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f9ab8b849ab40de2",
+      "parentSpanId": "0978754b0100ac4b",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350213322541",
+      "endTimeUnixNano": "1792061350219142375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e6bcb5ad4984500c",
+      "parentSpanId": "f26ce057ee5c8320",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351307455667",
+      "endTimeUnixNano": "1792061351309334458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "880764472464da21",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350222013166",
+      "endTimeUnixNano": "1792061350222878250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMapper.selectById"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e311af1851c28a2f",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351148007667",
+      "endTimeUnixNano": "1792061351163207833",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.RoleMapper.selectByIds"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0978754b0100ac4b",
+      "parentSpanId": "3fe29be3a26692de",
+      "name": "http get /api/tenant-selection/my-spaces",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350213077000",
+      "endTimeUnixNano": "1792061350230527666",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "76a0e21986b99086",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351136511500",
+      "endTimeUnixNano": "1792061351137751750",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.findByTenantIdAndUserId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ca2643ae3b64a5b4",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351119979708",
+      "endTimeUnixNano": "1792061351131097875",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.RoleMapper.selectByIds"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0c22e79c80564712",
+      "parentSpanId": "ae35d6a46c851c88",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351237271334",
+      "endTimeUnixNano": "1792061351252865917",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9725fc3bd52fc9c9",
+      "parentSpanId": "02a635e107d889eb",
+      "name": "http get /api/entitlements",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351009739000",
+      "endTimeUnixNano": "1792061351055481083",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "71cdbb81d1f27c57",
+      "parentSpanId": "be7c58feefb1f978",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350211395000",
+      "endTimeUnixNano": "1792061350211451667",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5429915bb01a42cd",
+      "parentSpanId": "b295c1ac47f31493",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217555875",
+      "endTimeUnixNano": "1792061350223699334",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7456e21e1fc092ce",
+      "parentSpanId": "6fe20d298421d574",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210797500",
+      "endTimeUnixNano": "1792061350211409792",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.saas.config.mapper.BootstrapMapper.findActiveBootstrap"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e7eaef3f6e366f14",
+      "parentSpanId": "cf3180f783ad298f",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351314909292",
+      "endTimeUnixNano": "1792061351316080583",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.engagement.mapper.UserEngagementMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9cc49a55f69e3d3c",
+      "parentSpanId": "07c3c50d4ee55fa6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351043287958",
+      "endTimeUnixNano": "1792061351060985000",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "756319efab5f71a1",
+      "parentSpanId": "a8ba54402433245b",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351224896875",
+      "endTimeUnixNano": "1792061351226524083",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "206c046fb10d0504",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219281583",
+      "endTimeUnixNano": "1792061350220721458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "151e8839914a086a",
+      "parentSpanId": "c81979ae0041a6da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350266475209",
+      "endTimeUnixNano": "1792061350267137250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "26ce595e32fb40c2",
+      "parentSpanId": "6b7d8560e4253dfa",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351253619917",
+      "endTimeUnixNano": "1792061351259106708",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantPreferenceMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f613e7bcbcc3c5bd",
+      "parentSpanId": "0cad89a64b9fecfa",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351335546000",
+      "endTimeUnixNano": "1792061351336216375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.inbox.mapper.InboxItemMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "602c151b1b0fdc77",
+      "parentSpanId": "7f86979137cc53da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351307591250",
+      "endTimeUnixNano": "1792061351308546167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f9e19fe916cf671d",
+      "parentSpanId": "fc25891c4fdbb78e",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350214497000",
+      "endTimeUnixNano": "1792061350214918042",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4d1ccdddb221f6ca",
+      "parentSpanId": "f610f5e80c0cc562",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351050443333",
+      "endTimeUnixNano": "1792061351165240208",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ee04ebad4f15834f",
+      "parentSpanId": "63c6f3e0e052ef0c",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351036187833",
+      "endTimeUnixNano": "1792061351039744458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "726c6f64d7eca8c0",
+      "parentSpanId": "a8ba54402433245b",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351226590625",
+      "endTimeUnixNano": "1792061351227141125",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fc25891c4fdbb78e",
+      "parentSpanId": "a6118b4ae3cb0649",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350214295625",
+      "endTimeUnixNano": "1792061350218960125",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a66f3f4bf2807f04",
+      "parentSpanId": "5429915bb01a42cd",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350222216875",
+      "endTimeUnixNano": "1792061350222936375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.dashboard.mapper.DashboardMapper.findWorkbenchContributions"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ad75be2e424368f9",
+      "parentSpanId": "7f86979137cc53da",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351309227500",
+      "endTimeUnixNano": "1792061351309283167",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "447a1e575738aac9",
+      "parentSpanId": "26b35eacdafd9767",
+      "name": "http get /api/menu/user",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350261606000",
+      "endTimeUnixNano": "1792061350274911250",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d74d458932e33c5e",
+      "parentSpanId": "ae35d6a46c851c88",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351256490417",
+      "endTimeUnixNano": "1792061351256595250",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "61f0ac95c7810f99",
+      "parentSpanId": "b3f810e71b89a4f3",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351255294833",
+      "endTimeUnixNano": "1792061351255352708",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2287334e8bbf318e",
+      "parentSpanId": "f0fd897199e6f880",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351254438375",
+      "endTimeUnixNano": "1792061351258533542",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantPreferenceMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "84e38bf0842c2588",
+      "parentSpanId": "0c18e1f926c58b44",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351208692791",
+      "endTimeUnixNano": "1792061351217644000",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9340cbd08126ceb0",
+      "parentSpanId": "0c18e1f926c58b44",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351182172375",
+      "endTimeUnixNano": "1792061351208289250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "adee93712120ea4b",
+      "parentSpanId": "ab86d0afdedfd2b1",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351226851792",
+      "endTimeUnixNano": "1792061351235456500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "09ce542cd03206b4",
+      "parentSpanId": "f26ce057ee5c8320",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351292001458",
+      "endTimeUnixNano": "1792061351296285250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f065dd2f8398e2cb",
+      "parentSpanId": "398eb5af00522d93",
+      "name": "http get /api/inbox",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351286947000",
+      "endTimeUnixNano": "1792061351317739333",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6b5f73b60ec8260a",
+      "parentSpanId": "7f86979137cc53da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351295588542",
+      "endTimeUnixNano": "1792061351301896125",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3e31b01dbbd50ce6",
+      "parentSpanId": "acb1ca02db012196",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219079833",
+      "endTimeUnixNano": "1792061350225949417",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fda44fb00785fc7e",
+      "parentSpanId": "0c18e1f926c58b44",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351224746000",
+      "endTimeUnixNano": "1792061351226297041",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a431c09845cad593",
+      "parentSpanId": "5e2fa45d5132a3b7",
+      "name": "http get /api/user-engagement",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351316573000",
+      "endTimeUnixNano": "1792061351330993500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "80f5d9ca6e29435f",
+      "parentSpanId": "24a3a4c5d7ef2015",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351018328208",
+      "endTimeUnixNano": "1792061351020882333",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0c18e1f926c58b44",
+      "parentSpanId": "b3f810e71b89a4f3",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351180844916",
+      "endTimeUnixNano": "1792061351232651000",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0a6b4cbd844078bd",
+      "parentSpanId": "7f86979137cc53da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351291206042",
+      "endTimeUnixNano": "1792061351291826333",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2bf02efa7a8f7bab",
+      "parentSpanId": "df059d415b399b12",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351316624750",
+      "endTimeUnixNano": "1792061351316684875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f187cc6bc6383ea8",
+      "parentSpanId": "120d21d7768a3571",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351240798416",
+      "endTimeUnixNano": "1792061351251176250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.notification.mapper.NotificationMapper.countUnread"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "14ebd23b9d381486",
+      "parentSpanId": "447a1e575738aac9",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350274598250",
+      "endTimeUnixNano": "1792061350274765042",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "64135afb6d06d77e",
+      "parentSpanId": "07c3c50d4ee55fa6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351112405083",
+      "endTimeUnixNano": "1792061351131831583",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper.isActiveLoginContext"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "510cd815dcc16fea",
+      "parentSpanId": "ac75bd9fadc57482",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350212490209",
+      "endTimeUnixNano": "1792061350214809500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7da749e7edcf4548",
+      "parentSpanId": "fa814f7975698de6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351020196666",
+      "endTimeUnixNano": "1792061351020985416",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9871f67536aeac94",
+      "parentSpanId": "dfbc880a13205234",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351308661583",
+      "endTimeUnixNano": "1792061351308716500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6c41cc636b332201",
+      "parentSpanId": "3c9b4c71c00f6032",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351310334375",
+      "endTimeUnixNano": "1792061351314158375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4ee3524add9d7d55",
+      "parentSpanId": "7f86979137cc53da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351302148208",
+      "endTimeUnixNano": "1792061351307052292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b92bf34e78a35f3a",
+      "parentSpanId": "f9ab8b849ab40de2",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350217175125",
+      "endTimeUnixNano": "1792061350217619291",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fc9a1ac5d0885029",
+      "parentSpanId": "0985b3b481b7c6d8",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351332959750",
+      "endTimeUnixNano": "1792061351333888500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ac75bd9fadc57482",
+      "parentSpanId": "b295c1ac47f31493",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210091959",
+      "endTimeUnixNano": "1792061350217553625",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f610f5e80c0cc562",
+      "parentSpanId": "abbacc9c8b003a32",
+      "name": "http get /api/tenant-selection/my-spaces",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351006059000",
+      "endTimeUnixNano": "1792061351165385250",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b3f810e71b89a4f3",
+      "parentSpanId": "f37fcb0cc70370e8",
+      "name": "http get /api/notifications/unread-count",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351177770000",
+      "endTimeUnixNano": "1792061351255429166",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "845dbe370d96bc79",
+      "parentSpanId": "a431c09845cad593",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351325915125",
+      "endTimeUnixNano": "1792061351330532875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4cad8904ea422fe8",
+      "parentSpanId": "f9ab8b849ab40de2",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350214783291",
+      "endTimeUnixNano": "1792061350215985833",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ab86d0afdedfd2b1",
+      "parentSpanId": "c94c480619f793b8",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351186389375",
+      "endTimeUnixNano": "1792061351242729792",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "91cbf39a2b0d22cb",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351050811208",
+      "endTimeUnixNano": "1792061351054213167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "653ace13e0fe81a5",
+      "parentSpanId": "9fd28afd45ea255a",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350218550458",
+      "endTimeUnixNano": "1792061350218845500",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9add0d8806daa155",
+      "parentSpanId": "0a0432e813f2064d",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351238122292",
+      "endTimeUnixNano": "1792061351241654792",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9846ab913c436ff0",
+      "parentSpanId": "fa814f7975698de6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351033924166",
+      "endTimeUnixNano": "1792061351042523958",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a8ba54402433245b",
+      "parentSpanId": "f675335532123e12",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351183822458",
+      "endTimeUnixNano": "1792061351235560875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8819dd18dd86de79",
+      "parentSpanId": "b295c1ac47f31493",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350223707584",
+      "endTimeUnixNano": "1792061350223764417",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3d2e3875707c3883",
+      "parentSpanId": "63c6f3e0e052ef0c",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351025857667",
+      "endTimeUnixNano": "1792061351032093125",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7cacdc9d4fc7de20",
+      "parentSpanId": "0a0432e813f2064d",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351208729167",
+      "endTimeUnixNano": "1792061351228678708",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b684f4c02443cb19",
+      "parentSpanId": "24a3a4c5d7ef2015",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351006547583",
+      "endTimeUnixNano": "1792061351018083583",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e718092bc582b08b",
+      "parentSpanId": "24a3a4c5d7ef2015",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351040873458",
+      "endTimeUnixNano": "1792061351049805167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3631cd534741cdf1",
+      "parentSpanId": "ac75bd9fadc57482",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350211291459",
+      "endTimeUnixNano": "1792061350212304292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3b27e52e7feb0fb3",
+      "parentSpanId": "cf3180f783ad298f",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351309640083",
+      "endTimeUnixNano": "1792061351311659250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a7182e8026fe6597",
+      "parentSpanId": "ae35d6a46c851c88",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351207022625",
+      "endTimeUnixNano": "1792061351209764167",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0985b3b481b7c6d8",
+      "parentSpanId": "ed3aebba2c3401e6",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351326049584",
+      "endTimeUnixNano": "1792061351334309792",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "819b7c67b0ffd8af",
+      "parentSpanId": "efe8422313650477",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350222088708",
+      "endTimeUnixNano": "1792061350223324958",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.RoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c4e78a882e6c3823",
+      "parentSpanId": "7f86979137cc53da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351287309333",
+      "endTimeUnixNano": "1792061351291079875",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "55a8dd4ac83ea2cf",
+      "parentSpanId": "13c192412493b230",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350269780375",
+      "endTimeUnixNano": "1792061350271831375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.permission.mapper.SubjectPermissionMapper.findBySubjects"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4c7d808340cd2672",
+      "parentSpanId": "0985b3b481b7c6d8",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351329538042",
+      "endTimeUnixNano": "1792061351331452334",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "914e036dbb16e50a",
+      "parentSpanId": "be7c58feefb1f978",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350210445834",
+      "endTimeUnixNano": "1792061350211389375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a34bf7e32a991915",
+      "parentSpanId": "99038c3b7c989b16",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351249311083",
+      "endTimeUnixNano": "1792061351251176083",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.inbox.mapper.InboxItemMapper.countUnread"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9fd28afd45ea255a",
+      "parentSpanId": "acb1ca02db012196",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350214546250",
+      "endTimeUnixNano": "1792061350219078417",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "05305410b4536678",
+      "parentSpanId": "dfbc880a13205234",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351292690208",
+      "endTimeUnixNano": "1792061351296526791",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f0f9bb66f05a247f",
+      "parentSpanId": "f9ab8b849ab40de2",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219112083",
+      "endTimeUnixNano": "1792061350219133916",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f675335532123e12",
+      "parentSpanId": "3558f03a404fd24d",
+      "name": "http get /api/inbox/unread-count",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351183403000",
+      "endTimeUnixNano": "1792061351263303167",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c94c480619f793b8",
+      "parentSpanId": "aebd720f85f0ae43",
+      "name": "http get /api/tenant-preferences/{key}",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351185733000",
+      "endTimeUnixNano": "1792061351259872542",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "aee282797672e8dc",
+      "parentSpanId": "a8ba54402433245b",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351184197000",
+      "endTimeUnixNano": "1792061351219009417",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c9ed66ade85a51a0",
+      "parentSpanId": "9725fc3bd52fc9c9",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351055346625",
+      "endTimeUnixNano": "1792061351055406875",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e633a82d37206322",
+      "parentSpanId": "f9ab8b849ab40de2",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350216056791",
+      "endTimeUnixNano": "1792061350216879166",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a0ee95b0011d5834",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350224195000",
+      "endTimeUnixNano": "1792061350225152291",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.RoleMapper.selectByIds"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "cf2e827dfe6b7691",
+      "parentSpanId": "0c18e1f926c58b44",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351232543166",
+      "endTimeUnixNano": "1792061351232630833",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ae35d6a46c851c88",
+      "parentSpanId": "6e214e4e0c4fbc0d",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351206581959",
+      "endTimeUnixNano": "1792061351256621959",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0d2d3c202b24ef0f",
+      "parentSpanId": "a8ba54402433245b",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351233280750",
+      "endTimeUnixNano": "1792061351235190375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7796afb1df46d133",
+      "parentSpanId": "63c6f3e0e052ef0c",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351042118833",
+      "endTimeUnixNano": "1792061351042224792",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "55bdd752f26285d8",
+      "parentSpanId": "fc25891c4fdbb78e",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350215003792",
+      "endTimeUnixNano": "1792061350215414625",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "44afd58c8525f673",
+      "parentSpanId": "ae35d6a46c851c88",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351236858792",
+      "endTimeUnixNano": "1792061351237197084",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "10ff75c44c737a36",
+      "parentSpanId": "f9ab8b849ab40de2",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350213593541",
+      "endTimeUnixNano": "1792061350214560875",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "71855c2cba492ac9",
+      "parentSpanId": "44f0e9995750dcc9",
+      "name": "http get /api/bootstrap/status",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350209871000",
+      "endTimeUnixNano": "1792061350211908583",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "df059d415b399b12",
+      "parentSpanId": "14a0325a2a97307c",
+      "name": "http get /api/user-engagement",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351289642000",
+      "endTimeUnixNano": "1792061351316757500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d77bcef0b426eb25",
+      "parentSpanId": "dfbc880a13205234",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351291167750",
+      "endTimeUnixNano": "1792061351292539041",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b295c1ac47f31493",
+      "parentSpanId": "3c81a0daf2b19801",
+      "name": "http get /api/dashboards/workbench",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350209880000",
+      "endTimeUnixNano": "1792061350223829292",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "cc18266c0ca5cae4",
+      "parentSpanId": "dfbc880a13205234",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351286013041",
+      "endTimeUnixNano": "1792061351290949333",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f26ce057ee5c8320",
+      "parentSpanId": "df059d415b399b12",
+      "name": "security filterchain before",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351289926792",
+      "endTimeUnixNano": "1792061351309488500",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "10af16f4409d211d",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350222893208",
+      "endTimeUnixNano": "1792061350223327791",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.findByTenantIdAndUserId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "58f3a855b54156cb",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351088784833",
+      "endTimeUnixNano": "1792061351112310917",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.getTenantIdsByUserId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "25fedaee3008ba9c",
+      "parentSpanId": "ab86d0afdedfd2b1",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351223725875",
+      "endTimeUnixNano": "1792061351225440875",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5e84530c6d4f8aea",
+      "parentSpanId": "03da8d07f9161e00",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351325816500",
+      "endTimeUnixNano": "1792061351325893250",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d13b785d3b2962cf",
+      "parentSpanId": "dd8714e816440bca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351260426750",
+      "endTimeUnixNano": "1792061351274142209",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "648bde22ffd72ca6",
+      "parentSpanId": "24a3a4c5d7ef2015",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351050341667",
+      "endTimeUnixNano": "1792061351050418667",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "67376f35afe5ae3d",
+      "parentSpanId": "ab86d0afdedfd2b1",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351225617500",
+      "endTimeUnixNano": "1792061351226816959",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2193df01d7185369",
+      "parentSpanId": "0978754b0100ac4b",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219143375",
+      "endTimeUnixNano": "1792061350230376375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "15d2e87f46afc918",
+      "parentSpanId": "3c9b4c71c00f6032",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351315054375",
+      "endTimeUnixNano": "1792061351317140000",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.inbox.mapper.InboxItemMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "17957564e779a340",
+      "parentSpanId": "0a0432e813f2064d",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351184795125",
+      "endTimeUnixNano": "1792061351208603375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6b3e8fb202c6dd72",
+      "parentSpanId": "07c3c50d4ee55fa6",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351071337291",
+      "endTimeUnixNano": "1792061351112329416",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.findByTenantIdAndUserId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b8ca72483173c07d",
+      "parentSpanId": "fc25891c4fdbb78e",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350215542458",
+      "endTimeUnixNano": "1792061350216195292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "fe12f7b8bbc64b3e",
+      "parentSpanId": "13c192412493b230",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350268093667",
+      "endTimeUnixNano": "1792061350268498584",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ac5d132ae35f599c",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350225997625",
+      "endTimeUnixNano": "1792061350226643666",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.findByTenantIdAndUserId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "120d21d7768a3571",
+      "parentSpanId": "b3f810e71b89a4f3",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351232653333",
+      "endTimeUnixNano": "1792061351255284375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "99038c3b7c989b16",
+      "parentSpanId": "f675335532123e12",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351235563083",
+      "endTimeUnixNano": "1792061351263144292",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a4479732a6d2f215",
+      "parentSpanId": "03da8d07f9161e00",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351322293417",
+      "endTimeUnixNano": "1792061351323250375",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "667f4f4b59289474",
+      "parentSpanId": "63c6f3e0e052ef0c",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351023838000",
+      "endTimeUnixNano": "1792061351025062208",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c0f97b664cf5dd4f",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350226726750",
+      "endTimeUnixNano": "1792061350227696416",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9035e6ad5c418f3d",
+      "parentSpanId": "03da8d07f9161e00",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351323915750",
+      "endTimeUnixNano": "1792061351325315709",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ba24d41d2446b266",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350227770250",
+      "endTimeUnixNano": "1792061350229766291",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.RoleMapper.selectByIds"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "dd8714e816440bca",
+      "parentSpanId": "6e214e4e0c4fbc0d",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351256624792",
+      "endTimeUnixNano": "1792061351296129709",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "54cb4f8d24010c44",
+      "parentSpanId": "4d1ccdddb221f6ca",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351115018417",
+      "endTimeUnixNano": "1792061351117278958",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.findByTenantIdAndUserId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0cad89a64b9fecfa",
+      "parentSpanId": "ed3aebba2c3401e6",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351334311917",
+      "endTimeUnixNano": "1792061351336672084",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "71ccfd67c1dce6a2",
+      "parentSpanId": "0985b3b481b7c6d8",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351328528834",
+      "endTimeUnixNano": "1792061351329315834",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "210343dc08586856",
+      "parentSpanId": "2193df01d7185369",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350223366375",
+      "endTimeUnixNano": "1792061350224126458",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b841c510a5d80be2",
+      "parentSpanId": "9fd28afd45ea255a",
+      "name": "authorize request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350219027583",
+      "endTimeUnixNano": "1792061350219066708",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4f3d500b9f7180c3",
+      "parentSpanId": "0cad89a64b9fecfa",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351334642334",
+      "endTimeUnixNano": "1792061351335066250",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "192b68cbb4a6be99",
+      "parentSpanId": "0978754b0100ac4b",
+      "name": "security filterchain after",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350230389166",
+      "endTimeUnixNano": "1792061350230452208",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9246a8a988c1368b",
+      "parentSpanId": "c81979ae0041a6da",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350262894292",
+      "endTimeUnixNano": "1792061350263338292",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e2708660b2051030",
+      "parentSpanId": "f9ab8b849ab40de2",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350218662708",
+      "endTimeUnixNano": "1792061350218996000",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6e214e4e0c4fbc0d",
+      "parentSpanId": "40084526d9bbd237",
+      "name": "http get /api/tenant-preferences/{key}",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351204594000",
+      "endTimeUnixNano": "1792061351296270375",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "89cb1bef9ca54d24",
+      "parentSpanId": "0c18e1f926c58b44",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351217833416",
+      "endTimeUnixNano": "1792061351222036291",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d03392ce298b75a3",
+      "parentSpanId": "03da8d07f9161e00",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351320897167",
+      "endTimeUnixNano": "1792061351322104792",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6b7d8560e4253dfa",
+      "parentSpanId": "f34812af736d7fb6",
+      "name": "secured request",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351242185208",
+      "endTimeUnixNano": "1792061351259539083",
+      "service": "auraboot-platform",
+      "attributes": {}
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6244729e3f97b881",
+      "parentSpanId": "24a3a4c5d7ef2015",
+      "name": "mybatis -s-e-l-e-c-t",
+      "kind": 1,
+      "startTimeUnixNano": "1792061351020990542",
+      "endTimeUnixNano": "1792061351026890125",
+      "service": "auraboot-platform",
+      "attributes": {
+        "db.operation": "SELECT",
+        "db.system": "postgresql",
+        "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9f0c0119ce99b00d",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350209000000",
+      "endTimeUnixNano": "1792061350211345791",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/auth/access-policy",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "44f0e9995750dcc9",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350209000000",
+      "endTimeUnixNano": "1792061350211641166",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/bootstrap/status",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3c81a0daf2b19801",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350209000000",
+      "endTimeUnixNano": "1792061350224484750",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/dashboards/workbench",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "338bdd82f58966d9",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350213000000",
+      "endTimeUnixNano": "1792061350226082500",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/i18n/zh-CN",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "22ba0dc91a7edd9a",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350213000000",
+      "endTimeUnixNano": "1792061350226125375",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/auth/me",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3fe29be3a26692de",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350212000000",
+      "endTimeUnixNano": "1792061350230652167",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-selection/my-spaces",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "26b35eacdafd9767",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350261000000",
+      "endTimeUnixNano": "1792061350274983000",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/menu/user",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "84fac5f03b43dbd3",
+      "parentSpanId": null,
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350106000000",
+      "endTimeUnixNano": "1792061350452744709",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/home",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "638639cf99111e09",
+      "parentSpanId": "7a2b9cf9fe4f6e86",
+      "name": "POST",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350980000000",
+      "endTimeUnixNano": "1792061351032206959",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "POST",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7a2b9cf9fe4f6e86",
+      "parentSpanId": "6a9225a8bce68cfd",
+      "name": "POST",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350979000000",
+      "endTimeUnixNano": "1792061351032736709",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "POST",
+        "url.path": "/api/auth/session-renew",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c1d24b84c7644894",
+      "parentSpanId": "4f1604cb4cd7bbc1",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350978000000",
+      "endTimeUnixNano": "1792061351090305000",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4f1604cb4cd7bbc1",
+      "parentSpanId": "88c6717742c735ac",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350977000000",
+      "endTimeUnixNano": "1792061351089749208",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/entitlements",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4bdbceab3c7d0028",
+      "parentSpanId": "7d969ad06394f473",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350969000000",
+      "endTimeUnixNano": "1792061351185788584",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7d969ad06394f473",
+      "parentSpanId": "98a650340cf6b827",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350969000000",
+      "endTimeUnixNano": "1792061351189575833",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-selection/my-spaces",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c9fb84f5e346d6be",
+      "parentSpanId": "c6a6036275b7631e",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350970000000",
+      "endTimeUnixNano": "1792061351192115666",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "c6a6036275b7631e",
+      "parentSpanId": "0a587f73413ac057",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350970000000",
+      "endTimeUnixNano": "1792061351192505333",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/actors",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "598b7d7796a938cc",
+      "parentSpanId": "4b1e4feca951aff0",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351153000000",
+      "endTimeUnixNano": "1792061351267620666",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4b1e4feca951aff0",
+      "parentSpanId": "2e868d1767bc15cc",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351153000000",
+      "endTimeUnixNano": "1792061351267888917",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/notifications/unread-count",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "26e69111d5444f90",
+      "parentSpanId": "95d1b8b53bec8671",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351154000000",
+      "endTimeUnixNano": "1792061351269638792",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "95d1b8b53bec8671",
+      "parentSpanId": "8f96b8c954404b50",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351154000000",
+      "endTimeUnixNano": "1792061351270222791",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.theme",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0691d3c97a3399be",
+      "parentSpanId": "41c09964a382ce6e",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351154000000",
+      "endTimeUnixNano": "1792061351270590541",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "41c09964a382ce6e",
+      "parentSpanId": "3916a0a398459b7f",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351154000000",
+      "endTimeUnixNano": "1792061351271245541",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.timezone",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a762443c1a3be671",
+      "parentSpanId": "3cd55d8c85b42040",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351150000000",
+      "endTimeUnixNano": "1792061351270823250",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3cd55d8c85b42040",
+      "parentSpanId": "7709ac478338d35a",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351150000000",
+      "endTimeUnixNano": "1792061351271092042",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox/unread-count",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "16cf6d99653bd5ea",
+      "parentSpanId": "5cc36a4086c0e140",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351193000000",
+      "endTimeUnixNano": "1792061351306762750",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5cc36a4086c0e140",
+      "parentSpanId": "71cf8f816eceb1df",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351193000000",
+      "endTimeUnixNano": "1792061351307093666",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.datetime.format",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f59202e85df84a62",
+      "parentSpanId": "188c7d5699515fd5",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351277000000",
+      "endTimeUnixNano": "1792061351318972250",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "188c7d5699515fd5",
+      "parentSpanId": "eebb78e987270681",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351277000000",
+      "endTimeUnixNano": "1792061351319271417",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/user-engagement",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "d8c566476b4b02c3",
+      "parentSpanId": "293e8c22d208ebf6",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351274000000",
+      "endTimeUnixNano": "1792061351319552292",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "293e8c22d208ebf6",
+      "parentSpanId": "8283fa22d9fe36dc",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351274000000",
+      "endTimeUnixNano": "1792061351320139083",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "38781cc6002c51c8",
+      "parentSpanId": "8772d06cdc6ccb74",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351272000000",
+      "endTimeUnixNano": "1792061351322060708",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8772d06cdc6ccb74",
+      "parentSpanId": "b81562f6957e4304",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351272000000",
+      "endTimeUnixNano": "1792061351322221500",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/workbench/stats",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5f9d39ba4a86781d",
+      "parentSpanId": "993afe621bc4dbbe",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351309000000",
+      "endTimeUnixNano": "1792061351333354458",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "993afe621bc4dbbe",
+      "parentSpanId": "f7a12f28fb02ac05",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351309000000",
+      "endTimeUnixNano": "1792061351333906000",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/user-engagement",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "1b771eddd7d1b441",
+      "parentSpanId": "99aa2f19ec55ca7e",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351321000000",
+      "endTimeUnixNano": "1792061351336697042",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "99aa2f19ec55ca7e",
+      "parentSpanId": "cb3dba091168bbb3",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351321000000",
+      "endTimeUnixNano": "1792061351336913875",
+      "service": "auraboot-ssr",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a739d7728771cc7c",
+      "parentSpanId": "84fac5f03b43dbd3",
+      "name": "ui.page",
+      "kind": 1,
+      "startTimeUnixNano": "1792061350852000000",
+      "endTimeUnixNano": "1792061350852200000",
+      "service": "auraboot-web",
+      "attributes": {
+        "url.path": "/home"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6a9225a8bce68cfd",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350974000000",
+      "endTimeUnixNano": "1792061351157800000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "POST",
+        "url.path": "/api/auth/session-renew",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "88c6717742c735ac",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350974000000",
+      "endTimeUnixNano": "1792061351158300000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/entitlements",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "98a650340cf6b827",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350962000000",
+      "endTimeUnixNano": "1792061351186400000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-selection/my-spaces",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "0a587f73413ac057",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350964000000",
+      "endTimeUnixNano": "1792061351193000000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/actors",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "2e868d1767bc15cc",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351143000000",
+      "endTimeUnixNano": "1792061351268000000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/notifications/unread-count",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8f96b8c954404b50",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351143000000",
+      "endTimeUnixNano": "1792061351269200000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.theme",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3916a0a398459b7f",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351144000000",
+      "endTimeUnixNano": "1792061351272500000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.timezone",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "7709ac478338d35a",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351143000000",
+      "endTimeUnixNano": "1792061351272100000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox/unread-count",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "71cf8f816eceb1df",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351144000000",
+      "endTimeUnixNano": "1792061351307800000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.datetime.format",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "eebb78e987270681",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351168000000",
+      "endTimeUnixNano": "1792061351323000000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/user-engagement",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "8283fa22d9fe36dc",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351168000000",
+      "endTimeUnixNano": "1792061351323200000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "b81562f6957e4304",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351168000000",
+      "endTimeUnixNano": "1792061351323900000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/workbench/stats",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f7a12f28fb02ac05",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351168000000",
+      "endTimeUnixNano": "1792061351345100000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/user-engagement",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "cb3dba091168bbb3",
+      "parentSpanId": "a739d7728771cc7c",
+      "name": "http.client",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351168000000",
+      "endTimeUnixNano": "1792061351345200000",
+      "service": "auraboot-web",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ecd1d5e802e887c6",
+      "parentSpanId": "638639cf99111e09",
+      "name": "POST",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351000000000",
+      "endTimeUnixNano": "1792061351027319459",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "POST",
+        "url.path": "/api/auth/session-renew",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "02a635e107d889eb",
+      "parentSpanId": "ea2cc45bc0ba3f33",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351002000000",
+      "endTimeUnixNano": "1792061351056910042",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "ea2cc45bc0ba3f33",
+      "parentSpanId": "c1d24b84c7644894",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351000000000",
+      "endTimeUnixNano": "1792061351087816667",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/entitlements",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "74b39ca8b3713899",
+      "parentSpanId": "e82a60badc44c898",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350999000000",
+      "endTimeUnixNano": "1792061351168536459",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "abbacc9c8b003a32",
+      "parentSpanId": "4f048672cd6479b3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061350988000000",
+      "endTimeUnixNano": "1792061351168948667",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4f048672cd6479b3",
+      "parentSpanId": "4bdbceab3c7d0028",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350972000000",
+      "endTimeUnixNano": "1792061351183885833",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-selection/my-spaces",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e82a60badc44c898",
+      "parentSpanId": "c9fb84f5e346d6be",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061350975000000",
+      "endTimeUnixNano": "1792061351184666333",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/actors",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f37fcb0cc70370e8",
+      "parentSpanId": "4532638c7bf02791",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351165000000",
+      "endTimeUnixNano": "1792061351262510125",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "a3ec7aa00abf268d",
+      "parentSpanId": "5d1596d22a959761",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351174000000",
+      "endTimeUnixNano": "1792061351262529625",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "aebd720f85f0ae43",
+      "parentSpanId": "e1168cc81c2286a5",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351175000000",
+      "endTimeUnixNano": "1792061351263316417",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3558f03a404fd24d",
+      "parentSpanId": "43e4cc8d75630a62",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351163000000",
+      "endTimeUnixNano": "1792061351265260166",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "4532638c7bf02791",
+      "parentSpanId": "598b7d7796a938cc",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351162000000",
+      "endTimeUnixNano": "1792061351267541333",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/notifications/unread-count",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5d1596d22a959761",
+      "parentSpanId": "26e69111d5444f90",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351166000000",
+      "endTimeUnixNano": "1792061351268609250",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.theme",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e1168cc81c2286a5",
+      "parentSpanId": "0691d3c97a3399be",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351169000000",
+      "endTimeUnixNano": "1792061351268895125",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.timezone",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "43e4cc8d75630a62",
+      "parentSpanId": "a762443c1a3be671",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351161000000",
+      "endTimeUnixNano": "1792061351270429416",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox/unread-count",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "40084526d9bbd237",
+      "parentSpanId": "6f853c896f6aa70a",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351200000000",
+      "endTimeUnixNano": "1792061351299871917",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "6f853c896f6aa70a",
+      "parentSpanId": "16cf6d99653bd5ea",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351195000000",
+      "endTimeUnixNano": "1792061351306180291",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/tenant-preferences/ui.datetime.format",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "14a0325a2a97307c",
+      "parentSpanId": "9494fe18415d8cd3",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351284000000",
+      "endTimeUnixNano": "1792061351317305417",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "398eb5af00522d93",
+      "parentSpanId": "40aa8f7f24a2caaf",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351284000000",
+      "endTimeUnixNano": "1792061351318171625",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "9494fe18415d8cd3",
+      "parentSpanId": "f59202e85df84a62",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351280000000",
+      "endTimeUnixNano": "1792061351318414791",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/user-engagement",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "40aa8f7f24a2caaf",
+      "parentSpanId": "d8c566476b4b02c3",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351280000000",
+      "endTimeUnixNano": "1792061351319188750",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "1e4e79e0f01c04a7",
+      "parentSpanId": "49961e12ccce16cb",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351282000000",
+      "endTimeUnixNano": "1792061351319193583",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "49961e12ccce16cb",
+      "parentSpanId": "38781cc6002c51c8",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351279000000",
+      "endTimeUnixNano": "1792061351321011709",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/workbench/stats",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "5e2fa45d5132a3b7",
+      "parentSpanId": "e1fa25bfa4043ade",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351315000000",
+      "endTimeUnixNano": "1792061351331149083",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "e1fa25bfa4043ade",
+      "parentSpanId": "5f9d39ba4a86781d",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351311000000",
+      "endTimeUnixNano": "1792061351332594291",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/user-engagement",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "f7bd053d4b101f62",
+      "parentSpanId": "3771ac7064ef7805",
+      "name": "GET",
+      "kind": 3,
+      "startTimeUnixNano": "1792061351323000000",
+      "endTimeUnixNano": "1792061351336275875",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "http.response.status_code": "200"
+      }
+    },
+    {
+      "traceId": "f8a2dc8ed530762d70ea28bafd0d54b1",
+      "spanId": "3771ac7064ef7805",
+      "parentSpanId": "1b771eddd7d1b441",
+      "name": "GET",
+      "kind": 2,
+      "startTimeUnixNano": "1792061351322000000",
+      "endTimeUnixNano": "1792061351336664792",
+      "service": "auraboot-bff",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inbox",
+        "http.response.status_code": "200"
+      }
+    }
+  ]
+}

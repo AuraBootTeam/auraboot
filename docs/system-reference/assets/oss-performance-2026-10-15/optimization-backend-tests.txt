@@ -1,0 +1,128 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+Configuration on demand is an incubating feature.
+> Task :platform-storage-minio:processResources NO-SOURCE
+> Task :platform-mq-kafka:processResources NO-SOURCE
+> Task :platform-storage-s3:processResources NO-SOURCE
+> Task :platform-storage-oss:processResources NO-SOURCE
+> Task :platform-storage-cos:processResources NO-SOURCE
+> Task :bootBuildInfo UP-TO-DATE
+> Task :platform-plugin-api:compileJava UP-TO-DATE
+> Task :platform-plugin-api:processResources NO-SOURCE
+> Task :platform-plugin-api:classes UP-TO-DATE
+> Task :platform-plugin-api:jar UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :compileJava
+> Task :classes
+> Task :jar
+> Task :compileTestJava UP-TO-DATE
+> Task :platform-storage-minio:compileJava UP-TO-DATE
+> Task :platform-storage-minio:classes UP-TO-DATE
+> Task :platform-storage-minio:jar UP-TO-DATE
+> Task :platform-storage-s3:compileJava UP-TO-DATE
+> Task :platform-storage-s3:classes UP-TO-DATE
+> Task :platform-storage-s3:jar UP-TO-DATE
+> Task :platform-storage-cos:compileJava UP-TO-DATE
+> Task :platform-storage-cos:classes UP-TO-DATE
+> Task :platform-storage-oss:compileJava UP-TO-DATE
+> Task :platform-storage-oss:classes UP-TO-DATE
+> Task :platform-storage-cos:jar UP-TO-DATE
+> Task :platform-mq-kafka:compileJava UP-TO-DATE
+> Task :platform-mq-kafka:classes UP-TO-DATE
+> Task :platform-storage-oss:jar UP-TO-DATE
+> Task :platform-mq-kafka:jar UP-TO-DATE
+> Task :instrumentMainOffline
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate multiple logic groups with OR between groups PASSED
+
+SubjectPermissionEvaluator Unit Tests > batchWithoutDeclarationsDoesNotLoadUserPermissions() PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should batch evaluate multiple subjects PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate OR logic group correctly - one satisfied PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should return true when no declarations exist (default visible) PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate AND logic group correctly - one not satisfied PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate OR logic group correctly - none satisfied PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate is_negated correctly PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should deny visibility when logic group has inconsistent types (fail-secure) PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate AND logic group correctly - all satisfied PASSED
+
+FieldPermissionServiceImplTest > readsFieldPermissionFromNestedExtensionMap() PASSED
+
+FieldPermissionServiceImplTest > hidesFieldWhenMemberRoleNotInViewList() PASSED
+
+FieldPermissionServiceImplTest > treatsFieldWithoutPermissionAsFullyAccessible() PASSED
+
+FieldPermissionServiceImplTest > allowsViewButNotEditWhenOnlyInViewList() PASSED
+
+FieldPermissionServiceImplTest > reusesFieldPermissionsInsideDynamicDataQueryScope() PASSED
+
+FieldPermissionServiceImplTest > unionsAccessAcrossMultipleRoles() PASSED
+
+FieldPermissionServiceImplTest > readsFieldPermissionFromDynamicPropertiesExtensionMap() PASSED
+
+FieldPermissionServiceImplTest > skipsRolesWhenRoleServiceReturnsNull() PASSED
+
+FieldPermissionServiceImplTest > returnsAllAllowedWhenModelHasNoFields() PASSED
+
+FieldPermissionServiceImplTest > emptyAllowedListIsTreatedAsAllowed() PASSED
+
+MenuServiceImplTest > releaseDirectoriesAlsoRetainOnlyAuthorizedChildren() PASSED
+
+MenuServiceImplTest > explicitDirectoryVisibilityDenialStillHidesItsAuthorizedDescendants() PASSED
+
+MenuServiceImplTest > convertPathToResourceCode should handle edge cases PASSED
+
+MenuServiceImplTest > directoryWithNoAuthorizedChildrenIsPruned() PASSED
+
+MenuServiceImplTest > legacyMenuPermissionRetainsSubjectRestriction() PASSED
+
+MenuServiceImplTest > releasePermissionCheckDeniesHiddenUnknownAndWrongEnvironmentMenus() PASSED
+
+MenuServiceImplTest > combinedNavigationDeduplicatesLegacyAndReleaseRoutesAfterPermissionFiltering() PASSED
+
+MenuServiceImplTest > convertPathToResourceCode should convert valid paths correctly PASSED
+
+MenuServiceImplTest > authorizedLeafRetainsNestedDirectoriesWithoutGrantingSiblingAccess() PASSED
+
+MenuServiceImplTest > actionableParentStillRequiresItsOwnPermission() PASSED
+
+MenuServiceImplTest > convertPathToResourceCode should return null for invalid paths PASSED
+
+MenuServiceImplTest > authoringManagedMenusAreVisibleOnlyInPublishedEnvironments() PASSED
+
+MenuServiceImplTest > releasePermissionCheckTracksExistingSessionGrantAndRevocationWithoutSyntheticIds() PASSED
+
+DynamicDataListingSupportTest > viewNamedQueryAliasTrimsMetadataAndFallsBackToModelCode() PASSED
+
+DynamicDataListingSupportTest > namedQueryWithoutOptionalFiltersAndCustomParametersHaveDeterministicDefaults() PASSED
+
+DynamicDataListingSupportTest > namedQueryReceivesScalarSetAndRangeConditionsAndRequestedSort() PASSED
+
+SqlObservationInterceptorTest > failedExecutionClosesItsScopeAndRecordsTheFailure() PASSED
+
+SqlObservationInterceptorTest > mapperExecutionIsAChildOfTheRequestAndDoesNotRecordSqlOrParameters() PASSED
+
+> Task :jacocoTestReport
+
+[Incubating] Problems report is available at: file://$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/platform/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 35s
+21 actionable tasks: 5 executed, 16 up-to-date

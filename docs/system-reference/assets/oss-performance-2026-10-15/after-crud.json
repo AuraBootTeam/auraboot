@@ -1,0 +1,445 @@
+{
+  "commit": "e73498c87b03ae702537876325fa895143936f6a",
+  "base": "http://127.0.0.1:6681",
+  "at": "2026-10-15T10:38:10.632Z",
+  "samples": 20,
+  "concurrency": 1,
+  "warmup": 3,
+  "rows": {
+    "create": [
+      {
+        "ms": 18.240917000000024,
+        "sqlCount": 21,
+        "traceId": "76d29d537ee39db99b7ca6e470771508"
+      },
+      {
+        "ms": 24.046792000000096,
+        "sqlCount": 21,
+        "traceId": "09b867b150b21bb6d2a3411746e66b65"
+      },
+      {
+        "ms": 16.74974999999995,
+        "sqlCount": 21,
+        "traceId": "b1df7af231a858c8da434d1ca9c2f03e"
+      },
+      {
+        "ms": 18.80533300000002,
+        "sqlCount": 21,
+        "traceId": "5074b5408bcdc61437162bc27093d68a"
+      },
+      {
+        "ms": 15.600082999999927,
+        "sqlCount": 21,
+        "traceId": "29b7fb9a89ee6572033b53315e4433f6"
+      },
+      {
+        "ms": 23.541875000000005,
+        "sqlCount": 21,
+        "traceId": "6869e3c04ee8ac108a6dc1683e6758a2"
+      },
+      {
+        "ms": 19.058332999999948,
+        "sqlCount": 21,
+        "traceId": "edf977e98b02b81cfdbd2e77709b2cbf"
+      },
+      {
+        "ms": 17.805083000000195,
+        "sqlCount": 21,
+        "traceId": "c2a0f3fe062013e1d89d562c43beefd5"
+      },
+      {
+        "ms": 16.188625000000002,
+        "sqlCount": 21,
+        "traceId": "77c838490b987df0380ad6640a059a1a"
+      },
+      {
+        "ms": 15.780332999999928,
+        "sqlCount": 21,
+        "traceId": "f30609fb269dcb46b88d802b71331a55"
+      },
+      {
+        "ms": 15.893749999999955,
+        "sqlCount": 21,
+        "traceId": "1b185493860923908fc459730772bbe7"
+      },
+      {
+        "ms": 16.166208000000097,
+        "sqlCount": 21,
+        "traceId": "69092303541f1b0a34be5510354f67e1"
+      },
+      {
+        "ms": 13.973207999999886,
+        "sqlCount": 21,
+        "traceId": "3241d46628e8f1a34310ac3d2cacfe56"
+      },
+      {
+        "ms": 18.072875000000067,
+        "sqlCount": 21,
+        "traceId": "2ba0613b99c446d0b7b59ce091b885f5"
+      },
+      {
+        "ms": 17.220250000000078,
+        "sqlCount": 21,
+        "traceId": "e6cdf7616d7eeb3c1b1757d9fb4dd2dc"
+      },
+      {
+        "ms": 15.191334000000097,
+        "sqlCount": 21,
+        "traceId": "deacfd5105a523d9a43f363582a2d66a"
+      },
+      {
+        "ms": 16.621458000000075,
+        "sqlCount": 21,
+        "traceId": "2f8ae5d6168b2ca95247e8c401cf838c"
+      },
+      {
+        "ms": 12.490000000000009,
+        "sqlCount": 21,
+        "traceId": "4a081aacf3aceb37ac4b6f9a3b7bdaed"
+      },
+      {
+        "ms": 15.008084000000053,
+        "sqlCount": 21,
+        "traceId": "64974d35ef4c7a5b6935b4b789d6b78e"
+      },
+      {
+        "ms": 15.952416999999969,
+        "sqlCount": 21,
+        "traceId": "00fd61f2962186d9b4d2bd6c9e1cc5d6"
+      }
+    ],
+    "update": [
+      {
+        "ms": 26.86754200000007,
+        "sqlCount": 36,
+        "traceId": "2d0db8d52ec8ecce35911a9a66d09254"
+      },
+      {
+        "ms": 27.152041999999938,
+        "sqlCount": 36,
+        "traceId": "2e1d0e63fb6ead89bffc500a6f02d4f8"
+      },
+      {
+        "ms": 26.016208000000006,
+        "sqlCount": 36,
+        "traceId": "73fd9951b2271404e35182ba7d64b0c7"
+      },
+      {
+        "ms": 25.222917000000052,
+        "sqlCount": 36,
+        "traceId": "75e2d5c43a894798784694f084d5eb71"
+      },
+      {
+        "ms": 23.585166999999956,
+        "sqlCount": 36,
+        "traceId": "11ed43a4e1daaa72bc9a7394ab076864"
+      },
+      {
+        "ms": 24.399,
+        "sqlCount": 36,
+        "traceId": "33ed0ee1fb8d5cfe5035a19cfe9722ae"
+      },
+      {
+        "ms": 34.45666700000015,
+        "sqlCount": 36,
+        "traceId": "ec4f54b1f591c08a069e4f27a546ba55"
+      },
+      {
+        "ms": 24.538749999999936,
+        "sqlCount": 36,
+        "traceId": "8c11ac1eccfdc69294dec50184a867c5"
+      },
+      {
+        "ms": 25.985374999999976,
+        "sqlCount": 36,
+        "traceId": "2aac6eb355fad564058114c254b86b27"
+      },
+      {
+        "ms": 23.433041000000003,
+        "sqlCount": 36,
+        "traceId": "d67093b03cf5d5d322d6bb078415d6de"
+      },
+      {
+        "ms": 21.73087499999997,
+        "sqlCount": 36,
+        "traceId": "91324ede368ab88982b624a9736f0e84"
+      },
+      {
+        "ms": 22.20937499999991,
+        "sqlCount": 36,
+        "traceId": "a0b4f34d7c9f06a50afdb79ea182d738"
+      },
+      {
+        "ms": 24.521082999999862,
+        "sqlCount": 36,
+        "traceId": "d2fd0285691fa70867da9d2121cf6ff2"
+      },
+      {
+        "ms": 25.625125000000025,
+        "sqlCount": 36,
+        "traceId": "a5e93b6f1a2b0f7ca882d29bae411cac"
+      },
+      {
+        "ms": 27.091042000000016,
+        "sqlCount": 36,
+        "traceId": "e58a5648fe124adb728cca0c8262e77a"
+      },
+      {
+        "ms": 23.782083000000057,
+        "sqlCount": 36,
+        "traceId": "bd75774927bb3aef00633748c90f7802"
+      },
+      {
+        "ms": 21.965208000000075,
+        "sqlCount": 36,
+        "traceId": "ad95357a979f7729785adba552f10eac"
+      },
+      {
+        "ms": 21.144500000000107,
+        "sqlCount": 36,
+        "traceId": "936f132e9adffb8a1a6a6364fe2fea8b"
+      },
+      {
+        "ms": 22.42583300000001,
+        "sqlCount": 36,
+        "traceId": "3285122e0cd16fcf6f4b5fff6342ee44"
+      },
+      {
+        "ms": 20.805832999999893,
+        "sqlCount": 36,
+        "traceId": "f4ebe043699a5ea98c99029c7f290c2d"
+      }
+    ],
+    "detail": [
+      {
+        "ms": 12.301374999999894,
+        "sqlCount": 18,
+        "traceId": "73ef0dc4de544c91aafcbad5904f6117"
+      },
+      {
+        "ms": 13.648750000000064,
+        "sqlCount": 18,
+        "traceId": "4820d121e34257741551eddaf2ae0783"
+      },
+      {
+        "ms": 13.604375000000005,
+        "sqlCount": 18,
+        "traceId": "6b50029d81e719ca061ef56d51aff46c"
+      },
+      {
+        "ms": 14.26379099999997,
+        "sqlCount": 18,
+        "traceId": "6688d13cfe7f59bdb2b666ba7189378f"
+      },
+      {
+        "ms": 12.339583000000061,
+        "sqlCount": 18,
+        "traceId": "c4c6ce5372b27e12c1d607b5c3259ff5"
+      },
+      {
+        "ms": 11.987875000000031,
+        "sqlCount": 18,
+        "traceId": "3c7bf87825e04185a7739d22f757d226"
+      },
+      {
+        "ms": 13.166082999999844,
+        "sqlCount": 18,
+        "traceId": "50c303cfee0b71fea0c01f31ca4af3f8"
+      },
+      {
+        "ms": 12.006917000000158,
+        "sqlCount": 18,
+        "traceId": "27824ad18b882bbc49e9bcc89d9faff5"
+      },
+      {
+        "ms": 12.880540999999994,
+        "sqlCount": 18,
+        "traceId": "18a50d6f62ab95411b425f97fd897d6e"
+      },
+      {
+        "ms": 8.092167000000018,
+        "sqlCount": 18,
+        "traceId": "c2db03091a9bf6c0cc49530553c98dd1"
+      },
+      {
+        "ms": 9.862917000000152,
+        "sqlCount": 18,
+        "traceId": "4247bf70a01095bf9bf459a97a8605e0"
+      },
+      {
+        "ms": 9.741457999999966,
+        "sqlCount": 18,
+        "traceId": "b1fcb49457a83dec3832d738582c18c1"
+      },
+      {
+        "ms": 10.689707999999882,
+        "sqlCount": 18,
+        "traceId": "e9f173407dad27713b6cea7a0ce043cf"
+      },
+      {
+        "ms": 11.128500000000031,
+        "sqlCount": 18,
+        "traceId": "ef4fede5c637f3652e743caf2c579a02"
+      },
+      {
+        "ms": 12.934083999999984,
+        "sqlCount": 18,
+        "traceId": "5e745ff63fdfde24f55107bb3dfa7fce"
+      },
+      {
+        "ms": 8.293957999999975,
+        "sqlCount": 18,
+        "traceId": "0f9e872c07ea45f0ef49ef14367a13e9"
+      },
+      {
+        "ms": 7.702374999999847,
+        "sqlCount": 18,
+        "traceId": "afab073c7ecf79f648c063484eb6ced9"
+      },
+      {
+        "ms": 9.80120799999986,
+        "sqlCount": 18,
+        "traceId": "06965b4a6fd0b2286f3745a5f31509ef"
+      },
+      {
+        "ms": 10.370709000000033,
+        "sqlCount": 18,
+        "traceId": "90794bc389c9f7173d98ac249cafb66b"
+      },
+      {
+        "ms": 10.112290999999914,
+        "sqlCount": 18,
+        "traceId": "8c04a129763c256f55098ba3901d805c"
+      }
+    ],
+    "delete": [
+      {
+        "ms": 25.871291999999926,
+        "sqlCount": 30,
+        "traceId": "6483989c666b663dd3677ad7ff383a23"
+      },
+      {
+        "ms": 19.166833999999994,
+        "sqlCount": 30,
+        "traceId": "1f39315d7e6aaf38f8f83ae70b74b891"
+      },
+      {
+        "ms": 25.33787499999994,
+        "sqlCount": 30,
+        "traceId": "d1e748be4c00b0ead873e695554d9f2a"
+      },
+      {
+        "ms": 23.125958000000082,
+        "sqlCount": 30,
+        "traceId": "4899e21b3f906fde4ae452734ff7a3c2"
+      },
+      {
+        "ms": 22.197875000000067,
+        "sqlCount": 30,
+        "traceId": "38ded9aa732c59edd3ad6a5fff9fb3ed"
+      },
+      {
+        "ms": 24.529999999999973,
+        "sqlCount": 30,
+        "traceId": "303b58049f83fead1fc1371b4cb14f09"
+      },
+      {
+        "ms": 24.350708000000168,
+        "sqlCount": 30,
+        "traceId": "af3068c09e1e91a4255e9505479722a7"
+      },
+      {
+        "ms": 15.819000000000187,
+        "sqlCount": 30,
+        "traceId": "1b608e42805682640a04a9334d896e4c"
+      },
+      {
+        "ms": 21.67429100000004,
+        "sqlCount": 30,
+        "traceId": "276a404e1dae3451ec752d9a4edfb0a3"
+      },
+      {
+        "ms": 19.286292000000003,
+        "sqlCount": 30,
+        "traceId": "e2208efd0e0e0341cb0b8a0299ff9853"
+      },
+      {
+        "ms": 20.39191699999992,
+        "sqlCount": 30,
+        "traceId": "b77e803c92dfe732c6d6e34744fa94ec"
+      },
+      {
+        "ms": 19.150583000000097,
+        "sqlCount": 30,
+        "traceId": "47f963414a00316fe54e673d7762cef1"
+      },
+      {
+        "ms": 21.892749999999978,
+        "sqlCount": 30,
+        "traceId": "8d29e7855dab72efeb4b0c3bc081f3c4"
+      },
+      {
+        "ms": 21.878625000000056,
+        "sqlCount": 30,
+        "traceId": "99d63af477880461d8cc4014a0f079f3"
+      },
+      {
+        "ms": 25.753250000000207,
+        "sqlCount": 30,
+        "traceId": "ff595947eb7568359156281ebd776d96"
+      },
+      {
+        "ms": 19.05229200000008,
+        "sqlCount": 30,
+        "traceId": "92f48c3c12a37998da2cfcb634878f0e"
+      },
+      {
+        "ms": 13.991915999999947,
+        "sqlCount": 30,
+        "traceId": "ab54b28c180f4d79a84e7bb1bad06da5"
+      },
+      {
+        "ms": 17.170791999999892,
+        "sqlCount": 30,
+        "traceId": "556037f577b8d281345e0845109df5fc"
+      },
+      {
+        "ms": 17.27270899999985,
+        "sqlCount": 30,
+        "traceId": "e0b598143cae8e86204350bd2d9f184b"
+      },
+      {
+        "ms": 14.695291999999881,
+        "sqlCount": 30,
+        "traceId": "2208202873d83081451c212fc53191e9"
+      }
+    ]
+  },
+  "status": "measured",
+  "summary": {
+    "create": {
+      "p50": 16.188625000000002,
+      "p95": 23.541875000000005,
+      "sqlMin": 21,
+      "sqlMax": 21
+    },
+    "update": {
+      "p50": 24.399,
+      "p95": 27.152041999999938,
+      "sqlMin": 36,
+      "sqlMax": 36
+    },
+    "detail": {
+      "p50": 11.128500000000031,
+      "p95": 13.648750000000064,
+      "sqlMin": 18,
+      "sqlMax": 18
+    },
+    "delete": {
+      "p50": 20.39191699999992,
+      "p95": 25.753250000000207,
+      "sqlMin": 30,
+      "sqlMax": 30
+    }
+  }
+}

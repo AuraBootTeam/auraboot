@@ -296,12 +296,12 @@ management:
       enabled: true
   tracing:
     sampling:
-      probability: 1.0  # 100% in dev; reduce to 0.1 in prod
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:0.1}
     propagation:
       type: w3c
   otlp:
     tracing:
-      endpoint: http://localhost:4318/v1/traces
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
 
 # MyBatis-Plus 配置
 mybatis-plus:

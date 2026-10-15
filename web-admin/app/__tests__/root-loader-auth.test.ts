@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   destroySession: vi.fn(),
   fetchBootstrapStatus: vi.fn(),
+  fetchAccessPolicy: vi.fn(),
   getI18nData: vi.fn(),
   getSessionFromRequest: vi.fn(),
   getTokenFromRequest: vi.fn(),
@@ -14,6 +15,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('~/shared/services/session', () => ({
   getSessionFromRequest: mocks.getSessionFromRequest,
+  getImpersonationFromRequest: vi.fn(async () => null),
+  restoreOperatorSession: vi.fn(),
+  maybeRenewSession: vi.fn(async () => ({ renewed: false })),
   getTokenFromRequest: mocks.getTokenFromRequest,
   sessionStorage: {
     destroySession: mocks.destroySession,
@@ -35,6 +39,8 @@ vi.mock('~/shared/services/menu', () => ({
 vi.mock('~/services/bootstrapStatus', () => ({
   fetchBootstrapStatus: mocks.fetchBootstrapStatus,
 }));
+
+vi.mock('~/services/accessPolicy', () => ({ fetchAccessPolicy: mocks.fetchAccessPolicy }));
 
 vi.mock('~/utils/ssr-cache', () => ({
   ssrCacheKey: (pathname: string, locale: string) => `${pathname}:${locale}`,
@@ -102,6 +108,7 @@ describe('root loader authentication guard', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mocks.fetchBootstrapStatus.mockResolvedValue(null);
+    mocks.fetchAccessPolicy.mockResolvedValue({ userRegistrationPolicy: 'closed' });
     mocks.getI18nData.mockResolvedValue({});
     mocks.getSessionFromRequest.mockResolvedValue({ get: vi.fn() });
     mocks.getUserInfo.mockResolvedValue({ user: null, permissions: null, preferences: null });
@@ -112,6 +119,24 @@ describe('root loader authentication guard', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+  });
+
+  it('starts independent shell reads before bootstrap finishes', async () => {
+    let release!: (value: null) => void;
+    const pendingBootstrap = new Promise<null>((resolve) => {
+      release = resolve;
+    });
+    mocks.fetchBootstrapStatus.mockReturnValue(pendingBootstrap);
+    mocks.getTokenFromRequest.mockResolvedValue(null);
+    const { loader } = await import('~/root');
+    const pending = loader({ request: new Request('http://localhost/login') } as any);
+    await vi.waitFor(() => expect(mocks.fetchBootstrapStatus).toHaveBeenCalledTimes(1));
+    try {
+      expect(mocks.fetchAccessPolicy).toHaveBeenCalledTimes(1);
+    } finally {
+      release(null);
+      await pending;
+    }
   });
 
   it('redirects anonymous private routes even when route middleware is bypassed', async () => {
@@ -253,17 +278,48 @@ describe('root loader authentication guard', () => {
   it('refreshes published branding on a public-route cache hit without mutating the cached locale bundle', async () => {
     vi.stubEnv('EDITION', 'standard');
     mocks.getTokenFromRequest.mockResolvedValue(null);
-    const cached = { locale: 'en-US', branding: { productName: 'Stale release' }, i18n: { retained: true } };
+    const cached = {
+      locale: 'en-US',
+      branding: { productName: 'Stale release' },
+      i18n: { retained: true },
+    };
     mocks.ssrCacheGet.mockReturnValue(cached);
-    const appearance = { version: 1, template: 'split', defaultLocale: 'zh-CN', content: { headline: { mode: 'hidden' } } };
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(
-      String(url).endsWith('/api/runtime/branding')
-        ? { branding: { mode: 'commercial', productName: 'Northstar', authAppearance: appearance } }
-        : { code: '0', data: {} },
-    ), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const appearance = {
+      version: 1,
+      template: 'split',
+      defaultLocale: 'zh-CN',
+      content: { headline: { mode: 'hidden' } },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementation(
+          async (url: string) =>
+            new Response(
+              JSON.stringify(
+                String(url).endsWith('/api/runtime/branding')
+                  ? {
+                      branding: {
+                        mode: 'commercial',
+                        productName: 'Northstar',
+                        authAppearance: appearance,
+                      },
+                    }
+                  : { code: '0', data: {} },
+              ),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+        ),
+    );
     const { loader } = await import('~/root');
-    const result = await loader({ request: new Request('http://localhost/login', { headers: { Cookie: 'locale=en-US' } }) } as any);
-    expect(result).toMatchObject({ i18n: { retained: true }, branding: { productName: 'Northstar', authAppearance: appearance } });
+    const result = await loader({
+      request: new Request('http://localhost/login', { headers: { Cookie: 'locale=en-US' } }),
+    } as any);
+    expect(result).toMatchObject({
+      i18n: { retained: true },
+      branding: { productName: 'Northstar', authAppearance: appearance },
+    });
     expect(cached.branding.productName).toBe('Stale release');
     expect(mocks.getI18nData).not.toHaveBeenCalled();
   });
@@ -324,8 +380,7 @@ describe('root loader authentication guard', () => {
       locale: 'zh-CN',
       runtimeProfile: 'storefront',
     });
-    expect(mocks.getI18nData).toHaveBeenCalledWith(
-      'zh-CN', expect.any(Request), false);
+    expect(mocks.getI18nData).toHaveBeenCalledWith('zh-CN', expect.any(Request), false);
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
   });
