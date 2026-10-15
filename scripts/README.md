@@ -19,7 +19,7 @@
 - **One-off migrations** (`migrate-*`, `*-split`, casing/backfill scripts) are **removed once the migration lands** — git history keeps them (`git log --all --full-history -- scripts/<name>`).
 - Before adding a script, check the tables below for an existing one to extend.
 
-## gate (43)
+## gate (44)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -33,6 +33,7 @@
 | `check-command-reachability.mjs` | 4 | 2026-07-23 | Gate: a declared command must have a way for a user to reach it. |
 | `check-command-reachability.sh` | 0 | 2026-07-23 | Pre-push gate: every declared command needs a UI entry point. |
 | `check-controller-authz.mjs` | 0 | 2026-07-15 | check-controller-authz.mjs — regression guard for the deep-review fail-open finding |
+| `check-controller-authz.sh` | 0 | 2026-10-15 | Pre-push controller-authz fail-open gate (wraps check-controller-authz.mjs; replaces the disabled GitHub Actions workflow). |
 | `check-airflow-provider-coverage.sh` | 0 | 2026-10-02 | Run hermetic provider tests and enforce 90% line and branch coverage per source file. |
 | `check-coverage-manifest-freshness.mjs` | 2 | 2026-07-23 | Gate: the committed coverage manifest must still describe reality. |
 | `check-cs-widget-bundle.mjs` | 0 | 2026-07-14 | The widget bundle served to customers is a build artifact that lives on the Java classpath, so |
