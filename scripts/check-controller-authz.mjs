@@ -166,7 +166,7 @@ if (removed.length) {
   removed.forEach((f) => console.log(`   - ${f}`));
 }
 if (added.length) {
-  console.error(`\n❌ ${added.length} NEW unguarded write or sensitive-read (/api/ai|/api/im) controller(s) — add @RequirePermission/@AuthenticatedAccess, move under /api/admin, or (if intentionally accepted) --write-baseline with justification:`);
+  console.error(`\n❌ ${added.length} NEW unguarded write or sensitive-read (/api/ai|/api/im) controller(s) — add @RequirePermission/@AuthenticatedAccess/@RequirePlatformAdmin, move under /api/admin, or (if intentionally accepted) --write-baseline with justification:`);
   added.forEach((f) => console.error(`   + ${f}`));
   process.exit(1);
 }
