@@ -224,10 +224,11 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(createdRecordResponse.ok()).toBe(true);
   expect(createdRecordResponse.request().postDataJSON()).toMatchObject({
     [customerField]: customerName,
-    [amountField]: 42000,
+    [amountField]: '42000',
   });
   const recordBody = await createdRecordResponse.json();
   expect(String(recordBody.code)).toBe('0');
+  expect(recordBody.data).toMatchObject({ [customerField]: customerName, [amountField]: 42000 });
   const recordPid = String(recordBody.data.pid);
   expect(recordPid).toMatch(/^[0-9A-Z]{26}$/);
   const row = page.locator('tr').filter({ hasText: customerName });
@@ -249,8 +250,10 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('form-btn-submit').click();
   const updatedRecordResponse = await updateRecord;
   expect(updatedRecordResponse.ok()).toBe(true);
-  expect(updatedRecordResponse.request().postDataJSON()).toMatchObject({ [amountField]: 68000 });
-  expect(String((await updatedRecordResponse.json()).code)).toBe('0');
+  expect(updatedRecordResponse.request().postDataJSON()).toMatchObject({ [amountField]: '68000' });
+  const updatedRecordBody = await updatedRecordResponse.json();
+  expect(String(updatedRecordBody.code)).toBe('0');
+  expect(updatedRecordBody.data).toMatchObject({ [customerField]: customerName, [amountField]: 68000 });
   await page.reload();
   await expect(row).toBeVisible();
   const persistedRecord = await page.request.get(`/api/dynamic/${code}/${recordPid}`);
