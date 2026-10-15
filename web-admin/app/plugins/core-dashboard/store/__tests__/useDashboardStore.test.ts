@@ -424,6 +424,45 @@ describe('useDashboardStore', () => {
   // ── updateLayout ──────────────────────────────────────────────────────────
 
   describe('updateLayout', () => {
+    it('keeps a loaded dashboard publishable when GridLayout repeats identical geometry', async () => {
+      const widget = { ...widgetData(), id: 'loaded-widget' };
+      findByPidMock.mockResolvedValue(minimalDashboard({ widgets: [widget] }));
+      await useDashboardStore.getState().loadDashboard('dash-1');
+      const before = useDashboardStore.getState();
+      useDashboardStore.getState().updateLayout([{ ...widget }]);
+      const after = useDashboardStore.getState();
+      expect(after.isDirty).toBe(false);
+      expect(after.mutationGeneration).toBe(before.mutationGeneration);
+      expect(after.history).toBe(before.history);
+      expect(after.widgets).toBe(before.widgets);
+    });
+
+    it('applies a genuine move without rolling back a newer widget configuration', () => {
+      useDashboardStore.getState().createDashboard('Board');
+      const id = useDashboardStore.getState().addWidget(widgetData());
+      const oldWidget = useDashboardStore.getState().getWidgetById(id)!;
+      useDashboardStore.getState().updateWidget(id, { config: { title: 'New title' } });
+      useDashboardStore.getState().setDirty(false);
+      const before = useDashboardStore.getState();
+      useDashboardStore.getState().updateLayout([{ ...oldWidget, x: 6 }]);
+      const after = useDashboardStore.getState();
+      expect(after.widgets[0].config.title).toBe('New title');
+      expect(after.widgets[0].x).toBe(6);
+      expect(after.isDirty).toBe(true);
+      expect(after.mutationGeneration).toBe(before.mutationGeneration + 1);
+      expect(after.history).toHaveLength(before.history.length + 1);
+    });
+
+    it('does not resurrect a widget removed after a layout callback was queued', () => {
+      useDashboardStore.getState().createDashboard('Board');
+      const id = useDashboardStore.getState().addWidget(widgetData());
+      const removed = useDashboardStore.getState().getWidgetById(id)!;
+      useDashboardStore.getState().deleteWidget(id);
+      useDashboardStore.getState().setDirty(false);
+      useDashboardStore.getState().updateLayout([{ ...removed, x: 6 }]);
+      expect(useDashboardStore.getState().widgets).toEqual([]);
+      expect(useDashboardStore.getState().isDirty).toBe(false);
+    });
     it('replaces widgets array and marks dirty', () => {
       useDashboardStore.getState().createDashboard('Board');
       const id = useDashboardStore.getState().addWidget(widgetData());

@@ -420,8 +420,20 @@ export const useDashboardStore = create<DashboardStore>()(
       // ==================== Layout Actions ====================
 
       updateLayout: (widgets: Widget[]) => {
+        const positions = new Map(widgets.map((widget) => [widget.id, widget]));
+        const changed = get().widgets.some((widget) => {
+          const next = positions.get(widget.id);
+          return next && (widget.x !== next.x || widget.y !== next.y || widget.w !== next.w || widget.h !== next.h);
+        });
+        // GridLayout also emits on mount. An unchanged layout is not an edit
+        // and must not disable publishing immediately after a successful save.
+        if (!changed) return;
         set((state) => {
-          state.widgets = widgets;
+          state.widgets = state.widgets.map((widget) => {
+            const next = positions.get(widget.id);
+            // A delayed layout callback only owns geometry, never newer config.
+            return next ? { ...widget, x: next.x, y: next.y, w: next.w, h: next.h } : widget;
+          });
           state.isDirty = true;
           state.mutationGeneration += 1;
 
