@@ -6,6 +6,13 @@
 # Designed for crontab scheduling; writes evidence under .workspace/nightly-coverage/.
 #
 # Usage: scripts/oss-backend-nightly-coverage.sh [repo-root]
+# Connection defaults target the original local-dev database (ghj@localhost:5432/aura_boot)
+# and stay fully overridable so a differently-provisioned executor (e.g. the aura-ci
+# host, whose role/database/password differ) can run the same gate unmodified:
+#   PGHOST / PGPORT / PGUSER / PGDATABASE / PGPASSWORD — standard libpq variables;
+#   set PGHOST empty to use the unix socket (peer auth, no password needed).
+# The Gradle suite receives the same coordinates through the TEST_DATABASE_* /
+# SPRING_DATASOURCE_* / DATABASE_URL contracts it already reads.
 # Crontab example (02:30 nightly, log under outputs/):
 #   30 2 * * * /home/local-oss-dev/work/auraboot/auraboot/scripts/oss-backend-nightly-coverage.sh >> /home/local-oss-dev/work/auraboot/outputs/nightly-coverage.log 2>&1
 
@@ -17,15 +24,37 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 EVIDENCE="$ROOT/.workspace/nightly-coverage/$STAMP"
 mkdir -p "$EVIDENCE"
 
+PGHOST="${PGHOST-localhost}"
+PGPORT="${PGPORT:-5432}"
+PGUSER="${PGUSER:-ghj}"
+PGDATABASE="${PGDATABASE:-aura_boot}"
+
+psql_args=(-U "$PGUSER" -d "$PGDATABASE" -p "$PGPORT")
+[[ -n "$PGHOST" ]] && psql_args=(-h "$PGHOST" "${psql_args[@]}")
+
+# The suite reads its JDBC coordinates from these; keep every contract the CI
+# runner exports so host-PG runs behave exactly like compose-backed ones.
+JDBC_URL="jdbc:postgresql://${PGHOST:-127.0.0.1}:${PGPORT}/${PGDATABASE}?charSet=UTF8"
+export TEST_DATABASE_URL="$JDBC_URL"
+export TEST_DATABASE_USERNAME="$PGUSER"
+export TEST_DATABASE_PASSWORD="${PGPASSWORD:-}"
+export TEST_EXPECTED_DATABASE="$PGDATABASE"
+export DATABASE_URL="$JDBC_URL"
+export DATABASE_USERNAME="$PGUSER"
+export DATABASE_PASSWORD="${PGPASSWORD:-}"
+export SPRING_DATASOURCE_URL="$JDBC_URL"
+export SPRING_DATASOURCE_USERNAME="$PGUSER"
+export SPRING_DATASOURCE_PASSWORD="${PGPASSWORD:-}"
+
 fail() { echo "[nightly-coverage] FAIL: $*" | tee -a "$EVIDENCE/result.txt"; exit 2; }
 
 # ── Preflight (cheap checks before the expensive run) ──
 command -v java >/dev/null || fail "java not on PATH"
-psql -h localhost -U ghj -d aura_boot -tAc "select 1" >/dev/null 2>&1 \
-  || fail "host PostgreSQL aura_boot is unreachable"
+psql "${psql_args[@]}" -tAc "select 1" >/dev/null 2>&1 \
+  || fail "host PostgreSQL ${PGDATABASE} is unreachable (user=${PGUSER} host=${PGHOST:-socket} port=${PGPORT})"
 
 # Schema must match HEAD: compare latest applied Flyway version with the newest migration file.
-DB_VERSION="$(psql -h localhost -U ghj -d aura_boot -tAc "select max(version) from ab_flyway_schema_history" | tr -d ' ')"
+DB_VERSION="$(psql "${psql_args[@]}" -tAc "select max(version) from ab_flyway_schema_history" | tr -d ' ')"
 HEAD_VERSION="$(ls "$PLATFORM/src/main/resources/db/migration/core" | sort | tail -1 | sed 's/V\([0-9]*\)__.*/\1/')"
 if [[ "$DB_VERSION" != "$HEAD_VERSION" ]]; then
   fail "schema drift: DB at $DB_VERSION, HEAD at $HEAD_VERSION — run pending migrations first"

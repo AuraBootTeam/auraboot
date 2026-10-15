@@ -157,9 +157,14 @@ class LlmConfigControllerIT extends BaseIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc().perform(delete(API + "/" + fixture.getPid())).andExpect(status().isForbidden());
         mvc().perform(post(API + "/" + fixture.getPid() + "/test")).andExpect(status().isForbidden());
-        applyTestMetaContext();
+        // Service reads are tenant-scoped (CloudConfigMapper.findByPid resolves visible rows
+        // as own-tenant + platform defaults), so the foreign row is only reachable from the
+        // FOREIGN context. Flip there to prove the data survived the boundary rejections,
+        // then return to the test tenant for the list-exclusion check.
+        MetaContext.setContext(foreign.getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
         assertThat(configs.getConfigMasked(fixture.getPid()).getPriority()).isEqualTo(1);
         assertThat(configs.getConfigMasked(fixture.getPid()).getTenantId()).isEqualTo(foreign.getId());
+        applyTestMetaContext();
         mvc().perform(get(API)).andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.pid == '" + fixture.getPid() + "')]").isEmpty());
     }
 

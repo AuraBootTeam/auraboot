@@ -36,6 +36,13 @@ public class CrudTemplateGeneratorIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         super.setupTenantContext();
+        // #2157 explicit authorization: the config below requests menu + permission + role
+        // side effects (CrudTemplateConfig defaults them on), which generateCrudPages gates
+        // behind meta.menu.update / meta.permission.update / org.role.update. Grant the
+        // three codes to the shared test role through the committed-grant helper.
+        grantCommittedPermissionToTestRole("meta.menu.update", "meta", "menu", "update", "Manage menus");
+        grantCommittedPermissionToTestRole("meta.permission.update", "meta", "permission", "update", "Manage permissions");
+        grantCommittedPermissionToTestRole("org.role.update", "org", "role", "update", "Manage roles");
     }
     
     @Test

@@ -20,10 +20,13 @@ class MetaRecordNotFoundHttpTest {
 
     @Test
     void absentRecordReturnsSafeNotFound() throws Exception {
+        // 052ae5c3e deliberately worded absent-record 404s as "Record not found" so a missing
+        // row stays distinct from an invalid business operation while leaking neither the
+        // entity type, the record id, nor the tenant.
         mvc.perform(get("/record/absent").accept("application/json"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("404"))
-                .andExpect(jsonPath("$.message").value("Resource not found"))
+                .andExpect(jsonPath("$.message").value("Record not found"))
                 .andExpect(jsonPath("$.data").doesNotExist())
                 .andExpect(jsonPath("$.context").doesNotExist());
     }
