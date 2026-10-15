@@ -1270,3 +1270,17 @@ tasks.register('integrationTest', Test) {
 tasks.named('check').configure {
     dependsOn 'compileIntegrationTestJava'
 }
+
+// Local enforcement of the controller-authz fail-open ratchet: any `check` run (test chains
+// included) fails when a NEW write/sensitive controller appears with no @RequirePermission /
+// @AuthenticatedAccess / @RequirePlatformAdmin. Deliberately wired outside GitHub Actions —
+// Actions stays disabled on this repository; this is the enforcement point.
+tasks.register('controllerAuthzCheck', Exec) {
+    group = 'verification'
+    description = 'Fails when a new un-annotated write/sensitive controller appears (scripts/check-controller-authz.mjs).'
+    workingDir = rootDir.parentFile
+    commandLine 'node', 'scripts/check-controller-authz.mjs'
+}
+tasks.named('check').configure {
+    dependsOn 'controllerAuthzCheck'
+}

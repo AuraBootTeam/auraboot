@@ -4,6 +4,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.ai.AiFieldProcessor.AiGenerationRequest;
 import com.auraboot.framework.meta.ai.AiFieldProcessor.AiGenerationResult;
 import com.auraboot.framework.meta.ai.AiFieldProcessor.ImageInput;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/meta/ai")
 @RequiredArgsConstructor
+@AuthenticatedAccess("AI field generation/fill helpers for record fields driven by caller-supplied prompts within the authenticated session")
 public class AiFieldController {
 
     private final AiFieldProcessor aiFieldProcessor;

@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.service.CommandAuditLogService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,6 +39,7 @@ import java.util.Map;
 @RequestMapping("/api/meta/audit")
 @RequiredArgsConstructor
 @Tag(name = "MCP Audit", description = "Audit ingest for aura mcp serve tool invocations")
+@AuthenticatedAccess("fire-and-forget audit ingest from the aura mcp serve CLI; appends one audit row and always returns success")
 public class McpAuditController {
 
     private final CommandAuditLogService commandAuditLogService;

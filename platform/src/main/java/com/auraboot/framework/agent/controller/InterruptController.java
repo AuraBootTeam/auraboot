@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.service.InterruptClassifier;
 import com.auraboot.framework.agent.service.InterruptDispatcher;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/aurabot/sessions")
 @RequiredArgsConstructor
+@AuthenticatedAccess("gateway-facing interrupt dispatch and audit reads; every dispatch and log query is tenant-scoped via MetaContext")
 public class InterruptController {
 
     private final InterruptClassifier classifier;

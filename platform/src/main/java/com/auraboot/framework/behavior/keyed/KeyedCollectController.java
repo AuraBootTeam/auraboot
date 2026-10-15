@@ -2,6 +2,7 @@ package com.auraboot.framework.behavior.keyed;
 
 import com.auraboot.framework.behavior.dto.CollectRequest;
 import com.auraboot.framework.behavior.service.BehaviorCollectService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/collect/keyed")
 @RequiredArgsConstructor
+@AuthenticatedAccess("public anonymous event ingestion; the abk_ site key is validated by KeyedCollectGuard which resolves the owning tenant — no user session exists by design")
 public class KeyedCollectController {
 
     private final KeyedCollectGuard guard;

@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.wechat.WechatPcClient;
 import com.auraboot.framework.auth.wechat.WechatPcIdentityService;
 import com.auraboot.framework.auth.wechat.WechatPcProperties;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import com.auraboot.framework.user.dao.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@AuthenticatedAccess("WeChat PC QR login flow: pre-authentication QR/status/callback endpoints resolve the WeChat identity and issue the platform session; /wechat/pc/bind operates on the current MetaContext user")
 public class WechatPcLoginController {
 
     private final WechatPcClient wechatPcClient;

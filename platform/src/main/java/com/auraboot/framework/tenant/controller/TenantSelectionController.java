@@ -11,6 +11,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.i18n.util.I18nLocaleResolver;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.rbac.entity.Role;
@@ -55,6 +56,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.UnreachableCod
 @RestController
 @RequestMapping("/api/tenant-selection")
 @RequiredArgsConstructor
+@AuthenticatedAccess("post-login space selection: the caller holds a platform session JWT but no tenant space yet; every action operates on the caller's own memberships and issues the tenant-scoped session")
 public class TenantSelectionController {
 
     private final UserService userService;

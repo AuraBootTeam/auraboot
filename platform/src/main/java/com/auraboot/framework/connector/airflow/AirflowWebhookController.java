@@ -1,5 +1,6 @@
 package com.auraboot.framework.connector.airflow;
 
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/webhooks/airflow")
 @RequiredArgsConstructor
+@AuthenticatedAccess("Airflow webhook receiver; HMAC signature is verified by AirflowWebhookService against per-connection shared secrets (connector_webhook_secret) before dispatch")
 public class AirflowWebhookController {
 
     private final AirflowWebhookService service;

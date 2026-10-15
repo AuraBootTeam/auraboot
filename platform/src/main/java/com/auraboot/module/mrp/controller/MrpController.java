@@ -1,6 +1,7 @@
 package com.auraboot.module.mrp.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.module.mrp.dto.DemandEntry;
 import com.auraboot.module.mrp.dto.MrpResult;
 import com.auraboot.module.mrp.dto.MrpRunRequest;
@@ -16,6 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/mrp")
 @RequiredArgsConstructor
+@AuthenticatedAccess("stateless MRP planning run over the demand list in the request payload; no persistent data is read or written")
 public class MrpController {
 
     private final MrpPlanningEngine engine;

@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.service.impl.RollUpFieldRegistry;
 import com.auraboot.framework.meta.service.impl.RollUpSummaryService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/meta/rollup")
 @RequiredArgsConstructor
+@AuthenticatedAccess("metadata maintenance endpoints that recalculate roll-up summary fields and invalidate the registry cache, scoped to the caller's tenant via MetaContext")
 public class RollUpController {
 
     private final RollUpSummaryService rollUpSummaryService;
