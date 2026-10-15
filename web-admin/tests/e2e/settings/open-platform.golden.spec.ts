@@ -2927,18 +2927,22 @@ test.describe('Public business API management journey', () => {
       await region.screenshot({ path: path.join(evidence, `${name}.png`) });
     };
     await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
-    const guidePopup = page.waitForEvent('popup');
-    await page.getByTestId('open-platform-integration-guide').click();
-    const guidePage = await guidePopup; await expect(guidePage.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
-    await expect(guidePage.locator('code[data-filename="crud.sh"]')).toContainText('AURABOOT_TOKEN');
-    await expect(guidePage.locator('code[data-filename="receiver.py"]')).toContainText('BEGIN IMMEDIATE');
-    await guidePage.screenshot({ path: path.join(evidence,'QAT-08-guide-entry.png'), fullPage: false });
-    const anonymous = await page.context().browser()!.newContext({ storageState: { cookies: [], origins: [] } });
+    // The project adds Referer for APIRequestContext CSRF. A real noreferrer popup has no such forced header.
+    await page.context().setExtraHTTPHeaders({});
     try {
-      const anonymousGuide = await anonymous.newPage(); const response = await anonymousGuide.goto(guidePage.url());
-      expect(response?.status()).toBe(200); await expect(anonymousGuide.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
-    } finally { await anonymous.close(); }
-    await guidePage.close();
+      const guidePopup = page.waitForEvent('popup');
+      await page.getByTestId('open-platform-integration-guide').click();
+      const guidePage = await guidePopup; await expect(guidePage.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+      await expect(guidePage.locator('code[data-filename="crud.sh"]')).toContainText('AURABOOT_TOKEN');
+      await expect(guidePage.locator('code[data-filename="receiver.py"]')).toContainText('BEGIN IMMEDIATE');
+      await guidePage.screenshot({ path: path.join(evidence,'QAT-08-guide-entry.png'), fullPage: false });
+      const anonymous = await page.context().browser()!.newContext({ storageState: { cookies: [], origins: [] } });
+      try {
+        const anonymousGuide = await anonymous.newPage(); const response = await anonymousGuide.goto(guidePage.url());
+        expect(response?.status()).toBe(200); await expect(anonymousGuide.getByRole('heading', { name: 'External Integration Guide', exact: true })).toBeVisible();
+      } finally { await anonymous.close(); }
+      await guidePage.close();
+    } finally { await page.context().setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` }); }
     await page.getByTestId('open-platform-actions-link').click();
     const editor = page.getByTestId('action-publication-editor'); await expect(editor).toBeVisible();
     await editor.getByRole('button', { name: text('New business API'), exact: true }).click();
