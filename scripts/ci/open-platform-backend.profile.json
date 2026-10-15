@@ -77,7 +77,8 @@
       "com.auraboot.framework.webhook.service.WebhookReceiverKey"
     ],
     "nonExecutableClasses": [
-      "com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor"
+      "com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor",
+      "com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate"
     ]
   }
 }

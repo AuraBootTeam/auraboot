@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from open_platform_backend_catalog import cases, plan, reconcile, coverage_result
+from open_platform_backend_catalog import cases, plan, reconcile, coverage_result, non_executable_declaration
 
 
 class BackendCatalogTest(unittest.TestCase):
@@ -64,10 +64,20 @@ class BackendCatalogTest(unittest.TestCase):
                             for folder in ['service', 'security']
                             for file in (self.root / 'platform/src/main/java/com/auraboot/framework/openplatform' / folder).rglob('*.java')}
         exemptions = {row['class'] for row in self.expected['coverage']['nonExecutable']}
-        self.assertEqual({'com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor'}, exemptions)
+        self.assertEqual({'com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor','com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate'}, exemptions)
         self.assertEqual(all_open_sources - exemptions, {name for name in coverage_names if '.openplatform.' in name})
         self.assertIn('com.auraboot.framework.meta.service.impl.NamedQueryServiceImpl', coverage_names)
         self.assertIn('com.auraboot.framework.meta.service.impl.AggregateQueryServiceImpl', coverage_names)
+
+    def test_only_pure_interfaces_and_annotation_metadata_can_be_non_executable(self):
+        self.assertTrue(non_executable_declaration('public @interface Candidate { String code(); String kind() default ""; }','Candidate'))
+        self.assertTrue(non_executable_declaration('public interface Contributor { void contribute(); }','Contributor'))
+        for source in ['public @interface Candidate { class Runner { static void execute() {} } }',
+                       'public @interface Candidate { int VALUE = dangerous(); }',
+                       'public interface Candidate { default void execute() {} }',
+                       'public interface Candidate { int VALUE = dangerous(); }',
+                       'public class Candidate { static void execute() {} }']:
+            with self.subTest(source=source):self.assertFalse(non_executable_declaration(source,'Candidate'))
 
     def test_exact_case_results_are_accepted(self):
         receipt = reconcile(self.expected, self.results, self.coverage)
