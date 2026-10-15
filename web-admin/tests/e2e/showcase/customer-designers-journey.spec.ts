@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { navigateToMenuByClick } from '../helpers';
-import { openAsRole } from '../rbac/rbac-helpers';
 import { parseReportTemplate } from '../../../app/plugins/core-designer/components/report-designer/services/reportTemplateIO';
 
 const templatePath = fileURLToPath(
@@ -232,12 +231,14 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const recordPid = String(recordBody.data.pid);
   expect(recordPid).toMatch(/^[0-9A-Z]{26}$/);
   const row = page.locator('tr').filter({ hasText: customerName });
+  await expect(page).toHaveURL(listUrl);
   await expect(row).toBeVisible();
   await expect(row.getByTestId('row-action-more')).toBeVisible({ timeout: 10000 });
   await row.getByTestId('row-action-more').click();
   const editMenuAction = page.getByRole('menu').getByTestId('row-action-edit');
   await expect(editMenuAction).toBeVisible({ timeout: 10000 });
   await editMenuAction.click();
+  await expect(page).toHaveURL(`${listUrl}/edit/${recordPid}`);
   await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(
     customerName,
   );
@@ -276,9 +277,16 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await screenshot(page, info, 'SC02-customer-followup-saved-reopened');
   await expect(page.getByTestId('form-btn-cancel')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('form-btn-cancel').click();
+  await expect(page).toHaveURL(listUrl);
+  await expect(row).toBeVisible();
 
   // Provision a task-owned read-only role. API use here is setup and a negative
   // authorization probe; the successful create/update path above is browser-only.
+  const authorIdentityResponse = await page.request.get('/api/auth/me');
+  expect(authorIdentityResponse.ok()).toBe(true);
+  const authorIdentity = (await authorIdentityResponse.json()).data;
+  const expectedTenantId = String(authorIdentity.user.tenantId);
+  expect(expectedTenantId).toMatch(/^\d+$/);
   const roleCode = `launch_reader_${Date.now().toString(36)}`;
   const roleResponse = await page.request.post('/api/roles', {
     data: {
@@ -320,8 +328,42 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     },
   });
   expect(userResponse.ok()).toBe(true);
-  const reader = await openAsRole(browser, email, password, 'zh-CN');
+  // A browser login owns its BFF session. Do not inject backend JWTs as cookies.
+  const readerContext = await browser.newContext({
+    baseURL: new URL(listUrl).origin,
+    storageState: { cookies: [], origins: [] },
+    locale: 'zh-CN',
+    viewport: { width: 1440, height: 1000 },
+  });
+  const reader = { context: readerContext, page: await readerContext.newPage() };
   try {
+    await reader.page.goto('/login');
+    await expect(reader.page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+    await reader.page.locator('#identifier').fill(email);
+    await reader.page.locator('#password').fill(password);
+    await reader.page.locator('form button[type="submit"]').click();
+    await expect(reader.page).not.toHaveURL(/\/login(?:$|\?)/);
+    if (new URL(reader.page.url()).pathname === '/tenant-selection') {
+      await reader.page.getByTestId(`space-business-${expectedTenantId}`).click();
+      await expect(reader.page).not.toHaveURL(/\/tenant-selection(?:$|\?)/);
+    }
+    const identityResponse = await reader.page.request.get('/api/auth/me');
+    expect(identityResponse.ok()).toBe(true);
+    const identity = (await identityResponse.json()).data;
+    expect(identity.user.email).toBe(email);
+    expect(String(identity.user.tenantId)).toBe(expectedTenantId);
+    expect(identity.permissions.roles.map((role: { code: string }) => role.code)).toContain(roleCode);
+    const readerPermissions: string[] = identity.permissions.permissionCodes;
+    expect(readerPermissions).toContain(`model.${code}.read`);
+    for (const action of ['create', 'update', 'delete']) {
+      expect(readerPermissions).not.toContain(`model.${code}.${action}`);
+    }
+    await info.attach('SC02-reader-identity', {
+      body: JSON.stringify({ tenantId: identity.user.tenantId,
+        roleCodes: identity.permissions.roles.map((role: { code: string }) => role.code),
+        modelPermissions: readerPermissions.filter(permission => permission.startsWith(`model.${code}.`)),
+      }), contentType: 'application/json',
+    });
     // Reuse the exact runtime URL reached through the author's real preview.
     await reader.page.goto(listUrl);
     const readerRow = reader.page.locator('tr').filter({ hasText: customerName });
