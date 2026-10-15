@@ -158,7 +158,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByText('林晓', { exact: true }).last()).toBeVisible();
     await shot('P09');
     await page.getByText('林晓', { exact: true }).last().click();
-    const newProjectName = '雨岚设计 · 合同协作门户';
+    const newProjectName = '华辰制造 · 合同协作门户';
     await page.locator('#tpm_pj_name').fill(newProjectName);
     await page.getByTestId('select-trigger-tpm_pj_customer_id').click();
     await page.getByRole('option', { name: '华辰制造', exact: true }).click();
@@ -185,7 +185,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     const newRow = page.getByRole('row').filter({ hasText: newProjectName });
     await expect(newRow).toContainText('林晓');
     await page.reload();
-    await expect(newRow).toContainText('雨岚设计');
+    await expect(newRow).toContainText('华辰制造');
     await shot('P12');
     await newRow.getByRole('button', { name: '查看', exact: true }).click();
     await expect(page.getByTestId('attachment-download-0')).toHaveText(/delivery-notes.txt/);
@@ -265,7 +265,7 @@ test('assigned view resolves the signed-in member and preserves shared attachmen
   const matrix = JSON.parse(await fs.readFile(path.join(evidence, 'acceptance-matrix.json'), 'utf8'));
   await page.screenshot({ path: path.join(evidence, 'screenshots', 'P20.png') });
   matrix.find((row: { id: string }) => row.id === 'P20').status = 'captured';
-  await page.getByRole('row').filter({ hasText: '雨岚设计 · 合同协作门户' }).getByRole('button', { name: '查看', exact: true }).click();
+  await page.getByRole('row').filter({ hasText: '华辰制造 · 合同协作门户' }).getByRole('button', { name: '查看', exact: true }).click();
   const downloadEvent = page.waitForEvent('download');
   await page.getByTestId('attachment-download-0').click();
   const download = await downloadEvent;
