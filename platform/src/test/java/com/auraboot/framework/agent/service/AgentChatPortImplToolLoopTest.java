@@ -512,6 +512,46 @@ class AgentChatPortImplToolLoopTest {
     }
 
     @Test
+    void callerPermissionsCannotWidenTheDeployedAgentProfile() throws Exception {
+        assertCallerAndProfileIntersection(java.util.Set.of("customers.read"),
+                java.util.Set.of("customers.read", "private.read"));
+    }
+
+    @Test
+    void agentProfileCannotWidenTheCallerPermissionBoundary() throws Exception {
+        assertCallerAndProfileIntersection(java.util.Set.of("customers.read", "private.read"),
+                java.util.Set.of("customers.read"));
+    }
+
+    private void assertCallerAndProfileIntersection(java.util.Set<String> profilePermissions,
+                                                     java.util.Set<String> callerPermissions) throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of("agent_code", AGENT_CODE, "name", "Scoped query employee",
+                        "status", "active", "model", "test-model", "system_prompt", "Query only permitted data.",
+                        "allowed_operations", List.of("query"), "guardrails",
+                        new ObjectMapper().writeValueAsString(Map.of("provider", "openai", "profilePermissions", profilePermissions)))));
+        stubProvider();
+        stubGrounding();
+        ToolDefinition customer = ToolDefinition.builder().toolCode("nq:customers").toolType("dsl_query")
+                .sourceCode("customers").riskLevel("L0").requiredPermissions(java.util.Set.of("customers.read")).build();
+        ToolDefinition restricted = ToolDefinition.builder().toolCode("nq:private").toolType("dsl_query")
+                .sourceCode("private").riskLevel("L0").requiredPermissions(java.util.Set.of("private.read")).build();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of(customer, restricted));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse("forged-private-query", "nq_private", Map.of()))
+                .thenReturn(endTurnResponse("Only permitted customer data is available."));
+        var overrides = com.auraboot.framework.agent.port.AgentTurnOverrides.builder()
+                .readOnlyExecution(true).effectivePermissions(callerPermissions).build();
+        service.runAgentTurn(newTurnContext(), newRequest("Read restricted data"), sink, overrides);
+        ArgumentCaptor<LlmChatRequest> requests = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requests.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requests.getAllValues().get(0).getTools()).extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("nq_customers");
+        verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+    }
+
+    @Test
     @DisplayName("tool catalog applies channel ACL before provider sees tools")
     void toolCatalogAppliesChannelAclBeforeProviderSeesTools() throws Exception {
         when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))

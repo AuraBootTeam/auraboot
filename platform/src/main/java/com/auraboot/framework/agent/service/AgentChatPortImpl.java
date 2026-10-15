@@ -437,7 +437,7 @@ public class AgentChatPortImpl implements AgentChatPort {
             recordOverrideUsage("effectivePermissions");
         }
         Set<String> effectivePermissions = overridePermissions != null
-                ? overridePermissions
+                ? restrictOverrideToProfile(overridePermissions, profile.profilePermissions())
                 : resolveProfileEffectivePermissions(
                         ctx,
                         profile.profilePermissions(),
@@ -753,6 +753,13 @@ public class AgentChatPortImpl implements AgentChatPort {
             }
         }
         return merged;
+    }
+
+    private Set<String> restrictOverrideToProfile(Set<String> overridePermissions, Set<String> profilePermissions) {
+        if (profilePermissions == null) return Set.copyOf(overridePermissions);
+        LinkedHashSet<String> intersection = new LinkedHashSet<>(overridePermissions);
+        intersection.retainAll(profilePermissions);
+        return Set.copyOf(intersection);
     }
 
     private Set<String> resolveProfileEffectivePermissions(TurnContext ctx,
