@@ -19,6 +19,7 @@ import type {
   ValidationError,
 } from '../types';
 import { dashboardService } from '../services/dashboardService';
+import { parseDashboardDocument } from '../utils/dashboardDocument';
 import { aggregateModelField, hasAggregateModel } from '~/framework/smart/utils/aggregateModel';
 
 /**
@@ -70,6 +71,7 @@ interface DashboardStore {
   // Actions - Dashboard
   loadDashboard: (pid: string) => Promise<void>;
   createDashboard: (title: string, scope?: DashboardScope) => void;
+  importDocument: (text: string) => void;
   updateDashboardMeta: (meta: {
     title?: string;
     description?: string;
@@ -212,6 +214,21 @@ export const useDashboardStore = create<DashboardStore>()(
           state.isDirty = true;
           state.selectedWidgetId = null;
           state.history = [[]];
+          state.historyIndex = 0;
+        });
+      },
+
+      importDocument: (text: string) => {
+        const { dashboard: draft } = parseDashboardDocument(text);
+        set((state) => {
+          state.dashboard = { ...draft, scope: 'personal', status: 'draft' };
+          state.widgets = draft.widgets;
+          state.layoutConfig = draft.layoutConfig;
+          state.selectedWidgetId = null;
+          state.isDirty = true;
+          state.mutationGeneration += 1;
+          state.validationResult = null;
+          state.history = [JSON.parse(JSON.stringify(draft.widgets))];
           state.historyIndex = 0;
         });
       },

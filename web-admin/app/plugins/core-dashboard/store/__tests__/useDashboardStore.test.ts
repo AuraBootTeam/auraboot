@@ -100,6 +100,30 @@ describe('useDashboardStore', () => {
     });
   });
 
+  describe('portable document import', () => {
+    function document() { return JSON.stringify({ format: 'auraboot.dashboard', version: 1, dashboard: {
+      ...minimalDashboard(), title: 'Imported delivery', tenantId: 99, scope: 'global', status: 'published',
+      widgets: [{ ...widgetData(), id: 'imported-card' }],
+    } }); }
+    it('creates a personal draft and saves through create, never updating the source', async () => {
+      useDashboardStore.setState({ dashboard: { ...minimalDashboard({ pid: 'original' }), layoutConfig: { columns: 12, rowHeight: 100, gap: 16 } } });
+      useDashboardStore.getState().importDocument(document());
+      const state = useDashboardStore.getState();
+      expect(state.dashboard?.pid).toBeUndefined(); expect(state.dashboard?.tenantId).toBeUndefined();
+      expect(state.dashboard?.scope).toBe('personal'); expect(state.dashboard?.status).toBe('draft');
+      expect(state.widgets).toHaveLength(1); expect(state.isDirty).toBe(true); expect(state.canUndo()).toBe(false);
+      createDashboardMock.mockResolvedValue({ ...state.dashboard, pid: 'new-copy' });
+      await state.saveDashboard();
+      expect(createDashboardMock).toHaveBeenCalledOnce(); expect(updateDashboardMock).not.toHaveBeenCalled();
+      expect(useDashboardStore.getState().dashboard?.pid).toBe('new-copy');
+    });
+    it('keeps current canvas unchanged when import validation fails', () => {
+      useDashboardStore.getState().createDashboard('Keep me');
+      expect(() => useDashboardStore.getState().importDocument('{')).toThrow();
+      expect(useDashboardStore.getState().dashboard?.title).toBe('Keep me');
+    });
+  });
+
   // ── updateDashboardMeta ───────────────────────────────────────────────────
 
   describe('updateDashboardMeta', () => {
