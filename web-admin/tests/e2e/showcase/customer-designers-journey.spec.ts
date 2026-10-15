@@ -93,7 +93,10 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(JSON.stringify(metadata.data)).toContain(`${code}_customer_name`);
   expect(JSON.stringify(metadata.data)).toContain('客户名称');
   expect(JSON.stringify(metadata.data)).toContain('商机金额');
-  expect(metadata.data).toHaveLength(2);
+  expect(metadata.data.filter((field: { code: string }) => field.code.startsWith(`${code}_`)))
+    .toHaveLength(2);
+  expect(metadata.data.filter((field: { code: string }) => !field.code.startsWith(`${code}_`))
+    .map((field: { code: string }) => field.code).sort()).toEqual(['created_at', 'updated_at']);
   expect(JSON.stringify(metadata.data)).toContain(`${code}_opportunity_amount`);
   await page.getByTestId('model-more-actions').click();
   await page.getByTestId('model-publish-action').click();
@@ -295,7 +298,7 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
         {
           id: 'customer_section',
           blockType: 'detail-section',
-          title: '客户联系信息',
+          title: { 'zh-CN': '客户联系信息', en: 'Customer contact information' },
           columns: 12,
           fields: [],
         },
@@ -323,7 +326,7 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
       {
         id: 'customer_section_imported',
         blockType: 'detail-section',
-        title: '客户跟进信息',
+        title: { 'zh-CN': '客户跟进信息', en: 'Customer follow-up information' },
         columns: 12,
         fields: [],
       },
@@ -341,7 +344,8 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
   const download = await downloadEvent;
   expect(download.suggestedFilename()).toMatch(/\.page\.json$/);
   const exported = JSON.parse(await readFile((await download.path())!, 'utf8'));
-  expect(JSON.stringify(exported.blocks)).toContain('客户经营与交付信息');
+  expect(exported.blocks.find((block: { id: string }) => block.id === 'customer_section_imported').title)
+    .toEqual({ 'zh-CN': '客户经营与交付信息', en: 'Customer follow-up information' });
   const save = page.waitForResponse(
     (r) => r.url().includes(`/api/pages/${pid}`) && r.request().method() === 'PUT',
   );
@@ -350,7 +354,9 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
   await page.reload();
   await expect(page.getByTestId('outline-item-customer_section_imported')).toBeVisible();
   const persisted = await page.request.get(`/api/pages/${pid}`);
-  expect(JSON.stringify((await persisted.json()).data.blocks)).toContain('客户经营与交付信息');
+  const persistedBlocks = (await persisted.json()).data.blocks;
+  expect(persistedBlocks.find((block: { id: string }) => block.id === 'customer_section_imported').title)
+    .toEqual({ 'zh-CN': '客户经营与交付信息', en: 'Customer follow-up information' });
   await screenshot(page, info, 'SC05-page-template-reopened');
 });
 
