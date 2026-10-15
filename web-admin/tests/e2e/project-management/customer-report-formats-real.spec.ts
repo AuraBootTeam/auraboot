@@ -113,16 +113,30 @@ test('SC06-FORMATS manual customer template persists and exports real Chinese da
       new URL(response.url()).pathname === definitionPath && response.request().method() === 'GET',
   );
   await page.locator('tr').filter({ hasText: title }).getByText('打开', { exact: true }).click();
-  expect((await reopen).status()).toBe(200);
+  const reopened = await reopen;
+  expect(reopened.status()).toBe(200);
+  expect(await reopened.finished()).toBeNull();
+  const reopenedDefinition = await reopened.json();
+  expect(String(reopenedDefinition.code)).toBe('0');
+  expect(reopenedDefinition.data.pid).toBe(reportPid);
+  expect(reopenedDefinition.data.dsl.dataSources).toEqual(persistedDsl.dataSources);
   await expect(page).toHaveURL(new RegExp(`/report-designer/${reportPid}$`));
-  const reload = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === definitionPath && response.request().method() === 'GET',
-  );
+  // Complete the initial UI read before navigating away. Response headers alone
+  // do not mean Chrome has retained its body across a subsequent full reload.
+  await expect(page.getByRole('textbox', { name: '报表标题', exact: true })).toHaveValue(title);
+  const reload = page
+    .waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === definitionPath &&
+        response.request().method() === 'GET',
+    )
+    .then(async (response) => {
+      expect(response.status()).toBe(200);
+      expect(await response.finished()).toBeNull();
+      return response.json();
+    });
   await page.reload();
-  const reloaded = await reload;
-  expect(reloaded.status()).toBe(200);
-  const definition = await reloaded.json();
+  const definition = await reload;
   expect(String(definition.code)).toBe('0');
   expect(definition.data.pid).toBe(reportPid);
   expect(definition.data.dsl.title).toBe(title);
