@@ -39,7 +39,15 @@ try {
     const onError = error => errors.push(error.message);
     const onResponse = response => {
       const path = new URL(response.url()).pathname;
-      if (['/api/inbox', '/api/workbench/stats', '/api/user-engagement'].includes(path)) responses.push((async () => ({ path, status: response.status(), code: (await response.json()).code, timing: response.request().timing(), traceId: response.headers()['x-trace-id'] }))());
+      if (['/api/inbox', '/api/workbench/stats', '/api/user-engagement'].includes(path)) {
+        // A duplicate request can finish after the next navigation has invalidated its CDP body.
+        // Keep this fact, and still require an observed successful payload for every critical API.
+        responses.push((async () => {
+          const observation = { path, status: response.status(), traceId: response.headers()['x-trace-id'] };
+          try { return { ...observation, code: (await response.json()).code, timing: response.request().timing() }; }
+          catch { return { ...observation, bodyReadError: 'body-unavailable-in-browser-protocol' }; }
+        })());
+      }
     };
     page.on('request', onRequest); page.on('response', onResponse); page.on('pageerror', onError);
     const response = await page.goto(base + '/home', { waitUntil: 'domcontentloaded' });
@@ -48,6 +56,7 @@ try {
     await expect(page.getByText('暂无待办事项', { exact: true })).toBeVisible();
     const observed = await page.evaluate(() => ({ marks: window.__perfHome, readAtMs: performance.now(), navigation: performance.getEntriesByType('navigation')[0].toJSON() }));
     const criticalResponses = await Promise.all(responses);
+    if (criticalResponses.some(r => r.status !== 200)) throw new Error('Critical API returned non-200');
     for (const path of ['/api/inbox', '/api/workbench/stats', '/api/user-engagement']) {
       if (!criticalResponses.some(r => r.path === path && r.status === 200 && r.code === '0')) throw new Error(`Missing successful critical API ${path}`);
     }
