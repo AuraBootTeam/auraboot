@@ -235,13 +235,21 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     await expect(readerRow).toBeVisible();
     await expect(reader.page.getByTestId('toolbar-btn-create')).not.toBeVisible();
     await expect(readerRow.getByTestId('row-action-edit')).not.toBeVisible();
-    const readRecord = await reader.page.request.get(`/api/dynamic/${code}/${recordPid}`);
+    const recordUrl = new URL(`/api/dynamic/${code}/${recordPid}`, listUrl);
+    const readRecord = await reader.page.request.get(recordUrl.toString());
     expect(readRecord.ok()).toBe(true);
     expect((await readRecord.json()).data[amountField]).toBe(68000);
-    const deniedWrite = await reader.page.request.put(`/api/dynamic/${code}/${recordPid}`, {
+    const deniedWrite = await reader.page.request.put(recordUrl.toString(), {
+      // This independently authenticated context does not inherit runner headers.
+      // Reach backend permission enforcement rather than mistaking BFF CSRF for RBAC.
+      headers: { Origin: recordUrl.origin, Referer: listUrl },
       data: { [amountField]: 999999 },
     });
     expect(deniedWrite.status()).toBe(403);
+    const deniedBody = await deniedWrite.json();
+    expect(String(deniedBody.code)).toBe('403');
+    expect(JSON.stringify(deniedBody)).not.toContain('csrf_origin_rejected');
+    expect(JSON.stringify(deniedBody)).toContain(`permissionCode: model.${code}.update`);
     const unchanged = await page.request.get(`/api/dynamic/${code}/${recordPid}`);
     expect((await unchanged.json()).data[amountField]).toBe(68000);
     await screenshot(reader.page, info, 'SC02-reader-cannot-write');
@@ -252,6 +260,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
         recordPid,
         readStatus: readRecord.status(),
         deniedWriteStatus: deniedWrite.status(),
+        deniedWriteBody: deniedBody,
         persistedAmount: 68000,
       }),
       contentType: 'application/json',
