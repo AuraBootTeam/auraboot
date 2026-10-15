@@ -1,0 +1,74 @@
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+
+ RUN  v4.1.11 $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin
+
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > blocks business writes during authoring preview but allows reads and authoring APIs 2ms 65 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > binds command requests to the active authoring session for the backend guard 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > should make a GET request by default 0ms 65 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > should make a POST request with body 0ms 65 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > should generate a client request identity for command posts 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > should preserve an explicit command client request identity 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > should use the httpOnly cookie without exposing an auth header for protected routes 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > fetchResult > should not include auth header for public routes 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > get > should make GET request with params as query string 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > post > should make POST request with params as body 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > put > should make PUT request 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > put > should make PUT request with array body for batch endpoints 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > del > should make DELETE request with query params (not body) 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > del > should make DELETE request without body when no extra params 0ms 66 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > del > should make DELETE request with array body for batch endpoints 0ms 67 MB heap used
+ ✓ app/shared/services/http-client/__tests__/HttpClient.test.ts > HttpClient integration > patch > should make PATCH request with body 0ms 67 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns false when permissions is undefined 1ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns true when permissionCodes array contains the code 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns true when permissions array has matching code 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns false when code is not in either list 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns false when both lists are empty 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasRole > returns false when permissions is undefined 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasRole > returns true when roles contains matching code 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasRole > returns false when role code does not match 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasAnyPermission > returns true when at least one permission matches 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasAnyPermission > returns false when none match 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasAnyPermission > returns false for empty permission code list 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasAllPermissions > returns true when all permissions match 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasAllPermissions > returns false when any permission is missing 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > hasAllPermissions > returns true for empty list (vacuously true) 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > returns null when no token is available 0ms 69 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > calls /api/auth/me with Bearer token and returns user info 2ms 70 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > returns null when the backend authoritatively rejects the session 0ms 70 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > returns null when result code is not 0 0ms 70 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > does not treat an authoritative 403 permission denial as an expired session 1ms 70 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > keeps transport failures distinct from invalid sessions 0ms 70 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > keeps backend 5xx failures distinct from invalid sessions 0ms 70 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > defaults permissions to empty arrays when not provided 0ms 71 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > uses the SSR BFF URL instead of the Spring Boot fallback 0ms 71 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > getUserInfo > returns nulls when no token 0ms 71 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > getUserInfo > returns full info on success 0ms 71 MB heap used
+ ✓ app/shared/services/__tests__/userService.test.ts > request scoped user info > deduplicates concurrent parent/child loaders but never reuses another request identity 1ms 71 MB heap used
+ ✓ app/plugins/core-dashboard/pages/home/__tests__/index.test.tsx > WorkbenchPage header > renders the loader workbench immediately without a second browser request 18ms 75 MB heap used
+ ✓ app/plugins/core-dashboard/pages/home/__tests__/index.test.tsx > WorkbenchPage header > loads workbench configuration with the incoming SSR request 2ms 75 MB heap used
+ ✓ app/plugins/core-dashboard/pages/home/__tests__/index.test.tsx > WorkbenchPage header > renders a page title and dated subline 48ms 87 MB heap used
+ ✓ app/plugins/core-dashboard/pages/home/__tests__/index.test.tsx > WorkbenchPage header > hydrates without a date mismatch when server and browser calendar days differ 10ms 88 MB heap used
+ ✓ app/plugins/core-dashboard/pages/home/__tests__/index.test.tsx > WorkbenchPage header > renders Open-in-Dashboard / Export / New actions 9ms 92 MB heap used
+ ✓ app/plugins/core-dashboard/pages/home/__tests__/index.test.tsx > WorkbenchPage header > passes hideWidgetActions to DashboardViewer so per-widget kebab is suppressed 3ms 92 MB heap used
+ ✓ app/plugins/core-dashboard/pages/home/__tests__/index.test.tsx > WorkbenchPage header > exports a workbench .xlsx download with real widget data 9ms 93 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > starts independent shell reads before bootstrap finishes 187ms 82 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > redirects anonymous private routes even when route middleware is bypassed 3ms 84 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > does not destroy an authenticated session when user resolution is temporarily unavailable 5ms 87 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > destroys an authenticated session only after an authoritative auth rejection 4ms 90 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps anonymous public routes available without user or menu fetches 2ms 93 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > injects ICP settings from the BFF runtime environment 2ms 95 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > loads commercial branding through the BFF-only runtime boundary 4ms 97 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > fails closed when commercial branding cannot be resolved by the BFF 2ms 100 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > refreshes published branding on a public-route cache hit without mutating the cached locale bundle 2ms 103 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > always emits a stable product title when ICP mode is disabled 2ms 105 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps commercial branding in the title when ICP records are enabled 2ms 107 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > declares browser identity links from the resolved branding contract 4ms 66 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps storefront runtime public even when an admin token exists 2ms 68 MB heap used
+ ✓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps checkout runtime public and isolated from admin menus 2ms 70 MB heap used
+
+ Test Files  4 passed (4)
+      Tests  63 passed (63)
+   Start at  18:26:26
+   Duration  692ms (transform 293ms, setup 347ms, import 278ms, tests 337ms, environment 1.16s)
+
+JSON report written to $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin/test-results/results.json

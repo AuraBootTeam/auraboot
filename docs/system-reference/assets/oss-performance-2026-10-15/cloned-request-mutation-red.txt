@@ -1,0 +1,56 @@
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+
+ RUN  v4.1.11 $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin
+
+ ↓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns false when permissions is undefined
+ ↓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns true when permissionCodes array contains the code
+ ↓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns true when permissions array has matching code
+ ↓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns false when code is not in either list
+ ↓ app/shared/services/__tests__/userService.test.ts > hasPermission > returns false when both lists are empty
+ ↓ app/shared/services/__tests__/userService.test.ts > hasRole > returns false when permissions is undefined
+ ↓ app/shared/services/__tests__/userService.test.ts > hasRole > returns true when roles contains matching code
+ ↓ app/shared/services/__tests__/userService.test.ts > hasRole > returns false when role code does not match
+ ↓ app/shared/services/__tests__/userService.test.ts > hasAnyPermission > returns true when at least one permission matches
+ ↓ app/shared/services/__tests__/userService.test.ts > hasAnyPermission > returns false when none match
+ ↓ app/shared/services/__tests__/userService.test.ts > hasAnyPermission > returns false for empty permission code list
+ ↓ app/shared/services/__tests__/userService.test.ts > hasAllPermissions > returns true when all permissions match
+ ↓ app/shared/services/__tests__/userService.test.ts > hasAllPermissions > returns false when any permission is missing
+ ↓ app/shared/services/__tests__/userService.test.ts > hasAllPermissions > returns true for empty list (vacuously true)
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > returns null when no token is available
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > calls /api/auth/me with Bearer token and returns user info
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > returns null when the backend authoritatively rejects the session
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > returns null when result code is not 0
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > does not treat an authoritative 403 permission denial as an expired session
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > keeps transport failures distinct from invalid sessions
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > keeps backend 5xx failures distinct from invalid sessions
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > defaults permissions to empty arrays when not provided
+ ↓ app/shared/services/__tests__/userService.test.ts > fetchUserInfo > uses the SSR BFF URL instead of the Spring Boot fallback
+ ↓ app/shared/services/__tests__/userService.test.ts > getUserInfo > returns nulls when no token
+ ↓ app/shared/services/__tests__/userService.test.ts > getUserInfo > returns full info on success
+ × app/shared/services/__tests__/userService.test.ts > request scoped user info > deduplicates concurrent parent/child loaders but never reuses another request identity 10ms 60 MB heap used
+   → expected "fetch" to be called 1 times, but got 2 times
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  app/shared/services/__tests__/userService.test.ts > request scoped user info > deduplicates concurrent parent/child loaders but never reuses another request identity
+AssertionError: expected "fetch" to be called 1 times, but got 2 times
+ ❯ app/shared/services/__tests__/userService.test.ts:369:22
+    367|     const [parent, child] = await Promise.all([getUserInfo(request, lo…
+    368|     expect(parent.user).toEqual(child.user);
+    369|     expect(fetchSpy).toHaveBeenCalledTimes(1);
+       |                      ^
+    370|     await getUserInfo(new Request('http://localhost/home'), new Router…
+    371|     expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 25 skipped (26)
+   Start at  18:25:11
+   Duration  686ms (transform 55ms, setup 114ms, import 57ms, tests 11ms, environment 432ms)
+
+JSON report written to $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin/test-results/results.json
+undefined
+$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run app/shared/services/__tests__/userService.test.ts -t deduplicates concurrent

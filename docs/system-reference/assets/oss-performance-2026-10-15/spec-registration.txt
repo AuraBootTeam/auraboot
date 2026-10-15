@@ -1,0 +1,2 @@
+[spec-registration] web-admin/tests/e2e/pcba-solution (project quoteops): 54 spec files, 53 registered, 1 allowlisted
+[spec-registration] PASS

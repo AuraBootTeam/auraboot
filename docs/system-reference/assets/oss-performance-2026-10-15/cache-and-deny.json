@@ -1,0 +1,487 @@
+{
+  "inventory": [
+    "cache.eviction.weight",
+    "cache.evictions",
+    "cache.gets",
+    "cache.puts",
+    "cache.size",
+    "hikaricp.connections",
+    "hikaricp.connections.acquire",
+    "hikaricp.connections.active",
+    "hikaricp.connections.creation",
+    "hikaricp.connections.idle",
+    "hikaricp.connections.max",
+    "hikaricp.connections.min",
+    "hikaricp.connections.pending",
+    "hikaricp.connections.timeout",
+    "hikaricp.connections.usage",
+    "http.server.requests",
+    "http.server.requests.active",
+    "mybatis.execution",
+    "mybatis.execution.active"
+  ],
+  "anonymousMenu": {
+    "status": 401
+  },
+  "anonymousList": {
+    "status": 401
+  },
+  "cache.gets": {
+    "status": 200,
+    "data": {
+      "name": "cache.gets",
+      "description": "The number of times cache lookup methods have returned a cached (hit) or uncached (newly loaded or null) value (miss).",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 1950.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "result",
+          "values": [
+            "hit",
+            "miss"
+          ]
+        },
+        {
+          "tag": "cache.manager",
+          "values": [
+            "cacheManager",
+            "permission"
+          ]
+        },
+        {
+          "tag": "cache",
+          "values": [
+            "fieldMaskConfig",
+            "user-role-snapshots",
+            "permission-catalog",
+            "viewModelFields",
+            "role-permission-snapshots",
+            "dataScopeCondition",
+            "dataPermissionMaskRules",
+            "cascadeDict",
+            "user-permissions",
+            "viewModelSummary",
+            "metaField",
+            "bindingRules",
+            "namedQuery",
+            "commandDefinitions",
+            "stateGraphDefinitions",
+            "secureQuery",
+            "baseline-role-snapshots",
+            "dictData",
+            "namedQueries",
+            "userDataDomainIds",
+            "aggregateQuery",
+            "modelFieldBindings",
+            "modelDefinitions",
+            "cascadeTree"
+          ]
+        },
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "name",
+          "values": [
+            "fieldMaskConfig",
+            "user-role-snapshots",
+            "permission-catalog",
+            "viewModelFields",
+            "role-permission-snapshots",
+            "dataScopeCondition",
+            "dataPermissionMaskRules",
+            "cascadeDict",
+            "user-permissions",
+            "viewModelSummary",
+            "metaField",
+            "bindingRules",
+            "namedQuery",
+            "commandDefinitions",
+            "stateGraphDefinitions",
+            "secureQuery",
+            "baseline-role-snapshots",
+            "dictData",
+            "namedQueries",
+            "userDataDomainIds",
+            "aggregateQuery",
+            "modelFieldBindings",
+            "modelDefinitions",
+            "cascadeTree"
+          ]
+        }
+      ]
+    }
+  },
+  "cache.size": {
+    "status": 200,
+    "data": {
+      "name": "cache.size",
+      "description": "The number of entries in this cache. This may be an approximation, depending on the type of cache.",
+      "measurements": [
+        {
+          "statistic": "VALUE",
+          "value": 106.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "cache.manager",
+          "values": [
+            "cacheManager",
+            "permission"
+          ]
+        },
+        {
+          "tag": "cache",
+          "values": [
+            "fieldMaskConfig",
+            "user-role-snapshots",
+            "permission-catalog",
+            "cascadeDict",
+            "viewModelFields",
+            "dataPermissionMaskRules",
+            "role-permission-snapshots",
+            "dataScopeCondition",
+            "user-permissions",
+            "metaField",
+            "viewModelSummary",
+            "bindingRules",
+            "namedQuery",
+            "commandDefinitions",
+            "stateGraphDefinitions",
+            "baseline-role-snapshots",
+            "secureQuery",
+            "dictData",
+            "namedQueries",
+            "aggregateQuery",
+            "userDataDomainIds",
+            "modelFieldBindings",
+            "modelDefinitions",
+            "cascadeTree"
+          ]
+        },
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "name",
+          "values": [
+            "fieldMaskConfig",
+            "user-role-snapshots",
+            "permission-catalog",
+            "cascadeDict",
+            "viewModelFields",
+            "dataPermissionMaskRules",
+            "role-permission-snapshots",
+            "dataScopeCondition",
+            "user-permissions",
+            "metaField",
+            "viewModelSummary",
+            "bindingRules",
+            "namedQuery",
+            "commandDefinitions",
+            "stateGraphDefinitions",
+            "baseline-role-snapshots",
+            "secureQuery",
+            "dictData",
+            "namedQueries",
+            "aggregateQuery",
+            "userDataDomainIds",
+            "modelFieldBindings",
+            "modelDefinitions",
+            "cascadeTree"
+          ]
+        }
+      ]
+    }
+  },
+  "mybatis.execution": {
+    "status": 200,
+    "data": {
+      "name": "mybatis.execution",
+      "baseUnit": "seconds",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 28407.0
+        },
+        {
+          "statistic": "TOTAL_TIME",
+          "value": 17.53471000800001
+        },
+        {
+          "statistic": "MAX",
+          "value": 0.299628959
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "db.system",
+          "values": [
+            "postgresql"
+          ]
+        },
+        {
+          "tag": "db.operation",
+          "values": [
+            "UPDATE",
+            "INSERT",
+            "DELETE",
+            "SELECT"
+          ]
+        },
+        {
+          "tag": "mybatis.mapper",
+          "values": [
+            "com.auraboot.framework.menu.mapper.MenuMapper.existsByCode",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.queryList",
+            "com.auraboot.framework.agent.mapper.AbCapabilityMapper.updateById",
+            "com.auraboot.framework.meta.mapper.AuditTrailMapper.getLatestByTenant",
+            "com.auraboot.framework.scheduler.mapper.ScheduledTaskLogMapper.insert",
+            "com.auraboot.framework.meta.mapper.MetaFieldMapper.updateFieldInPlace",
+            "com.auraboot.framework.meta.mapper.CommandDefinitionMapper.findCurrentByCode",
+            "com.auraboot.framework.plugin.mapper.PluginRecordMapper.updateById",
+            "com.auraboot.framework.semantic.mapper.AbSemanticPreaggMapper.listAllAcrossTenants",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.updateForPluginImport",
+            "com.auraboot.framework.plugin.mapper.PluginRecordMapper.findByTenantAndNamespace",
+            "com.auraboot.framework.permission.capability.mapper.CapabilityMapper.findByTenantAndCode",
+            "com.auraboot.framework.behavior.mapper.BehaviorOutcomeOutboxMapper.findPending",
+            "com.auraboot.framework.meta.mapper.StateGraphDefinitionMapper.findPublishedByModelCode",
+            "com.auraboot.framework.notification.mapper.NotificationTemplateMapper.findByCode",
+            "com.auraboot.framework.menu.mapper.MenuMapper.findByPermissionCode",
+            "com.auraboot.framework.meta.mapper.DictMapper.updateById",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.checkColumnExists",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.findByMemberIdAndTenantId",
+            "com.auraboot.framework.meta.mapper.IdempotentKeyMapper.deleteExpired",
+            "com.auraboot.framework.inbox.mapper.InboxItemMapper.countUnread",
+            "com.auraboot.framework.meta.mapper.DictMapper.findCurrentByCode",
+            "com.auraboot.framework.dashboard.mapper.DashboardMapper.findWorkbench",
+            "com.auraboot.framework.meta.mapper.MetaModelMapper.findByPid",
+            "com.auraboot.framework.dashboard.mapper.DashboardMapper.findByPid",
+            "com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper.releaseUnusedReceivers",
+            "com.auraboot.framework.view.mapper.SavedViewMapper.findAccessibleViews",
+            "com.auraboot.framework.meta.mapper.AuditTrailMapper.lockTenantChain",
+            "com.auraboot.framework.automation.mapper.AutomationMapper.findEnabledByModelCodeAndTriggerType",
+            "com.auraboot.framework.menu.mapper.MenuMapper.findIdByPid",
+            "com.auraboot.framework.engagement.mapper.UserEngagementMapper.insert",
+            "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectAnyByPageKey",
+            "com.auraboot.framework.permission.mapper.PermissionMapper.findByCode",
+            "com.auraboot.framework.meta.mapper.StateGraphDefinitionMapper.findByModelCode",
+            "com.auraboot.framework.meta.mapper.AuditTrailMapper.getMaxSequenceNo",
+            "com.auraboot.framework.saas.config.mapper.BootstrapMapper.findActiveBootstrap",
+            "com.auraboot.framework.meta.mapper.DictItemMapper.insert",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.cleanupDelivered",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.findJsonbColumns",
+            "com.auraboot.framework.meta.mapper.DictMapper.updatePluginPidByPid",
+            "com.auraboot.framework.tenant.dao.mapper.TenantMapper.findByStatus",
+            "com.auraboot.framework.rbac.mapper.RolePermissionMapper.findConditionAstGrants",
+            "com.auraboot.framework.dashboard.mapper.DashboardMapper.findWorkbenchContributions",
+            "com.auraboot.framework.meta.mapper.CommandDefinitionMapper.findByPid",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.insertWithJsonb",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.existsByCode",
+            "com.auraboot.framework.meta.mapper.IdempotencyRecordMapper.deleteExpired",
+            "com.auraboot.framework.meta.mapper.NamedQueryMapper.selectList",
+            "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.findByTenantIdAndUserId",
+            "com.auraboot.framework.view.mapper.SavedViewChipPinMapper.selectList",
+            "com.auraboot.framework.meta.mapper.PageSchemaMapper.updateForPluginImport",
+            "com.auraboot.framework.plugin.mapper.PluginImportHistoryMapper.updateStatus",
+            "com.auraboot.framework.governance.dao.mapper.MasterDataPolicyMapper.selectList",
+            "com.auraboot.framework.menu.mapper.MenuMapper.linkMenusToPagesByPageKey",
+            "com.auraboot.framework.meta.mapper.NamedQueryFieldMapper.deleteByQueryAndSource",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.findPidByCode",
+            "com.auraboot.framework.scheduler.mapper.ScheduledTaskLogMapper.updateById",
+            "com.auraboot.framework.menu.mapper.MenuMapper.findByPath",
+            "com.auraboot.framework.rbac.mapper.RolePermissionMapper.findPermissionIdsByRole",
+            "com.auraboot.framework.organization.mapper.TeamMemberMapper.findTeamIdsByUserIdAndTenantId",
+            "com.auraboot.framework.meta.mapper.CommandDefinitionMapper.updateForPluginImport",
+            "com.auraboot.framework.permission.mapper.RecordShareMapper.countByRecordPidAndUser",
+            "com.auraboot.framework.versioning.mapper.DesignVersionHistoryMapper.findLatestVersions",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.deleteByQuery",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.selectById",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.countReadyEvents",
+            "com.auraboot.framework.tenant.dao.mapper.TenantPreferenceMapper.selectList",
+            "com.auraboot.framework.party.mapper.PartyMembershipMapper.findActorOptions",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.claimReadyEvents",
+            "com.auraboot.framework.meta.mapper.DictMapper.selectByPidWithContext",
+            "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail",
+            "com.auraboot.framework.meta.mapper.NamedQueryVersionMapper.insert",
+            "com.auraboot.framework.inbox.mapper.InboxItemMapper.selectList",
+            "com.auraboot.framework.i18n.mapper.I18nResourceMapper.selectDistinctLangs",
+            "com.auraboot.framework.meta.mapper.MetaFieldMapper.findByStatus",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery",
+            "com.auraboot.framework.rbac.mapper.UserRoleMapper.findEffectiveByMemberIdAndTenantId",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.updateByQuery",
+            "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid",
+            "com.auraboot.framework.meta.mapper.DictItemMapper.selectByDictIdAndStatus",
+            "com.auraboot.framework.user.mapper.UserPreferenceMapper.selectList",
+            "com.auraboot.framework.tenant.dao.mapper.TenantMapper.selectById",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectTargetVersionForUpdate",
+            "com.auraboot.framework.meta.mapper.DictItemMapper.deleteByDictIdAndSource",
+            "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId",
+            "com.auraboot.framework.rbac.mapper.UserRoleMapper.findRoleIdsByMemberId",
+            "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId",
+            "com.auraboot.framework.meta.mapper.BindingRuleMapper.softDelete",
+            "com.auraboot.framework.meta.mapper.DataChangeLogMapper.insert",
+            "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey",
+            "com.auraboot.framework.plugin.mapper.PluginRecordMapper.findByPid",
+            "com.auraboot.framework.plugin.mapper.PluginResourceMapper.updateById",
+            "com.auraboot.framework.meta.mapper.IdempotencyRecordMapper.insertIdempotent",
+            "com.auraboot.framework.permission.mapper.PermissionMapper.findResolvableDefinitions",
+            "com.auraboot.framework.auth.mapper.UserSessionMapper.findExpiredImpersonationSessions",
+            "com.auraboot.framework.versioning.mapper.DesignVersionHistoryMapper.countByResource",
+            "com.auraboot.framework.i18n.mapper.I18nResourceMapper.selectSystemByLang",
+            "com.auraboot.framework.plugin.mapper.PluginImportHistoryMapper.selectList",
+            "com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper.updateRunTimes",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.findPublishedModelCodesByFieldId",
+            "com.auraboot.framework.meta.mapper.InvariantDefinitionMapper.findAllPublishedAlways",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.alterTable",
+            "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByTenant",
+            "com.auraboot.framework.meta.mapper.DictItemMapper.findByDictId",
+            "com.auraboot.framework.dashboard.mapper.DashboardMapper.findByCode",
+            "com.auraboot.framework.meta.mapper.NamedQueryVersionMapper.getMaxVersionNo",
+            "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage",
+            "com.auraboot.framework.email.mapper.EmailAccountMapper.findAllActiveGlobal",
+            "com.auraboot.framework.permission.mapper.RecordShareMapper.countByRecordPidAndSubjectPid",
+            "com.auraboot.framework.permission.mapper.PermissionMapper.updateForPluginImport",
+            "com.auraboot.framework.meta.mapper.BindingRuleMapper.insertRule",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.countUserFieldsByModelId",
+            "com.auraboot.framework.i18n.mapper.I18nResourceMapper.selectByKeyAndLang",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.findByModelId",
+            "com.auraboot.framework.permission.mapper.RoleDataScopeMapper.findByRoleIdsAndResource",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.countOpenDeadLetters",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.recoverExpiredLeases",
+            "com.auraboot.framework.menu.mapper.MenuMapper.findIdByCode",
+            "com.auraboot.framework.rbac.mapper.RolePermissionMapper.countByRoleAndPermission",
+            "com.auraboot.framework.meta.mapper.FieldMaskConfigMapper.findByModelCode",
+            "com.auraboot.framework.plugin.mapper.PluginImportHistoryMapper.updateById",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.countExpiredLeases",
+            "com.auraboot.framework.meta.mapper.NamedQueryFieldMapper.findByQueryCode",
+            "com.auraboot.framework.i18n.mapper.I18nResourceMapper.upsert",
+            "com.auraboot.framework.meta.mapper.AsyncTaskMapper.requeueExpiredResumableTasks",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.getPidByModelAndField",
+            "com.auraboot.framework.meta.mapper.MetaFieldMapper.selectByPidWithContext",
+            "com.auraboot.framework.menu.mapper.MenuMapper.findVisibleDirectoriesAndMenus",
+            "com.auraboot.framework.plugin.mapper.PluginImportHistoryMapper.insert",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.clearDeletedFlag",
+            "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.getTenantNameById",
+            "com.auraboot.framework.permission.mapper.SubjectPermissionMapper.findBySubject",
+            "com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper.findAllowedPartyCapabilities",
+            "com.auraboot.framework.meta.mapper.MetaFieldMapper.findCurrentByCode",
+            "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.searchMembersPage",
+            "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode",
+            "com.auraboot.framework.permission.mapper.RecordShareMapper.countByRecordPidAndRoles",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQueryWithoutTenant",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.findIdByCode",
+            "com.auraboot.framework.meta.mapper.ExportTaskMapper.findExpired",
+            "com.auraboot.framework.user.mapper.UserMapper.selectList",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.countByModelAndField",
+            "com.auraboot.framework.notification.mapper.DigestEntryMapper.findFlushableEntriesForUpdate",
+            "com.auraboot.framework.dashboard.mapper.DashboardMapper.updateDashboard",
+            "com.auraboot.framework.engagement.mapper.UserEngagementMapper.updateById",
+            "com.auraboot.framework.behavior.mapper.BehaviorEventMapper.insert",
+            "com.auraboot.framework.plugin.mapper.PluginResourceMapper.findByTenantAndType",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.selectByIds",
+            "com.auraboot.framework.meta.mapper.MetaFieldMapper.findCurrentByTenant",
+            "com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper.findAllEnabled",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.updateById",
+            "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode",
+            "com.auraboot.framework.meta.mapper.BindingRuleMapper.updatePluginPid",
+            "com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper.findEnabledAuthOptions",
+            "com.auraboot.framework.meta.mapper.DictMapper.reviveRetiredByCode",
+            "com.auraboot.framework.meta.mapper.CommandDefinitionMapper.selectList",
+            "com.auraboot.framework.plugin.mapper.PluginRecordMapper.selectList",
+            "com.auraboot.framework.meta.mapper.AsyncTaskMapper.findResumablePendingTasks",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.findByTenantId",
+            "com.auraboot.framework.menu.mapper.MenuMapper.updateForPluginImport",
+            "com.auraboot.framework.versioning.mapper.DesignVersionHistoryMapper.insertVersion",
+            "com.auraboot.framework.meta.mapper.InvariantDefinitionMapper.findPublishedByScope",
+            "com.auraboot.framework.email.mapper.EmailSequenceEnrollmentMapper.findDueEnrollments",
+            "com.auraboot.framework.meta.mapper.FieldAuditConfigMapper.getEnabledByModel",
+            "com.auraboot.framework.semantic.mapper.AbSemanticMetricAlertMapper.listActiveAcrossTenants",
+            "com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper.resolveLoginContext",
+            "com.auraboot.framework.meta.mapper.IdempotencyRecordMapper.deleteExpiredByClientRequestId",
+            "com.auraboot.framework.user.mapper.UserMapper.selectById",
+            "com.auraboot.framework.agent.mapper.AbCapabilityMapper.selectList",
+            "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies",
+            "com.auraboot.framework.i18n.mapper.I18nResourceMapper.selectAllByLang",
+            "com.auraboot.framework.auth.mapper.UserDeactivationMapper.findExpiredCoolingOff",
+            "com.auraboot.framework.permission.mapper.SubjectPermissionMapper.findBySubjects",
+            "com.auraboot.framework.plugin.mapper.PluginRecordMapper.markAsEnabled",
+            "com.auraboot.framework.meta.mapper.AsyncTaskMapper.failExpiredTasks",
+            "com.auraboot.framework.meta.mapper.CommandDefinitionMapper.findByModelCode",
+            "com.auraboot.framework.decision.mapper.DecisionUsageRefMapper.deleteBySource",
+            "com.auraboot.framework.rbac.mapper.UserRoleMapper.selectList",
+            "com.auraboot.framework.tenant.dao.mapper.TenantMapper.selectList",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.reconcileMissingDeadLetters",
+            "com.auraboot.framework.meta.mapper.MetaFieldDictBindingMapper.updateById",
+            "com.auraboot.framework.auth.mapper.UserSessionMapper.insertIfAbsent",
+            "com.auraboot.framework.openplatform.mapper.OpenApiPublicationMapper.activeDefinitions",
+            "com.auraboot.framework.meta.mapper.MetaFieldMapper.findByIds",
+            "com.auraboot.framework.user.mapper.UserMapper.searchUsersByTenant",
+            "com.auraboot.framework.plugin.mapper.PluginRecordMapper.findByTenantAndPluginId",
+            "com.auraboot.framework.meta.mapper.NamedQueryFieldMapper.insert",
+            "com.auraboot.framework.user.mapper.UserApplicationPreferenceMapper.upsert",
+            "com.auraboot.framework.plugin.mapper.PluginResourceMapper.findByTenantPluginAndResource",
+            "com.auraboot.framework.meta.mapper.IdempotencyRecordMapper.completeClaim",
+            "com.auraboot.framework.meta.mapper.MetaModelMapper.selectById",
+            "com.auraboot.framework.rbac.mapper.RoleMapper.findByTenantIdAndCode",
+            "com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.selectByModelAndField",
+            "com.auraboot.framework.plugin.mapper.PluginResourceMapper.findByTypeAndCode",
+            "com.auraboot.framework.auth.mapper.UserSessionMapper.updateLastActive",
+            "com.auraboot.framework.meta.mapper.MetaFieldDictBindingMapper.findByFieldPid",
+            "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.selectList",
+            "com.auraboot.framework.auth.mapper.TenantLoginChannelMapper.selectList",
+            "com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper.claimReady",
+            "com.auraboot.framework.menu.mapper.MenuMapper.findPidByCode",
+            "com.auraboot.framework.meta.mapper.AsyncTaskMapper.delete",
+            "com.auraboot.framework.engagement.mapper.UserEngagementMapper.selectList",
+            "com.auraboot.framework.permission.capability.mapper.CapabilityMapper.updateById",
+            "com.auraboot.framework.meta.mapper.CommandAuditLogMapper.insertLog",
+            "com.auraboot.framework.meta.mapper.BindingRuleMapper.findByCommandId",
+            "com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper.getTenantIdsByUserId",
+            "com.auraboot.framework.notification.mapper.NotificationMapper.countUnread",
+            "com.auraboot.framework.automation.mapper.AutomationMapper.findEnabledScheduled",
+            "com.auraboot.framework.meta.mapper.MetaModelMapper.updateForPluginImport",
+            "com.auraboot.framework.meta.mapper.NamedQueryMapper.updateById",
+            "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant",
+            "com.auraboot.framework.meta.mapper.DecisionDefinitionMapper.findAllPublished",
+            "com.auraboot.framework.meta.mapper.MetaFieldDictBindingMapper.findByFieldPids",
+            "com.auraboot.framework.saas.config.mapper.SystemConfigMapper.findByKey",
+            "com.auraboot.framework.meta.mapper.SodRuleMapper.findAllEnabled",
+            "com.auraboot.framework.user.mapper.UserApplicationPreferenceMapper.find",
+            "com.auraboot.framework.meta.mapper.AuditTrailMapper.insert",
+            "com.auraboot.framework.meta.mapper.NamedQueryFieldMapper.findByQueryAndField",
+            "com.auraboot.framework.view.mapper.SavedViewMapper.findDefaultOverlayStack",
+            "com.auraboot.framework.meta.mapper.OutboxEventMapper.oldestUndeliveredAgeSeconds",
+            "com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper.isActiveLoginContext",
+            "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.selectById",
+            "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery",
+            "com.auraboot.framework.user.mapper.UserMapper.findDisplayNamesByPidsInTenant"
+          ]
+        },
+        {
+          "tag": "error",
+          "values": [
+            "none"
+          ]
+        }
+      ]
+    }
+  }
+}
