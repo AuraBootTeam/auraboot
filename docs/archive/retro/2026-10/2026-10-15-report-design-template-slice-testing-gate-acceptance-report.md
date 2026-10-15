@@ -55,3 +55,11 @@ PW_PROFILE=full ./node_modules/.bin/playwright test tests/e2e/showcase/customer-
 Web 窄测试包括必填业务名、非法编码、有效字段创建与绑定 payload、取消不写入、重复编码不创建、不绑定；模板解析、undo/redo 与 read-only 测试保持执行。故意将提交 label 改成 `mutated-label` 后，字段单测退出 1；恢复原文件后重新运行六个窄测试文件，34 条通过。变异只证明 Web label 断言有效，不能替代数据库残留/权限验收。
 
 真实 Enterprise 栈应再核对新字段 `uiSchema.label` 与有效 `displayName`、发布/生成后的表单和列表名称、刷新后的持久化、取消及重复编码没有多余版本/绑定，以及只读用户不能写配置。
+
+## S2 业务记录与只读身份候选验证补充
+
+同一个 SC02 候选测试已扩展：从生成后的真实业务列表点击新建，填写客户名称/商机金额，断言 POST payload 和返回 pid；从该行编辑金额 42000 → 68000，断言 PUT payload、刷新与 GET readback，再打开编辑表单确认 68000。
+
+测试使用 task-owned 自定义只读角色，仅授予刚发布模型的 read permission；重用从作者页面预览进入的真实运行 URL，验证同一条记录可读、新建与编辑入口不可见、直接 PUT 返回 403，随后由管理员反查金额仍为 68000。角色、用户与模型记录保留为验收痕迹，不发送邀请邮件。不依赖业务成功路径的 API 写入；角色配置是 fixture setup，直接 PUT 仅用于权限否定探针。
+
+该扩展仍为 collected-only：3 条浏览器用例已重新收集，executed=0。运行与视觉复核归主会话统一 Enterprise 栈。本次仅改候选测试与本报告，不以 collection 代替业务验证。

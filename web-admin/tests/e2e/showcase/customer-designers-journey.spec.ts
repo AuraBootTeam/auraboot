@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { navigateToMenuByClick } from '../helpers';
+import { openAsRole } from '../rbac/rbac-helpers';
 import { parseReportTemplate } from '../../../app/plugins/core-designer/components/report-designer/services/reportTemplateIO';
 
 const templatePath = fileURLToPath(
@@ -24,6 +25,7 @@ async function screenshot(page: Page, info: TestInfo, name: string) {
 
 test('SC02: create a model, bind fields, publish and generate CRUD from the real menus', async ({
   page,
+  browser,
 }, info) => {
   const code = `launch_followup_${Date.now().toString(36)}`;
   await page.goto('/home');
@@ -129,6 +131,134 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.reload();
   await expect(page.getByRole('columnheader', { name: '客户名称', exact: true })).toBeVisible();
   await screenshot(page, info, 'SC02-runtime-business-labels');
+  const listUrl = page.url();
+  const customerField = `${code}_customer_name`;
+  const amountField = `${code}_opportunity_amount`;
+  const customerName = `华辰客户跟进 ${Date.now()}`;
+  await page.getByTestId('toolbar-btn-create').click();
+  await page.getByTestId(`form-field-${customerField}`).locator('input').fill(customerName);
+  await page.getByTestId(`form-field-${amountField}`).locator('input').fill('42000');
+  await screenshot(page, info, 'SC02-customer-followup-form');
+  const createRecord = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === `/api/dynamic/${code}` && r.request().method() === 'POST',
+  );
+  await page.getByTestId('form-btn-submit').click();
+  const createdRecordResponse = await createRecord;
+  expect(createdRecordResponse.ok()).toBe(true);
+  expect(createdRecordResponse.request().postDataJSON()).toMatchObject({
+    [customerField]: customerName,
+    [amountField]: 42000,
+  });
+  const recordBody = await createdRecordResponse.json();
+  expect(String(recordBody.code)).toBe('0');
+  const recordPid = String(recordBody.data.pid);
+  expect(recordPid).toMatch(/^[0-9A-Z]{26}$/);
+  const row = page.locator('tr').filter({ hasText: customerName });
+  await expect(row).toBeVisible();
+  await row.getByTestId('row-action-edit').click();
+  await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(
+    customerName,
+  );
+  await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('42000');
+  await page.getByTestId(`form-field-${amountField}`).locator('input').fill('68000');
+  const updateRecord = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === `/api/dynamic/${code}/${recordPid}` &&
+      r.request().method() === 'PUT',
+  );
+  await page.getByTestId('form-btn-submit').click();
+  const updatedRecordResponse = await updateRecord;
+  expect(updatedRecordResponse.ok()).toBe(true);
+  expect(updatedRecordResponse.request().postDataJSON()).toMatchObject({ [amountField]: 68000 });
+  expect(String((await updatedRecordResponse.json()).code)).toBe('0');
+  await page.reload();
+  await expect(row).toBeVisible();
+  const persistedRecord = await page.request.get(`/api/dynamic/${code}/${recordPid}`);
+  expect(persistedRecord.ok()).toBe(true);
+  expect((await persistedRecord.json()).data).toMatchObject({
+    [customerField]: customerName,
+    [amountField]: 68000,
+  });
+  await row.getByTestId('row-action-edit').click();
+  await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('68000');
+  await screenshot(page, info, 'SC02-customer-followup-saved-reopened');
+  await page.getByTestId('form-btn-cancel').click();
+
+  // Provision a task-owned read-only role. API use here is setup and a negative
+  // authorization probe; the successful create/update path above is browser-only.
+  const roleCode = `launch_reader_${Date.now().toString(36)}`;
+  const roleResponse = await page.request.post('/api/roles', {
+    data: {
+      code: roleCode,
+      name: '客户跟进只读验证',
+      type: 'custom',
+      status: 'active',
+      scopeType: 'tenant',
+      defaultDataScopeType: 'all',
+    },
+  });
+  expect(roleResponse.ok()).toBe(true);
+  const rolePid = (await roleResponse.json()).data.pid;
+  const treeResponse = await page.request.get('/api/permissions/tree');
+  expect(treeResponse.ok()).toBe(true);
+  const permissionTree = await treeResponse.json();
+  const permissionIds = new Map<string, number>();
+  interface PermissionNode { code: string; id: number; children?: PermissionNode[] }
+  const collectPermission = (node: PermissionNode) => {
+    permissionIds.set(node.code, node.id);
+    (node.children ?? []).forEach(collectPermission);
+  };
+  permissionTree.data.forEach(collectPermission);
+  const readId = permissionIds.get(`model.${code}.read`);
+  expect(readId, 'published model must expose its read permission').toBeDefined();
+  const grants = await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+    data: [{ permissionId: readId, granted: true }],
+  });
+  expect(grants.ok()).toBe(true);
+  const email = `${roleCode}@e2e.local`;
+  const password = 'Test2026x';
+  const userResponse = await page.request.post('/api/admin/users', {
+    data: {
+      email,
+      displayName: '客户跟进只读验证',
+      initialPassword: password,
+      roleCodes: [roleCode],
+      sendInviteEmail: false,
+    },
+  });
+  expect(userResponse.ok()).toBe(true);
+  const reader = await openAsRole(browser, email, password, 'zh-CN');
+  try {
+    // Reuse the exact runtime URL reached through the author's real preview.
+    await reader.page.goto(listUrl);
+    const readerRow = reader.page.locator('tr').filter({ hasText: customerName });
+    await expect(readerRow).toBeVisible();
+    await expect(reader.page.getByTestId('toolbar-btn-create')).not.toBeVisible();
+    await expect(readerRow.getByTestId('row-action-edit')).not.toBeVisible();
+    const readRecord = await reader.page.request.get(`/api/dynamic/${code}/${recordPid}`);
+    expect(readRecord.ok()).toBe(true);
+    expect((await readRecord.json()).data[amountField]).toBe(68000);
+    const deniedWrite = await reader.page.request.put(`/api/dynamic/${code}/${recordPid}`, {
+      data: { [amountField]: 999999 },
+    });
+    expect(deniedWrite.status()).toBe(403);
+    const unchanged = await page.request.get(`/api/dynamic/${code}/${recordPid}`);
+    expect((await unchanged.json()).data[amountField]).toBe(68000);
+    await screenshot(reader.page, info, 'SC02-reader-cannot-write');
+    await info.attach('SC02-readonly-enforcement', {
+      body: JSON.stringify({
+        roleCode,
+        modelCode: code,
+        recordPid,
+        readStatus: readRecord.status(),
+        deniedWriteStatus: deniedWrite.status(),
+        persistedAmount: 68000,
+      }),
+      contentType: 'application/json',
+    });
+  } finally {
+    await reader.context.close();
+  }
   await info.attach('SC02-model-identity', {
     body: JSON.stringify(
       { modelCode: code, modelPid: pid, fields: metadata.data, generated: generated.data },
