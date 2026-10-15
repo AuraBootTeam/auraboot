@@ -57,6 +57,20 @@ describe('AI draft changes persist through the pure CRUD edit path', () => {
     expect(result.current.payload).toEqual({ contact: '人工核对联系人' });
   });
 
+  it('persists an explicit string clear from the real form setter, leaving required validation to the caller', () => {
+    const { result } = renderHook(() => useEditForm({ name: '华辰制造', contact: '张经理' }));
+    act(() => { result.current.setValues(current => ({ ...current, contact: '' })); });
+    expect(result.current.payload).toEqual({ contact: '' });
+    act(() => { result.current.setValues(current => ({ ...current, name: '' })); });
+    expect(result.current.payload).toEqual({ name: '', contact: '' });
+  });
+
+  it('never submits an undefined field even if the real setter changed a loaded value', () => {
+    const { result } = renderHook(() => useEditForm({ name: '华辰制造', contact: '张经理' }));
+    act(() => { result.current.setValues(current => ({ ...current, contact: undefined })); });
+    expect(result.current.payload).toEqual({});
+  });
+
   it('keeps an explicit null clear and omits normalized unchanged business values', () => {
     const initial = { name: '华辰制造', contact: '张经理', config: '{"enabled":true}' };
     const meta = { ...metadata, config: { dataType: 'json' } };
