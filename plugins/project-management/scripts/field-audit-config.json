@@ -1,0 +1,23 @@
+{
+  "modelCode": "tpm_project",
+  "configs": [
+    {
+      "fieldCode": "tpm_pj_progress",
+      "enabled": true,
+      "requireReason": false,
+      "notifyOnChange": false
+    },
+    {
+      "fieldCode": "tpm_pj_end_date",
+      "enabled": true,
+      "requireReason": false,
+      "notifyOnChange": false
+    },
+    {
+      "fieldCode": "tpm_pj_status",
+      "enabled": true,
+      "requireReason": false,
+      "notifyOnChange": false
+    }
+  ]
+}

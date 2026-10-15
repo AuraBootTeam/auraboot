@@ -100,6 +100,8 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -184,6 +186,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final MetaFieldMapper metaFieldMapper;
     private final ExtensionConverter extensionConverter;
     private final PluginResourceMapper pluginResourceMapper;
+    private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
 
     // Optional dependency - may not be configured in all environments
@@ -335,6 +338,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public PluginResource importModel(ModelDefinitionDTO dto, String pluginPid, String importId,
                                        Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                        Boolean autoPublish) {
+        registerModelCacheRollbackEviction(dto.getCode());
         boolean exists = checkModelExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
@@ -436,6 +440,30 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     created.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),
                     ResourceAction.CREATE, null, extension);
         }
+    }
+
+    /**
+     * The meta definition cache is a read-through Spring cache: an entry loaded
+     * while the import transaction is still open survives that transaction's
+     * rollback, leaving a phantom definition for a model the database no longer
+     * has (misleading retries, and any runtime reader between rollback and the
+     * next eviction). Evict on rollback so the cache converges with the
+     * database; commits keep the entry, which is then accurate.
+     */
+    void registerModelCacheRollbackEviction(String modelCode) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    log.warn("Import rolled back; evicting cached definitions of model {}",
+                            logSafe(modelCode));
+                    metaModelService.clearAllCache();
+                }
+            }
+        });
     }
 
     @Override
@@ -996,6 +1024,20 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         boolean exists = checkCommandExists(tenantId, dto.getCode());
+        if (!exists) {
+            // A previous uninstall leaves the command soft-deleted; the idempotent
+            // insert (ON CONFLICT (tenant_id, code, version) DO NOTHING) would then
+            // silently skip the insert and the auto-publish would fail on the
+            // never-persisted pid. Resurrect the retired row so the update path
+            // refreshes and republishes it in place.
+            String resurrectedPid = resurrectSoftDeleted("ab_command_definition", "code",
+                    dto.getCode(), tenantId, pluginPid, dto.getEffectiveExtension());
+            if (resurrectedPid != null) {
+                log.info("Resurrected soft-deleted command {} as {} for plugin reimport",
+                        logSafe(dto.getCode()), logSafe(resurrectedPid));
+                exists = checkCommandExists(tenantId, dto.getCode());
+            }
+        }
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Command already exists: " + dto.getCode());
@@ -1066,8 +1108,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             com.auraboot.framework.meta.dto.CommandDefinitionDTO created = commandService.create(request);
 
-            // Auto-publish if requested
-            if (Boolean.TRUE.equals(autoPublish)) {
+            // Auto-publish if requested — an adopted (resurrected) row may already be
+            // PUBLISHED; republishing it would trip the DRAFT-only guard.
+            if (Boolean.TRUE.equals(autoPublish)
+                    && !StatusConstants.PUBLISHED.equals(created.getStatus())) {
                 commandService.publish(created.getPid());
             }
 
@@ -2034,6 +2078,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (exists) {
+            // A previous uninstall leaves the dict soft-deleted while
+            // findCurrentByCode (no deleted_flag filter) still reports it as
+            // existing — the update-in-place below would silently refresh a dead
+            // row. Revive it first so the reimport lands on a live dict.
+            int revived = dictMapper.reviveRetiredByCode(dto.getCode());
+            if (revived > 0) {
+                log.info("Revived soft-deleted dict {} for plugin reimport", logSafe(dto.getCode()));
+            }
+
             // Update existing dict
             DictDTO existingDict = dictService.findByCode(dto.getCode());
 
@@ -2580,6 +2633,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         ResourceType type = resource.getResourceTypeEnum();
 
         switch (type) {
+            case PUBLIC_RESOURCE, PUBLIC_QUERY -> publicPublicationLifecycle.restore(resource);
             case MODEL -> {
                 if (resource.getResourcePid() != null) {
                     try {
@@ -2698,6 +2752,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public void restoreResource(PluginResource resource) {
         log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
         ResourceType type = resource.getResourceTypeEnum();
+        if (type.isPublicPublication()) {
+            publicPublicationLifecycle.restore(resource);
+            return;
+        }
         if (type == ResourceType.AGENT_DEFINITION) {
             if (resource.getResourcePid() != null) {
                 jdbcTemplate.update("""

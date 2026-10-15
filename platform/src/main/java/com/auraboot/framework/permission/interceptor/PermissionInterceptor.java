@@ -85,17 +85,21 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
     /**
      * Authorization behavior for handlers that have NEITHER {@link RequirePermission} NOR
-     * {@link AuthenticatedAccess} — the "un-annotated" surface. Staged default-deny migration:
+     * {@link AuthenticatedAccess} — the "un-annotated" surface. Default-deny: every
+     * controller handler carries an explicit decision (authz sweep), so an un-annotated
+     * handler is treated as a mistake, not a feature.
      * <ul>
-     *   <li>{@code allow}  — legacy fail-open: permit silently.</li>
-     *   <li>{@code shadow} — permit, but log each unique reached endpoint once (default). This
-     *       collects the real-traffic coverage needed to flip to {@code deny} safely.</li>
-     *   <li>{@code deny}   — fail-closed / default-deny: reject un-annotated handlers.</li>
+     *   <li>{@code deny}   — fail-closed / default-deny: reject un-annotated handlers (default).</li>
+     *   <li>{@code shadow} — permit, but log each unique reached endpoint once. Migration and
+     *       diagnostics mode; collects the real-traffic coverage before re-enforcing.</li>
+     *   <li>{@code allow}  — legacy fail-open: permit silently. Escape hatch only.</li>
      * </ul>
-     * Configured via {@code aura.security.authz.unannotated-mode} (default {@code shadow}).
+     * Configured via {@code aura.security.authz.unannotated-mode} (default {@code deny};
+     * set {@code AURA_AUTHZ_UNANNOTATED_MODE=shadow} for one upgrade cycle if a downstream
+     * embedder still needs the legacy behavior).
      */
-    @Value("${aura.security.authz.unannotated-mode:shadow}")
-    private String unannotatedMode = "shadow";
+    @Value("${aura.security.authz.unannotated-mode:deny}")
+    private String unannotatedMode = "deny";
 
     /** Bounded dedup for shadow logging — log each (method+uri+userId) once to avoid log spam. */
     private final Set<String> shadowSeen = ConcurrentHashMap.newKeySet();
@@ -119,6 +123,16 @@ public class PermissionInterceptor implements HandlerInterceptor {
                             HttpServletResponse response, 
                             Object handler) throws Exception {
         
+        // The authz contract decides CONTROLLER handlers on normal dispatches only:
+        //  - non-HandlerMethod handlers (resource/static-asset handlers) were never part of
+        //    the fail-open surface and must keep rendering under default-deny;
+        //  - ERROR dispatches render the error response itself — denying them would turn
+        //    every 404 into a 403 (BasicErrorController carries no authz annotations).
+        if (!(handler instanceof HandlerMethod)
+                || request.getDispatcherType() == jakarta.servlet.DispatcherType.ERROR) {
+            return true;
+        }
+
         boolean platformAdminContract = handler instanceof HandlerMethod method
                 && (method.hasMethodAnnotation(RequirePlatformAdmin.class)
                     || method.getBeanType().isAnnotationPresent(RequirePlatformAdmin.class));
@@ -251,7 +265,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
         if (hasAuthenticatedAccess(handler)) {
             return true;
         }
-        String mode = unannotatedMode == null ? "shadow" : unannotatedMode;
+        String mode = unannotatedMode == null ? "deny" : unannotatedMode;
         switch (mode) {
             case "deny":
                 log.warn("[authz-deny] denied un-annotated handler under default-deny: {} {}",

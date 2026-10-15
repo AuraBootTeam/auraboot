@@ -7,6 +7,7 @@ import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +36,7 @@ import java.util.Map;
 @RequestMapping("/api/automations/webhooks")
 @RequiredArgsConstructor
 @Tag(name = "Automation Webhooks", description = "Webhook receiver for automation triggers")
+@AuthenticatedAccess("external webhook endpoint, JWT-exempt by design; HMAC signature or secret token is validated in-controller (fail-closed) before any automation executes")
 public class AutomationWebhookController {
 
     private final AutomationMapper automationMapper;

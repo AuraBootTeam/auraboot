@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.meta.ai.AiFieldLockSupport;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/wd-leave-request")
 @RequiredArgsConstructor
+@AuthenticatedAccess("P1 demo vertical slice for the leave-request AI flow; every endpoint resolves the caller's tenant via MetaContext and returns 401 without one")
 public class WdLeaveAiController {
 
     private static final String TARGET_MODEL_CODE = "wd_leave_request";

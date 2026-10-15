@@ -23,6 +23,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,14 +53,11 @@ class ModelControllerCreateVirtualModelIntegrationTest extends BaseIntegrationTe
 
     @BeforeEach
     void setupMvc() {
+        grantCommittedPermissionToTestRole("meta.model.update", "meta", "model", "update", "Manage model metadata");
+        grantCommittedPermissionToTestRole("meta.model.read", "meta", "model", "read", "Read model metadata");
         Filter contextFilter = (request, response, chain) -> {
             try {
-                MetaContext.setContext(
-                        getTestTenant().getId(),
-                        getTestUser().getId(),
-                        getTestUser().getPid(),
-                        getTestUser().getUserName()
-                );
+                applyTestMetaContext();
                 CustomUserDetails userDetails = new CustomUserDetails(
                         getTestUser().getUserName(),
                         "test-password",
@@ -117,22 +115,17 @@ class ModelControllerCreateVirtualModelIntegrationTest extends BaseIntegrationTe
                 "extension", Map.of("endpointAdapter", "rest")
         );
 
-        mockMvc.perform(post("/api/meta/models")
+        var created = mockMvc.perform(post("/api/meta/models")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.code").value(code))
-                .andExpect(jsonPath("$.data.pid").isNotEmpty());
+                .andExpect(jsonPath("$.data.pid").isNotEmpty()).andReturn();
 
         // Reload via service to assert the definition actually carries virtual-model data.
         // The MockMvc filter scope ends after perform(); re-install MetaContext here.
-        MetaContext.setContext(
-                getTestTenant().getId(),
-                getTestUser().getId(),
-                getTestUser().getPid(),
-                getTestUser().getUserName()
-        );
+        applyTestMetaContext();
         ModelDefinition def;
         try {
             def = metaModelService.getDefinitionByCode(code);
@@ -161,6 +154,25 @@ class ModelControllerCreateVirtualModelIntegrationTest extends BaseIntegrationTe
         assertThat(def.getExtension())
                 .as("caller-supplied extension keys survive the create path")
                 .containsEntry("endpointAdapter", "rest");
+        String pid = objectMapper.readTree(created.getResponse().getContentAsString()).path("data").path("pid").asText();
+        mockMvc.perform(put("/api/meta/models/" + pid).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("displayName", "Renamed virtual model"))))
+                .andExpect(result -> assertThat(result.getResponse().getStatus())
+                        .as("Model metadata update: %s; exception=%s; trace=%s",
+                                objectMapper.readTree(result.getResponse().getContentAsString()).path("message").asText(),
+                                result.getResolvedException(), result.getResolvedException() == null ? List.of()
+                                        : java.util.Arrays.stream(result.getResolvedException().getStackTrace()).limit(5).toList())
+                        .isEqualTo(200)).andExpect(jsonPath("$.code").value("0"));
+        applyTestMetaContext();
+        try {
+            var renamed = metaModelService.getDefinitionByCode(code);
+            assertThat(renamed.getSourceType()).isEqualTo(def.getSourceType());
+            assertThat(renamed.getSourceRef()).isEqualTo(def.getSourceRef());
+            assertThat(renamed.getPrimaryKey()).isEqualTo(def.getPrimaryKey());
+            assertThat(renamed.getCapabilities()).isEqualTo(def.getCapabilities());
+            assertThat(renamed.getFields()).isEqualTo(def.getFields());
+            assertThat(renamed.getExtension()).containsEntry("endpointAdapter", "rest");
+        } finally { MetaContext.clear(); }
     }
 
     @Test

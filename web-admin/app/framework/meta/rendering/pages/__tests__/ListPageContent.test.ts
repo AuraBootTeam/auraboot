@@ -763,6 +763,9 @@ describe('viewFilterToQueryCondition', () => {
 });
 
 describe('tabFilterToQueryCondition', () => {
+  it('resolves the current user token to the actual public user identity', () => {
+    expect(tabFilterToQueryCondition({ field: 'owner', operator: 'EQ', value: '$currentUser' }, 'member-1')).toEqual({ fieldName: 'owner', operator: 'EQ', value: 'member-1' });
+  });
   it('preserves DSL IN arrays in the dynamic-query values property', () => {
     expect(
       tabFilterToQueryCondition({

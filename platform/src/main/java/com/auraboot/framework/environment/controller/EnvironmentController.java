@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.environment.dto.*;
 import com.auraboot.framework.environment.service.EnvironmentService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/environments")
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; CRUD, import/export, diff, and lock/unlock of tenant environments")
 public class EnvironmentController {
 
     @Autowired

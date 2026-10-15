@@ -14,6 +14,7 @@ import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,8 +60,18 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     @Autowired private UserPermissionService userPermissionService;
     @Autowired private ReportStorageService reportStorageService;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private MockMvc mockMvc;
+
+    @AfterEach
+    void cleanupCommittedAuditRows() {
+        // Report writes commit audit rows in a REQUIRES_NEW transaction, so they survive the
+        // test's rollback and would poison the next reseed of the same tenant's audit chain
+        // (uq_audit_trail_tenant_seq). Same hygiene as ReportStorageServiceIT.
+        jdbc.update("DELETE FROM ab_audit_trail WHERE tenant_id IN (?, ?)",
+                getTestTenant().getId(), getTestTenant().getId() + 999_999L);
+    }
 
     @BeforeEach
     void setupMockMvc() {

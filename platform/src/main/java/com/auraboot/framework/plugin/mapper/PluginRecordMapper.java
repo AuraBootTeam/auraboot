@@ -1,9 +1,11 @@
 package com.auraboot.framework.plugin.mapper;
 
 import com.auraboot.framework.plugin.entity.PluginRecord;
+import com.auraboot.framework.plugin.dto.imports.PluginMetadataRollbackSnapshot;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -24,6 +26,26 @@ public interface PluginRecordMapper extends BaseMapper<PluginRecord> {
      */
     @Select("SELECT * FROM ab_plugin WHERE pid = #{pid} AND deleted_flag = false")
     PluginRecord findByPid(@Param("pid") String pid);
+
+    /** Retired plugin identity remains available for publication ownership verification. */
+    @Select("SELECT * FROM ab_plugin WHERE tenant_id = #{tenantId} AND pid = #{pid}")
+    PluginRecord findIdentityIncludingDeleted(@Param("tenantId") Long tenantId, @Param("pid") String pid);
+
+    @Select("SELECT * FROM ab_plugin WHERE tenant_id = #{tenantId} AND pid = #{pid} FOR UPDATE")
+    @ResultMap("mybatis-plus_PluginRecord")
+    PluginRecord lockIdentityIncludingDeleted(@Param("tenantId") Long tenantId, @Param("pid") String pid);
+
+    /** Restore only import-owned metadata; preserve runtime settings and owner edits elsewhere. */
+    @Update("UPDATE ab_plugin SET namespace = #{metadata.namespace}, version = #{metadata.version}, "
+            + "display_name = #{metadata.displayName}, description = #{metadata.description}, "
+            + "manifest = #{metadata.manifest,jdbcType=OTHER,typeHandler=com.auraboot.framework.plugin.typehandler.PluginManifestTypeHandler}, "
+            + "updated_at = NOW() WHERE tenant_id = #{tenantId} AND pid = #{pid} "
+            + "AND plugin_id = #{metadata.pluginId} AND deleted_flag = false")
+    int restoreImportedMetadata(@Param("tenantId") Long tenantId, @Param("pid") String pid,
+                                @Param("metadata") PluginMetadataRollbackSnapshot.Metadata metadata);
+
+
+
 
     /**
      * Find plugin by namespace within a tenant.

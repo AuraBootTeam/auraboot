@@ -3,6 +3,7 @@ package com.auraboot.framework.auth.controller;
 import com.auraboot.framework.auth.entity.VerificationCode;
 import com.auraboot.framework.auth.mapper.VerificationCodeMapper;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -25,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth/verify-code/dev")
 @Profile({"dev", "local", "test"})
+@AuthenticatedAccess("dev/test-only verification-code lookup for automated tests; guarded by @Profile({dev, local, test}) so the bean is never loaded in production")
 public class DevVerifyCodeController {
 
     private static final Logger log = LoggerFactory.getLogger(DevVerifyCodeController.class);

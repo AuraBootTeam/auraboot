@@ -5,6 +5,7 @@ import com.auraboot.framework.dsl.dto.DslIntrospectionResponse;
 import com.auraboot.framework.dsl.dto.DslIntrospectionResponse.CapabilityCatalog;
 import com.auraboot.framework.dsl.dto.DslIntrospectionResponse.ModelIntrospection;
 import com.auraboot.framework.dsl.service.DslIntrospectionService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,7 @@ import java.util.Set;
 @RequestMapping("/api/dsl/introspect")
 @RequiredArgsConstructor
 @Tag(name = "DSL Introspection", description = "Schema Introspection Protocol for DSL auto-discovery")
+@AuthenticatedAccess("read-only DSL schema introspection metadata for designer and tooling auto-discovery")
 public class DslIntrospectionController {
 
     private final DslIntrospectionService introspectionService;

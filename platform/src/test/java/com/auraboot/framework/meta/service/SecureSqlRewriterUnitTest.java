@@ -96,11 +96,24 @@ class SecureSqlRewriterUnitTest {
 
     @Test
     void rewriteForCount_wraps_union_query_as_subquery() {
-        String unionSql = "SELECT id FROM a UNION SELECT id FROM b";
-        String result = rewriter.rewriteForCount(unionSql);
-        // For UNION the rewriter keeps wrap form OR rebuilds; either way COUNT must appear
-        // and the original semantics must be preserved. Accept either wrapping or pure rewrite.
-        assertThat(result.toUpperCase()).contains("COUNT");
+        var previous = (com.baomidou.mybatisplus.extension.parser.cache.JsqlParseCache)
+                org.springframework.test.util.ReflectionTestUtils.getField(
+                        com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.class, "jsqlParseCache");
+        var cache = new com.baomidou.mybatisplus.extension.parser.cache.JdkSerialCaffeineJsqlParseCache(
+                builder -> builder.maximumSize(32));
+        com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.setJsqlParseCache(cache);
+        try {
+            String unionSql = "SELECT id FROM a UNION SELECT id FROM b";
+            String result = rewriter.rewriteForCount(unionSql);
+            // For UNION the rewriter keeps wrap form OR rebuilds; either way COUNT must appear
+            // and the original semantics must be preserved. Accept either wrapping or pure rewrite.
+            assertThat(result.toUpperCase()).contains("COUNT");
+            assertThat(cache.getStatement(unionSql)).as("COUNT rewriting must reuse the shared syntax cache").isNotNull();
+            String simple = "SELECT id FROM a WHERE id > 10 ORDER BY id";
+            assertThat(rewriter.rewriteForCount(simple).toUpperCase(java.util.Locale.ROOT)).contains("COUNT");
+            assertThat(rewriter.referencedTables(simple)).containsExactly("a");
+            assertThat(cache.getStatement(simple).toString()).contains("SELECT id", "ORDER BY id");
+        } finally { com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal.setJsqlParseCache(previous); }
     }
 
     @Test

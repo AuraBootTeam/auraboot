@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import fnmatch
 import json
+import re
 from pathlib import Path
 import subprocess
 import tarfile
@@ -64,6 +65,32 @@ def validate_archive(path, canonical, expected):
                 "license": metadata["license"], "private": metadata.get("private", False),
                 "files": sorted(files), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
+
+
+def consumer_case_names():
+    fixture = Path(__file__).with_name("fixtures") / "open-platform-consumer/consumer.test.mjs"
+    declarations = re.findall(r'^check\(("(?:[^"\\]|\\.)*"), async \(\) => \{$', fixture.read_text(), re.MULTILINE)
+    names = [json.loads(name) for name in declarations]
+    if len(names) != 14 or len(set(names)) != 14:
+        raise ValueError("fixed consumer fixture must declare fourteen distinct cases")
+    return names
+
+
+def validate_consumer_output(output):
+    lines = [line.removeprefix("CONSUMER_RESULTS ") for line in output.splitlines() if line.startswith("CONSUMER_RESULTS ")]
+    if len(lines) != 1:
+        raise ValueError("consumer must emit exactly one execution ledger")
+    rows = json.loads(lines[0])
+    if (not isinstance(rows, list) or len(rows) != 14
+            or any(not isinstance(row, dict) or set(row) != {"name", "status"}
+                   or not isinstance(row["name"], str) for row in rows)
+            or len({row["name"] for row in rows}) != 14):
+        raise ValueError("consumer execution ledger must contain fourteen distinct cases")
+    if {row["name"] for row in rows} != set(consumer_case_names()):
+        raise ValueError("consumer execution ledger differs from the fixed consumer fixture")
+    if any(row.get("status") != "passed" for row in rows):
+        raise ValueError("consumer execution ledger contains an incomplete or failed case")
+    return rows
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -133,15 +160,15 @@ def main():
         (consumer / f"{name}.exit").write_text(str(ran.returncode) + "\n")
         if ran.returncode:
             raise RuntimeError(f"clean consumer {name} failed; see {consumer / (name + '.log')}")
-        if name == "runtime" and "SUMMARY pass=9 fail=0" not in ran.stdout:
-            raise ValueError("consumer fixture did not execute the full nine-case contract")
+        if name == "runtime":
+            consumer_cases = validate_consumer_output(ran.stdout)
     # Create only after every package and consumer has passed. No stale success receipt is reused.
     (args.out / "receipt.json").write_text(json.dumps({"publish": "not_executed",
         "source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=core, text=True).strip(),
         "dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=core)),
         "enterpriseSource": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=args.enterprise_root, text=True).strip(),
         "enterpriseDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=args.enterprise_root)),
-        "packages": results, "consumer": {"cases": 9, "provider": "loopback-fixture",
+        "packages": results, "consumer": {"cases": len(consumer_cases), "results": consumer_cases, "provider": "loopback-fixture",
         "types": "pass", "qrImport": "pass"}}, indent=2) + "\n")
     print(f"Validated {len(results)} real tarballs; publication not executed.")
 

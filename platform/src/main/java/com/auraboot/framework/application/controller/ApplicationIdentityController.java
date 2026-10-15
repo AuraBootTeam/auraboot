@@ -1,5 +1,6 @@
 package com.auraboot.framework.application.controller;
 
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** Exposes the immutable application release identity supplied by the deployer. */
 @RestController
 @RequestMapping("/api/application")
+@AuthenticatedAccess("read-only application release identity (immutable deployer-supplied values)")
 public class ApplicationIdentityController {
 
     private final ApplicationIdentity identity;

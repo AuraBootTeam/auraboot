@@ -42,13 +42,18 @@ test.describe('Page Designer form-buttons refresh runtime', () => {
     // dynamic model route; accept both shapes in case the binding changes.
     const reloadResponse = page.waitForResponse(
       (response) =>
-        (response.url().includes(`/api/pages/${targetPid}`) ||
-          response.url().includes(`/api/dynamic/page_schema/${targetPid}`)) &&
+        [`/api/pages/${targetPid}`, `/api/dynamic/page_schema/${targetPid}`].includes(
+          new URL(response.url()).pathname,
+        ) &&
         response.request().method() === 'GET',
       { timeout: 10_000 },
     );
     await page.getByTestId('form-btn-refresh').click();
-    expect((await reloadResponse).ok(), 'form refresh record reload response').toBeTruthy();
+    const response = await reloadResponse;
+    expect(response.ok(), 'form refresh record reload response').toBeTruthy();
+    const reloaded = await response.json();
+    expect(reloaded.code, 'form refresh response API code').toBe('0');
+    expect(reloaded.data?.name, 'form refresh response persisted name').toBe(refreshedName);
     await expect(nameInput).toHaveValue(refreshedName);
     await expect(page.getByTestId('field-name')).not.toContainText(
       /required|必填|不能为空|请填写/i,

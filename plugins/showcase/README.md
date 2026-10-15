@@ -47,3 +47,19 @@ draft → active → review → archived
 ```bash
 aura plugin publish plugins/showcase --yes
 ```
+
+## Shared DSL page presentation
+
+The showcase remains a config-only plugin. Its form uses four business sections; optional
+sections opt into `extension.collapsible: true` and `extension.defaultCollapsed: true`.
+Collapsing keeps controls mounted, so unsaved values are retained. Validation errors expand
+the affected section. Other forms remain expanded unless they explicitly opt in.
+
+The shared form renderer provides the section cards and a sticky action bar. AI filling is
+not inserted automatically. A form that needs the feature must declare an `ai-fill-banner`
+block explicitly; existing command, permission and field-lock contracts still apply.
+
+The list defaults to seven business columns plus actions. Additional columns can be selected
+through the existing field/view tools. Search and empty-state guidance come from the table DSL.
+The detail header explicitly uses `extension.headerTitleField: "sc_name"` and
+`extension.headerSubtitleFields: ["sc_code"]`; generic pages do not assume business field names.

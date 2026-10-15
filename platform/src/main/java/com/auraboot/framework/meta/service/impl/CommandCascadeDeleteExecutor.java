@@ -3,14 +3,18 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.auraboot.framework.meta.service.MetaModelService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.util.HashMap;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.application.tenant.MetaContext;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
+import com.auraboot.framework.exception.ConflictException;
 import java.util.List;
 import java.util.Map;
 
@@ -26,8 +30,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CommandCascadeDeleteExecutor {
 
-    private final DynamicDataMapper dynamicDataMapper;
+    private final JdbcTemplate jdbc;
     private final MetaModelService metaModelService;
+    private final ObjectProvider<DynamicDataService> dataService;
 
     /**
      * Execute cascade delete phase based on executionConfig.cascadeDelete configuration.
@@ -48,6 +53,9 @@ public class CommandCascadeDeleteExecutor {
             return;
         }
 
+        if (tenantId == null || !tenantId.equals(MetaContext.getCurrentTenantId())) {
+            throw new AccessDeniedException("Cascade delete requires the bound tenant");
+        }
         executeCascadeDeleteRecursive(cascadeConfigs, List.of(request.getTargetRecordId()), tenantId);
     }
 
@@ -69,51 +77,44 @@ public class CommandCascadeDeleteExecutor {
             CommandExecutorUtils.validateSqlIdentifier(parentField, "CASCADE_DELETE parentField");
 
             try {
-                ModelMutationGuard.assertDeleteAllowed(
-                        metaModelService.getModelDefinition(childModel).orElse(null));
+                var model = metaModelService.getModelDefinition(childModel)
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown cascade model"));
+                ModelMutationGuard.assertDeleteAllowed(model);
                 String childTable = metaModelService.getTableName(childModel);
-
-                // Collect child PIDs before deleting (needed for nested cascades)
+                CommandExecutorUtils.validateSqlIdentifier(childTable, "CASCADE_DELETE table");
                 List<Map<String, Object>> subCascades = (List<Map<String, Object>>) config.get("cascadeDelete");
-                if (subCascades != null && !subCascades.isEmpty()) {
-                    for (String parentId : parentRecordIds) {
-                        String selectSql = "SELECT pid FROM " + childTable
-                                + " WHERE " + parentField + " = #{params.parentId}";
-                        // Convert parentId to Long for integer column compatibility
-                        Object typedParentId;
-                        try {
-                            typedParentId = Long.parseLong(parentId);
-                        } catch (NumberFormatException e) {
-                            typedParentId = parentId;
-                        }
-                        List<Map<String, Object>> childRows = dynamicDataMapper.selectByQuery(
-                                selectSql, Map.of("parentId", typedParentId));
-                        if (childRows != null && !childRows.isEmpty()) {
-                            List<String> childPids = childRows.stream()
-                                    .map(r -> String.valueOf(r.get("pid")))
-                                    .toList();
-                            executeCascadeDeleteRecursive(subCascades, childPids, tenantId);
-                        }
-                    }
-                }
-
-                // Delete children for all parent IDs
-                int totalDeleted = 0;
+                var childPids = new java.util.LinkedHashSet<String>();
                 for (String parentId : parentRecordIds) {
-                    Map<String, Object> conditions = new HashMap<>();
-                    conditions.put("tenant_id", tenantId);
-                    // Convert parentId to Long for integer column compatibility in PostgreSQL
-                    // (prevents "operator does not exist: integer = character varying")
+                    Object typedParentId;
                     try {
-                        conditions.put(parentField, Long.parseLong(parentId));
+                        typedParentId = Long.parseLong(parentId);
                     } catch (NumberFormatException e) {
-                        conditions.put(parentField, parentId);
+                        typedParentId = parentId;
                     }
-                    totalDeleted += dynamicDataMapper.delete(childTable, conditions);
+                    String selectSql = "SELECT pid FROM " + childTable
+                            + " WHERE tenant_id = ? AND " + parentField + " = ?"
+                            + (model.isSoftDelete() ? " AND deleted_flag = false" : "")
+                            + " ORDER BY pid FOR UPDATE";
+                    var childRows = jdbc.queryForList(selectSql, tenantId, typedParentId);
+                    if (childRows != null) {
+                        for (var row : childRows) {
+                            if (row.get("pid") == null) throw new IllegalStateException("Cascade row has no PID");
+                            childPids.add(row.get("pid").toString());
+                        }
+                    }
                 }
+                if (subCascades != null && !subCascades.isEmpty() && !childPids.isEmpty()) {
+                    executeCascadeDeleteRecursive(subCascades, List.copyOf(childPids), tenantId);
+                }
+                // Use the production model writer: permissions, soft-delete, optimistic
+                // guards and source events all participate in the command owner transaction.
+                for (String childPid : childPids) dataService.getObject().delete(childModel, childPid);
+                int totalDeleted = childPids.size();
                 log.info("CASCADE_DELETE: deleted {} records from {} where {} IN [{}]",
                         totalDeleted, childModel, parentField,
                         parentRecordIds.size() <= 3 ? String.join(",", parentRecordIds) : parentRecordIds.size() + " ids");
+            } catch (AccessDeniedException | ConflictException e) {
+                throw e;
             } catch (Exception e) {
                 log.error("CASCADE_DELETE failed for {}.{}={}: {}",
                         childModel, parentField, parentRecordIds, e.getMessage());

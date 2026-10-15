@@ -8,6 +8,7 @@ import com.auraboot.framework.email.model.EmailAccountMember;
 import com.auraboot.framework.email.model.EmailConstants;
 import com.auraboot.framework.email.service.EmailAccountService;
 import com.auraboot.framework.email.service.GmailApiClient;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,6 +36,7 @@ import java.util.UUID;
 @RequestMapping("/api/email")
 @RequiredArgsConstructor
 @Tag(name = "Email Accounts", description = "Gmail OAuth2 account binding and shared mailbox management")
+@AuthenticatedAccess("Gmail OAuth2 callback is whitelisted and identity is recovered in-controller from an encrypted state parameter; remaining endpoints operate on the authenticated caller's own accounts (MetaContext tenant/user)")
 public class EmailAccountController {
 
     private static final String STATE_SEPARATOR = ":";

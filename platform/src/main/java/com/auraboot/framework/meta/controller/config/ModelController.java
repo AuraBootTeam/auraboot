@@ -13,6 +13,9 @@ import com.auraboot.framework.meta.dto.MetaModelPublishRequest;
 import com.auraboot.framework.meta.dto.MetaModelPublishReplayRequest;
 import com.auraboot.framework.meta.dto.MetaModelUpdateRequest;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.meta.dto.ModelPublishReplayReportDTO;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
@@ -61,6 +64,7 @@ public class ModelController {
     private final PluginResourceTracker pluginResourceTracker;
     private final ModelExportService modelExportService;
     private final SchemaManagementService schemaManagementService;
+    private final ObjectMapper objectMapper;
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -159,9 +163,24 @@ public class ModelController {
         // "Model code already exists" because the model row is already there.
         // saveDefinition() looks up by code and routes to UPDATE for existing rows,
         // preserving sourceType/sourceRef/capabilities/primaryKey.
+        ModelDefinition existingDefinition = metaModelService.getDefinitionByCode(existingModel.getCode());
+        if (existingDefinition == null) {
+            throw new IllegalStateException("Existing model definition is unavailable");
+        }
         Map<String, Object> mergedExtension = new java.util.LinkedHashMap<>();
+        if (existingDefinition.getExtension() != null) {
+            mergedExtension.putAll(existingDefinition.getExtension());
+        }
         if (request.getExtension() != null) {
             mergedExtension.putAll(request.getExtension());
+        }
+        List<FieldDefinition> fields = existingDefinition.getFields();
+        if (request.getExtension() != null && request.getExtension().containsKey("fields")) {
+            Object requestedFields = request.getExtension().get("fields");
+            if (!(requestedFields instanceof List<?>)) {
+                throw new IllegalArgumentException("Model extension fields must be an array");
+            }
+            fields = objectMapper.convertValue(requestedFields, new TypeReference<List<FieldDefinition>>() { });
         }
         // displayName / description / modelType are stored as extension keys (Model entity getters read from extension)
         if (request.getDisplayName() != null) {
@@ -180,6 +199,15 @@ public class ModelController {
                 .displayName(request.getDisplayName())
                 .description(request.getDescription())
                 .modelType(effectiveModelType)
+                .sourceType(existingDefinition.getSourceType())
+                .sourceRef(existingDefinition.getSourceRef())
+                .tableName(existingDefinition.getTableName())
+                .primaryKey(existingDefinition.getPrimaryKey())
+                .capabilities(existingDefinition.getCapabilities())
+                .fields(fields)
+                .softDelete(existingDefinition.isSoftDelete())
+                .immutable(existingDefinition.isImmutable())
+                .commandOnlyCreate(existingDefinition.isCommandOnlyCreate())
                 .extension(mergedExtension)
                 .build();
         metaModelService.saveDefinition(updateDef);

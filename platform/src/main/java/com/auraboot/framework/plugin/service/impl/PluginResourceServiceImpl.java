@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
+import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.plugin.dto.PluginResourceOwner;
 import com.auraboot.framework.plugin.dto.imports.OwnershipType;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
@@ -47,7 +48,9 @@ public class PluginResourceServiceImpl implements PluginResourceService {
 
     private final PluginResourceMapper resourceMapper;
     private final PluginRecordMapper pluginRecordMapper;
+    private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final MetaModelFieldBindingMapper bindingMapper;
+    private final NamedQueryMapper namedQueryMapper;
     private final ObjectMapper objectMapper;
     // JdbcTemplate retained only for getCurrentDatabaseState() which requires dynamic table/column queries
     private final JdbcTemplate jdbcTemplate;
@@ -112,8 +115,15 @@ public class PluginResourceServiceImpl implements PluginResourceService {
             if (snapshot == null || snapshot.isEmpty()) {
                 continue;
             }
-            byType.computeIfAbsent(resource.getResourceType(), ignored -> new ArrayList<>())
-                    .add(snapshot);
+            var type = resource.getResourceTypeEnum();
+            if (type.isPublicPublication()) {
+                Map<String, Object> declaration = objectMapper.convertValue(snapshot.get("draft"),
+                        new TypeReference<Map<String, Object>>() { });
+                byType.computeIfAbsent(type == ResourceType.PUBLIC_RESOURCE ? "publicResources" : "publicQueries",
+                        ignored -> new ArrayList<>()).add(declaration);
+            } else {
+                byType.computeIfAbsent(resource.getResourceType(), ignored -> new ArrayList<>()).add(snapshot);
+            }
         }
         return byType;
     }
@@ -197,6 +207,9 @@ public class PluginResourceServiceImpl implements PluginResourceService {
 
     @Override
     public Map<String, Object> getCurrentDatabaseState(Long tenantId, ResourceType type, String code) {
+        if (type.isPublicPublication()) {
+            return publicPublicationLifecycle.currentState(tenantId, type, code);
+        }
         // NOTE: JdbcTemplate is used here because this method queries arbitrary tables
         // with dynamic table/column names. This cannot be expressed as a single Mapper method.
         String tableName = type.getTableName();
@@ -288,6 +301,10 @@ public class PluginResourceServiceImpl implements PluginResourceService {
 
             OwnershipType ownership = resource.getOwnershipTypeEnum();
             boolean modified = Boolean.TRUE.equals(resource.getUserModified());
+            if (resource.getResourceTypeEnum().isPublicPublication()) {
+                modified = modified || !detectModifications(tenantId, resource.getResourceTypeEnum(),
+                        resource.getResourceCode()).isEmpty();
+            }
 
             if (ownership == OwnershipType.USER_CLAIMED) {
                 info.setSuggestedDecision(null);
@@ -315,7 +332,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         }
 
         Comparator<ResourceUninstallInfo> byType = Comparator.comparingInt(
-                info -> info.getType().getImportOrder());
+                info -> info.getType().isPublicPublication() ? -info.getType().getImportOrder() : info.getType().getImportOrder());
         willDelete.sort(byType);
         needsDecision.sort(byType);
         willKeep.sort(byType);
@@ -356,6 +373,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         }
 
         List<String> deletedResources = new ArrayList<>();
+        List<PluginResource> deletedTrackingRecords = new ArrayList<>();
         List<String> detachedResources = new ArrayList<>();
         int keptCount = preview.getWillKeep().size();
 
@@ -365,6 +383,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
                 if (resource != null) {
                     deleteResource(resource);
                     deletedResources.add(info.getCode());
+                    deletedTrackingRecords.add(resource);
                 }
             }
 
@@ -382,6 +401,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
                     case DELETE -> {
                         deleteResource(resource);
                         deletedResources.add(info.getCode());
+                    deletedTrackingRecords.add(resource);
                     }
                     case KEEP_AND_DETACH -> {
                         detachResource(resource);
@@ -394,8 +414,10 @@ public class PluginResourceServiceImpl implements PluginResourceService {
             }
 
             // Clean up plugin resource tracking records
-            for (String code : deletedResources) {
-                resourceMapper.deleteByPluginPidAndCode(pluginPid, code);
+            for (PluginResource resource : deletedTrackingRecords) {
+                if (!resource.getResourceTypeEnum().isPublicPublication()) {
+                    resourceMapper.deleteById(resource.getId());
+                }
             }
 
             return UninstallResult.builder()
@@ -412,12 +434,8 @@ public class PluginResourceServiceImpl implements PluginResourceService {
 
         } catch (Exception e) {
             log.error("Failed to uninstall plugin {}: {}", pluginPid, e.getMessage(), e);
-            return UninstallResult.builder()
-                    .success(false)
-                    .pluginPid(pluginPid)
-                    .pluginId(preview.getPluginId())
-                    .errorMessage(e.getMessage())
-                    .build();
+            // CATCH: preserve the transaction rollback signal after any earlier resource mutations.
+            throw new com.auraboot.framework.meta.exception.MetaServiceException("Plugin resource uninstall failed", e);
         }
     }
 
@@ -426,6 +444,10 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     public void deleteResource(PluginResource resource) {
         ResourceType type = resource.getResourceTypeEnum();
         String resourcePid = resource.getResourcePid();
+        if (type.isPublicPublication()) {
+            publicPublicationLifecycle.withdraw(resource);
+            return;
+        }
 
         if (type == ResourceType.MODEL_FIELD_BINDING) {
             // Binding table now has pid column — use it for soft-delete
@@ -433,6 +455,15 @@ public class PluginResourceServiceImpl implements PluginResourceService {
                 bindingMapper.softDeleteByPid(resourcePid);
             } else {
                 log.warn("Cannot delete binding: no resourcePid for resource code {}", resource.getResourceCode());
+            }
+        } else if (type == ResourceType.NAMED_QUERY) {
+            // ab_named_query has no deleted_flag column: named queries retire by
+            // status (the same contract rollbackResource applies), not soft-delete.
+            if (resourcePid != null) {
+                namedQueryMapper.updateStatusByPid(resourcePid, "archived");
+            } else {
+                log.warn("Cannot delete named query: no resourcePid for resource code {}",
+                        resource.getResourceCode());
             }
         } else {
             // All other resource tables support pid-based soft-delete
@@ -456,13 +487,13 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     @Transactional
     public void detachResource(PluginResource resource) {
         // Update ownership to USER_CLAIMED via mapper
-        resource.setOwnershipType(OwnershipType.USER_CLAIMED.name());
+        resource.setOwnershipTypeEnum(OwnershipType.USER_CLAIMED);
         resource.setUpdatedAt(Instant.now());
         resourceMapper.updateById(resource);
 
         // Remove plugin_pid from the actual resource table
         ResourceType type = resource.getResourceTypeEnum();
-        if (type != ResourceType.MODEL_FIELD_BINDING) {
+        if (type != ResourceType.MODEL_FIELD_BINDING && !type.isPublicPublication()) {
             String tableName = type.getTableName();
             // SECURITY_BOUNDARY: same as deleteResource above. (BE-4 P2 fix 2026-04-30)
             if (!ResourceType.isKnownTable(tableName)) {

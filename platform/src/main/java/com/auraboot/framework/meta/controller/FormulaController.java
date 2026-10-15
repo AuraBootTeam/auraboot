@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.controller;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.formula.FormulaFunctionRegistry;
 import com.auraboot.framework.meta.service.VirtualFieldEngine;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/meta/formula")
 @RequiredArgsConstructor
+@AuthenticatedAccess("design-time formula tooling for the metadata studio: function catalog plus preview/validation/cross-table lookup of caller-supplied expressions")
 public class FormulaController {
 
     private final FormulaFunctionRegistry functionRegistry;

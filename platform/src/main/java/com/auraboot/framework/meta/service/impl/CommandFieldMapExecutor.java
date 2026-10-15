@@ -47,6 +47,7 @@ public class CommandFieldMapExecutor {
     private final FieldPermissionService fieldPermissionService;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
+    private final CommandModelMutationSupport modelMutations;
 
     public Map<String, Object> executeFieldMapPhase(List<BindingRule> fieldMapRules,
                                               Map<String, Object> payload,
@@ -175,6 +176,9 @@ public class CommandFieldMapExecutor {
                 int inserted = jsonbCols.isEmpty()
                         ? dynamicDataMapper.insert(tableName, columnData)
                         : dynamicDataMapper.insertWithJsonb(tableName, columnData, jsonbCols);
+                if (inserted != 1) throw new BusinessException(ResponseCode.BadParam, "Command create affected an unexpected row count");
+                modelMutations.observe(targetModel, Map.entry("pid", newPid), tenantId,
+                        com.auraboot.framework.meta.service.ModelMutationObserver.Operation.CREATED);
                 results.put(targetModel + "_inserted", inserted);
                 results.put("recordPid", newPid);
             }
@@ -358,6 +362,9 @@ public class CommandFieldMapExecutor {
                 // Preserve rollback and server diagnostics without exposing constraint or SQL text.
                 throw new BusinessException(ResponseCode.BadParam, "$i18n:meta_record.duplicate", duplicate);
             }
+            if (inserted != 1) throw new BusinessException(ResponseCode.BadParam, "Command create affected an unexpected row count");
+            modelMutations.observe(modelCode, Map.entry("pid", newPid), tenantId,
+                    com.auraboot.framework.meta.service.ModelMutationObserver.Operation.CREATED);
             results.put(modelCode + "_inserted", inserted);
             results.put("recordPid", newPid);
             log.info("Implicit FIELD_MAP INSERT: {} rows in {} (pid={}, command={})", inserted, modelCode, newPid, command.getCode());
@@ -424,11 +431,19 @@ public class CommandFieldMapExecutor {
         }
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
+        boolean deleting = Boolean.TRUE.equals(updateData.get("deleted_flag"));
+        if (deleting) modelMutations.observe(modelCode, idEntry, tenantId,
+                com.auraboot.framework.meta.service.ModelMutationObserver.Operation.DELETED);
         int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
         if (updated == 0 && expectedVersion != null) {
             throw new com.auraboot.framework.exception.ConflictException(
                     "FIELD_MAP update refused: target changed after command authorization");
         }
+        if (updated == 0 && deleting) {
+            throw new BusinessException(ResponseCode.BadParam, "Command delete affected no authorized row");
+        }
+        if (updated > 0 && !deleting) modelMutations.observe(modelCode, idEntry, tenantId,
+                com.auraboot.framework.meta.service.ModelMutationObserver.Operation.UPDATED);
         if (updated > 0 && expectedVersion != null) {
             MetaContext.advanceCommandExpectedVersion(modelCode, String.valueOf(idEntry.getValue()));
         }
@@ -460,11 +475,14 @@ public class CommandFieldMapExecutor {
         }
         appendScopedWriteGuards(sql, tenantId, modelCode, "delete");
 
+        modelMutations.observe(modelCode, idEntry, tenantId,
+                com.auraboot.framework.meta.service.ModelMutationObserver.Operation.DELETED);
         int deleted = dynamicDataMapper.deleteByQuery(sql.toString(), params);
         if (deleted == 0 && expectedVersion != null) {
             throw new com.auraboot.framework.exception.ConflictException(
                     "FIELD_MAP delete refused: target changed after command authorization");
         }
+        if (deleted == 0) throw new BusinessException(ResponseCode.BadParam, "Command delete affected no authorized row");
         return deleted;
     }
 

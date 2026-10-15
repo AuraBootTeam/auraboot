@@ -1,0 +1,6 @@
+{
+  "name": "open-platform-release-sdk-toolchain",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": { "typescript": "5.9.3" }
+}

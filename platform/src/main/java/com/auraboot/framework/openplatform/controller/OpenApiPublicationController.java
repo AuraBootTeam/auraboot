@@ -1,0 +1,82 @@
+package com.auraboot.framework.openplatform.controller;
+
+import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.openplatform.service.OpenApiInstallationPolicy;
+import com.auraboot.framework.openplatform.service.OpenApiPublicationService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/open-platform")
+@AuthenticatedAccess("Publication administration is checked by the service for the current tenant")
+@RequiredArgsConstructor
+public class OpenApiPublicationController {
+    private final OpenApiPublicationService publications;
+
+    @GetMapping("/publications")
+    public ApiResponse<List<OpenApiPublicationService.PublicationView>> list() {
+        return ApiResponse.success(publications.list());
+    }
+
+    @GetMapping("/publication-sources/{code}")
+    public ApiResponse<com.auraboot.framework.openplatform.service.OpenApiPublicationValidator.SourceView> source(@PathVariable String code) {
+        return ApiResponse.success(publications.sourceForAdministration(code));
+    }
+
+    @GetMapping("/publications/{code}/openapi")
+    public java.util.Map<String, Object> document(@PathVariable String code) {
+        return com.auraboot.framework.openplatform.service.OpenApiContractArtifacts.resource(publications.publishedForAdministration(code));
+    }
+
+    @GetMapping("/publications/{code}/types")
+    public org.springframework.http.ResponseEntity<String> types(@PathVariable String code) {
+        var contract = publications.publishedForAdministration(code);
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType("text/plain;charset=UTF-8"))
+                .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment().filename(contract.code() + ".d.ts", java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .body(com.auraboot.framework.openplatform.service.OpenApiContractArtifacts.resourceTypes(contract));
+    }
+
+    @PutMapping("/publications/{code}/draft")
+    public ApiResponse<OpenApiPublicationService.PublicationView> save(
+            @PathVariable String code, @RequestBody OpenApiPublicationService.DraftRequest request) {
+        return ApiResponse.success(publications.saveDraft(code, request));
+    }
+
+    @PostMapping("/publications/{code}/publish")
+    public ApiResponse<OpenApiPublicationService.PublicationView> publish(
+            @PathVariable String code, @RequestBody OpenApiPublicationService.RevisionRequest request) {
+        return ApiResponse.success(publications.publish(code, request.expectedRevision()));
+    }
+
+    @PostMapping("/publications/{code}/withdraw")
+    public ApiResponse<OpenApiPublicationService.PublicationView> withdraw(
+            @PathVariable String code, @RequestBody OpenApiPublicationService.RevisionRequest request) {
+        return ApiResponse.success(publications.withdraw(code, request.expectedRevision()));
+    }
+
+    @GetMapping("/installations/{installationPid}/resources")
+    public ApiResponse<java.util.List<OpenApiPublicationService.InstallationGrantView>> installationGrants(@PathVariable String installationPid) {
+        return ApiResponse.success(publications.installationGrants(installationPid));
+    }
+    @PutMapping("/installations/{installationPid}/resources/{code}")
+    public ApiResponse<Void> grant(@PathVariable String installationPid, @PathVariable String code,
+                                   @RequestBody OpenApiInstallationPolicy policy) {
+        publications.grant(installationPid, code, policy);
+        return ApiResponse.success();
+    }
+
+    @DeleteMapping("/installations/{installationPid}/resources/{code}")
+    public ApiResponse<Void> revoke(@PathVariable String installationPid, @PathVariable String code) {
+        publications.revoke(installationPid, code);
+        return ApiResponse.success();
+    }
+}

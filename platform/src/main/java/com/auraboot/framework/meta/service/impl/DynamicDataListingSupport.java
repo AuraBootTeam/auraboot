@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.service.*;
@@ -95,6 +96,10 @@ final class DynamicDataListingSupport extends BaseMetaService {
 
         // 获取模型定义
         ModelDefinition model = getModelDefinition(modelCode);
+        MachineDataAccessGuards.requireQueryFields(modelCode, request);
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
+        }
 
         // Phase 1 virtual-model dispatch: if the model has a non-physical sourceType
         // AND an executor is registered for it, delegate. Otherwise fall through to
@@ -129,15 +134,23 @@ final class DynamicDataListingSupport extends BaseMetaService {
         // 添加租户条件
         Long tenantId = getCurrentTenantId();
         queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
+        MachineDataAccessGuards.constrain(modelCode, queryBuilder);
+        if (request.getKeysetContinuation() != null) {
+            var continuation = request.getKeysetContinuation();
+            String column = model.getFields().stream().filter(field -> field.getCode().equals(continuation.field()))
+                    .map(field -> field.getColumnName() == null ? field.getCode() : field.getColumnName())
+                    .findFirst().orElseThrow(() -> new IllegalArgumentException("Unknown keyset field"));
+            queryBuilder.addKeysetCondition(column, continuation.direction(), continuation.value(), continuation.pid());
+        }
 
         Long userId = getCurrentUserId();
         String permitRowFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
-        boolean commandPermitInForce = permitRowFilter != null;
+        boolean commandPermitInForce = permitRowFilter != null || MachineDataAccessContext.isActive();
         String scopedRowFilter = null;
         String scopedDomainFilter = null;
         if (commandPermitInForce) {
             scopedRowFilter = permitRowFilter;
-            if (!scopedRowFilter.isBlank()) {
+            if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
                 queryBuilder.addRawCondition(scopedRowFilter);
             }
         } else {
@@ -212,6 +225,7 @@ final class DynamicDataListingSupport extends BaseMetaService {
         QueryBuilderService.QueryBuilder countBuilder = queryBuilderService.buildConditionQuery(
                 model, request.getConditions());
         countBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
+        MachineDataAccessGuards.constrain(modelCode, countBuilder);
 
         // Reuse the exact row-level filter from the data query so count cannot drift and
         // the same request does not re-run permission lookup for the count builder.
@@ -275,6 +289,10 @@ final class DynamicDataListingSupport extends BaseMetaService {
         // and a large N+1 multiplier for multi-step commands.
         if (!commandPermitInForce) {
             records = enrichListRecords(modelCode, records);
+        }
+
+        if (MachineDataAccessContext.isActive()) {
+            records = records.stream().map(record -> MachineDataAccessGuards.filterFields(modelCode, record)).toList();
         }
 
         if (useCursor) {

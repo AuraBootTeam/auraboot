@@ -5,6 +5,7 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,6 +33,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/meta/auto-fill")
 @RequiredArgsConstructor
+@AuthenticatedAccess("form auto-fill lookup; DynamicDataService enforces tenant isolation and row-level ACL")
 public class AutoFillController {
 
     private final DynamicDataService dynamicDataService;

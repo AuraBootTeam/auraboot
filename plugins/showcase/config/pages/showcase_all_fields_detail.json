@@ -7,7 +7,11 @@
   "schemaVersion": 4,
   "extension": {
     "showShare": false,
-    "showReport": false
+    "showReport": false,
+    "headerTitleField": "sc_name",
+    "headerSubtitleFields": [
+      "sc_code"
+    ]
   },
   "layout": {
     "type": "stack"

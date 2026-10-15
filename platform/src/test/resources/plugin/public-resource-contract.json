@@ -1,0 +1,37 @@
+{
+  "code": "public.records",
+  "modelCode": "public_record",
+  "schemaVersion": 1,
+  "operations": [
+    "get",
+    "list"
+  ],
+  "scopes": {
+    "get": "public.record.get",
+    "list": "public.record.list"
+  },
+  "dataPolicy": "installation_filter",
+  "fields": {
+    "pid": {
+      "source": "pid",
+      "type": "pid",
+      "readable": true,
+      "writable": false,
+      "required": false,
+      "nullable": false,
+      "operators": [],
+      "sortable": false,
+      "referenceResource": null,
+      "properties": {},
+      "items": null
+    }
+  },
+  "maxPageSize": 25,
+  "maxConditions": 4,
+  "timeoutMs": 1000,
+  "events": [
+    "created",
+    "updated",
+    "deleted"
+  ]
+}

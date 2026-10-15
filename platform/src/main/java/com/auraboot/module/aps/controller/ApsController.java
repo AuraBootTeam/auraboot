@@ -1,6 +1,7 @@
 package com.auraboot.module.aps.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.module.aps.dto.GanttData;
 import com.auraboot.module.aps.dto.ScheduleRequest;
 import com.auraboot.module.aps.dto.ScheduleResult;
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/aps")
 @RequiredArgsConstructor
+@AuthenticatedAccess("stateless APS scheduling computations over the jobs and resources in the request payload; no persistent data is read or written")
 public class ApsController {
 
     private final SchedulingEngine engine;

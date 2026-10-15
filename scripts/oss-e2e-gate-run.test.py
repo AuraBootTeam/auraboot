@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Hermetic process contracts; does not qualify product browser behavior."""
+import json
 import os
 from pathlib import Path
 import shutil
@@ -39,9 +40,18 @@ const path = require('node:path');
 const args = process.argv.slice(2);
 if (args[0] === 'control') process.exit(0);
 if (process.env.RECORD_AURA === '1') fs.appendFileSync(process.env.CALLS, args.join(' ') + '\\n');
+if (args[1] === 'verify') process.exit(Number(process.env.VERIFY_EXIT || '0'));
+if (args[1] === 'show') {
+  console.log(JSON.stringify({allocation: {name: 'owned-new', repo: process.env.RUNTIME_REPO || 'auraboot', slot: 239},
+    sources: [{key: 'core', expected: {root: process.env.RUNTIME_CORE || path.join(process.env.AURA_WORKSPACE_ROOT, 'auraboot')}}]}));
+  process.exit(0);
+}
 if (args[1] === 'list') console.log('name repo slot\\n' + (process.env.EXISTING_RUNTIME || ''));
 else if (args[1] === 'evidence' && args[2] === 'begin') {
-  const dir = path.join(process.env.AURA_WORKSPACE_ROOT, '.workspace/evidence/fixture-round');
+  const counter = path.join(process.env.AURA_WORKSPACE_ROOT, 'round-counter');
+  const n = fs.existsSync(counter) ? Number(fs.readFileSync(counter, 'utf8')) + 1 : 1;
+  fs.writeFileSync(counter, String(n));
+  const dir = path.join(process.env.AURA_WORKSPACE_ROOT, '.workspace/evidence/fixture-round-' + n);
   fs.mkdirSync(dir, { recursive: true });
   console.log(dir);
 } else console.log('runtime ensure');
@@ -53,15 +63,21 @@ PW_FIXTURE_COLLECTION=0
 [[ " $* " != *' --list '* ]] || PW_FIXTURE_COLLECTION=1
 export PW_FIXTURE_COLLECTION
 python3 - <<'REPORT_FIXTURE'
-import json,os
+import json,os,base64
 from pathlib import Path
 profile=json.loads(Path('../scripts/gates/oss-e2e-gate-profile.json').read_text())
 collection=os.environ['PW_FIXTURE_COLLECTION']=='1'
-n=len(profile['tests']) if collection else int(os.environ.get('REPORT_COUNT','12'))
+n=len(profile['tests']) if collection else int(os.environ.get('REPORT_COUNT',str(len(profile['tests']))))
 rows=profile['tests'][:n]
 tests=[{'file':row['file'],'title':row['title'],'tests':[{'projectName':row['project'],'expectedStatus':'passed','status':'expected','results':[] if collection else [{'status':'passed','retry':int(os.environ.get('REPORT_RETRY','0'))}]}]} for row in rows]
+if not collection and os.environ.get('REPORT_MISSING_EVIDENCE') != '1':
+ for row,spec in zip(rows,tests):
+  spec['tests'][0]['results'][0]['attachments']=[{'name':evidence['name'],'contentType':'application/json','body':base64.b64encode(json.dumps(evidence['fields']).encode()).decode()} for evidence in row.get('requiredEvidence',[])]
 report={'stats':{'expected':n,'unexpected':0,'skipped':int(os.environ.get('REPORT_SKIPPED','0')),'flaky':0},'errors':[],'config':{'projects':[{'name':'oss','retries':0}]},'suites':[{'specs':tests}]}
-if collection: print(json.dumps(report))
+if collection:
+ if os.environ.get('PLAYWRIGHT_JSON_OUTPUT_FILE'):
+  p=Path(os.environ['PLAYWRIGHT_JSON_OUTPUT_FILE']);p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(report));print('Listing tests:')
+ else: print(json.dumps(report))
 elif os.environ.get('REPORT_MISSING')!='1':
  p=Path(os.environ['PLAYWRIGHT_JSON_OUTPUT_FILE']);p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(report))
 REPORT_FIXTURE
@@ -72,7 +88,7 @@ exit "${PW_EXIT:-0}"
 printf '%s\n' "$*" >> "$CALLS"
 case "$1" in
  up) exit "${UP_EXIT:-0}";;
- env) printf 'export PLAYWRIGHT_BASE_URL=http://private-fixture BACKEND_URL=http://private-fixture BFF_PORT=1 PW_RESULTS_JSON=$AURA_EVIDENCE_ROOT/report/results.json\n';;
+ env) printf 'export AURA_EVIDENCE_ROOT=$AURA_WORKSPACE_ROOT/retained-stack-evidence\nexport PLAYWRIGHT_BASE_URL=http://private-fixture BACKEND_URL=http://private-fixture BFF_PORT=1 PW_RESULTS_JSON=$AURA_EVIDENCE_ROOT/report/results.json\n';;
  destroy|down) exit 99;;
 esac
 ''')
@@ -84,8 +100,8 @@ esac
         p.write_text(text)
         p.chmod(0o755)
 
-    def run_gate(self, **env):
-        return subprocess.run(['bash', str(self.repo / 'scripts/oss-e2e-gate-run.sh'), '--name', 'owned-new', '--slot', '239'],
+    def run_gate(self, *, reuse=False, **env):
+        return subprocess.run(['bash', str(self.repo / 'scripts/oss-e2e-gate-run.sh'), '--name', 'owned-new', '--slot', '239'] + (['--reuse-runtime'] if reuse else []),
                               env={**self.env, **env}, capture_output=True, text=True, timeout=10)
 
     def calls(self):
@@ -96,12 +112,18 @@ esac
         r = self.run_gate()
         self.assertEqual(r.returncode, 0, r.stderr)
         calls = self.calls()
-        self.assertNotIn('destroy', calls)
-        self.assertNotIn('down', calls)
+        commands = [line.split()[0] for line in calls.splitlines() if line.strip()]
+        self.assertNotIn('destroy', commands)
+        self.assertNotIn('down', commands)
         self.assertIn('--require-new-db', calls)
         self.assertNotIn('--fresh-db', calls)
         self.assertIn('--project=oss --project=oss-deep --no-deps --repeat-each=1 --retries=0', calls)
-        self.assertEqual(calls.count('.spec.ts'), 8)
+        profile = json.loads((self.repo / 'scripts/gates/oss-e2e-gate-profile.json').read_text())
+        files = list(dict.fromkeys(row['file'] for row in profile['tests']))
+        self.assertEqual(calls.count('.spec.ts'), 2 * len(files))
+        for file in files: self.assertEqual(calls.count(file), 2)
+        self.assertIn('--grep', calls)
+        self.assertIn('persists resource and query grants', calls)
         self.assertIn('--list --reporter=json', calls)
         self.assertIn('--reporter=line,json', calls)
 
@@ -132,6 +154,43 @@ esac
         r = self.run_gate(EXISTING_RUNTIME='owned-new auraboot 239\n')
         self.assertEqual(r.returncode, 2)
         self.assertEqual(self.calls(), '')
+
+    def test_explicit_reuse_verifies_existing_runtime_and_runs_fixed_gate_without_up(self):
+        r = self.run_gate(reuse=True, EXISTING_RUNTIME='owned-new auraboot 239\n', RECORD_AURA='1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        calls = self.calls()
+        self.assertIn('runtime verify owned-new', calls)
+        self.assertIn('--list --reporter=json', calls)
+        self.assertIn('--retries=0', calls)
+        self.assertFalse(any(line.startswith(('up ', 'down ', 'destroy ')) for line in calls.splitlines()))
+        first = self.root / '.workspace/evidence/fixture-round-1/results.json'
+        self.assertTrue(first.is_file(), r.stdout + r.stderr)
+        original = first.read_bytes()
+        failed = self.run_gate(reuse=True, EXISTING_RUNTIME='owned-new auraboot 239\n', RECORD_AURA='1', REPORT_COUNT='14')
+        self.assertEqual(failed.returncode, 1, failed.stdout + failed.stderr)
+        second = self.root / '.workspace/evidence/fixture-round-2/results.json'
+        self.assertTrue(second.is_file())
+        self.assertNotEqual(first, second)
+        self.assertEqual(first.read_bytes(), original)
+        self.assertNotEqual(second.read_bytes(), original)
+        self.assertFalse((self.root / 'retained-stack-evidence/results.json').exists())
+
+    def test_reuse_rejects_unknown_slot_mismatch_or_failed_identity_before_browser(self):
+        for env in [{}, {'EXISTING_RUNTIME':'owned-new auraboot 240\n'},
+                    {'EXISTING_RUNTIME':'owned-new auraboot 239\n','VERIFY_EXIT':'1'},
+                    {'EXISTING_RUNTIME':'owned-new auraboot 239\n','RUNTIME_REPO':'enterprise'},
+                    {'EXISTING_RUNTIME':'owned-new auraboot 239\n','RUNTIME_CORE':str(self.root)}]:
+            with self.subTest(env=env):
+                r = self.run_gate(reuse=True, **env)
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertNotIn('playwright', self.calls())
+                self.assertNotIn('up ', self.calls())
+
+    def test_missing_notification_evidence_rejects_otherwise_complete_browser_report(self):
+        rejected = self.run_gate(REPORT_MISSING_EVIDENCE='1')
+        self.assertEqual(rejected.returncode, 1, rejected.stdout + rejected.stderr)
+        self.assertIn('missing or duplicate mandatory evidence', rejected.stderr)
+        self.assertEqual(self.run_gate().returncode, 0)
 
     def test_existing_evidence_is_not_overwritten(self):
         p = self.root / '.workspace/golden/owned-new'

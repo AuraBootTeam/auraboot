@@ -29,6 +29,11 @@ final class DynamicJointSaveSupport extends BaseMetaService {
 
     private final AssertWritableOperation assertWritableOperation;
 
+    private final DeleteChildrenOperation deleteChildrenOperation;
+
+    @FunctionalInterface
+    interface DeleteChildrenOperation { void execute(RelationDefinition relation, String masterId); }
+
     @FunctionalInterface
     interface CreateOperation { Map<String, Object> execute(String modelCode, Map<String, Object> data); }
 
@@ -224,13 +229,8 @@ final class DynamicJointSaveSupport extends BaseMetaService {
             log.debug("Deleted existing M2M relations from {} for master {}",
                     logSafe(relation.getJoinTable()), logSafe(masterId));
         } else if (relation.getRelationType() == RelationDefinition.RelationType.ONE_TO_MANY) {
-            // For O2M, delete from target table
-            Map<String, Object> conditions = new HashMap<>();
-            conditions.put(relation.getTargetField(), masterId);
-            conditions.put("tenant_id", tenantId);
-            dynamicDataMapper.delete(relation.getTargetTable(), conditions);
-            log.debug("Deleted existing child records from {} for master {}",
-                    logSafe(relation.getTargetTable()), logSafe(masterId));
+            // Entity replacement must use the owner writer and its mutation observers.
+            deleteChildrenOperation.execute(relation, masterId);
         }
     }
 

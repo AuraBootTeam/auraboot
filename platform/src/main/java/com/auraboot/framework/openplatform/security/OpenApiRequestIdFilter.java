@@ -17,11 +17,13 @@ import java.util.UUID;
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class OpenApiRequestIdFilter extends OncePerRequestFilter {
     public static final String REQUEST_ID_ATTRIBUTE = OpenApiRequestIdFilter.class.getName() + ".requestId";
+    public static final String STARTED_NANOS_ATTRIBUTE = OpenApiRequestIdFilter.class.getName() + ".startedNanos";
     private static final int MAX_REQUEST_ID_LENGTH = 128;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        request.setAttribute(STARTED_NANOS_ATTRIBUTE, System.nanoTime());
         String supplied = request.getHeader("X-Request-Id");
         String requestId = supplied == null || supplied.isBlank() || supplied.length() > MAX_REQUEST_ID_LENGTH
                 ? UUID.randomUUID().toString() : supplied;

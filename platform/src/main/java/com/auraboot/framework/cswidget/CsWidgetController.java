@@ -1,5 +1,6 @@
 package com.auraboot.framework.cswidget;
 
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.CacheControl;
@@ -32,6 +33,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @RestController
+@AuthenticatedAccess("serves the public embeddable customer-service widget bundle; byte-identical static asset under /api/public/cs, no data access")
 public class CsWidgetController {
 
     private static final String BUNDLE = "static/cs/aura-cs.global.js";

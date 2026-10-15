@@ -102,7 +102,7 @@ test.describe('AMOS lens fault journeys (S12 batch-2)', () => {
       });
       await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
         `${lens.code} shell still renders under query failure`,
       ).toBeVisible({ timeout: 20_000 });
       await expect(page.getByRole('alert').first(), 'the failed query must render an explicit error').toBeVisible();
@@ -131,15 +131,28 @@ test.describe('AMOS lens fault journeys (S12 batch-2)', () => {
       release!();
       await navigation;
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
         'content replaces the loading state',
       ).toBeVisible({ timeout: 20_000 });
       await page.screenshot({ path: `test-results/artifacts/amos-fault-${lens.code}-loading.png` });
     });
 
     test(`fault query stale: ${lens.code}`, async ({ page }) => {
-      // Freshness must be expressed, never hidden: a stale governed payload
-      // renders the STALE freshness state on the lens governance table.
+      // Freshness must be expressed, never hidden. Two honest surfaces exist:
+      //  - governance lenses whose state table carries freshness_status render
+      //    the STALE freshness state (localized 已过期);
+      //  - business-rollup lenses have no freshness surface at all (their stale
+      //    governance lives on the data-trust / metric-governance lenses) — for
+      //    them the contract is that a stale-shaped payload is consumed
+      //    honestly: served, rendered as governed values, never faked into a
+      //    freshness claim, page stays up with no error state.
+      const dashboard = await page.request.get(`/api/dashboards/code/${lens.code}`);
+      const dashboardBody = await dashboard.json().catch(() => null);
+      const widgets: Array<{ config?: { table?: { columns?: Array<{ field?: string }> } } }> =
+        dashboardBody?.data?.widgets ?? [];
+      const hasFreshnessSurface = widgets.some((widget) =>
+        (widget.config?.table?.columns ?? []).some((column) => column.field === 'freshness_status'),
+      );
       let staleServed = false;
       await page.route('**/api/meta/chart-data*', async (route) => {
         const request = route.request();
@@ -159,14 +172,21 @@ test.describe('AMOS lens fault journeys (S12 batch-2)', () => {
       });
       await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
       ).toBeVisible({ timeout: 20_000 });
-      await expect
-        .poll(
-          async () => (await page.getByText('STALE', { exact: true }).count()),
-          { timeout: 20_000, message: `${lens.code} expresses the STALE freshness state` },
-        )
-        .toBeGreaterThan(0);
+      if (hasFreshnessSurface) {
+        await expect
+          .poll(
+            async () => (await page.getByText(/^(STALE|已过期)$/, { exact: true }).count()),
+            { timeout: 20_000, message: `${lens.code} expresses the STALE freshness state` },
+          )
+          .toBeGreaterThan(0);
+      } else {
+        await expect(
+          page.getByText(/^(STALE|已过期)$/),
+          `${lens.code} has no freshness surface and must not fake one`,
+        ).toHaveCount(0);
+      }
       expect(staleServed, 'the stale payload must actually be exercised').toBeTruthy();
       await page.screenshot({ path: `test-results/artifacts/amos-fault-${lens.code}-stale.png` });
     });

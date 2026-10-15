@@ -72,6 +72,310 @@
       "file": "tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
       "title": "P6.3: detail page renders tabs + sections + field values from list-row navigation",
       "project": "oss"
+    },
+    {
+      "id": "DOP-BROWSER-01",
+      "file": "tests/e2e/settings/open-platform.golden.spec.ts",
+      "title": "publishes a real model contract through UI, retains conflicts, downloads and withdraws",
+      "project": "oss",
+      "requirements": [
+        "DOP-01",
+        "DOP-08",
+        "DOP-09"
+      ],
+      "requiredEvidence": [
+        {
+          "name": "source-keyboard-controls",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "controlCount": 5,
+            "cases": [
+              "accessible-names",
+              "native-forward-tab",
+              "native-reverse-tab"
+            ],
+            "forwardTransitions": 4,
+            "reverseTransitions": 4
+          }
+        },
+        {
+          "name": "required-scope-accessibility",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "browser-native-validation",
+            "cases": [
+              "invalid-focus",
+              "linked-error",
+              "accessible-description"
+            ]
+          }
+        },
+        {
+          "name": "draft-cancel-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "enter-cancel-focus-return",
+              "escape-cancel-focus-return",
+              "draft-retained-no-write"
+            ]
+          }
+        },
+        {
+          "name": "confirmed-discard-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "confirmed-discard-focus-return",
+              "no-write-server-state-restored"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-02",
+      "file": "tests/e2e/settings/open-platform.golden.spec.ts",
+      "title": "pins a real NamedQuery, saves read-only projections, downloads and withdraws through UI",
+      "project": "oss",
+      "requirements": [
+        "DOP-04",
+        "DOP-08",
+        "DOP-09"
+      ],
+      "requiredEvidence": [
+        {
+          "name": "source-keyboard-controls",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "controlCount": 5,
+            "cases": [
+              "accessible-names",
+              "native-forward-tab",
+              "native-reverse-tab"
+            ],
+            "forwardTransitions": 4,
+            "reverseTransitions": 4
+          }
+        },
+        {
+          "name": "draft-cancel-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "enter-cancel-focus-return",
+              "escape-cancel-focus-return",
+              "draft-retained-no-write"
+            ]
+          }
+        },
+        {
+          "name": "confirmed-discard-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "confirmed-discard-focus-return",
+              "no-write-server-state-restored"
+            ]
+          }
+        },
+        {
+          "name": "busy-confirmation-publication",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "actual-http-held-response",
+            "requests": 1,
+            "cases": [
+              "busy-disabled-controls",
+              "focused-escape-keeps-operation",
+              "single-real-publish-completes"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-03",
+      "file": "tests/e2e/settings/open-platform.golden.spec.ts",
+      "title": "persists resource and query grants through installation UI and enforces them on real machine calls",
+      "project": "oss",
+      "requirements": [
+        "DOP-02",
+        "DOP-03",
+        "DOP-05",
+        "DOP-07",
+        "DOP-08",
+        "DOP-11"
+      ],
+      "requiredEvidence": [
+        {
+          "name": "dynamic-model-notifications",
+          "fields": {
+            "schemaVersion": 1,
+            "cases": [
+              "ui-subscription-persisted",
+              "signed-real-delivery",
+              "real-dead-letter",
+              "confirmed-same-event-replay",
+              "revoked-authority-no-send",
+              "ui-subscription-disabled"
+            ],
+            "fixture": "original-installation-ui-authored-grant",
+            "routeMocks": false,
+            "editorActions": [
+              "reload-real-GET",
+              "dirty-cancel-discard-no-write",
+              "new-form-reset-no-write",
+              "disable-enable-signed-send"
+            ],
+            "eventVariants": [
+              "second-ui-subscription",
+              "updated-signed-delivery",
+              "edited-deleted-signed-delivery",
+              "second-ui-disabled"
+            ],
+            "editorStates": [
+              "real-latency-loading",
+              "offline-no-false-empty-restored",
+              "real-principal-403-restored",
+              "ui-inactive-read-only-reopened"
+            ],
+            "keyboardSave": [
+              "native-tab-submit-validation",
+              "real-create-400-no-write-corrected",
+              "real-update-400-unchanged-corrected-signed",
+              "escape-cancel-focus-return"
+            ],
+            "saveAuthority": [
+              "real-create403-zero-write-retained-recovered",
+              "real-update403-unchanged-retained-recovered-signed"
+            ]
+          }
+        },
+        {
+          "name": "draft-cancel-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "enter-cancel-focus-return",
+              "escape-cancel-focus-return",
+              "draft-retained-no-write"
+            ]
+          }
+        },
+        {
+          "name": "confirmed-discard-recovery",
+          "fields": {
+            "schemaVersion": 1,
+            "driver": "native-keyboard",
+            "writes": 0,
+            "cases": [
+              "confirmed-discard-focus-return",
+              "no-write-server-state-restored"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-04",
+      "file": "tests/e2e/settings/open-platform.golden.spec.ts",
+      "title": "covers application, installation, credential and revocation states",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-05",
+      "file": "tests/e2e/settings/open-platform-collaboration.golden.spec.ts",
+      "title": "captures owner, maintainer, viewer and non-member projections",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-06",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "owner (admin) sees full management surface from the real account menu",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-07",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "maintainer manages runtime but is denied member and lifecycle writes server-side",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-08",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "viewer is read-only and denied credentials and writes server-side",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-09",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "non-member sees an empty console and is denied all app access server-side",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-10",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "missing and disabled applications return 404 for reads and locked member writes",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-11",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "sole owner cannot self-remove; concurrent owner deletes keep exactly one owner",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
     }
   ]
 }

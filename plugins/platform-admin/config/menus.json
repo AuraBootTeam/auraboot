@@ -409,5 +409,43 @@
         "web"
       ]
     }
+  },
+{
+  "code": "open_platform_publications",
+  "parentCode": "system_management",
+  "name:zh-CN": "公共资源发布",
+  "name:en": "Public Resource Publications",
+  "path": "/p/c/open_platform_publications",
+  "pageKey": "open_platform_publications",
+  "component": null,
+  "icon": "globe",
+  "type": 1,
+  "permissionCode": "sys.connector.update",
+  "orderNo": 59,
+  "visible": true,
+  "extension": {
+    "platforms": [
+      "web"
+    ]
   }
+},
+{
+  "code": "open_platform_queries",
+  "parentCode": "system_management",
+  "name:zh-CN": "公共查询发布",
+  "name:en": "Public Query Publications",
+  "path": "/p/c/open_platform_queries",
+  "pageKey": "open_platform_queries",
+  "component": null,
+  "icon": "globe",
+  "type": 1,
+  "permissionCode": "sys.connector.update",
+  "orderNo": 60,
+  "visible": true,
+  "extension": {
+    "platforms": [
+      "web"
+    ]
+  }
+}
 ]

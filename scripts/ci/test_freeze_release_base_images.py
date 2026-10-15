@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
@@ -35,6 +36,43 @@ class BaseImageIdentityTest(unittest.TestCase):
     def test_controlled_registry_keeps_its_repository_authority(self):
         tag = "controlled.example/team/redis@sha256:" + "b" * 64
         self.assertEqual(module.freeze_image(tag, self.record([tag]))["reference"], tag)
+        image = module.freeze_image(tag, self.record([tag]))
+        transport = "mirror.example/cache/redis@sha256:" + "b" * 64
+        bound = module.bind_transports([image], json.dumps({tag: transport}))[0]
+        self.assertEqual(bound["reference"], tag)
+        self.assertEqual(bound["transportReference"], transport)
+        self.assertEqual(bound["imageId"], image["imageId"])
+        self.assertEqual(module.bind_transports([image], "{}")[0]["transportReference"], tag)
+        selected = []
+        canonical = "docker.io/docker/dockerfile@sha256:" + "b" * 64
+        frontend = "mirror.example/docker/dockerfile@sha256:" + "b" * 64
+        record = self.record([frontend])
+        image = module.freeze_prewarmed(canonical, {canonical: frontend}, lambda ref: (selected.append(ref), record)[1])
+        self.assertEqual(selected, [frontend])
+        self.assertEqual(image["reference"], canonical)
+        self.assertEqual(image["tag"], canonical)
+        self.assertEqual(image["imageId"], record["Id"])
+        with self.assertRaises(ValueError):
+            module.freeze_prewarmed(canonical, {canonical: frontend.replace("b" * 64, "c" * 64)},
+                                   lambda ref: self.fail("changed digest must reject before inspection"))
+        with self.assertRaises(ValueError):
+            module.freeze_prewarmed(canonical, {canonical: frontend}, lambda ref: self.record([frontend.replace("b" * 64, "c" * 64)]))
+        with self.assertRaises(ValueError):
+            module.freeze_prewarmed("redis:7.4-alpine", {}, lambda ref: self.record([frontend]))
+        bad_maps = [{tag: transport.replace("b" * 64, "c" * 64)},
+                    {tag: "mirror.example/cache/redis:latest"}, {"unknown": transport},
+                    {tag: "https://" + transport}, {tag: None}, [],
+                    {tag: transport.replace("cache/", "../")},
+                    {tag: transport.replace("cache/", "cache//")},
+                    {tag: transport.replace("mirror.example", "mirror")},
+                    {tag: transport.replace("@sha256:", "?token=private@sha256:")}]
+        for mapping in bad_maps:
+            with self.subTest(mapping=mapping), self.assertRaises(ValueError):
+                module.bind_transports([image], json.dumps(mapping))
+        with self.assertRaises(ValueError):
+            module.bind_transports([image], json.dumps({tag: transport})[:-1] + ',"' + tag + '":"' + transport + '"}')
+        with self.assertRaises(ValueError):
+            module.bind_transports([image], " " * 65537)
 
 
 if __name__ == "__main__":

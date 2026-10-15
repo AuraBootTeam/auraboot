@@ -52,6 +52,12 @@ interface NumberCardItem {
   prefix?: string;
   suffix?: string;
   drillDown?: DrillDownConfig;
+  /**
+   * Row selector for multi-row responses: the card reads the first row whose
+   * fields equal every entry. Required when several cards share one `field`
+   * but must surface different rows (e.g. one metric per row).
+   */
+  matchRow?: Record<string, string | number | boolean>;
 }
 
 /**
@@ -337,9 +343,19 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
 
     return (
       <div className={cn('grid h-full gap-3', cardGridClass, className)} style={style}>
-        {effectiveCards.map((card) => {
+        {effectiveCards.map((card, cardIndex) => {
           const cardDrillDown = card.drillDown ?? drillDown;
           const cardClickable = Boolean(cardDrillDown?.enabled && onDrillDown);
+          const matchEntries = Object.entries(card.matchRow ?? {});
+          const rowForCard =
+            matchEntries.length && data?.rows?.length
+              ? (data.rows.find((row) =>
+                  matchEntries.every(([key, expected]) => row[key] === expected),
+                ) ?? {})
+              : firstRow;
+          const cardKey = `${card.field}:${cardIndex}`;
+          const fieldOccurrences = effectiveCards.filter((c) => c.field === card.field).length;
+          const cardTestId = `number-card-${fieldOccurrences > 1 ? cardKey : card.field}-drilldown`;
           const cardContent = (
             <>
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -350,7 +366,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
                   ? '...'
                   : error
                     ? 'Error'
-                    : formatCardValue(firstRow[card.field], card.format, card.prefix, card.suffix)}
+                    : formatCardValue(rowForCard[card.field], card.format, card.prefix, card.suffix)}
               </div>
               <div
                 className="mt-3 h-1 w-8 rounded-full"
@@ -365,16 +381,16 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           );
           return cardClickable ? (
             <button
-              key={card.field}
+              key={cardKey}
               type="button"
               className={cardClassName}
-              data-testid={`number-card-${card.field}-drilldown`}
+              data-testid={cardTestId}
               onClick={() => onDrillDown?.(cardDrillDown!)}
             >
               {cardContent}
             </button>
           ) : (
-            <div key={card.field} className={cardClassName}>
+            <div key={cardKey} className={cardClassName}>
               {cardContent}
             </div>
           );

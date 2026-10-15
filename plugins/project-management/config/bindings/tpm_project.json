@@ -1,10 +1,150 @@
 [
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_description", "sequence": 3, "required": false, "visible": false, "editable": true },
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_status", "sequence": 4, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_priority", "sequence": 5, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_owner", "sequence": 6, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_start_date", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
-  { "modelCode": "tpm_project", "fieldCode": "tpm_pj_end_date", "sequence": 8, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } }
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_description",
+    "sequence": 3,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_status",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_priority",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_owner",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_start_date",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_end_date",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_customer",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_budget",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_owner_user",
+    "sequence": 11,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_progress",
+    "sequence": 12,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_customer_id",
+    "sequence": 13,
+    "visible": true,
+    "editable": true,
+    "required": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_notes",
+    "sequence": 14,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_files",
+    "sequence": 15,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_type",
+    "sequence": 16,
+    "visible": true,
+    "editable": false
+  }
 ]

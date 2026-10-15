@@ -45,6 +45,20 @@ public interface OpenPlatformAuthMapper {
                               @Param("audience") String audience,
                               @Param("now") Instant now);
 
+    @Select("""
+            SELECT t.tenant_id, t.pid AS token_pid, i.pid AS installation_pid,
+                   a.pid AS application_pid
+            FROM ab_application_access_token t
+            JOIN ab_application_installation i ON i.id = t.installation_id
+            JOIN ab_external_application a ON a.id = i.application_id
+            WHERE t.token_hash = #{tokenHash} AND t.audience = #{audience}
+            LIMIT 1
+            """)
+    AuditTokenIdentity findTokenIdentityForAudit(@Param("tokenHash") String tokenHash,
+                                                @Param("audience") String audience);
+
+    record AuditTokenIdentity(Long tenantId, String tokenPid, String installationPid, String applicationPid) { }
+
     @Update("""
             UPDATE ab_application_credential
             SET last_used_at = #{now}

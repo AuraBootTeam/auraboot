@@ -11,6 +11,7 @@ import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
 import com.auraboot.framework.webhook.service.WebhookDispatchResult;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.auraboot.framework.webhook.service.WebhookSignature;
+import com.auraboot.framework.webhook.service.WebhookRetryPolicy;
 import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
 
     private static final int DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
     private static final int DEFAULT_READ_TIMEOUT_MS = 10_000;
+    private final WebhookRetryPolicy retryPolicy = new WebhookRetryPolicy();
 
     /**
      * Shared JDK HTTP client for webhook delivery (P3-E DNS-rebinding
@@ -60,6 +62,32 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     private final FieldEncryptionService fieldEncryptionService;
     private final WebhookSignature webhookSignature;
     private final OpenApiEventCatalog eventCatalog;
+
+    private List<com.auraboot.framework.webhook.service.WebhookDeliveryPolicy> deliveryPolicies = List.of();
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setDeliveryPolicies(List<com.auraboot.framework.webhook.service.WebhookDeliveryPolicy> policies) {
+        this.deliveryPolicies = List.copyOf(policies);
+    }
+
+    private Map<String, Object> preparePublished(WebhookSubscription subscription, WebhookDeliveryLog delivery,
+                                                 Map<String, Object> fallback) {
+        var policies = deliveryPolicies.stream().filter(policy -> policy.supports(subscription.getEventType())).toList();
+        if (OpenApiEventCatalog.isModelEvent(subscription.getEventType()) && policies.size() != 1)
+            throw new org.springframework.security.access.AccessDeniedException("Model event authority cannot be evaluated");
+        if (policies.isEmpty()) return fallback;
+        if (policies.size() != 1) throw new IllegalStateException("Ambiguous webhook delivery policy");
+        return policies.getFirst().prepare(subscription, delivery);
+    }
+
+    @Override
+    public WebhookDispatchResult dispatchPublished(WebhookSubscription subscription, Map<String, Object> payload,
+                                                   String authorizationContext) {
+        if (!OpenApiEventCatalog.isModelEvent(subscription.getEventType()) || subscription.getInstallationPid() == null)
+            throw new IllegalArgumentException("Installation-bound published model event required");
+        var receipt = enqueue(subscription, payload, authorizationContext);
+        return new WebhookDispatchResult(receipt == null ? List.of() : List.of(receipt));
+    }
 
     private static final Pattern DANGEROUS_SPEL_PATTERN = Pattern.compile(
             "(?i)(T\\s*\\(|new\\s+|getClass|forName|invoke|exec|Runtime|Process|System|Thread|Class\\." +
@@ -93,11 +121,23 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     }
 
     private WebhookDispatchResult.Receipt enqueue(WebhookSubscription subscription, Map<String, Object> payload) {
+        return enqueue(subscription, payload, null);
+    }
+
+    private WebhookDispatchResult.Receipt enqueue(WebhookSubscription subscription, Map<String, Object> payload,
+                                                 String authorizationContext) {
+        WebhookDeliveryLog delivery = new WebhookDeliveryLog();
+        delivery.setAuthorizationContext(authorizationContext);
+        delivery.setSubscriptionPid(subscription.getPid());
+        delivery.setTenantId(subscription.getTenantId());
+        delivery.setInstallationPid(subscription.getInstallationPid());
+        delivery.setRequestBody(serializePayload(payload));
+        payload = preparePublished(subscription, delivery, payload);
         if (subscription.getInstallationPid() != null) {
             int version = subscription.getEventVersion() == null ? 1 : subscription.getEventVersion();
             try {
                 OpenApiEventCatalog.EventDescriptor descriptor =
-                        eventCatalog.requireExternal(subscription.getEventType(), version);
+                        eventCatalog.requireExternal(subscription.getTenantId(), subscription.getEventType(), version);
                 requirePublishedEnvelope(descriptor, version, payload);
             } catch (IllegalArgumentException exception) {
                 log.warn("Skipping incompatible Open Platform webhook subscription: subscription={}, reason={}",
@@ -110,7 +150,6 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     subscription.getPid(), subscription.getFilterExpression());
             return null;
         }
-        WebhookDeliveryLog delivery = new WebhookDeliveryLog();
         delivery.setPid(UniqueIdGenerator.generate());
         delivery.setTenantId(subscription.getTenantId());
         delivery.setSubscriptionPid(subscription.getPid());
@@ -135,8 +174,19 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         } catch (Exception exception) {
             throw new IllegalArgumentException("Webhook payload is not JSON serializable", exception);
         }
+        String receiverKey = com.auraboot.framework.webhook.service.WebhookReceiverKey.of(
+                subscription.getTargetUrl(), subscription.getPid());
+        delivery.setReceiverKey(receiverKey);
+        deliveryLogMapper.registerReceiver(subscription.getTenantId(), receiverKey);
         deliveryLogMapper.insert(delivery);
         return receiptFrom(subscription, delivery);
+    }
+
+    private String serializePayload(Map<String, Object> payload) {
+        try { return objectMapper.writeValueAsString(payload); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw new IllegalArgumentException("Webhook payload is not JSON serializable", error);
+        }
     }
 
     private void requirePublishedEnvelope(OpenApiEventCatalog.EventDescriptor descriptor, int version,
@@ -169,7 +219,22 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
             return;
         }
         try {
+            String receiverKey = com.auraboot.framework.webhook.service.WebhookReceiverKey.of(
+                    subscription.getTargetUrl(), subscription.getPid());
+            if (!receiverKey.equals(delivery.getReceiverKey())) {
+                deliveryLogMapper.registerReceiver(subscription.getTenantId(), receiverKey);
+                deliveryLogMapper.rebindReceiver(delivery.getId(), delivery.getLeaseToken(),
+                        delivery.getReceiverKey(), receiverKey, subscription.getTargetUrl());
+                return; // Changed targets must acquire their current receiver's bulkhead before sending.
+            }
+            boolean modelEvent = OpenApiEventCatalog.isModelEvent(subscription.getEventType());
+            if (modelEvent && (subscription.getSecret() == null || subscription.getSecret().isBlank())) {
+                throw new IllegalArgumentException("Published model notifications require a signing secret");
+            }
             String body = delivery.getRequestBody();
+            if (OpenApiEventCatalog.isModelEvent(subscription.getEventType())) {
+                body = serializePayload(preparePublished(subscription, delivery, Map.of()));
+            }
 
             // Validate URL + pin the resolved IP so the HTTP send cannot be
             // re-resolved to a different address (P3-E #1 DNS rebinding TOCTOU).
@@ -184,6 +249,9 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     ? subscription.getTimeoutMs()
                     : DEFAULT_READ_TIMEOUT_MS;
 
+            if (readTimeoutMs < 1000 || readTimeoutMs > 60000) {
+                throw new IllegalArgumentException("Webhook timeout must be between 1000 and 60000 milliseconds");
+            }
             String timestamp = String.valueOf(Instant.now().getEpochSecond());
             HttpRequest.Builder requestBuilder = PinnedHttpRequests.newPinnedRequestBuilder(target)
                     .timeout(Duration.ofMillis(readTimeoutMs))
@@ -194,11 +262,13 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     .header("X-Webhook-Timestamp", timestamp)
                     .header("X-Webhook-Delivery", delivery.getPid());
 
-            // Add HMAC signature if secret is configured
+            String signature = null;
             if (subscription.getSecret() != null && !subscription.getSecret().isBlank()) {
                 String decryptedSecret = fieldEncryptionService.decrypt(subscription.getSecret());
-                String signature = webhookSignature.sign(decryptedSecret, timestamp, body);
-                requestBuilder.header("X-Webhook-Signature", signature);
+                if (modelEvent && (decryptedSecret == null || decryptedSecret.isBlank())) {
+                    throw new IllegalArgumentException("Published model notifications require a signing secret");
+                }
+                signature = webhookSignature.sign(decryptedSecret, timestamp, body);
             }
 
             // Add custom headers
@@ -208,6 +278,15 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                         objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class));
                 customHeaders.forEach(requestBuilder::header);
             }
+
+            // Protocol identity and signatures cannot be replaced or duplicated by subscription headers.
+            requestBuilder.setHeader("Content-Type", "application/json");
+            requestBuilder.setHeader("X-Webhook-Event", subscription.getEventType());
+            requestBuilder.setHeader("X-Webhook-Event-Version",
+                    String.valueOf(subscription.getEventVersion() == null ? 1 : subscription.getEventVersion()));
+            requestBuilder.setHeader("X-Webhook-Timestamp", timestamp);
+            requestBuilder.setHeader("X-Webhook-Delivery", delivery.getPid());
+            if (signature != null) requestBuilder.setHeader("X-Webhook-Signature", signature);
 
             // A subscription header cannot replace the persisted originating ID.
             if (delivery.getRequestId() != null && !delivery.getRequestId().isBlank()) {
@@ -228,6 +307,9 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
             log.debug("Webhook delivered: subscription={}, url={}, status={}",
                     subscription.getPid(), subscription.getTargetUrl(), status);
 
+        } catch (org.springframework.security.access.AccessDeniedException exception) {
+            deliveryLogMapper.markPermanentFailure(delivery.getId(), delivery.getLeaseToken(),
+                    "Published model event authority revoked or unavailable");
         } catch (IllegalArgumentException exception) {
             log.warn("SSRF blocked or invalid URL for webhook: subscription={}, url={}, reason={}",
                     subscription.getPid(), subscription.getTargetUrl(), exception.getMessage());
@@ -235,8 +317,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     truncate(exception.getMessage()));
         } catch (Exception exception) {
             int retryCount = delivery.getRetryCount() == null ? 0 : delivery.getRetryCount();
-            long backoffSeconds = Math.min(3600L, 1L << Math.min(retryCount, 12));
-            Instant nextRetryAt = Instant.now().plusSeconds(backoffSeconds);
+            Instant nextRetryAt = Instant.now().plus(retryPolicy.delayForRetry(retryCount));
             Integer status = exception instanceof ResponseFailure failure ? failure.status : null;
             String body = exception instanceof ResponseFailure failure ? failure.body : null;
             deliveryLogMapper.markFailure(delivery.getId(), delivery.getLeaseToken(), status, body,

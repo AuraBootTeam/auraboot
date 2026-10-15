@@ -23,6 +23,10 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC"
+            # Default-deny authorization knob (PermissionInterceptor un-annotated surface,
+      # shipped deny since the authz flip); ops can override to shadow/allow per
+      # deployment without an image rebuild. See aura.security.authz.unannotated-mode.
+      AURA_AUTHZ_UNANNOTATED_MODE: ${AURA_AUTHZ_UNANNOTATED_MODE:-deny}
     depends_on:
       postgres:
         condition: service_healthy

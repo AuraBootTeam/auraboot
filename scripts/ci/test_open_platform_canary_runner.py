@@ -89,6 +89,59 @@ class RunnerTests(unittest.TestCase):
                 Receiver(path, b'secret', 'fresh-run')
             self.assertEqual(path.read_bytes(), before)
 
+    def model_rows(self):
+        secret = b'private-model-secret'
+        rows = []
+        for index, projection in enumerate([{'pid': 'part-1', 'name': 'Visible', 'zone': 'A'},
+                                            {'pid': 'part-1', 'zone': 'A'}]):
+            raw = json.dumps({'id': 'event-model', 'type': 'open.resource.parts.created', 'schemaVersion': 2,
+                              'subject': {'type': 'parts', 'pid': 'part-1'}, 'data': projection,
+                              'occurredAt': '2026-10-11T00:00:00Z', 'recordVersion': 1,
+                              'correlationId': 'source-request'}).encode()
+            timestamp = str(int(time.time()))
+            rows.append({'sequence': index + 1, 'raw_body': raw, 'timestamp_text': timestamp,
+                         'received_at': time.time(), 'signature_valid': 1, 'delivery_id': 'delivery-model',
+                         'event_id': 'event-model', 'response_status': 200, 'body_sha': hashlib.sha256(raw).hexdigest(),
+                         'duplicate': bool(index),
+                         'signature': 'sha256=' + hmac.new(secret, timestamp.encode() + b'.' + raw, hashlib.sha256).hexdigest()})
+        kwargs = {'secret': secret, 'delivery_pid': 'delivery-model', 'event_id': 'event-model',
+                  'subject_pid': 'part-1', 'statuses': [200, 200], 'event_type': 'open.resource.parts.created',
+                  'subject_type': 'parts', 'schema_version': 2,
+                  'projections': [json.loads(row['raw_body'])['data'] for row in rows]}
+        return rows, kwargs
+
+    def test_dynamic_event_requires_explicit_contract_and_exact_projections(self):
+        rows, kwargs = self.model_rows()
+        self.assertEqual(verify_delivery(rows, **kwargs)['attempts'], 2)
+        for key, value in [('event_type', 'other.created'), ('subject_type', 'other'), ('schema_version', 1),
+                           ('projections', [{'pid': 'part-1'}, {'pid': 'part-1'}])]:
+            with self.subTest(key=key), self.assertRaises(ProtocolError):
+                verify_delivery(rows, **dict(kwargs, **{key: value}))
+
+    def test_dynamic_projection_denominator_cannot_shrink(self):
+        rows, kwargs = self.model_rows()
+        for projection in [[], kwargs['projections'][:1], [None, None], {}]:
+            with self.assertRaises(ProtocolError): verify_delivery(rows, **dict(kwargs, projections=projection))
+
+    def test_raw_stability_remains_required_without_projection_contract(self):
+        rows, kwargs = self.model_rows()
+        with self.assertRaises(ProtocolError): verify_delivery(rows, **dict(kwargs, projections=None))
+
+    def test_dynamic_raw_hmac_is_recomputed_despite_recorded_green(self):
+        rows, kwargs = self.model_rows()
+        rows[1]['signature'] = 'sha256=' + '0' * 64
+        self.assertEqual(rows[1]['signature_valid'], 1)
+        with self.assertRaises(ProtocolError): verify_delivery(rows, **kwargs)
+
+    def test_signed_metadata_change_or_internal_field_still_rejected(self):
+        for mutation in [{'recordVersion': 2}, {'correlationId': 'other-request'}, {'tenant_id': 1}, {'schemaVersion': True}]:
+            rows, kwargs = self.model_rows()
+            payload = json.loads(rows[1]['raw_body']); payload.update(mutation)
+            raw = json.dumps(payload).encode(); rows[1]['raw_body'] = raw
+            rows[1]['body_sha'] = hashlib.sha256(raw).hexdigest()
+            rows[1]['signature'] = 'sha256=' + hmac.new(kwargs['secret'], rows[1]['timestamp_text'].encode() + b'.' + raw, hashlib.sha256).hexdigest()
+            with self.subTest(mutation=mutation), self.assertRaises(ProtocolError): verify_delivery(rows, **kwargs)
+
     def test_event_requires_exact_consumer_identity_and_downstream_artifact(self):
         event = {'id': 'fresh-event', 'type': 'asset.created', 'data': {'runId': 'canary-selftest-001', 'originatingRequestId': 'fresh-request'}}
         log = {'status': 'success', 'automationId': 'automation-1', 'tenantId': 1,

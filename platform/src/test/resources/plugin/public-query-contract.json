@@ -1,0 +1,32 @@
+{
+  "code": "public.records-search",
+  "queryCode": "public_record_search",
+  "schemaVersion": 1,
+  "sourceFingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+  "scopes": {
+    "execute": "public.record.search"
+  },
+  "sourceResources": {
+    "public_record": "public.records"
+  },
+  "parameters": {},
+  "fields": {
+    "pid": {
+      "source": "pid",
+      "type": "pid",
+      "readable": true,
+      "writable": false,
+      "required": false,
+      "nullable": false,
+      "operators": [],
+      "sortable": false,
+      "referenceResource": null,
+      "properties": {},
+      "items": null
+    }
+  },
+  "maxPageSize": 25,
+  "maxRows": 100,
+  "timeoutMs": 1000,
+  "maxConcurrent": 2
+}

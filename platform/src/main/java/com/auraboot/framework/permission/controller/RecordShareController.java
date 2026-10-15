@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.notification.service.NotificationService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.service.RecordShareService;
@@ -58,6 +59,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "Record Share", description = "Per-record sharing (ReBAC)")
+@AuthenticatedAccess("per-record ReBAC share management; management capability is asserted per record in-controller and tenant isolation is enforced via MetaContext")
 public class RecordShareController {
 
     private final RecordShareService recordShareService;

@@ -1,0 +1,18 @@
+[
+  {
+    "modelCode": "tpm_customer",
+    "fieldCode": "tpm_cu_name",
+    "sequence": 1,
+    "visible": true,
+    "editable": true,
+    "required": true
+  },
+  {
+    "modelCode": "tpm_customer",
+    "fieldCode": "tpm_cu_contact",
+    "sequence": 2,
+    "visible": true,
+    "editable": true,
+    "required": false
+  }
+]

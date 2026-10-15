@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 
@@ -45,6 +46,7 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 @Slf4j
 @RestController
 @RequestMapping("/api/memory/promotions")
+@AuthenticatedAccess("tenant-scoped memory-promotion reads for the authenticated caller; review, retract and batch-approve mutations carry method-level @RequirePermission")
 public class MemoryPromotionController {
 
     // Valid reject_reason values — mirrors chk_memory_promotion_reject_reason.

@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { Download } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { ToolbarActionConfig, SavedView, ViewType } from '~/framework/smart/types/savedView';
@@ -15,6 +16,8 @@ import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
 export interface ListPageHeaderProps {
+  workspace?: boolean;
+  description?: string;
   /** Page title (already localized) */
   title: string;
   /** Model code for test IDs and export */
@@ -57,6 +60,8 @@ export interface ListPageHeaderProps {
 
 export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   title,
+  workspace = false,
+  description,
   modelCode,
   savedViews,
   currentView,
@@ -90,12 +95,11 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   const { t: contextT } = useI18n();
   const t = providedT ?? contextT;
   return (
-    <div className="border-border bg-panel border-b px-6 py-4">
+    <div className={workspace ? 'mb-6 bg-transparent pt-1' : 'border-border bg-panel border-b px-5 py-4'}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="text-text flex-shrink-0 text-xl font-semibold tracking-tight whitespace-nowrap">
-            {title}
-          </h2>
+          <div><h2 className={`text-text min-w-0 font-semibold tracking-tight break-words ${workspace ? 'text-2xl' : 'text-xl'}`}>{title}</h2>
+          {workspace && description && <p className="text-text-2 mt-2 text-xs">{description}</p>}</div>
           {!hideSavedViews && (
             <ViewSelector
               views={savedViews}
@@ -142,6 +146,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               {t('member.import')}
             </button>
           )}
+          {workspace && !hideBuiltInExport && <button type="button" onClick={() => onExport('xlsx')} data-testid="workspace-export" className="border-border-strong text-text-2 inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs"><Download className="h-3.5 w-3.5" />{t('action.export', undefined, 'Export')}</button>}
           <ToolbarActionGroup
             buttons={buttons}
             toolbarActions={toolbarActions}
@@ -155,7 +160,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
             modelCode={modelCode}
             filters={exportFilters}
             hideBuiltInImport={hideBuiltInImport ?? isTenantMemberPage}
-            hideBuiltInExport={hideBuiltInExport}
+            hideBuiltInExport={workspace || hideBuiltInExport}
             hideBuiltInPrint={hideBuiltInPrint}
           />
         </div>

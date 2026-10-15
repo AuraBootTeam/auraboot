@@ -30,6 +30,12 @@ class QueryBuilderParameterBindingTest {
 
     @BeforeEach void setup() {
         MetaContext.setContext(7L, 99L, "actor", "tester");
+        // canReadModel prefers the MetaContext member binding over the userId. MEMBER_ID is
+        // a separate ThreadLocal that setContext does not reset, so a stale binding leaked
+        // by an earlier test class on the same pooled JUnit thread hijacks the lookup to an
+        // unstubbed member id and the deny branch fires instead of the stub. This class's
+        // premise is the no-member fallback: bind nothing, resolve by userId.
+        MetaContext.setMemberId(null);
         when(permissions.canAction(99L, "customers", "read")).thenReturn(true);
         var field = new FieldDefinition();
         field.setCode("name");

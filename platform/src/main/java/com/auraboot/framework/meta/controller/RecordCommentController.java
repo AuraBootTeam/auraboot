@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.service.RecordCommentService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.Map;
 @RequestMapping("/api/records")
 @RequiredArgsConstructor
 @Tag(name = "Record Comments", description = "Record-level comments and activity history")
+@AuthenticatedAccess("record-level comments and activity history for CRM records addressed by modelCode+recordPid within the authenticated session")
 public class RecordCommentController {
 
     private final RecordCommentService commentService;

@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.constant.DataType;
@@ -80,7 +81,17 @@ class TemplateGeneratorIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void ensureModelExists() {
         setupTenantContext();
-        
+        // #2157 made the menu/permission/role side effects of generation explicitly
+        // authorized: generateCrudPages requires meta.menu.update / meta.permission.update /
+        // org.role.update whenever the config requests them (CrudTemplateConfig defaults
+        // them all on). The shared test role is permission-less by default, so grant the
+        // three codes through the committed-grant helper the PermissionInterceptor-visible
+        // contract uses. generateCrudPagesUnauthorizedSideEffectIsDenied pins the denial
+        // side of this contract.
+        grantCommittedPermissionToTestRole("meta.menu.update", "meta", "menu", "update", "Manage menus");
+        grantCommittedPermissionToTestRole("meta.permission.update", "meta", "permission", "update", "Manage permissions");
+        grantCommittedPermissionToTestRole("org.role.update", "org", "role", "update", "Manage roles");
+
         if (!modelInitialized) {
             try {
                 cleanupExistingModel();
@@ -400,6 +411,30 @@ class TemplateGeneratorIntegrationTest extends BaseIntegrationTest {
         assertNotNull(result);
         // Permissions should be created and assigned to the specified roles
         assertFalse(result.getGeneratedResources().getPermissions().isEmpty());
+    }
+
+    @Test
+    @Order(60)
+    @DisplayName("P0-4.4: side-effect generation without the manage grants is denied")
+    void generateCrudPagesUnauthorizedSideEffectIsDenied() {
+        // #2157 contract: page generation authority does NOT imply authority to create
+        // menus (meta.menu.update), permissions (meta.permission.update), or role grants
+        // (org.role.update). A principal holding none of them must be denied before any
+        // side effect persists, even though this class granted them to the shared role.
+        CrudTemplateConfig config = buildDefaultConfig();
+        Long tenantId = getTestTenant().getId();
+        MetaContext.setContext(tenantId, tenantId + 7_777_777L, "unauthorized-template-user", "unauthorized");
+        // Drop the inherited member binding too: permissions resolve through the member's
+        // roles, and the shared test member now HOLDS the grants — a userId-only swap would
+        // still pass. A principal with no member has no roles and must be denied.
+        MetaContext.setMemberId(null);
+        try {
+            assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                    () -> templateGeneratorService.generateCrudPages(testModelCode, config),
+                    "Side-effect generation without the manage grants must be denied");
+        } finally {
+            applyTestMetaContext();
+        }
     }
 
     // ==================== Helper Methods ====================

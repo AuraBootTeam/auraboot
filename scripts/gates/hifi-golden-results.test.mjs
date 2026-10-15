@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { auditHifiReport } from './hifi-golden-results.mjs';
+import { auditHifiReport, profileGrep } from './hifi-golden-results.mjs';
 const profile = JSON.parse(fs.readFileSync(new URL('./hifi-golden-profile.json', import.meta.url)));
 const makeReport = () => ({ errors: [], suites: [{ specs: profile.tests.map(t => ({
   file: t.file, title: t.title, tests: [{ projectName: t.project, expectedStatus: 'passed',
@@ -34,4 +34,62 @@ test('restoring a rejected report restores green', () => {
   const report = makeReport(); report.suites[0].specs.pop();
   assert.throws(() => auditHifiReport(profile, report));
   assert.equal(auditHifiReport(profile, makeReport()).passed, profile.tests.length);
+});
+
+test('profile selection matches literal complete titles', () => {
+  const pattern = new RegExp(profileGrep({ tests: [{ title: 'write (A+B) [record]?' }] }));
+  assert.ok(pattern.test('oss file suite write (A+B) [record]?'));
+  assert.ok(!pattern.test('oss file suite write A+B record'));
+  assert.ok(!pattern.test('oss file suite write (A+B) [record]? extra'));
+  assert.throws(() => profileGrep({ tests: [] }));
+});
+
+const ossProfile = JSON.parse(fs.readFileSync(new URL('./oss-e2e-gate-profile.json', import.meta.url)));
+const makeOssReport = () => ({ errors: [], suites: [{ specs: ossProfile.tests.map(row => ({
+  file: row.file, title: row.title, tests: [{ projectName: row.project, expectedStatus: 'passed',
+    status: 'expected', results: [{ status: 'passed', retry: 0, attachments: (row.requiredEvidence ?? []).map(evidence => ({
+      name: evidence.name, contentType: 'application/json', body: Buffer.from(JSON.stringify(evidence.fields)).toString('base64'),
+    })) }] }],
+})) }] });
+for (const row of ossProfile.tests.filter(row => row.id.startsWith('DOP-BROWSER-'))) {
+  for (const fault of ['omitted', 'duplicated', 'skipped', 'retried']) {
+    test(`${row.id} ${fault} rejects a previously complete OSS report`, () => {
+      assert.equal(auditHifiReport(ossProfile, makeOssReport()).passed, ossProfile.tests.length);
+      const report = makeOssReport();
+      const specs = report.suites[0].specs;
+      const index = specs.findIndex(spec => spec.title === row.title);
+      if (fault === 'omitted') specs.splice(index, 1);
+      if (fault === 'duplicated') specs.push(specs[index]);
+      if (fault === 'skipped') specs[index].tests[0].results[0].status = 'skipped';
+      if (fault === 'retried') specs[index].tests[0].results[0].retry = 1;
+      assert.throws(() => auditHifiReport(ossProfile, report));
+      assert.equal(auditHifiReport(ossProfile, makeOssReport()).passed, ossProfile.tests.length);
+    });
+  }
+}
+
+test('mandatory browser evidence cannot be omitted, duplicated or weakened', () => {
+  for (const row of ossProfile.tests.filter(row => row.requiredEvidence?.length)) {
+    for (const required of row.requiredEvidence) {
+      for (const fault of ['missing', 'duplicate', 'mocked', 'incomplete']) {
+        const report = makeOssReport();
+        const spec = report.suites[0].specs.find(item => item.title === row.title);
+        const result = spec.tests[0].results[0];
+        const attachment = result.attachments.find(item => item.name === required.name);
+        if (fault === 'missing') result.attachments = result.attachments.filter(item => item !== attachment);
+        else if (fault === 'duplicate') result.attachments.push(attachment);
+        else {
+          const value = JSON.parse(Buffer.from(attachment.body, 'base64'));
+          if (fault === 'mocked') {
+            if ('routeMocks' in value) value.routeMocks = true;
+            else value.driver = 'programmatic-focus';
+          }
+          else value.cases.pop();
+          attachment.body = Buffer.from(JSON.stringify(value)).toString('base64');
+        }
+        assert.throws(() => auditHifiReport(ossProfile, report));
+        assert.equal(auditHifiReport(ossProfile, makeOssReport()).passed, ossProfile.tests.length);
+      }
+    }
+  }
 });
