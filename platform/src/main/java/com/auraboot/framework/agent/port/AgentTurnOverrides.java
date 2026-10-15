@@ -105,8 +105,10 @@ public final class AgentTurnOverrides {
     private final Boolean persistSessionTape;
     private final Set<String> effectivePermissions;
     private final boolean readOnlyExecution;
+    private final boolean scopedModelQueryOnly;
 
     private AgentTurnOverrides(Builder b) {
+        this.scopedModelQueryOnly = b.scopedModelQueryOnly;
         this.readOnlyExecution = b.readOnlyExecution;
         this.systemPromptOverride = b.systemPromptOverride;
         this.messagesOverride = b.messagesOverride;
@@ -133,6 +135,9 @@ public final class AgentTurnOverrides {
     /** Server-imposed capability ceiling; cannot be supplied by a public chat DTO. */
     public boolean readOnlyExecution() { return readOnlyExecution; }
 
+    /** Only tenant-scoped DSL model/NQ queries; excludes raw SQL and external providers. */
+    public boolean scopedModelQueryOnly() { return scopedModelQueryOnly; }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -145,6 +150,7 @@ public final class AgentTurnOverrides {
         private Boolean persistSessionTape;
         private Set<String> effectivePermissions;
         private boolean readOnlyExecution;
+        private boolean scopedModelQueryOnly;
 
         private Builder() {}
 
@@ -156,6 +162,8 @@ public final class AgentTurnOverrides {
         public Builder effectivePermissions(Set<String> v) { this.effectivePermissions = v; return this; }
 
         public Builder readOnlyExecution(boolean value) { this.readOnlyExecution = value; return this; }
+
+        public Builder scopedModelQueryOnly(boolean value) { this.scopedModelQueryOnly = value; return this; }
 
         public AgentTurnOverrides build() {
             return new AgentTurnOverrides(this);

@@ -404,6 +404,21 @@ public class AgentChatPortImpl implements AgentChatPort {
         // to extraTools (caller knows conversation-scope semantics).
         toolDefs = mergeExtraTools(toolDefs, extraToolsForMerge);
         toolDefs = toLlmFacingToolDefinitions(toolDefs);
+        Set<String> scopedQueryAllowlist = null;
+        if (overrides != null && overrides.scopedModelQueryOnly()) {
+            scopedQueryAllowlist = new LinkedHashSet<>();
+            for (ToolDefinition definition : toolDefs) {
+                if (isScopedModelQuery(definition)) {
+                    Set<String> required = new LinkedHashSet<>(definition.getRequiredPermissions() == null
+                            ? Set.of() : definition.getRequiredPermissions());
+                    required.add("model." + definition.getModelCode() + ".read");
+                    definition.setRequiredPermissions(Set.copyOf(required));
+                    scopedQueryAllowlist.add(definition.getToolCode());
+                }
+            }
+            scopedQueryAllowlist = Set.copyOf(scopedQueryAllowlist);
+            recordOverrideUsage("scopedModelQueryOnly");
+        }
         List<LlmChatRequest.Tool> tools = toLlmTools(toolDefs);
 
         // Build conversation: prefer the persisted multi-turn tape (so any prior
@@ -457,7 +472,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         // Run the tool loop
         return doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
                 systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink,
-                effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks);
+                effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks, scopedQueryAllowlist);
     }
 
     // =========================================================================
@@ -591,7 +606,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         AgentProfile profile,
                                         boolean persistTape,
                                         boolean requireInitialToolCall,
-                                        List<AgentContextBlock> contextBlocks) {
+                                        List<AgentContextBlock> contextBlocks, Set<String> scopedQueryAllowlist) {
         return chatTurnRuntime.runToolLoop(
                 new ChatTurnRuntime.ChatToolLoopSpec(
                         ctx,
@@ -617,7 +632,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                         AgentChatTurnOutcomeAdapter.HANDOFF_TOOL_NAME,
                         null,
                         objectMapper),
-                toolRuntimeAdapterFactory.callbacks(this, contextBlocks));
+                toolRuntimeAdapterFactory.callbacks(this, contextBlocks, scopedQueryAllowlist));
     }
 
     boolean defersPolicyUntilToolResult(ToolDefinition definition) {
@@ -755,6 +770,15 @@ public class AgentChatPortImpl implements AgentChatPort {
         return merged;
     }
 
+    private boolean isScopedModelQuery(ToolDefinition definition) {
+        if (definition == null || !"dsl".equalsIgnoreCase(definition.getProviderCode())
+                || !"dsl_query".equalsIgnoreCase(definition.getToolType())
+                || !"query".equalsIgnoreCase(definition.getOperationKind())
+                || definition.getModelCode() == null || definition.getModelCode().isBlank()) return false;
+        String code = definition.getToolCode();
+        return code != null && (code.startsWith("nq_") || code.startsWith("list_") || code.startsWith("get_"));
+    }
+
     private Set<String> restrictOverrideToProfile(Set<String> overridePermissions, Set<String> profilePermissions) {
         if (profilePermissions == null) return Set.copyOf(overridePermissions);
         LinkedHashSet<String> intersection = new LinkedHashSet<>(overridePermissions);
@@ -839,6 +863,8 @@ public class AgentChatPortImpl implements AgentChatPort {
                     .providerCode(def.getProviderCode())
                     .toolType(def.getToolType())
                     .sourceCode(sourceCode)
+                    .modelCode(def.getModelCode())
+                    .operationKind(def.getOperationKind())
                     .riskLevel(def.getRiskLevel())
                     .requiredPermissions(def.getRequiredPermissions())
                     .confirmationPolicy(def.getConfirmationPolicy())

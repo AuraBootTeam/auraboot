@@ -31,6 +31,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -548,6 +550,93 @@ class AgentChatPortImplToolLoopTest {
         assertThat(requests.getAllValues().get(0).getTools()).extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("nq_customers");
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "platform_execute_sql, platform, platform",
+            "get_customer_update, DSL_COMMAND, dsl",
+            "list_customer_notify, API_CALL, api",
+            "nq_customer_remote, MCP, mcp",
+            "platform_execute_sql, dsl_query, dsl",
+            "get_customer_raw, dsl_query, platform"
+    })
+    void scopedQueryBoundaryRejectsRawSqlExternalAndDisguisedToolsAtExecution(String unsafeName,
+                                                                                   String unsafeType,
+                                                                                   String unsafeProvider) throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of("agent_code", AGENT_CODE, "name", "Scoped query employee",
+                        "status", "active", "model", "test-model", "system_prompt", "Query customer data.",
+                        "allowed_operations", List.of("query"), "guardrails", "{\"provider\":\"openai\"}")));
+        stubProvider();
+        stubGrounding();
+        ToolDefinition safe = ToolDefinition.builder().toolCode("list:tpm_customer").providerCode("dsl")
+                .toolType("dsl_query").sourceCode("tpm_customer").modelCode("tpm_customer").operationKind("query").riskLevel("L0").build();
+        ToolDefinition unsafe = ToolDefinition.builder().toolCode(unsafeName).providerCode(unsafeProvider)
+                .toolType(unsafeType).sourceCode("platform.execute_sql").modelCode("tpm_customer").operationKind("query")
+                .requiredPermissions(java.util.Set.of("customers.manage")).riskLevel("L0").build();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of(safe, unsafe));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse("forged-sql", unsafeName, Map.of("sql", "SELECT * FROM ab_cloud_config WHERE 1=0 OR 1=1")))
+                .thenReturn(endTurnResponse("This tool is unavailable in the query channel."));
+        var overrides = com.auraboot.framework.agent.port.AgentTurnOverrides.builder().readOnlyExecution(true)
+                .scopedModelQueryOnly(true).effectivePermissions(java.util.Set.of("model.tpm_customer.read", "customers.manage")).build();
+        service.runAgentTurn(newTurnContext(), newRequest("Query customer data"), sink, overrides);
+        ArgumentCaptor<LlmChatRequest> requests = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requests.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requests.getAllValues().get(0).getTools()).extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("list_tpm_customer");
+        verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(sink, never()).onConfirmRequired(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void scopedModelQueryAllowlistStillExecutesAuthorizedModelQueries() throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of("agent_code", AGENT_CODE, "name", "Scoped employee",
+                        "status", "active", "model", "test-model", "system_prompt", "Query customers.",
+                        "allowed_operations", List.of("query"), "guardrails", "{\"provider\":\"openai\"}")));
+        stubProvider(); stubGrounding();
+        var model = ToolDefinition.builder().toolCode("list:tpm_customer").providerCode("dsl")
+                .toolType("dsl_query").sourceCode("tpm_customer").modelCode("tpm_customer").operationKind("query").build();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of(model));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse("allowed-read", "list_tpm_customer", Map.of()))
+                .thenReturn(endTurnResponse("One customer was returned."));
+        when(toolLoopService.executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any()))
+                .thenReturn("{\"success\":true,\"data\":{\"records\":[{\"tpm_cu_name\":\"Customer A\"}]}}");
+        var overrides = com.auraboot.framework.agent.port.AgentTurnOverrides.builder().readOnlyExecution(true)
+                .scopedModelQueryOnly(true).effectivePermissions(java.util.Set.of("model.tpm_customer.read")).build();
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Query customer data"), sink, overrides);
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AgentToolDefinition>> definitions = ArgumentCaptor.forClass(List.class);
+        verify(toolLoopService).executeToolCall(any(), any(), any(), eq(AGENT_CODE), eq("list_tpm_customer"),
+                anyMap(), definitions.capture(), any());
+        assertThat(definitions.getValue().get(0).getRequiredPermissions()).containsExactly("model.tpm_customer.read");
+    }
+
+    @Test
+    void scopedModelQueriesRequireTheBoundCallersModelReadPermission() throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of("agent_code", AGENT_CODE, "name", "Scoped employee",
+                        "status", "active", "model", "test-model", "system_prompt", "Query customers.",
+                        "guardrails", "{\"provider\":\"openai\"}")));
+        stubProvider(); stubGrounding();
+        var model = ToolDefinition.builder().toolCode("list:tpm_customer").providerCode("dsl")
+                .toolType("dsl_query").sourceCode("tpm_customer").modelCode("tpm_customer").operationKind("query").build();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of(model));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse("denied-read", "list_tpm_customer", Map.of()))
+                .thenReturn(endTurnResponse("The caller lacks model read permission."));
+        var overrides = com.auraboot.framework.agent.port.AgentTurnOverrides.builder().readOnlyExecution(true)
+                .scopedModelQueryOnly(true).effectivePermissions(java.util.Set.of("unrelated.read")).build();
+        service.runAgentTurn(newTurnContext(), newRequest("Query customer data"), sink, overrides);
+        ArgumentCaptor<LlmChatRequest> requests = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requests.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requests.getAllValues().get(0).getTools()).isNull();
         verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
     }
 
