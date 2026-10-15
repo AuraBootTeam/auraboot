@@ -1952,6 +1952,7 @@ openPlatform:
   title: 开放平台
   badge: 系统对系统访问
   subtitle: 创建租户级应用，按最小权限授权，轮换凭据，并查看统一的公共 API 契约。
+  integrationGuide: 接入指南（英文）
   apiReference: API 参考
   newApplication: 新建应用
   connectionFlow: 接入流程

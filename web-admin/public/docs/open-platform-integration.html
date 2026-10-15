@@ -1,0 +1,183 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AuraBoot External Integration Guide</title><meta name="description" content="Client credentials, dynamic model CRUD and queries, signed model events, retry and replay."><style>
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,sans-serif;line-height:1.65;color:#172034;background:#f5f7fb}*{box-sizing:border-box}body{margin:0}main{max-width:960px;margin:auto;background:white;padding:48px clamp(20px,5vw,64px)}h1{font-size:clamp(28px,5vw,42px);line-height:1.15;letter-spacing:-.025em}h2{line-height:1.3;font-size:24px}header p{color:#526078}nav{display:grid;gap:8px;border-left:3px solid #6366f1;padding:12px 20px;margin:28px 0}a{color:#4338ca;text-underline-offset:3px}section{margin:48px 0;scroll-margin-top:24px}p,li,td{overflow-wrap:anywhere}li{margin-bottom:10px}code{font-size:.88em;background:#eef1f7;border-radius:4px;padding:.1em .3em}pre{max-width:100%;overflow:auto;padding:20px;background:#111827;color:#e5e7eb;border-radius:10px;font-size:13px;line-height:1.6;tab-size:4}pre code{background:none;padding:0;font-size:inherit;color:inherit}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #d7ddea;padding:12px 8px}th:first-child{width:25%}footer{border-top:1px solid #d7ddea;padding-top:24px;color:#526078}@media(prefers-color-scheme:dark){:root{background:#0b1020;color:#e5e7eb}main{background:#141b2d}header p,footer{color:#b5bfd3}a{color:#a5b4fc}code{background:#273149}}@media print{main{max-width:none;padding:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}nav{break-inside:avoid}}
+</style></head><body><main><header><p>AuraBoot · Developer documentation · English</p><h1>External Integration Guide</h1><p>Connect your system through explicit public APIs and signed model notifications. Start with the operator-provided contract, then run the examples against your development installation.</p></header><nav aria-label="On this page"><a href="#prepare">1. Prepare your installation</a><a href="#auth">2. Authenticate and understand responses</a><a href="#crud">3. Run dynamic CRUD and queries</a><a href="#subscribe">4. Subscribe to model events</a><a href="#verify">5. Verify, persist, then acknowledge</a><a href="#retry">6. Handle failures and request replay</a></nav><section id="prepare"><h2>1. Prepare your installation</h2><p>Ask your AuraBoot operator for the HTTPS API base URL, environment, installation client ID/secret, granted scopes, public resource and query codes, exported OpenAPI contracts/types, and the webhook signing secret. Keep each environment separate. Calls use installation credentials, never a staff account or an internal model/table identifier.</p><p>The operator creates an application and installation in <code>/settings/api-docs</code>, publishes explicit capabilities in <code>/p/c/open_platform_publications</code>, and grants the installation the required operations, rows, fields and query sources. A valid token alone does not grant model access. Some sources are read-only; only call operations advertised in your contract.</p><p><strong>Example contract, not a built-in model:</strong> <code>manufacturing.parts</code> supports list/get/create/update/delete; readable/writable fields are <code>name</code> (required string), <code>code</code> (nullable string), and <code>warehouse</code> (required string). <code>pid</code> is server-generated/read-only. List permits <code>warehouse EQ</code> and sorting by <code>name</code>; max page size is at least 20. Query <code>manufacturing.parts-by-warehouse</code> has a required string parameter <code>warehouse</code> and returns the installation-visible parts. The operator must publish this example contract or adapt every sample to your actual export.</p><p>For this example request the exact scopes assigned to all five resource operations and query execution. Scope names are operator-defined. Use minimum privileges and a secret manager. Never embed client secrets in a browser/mobile app or source control.</p></section><section id="auth"><h2>2. Authenticate and understand responses</h2><p><code>POST /oauth2/token</code> accepts form-encoded <code>grant_type=client_credentials</code>, <code>client_id</code>, <code>client_secret</code>, and space-separated <code>scope</code>. HTTP Basic client authentication is also supported; do not combine Basic with form credentials.</p><pre><code data-language="http">POST /oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&amp;client_id=YOUR_CLIENT_ID&amp;client_secret=YOUR_ENCODED_SECRET&amp;scope=YOUR_ENCODED_SCOPES
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{&quot;access_token&quot;:&quot;REDACTED&quot;,&quot;token_type&quot;:&quot;Bearer&quot;,&quot;expires_in&quot;:3600,&quot;scope&quot;:&quot;YOUR_GRANTED_SCOPES&quot;}</code></pre><p>The lifetime above is illustrative: honor the returned <code>expires_in</code>, cache securely and refresh before expiry. There is no refresh-token flow here; request another client-credentials token. On a 401, refresh once and retry the original intent; repeated 401 needs operator attention. Do not print the token response. Send <code>Authorization: Bearer &lt;access_token&gt;</code> on public API calls. The token identifies its tenant/installation; do not add an arbitrary tenant header.</p><p>Public resource GET/POST/PATCH responses are the projected record itself, not the administration <code>{code,data}</code> envelope. GET/POST/PATCH return an <code>ETag</code>; create is 201 with <code>Location</code>, update/read are 200, delete is 204 with no JSON body. List returns <code>{items,hasMore,nextCursor}</code>; NamedQuery returns <code>{items,total,hasMore,nextCursor,schemaVersion}</code>. Errors carry a public code/message/requestId; retain the <code>X-Request-Id</code> response header for support. OAuth errors instead use <code>{error}</code>.</p></section><section id="crud"><h2>3. Run dynamic CRUD and queries</h2><p>Save the following complete Bash example as <code>crud.sh</code>. Set the four required environment variables and the public codes from your exported contracts, then run <code>bash crud.sh</code> in development. It creates and later deletes its demo record. Do not enable shell tracing. Example output files and the credential form are private temporary files.</p><pre><code data-language="bash" data-filename="crud.sh">#!/usr/bin/env bash
+set -euo pipefail
+# Requires Bash, curl, jq and Python 3. Use a disposable development record.
+: &quot;${AURABOOT_BASE_URL:?Set the operator-provided HTTPS API origin}&quot;
+: &quot;${AURABOOT_CLIENT_ID:?Set the installation client ID}&quot;
+: &quot;${AURABOOT_CLIENT_SECRET:?Load the secret from your secret manager}&quot;
+: &quot;${AURABOOT_SCOPE:?Set the exact granted scopes}&quot;
+RESOURCE=${AURABOOT_RESOURCE:-manufacturing.parts}
+QUERY=${AURABOOT_QUERY:-manufacturing.parts-by-warehouse}
+BASE=${AURABOOT_BASE_URL%/}
+TASK_DIR=$(mktemp -d); chmod 700 &quot;$TASK_DIR&quot;
+trap &#x27;rm -rf &quot;$TASK_DIR&quot;&#x27; EXIT
+# Keep credentials out of curl&#x27;s argument list and terminal output.
+python3 - &lt;&lt;&#x27;TOKEN&#x27; &gt; &quot;$TASK_DIR/token.form&quot;
+import os, urllib.parse
+print(urllib.parse.urlencode(dict(grant_type=&#x27;client_credentials&#x27;,
+ client_id=os.environ[&#x27;AURABOOT_CLIENT_ID&#x27;], client_secret=os.environ[&#x27;AURABOOT_CLIENT_SECRET&#x27;],
+ scope=os.environ[&#x27;AURABOOT_SCOPE&#x27;])), end=&#x27;&#x27;)
+TOKEN
+curl --fail-with-body -sS -X POST &quot;$BASE/oauth2/token&quot; \
+ -H &#x27;Content-Type: application/x-www-form-urlencoded&#x27; \
+ --data-binary @&quot;$TASK_DIR/token.form&quot; &gt; &quot;$TASK_DIR/token.json&quot;
+TOKEN=$(jq -er &#x27;.access_token&#x27; &quot;$TASK_DIR/token.json&quot;)
+printf &#x27;Authorization: Bearer %s\n&#x27; &quot;$TOKEN&quot; &gt; &quot;$TASK_DIR/auth.headers&quot;
+new_key() { python3 -c &#x27;import uuid; print(uuid.uuid4())&#x27;; }
+etag() { awk &#x27;tolower($1)==&quot;etag:&quot; {sub(/\r$/, &quot;&quot;); $1=&quot;&quot;; sub(/^ /, &quot;&quot;); print}&#x27; &quot;$1&quot;; }
+# Persist each key/body before sending in a real integration. On uncertainty,
+# repeat the SAME key/body/ETag; this walkthrough intentionally has no auto-retry.
+CREATE_KEY=$(new_key)
+curl --fail-with-body -sS -D &quot;$TASK_DIR/create.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $CREATE_KEY&quot; \
+ --data &#x27;{&quot;name&quot;:&quot;Motor&quot;,&quot;code&quot;:&quot;M1&quot;,&quot;warehouse&quot;:&quot;A&quot;}&#x27; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/created.json&quot;
+PID=$(jq -er &#x27;.pid&#x27; &quot;$TASK_DIR/created.json&quot;)
+# Read one record; preserve the quotes in ETag.
+curl --fail-with-body -sS -D &quot;$TASK_DIR/get.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; &quot;$BASE/api/open/v1/resources/$RESOURCE/$PID&quot; \
+ &gt; &quot;$TASK_DIR/current.json&quot;
+ETAG=$(etag &quot;$TASK_DIR/get.headers&quot;); test -n &quot;$ETAG&quot;
+UPDATE_KEY=$(new_key)
+curl --fail-with-body -sS -X PATCH -D &quot;$TASK_DIR/update.headers&quot; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &#x27;Content-Type: application/json&#x27; \
+ -H &quot;Idempotency-Key: $UPDATE_KEY&quot; -H &quot;If-Match: $ETAG&quot; \
+ --data &#x27;{&quot;name&quot;:&quot;Motor revision 2&quot;,&quot;code&quot;:null}&#x27; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE/$PID&quot; &gt; &quot;$TASK_DIR/updated.json&quot;
+UPDATED_ETAG=$(etag &quot;$TASK_DIR/update.headers&quot;); test -n &quot;$UPDATED_ETAG&quot;
+# Filter/order/limit must be allowed by this publication and installation.
+curl --fail-with-body -sS -G -H @&quot;$TASK_DIR/auth.headers&quot; \
+ --data-urlencode &#x27;limit=20&#x27; --data-urlencode &#x27;sort=name&#x27; --data-urlencode &#x27;direction=ASC&#x27; \
+ --data-urlencode &#x27;filters=[{&quot;field&quot;:&quot;warehouse&quot;,&quot;operator&quot;:&quot;EQ&quot;,&quot;value&quot;:&quot;A&quot;}]&#x27; \
+ &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; &gt; &quot;$TASK_DIR/page.json&quot;
+CURSOR=$(jq -r &#x27;.nextCursor // empty&#x27; &quot;$TASK_DIR/page.json&quot;)
+if test -n &quot;$CURSOR&quot;; then
+ curl --fail-with-body -sS -G -H @&quot;$TASK_DIR/auth.headers&quot; \
+  --data-urlencode &#x27;limit=20&#x27; --data-urlencode &#x27;sort=name&#x27; --data-urlencode &#x27;direction=ASC&#x27; \
+  --data-urlencode &#x27;filters=[{&quot;field&quot;:&quot;warehouse&quot;,&quot;operator&quot;:&quot;EQ&quot;,&quot;value&quot;:&quot;A&quot;}]&#x27; \
+  --data-urlencode &quot;cursor=$CURSOR&quot; &quot;$BASE/api/open/v1/resources/$RESOURCE&quot; \
+  &gt; &quot;$TASK_DIR/page2.json&quot;
+fi
+# NamedQuery parameters are typed JSON, never SQL or internal model codes.
+curl --fail-with-body -sS -X POST -H @&quot;$TASK_DIR/auth.headers&quot; \
+ -H &#x27;Content-Type: application/json&#x27; \
+ --data &#x27;{&quot;parameters&quot;:{&quot;warehouse&quot;:&quot;A&quot;},&quot;limit&quot;:20}&#x27; \
+ &quot;$BASE/api/open/v1/queries/$QUERY:execute&quot; &gt; &quot;$TASK_DIR/query.json&quot;
+jq &#x27;{items, hasMore, nextCursor}&#x27; &quot;$TASK_DIR/page.json&quot;
+jq &#x27;{items, total, hasMore, nextCursor, schemaVersion}&#x27; &quot;$TASK_DIR/query.json&quot;
+# DELETE succeeds with 204 and no JSON body. This removes the demo record.
+DELETE_KEY=$(new_key)
+STATUS=$(curl --fail-with-body -sS -X DELETE -o &quot;$TASK_DIR/delete.body&quot; -w &#x27;%{http_code}&#x27; \
+ -H @&quot;$TASK_DIR/auth.headers&quot; -H &quot;Idempotency-Key: $DELETE_KEY&quot; \
+ -H &quot;If-Match: $UPDATED_ETAG&quot; &quot;$BASE/api/open/v1/resources/$RESOURCE/$PID&quot;)
+test &quot;$STATUS&quot; = 204
+printf &#x27;CRUD/query walkthrough completed.\n&#x27;
+</code></pre><p>Keep an opaque cursor unchanged. Subsequent list pages must preserve installation, contract, limit, filters and order; NamedQuery pages must preserve parameters and limit and add <code>cursor</code> to the JSON request. A changed policy/contract or expired cursor requires starting over. Filtering, sorting and parameter types are restricted by the publication; arbitrary SQL and arbitrary fields are not accepted. Omitted PATCH fields stay unchanged; explicit <code>null</code> clears only a nullable, writable field.</p><p>Retain the exact quoted ETag from the latest read/write. A 412 means reread and reconcile with concurrent changes before creating a new write intent; never blindly replace it with a new ETag. Persist a unique idempotency key and exact body/ETag per write intent before sending. On an ambiguous network failure repeat that exact intent. Keys are installation/route scoped, retained for 24 hours; a mismatched or expired intent returns conflict. Successful replay carries <code>Idempotent-Replay: true</code>. Authorization is checked again; replay cannot restore revoked access.</p><p>The TypeScript SDK supports <code>createResource</code>, <code>getResourceVersioned</code>, <code>updateResource</code>, <code>deleteResource</code>, <code>listResources</code>, <code>executeQuery</code>. SDK mutation responses wrap the record as <code>{resource,etag,...}</code>. Obtain the version/archive that includes these dynamic methods from your operator; an older npm release may not include them. The direct HTTP example does not depend on SDK publication.</p></section><section id="subscribe"><h2>4. Subscribe to model events</h2><ol><li>The operator publishes <code>created</code>, <code>updated</code> and/or <code>deleted</code> events on the public resource, and grants installation read/row/field authority.</li><li>Deploy a fast receiver behind a valid HTTPS endpoint. Store the signing secret separately from OAuth credentials.</li><li>In the installation card, open <strong>Model notifications</strong>, select the exact event, schema version, HTTPS URL and signing secret. Create one subscription per event type. Keep the endpoint enabled.</li><li>Trigger a real permitted change and inspect the installation delivery log plus your durable inbox. A generic test payload is not proof of model-event authorization or projection.</li></ol><p>Event names are <code>open.resource.&lt;public-code&gt;.created</code>, <code>.updated</code> and <code>.deleted</code>. The machine-readable event directory is <code>GET /api/open/v1/event-catalog</code> with its required granted scope. Subscribe only to advertised versions. Current grants/source bindings are rechecked before every attempt/replay; withdrawn resources, revoked grants and invalid sources can prevent a send.</p><pre><code data-language="http">POST /webhooks/auraboot
+Content-Type: application/json
+X-Webhook-Event: open.resource.manufacturing.parts.updated
+X-Webhook-Event-Version: 1
+X-Webhook-Timestamp: 1792020000
+X-Webhook-Delivery: delivery_public_pid
+X-Webhook-Signature: sha256=LOWERCASE_HEX_HMAC
+
+{&quot;id&quot;:&quot;event_public_id&quot;,&quot;type&quot;:&quot;open.resource.manufacturing.parts.updated&quot;,&quot;schemaVersion&quot;:1,&quot;occurredAt&quot;:&quot;2026-10-15T00:00:00Z&quot;,&quot;subject&quot;:{&quot;type&quot;:&quot;manufacturing.parts&quot;,&quot;pid&quot;:&quot;record_public_pid&quot;},&quot;recordVersion&quot;:2,&quot;correlationId&quot;:&quot;request_correlation&quot;,&quot;data&quot;:{&quot;pid&quot;:&quot;record_public_pid&quot;,&quot;name&quot;:&quot;Motor revision 2&quot;,&quot;code&quot;:null,&quot;warehouse&quot;:&quot;A&quot;}}</code></pre><p>Payload data contains only the installation-visible published fields. A field omitted by policy is not a null value or a request to erase previously stored data. Deleted events describe the projected pre-delete record with a newer record version. Delivery is at least once; duplicates and out-of-order arrival are possible. Retain event IDs and per-record versions/tombstones. Do not assume every recordVersion is observed or contiguous. Model events can originate from authorized UI, imports and commands as well as public API writes.</p></section><section id="verify"><h2>5. Verify, persist, then acknowledge</h2><p>Calculate <code>sha256=hex(HMAC-SHA256(UTF8(secret), ASCII(timestamp) + b"." + raw_request_body))</code>. Read the raw bytes before any JSON parser, verify a bounded timestamp window and compare signatures in constant time, then parse/validate the subscribed schema. The sample uses a receiver-chosen ±300 second window and schema version 1; synchronize clocks and adjust schema validation to your actual export. Configure a reverse proxy/body/read timeout in front of this local standard-library receiver.</p><p>Save as <code>receiver.py</code>, set <code>AURABOOT_CONSUMER_KEY</code> to a stable namespace for this installation/subscription and <code>AURABOOT_WEBHOOK_SECRET</code> from your secret manager. Set <code>INBOX_DB</code> to an absolute persistent path. Run <code>python3 receiver.py</code>; the HTTPS proxy forwards only the webhook path to loopback port 8099. Run <code>python3 receiver.py --drain</code> periodically as a separate worker. The example applies a local projection and tombstone atomically with inbox completion; it makes no external business side effects.</p><pre><code data-language="python" data-filename="receiver.py">#!/usr/bin/env python3
+&quot;&quot;&quot;Python 3 stdlib receiver + inbox worker; run behind a managed HTTPS proxy.&quot;&quot;&quot;
+import hashlib, hmac, json, os, sqlite3, sys, time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+DB = os.environ.get(&#x27;INBOX_DB&#x27;, &#x27;./auraboot-inbox.sqlite3&#x27;)
+# One stable consumer namespace per installation/subscription endpoint.
+CONSUMER = os.environ[&#x27;AURABOOT_CONSUMER_KEY&#x27;]
+def connect():
+    db = sqlite3.connect(DB, timeout=5)
+    db.execute(&#x27;PRAGMA journal_mode=WAL&#x27;)
+    db.execute(&#x27;CREATE TABLE IF NOT EXISTS inbox (consumer TEXT, id TEXT, body TEXT, done INTEGER DEFAULT 0, PRIMARY KEY(consumer,id))&#x27;)
+    db.execute(&#x27;CREATE TABLE IF NOT EXISTS projection (consumer TEXT, resource TEXT, pid TEXT, version INTEGER, deleted INTEGER, data TEXT, PRIMARY KEY(consumer,resource,pid))&#x27;)
+    return db
+
+def drain():
+    db = connect()
+    try:
+        # One worker, short transactions. A newer event wins even if delivery is reordered.
+        while True:
+            with db:
+                db.execute(&#x27;BEGIN IMMEDIATE&#x27;)
+                row = db.execute(&#x27;SELECT id,body FROM inbox WHERE consumer=? AND done=0 ORDER BY rowid LIMIT 1&#x27;, (CONSUMER,)).fetchone()
+                if row is None:
+                    return
+                event = json.loads(row[1]); subject = event[&#x27;subject&#x27;]
+                deleted = int(event[&#x27;type&#x27;].endswith(&#x27;.deleted&#x27;))
+                db.execute(&#x27;INSERT INTO projection VALUES (?,?,?,?,?,?) ON CONFLICT(consumer,resource,pid) DO UPDATE SET version=excluded.version,deleted=excluded.deleted,data=excluded.data WHERE excluded.version&gt;projection.version&#x27;,
+                           (CONSUMER, subject[&#x27;type&#x27;], subject[&#x27;pid&#x27;], event[&#x27;recordVersion&#x27;], deleted, json.dumps(event[&#x27;data&#x27;])))
+                db.execute(&#x27;UPDATE inbox SET done=1 WHERE consumer=? AND id=?&#x27;, (CONSUMER, row[0]))
+    finally:
+        db.close()
+
+class Receiver(BaseHTTPRequestHandler):
+    def log_message(self, *_):
+        pass  # Send safe metrics to your logger; never log body, secret or auth headers.
+    def do_POST(self):
+        if self.path != &#x27;/webhooks/auraboot&#x27;:
+            self.send_error(404); return
+        try:
+            size = int(self.headers.get(&#x27;Content-Length&#x27;, &#x27;0&#x27;))
+            if not 0 &lt; size &lt;= 1048576:
+                self.send_error(413); return
+            raw = self.rfile.read(size)
+            timestamp = self.headers.get(&#x27;X-Webhook-Timestamp&#x27;, &#x27;&#x27;)
+            signature = self.headers.get(&#x27;X-Webhook-Signature&#x27;, &#x27;&#x27;)
+            if not timestamp.isdecimal() or abs(int(time.time()) - int(timestamp)) &gt; 300:
+                self.send_error(401); return
+            if len(signature) != 71 or not signature.startswith(&#x27;sha256=&#x27;):
+                self.send_error(401); return
+            keys = [os.environ[&#x27;AURABOOT_WEBHOOK_SECRET&#x27;]]
+            if os.environ.get(&#x27;AURABOOT_WEBHOOK_PREVIOUS_SECRET&#x27;):
+                keys.append(os.environ[&#x27;AURABOOT_WEBHOOK_PREVIOUS_SECRET&#x27;])
+            message = timestamp.encode(&#x27;ascii&#x27;) + b&#x27;.&#x27; + raw
+            valid = False
+            for key in keys:
+                expected = &#x27;sha256=&#x27; + hmac.new(key.encode(&#x27;utf-8&#x27;), message, hashlib.sha256).hexdigest()
+                valid |= hmac.compare_digest(expected.encode(&#x27;ascii&#x27;), signature.encode(&#x27;ascii&#x27;))
+            if not valid:
+                self.send_error(401); return
+            event = json.loads(raw)
+            if (not isinstance(event, dict) or not isinstance(event.get(&#x27;id&#x27;), str)
+                or not isinstance(event.get(&#x27;type&#x27;), str) or not event[&#x27;type&#x27;].startswith(&#x27;open.resource.&#x27;)
+                or not isinstance(event.get(&#x27;schemaVersion&#x27;), int) or event[&#x27;schemaVersion&#x27;] != 1
+                or not isinstance(event.get(&#x27;recordVersion&#x27;), int) or event[&#x27;recordVersion&#x27;] &lt; 1
+                or not isinstance(event.get(&#x27;subject&#x27;), dict)
+                or not isinstance(event[&#x27;subject&#x27;].get(&#x27;type&#x27;), str)
+                or not isinstance(event[&#x27;subject&#x27;].get(&#x27;pid&#x27;), str)
+                or not isinstance(event.get(&#x27;data&#x27;), dict)):
+                self.send_error(400); return
+            # Also validate the selected publication&#x27;s field types/schema before consuming.
+            # Commit before acknowledging. Duplicate authenticated event IDs are harmless.
+            db = connect()
+            try:
+                with db:
+                    db.execute(&#x27;INSERT OR IGNORE INTO inbox(consumer,id,body) VALUES (?,?,?)&#x27;,
+                               (CONSUMER, event[&#x27;id&#x27;], raw.decode(&#x27;utf-8&#x27;)))
+            finally:
+                db.close()
+            self.send_response(204); self.end_headers()
+        except (ValueError, UnicodeError, KeyError, TypeError):
+            self.send_error(400)
+        except sqlite3.Error:
+            self.send_error(503)  # No acknowledgement if durable acceptance failed.
+
+if __name__ == &#x27;__main__&#x27;:
+    if sys.argv[1:] == [&#x27;--drain&#x27;]:
+        drain()
+    else:
+        os.environ[&#x27;AURABOOT_WEBHOOK_SECRET&#x27;]  # Fail fast on missing signing secret.
+        HTTPServer((&#x27;127.0.0.1&#x27;, int(os.environ.get(&#x27;PORT&#x27;, &#x27;8099&#x27;))), Receiver).serve_forever()
+</code></pre><p>Respond with 204 only after durable acceptance. A duplicate authenticated event returns success without a duplicate inbox row. A database failure returns 503 for redelivery. The worker transaction demonstrates idempotent local state changes; for payments/email/other external effects, use a transactional outgoing outbox and downstream idempotency keys. Acknowledging inbox storage moves subsequent business-processing retries to your own worker.</p><p>For secret rotation, temporarily verify against the current and explicitly retained previous secret; stop accepting the old one at the agreed overlap deadline. Deduplicate using the authenticated body event ID within your consumer namespace, not only the delivery header. A manual replay can repeat an event after the normal HTTP replay window; its fresh transport timestamp must still pass verification.</p></section><section id="retry"><h2>6. Handle failures and request replay</h2><table><thead><tr><th>Public API result</th><th>Caller action</th></tr></thead><tbody><tr><td>400</td><td>Fix body, field, filter or parameter contract; do not retry unchanged.</td></tr><tr><td>401</td><td>Refresh client-credentials token once; repeated failure needs operator intervention.</td></tr><tr><td>403 / 404</td><td>Check publication/installation, scopes and row/field/source grants. 404 can hide inaccessible data. Do not probe other tenants.</td></tr><tr><td>409</td><td>Inspect conflict/source-change code; resolve the contract or intent mismatch before a deliberate new request.</td></tr><tr><td>412</td><td>Read the current record and reconcile concurrency; never blind retry.</td></tr><tr><td>429</td><td>Honor Retry-After when supplied, otherwise use bounded backoff with jitter. Keep the same intent for writes.</td></tr><tr><td>Network timeout / 5xx</td><td>Outcome may be uncertain. Retry only within a bounded client policy using the original write key/body/ETag. Do not mint a new key on every attempt.</td></tr></tbody></table><p><strong>AuraBoot → your receiver:</strong> delivery uses persisted attempts, leases and bounded exponential backoff with jitter, capped at one hour. The current maxRetries setting is the failed-attempt budget, not a promise of that many additional attempts after the first; at the configured budget a delivery enters <code>dead_letter</code>. HTTP errors (including 4xx/5xx) and transport failures consume that budget; SSRF/configuration rejection or revoked model authority can dead-letter immediately. Return a prompt 2xx on accepted requests; never redirect, because redirects are not followed. Do not rely on a particular exact retry schedule or cross-receiver ordering.</p><p>Slow endpoints have bounded in-flight lanes per tenant and receiver origin, shared across subscriptions; adding subscriptions does not bypass the limit. This isolation is not a production throughput guarantee. Monitor inbox lag, age, failures and duplicates as well as delivery status.</p><ol><li>Find the dead-letter event in the installation delivery log; record its delivery PID, event ID, requestId, response status and time. Do not send secrets or full personal-data payloads to support.</li><li>Repair your endpoint/database/schema or ask the operator to repair publication/grants/source binding. Confirm the original event is still authorized.</li><li>Ask an authorized operator to select <strong>Replay</strong> and confirm the repeated-side-effect warning. The machine token cannot administer subscriptions or replay deliveries.</li><li>Verify the same event is durably accepted once by your inbox and the delivery reaches success. Replaying does not bypass source/authorization checks, create a new business event or guarantee a network send when authority is revoked.</li></ol><p>The operator-only management route is <code>POST /api/open-platform/installations/{installationPid}/webhook-deliveries/{deliveryPid}/replay</code>. It uses the authenticated administration session and its CSRF policy, not OAuth machine credentials; success uses the management <code>{code,data}</code> envelope. Prefer the management page. Generic webhook administration also checks the exact subscription/delivery pairing.</p><p>Before enabling production, agree rate limits, payload/schema compatibility, notification latency/loss targets, endpoint secret rotation and support ownership with your operator. Local development measurements are not a production capacity/SLO commitment.</p></section><footer>Contract reference: <a href="/swagger-ui/index.html?urls.primaryName=open-platform">Open Platform API reference</a>. Download tenant-specific model/query OpenAPI contracts from the publication management page. This guide contains no credentials and can be shared with your integration developer.</footer></main></body></html>

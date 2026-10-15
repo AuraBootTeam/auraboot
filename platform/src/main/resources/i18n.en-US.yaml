@@ -1655,6 +1655,7 @@ openPlatform:
   title: Open Platform
   badge: Machine-to-machine access
   subtitle: Create tenant-scoped applications, grant minimum scopes, rotate credentials, and inspect the unified public API contract.
+  integrationGuide: Integration guide (English)
   apiReference: API reference
   newApplication: New application
   connectionFlow: Connection flow

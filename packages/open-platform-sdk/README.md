@@ -1,5 +1,10 @@
 # AuraBoot Open Platform SDK
 
+For authentication, end-to-end HTTP CRUD/query examples and a durable signed-event receiver,
+see the [External Integration Guide](../../web-admin/public/docs/open-platform-integration.html).
+A deployed Web Admin serves it at `/docs/open-platform-integration.html`; the Open Platform
+management page links to the same packaged document.
+
 Published on npm: `npm install @auraboot/open-platform-sdk`
 
 ```ts

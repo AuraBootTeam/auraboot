@@ -451,6 +451,17 @@ export default function OpenPlatformPage() {
               )}
             </Link>
           )}
+          <a
+            href="/docs/open-platform-integration.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="open-platform-integration-guide"
+            className="rounded-control border-border-strong bg-panel text-text inline-flex items-center gap-2 border px-3 py-2 text-sm"
+          >
+            <ClipboardDocumentIcon className="h-4 w-4" />
+            {t('openPlatform.integrationGuide', undefined, locale.startsWith('zh') ? '接入指南（英文）' : 'Integration guide (English)')}
+            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+          </a>
           <button
             type="button"
             onClick={() =>
