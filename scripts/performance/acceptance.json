@@ -6,7 +6,7 @@
       "feature": "home",
       "action": "render workbench from SSR",
       "state": "ready",
-      "expectation": "widgets visible, no browser workbench config request",
+      "expectation": "inbox empty result, shortcuts and numeric stats visible; no browser workbench config request",
       "screenshot": "home-ready.png"
     },
     {

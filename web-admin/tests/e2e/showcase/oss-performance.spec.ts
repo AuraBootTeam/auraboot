@@ -72,6 +72,14 @@ test('PERF journey: home, menu, search, pagination and persisted CRUD @critical'
   await page.goto('/home');
   await expect(page.getByTestId('workbench-open-in-dashboard')).toBeVisible();
   await expect(page.locator('.react-grid-item').first()).toBeVisible();
+  await expect(page.getByText('暂无待办事项', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('shortcut-row').first()).toBeVisible();
+  await expect(
+    page.getByTestId('stat-card-inbox_pending').getByText('0', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId('stat-card-inbox_urgent').getByText('0', { exact: true }),
+  ).toBeVisible();
   expect(configurationRequests).toEqual([]);
   await capture(page, 'PERF-01');
 
