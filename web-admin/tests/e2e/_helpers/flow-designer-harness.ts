@@ -402,8 +402,10 @@ async function fillOneField(
     // async after the parent field (e.g. stateField) is set, so open the control and wait
     // for each option button to appear, then click it by its visible label.
     for (const v of value) {
-      await field.click();
       const opt = field.locator('div.absolute button').filter({ hasText: v }).first();
+      if (!(await opt.isVisible())) {
+        await field.getByRole('textbox').click({ timeout: 5_000 });
+      }
       await opt.waitFor({ state: 'visible', timeout: 5_000 });
       await opt.click();
     }
