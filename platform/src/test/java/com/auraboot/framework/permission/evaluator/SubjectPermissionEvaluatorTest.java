@@ -208,6 +208,14 @@ class SubjectPermissionEvaluatorTest {
     }
     
     @Test
+    void batchWithoutDeclarationsDoesNotLoadUserPermissions() {
+        when(subjectPermissionMapper.findBySubjects("menu", List.of(1L, 2L))).thenReturn(List.of());
+        assertThat(evaluator.batchEvaluate("menu", List.of(1L, 2L), 1L))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(1L, true, 2L, true));
+        verifyNoInteractions(userPermissionService);
+    }
+
+    @Test
     @DisplayName("Should batch evaluate multiple subjects")
     void testBatchEvaluate_Success() {
         // Given

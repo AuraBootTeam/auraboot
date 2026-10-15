@@ -93,12 +93,24 @@ export async function fetchUserInfo(request: Request): Promise<{
  * - 始终从后端API获取（安全第一）
  * - 不解析JWT（零信任原则）
  */
+const userInfoRequests = new WeakMap<Request, ReturnType<typeof fetchUserInfo>>();
+
 export async function getUserInfo(request: Request): Promise<{
   user: User | null;
   permissions: UserPermissions | null;
   preferences: Preferences | null;
 }> {
-  const fullInfo = await fetchUserInfo(request);
+  // Parent and child loaders share one incoming Request. Reuse its authoritative
+  // auth lookup, without sharing identity or cached authorization across requests.
+  let pending = userInfoRequests.get(request);
+  if (!pending) {
+    pending = fetchUserInfo(request).catch((error) => {
+      userInfoRequests.delete(request);
+      throw error;
+    });
+    userInfoRequests.set(request, pending);
+  }
+  const fullInfo = await pending;
 
   if (!fullInfo) {
     return { user: null, permissions: null, preferences: null };

@@ -323,7 +323,7 @@ describe('getUserInfo', () => {
   it('returns nulls when no token', async () => {
     getTokenMock.mockResolvedValue(null);
 
-    const result = await getUserInfo(FAKE_REQUEST);
+    const result = await getUserInfo(new Request('http://localhost/home'));
 
     expect(result).toEqual({ user: null, permissions: null, preferences: null });
   });
@@ -340,10 +340,32 @@ describe('getUserInfo', () => {
       json: async () => ({ code: '0', data: userData }),
     } as any);
 
-    const result = await getUserInfo(FAKE_REQUEST);
+    const result = await getUserInfo(new Request('http://localhost/home'));
 
     expect(result.user).toEqual(userData.user);
     expect(result.permissions?.roles).toHaveLength(1);
     expect(result.preferences).toEqual({ theme: 'dark' });
+  });
+});
+
+describe('request scoped user info', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it('deduplicates concurrent parent/child loaders but never reuses another request identity', async () => {
+    getTokenMock.mockResolvedValue(TOKEN);
+    const fetchSpy = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          code: '0',
+          data: { user: { id: 42 }, permissions: { roles: [], permissions: [] } },
+        }),
+      } as any);
+    const request = new Request('http://localhost/home');
+    const [parent, child] = await Promise.all([getUserInfo(request), getUserInfo(request)]);
+    expect(parent.user).toEqual(child.user);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await getUserInfo(new Request('http://localhost/home'));
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

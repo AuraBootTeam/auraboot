@@ -26,6 +26,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * Unit tests for {@link FieldPermissionServiceImpl}.
@@ -64,7 +65,6 @@ class FieldPermissionServiceImplTest {
 
     @Test
     void returnsAllAllowedWhenModelHasNoFields() {
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
         when(metaModelService.getModelFields("model.user")).thenReturn(List.of());
 
         FieldPermissionSet result = service.getFieldPermissions(1L, "model.user");
@@ -72,11 +72,11 @@ class FieldPermissionServiceImplTest {
         assertThat(result.viewableFields()).isEmpty();
         assertThat(result.editableFields()).isEmpty();
         assertThat(result.hiddenFields()).isEmpty();
+        verifyNoInteractions(userRoleService, roleService);
     }
 
     @Test
     void reusesFieldPermissionsInsideDynamicDataQueryScope() {
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
         when(metaModelService.getModelFields("model.user"))
                 .thenReturn(List.of(field("name", null)));
 
@@ -87,13 +87,12 @@ class FieldPermissionServiceImplTest {
                     .containsExactly("name");
         }
 
-        verify(userRoleService, times(1)).getRoleIdsByMemberIdAndTenantId(1L, 100L);
+        verifyNoInteractions(userRoleService, roleService);
         verify(metaModelService, times(1)).getModelFields("model.user");
     }
 
     @Test
     void treatsFieldWithoutPermissionAsFullyAccessible() {
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
         when(metaModelService.getModelFields("model.user")).thenReturn(List.of(
                 field("name", null),
                 field("email", new HashMap<>())));
@@ -111,7 +110,7 @@ class FieldPermissionServiceImplTest {
         admin.setId(7L);
         admin.setCode("admin");
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.getById(7L)).thenReturn(admin);
+        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(admin));
 
         Map<String, Object> fp = Map.of(
                 "view", List.of("sales_manager"),
@@ -134,7 +133,7 @@ class FieldPermissionServiceImplTest {
         low.setId(7L);
         low.setCode("low_field_viewer");
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.getById(7L)).thenReturn(low);
+        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(low));
 
         Map<String, Object> fieldPermission = Map.of(
                 "view", List.of("full_field_editor"),
@@ -156,7 +155,7 @@ class FieldPermissionServiceImplTest {
         low.setId(7L);
         low.setCode("low_field_viewer");
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.getById(7L)).thenReturn(low);
+        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(low));
 
         Map<String, Object> fieldPermission = Map.of(
                 "view", List.of("low_field_viewer"),
@@ -179,7 +178,7 @@ class FieldPermissionServiceImplTest {
         admin.setId(7L);
         admin.setCode("admin");
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.getById(7L)).thenReturn(admin);
+        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(admin));
 
         Map<String, Object> fp = Map.of(
                 "view", List.of("admin"),
@@ -203,8 +202,7 @@ class FieldPermissionServiceImplTest {
         r2.setId(8L);
         r2.setCode("manager");
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L, 8L));
-        when(roleService.getById(7L)).thenReturn(r1);
-        when(roleService.getById(8L)).thenReturn(r2);
+        when(roleService.listByIds(List.of(7L, 8L))).thenReturn(List.of(r1, r2));
 
         Map<String, Object> fp = Map.of(
                 "view", List.of("manager"),
@@ -236,7 +234,7 @@ class FieldPermissionServiceImplTest {
     @Test
     void skipsRolesWhenRoleServiceReturnsNull() {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        lenient().when(roleService.getById(anyLong())).thenReturn(null);
+        when(roleService.listByIds(List.of(7L))).thenReturn(List.of());
 
         Map<String, Object> fp = Map.of("view", List.of("admin"));
         when(metaModelService.getModelFields("model.user"))

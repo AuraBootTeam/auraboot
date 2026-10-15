@@ -145,13 +145,14 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
-  const branding = await resolveDeploymentBrandingFromBff(process.env);
   const buildIdentity = resolveBuildIdentity(process.env);
-
-  // Bootstrap status: never redirect; inject into loader data so the banner can render
-  const bootstrapStatus = await fetchBootstrapStatus();
-  const accessPolicy = await fetchAccessPolicy();
-  const token = await getTokenFromRequest(request);
+  // These reads are independent. Keep every request fresh without serial network waits.
+  const [branding, bootstrapStatus, accessPolicy, token] = await Promise.all([
+    resolveDeploymentBrandingFromBff(process.env),
+    fetchBootstrapStatus(),
+    fetchAccessPolicy(),
+    getTokenFromRequest(request),
+  ]);
 
   // Public runtime shells must never load admin user, permissions, or menus.
   // This includes logged-in browser sessions visiting a storefront or checkout
