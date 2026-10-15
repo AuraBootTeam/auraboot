@@ -165,6 +165,8 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
     await page.locator('#tpm_pj_description').fill('统一合同审批、版本管理与交付归档。（虚构示例数据）');
     await page.locator('#tpm_pj_budget').fill('36000');
+    await page.locator('#tpm_pj_risk_summary').fill('客户合同模板的版本需确认。');
+    await page.locator('#tpm_pj_next_action').fill('林晓于本周五前确认合同模板。');
     await page.getByTestId('form-section-supplement').locator('summary').click();
     await page.locator('#tpm_pj_notes').fill('真实浏览器创建并上传附件');
     const uploadResponse = page.waitForResponse(response => response.url().includes('/api/file/upload') && response.request().method() === 'POST');
@@ -192,19 +194,28 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     const notes = await noteDownload;
     await notes.saveAs(path.join(evidence, 'downloaded-notes.txt'));
     expect(await fs.readFile(path.join(evidence, 'downloaded-notes.txt'), 'utf8')).toBe('Delivery review notes: scope agreed.');
+    await expect(page.getByTestId('object-section-overview')).toContainText('客户合同模板的版本需确认。');
     await shot('P18');
     await page.getByTestId('toolbar-btn-edit').click();
     await page.getByTestId('form-section-supplement').locator('summary').click();
     await page.locator('#tpm_pj_notes').fill('客户已确认交付范围，附件保存并可下载。');
+    await page.locator('#tpm_pj_risk_summary').fill('合同模板已确认，暂无阻塞。');
+    await page.locator('#tpm_pj_next_action').fill('林晓安排下周一用户培训。');
     const editResponse = page.waitForResponse(response => response.url().includes('/execute/tpm:update_project') && response.request().method() === 'POST');
     await page.getByTestId('form-btn-submit').click();
     const edited = await editResponse;
+    expect(edited.request().postDataJSON().payload.tpm_pj_risk_summary).toBe('合同模板已确认，暂无阻塞。');
+    expect(edited.request().postDataJSON().payload.tpm_pj_next_action).toBe('林晓安排下周一用户培训。');
     expect(edited.request().postDataJSON().payload.tpm_pj_notes).toBe('客户已确认交付范围，附件保存并可下载。');
     expect((await edited.json()).data.phaseReached).toBe('completed');
     await newRow.getByRole('button', { name: '查看', exact: true }).click();
     await expect(page.getByTestId('object-section-overview')).toContainText('客户已确认交付范围，附件保存并可下载。');
+    await expect(page.getByTestId('object-section-overview')).toContainText('合同模板已确认，暂无阻塞。');
+    await expect(page.getByTestId('object-section-overview')).toContainText('林晓安排下周一用户培训。');
     await page.reload();
     await expect(page.getByTestId('object-section-overview')).toContainText('客户已确认交付范围，附件保存并可下载。');
+    await expect(page.getByTestId('object-section-overview')).toContainText('合同模板已确认，暂无阻塞。');
+    await expect(page.getByTestId('object-section-overview')).toContainText('林晓安排下周一用户培训。');
     await shot('P19');
     await fs.writeFile(path.join(evidence, 'completed-command.json'), JSON.stringify({ request: payload, response: body }, null, 2));
   } finally {
