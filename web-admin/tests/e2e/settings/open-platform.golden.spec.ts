@@ -8,6 +8,9 @@ import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environment
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { verifyModelNotifications } from '../../helpers/open-platform-notifications';
 
+// Secrets are captured only by explicit masked screenshots, never worker recordings.
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
 const PUBLICATION_VIEWPORT = process.env.AURA_OPEN_PLATFORM_PUBLICATION_VIEWPORT || 'desktop';
 if (!['desktop', 'narrow'].includes(PUBLICATION_VIEWPORT)) throw new Error('Unsupported publication viewport');
@@ -2784,8 +2787,7 @@ test.describe('Open Platform golden journey', () => {
 // Explicit masked captures replace automatic trace/video/screenshots for one-time secrets.
 test.describe('Quick integration token journey', () => {
   test.setTimeout(120_000);
-  test.use({ storageState: { cookies: [], origins: [] }, locale: 'en-US', viewport: publicationViewport,
-    trace: 'off', video: 'off', screenshot: 'off' });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: 'en-US', viewport: publicationViewport });
   test('generates expiring and permanent tokens, rotates and revokes through the installation UI', async ({ page }) => {
     await authenticate(page, 'en-US');
     const name = `Office token acceptance ${Date.now()}`;
