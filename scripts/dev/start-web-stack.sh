@@ -3,6 +3,10 @@
 set -euo pipefail
 case "${AURA_WEB_MODE:-development}" in
   production)
+    test -n "${SESSION_SECRET_FILE:-}" && test -r "$SESSION_SECRET_FILE" \
+      || { echo 'Explicit SESSION_SECRET_FILE required for production' >&2; exit 1; }
+    export SESSION_SECRET="$(cat "$SESSION_SECRET_FILE")"
+    test "${#SESSION_SECRET}" -ge 32 || { echo 'Production session secret too short' >&2; exit 1; }
     test -f build/server/index.js || { echo 'Production SSR build missing' >&2; exit 1; }
     exec env NODE_ENV=production pnpm exec concurrently --kill-others-on-fail --names ingress,bff \
       'node --import ./instrumentation.server.mjs scripts/production-entry.mjs' 'pnpm dev:bff'

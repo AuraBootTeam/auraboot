@@ -427,6 +427,9 @@ cmd_up() {
     *) die "unknown arg: $1";;
   esac; done
   case "$web_mode" in development|production) ;; *) die "invalid --web-mode";; esac
+  if [ "$web_mode" = production ]; then
+    [ -n "${SESSION_SECRET_FILE:-}" ] && [ -r "$SESSION_SECRET_FILE" ] || die "production requires explicit SESSION_SECRET_FILE"
+  fi
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
   [ "$fresh_db$require_new_db" != "11" ] || die "--fresh-db and --require-new-db are mutually exclusive"
   [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] || [ "$require_new_db" = "1" ] \
@@ -764,7 +767,7 @@ XML
     fi
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/logs/frontend.log" \
       env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
-      BFF_INTERNAL_URL="http://127.0.0.1:$server_port" AURA_WEB_MODE="$web_mode" \
+      BFF_INTERNAL_URL="http://127.0.0.1:$server_port" AURA_WEB_MODE="$web_mode" SESSION_SECRET_FILE="${SESSION_SECRET_FILE:-}" \
       bash "$SCRIPT_DIR/dev/start-web-stack.sh" fresh
     node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
       || die "frontend supervisor registration failed"
