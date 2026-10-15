@@ -3,6 +3,7 @@ package com.auraboot.framework.dsl.controller;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.dsl.dto.ComponentSchemaDTO;
 import com.auraboot.framework.dsl.service.ComponentSchemaService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -17,6 +18,7 @@ import java.util.*;
  */
 @RestController
 @RequestMapping("/api/dsl/components")
+@AuthenticatedAccess("read-only DSL component property schemas consumed by the low-code page designer")
 public class ComponentSchemaController {
 
     private final ComponentSchemaService componentSchemaService;

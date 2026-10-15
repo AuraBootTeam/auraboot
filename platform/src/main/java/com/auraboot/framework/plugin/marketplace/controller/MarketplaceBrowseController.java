@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.marketplace.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.plugin.marketplace.dto.*;
 import com.auraboot.framework.plugin.marketplace.entity.MarketplaceCategory;
 import com.auraboot.framework.plugin.marketplace.service.MarketplaceBrowseService;
@@ -18,6 +19,7 @@ import java.util.List;
 @RequestMapping("/api/marketplace")
 @RequiredArgsConstructor
 @Tag(name = "Marketplace Browse", description = "Plugin marketplace browsing APIs")
+@AuthenticatedAccess("public marketplace catalog browse; read-only plugin listings and upgrade checks")
 public class MarketplaceBrowseController {
 
     private final MarketplaceBrowseService browseService;

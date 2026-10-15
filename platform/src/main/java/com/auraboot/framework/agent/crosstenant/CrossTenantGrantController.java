@@ -4,6 +4,7 @@ import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.enums.RoleCodes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +53,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/cross-tenant-grants")
 @RequiredArgsConstructor
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; every handler additionally enforces an in-code platform_admin guard for cross-tenant sub-agent grant management")
 public class CrossTenantGrantController {
 
     private final JdbcTemplate jdbc;

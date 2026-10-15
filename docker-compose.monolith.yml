@@ -86,10 +86,10 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
       SPRING_DATA_REDIS_HOST: redis
-      # Staged default-deny authorization knob (PermissionInterceptor un-annotated
-      # surface). Default keeps legacy shadow behavior; ops can flip to deny/allow
-      # without an image rebuild. See aura.security.authz.unannotated-mode.
-      AURA_AUTHZ_UNANNOTATED_MODE: ${AURA_AUTHZ_UNANNOTATED_MODE:-shadow}
+            # Default-deny authorization knob (PermissionInterceptor un-annotated surface,
+      # shipped deny since the authz flip); ops can override to shadow/allow per
+      # deployment without an image rebuild. See aura.security.authz.unannotated-mode.
+      AURA_AUTHZ_UNANNOTATED_MODE: ${AURA_AUTHZ_UNANNOTATED_MODE:-deny}
     ports:
       - "6443:6443"
     depends_on:

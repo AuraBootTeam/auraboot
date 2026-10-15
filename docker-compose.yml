@@ -90,10 +90,10 @@ services:
       SPRING_PROFILES_ACTIVE: community
       AURA_BUILTIN_PLUGINS_DIR: /app/plugins
       AURA_PLUGINS_DIR: /app/pf4j-plugins
-      # Staged default-deny authorization knob (PermissionInterceptor un-annotated
-      # surface). Default keeps legacy shadow behavior; ops can flip to deny/allow
-      # without an image rebuild. See aura.security.authz.unannotated-mode.
-      AURA_AUTHZ_UNANNOTATED_MODE: ${AURA_AUTHZ_UNANNOTATED_MODE:-shadow}
+      # Default-deny authorization knob (PermissionInterceptor un-annotated surface,
+      # shipped deny since the authz flip; ops can override to shadow/allow
+      # per deployment without an image rebuild. See aura.security.authz.unannotated-mode.
+      AURA_AUTHZ_UNANNOTATED_MODE: ${AURA_AUTHZ_UNANNOTATED_MODE:-deny}
       MANAGEMENT_TRACING_ENABLED: "false"
       # Docker Desktop/overlay filesystems can report 0 bytes available for
       # /app, which makes actuator health flap DOWN even when DB/app are OK.

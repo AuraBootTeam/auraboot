@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.service.AgentSseService;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -18,6 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @RequestMapping("/api/agent")
 @RequiredArgsConstructor
+@AuthenticatedAccess("SSE stream scoped to the caller's tenant (MetaContext tenantId)")
 public class AgentSseController {
 
     private final AgentSseService agentSseService;

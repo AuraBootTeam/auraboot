@@ -24,6 +24,7 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -53,6 +54,7 @@ import java.util.Map;
 @RequestMapping("/api/test")
 @Profile("test")
 @RequiredArgsConstructor
+@AuthenticatedAccess("test-profile E2E seed fixture: never registered outside the test profile; seeds a dedicated e2e tenant")
 public class TestSeedController {
 
     private static final String TEST_TENANT_NAME = "e2e_test";

@@ -2,6 +2,7 @@ package com.auraboot.framework.tenant.controller;
 
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.service.TenantInviteService;
@@ -15,6 +16,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/tenant/invite-code")
+@AuthenticatedAccess("unguarded handlers validate and redeem invite codes in the self-service join flow for invited users")
 public class TenantInviteController {
 
     @Autowired

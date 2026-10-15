@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.datasync.DataSyncSseRegistry;
 import com.auraboot.framework.notification.service.NotificationQueryService;
 import com.auraboot.framework.notification.service.NotificationSseService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -25,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
+@AuthenticatedAccess("SSE stream scoped to the caller's own notification subscriptions (MetaContext userId)")
 public class NotificationSseController {
 
     private final NotificationSseService notificationSseService;

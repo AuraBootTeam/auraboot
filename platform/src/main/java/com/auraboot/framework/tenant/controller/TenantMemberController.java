@@ -7,6 +7,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.tenant.controller.request.ApproveRequest;
@@ -31,6 +32,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/tenant/members")
 @Tag(name = "Tenant Members", description = "Tenant membership management")
+@AuthenticatedAccess("unguarded handlers are member read/search endpoints scoped to the caller's own tenant member data via @CurrentUserId")
 public class TenantMemberController {
 
     private static final int MAX_BATCH_SIZE = 100;

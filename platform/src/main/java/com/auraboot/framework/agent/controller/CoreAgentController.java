@@ -22,12 +22,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 
 @RestController
 @RequestMapping("/api/agent")
 @RequiredArgsConstructor
+@AuthenticatedAccess("tenant-scoped runtime status, provider, tool-registry and sanitized MCP server reads for the authenticated caller; MCP mutations and agent lifecycle operations carry method-level @RequirePermission")
 public class CoreAgentController {
 
     private final AgentProperties agentProperties;

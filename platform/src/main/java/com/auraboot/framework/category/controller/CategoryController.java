@@ -3,6 +3,7 @@ package com.auraboot.framework.category.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.auraboot.framework.application.annotation.CurrentUserId;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -27,6 +28,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 @RestController
 @RequestMapping("/api/categories")
 @Tag(name = "Categories", description = "Category tree management")
+@AuthenticatedAccess("tenant-scoped category tree and metadata reads for the authenticated caller; write operations carry method-level @RequirePermission")
 public class CategoryController {
 
     @Autowired
