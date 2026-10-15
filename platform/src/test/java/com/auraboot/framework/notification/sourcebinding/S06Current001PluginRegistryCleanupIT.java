@@ -44,6 +44,7 @@ import static com.auraboot.framework.notification.sourcebinding.S06Current001Plu
 @SpringBootTest(classes = TestApplication.class, properties = {
         "spring.datasource.url=${TEST_DATABASE_URL}", "spring.data.redis.database=${TEST_REDIS_DATABASE}",
         "s06.native.source-binding.fixture=true",
+        "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'",
         "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.slf4j.Slf4jImpl",
         "logging.level.com.auraboot.framework=INFO", "logging.level.org.mybatis=INFO",
         "logging.level.org.springframework.security=WARN", "logging.level.org.springframework.cache=WARN"})
@@ -77,6 +78,8 @@ class S06Current001PluginRegistryCleanupIT {
                     && connection.getCatalog().equals("enterprise_22"), "CLEANUP_DATABASE_SCOPE_INVALID");
             validateDatabaseUrl(connection.getMetaData().getURL());
         }
+        String sessionTimezone = jdbc.queryForObject("SELECT current_setting('TimeZone')", String.class);
+        require("UTC".equals(sessionTimezone), "CLEANUP_SESSION_TIMEZONE_NOT_UTC");
         var admission = S06Current001PluginCleanupAdmission.load(
                 Path.of(required("S06_NATIVE_PLUGIN_CLEANUP_INPUT")), required("S06_NATIVE_PLUGIN_CLEANUP_INPUT_SHA256"), json);
         Map<String, Object> crypto = S06NativeEncryptionAdmission.admit(System.getenv(), json, encryption,
@@ -121,7 +124,7 @@ class S06Current001PluginRegistryCleanupIT {
                                     "tenantId", Long.toString(target.tenant()), "pluginPid", target.pid(),
                                     "pluginId", target.pluginId(), "namespace", target.namespace(), "version", target.version(),
                                     "status", target.status(), "rowSha256", target.rowSha256(), "manifestSha256", target.manifestSha256())).toList(), "preservedBefore", summary(before), "crypto", crypto,
-                            "executed", false, "sourceClassificationSha256", S06Current001PluginCleanupAdmission.CLASSIFICATION_SHA));
+                            "sessionTimezone", sessionTimezone, "executed", false, "sourceClassificationSha256", S06Current001PluginCleanupAdmission.CLASSIFICATION_SHA));
                     List<Map<String, Object>> results = new ArrayList<>();
                     for (var target : admission.plugins()) {
                         MetaContext.setContext(target.tenant(), 0L, "SYSTEM", "s06-current001-owned-lifecycle-cleanup");
@@ -169,6 +172,7 @@ class S06Current001PluginRegistryCleanupIT {
         completed.put("inputSha256", admission.inputSha256());
         completed.put("sourceClassificationSha256", S06Current001PluginCleanupAdmission.CLASSIFICATION_SHA);
         completed.put("softDeletedPluginRegistrations", 14);
+        completed.put("sessionTimezone", sessionTimezone);
         completed.put("businessDeliverySuccessClaimed", false);
         completed.put("stage", "current001-plugin-registration-cleanup-completed");
         write(admission.output().resolve("cleanup-receipt.json"), completed);
