@@ -145,6 +145,37 @@ public final class RecordCommandWriterGuard {
             .append(" AND record_writer_parent.").append(column(parent.policy().marker())).append(" IS TRUE)");
     }
 
+    /** The receipt counter path retains a positive stored-parent fence instead of general parent update authority. */
+    public static void appendCounterStoredPredicate(StringBuilder sql, ModelDefinition model, String operation,
+            java.util.function.Function<String, ModelDefinition> resolver, String recordId,
+            Object expectedVersion, String compareColumn, Object compareValue,
+            Map<String,Object> columns, Map<String,Object> params) {
+        var receipt = com.auraboot.framework.integration.ProcurementReceiptCommandScope.verifiedCounterParent(
+                MetaContext.getCurrentTenantId(), model.getCode(), recordId,
+                expectedVersion, compareColumn, compareValue, columns);
+        if (receipt.isEmpty()) {
+            appendStoredPredicate(sql, model, operation, resolver);
+            return;
+        }
+        Parent parent = parent(model, resolver);
+        Policy childPolicy = policy(model);
+        if (!"update".equals(operation) || parent == null || childPolicy == null
+                || !"pr_purchase_order_line".equals(model.getCode()) || !"pr_purchase_order".equals(parent.model().getCode())
+                || !"pr_pol_order_id".equals(parent.link().getCode())
+                || !"pr_pol_collaboration_managed".equals(childPolicy.marker().getCode())
+                || !"pr_po_collaboration_managed".equals(parent.policy().marker().getCode())) throw invalid(model);
+        appendOwnStoredPredicate(sql, model, operation);
+        params.put("receiptParentPid", receipt.get().pid());
+        params.put("receiptParentVersion", receipt.get().version());
+        sql.append(" AND ").append(column(childPolicy.marker())).append(" IS TRUE")
+            .append(" AND EXISTS (SELECT 1 FROM ").append(parent.model().getTableName())
+            .append(" record_writer_parent WHERE record_writer_parent.pid = #{params.receiptParentPid}")
+            .append(" AND record_writer_parent.pid = ").append(model.getTableName()).append('.').append(column(parent.link()))
+            .append(" AND record_writer_parent.tenant_id = ").append(model.getTableName()).append(".tenant_id")
+            .append(" AND record_writer_parent.").append(column(parent.policy().marker())).append(" IS TRUE")
+            .append(" AND record_writer_parent.row_version = #{params.receiptParentVersion})");
+    }
+
     private static void guardStoredParents(com.auraboot.framework.meta.mapper.DynamicDataMapper mapper,
             ModelDefinition child, java.util.function.Function<String, ModelDefinition> resolver, Map<String,Object> conditions) {
         Parent parent = parent(child, resolver);

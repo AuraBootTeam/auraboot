@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
+import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
 import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
@@ -106,6 +107,7 @@ class ProcurementReceiptCommandScopeTest {
         when(receipts.countMatchingEnvelope(any())).thenReturn(1);
         when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         when(data.getById("pr_purchase_order_line", "line")).thenReturn(row());
+        when(data.getById("pr_purchase_order", "order")).thenReturn(parentRow());
         when(data.compareAndSet(anyString(), anyString(), anyString(), any(), anyMap())).thenReturn(true);
         when(receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
         // The memory transaction delegate exposes Spring's active-T01 marker, not PG atomicity.
@@ -263,11 +265,142 @@ class ProcurementReceiptCommandScopeTest {
         when(plugins.isDiscoveredExtensionInstance(ReliableEventConsumerExtension.class,consumer)).thenReturn(false);
         assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
     }
+    @Test void qualifiedCounterSqlFencesExactStoredParentAndBothManagedFlags() {
+        installWriterDefinitions();
+        when(data.compareAndSet(anyString(), anyString(), anyString(), any(), anyMap())).thenAnswer(call -> {
+            Map<String,Object> params = new HashMap<>();
+            String sql = counterSql(31, "line", 7, "row_version", 7, Map.of("pr_pol_received_qty", "25.000001"), params);
+            assertThat(sql).contains("AND EXISTS", "pr_pol_collaboration_managed IS TRUE",
+                    "record_writer_parent.pid = #{params.receiptParentPid}",
+                    "record_writer_parent.pid = mt_pr_purchase_order_line.pr_pol_order_id",
+                    "record_writer_parent.tenant_id = mt_pr_purchase_order_line.tenant_id",
+                    "record_writer_parent.pr_po_collaboration_managed IS TRUE",
+                    "record_writer_parent.row_version = #{params.receiptParentVersion}").doesNotContain("NOT EXISTS");
+            assertThat(params).containsEntry("receiptParentPid", "order").containsEntry("receiptParentVersion", 4L);
+            assertThatThrownBy(() -> counterSql(31, "line", 7, "row_version", 7,
+                    Map.of("pr_pol_received_qty", "25.000001"), new HashMap<>())).isInstanceOf(SecurityException.class);
+            return true;
+        });
+        effect = event -> accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7,
+                Map.of("pr_pol_received_qty", "25.000001"));
+        deliver();
+        assertThat(ProcurementReceiptCommandScope.verifiedCounterParent(31, "pr_purchase_order_line", "line",
+                7, "row_version", 7, Map.of("pr_pol_received_qty", "25.000001"))).isEmpty();
+    }
+
+    @Test void counterSqlCannotBorrowFrameForAnotherTenantTargetVersionOrPatch() {
+        installWriterDefinitions();
+        when(data.compareAndSet(anyString(), anyString(), anyString(), any(), anyMap())).thenAnswer(call -> {
+            for (Runnable invalid : List.<Runnable>of(
+                    () -> counterSql(31, "line", 7, null, null, Map.of("pr_pol_received_qty", 25), new HashMap<>()),
+                    () -> counterSql(32, "line", 7, "row_version", 7, Map.of("pr_pol_received_qty", 25), new HashMap<>()),
+                    () -> counterSql(31, "other", 7, "row_version", 7, Map.of("pr_pol_received_qty", 25), new HashMap<>()),
+                    () -> counterSql(31, "line", 6, "row_version", 7, Map.of("pr_pol_received_qty", 25), new HashMap<>()),
+                    () -> counterSql(31, "line", 7, "row_version", 6, Map.of("pr_pol_received_qty", 25), new HashMap<>()),
+                    () -> counterSql(31, "line", 7, "pr_pol_received_qty", 7, Map.of("pr_pol_received_qty", 25), new HashMap<>()),
+                    () -> counterSql(31, "line", 7, "row_version", 7, Map.of("pr_pol_received_qty", 26), new HashMap<>()),
+                    () -> counterSql(31, "line", 7, "row_version", 7, Map.of("pr_pol_received_qty", 25, "pr_pol_qty", 200), new HashMap<>()))) {
+                assertThatThrownBy(invalid::run).isInstanceOf(SecurityException.class);
+            }
+            assertThat(counterSql(31, "line", 7, "row_version", 7,
+                    Map.of("pr_pol_received_qty", 25, "updated_by", 0L), new HashMap<>())).contains("AND EXISTS");
+            return true;
+        });
+        effect = event -> accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7,
+                Map.of("pr_pol_received_qty", 25));
+        deliver();
+    }
+
+    @Test void activeConsumerAndMatchingCommandAloneStillDenyManagedParent() {
+        installWriterDefinitions();
+        effect = event -> {
+            assertThat(counterSql(31, "line", 7, "row_version", 7,
+                    Map.of("pr_pol_received_qty", 25), new HashMap<>())).contains("NOT EXISTS");
+            MetaContext.runWithCommandPermitPlan("ALL", 7L, "pr_purchase_order_line", "line", () ->
+                    MetaContext.runWithAuthorizedCommandCode(ProcurementReceiptCommandScope.COMMAND, () -> {
+                        assertThat(counterSql(31, "line", 7, "row_version", 7,
+                                Map.of("pr_pol_received_qty", 25), new HashMap<>())).contains("NOT EXISTS");
+                    }));
+        };
+        deliver();
+        verify(data, never()).compareAndSet(anyString(), anyString(), anyString(), any(), anyMap());
+    }
+
+    @Test void wrongParentIdentityTenantMarkerVersionOrOwnerCannotOpenCounterFrame() {
+        for (Map<String,Object> invalid : List.of(
+                parentChanged("pid", "other"), parentChanged("tenant_id", 32L),
+                parentChanged("pr_po_collaboration_managed", false), parentChanged("row_version", -1L))) {
+            when(data.getById("pr_purchase_order", "order")).thenReturn(invalid);
+            effect = event -> accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7,
+                    Map.of("pr_pol_received_qty", 25));
+            assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        }
+        when(data.getById("pr_purchase_order", "order")).thenReturn(parentRow());
+        actualModels.get("pr_purchase_order").setPluginPid("product-owner");
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        verify(data, never()).compareAndSet(anyString(), anyString(), anyString(), any(), anyMap());
+    }
+
+    @Test void lostLeaseInsideCounterSqlFrameFailsClosedAndFrameIsRemoved() {
+        installWriterDefinitions();
+        when(data.compareAndSet(anyString(), anyString(), anyString(), any(), anyMap())).thenAnswer(call -> {
+            when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(0);
+            return !counterSql(31, "line", 7, "row_version", 7,
+                    Map.of("pr_pol_received_qty", 25), new HashMap<>()).isEmpty();
+        });
+        effect = event -> accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7,
+                Map.of("pr_pol_received_qty", 25));
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        assertThat(ProcurementReceiptCommandScope.verifiedCounterParent(31, "pr_purchase_order_line", "line",
+                7, "row_version", 7, Map.of("pr_pol_received_qty", 25))).isEmpty();
+        verify(receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(transactions).rollback(any());
+    }
+
+    private String counterSql(long tenant, String record, Object version, String compare, Object expected,
+            Map<String,Object> columns, Map<String,Object> params) {
+        Long previous = MetaContext.getCurrentTenantId();
+        if (tenant != previous) {
+            MetaContext.setCurrentTenantId(tenant);
+            try {
+                return counterSql(tenant, record, version, compare, expected, columns, params);
+            } finally {
+                MetaContext.setCurrentTenantId(previous);
+            }
+        }
+        StringBuilder sql = new StringBuilder("UPDATE mt_pr_purchase_order_line SET pr_pol_received_qty=? WHERE pid=?");
+        RecordCommandWriterGuard.appendCounterStoredPredicate(sql, effectiveModels.get("pr_purchase_order_line"), "update",
+                effectiveModels::get, record, version, compare, expected, columns, params);
+        return sql.toString();
+    }
+
+    private void installWriterDefinitions() {
+        var reference = new FieldDefinition.RefTarget();
+        reference.setTargetEntity("pr_purchase_order"); reference.setValueField("pid");
+        effectiveModels.get("pr_purchase_order_line").setFields(List.of(
+                FieldDefinition.builder().code("pr_pol_order_id").refTarget(reference).build(),
+                FieldDefinition.builder().code("pr_pol_collaboration_managed").dataType("boolean").immutable(true).build()));
+        effectiveModels.get("pr_purchase_order_line").setExtension(Map.of("parentModel", "pr_purchase_order",
+                "parentField", "pr_pol_order_id", "recordCommandWriters", Map.of("field", "pr_pol_collaboration_managed",
+                "commands", Map.of("create", List.of(), "update", List.of(ProcurementReceiptCommandScope.COMMAND), "delete", List.of()))));
+        effectiveModels.get("pr_purchase_order").setFields(List.of(
+                FieldDefinition.builder().code("pr_po_collaboration_managed").dataType("boolean").immutable(true).build()));
+        effectiveModels.get("pr_purchase_order").setExtension(Map.of("recordCommandWriters", Map.of("field", "pr_po_collaboration_managed",
+                "commands", Map.of("create", List.of(), "update", List.of("qo_procurement_order_common:sync_orders"), "delete", List.of()))));
+    }
+
+    private static Map<String,Object> parentChanged(String key, Object value) {
+        Map<String,Object> parent = new HashMap<>(parentRow()); parent.put(key, value); return parent;
+    }
+
     private void deliver() {
         new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins, authority, provenance).deliver(event(), consumer, "lease");
     }
     private static Map<String,Object> row() { return Map.of("pid", "line", "tenant_id", 31L, "row_version", 7,
-        "pr_pol_collaboration_managed", true, "pr_pol_received_qty", "20", "pr_pol_qty", "100"); }
+        "pr_pol_collaboration_managed", true, "pr_pol_received_qty", "20", "pr_pol_qty", "100", "pr_pol_order_id", "order"); }
+    private static Map<String,Object> parentRow() {
+        return Map.of("pid", "order", "tenant_id", 31L, "row_version", 4L, "pr_po_collaboration_managed", true);
+    }
     private static Map<String,Object> changed(String key, Object value) { Map<String,Object> row = new HashMap<>(row()); row.put(key,value); return row; }
     private static IntegrationEventEnvelope event() {
         String id = java.util.UUID.nameUUIDFromBytes("inventory.receipt.confirmed.v1:31:receipt:3".getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();

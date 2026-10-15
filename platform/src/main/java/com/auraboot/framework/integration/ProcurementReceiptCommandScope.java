@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -25,6 +26,12 @@ public final class ProcurementReceiptCommandScope {
                           InventoryOwnerModelAuthority authority, Set<String> targets,
                           Map<String, InventoryOwnerModelAuthority.Binding> bindings, Set<String> applied) {}
     private static final ThreadLocal<Permit> CURRENT = new ThreadLocal<>();
+    private record CounterWrite(Permit permit, String record, long version, BigDecimal quantity,
+                                String parentPid, long parentVersion, java.util.concurrent.atomic.AtomicBoolean claimed) {}
+    private static final ThreadLocal<CounterWrite> COUNTER_WRITE = new ThreadLocal<>();
+
+    /** Read-only proof returned only while the verified host CAS delegate is executing. */
+    public record VerifiedCounterParent(String pid, long version) {}
     private ProcurementReceiptCommandScope() {}
 
     static void consume(IntegrationEventEnvelope event, ReliableEventConsumerExtension consumer,
@@ -88,17 +95,57 @@ public final class ProcurementReceiptCommandScope {
             BigDecimal previous = decimal(row.get("pr_pol_received_qty"));
             BigDecimal ordered = decimal(row.get("pr_pol_qty"));
             if (next.compareTo(previous) <= 0 || next.compareTo(ordered) > 0) throw denied();
+            Object parentIdentity = row.get("pr_pol_order_id");
+            if (!(parentIdentity instanceof String parentPid) || parentPid.isBlank() || parentPid.length() > 128) throw denied();
+            binding(permit, "pr_purchase_order", false);
+            Map<String,Object> parent = MetaContext.runWithCommandPermitPlan("ALL", null, "pr_purchase_order", parentPid,
+                    () -> data.getById("pr_purchase_order", parentPid));
+            if (parent == null || !parentPid.equals(parent.get("pid")) || number(parent.get("tenant_id")) != tenant
+                    || !Boolean.TRUE.equals(parent.get("pr_po_collaboration_managed"))) throw denied();
+            long parentVersion = number(parent.get("row_version"));
+            if (parentVersion < 0 || COUNTER_WRITE.get() != null) throw denied();
+            binding(permit, "pr_purchase_order", false);
             verify(permit);
             InventoryOwnerModelAuthority.assertUnchanged(binding, permit.authority().resolveProcurement(tenant, model, true));
             return MetaContext.runWithCommandPermitPlan("ALL", version, model, record,
                     () -> MetaContext.runWithAuthorizedCommandCode(COMMAND, () -> {
-                        boolean result = data.compareAndSet(model, record, field, version, immutablePatch);
-                        InventoryOwnerModelAuthority.assertUnchanged(binding, permit.authority().resolveProcurement(tenant, model, true));
-                        verify(permit);
-                        if (result) permit.applied().add(record);
-                        return result;
+                        COUNTER_WRITE.set(new CounterWrite(permit, record, version, next, parentPid, parentVersion,
+                                new java.util.concurrent.atomic.AtomicBoolean()));
+                        try {
+                            boolean result = data.compareAndSet(model, record, field, version, immutablePatch);
+                            InventoryOwnerModelAuthority.assertUnchanged(binding, permit.authority().resolveProcurement(tenant, model, true));
+                            binding(permit, "pr_purchase_order", false);
+                            verify(permit);
+                            if (result) permit.applied().add(record);
+                            return result;
+                        } finally {
+                            COUNTER_WRITE.remove();
+                        }
                     }));
         });
+    }
+
+    /**
+     * A command name or an active consumer is insufficient. Match the final scoped SQL inputs
+     * to this one host-verified CAS frame, including the normalized single counter value.
+     */
+    public static Optional<VerifiedCounterParent> verifiedCounterParent(long tenant, String model, String record,
+            Object expectedVersion, String compareColumn, Object compareValue, Map<String,Object> columns) {
+        CounterWrite write = COUNTER_WRITE.get();
+        if (write == null) return Optional.empty();
+        Permit permit = require(tenant);
+        if (permit != write.permit() || !MODEL.equals(model) || !write.record().equals(record)
+                || !COMMAND.equals(MetaContext.getAuthorizedCommandCode())
+                || !Long.valueOf(write.version()).equals(MetaContext.getCommandExpectedVersion(model, record))
+                || !"row_version".equals(compareColumn) || number(expectedVersion) != write.version()
+                || number(compareValue) != write.version() || columns == null
+                || !columns.containsKey("pr_pol_received_qty")
+                || !Set.of("pr_pol_received_qty", "updated_at", "updated_by").containsAll(columns.keySet())
+                || decimal(columns.get("pr_pol_received_qty")).compareTo(write.quantity()) != 0) throw denied();
+        binding(permit, MODEL, true);
+        binding(permit, "pr_purchase_order", false);
+        if (!write.claimed().compareAndSet(false, true)) throw denied();
+        return Optional.of(new VerifiedCounterParent(write.parentPid(), write.parentVersion()));
     }
 
     private static Permit require(long tenant) {

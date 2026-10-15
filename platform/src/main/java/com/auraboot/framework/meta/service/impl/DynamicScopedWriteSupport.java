@@ -137,7 +137,9 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
                     .append(" IS NOT DISTINCT FROM #{params.compareValue}");
         }
         appendAggregateBindingGuard(sql, params, model);
-        RecordCommandWriterGuard.appendStoredPredicate(sql, model, permissionOperation, metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null));
+        RecordCommandWriterGuard.appendCounterStoredPredicate(sql, model, permissionOperation,
+                metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null),
+                recordId, expectedVersion, compareColumn, compareValue, columnData, params);
         RecordCommandWriterGuard.appendMarkerInvariant(sql, model, columnData);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
 
