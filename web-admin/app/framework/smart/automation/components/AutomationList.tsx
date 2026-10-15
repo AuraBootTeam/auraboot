@@ -284,22 +284,22 @@ export function AutomationList({
               className="px-6 py-4 transition-colors hover:bg-gray-50"
               data-testid={`automation-row-${automation.pid}`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-2xl text-gray-400">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <span className="shrink-0 font-mono text-2xl text-gray-400">
                     {getTriggerIcon(automation.triggerType)}
                   </span>
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to={`/automation/${automation.pid}`}
-                        className="font-medium text-gray-900 hover:text-blue-600"
+                        className="min-w-0 break-words font-medium text-gray-900 hover:text-blue-600"
                       >
                         {automation.name}
                       </Link>
                       <span
                         className={cn(
-                          'rounded px-2 py-0.5 text-xs font-medium',
+                          'shrink-0 whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium',
                           automation.enabled
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-600',
@@ -312,7 +312,7 @@ export function AutomationList({
                       </span>
                     </div>
                     {automation.description && (
-                      <p className="mt-1 text-sm text-gray-500">{automation.description}</p>
+                      <p className="mt-1 line-clamp-2 break-words text-sm text-gray-500" title={automation.description}>{automation.description}</p>
                     )}
                     {automation.lastRunAt && (
                       <p className="mt-1 text-xs text-gray-400">
@@ -323,7 +323,7 @@ export function AutomationList({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 self-end lg:self-center [&>a]:whitespace-nowrap [&>button]:whitespace-nowrap">
                   <button
                     onClick={() => handleToggleEnabled(automation)}
                     disabled={!hydrated}
