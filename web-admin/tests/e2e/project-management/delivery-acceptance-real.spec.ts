@@ -135,12 +135,12 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     await expect(page.getByTestId('strategy-test-outputs')).toContainText(route);
   }
   await shot(page,'d02');
-  await page.getByLabel('feel-0-amount',{exact:true}).fill('>< invalid');
+  await page.getByLabel('feel-0-risk',{exact:true}).fill('>< invalid');
   const invalid=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/decision/test-run'&&r.request().method()==='POST');
   await page.getByTestId('strategy-run-test').click();expect((await data(await invalid)).status).toBe('ERROR');
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','error');
   await expect(page.getByTestId('strategy-operation-status')).toContainText('Invalid FEEL');await shot(page,'d03');
-  await page.getByLabel('feel-0-amount',{exact:true}).fill('');
+  await page.getByLabel('feel-0-risk',{exact:true}).fill('');
   await page.getByTestId('strategy-check-readiness').click();
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
   await page.getByLabel('input-label-0').fill('交付金额（草稿修改）');
@@ -197,13 +197,17 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
   const configs=await data(await page.request.get('/api/bpm/sla-configs'));
   const config=configs.find((item:any)=>item.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
   const change=async(value:any)=>data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:value}));
-  await change({...config,name:'加强审核 · 30秒加速验证',deadlineMode:'FIXED',deadlineValue:'PT30S'});
+  await change({...config,name:'加强审核 · 30秒加速验证',deadlineMode:'FIXED',deadlineValue:'PT30S',ruleBinding:{...config.ruleBinding,enabled:false}});
   try {
     const name='SLA 加速验证 · 30秒交付验收';const pid=await create(page,user,name,100000,'普通',true);
     const sla=await submit(page,pid,0.5,'tpm_enhanced_review');await shot(page,'d10');
     let expired:any;
     await expect.poll(async()=>{expired=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));return expired.status;},{timeout:65000,intervals:[3000]}).toBe('overdue');
     expect(expired.currentWarningLevel).toBe(2);expect(expired.warningHistory.length).toBeGreaterThanOrEqual(2);
+    let actual:any[]=[];
+    await expect.poll(async()=>{const notifications=await data(await page.request.get('/api/bpm/notify/received?type=urge'));actual=notifications.filter((item:any)=>item.taskId===sla.taskId);return actual.length;},{timeout:10000}).toBe(2);expect(actual.every((item:any)=>String(item.processInstanceId)===sla.processInstanceId)).toBe(true);
+    let action:any;await expect.poll(async()=>{const logs=await data(await page.request.get(`/api/event-policy/action-logs?size=100&correlationId=sla:${sla.pid}`));action=logs.records.find((item:any)=>item.correlationId===`sla:${sla.pid}`);return action?.status;},{timeout:10000}).toBe('SUCCESS');
+    await writeFile(join(evidence!,'sla-notification-evidence.json'),JSON.stringify({notifications:actual,action},null,2));
     await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('30秒');await shot(page,'d11');
     await openRecord(page,name);await decide(page,pid,'approve');
     const completed=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));
@@ -228,7 +232,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
     await data(await page.request.post('/api/admin/users',{data:{email,displayName:reviewer?'验收协作成员':'交付只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
     const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
     try {
-      const actor=await context.newPage();await login(actor,email,String(admin.tenantId));
+      const actor=await context.newPage();const actorUser=await login(actor,email,String(admin.tenantId));
       const identity=await data(await actor.request.get('/api/auth/me'));expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
       await openRecord(actor,name);
       if(reviewer) {
@@ -241,6 +245,13 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
         const refused=await actor.request.post('/api/meta/commands/execute/tpm:accept_acceptance',{data:{operationType:'update',targetRecordPid:pid,payload:{}}});expect(refused.status()).toBe(403);
       }
       expect((await row(page,pid)).tpm_ac_status).toBe('submitted');await shot(actor,reviewer?'d13':'d13-readonly');
+      if(reviewer) {
+        const assignedName='华辰制造 · 指定协作成员审批';
+        const assignedPid=await create(page,actorUser,assignedName,68000,'普通',true);
+        await submit(page,assignedPid,480,'tpm_standard_review');
+        await openRecord(actor,assignedName);await expect(actor.getByTestId('bpm-operations-approve')).toBeEnabled();
+        await decide(actor,assignedPid,'approve');await shot(actor,'d13-assigned');
+      }
     } finally {await context.close();}
   }
   await decide(page,pid,'approve');
@@ -249,10 +260,10 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
 test('missing route and deadline rules fail closed and can recover after configuration is restored @critical',async({page})=>{
   const user=await login(page);const root=process.env.AURA_CORE_PROJECT_ROOT!;
   const bundle=JSON.parse(await readFile(join(root,'plugins/project-management/examples/acceptance-workflow.bpm-package.json'),'utf8'));
-  const process=(await data(await page.request.get('/api/bpm/process-definitions?size=1000'))).records.find((p:any)=>p.processKey===bundle.processKey);
+  const workflow=(await data(await page.request.get('/api/bpm/process-definitions?size=1000'))).records.find((p:any)=>p.processKey===bundle.processKey);
   const deploy=async(value:any)=>{
     await data(await page.request.post('/api/bpm/import/execute',{data:{package:value,strategy:'overwrite'}}));
-    await data(await page.request.post(`/api/bpm/process-definitions/${process.pid}/deploy`,{data:{}}));
+    await data(await page.request.post(`/api/bpm/process-definitions/${workflow.pid}/deploy`,{data:{}}));
   };
   const broken=JSON.parse(JSON.stringify(bundle));
   broken.processDefinition.bpmnContent=broken.processDefinition.bpmnContent.replaceAll('tpm_acceptance_route','absent_acceptance_route');
@@ -270,7 +281,7 @@ test('missing route and deadline rules fail closed and can recover after configu
   const config=(await data(await page.request.get('/api/bpm/sla-configs'))).find((c:any)=>c.targetKey==='tpm_standard_review');
   const set=async(value:any)=>data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:value}));
   try {
-    await set({...config,deadlineValue:'absent_deadline_rule'});await failSubmit();
+    await set({...config,deadlineValue:'absent_deadline_rule',ruleBinding:{...config.ruleBinding,decisionBinding:{...config.ruleBinding.decisionBinding,decisionCode:'absent_deadline_rule'}}});await failSubmit();
   } finally {await set(config);}
   await submit(page,pid,480,'tpm_standard_review');await decide(page,pid,'approve');
 });
@@ -280,5 +291,5 @@ test('accepted project list form and detail remain available through their exist
   await shot(page,'d15-list');await page.getByRole('button',{name:'新建项目',exact:true}).click();await expect(page.locator('#tpm_pj_name')).toBeVisible();
   await expect(page.getByTestId('ai-fill-banner')).toHaveCount(0);await shot(page,'d15-form');await page.getByTestId('form-btn-cancel').click();
   await page.getByRole('row').filter({hasText:'华辰制造 · 供应链协同平台'}).getByRole('button',{name:/查看|详情/}).click();
-  await expect(page.getByTestId('object-summary')).toContainText('华辰制造');await expect(page.getByTestId('collection-completion')).toBeVisible();await shot(page,'d15');
+  await expect(page.getByTestId('object-summary')).toContainText('林晓');await expect(page.getByRole('main')).toContainText('华辰制造');await expect(page.getByTestId('collection-completion')).toBeVisible();await shot(page,'d15');
 });

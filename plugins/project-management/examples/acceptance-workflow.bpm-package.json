@@ -13,7 +13,7 @@
   "nodeHooks": [],
   "slaConfigs": [
     {
-      "name": "常规验收 · 8小时",
+      "name": "交付验收 · 常规验收 · 8小时",
       "targetType": "NODE",
       "targetKey": "tpm_standard_review",
       "deadlineMode": "RULE",
@@ -32,10 +32,62 @@
           "action": "escalate",
           "recipients": "assignee"
         }
-      ]
+      ],
+      "slaKey": "tpm_standard_acceptance_sla",
+      "ruleBinding": {
+        "consumerType": "SLA",
+        "consumerCode": "tpm_standard_acceptance_sla",
+        "consumerNodeId": "tpm_standard_review",
+        "bindingKind": "DECISION_REF",
+        "enabled": true,
+        "decisionBinding": {
+          "decisionCode": "tpm_acceptance_deadline",
+          "versionPolicy": "LATEST_PUBLISHED",
+          "enabled": true,
+          "traceMode": "ALWAYS",
+          "fallbackPolicy": {
+            "mode": "FAIL_CLOSED"
+          },
+          "inputMappings": [
+            {
+              "input": "targetKey",
+              "source": {
+                "kind": "FIELD",
+                "scope": "record",
+                "path": "data.targetKey"
+              }
+            }
+          ],
+          "outputMappings": [
+            {
+              "output": "deadlineMinutes",
+              "target": {
+                "kind": "SLA_FIELD",
+                "path": "deadlineMinutes"
+              }
+            }
+          ]
+        }
+      },
+      "actionPolicy": {
+        "trigger": "SLA_TIMEOUT",
+        "failureStrategy": "FAIL_FAST",
+        "actions": [
+          {
+            "type": "NOTIFY",
+            "target": "ROLE:tenant_admin",
+            "order": 10,
+            "payload": {
+              "title": "交付验收审批已超时",
+              "content": "${sla.configName} 已超时，请在流程监控中查看并跟进待处理审批。"
+            },
+            "idempotencyKeyTemplate": "${sla.recordPid}:timeout:notify-admin"
+          }
+        ]
+      }
     },
     {
-      "name": "加强审核 · 2小时",
+      "name": "交付验收 · 加强审核 · 2小时",
       "targetType": "NODE",
       "targetKey": "tpm_enhanced_review",
       "deadlineMode": "RULE",
@@ -54,7 +106,59 @@
           "action": "escalate",
           "recipients": "assignee"
         }
-      ]
+      ],
+      "slaKey": "tpm_enhanced_acceptance_sla",
+      "ruleBinding": {
+        "consumerType": "SLA",
+        "consumerCode": "tpm_enhanced_acceptance_sla",
+        "consumerNodeId": "tpm_enhanced_review",
+        "bindingKind": "DECISION_REF",
+        "enabled": true,
+        "decisionBinding": {
+          "decisionCode": "tpm_acceptance_deadline",
+          "versionPolicy": "LATEST_PUBLISHED",
+          "enabled": true,
+          "traceMode": "ALWAYS",
+          "fallbackPolicy": {
+            "mode": "FAIL_CLOSED"
+          },
+          "inputMappings": [
+            {
+              "input": "targetKey",
+              "source": {
+                "kind": "FIELD",
+                "scope": "record",
+                "path": "data.targetKey"
+              }
+            }
+          ],
+          "outputMappings": [
+            {
+              "output": "deadlineMinutes",
+              "target": {
+                "kind": "SLA_FIELD",
+                "path": "deadlineMinutes"
+              }
+            }
+          ]
+        }
+      },
+      "actionPolicy": {
+        "trigger": "SLA_TIMEOUT",
+        "failureStrategy": "FAIL_FAST",
+        "actions": [
+          {
+            "type": "NOTIFY",
+            "target": "ROLE:tenant_admin",
+            "order": 10,
+            "payload": {
+              "title": "交付验收审批已超时",
+              "content": "${sla.configName} 已超时，请在流程监控中查看并跟进待处理审批。"
+            },
+            "idempotencyKeyTemplate": "${sla.recordPid}:timeout:notify-admin"
+          }
+        ]
+      }
     }
   ],
   "permissions": []
