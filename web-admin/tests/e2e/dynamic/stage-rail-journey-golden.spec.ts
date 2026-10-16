@@ -2,11 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 import { executeCommandViaApi, uniqueId, findRowInPaginatedList } from '../helpers';
 
 /**
- * CRM 管线 re-vehicle golden — the CRM/quote plugin is not part of the OSS e2e
- * profile, so the pipeline journey rides the e2et_crm_opp stage-rail fixture
- * (verbatim CRM pipeline-stage dict + list/form/detail trio shipped by
- * test-fixtures). This is the OSS-gate vehicle for the CRM pipeline journey:
- * seed → list search → UI form create → stage advance (command CAS) → detail.
+ * Platform stage-rail fixture journey: list search, browser form creation,
+ * versioned update and detail navigation through the generic dynamic runtime.
+ * The historical e2et_crm_opp fixture vocabulary is retained; this spec neither
+ * loads the CRM product nor certifies its business pipeline implementation.
  */
 
 const LIST_PATH = '/p/e2et_crm_opp';
@@ -58,7 +57,7 @@ async function openList(page: Page): Promise<void> {
   expect(resp.ok()).toBe(true);
 }
 
-test.describe('CRM pipeline journey golden (e2et stage-rail vehicle)', () => {
+test.describe('Platform stage-rail fixture journey', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60_000);
 

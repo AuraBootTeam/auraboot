@@ -9,6 +9,7 @@ import {
   loadOrCreateReleasePlan,
   normalizeBaseUrl,
   publishApplicationRelease,
+  upgradeTenantApplicationRelease,
 } from './application-release-control.mjs';
 
 const digest = (character) => `sha256:${character.repeat(64)}`;
@@ -108,4 +109,62 @@ test('completed receipt makes reruns side-effect free', async () => {
     token: 'secret-token',
   });
   assert.equal(receipt.status, 'completed');
+});
+
+function upgradeInput(directory) {
+  return { applicationCode: 'aura-edu', tenantId: 42,
+    expectedCurrentReleaseId: '01K60000000000000000000001', expectedVersion: 1,
+    targetReleaseId: '01K60000000000000000000002', targetDigest: digest('c'),
+    baseUrl: 'http://127.0.0.1:7105', token: 'private-token', receiptPath: join(directory, 'upgrade.json') };
+}
+function upgradedBinding(input) {
+  return { tenantId: input.tenantId, applicationId: 9, releaseId: input.targetReleaseId,
+    releaseDigest: input.targetDigest, status: 'active', version: input.expectedVersion + 1 };
+}
+test('binding upgrade retains one exact operation across a lost response and validates the committed transition', async () => {
+  const input = upgradeInput(mkdtempSync(join(tmpdir(), 'binding-upgrade-')));
+  let seen;
+  await assert.rejects(upgradeTenantApplicationRelease({ ...input, fetchImpl: async (_url, options) => {
+    seen = JSON.parse(options.body).operationId; throw new Error('response lost');
+  } }), /response lost/);
+  const receipt = await upgradeTenantApplicationRelease({ ...input, fetchImpl: async (url, options) => {
+    assert.ok(url.endsWith('/aura-edu/tenant-bindings/42/upgrade'));
+    assert.equal(JSON.parse(options.body).operationId, seen);
+    return { ok: true, status: 200, text: async () => JSON.stringify({ code: '0', data: upgradedBinding(input) }) };
+  } });
+  assert.equal(receipt.status, 'completed');
+  assert.equal(receipt.binding.version, 2);
+  assert.ok(!readFileSync(input.receiptPath, 'utf8').includes('private-token'));
+  await assert.rejects(upgradeTenantApplicationRelease({ ...input, expectedVersion: 2 }), /input differs/);
+  assert.equal((await upgradeTenantApplicationRelease({ ...input,
+    fetchImpl: async () => { throw new Error('completed receipt must not issue a new operation'); } })).status, 'completed');
+});
+test('binding upgrade refuses denied and mismatched responses without completing the receipt', async () => {
+  for (const denied of [true, false]) {
+    const input = upgradeInput(mkdtempSync(join(tmpdir(), 'binding-upgrade-deny-')));
+    await assert.rejects(upgradeTenantApplicationRelease({ ...input, fetchImpl: async () => ({
+      ok: !denied, status: denied ? 403 : 200, text: async () => JSON.stringify(denied
+        ? { code: '403' } : { code: '0', data: { ...upgradedBinding(input), tenantId: 99 } }),
+    }) }), denied ? /rejected/ : /differs/);
+    assert.equal(JSON.parse(readFileSync(input.receiptPath)).status, 'planned');
+  }
+});
+test('binding upgrade rejects a forged completed receipt and invalid source identity', async () => {
+  const input = upgradeInput(mkdtempSync(join(tmpdir(), 'binding-upgrade-forged-')));
+  await assert.rejects(upgradeTenantApplicationRelease({ ...input, expectedVersion: 0 }), /source binding version/);
+  await assert.rejects(upgradeTenantApplicationRelease({ ...input, fetchImpl: async () => { throw new Error('offline'); } }), /offline/);
+  const receipt = JSON.parse(readFileSync(input.receiptPath));
+  receipt.status = 'completed'; receipt.binding = { ...upgradedBinding(input), version: 88 };
+  writeFileSync(input.receiptPath, JSON.stringify(receipt));
+  await assert.rejects(upgradeTenantApplicationRelease(input), /invalid binding/);
+});
+
+test('binding upgrade preserves full 64-bit decimal tenant IDs and refuses rounded JSON numbers', async () => {
+  const input = {...upgradeInput(mkdtempSync(join(tmpdir(), 'binding-upgrade-id-'))), tenantId: '369448397205278720'};
+  const receipt = await upgradeTenantApplicationRelease({...input, fetchImpl: async url => {
+    assert.ok(url.includes('/tenant-bindings/369448397205278720/upgrade'));
+    return {ok: true, status: 200, text: async () => JSON.stringify({code: '0', data: upgradedBinding(input)})};
+  }});
+  assert.equal(receipt.binding.tenantId, '369448397205278720');
+  await assert.rejects(upgradeTenantApplicationRelease({...input, tenantId: Number(input.tenantId)}), /unsafe numeric tenant ID/);
 });

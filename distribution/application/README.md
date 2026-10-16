@@ -118,6 +118,20 @@ pnpm application emit-route-manifest \
 Client and SSR runs must produce the same graph digest.
 Source paths stay outside the graph identity and are never valid release inputs.
 
+### Core ownership and product capabilities
+
+`core-owned-surfaces.json` explicitly inventories platform routes, bootstrap
+permission modules and public assets. Customer impersonation controls and the
+external integration guides are platform surfaces. Product HTTP endpoints and
+test directories remain outside Core; the unchanged ownership gate enforces both.
+
+The BPM contribution owns `workflow.start` and the `aura.resource.workflow`
+service. Core invokes registered capabilities without issuing BPM HTTP requests
+as a fallback. Missing workflow discovery produces no options; a registered
+provider's failure propagates. The platform stage-rail browser fixture stays in
+`tests/e2e/dynamic`, preserving its original four cases and assertions; it does
+not qualify the CRM product's business pipeline.
+
 ## Publishing the AuraBoot platform artifact set
 
 Build the runtime and public plugin API, commit the exact source state, then stage a

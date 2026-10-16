@@ -142,6 +142,49 @@ class ApplicationReleaseControllerTest {
                 .andExpect(jsonPath("$.message").value("Shadow binding connection is not enabled"));
     }
 
+    @Test
+    void upgradesWithTheExactOldBindingAndTargetDigest() throws Exception {
+        String oldRelease = "01M3GNS9B7VCK4G88GPQXX941W";
+        String digest = "sha256:" + "c".repeat(64);
+        MetaContext.setContext(9L, 11L, "admin", "Admin");
+        when(control.upgradeStableActive(42L, "aura-edu", oldRelease, 3L, RELEASE_ID,
+                digest, "user:9:11", OPERATION_ID)).thenReturn(new ApplicationReleaseControlService.Binding(
+                        42L, 7L, RELEASE_ID, digest, 1, "active", 4L));
+        standaloneSetup(new ApplicationReleaseController(registration, control, comparison, shadowBindings)).build()
+                .perform(post("/api/admin/application-releases/aura-edu/tenant-bindings/42/upgrade")
+                        .contentType("application/json").accept("application/json")
+                        .content("""
+                                {"expectedCurrentReleaseId":"%s","expectedVersion":3,
+                                 "targetReleaseId":"%s","targetDigest":"%s","operationId":"%s"}
+                                """.formatted(oldRelease, RELEASE_ID, digest, OPERATION_ID)))
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.releaseId").value(RELEASE_ID))
+                .andExpect(jsonPath("$.data.version").value(4));
+        verifyNoInteractions(comparison, shadowBindings);
+        verify(control).upgradeStableActive(42L, "aura-edu", oldRelease, 3L, RELEASE_ID,
+                digest, "user:9:11", OPERATION_ID);
+    }
+
+    @Test
+    void upgradeRejectsUnauthenticatedActorBeforeCallingTheControl() throws Exception {
+        standaloneSetup(new ApplicationReleaseController(registration, control, comparison, shadowBindings)).build()
+                .perform(post("/api/admin/application-releases/aura-edu/tenant-bindings/42/upgrade")
+                        .contentType("application/json").accept("application/json").content("{}"))
+                .andExpect(jsonPath("$.code").value("409"));
+        verifyNoInteractions(control);
+    }
+
+    @Test
+    void upgradeSerializesLargeIdentifiersAsExactDecimalStrings() {
+        var binding = new ApplicationReleaseControlService.Binding(369448397205278720L, 369448397205278721L,
+                RELEASE_ID, "sha256:" + "c".repeat(64), 1, "active", 2L);
+        var response = ApplicationReleaseController.UpgradeTenantBindingResponse.from(binding);
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(response);
+        org.junit.jupiter.api.Assertions.assertTrue(json.get("tenantId").isTextual());
+        org.junit.jupiter.api.Assertions.assertEquals("369448397205278720", json.get("tenantId").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("369448397205278721", json.get("applicationId").asText());
+    }
+
     private static DefinitionShadowComparisonService.Report report(
             DefinitionShadowComparisonService.Classification classification) {
         return new DefinitionShadowComparisonService.Report(

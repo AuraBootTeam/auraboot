@@ -87,7 +87,6 @@ export async function bootCorePlugins(opts: { hasFeature?: (key: string) => bool
   }
 
   const activated = await kernel.pluginLoader.activateAll()
-  registerBuiltInRuntimeActions(kernel)
   bootedOnce = true
   // eslint-disable-next-line no-console
   console.info(`[boot-plugins] activated ${activated.length}/${ALL_PLUGINS.length} plugins (${CORE_PLUGINS.length} core + ${ENTERPRISE_PLUGINS.length} ent):`, activated.join(', '))
@@ -97,48 +96,4 @@ export async function bootCorePlugins(opts: { hasFeature?: (key: string) => bool
 /** Test-only: reset bootedOnce so a fresh boot can run. */
 export function _resetBootState(): void {
   bootedOnce = false
-}
-
-/**
- * Host-level runtime action defaults for codes the OSS web bundle ships no
- * plugin implementation for. The workflow.start invocation (useActionHandler
- * + unified runtime execution) otherwise throws "no action registered" before
- * any request fires. A BPM web package can still claim the code first — this
- * runs after activation and never overrides a plugin handler.
- */
-type WorkflowStartPayload = {
-  workflowKey: string
-  businessKey: string
-  variables?: Record<string, unknown>
-}
-
-async function defaultWorkflowStart(payload: WorkflowStartPayload): Promise<unknown> {
-  const { fetchResult } = await import('~/shared/services/http-client')
-  const result = await fetchResult('/api/bpm/process-instances', {
-    method: 'post',
-    params: {
-      processDefinitionId: payload.workflowKey,
-      businessKey: payload.businessKey,
-      variables: payload.variables ?? {},
-    },
-  })
-  const code = String((result as { code?: unknown })?.code ?? '')
-  if (code === '0') {
-    const data = (result as { data?: { instanceId?: unknown; processInstanceId?: unknown } })?.data
-    const processInstanceId = String(
-      data?.instanceId ?? data?.processInstanceId ?? '',
-    )
-    return { deduped: false, processInstanceId }
-  }
-  const scoped = result as { desc?: unknown; message?: unknown }
-  const desc = String(scoped.desc ?? scoped.message ?? '')
-  // A running instance for the same business key is a benign duplicate start.
-  if (/already|running|conflict|409/i.test(`${code} ${desc}`)) return { deduped: true }
-  throw new Error(`workflow.start failed: ${code} ${desc}`.trim())
-}
-
-function registerBuiltInRuntimeActions(kernel: ReturnType<typeof getKernel>): void {
-  if (kernel.pluginLoader.hasAction('workflow.start')) return
-  kernel.pluginLoader.registerHostAction('workflow.start', (payload) =>
-    defaultWorkflowStart(payload as WorkflowStartPayload))
 }

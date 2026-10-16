@@ -228,3 +228,57 @@ export async function publishApplicationRelease({
   updateReceipt(absoluteReceiptPath, plan, 'completed', 'stable', stable);
   return plan;
 }
+
+function exactTenantIdentifier(value) {
+  requireValue(typeof value !== 'number' || Number.isSafeInteger(value), 'unsafe numeric tenant ID');
+  const id = String(value);
+  requireValue(/^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= 9223372036854775807n,
+    'exact positive decimal tenant ID required');
+  return id;
+}
+
+/** Resume only the exact recorded binding request; the server owns compatibility and authorization. */
+export async function upgradeTenantApplicationRelease({ applicationCode, tenantId, expectedCurrentReleaseId,
+  expectedVersion, targetReleaseId, targetDigest, baseUrl, token, receiptPath,
+  fetchImpl = fetch, timeoutMs = 30_000 }) {
+  requireValue(APPLICATION_CODE.test(applicationCode ?? ''), 'valid application code required');
+  tenantId = exactTenantIdentifier(tenantId);
+  requireValue(Number.isSafeInteger(expectedVersion) && expectedVersion > 0 && expectedVersion < Number.MAX_SAFE_INTEGER,
+    'exact bounded source binding version required');
+  for (const value of [expectedCurrentReleaseId, targetReleaseId])
+    requireValue(/^[0-9A-HJKMNP-TV-Z]{26}$/.test(value ?? ''), 'exact source and target release IDs required');
+  requireValue(expectedCurrentReleaseId !== targetReleaseId && SHA256_IDENTITY.test(targetDigest ?? ''),
+    'different target release and exact digest required');
+  requireValue(typeof token === 'string' && token.trim(), 'release API token required');
+  requireValue(Number.isSafeInteger(timeoutMs) && timeoutMs > 0, 'positive request timeout required');
+  const input = { applicationCode, tenantId, expectedCurrentReleaseId, expectedVersion,
+    targetReleaseId, targetDigest, baseUrl: normalizeBaseUrl(baseUrl) };
+  const file = resolve(receiptPath);
+  let receipt;
+  if (existsSync(file)) {
+    receipt = JSON.parse(readFileSync(file, 'utf8'));
+    requireValue(receipt.schemaVersion === 1 && receipt.kind === 'tenant-release-upgrade', 'invalid upgrade receipt');
+    requireValue(JSON.stringify(receipt.input) === JSON.stringify(input), 'upgrade receipt input differs');
+    requireValue(/^[0-9A-HJKMNP-TV-Z]{26}$/.test(receipt.operationId ?? ''), 'exact upgrade operation required');
+  } else {
+    receipt = { schemaVersion: 1, kind: 'tenant-release-upgrade', input,
+      operationId: generateOperationId(), status: 'planned', binding: null };
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(receipt, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+  }
+  requireValue(['planned', 'completed'].includes(receipt.status), 'invalid upgrade receipt state');
+  const matches = binding => binding && exactTenantIdentifier(binding.tenantId) === tenantId && binding.releaseId === targetReleaseId
+    && binding.releaseDigest === targetDigest && binding.status === 'active' && binding.version === expectedVersion + 1;
+  if (receipt.status === 'completed') {
+    requireValue(matches(receipt.binding), 'completed upgrade receipt has an invalid binding');
+    return receipt;
+  }
+  const binding = await requestJson({ fetchImpl, baseUrl: input.baseUrl, token, timeoutMs,
+    path: `/api/admin/application-releases/${encodeURIComponent(applicationCode)}/tenant-bindings/${tenantId}/upgrade`,
+    body: { expectedCurrentReleaseId, expectedVersion, targetReleaseId, targetDigest, operationId: receipt.operationId } });
+  requireValue(matches(binding), 'upgrade response differs from the exact requested transition');
+  receipt.binding = binding;
+  receipt.status = 'completed';
+  atomicWriteJson(file, receipt);
+  return receipt;
+}
