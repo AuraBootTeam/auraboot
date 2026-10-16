@@ -6,6 +6,7 @@ const evidence=process.env.AURA_EVIDENCE_DIR;
 if(!evidence || !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.AURA_CORE_PROJECT_ROOT) throw Error('Bind the owned scenario sources, evidence and administrator.');
 const receipts:unknown[]=[];
 const prefix=`交付核验 ${Date.now()}`;
+const projectName=prefix+' · 专项交付项目';
 const createCommand='tdv:create_check';
 const verificationCommand='tdv:verify_delivery';
 async function data(response:APIResponse|Response) {
@@ -40,8 +41,9 @@ async function upload(page:Page) {
 async function createAcceptance(page:Page,user:any,name:string,amount:number,files:boolean) {
   await menu(page,'交付验收');await page.getByRole('button',{name:'新建验收',exact:true}).click();
   await page.locator('#tpm_ac_name').fill(name);await page.getByTestId('select-trigger-tpm_ac_project').click();
-  await page.getByRole('option',{name:'华辰制造 · 供应链协同平台',exact:true}).click();
+  await page.getByRole('option',{name:projectName,exact:true}).click();
   await page.locator('#tpm_ac_scope').fill('会员迁移、权限配置和培训完成，按交付清单核对。');await page.locator('#tpm_ac_amount').fill(String(amount));
+  await page.getByTestId('select-trigger-tpm_ac_risk').click();await page.getByRole('option',{name:'普通',exact:true}).click();
   await page.getByTestId('user-select-trigger-tpm_ac_reviewer').click();
   await page.getByTestId(`user-select-option-tpm_ac_reviewer-${user.pid}`).click();if(files)await upload(page);
   const sent=page.waitForResponse(r=>r.url().includes('/execute/tpm:create_acceptance')&&r.request().method()==='POST');
@@ -51,14 +53,24 @@ async function createAcceptance(page:Page,user:any,name:string,amount:number,fil
 async function createCheck(page:Page,name:string,acceptanceName:string) {
   await menu(page,'交付核验');await page.getByRole('button',{name:'新建核验',exact:true}).click();
   await page.getByRole('button',{name:'保存核验记录',exact:true}).click();await expect(page).toHaveURL(/\/new$/);
-  await expect(page.getByTestId('form-error-summary')).toContainText('核验名称');
-  await expect(page.getByTestId('form-error-summary')).toContainText('关联验收单');await shot(page,'v04');
+  await expect(page.getByTestId('form-field-tdv_ck_name').locator('p.text-status-red')).toContainText('核验名称');
+  await expect(page.getByTestId('form-field-tdv_ck_acceptance').locator('p.text-status-red')).toContainText('关联验收单');await shot(page,'v04');
   await page.locator('#tdv_ck_name').fill(name);await page.getByTestId('select-trigger-tdv_ck_acceptance').click();
   await page.getByRole('option',{name:acceptanceName,exact:true}).click();await shot(page,'v03');
   const sent=page.waitForResponse(r=>r.url().includes(`/execute/${createCommand}`)&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存核验记录',exact:true}).click();const response=await sent;
   expect(response.request().postDataJSON().payload.tdv_ck_acceptance).toBeTruthy();const pid=(await data(response)).data.recordPid;
   expect(pid).toBeTruthy();await open(page,'交付核验',name);await expect(page).toHaveURL(/\/p\/tdv_check\/view\//);return pid;
+}
+
+// API setup isolates budget accounting from the neighboring approval/SLA profile.
+// All acceptance/check creation and verification below still use real UI actions.
+async function prepareProject(page:Page) {
+  const projects=await data(await page.request.get('/api/dynamic/tpm_project/list',{params:{pageSize:500}}));
+  if(projects.records.some((row:any)=>row.tpm_pj_name===projectName))return;
+  const source=projects.records.find((row:any)=>row.tpm_pj_name==='华辰制造 · 供应链协同平台');expect(source).toBeTruthy();
+  const created=await data(await page.request.post('/api/meta/commands/execute/tpm:create_project',{data:{operationType:'create',payload:{tpm_pj_name:projectName,tpm_pj_customer_id:source.tpm_pj_customer_id,tpm_pj_owner_user:source.tpm_pj_owner_user,tpm_pj_budget:128000}}}));
+  expect(created.data.recordPid).toBeTruthy();
 }
 async function verify(page:Page,pid:string,expected:'passed'|'blocked') {
   const before=await data(await page.request.get('/api/dynamic/tdv_check/list',{params:{pageSize:500}}));
@@ -73,7 +85,7 @@ async function verify(page:Page,pid:string,expected:'passed'|'blocked') {
 }
 
 test('optional PF4J verifier reads stored evidence and recomputes after actual form correction @critical',async({page})=>{
-  const user=await login(page);await menu(page,'交付核验');
+  const user=await login(page);await prepareProject(page);await menu(page,'交付核验');
   await expect(page).toHaveURL(/\/p\/tdv_check$/);
   await expect(page.getByRole('main')).toContainText('还没有交付核验');
   expect((await data(await page.request.get('/api/dynamic/tdv_check/list'))).total).toBe(0);await shot(page,'v01');
@@ -93,7 +105,7 @@ test('optional PF4J verifier reads stored evidence and recomputes after actual f
 });
 
 test('accepted delivery reduces budget and one cent over the exact allowance blocks verification @critical',async({page})=>{
-  const user=await login(page);const acceptedName=prefix+' · 前次已验收';const acceptedPid=await createAcceptance(page,user,acceptedName,60000,true);
+  const user=await login(page);await prepareProject(page);const acceptedName=prefix+' · 前次已验收';const acceptedPid=await createAcceptance(page,user,acceptedName,60000,true);
   const submitted=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');
   await page.getByTestId('toolbar-btn-submit_acceptance').click();await data(await submitted);
   await expect(page.getByTestId('bpm-operations-approve')).toBeEnabled();await page.getByTestId('bpm-operations-approve').click();
