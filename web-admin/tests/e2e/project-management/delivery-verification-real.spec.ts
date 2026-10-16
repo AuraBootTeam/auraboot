@@ -53,7 +53,7 @@ async function createAcceptance(page:Page,user:any,name:string,amount:number,fil
 }
 async function createCheck(page:Page,name:string,acceptanceName:string) {
   await menu(page,'交付核验');await page.getByRole('button',{name:'新建核验',exact:true}).click();
-  expect(new URL(page.url()).pathname).toBe('/p/tdv_check/new');
+  await expect(page).toHaveURL(/\/p\/tdv_check\/new$/);
   await page.getByRole('button',{name:'保存核验记录',exact:true}).click();await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByTestId('form-field-tdv_ck_name').locator('p.text-status-red')).toContainText('核验名称');
   await expect(page.getByTestId('form-field-tdv_ck_acceptance').locator('p.text-status-red')).toContainText('关联验收单');await shot(page,'v04');
@@ -88,7 +88,7 @@ async function verify(page:Page,pid:string,expected:'passed'|'blocked') {
 
 test('optional PF4J verifier reads stored evidence and recomputes after actual form correction @critical',async({page})=>{
   const user=await login(page);await prepareProject(page);await menu(page,'交付核验');
-  expect(new URL(page.url()).pathname).toBe('/p/tdv_check');
+  await expect(page).toHaveURL(/\/p\/tdv_check$/);
   await expect(page.getByRole('main')).toContainText('还没有交付核验');
   expect((await data(await page.request.get('/api/dynamic/tdv_check/list'))).total).toBe(0);await shot(page,'v01');
   const name=prefix+' · 补齐材料';const acceptance=await createAcceptance(page,user,name,68000,false);

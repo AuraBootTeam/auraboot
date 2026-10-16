@@ -136,8 +136,8 @@
         "tdv_ck_name"
       ],
       "searchPlaceholder": {
-        "zh-CN": "搜索项目或核验名称",
-        "en": "Search project or verification name"
+        "zh-CN": "搜索核验名称",
+        "en": "Search verification name"
       },
       "defaultSort": {
         "field": "tdv_ck_checked_at",
