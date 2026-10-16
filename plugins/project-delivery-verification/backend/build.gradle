@@ -19,10 +19,13 @@ dependencies {
     compileOnly 'org.pf4j:pf4j:3.15.1'
     annotationProcessor 'org.pf4j:pf4j:3.15.1'
     compileOnly 'org.slf4j:slf4j-api:2.0.18'
+    // Same host-owned JSON ABI as platform/build.gradle; never bundled in the thin JAR.
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
     testImplementation files(apiJar)
     testImplementation 'org.pf4j:pf4j:3.15.1'
     testImplementation platform('org.junit:junit-bom:5.14.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 test { useJUnitPlatform(); finalizedBy jacocoTestReport }

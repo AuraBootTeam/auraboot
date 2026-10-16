@@ -2,6 +2,8 @@ package com.auraboot.plugins.delivery;
 
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -12,6 +14,7 @@ import org.pf4j.Extension;
 /** Recomputes an advisory snapshot through the host's tenant-scoped, transactional bridge. */
 @Extension
 public final class VerifyDeliveryHandler implements CommandHandlerExtension {
+    private static final ObjectMapper JSON = new ObjectMapper();
     private final Clock clock;
     public VerifyDeliveryHandler() { this(Clock.systemUTC()); }
     VerifyDeliveryHandler(Clock clock) { this.clock = Objects.requireNonNull(clock); }
@@ -45,7 +48,7 @@ public final class VerifyDeliveryHandler implements CommandHandlerExtension {
         }
         BigDecimal available = budget == null ? null : budget.subtract(accepted);
         Object files = acceptance.get("tpm_ac_files");
-        boolean materialsOk = files instanceof Collection<?> list && !list.isEmpty();
+        boolean materialsOk = hasMaterials(files);
         boolean scopeOk = !blank(acceptance.get("tpm_ac_scope"));
         boolean amountOk = amount != null && amount.signum() > 0;
         boolean budgetKnown = budget != null && budget.signum() > 0;
@@ -82,6 +85,19 @@ public final class VerifyDeliveryHandler implements CommandHandlerExtension {
         return id;
     }
     private static boolean blank(Object value) { return value == null || value.toString().isBlank(); }
+    private static boolean hasMaterials(Object value) {
+        if (value instanceof Collection<?> list) return !list.isEmpty();
+        // The public DataAccessor read contract serializes json/jsonb as strings.
+        if (value instanceof String text) {
+            try {
+                var parsed = JSON.readTree(text);
+                return parsed != null && parsed.isArray() && !parsed.isEmpty();
+            } catch (JsonProcessingException invalid) {
+                return false;
+            }
+        }
+        return false;
+    }
     private static BigDecimal money(Object value) {
         if (value == null || value.toString().isBlank()) return null;
         try {

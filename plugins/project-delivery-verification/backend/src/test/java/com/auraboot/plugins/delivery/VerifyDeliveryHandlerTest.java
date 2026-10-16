@@ -72,8 +72,12 @@ class VerifyDeliveryHandlerTest {
         assertEquals("blocked", target.get("tdv_ck_status")); assertEquals(2, target.get("tdv_ck_passed"));
         assertEquals("blocked", target.get("tdv_ck_materials")); assertEquals("blocked", target.get("tdv_ck_scope"));
     }
-    @Test void doesNotTreatSerializedOrMissingAttachmentListsAsEvidence() {
-        acceptance.put("tpm_ac_files", "[]"); run(); assertEquals("blocked", target.get("tdv_ck_materials"));
+    @Test void readsSerializedJsonbAndRejectsEmptyMalformedOrNonArrayValues() {
+        acceptance.put("tpm_ac_files", "[{\"fileId\":\"uploaded-evidence\"}]"); run();
+        assertEquals("passed", target.get("tdv_ck_materials"));
+        for (Object value : List.of("[]", "bad-json", "{}", "null", "", 42)) {
+            acceptance.put("tpm_ac_files", value); run(); assertEquals("blocked", target.get("tdv_ck_materials"));
+        }
         acceptance.remove("tpm_ac_files"); run(); assertEquals("blocked", target.get("tdv_ck_materials"));
     }
     @Test void acceptedAmountsReduceBudgetAndCurrentRecordIsNotDoubleCounted() {
