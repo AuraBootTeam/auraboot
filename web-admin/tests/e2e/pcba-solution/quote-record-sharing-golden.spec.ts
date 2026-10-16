@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { createWriteStream, readFileSync, statSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDetailFromList,
   seedBomPriceManualReviewQuote, seedDownloadableQuote, type QuoteRoleUser } from './quote-e2e-helpers';
@@ -12,6 +13,54 @@ const recipients: QuoteRoleUser[] = [
   makeQuoteRoleUser('share_b', sharingUid, ['qo_sales']),
   makeQuoteRoleUser('share_proc', sharingUid, ['qo_procurement']),
 ];
+
+test.beforeAll(async ({}, testInfo) => {
+  test.setTimeout(180_000);
+  const required = (key: string): string => {
+    const value = process.env[key];
+    if (!value) throw new Error(`${key} is required for managed foreign identity preparation`);
+    return value;
+  };
+  const workspace = required('AURA_WORKSPACE_ROOT');
+  const core = required('AURA_CORE_PROJECT_ROOT');
+  for (const root of [workspace, core]) expect(path.isAbsolute(root)).toBe(true);
+  const runtime = required('AURA_RUNTIME_NAME');
+  const database = required('POSTGRES_DB');
+  expect(database).toBe(required('PG_DB'));
+  const project = path.join(core, 'platform');
+  const started = Date.now();
+  const logPath = testInfo.outputPath('cross-tenant-identity-seed.log');
+  const log = createWriteStream(logPath);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(process.execPath, [path.join(workspace, 'aura'), 'gradle', runtime,
+        '--project', project, '--', ':test', '--tests',
+        'com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.seed_createsTestTenantAndUser',
+        '--no-daemon', '--rerun-tasks'], {
+        cwd: project,
+        env: { ...process.env, AURA_E2E_SEED_IDENTITY_ONLY: 'true',
+          TEST_DATABASE_URL: `jdbc:postgresql://${required('POSTGRES_HOST')}:${required('POSTGRES_PORT')}/${database}`,
+          TEST_DATABASE_USERNAME: required('POSTGRES_USER'), TEST_DATABASE_PASSWORD: required('POSTGRES_PASSWORD'),
+          SPRING_DATA_REDIS_HOST: required('REDIS_HOST'), SPRING_DATA_REDIS_PORT: required('REDIS_PORT'),
+          SPRING_DATA_REDIS_DATABASE: required('REDIS_DATABASE'),
+        }, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      child.stdout.pipe(log, { end: false });
+      child.stderr.pipe(log, { end: false });
+      child.once('error', reject);
+      child.once('close', code => code === 0 ? resolve() : reject(new Error(
+        `Managed foreign identity preparation failed (${code}); evidence: ${logPath}`)));
+    });
+  } finally { log.end(); }
+  const receipt = path.join(project, 'build/test-results/test/TEST-com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.xml');
+  expect(statSync(receipt).mtimeMs).toBeGreaterThanOrEqual(started);
+  const xml = readFileSync(receipt, 'utf8');
+  const header = xml.match(/<testsuite\b[^>]*>/)?.[0] ?? '';
+  for (const [key, value] of Object.entries({ tests: '1', skipped: '0', failures: '0', errors: '0' })) {
+    expect(header).toMatch(new RegExp(`\\b${key}="${value}"`));
+  }
+  await testInfo.attach('managed-foreign-identity-junit', { path: receipt, contentType: 'application/xml' });
+});
 
 test('quote sharing release gate: multiple members, role access and revocation through UI', async ({ page, browser }, testInfo) => {
   test.setTimeout(300_000);
@@ -202,21 +251,12 @@ test('quote sharing release gate: multiple members, role access and revocation t
   // Create a real isolated tenant through the same public company flow as host-first users.
   // Company changes invalidate that user's old credentials. Use an independent
   // fixture actor so provisioning cannot invalidate the owner's session.
-  const foreignContext = await browser.newContext({ storageState: await viewers[0].context.storageState(), locale: 'zh-CN' });
-  const foreign = { context: foreignContext, page: await foreignContext.newPage() };
-  const tenantResponse = await foreign.page.request.post('/api/tenant-selection/process', {
-    data: { action: 'create', tenantName: `quote-sharing-${Date.now()}`, displayName: 'Quote sharing isolation' },
-    timeout: 90_000,
+  // Prepare this identity through the existing seed integration runner with
+  // AURA_E2E_SEED_IDENTITY_ONLY=true. Public self-provisioning stays disabled in SINGLE.
+  const foreign = await openQuoteRolePage(browser, {
+    key: 'cross-tenant-fixture', email: 'e2e@test.local',
+    displayName: 'E2E Test Admin', password: 'E2eTestPass2026!', roleCodes: ['tenant_admin'],
   });
-  expect(tenantResponse.status(), await tenantResponse.text()).toBe(200);
-  const tenant = (await tenantResponse.json()).data;
-  expect(tenant.tenantId).toBeTruthy();
-  const switched = await foreign.page.request.post('/_action/switch-space', {
-    form: { tenantId: String(tenant.tenantId), redirectTo: '/' },
-    maxRedirects: 0,
-  });
-  expect(switched.status(), await switched.text()).toBe(302);
-  expect(switched.headers()['location']).toBe('/');
   try {
     const ownerIdentity = await page.request.get('/api/auth/me');
     const foreignIdentity = await foreign.page.request.get('/api/auth/me');
@@ -228,7 +268,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignMe.user.tenantId).toBeTruthy();
     expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
     expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
-    // The freshly created foreign tenant needs the
+    // The independently seeded foreign tenant needs the
     // same product page before this journey can exercise the record boundary.
     const quoteRoot = process.env.AURA_QUOTE_ROOT;
     expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
@@ -242,6 +282,8 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const dependencies = [
       [path.join(crmRoot!, 'plugin-aura', 'crm'), 'com.auraboot.crm'],
       [path.join(pluginsRoot!, 'pcba-crm'), 'com.auraboot.pcba-crm'],
+      [path.join(pluginsRoot!, 'customer-pcba-integration'), 'com.auraboot.customer-pcba-integration'],
+      [path.join(pluginsRoot!, 'bom-standardization'), 'com.auraboot.bom-standardization'],
       [path.join(quoteRoot!, 'plugin-aura', 'quote-core'), 'com.auraboot.quote-core'],
     ];
     for (const [pluginPath, pluginId] of dependencies) {
@@ -262,6 +304,27 @@ test('quote sharing release gate: multiple members, role access and revocation t
       expect(imported.status(), pluginId).toBe(200);
       expect((await imported.json()).success, pluginId).toBe(true);
     }
+    // A newly imported tenant has no product command entitlement yet. Use the
+    // original runtime-scoped product initialization, keeping entitlement and
+    // tenant isolation enforcement enabled for the own-record positive control.
+    const entitlementLogPath = testInfo.outputPath('foreign-product-initialization.log');
+    const entitlementLog = createWriteStream(entitlementLogPath);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn('bash', [path.join(quoteRoot!, 'scripts/quote-bom-env.sh'),
+          'start', process.env.AURA_RUNTIME_NAME!, '--no-reset', '--phase=import'], {
+          cwd: quoteRoot!, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        child.stdout.pipe(entitlementLog, { end: false });
+        child.stderr.pipe(entitlementLog, { end: false });
+        child.once('error', reject);
+        child.once('close', code => code === 0 ? resolve() : reject(new Error(
+          `Foreign product initialization failed (${code}); evidence: ${entitlementLogPath}`)));
+      });
+    } finally { entitlementLog.end(); }
+    await testInfo.attach('foreign-product-initialization', {
+      path: entitlementLogPath, contentType: 'text/plain',
+    });
     const foreignSchema = await foreign.page.request.get('/api/pages/key/qo_quote_common_detail');
     expect(foreignSchema.status()).toBe(200);
     expect(String((await foreignSchema.json()).code)).toBe('0');
@@ -284,6 +347,12 @@ test('quote sharing release gate: multiple members, role access and revocation t
     ])] });
     expect(explicitRead.status()).toBe(200);
     expect(String((await explicitRead.json()).code)).toBe('0');
+    // A valid own-record read prevents an uninitialized foreign product or a
+    // blanket-deny session from masquerading as tenant isolation.
+    const foreignOwned = await seedBomPriceManualReviewQuote(foreign.page);
+    const ownRead = await foreign.page.request.get(`/api/dynamic/qo_quote_common/${foreignOwned.quoteId}`);
+    expect(ownRead.status()).toBe(200);
+    expect((await ownRead.json()).data.qo_quote_code).toBe(foreignOwned.quoteCode);
     const deniedRecord = foreign.page.waitForResponse(response =>
       new URL(response.url()).pathname === root && response.request().method() === 'GET');
     await foreign.page.goto(new URL(`/p/qo_quote_common/view/${quote.quoteId}`, page.url()).href);

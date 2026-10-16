@@ -88,7 +88,11 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
     @Order(1)
     @DisplayName("TS-01: POST /api/test/seed creates test tenant and user, returns valid SeedResult")
     void seed_createsTestTenantAndUser() throws Exception {
+        boolean identityOnly = "true".equals(System.getenv("AURA_E2E_SEED_IDENTITY_ONLY"));
+        Long pluginsBefore = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ab_plugin WHERE deleted_flag = false", Long.class);
         MvcResult result = mockMvc.perform(post("/api/test/seed")
+                        .param("identityOnly", Boolean.toString(identityOnly))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tenantId").isNumber())
@@ -104,6 +108,11 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
         seededTenantId = body.get("tenantId").asLong();
         seededUserId = body.get("userId").asLong();
         assertJwtIncludesMemberId(body);
+        if (identityOnly) {
+            Assertions.assertEquals(pluginsBefore, jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM ab_plugin WHERE deleted_flag = false", Long.class),
+                    "Identity preparation must not import unrelated product fixtures");
+        }
 
         log.info("TS-01: seed returned tenantId={}, userId={}", seededTenantId, seededUserId);
     }

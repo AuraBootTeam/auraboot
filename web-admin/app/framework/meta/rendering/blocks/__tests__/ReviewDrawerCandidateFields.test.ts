@@ -594,3 +594,16 @@ describe('resolveProfiledFieldColumns', () => {
     expect(fields.find((field) => field.key === 'other')).toBeUndefined();
   });
 });
+
+it('localizes configured extra attributes while retaining unknown values and source units', () => {
+  const item = { fieldProfiles: { otherField: { key: 'other', attributeLabels: {
+    voltage_volts: { 'zh-CN': '耐压（V）', en: 'Voltage (V)' },
+  } } } };
+  const candidate = { bom_me_candidate_snapshot_json: { attributes: {
+    voltage_volts: 16, vendor_note: 'original value',
+  } } };
+  expect(resolveCandidateFieldColumns({ item, candidate, locale: 'zh-CN' })[0].value)
+    .toBe('耐压（V）: 16；vendor_note: original value');
+  expect(resolveCandidateFieldColumns({ item, candidate, locale: 'en' })[0].value)
+    .toBe('Voltage (V): 16；vendor_note: original value');
+});

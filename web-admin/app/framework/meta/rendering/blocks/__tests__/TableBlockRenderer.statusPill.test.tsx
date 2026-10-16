@@ -254,3 +254,31 @@ describe('TableBlockRenderer status-pill renderType', () => {
     expect(screen.queryByText('01KZKV0T575BDJ3B3FT2QHBKDW')).not.toBeInTheDocument();
   });
 });
+
+it('translates explicitly delimited dictionary values without exposing field codes', async () => {
+  const block = tableBlock();
+  if (!Array.isArray(block.columns)) throw new Error('Test requires table columns');
+  block.columns[0].dictValueSeparator = ',';
+  render(
+    <TableBlockRenderer
+      block={block}
+      runtime={makeRuntime([{ pid: 'r1', reason: 'match_spec_package, no_library_match' }])}
+    />,
+  );
+  expect(await screen.findByText('规格+封装精确命中、物料库无匹配')).toBeInTheDocument();
+  expect(screen.queryByText('match_spec_package, no_library_match')).not.toBeInTheDocument();
+});
+
+it('reports an incomplete multi-value dictionary instead of leaking unknown codes', async () => {
+  const block = tableBlock();
+  if (!Array.isArray(block.columns)) throw new Error('Test requires table columns');
+  block.columns[0].dictValueSeparator = ',';
+  render(
+    <TableBlockRenderer
+      block={block}
+      runtime={makeRuntime([{ pid: 'r1', reason: 'match_spec_package,unknown_internal' }])}
+    />,
+  );
+  expect(await screen.findByText('标签未配置')).toBeInTheDocument();
+  expect(screen.queryByText(/unknown_internal/)).not.toBeInTheDocument();
+});
