@@ -29,6 +29,9 @@ async function menu(page: Page, name: string) {
 }
 async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), {recursive:true});
+  if (['d01','d04'].includes(id)) await page.getByTestId('strategy-check-readiness').evaluate(el=>el.scrollIntoView({block:'center'}));
+  if (['d02','d03','d02-published'].includes(id)) await page.getByTestId('strategy-test-inputs').evaluate(el=>el.scrollIntoView({block:'start'}));
+  if (['d07','d08-pending'].includes(id)) await expect(page.getByText('保存成功',{exact:true})).toHaveCount(0,{timeout:15000});
   await page.screenshot({path:join(evidence!, 'screenshots', `${id}.png`),fullPage:true});
 }
 async function row(page: Page, pid: string) {
