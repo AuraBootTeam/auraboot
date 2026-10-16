@@ -524,7 +524,9 @@ export function resolveExtensionDisplayName(
   extension: Record<string, any> | null | undefined,
   code: string,
   locale: string = 'zh-CN',
+  configuredLabel?: unknown,
 ): string {
+  if (typeof configuredLabel === 'string' && configuredLabel.trim()) return configuredLabel.trim();
   if (extension) {
     const localized = extension[`displayName:${locale}`];
     if (typeof localized === 'string' && localized) return localized;

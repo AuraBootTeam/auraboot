@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "runtime": "oss-performance",
+  "generatedAt": "2026-10-15T10:48:37.421Z",
+  "sourceCommit": "0e89bbbe3a0f43b73fb166fc6217faf50064e3e5",
+  "artifactHash": "2c70ab52f61ccdc09ab73e76ba8ee2cb4a0a6306f68f05562c40e5ac1c67b4b1",
+  "sourceRoots": [
+    {
+      "key": "core",
+      "root": "$WORKSPACE/.workspace/worktrees/oss-performance/auraboot",
+      "branch": "codex/oss-performance",
+      "commit": "0e89bbbe3a0f43b73fb166fc6217faf50064e3e5",
+      "dirtyFingerprint": "clean"
+    },
+    {
+      "key": "workspace",
+      "root": "$WORKSPACE/.workspace/worktrees/oss-performance/workspace",
+      "branch": "detached",
+      "commit": "5c687fd22d84ae339090a1f1d6765fe7c4cb8d61",
+      "dirtyFingerprint": "clean"
+    }
+  ],
+  "backendArtifact": {
+    "path": "$WORKSPACE/.workspace/runtimes/oss-performance/artifacts/backend/AuraBoot-1.0.0-boot.jar",
+    "hash": "2c70ab52f61ccdc09ab73e76ba8ee2cb4a0a6306f68f05562c40e5ac1c67b4b1"
+  },
+  "processes": [
+    {
+      "key": "backend-launch",
+      "pid": 50508,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/platform",
+      "commandHash": "86832831bac23c3bf1c9b9633e837bc9cfd59d20de363886746e814efdde8248"
+    },
+    {
+      "key": "backend",
+      "pid": 50508,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/platform",
+      "commandHash": "86832831bac23c3bf1c9b9633e837bc9cfd59d20de363886746e814efdde8248"
+    },
+    {
+      "key": "bff",
+      "pid": 50849,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin",
+      "commandHash": "893fbba0c1cb4e7c297c8fac126a0d1a561e140a2f9d099b117cd035391b5755"
+    },
+    {
+      "key": "frontend-launch",
+      "pid": 50705,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin",
+      "commandHash": "614e81d106a2121a4ff1b24c44cb56fc8cf5ec96ae629a6d50a2b99578382480"
+    },
+    {
+      "key": "web",
+      "pid": 50843,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin",
+      "commandHash": "e8bab9f4ad90eb34d533c838a20f6677b48ab26fe618d999edd59a5f8d59b83b"
+    }
+  ],
+  "ports": {
+    "backend": {
+      "port": 6681,
+      "status": "listening",
+      "pids": [
+        50508
+      ]
+    },
+    "web": {
+      "port": 5381,
+      "status": "listening",
+      "pids": [
+        50843
+      ]
+    },
+    "bff": {
+      "port": 6381,
+      "status": "listening",
+      "pids": [
+        50849
+      ]
+    }
+  },
+  "database": "auraboot_281",
+  "redisDatabase": "7",
+  "backendUrl": "http://127.0.0.1:6681",
+  "webUrl": "http://127.0.0.1:5381",
+  "bffUrl": "http://127.0.0.1:6381",
+  "scope": "OSS source, staged backend, live Web/BFF/backend identity and service namespaces; plugin import and browser acceptance are separate"
+}

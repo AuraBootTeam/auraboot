@@ -100,6 +100,30 @@ describe('useDashboardStore', () => {
     });
   });
 
+  describe('portable document import', () => {
+    function document() { return JSON.stringify({ format: 'auraboot.dashboard', version: 1, dashboard: {
+      ...minimalDashboard(), title: 'Imported delivery', tenantId: 99, scope: 'global', status: 'published',
+      widgets: [{ ...widgetData(), id: 'imported-card' }],
+    } }); }
+    it('creates a personal draft and saves through create, never updating the source', async () => {
+      useDashboardStore.setState({ dashboard: { ...minimalDashboard({ pid: 'original' }), layoutConfig: { columns: 12, rowHeight: 100, gap: 16 } } });
+      useDashboardStore.getState().importDocument(document());
+      const state = useDashboardStore.getState();
+      expect(state.dashboard?.pid).toBeUndefined(); expect(state.dashboard?.tenantId).toBeUndefined();
+      expect(state.dashboard?.scope).toBe('personal'); expect(state.dashboard?.status).toBe('draft');
+      expect(state.widgets).toHaveLength(1); expect(state.isDirty).toBe(true); expect(state.canUndo()).toBe(false);
+      createDashboardMock.mockResolvedValue({ ...state.dashboard, pid: 'new-copy' });
+      await state.saveDashboard();
+      expect(createDashboardMock).toHaveBeenCalledOnce(); expect(updateDashboardMock).not.toHaveBeenCalled();
+      expect(useDashboardStore.getState().dashboard?.pid).toBe('new-copy');
+    });
+    it('keeps current canvas unchanged when import validation fails', () => {
+      useDashboardStore.getState().createDashboard('Keep me');
+      expect(() => useDashboardStore.getState().importDocument('{')).toThrow();
+      expect(useDashboardStore.getState().dashboard?.title).toBe('Keep me');
+    });
+  });
+
   // ── updateDashboardMeta ───────────────────────────────────────────────────
 
   describe('updateDashboardMeta', () => {
@@ -400,6 +424,45 @@ describe('useDashboardStore', () => {
   // ── updateLayout ──────────────────────────────────────────────────────────
 
   describe('updateLayout', () => {
+    it('keeps a loaded dashboard publishable when GridLayout repeats identical geometry', async () => {
+      const widget = { ...widgetData(), id: 'loaded-widget' };
+      findByPidMock.mockResolvedValue(minimalDashboard({ widgets: [widget] }));
+      await useDashboardStore.getState().loadDashboard('dash-1');
+      const before = useDashboardStore.getState();
+      useDashboardStore.getState().updateLayout([{ ...widget }]);
+      const after = useDashboardStore.getState();
+      expect(after.isDirty).toBe(false);
+      expect(after.mutationGeneration).toBe(before.mutationGeneration);
+      expect(after.history).toBe(before.history);
+      expect(after.widgets).toBe(before.widgets);
+    });
+
+    it('applies a genuine move without rolling back a newer widget configuration', () => {
+      useDashboardStore.getState().createDashboard('Board');
+      const id = useDashboardStore.getState().addWidget(widgetData());
+      const oldWidget = useDashboardStore.getState().getWidgetById(id)!;
+      useDashboardStore.getState().updateWidget(id, { config: { title: 'New title' } });
+      useDashboardStore.getState().setDirty(false);
+      const before = useDashboardStore.getState();
+      useDashboardStore.getState().updateLayout([{ ...oldWidget, x: 6 }]);
+      const after = useDashboardStore.getState();
+      expect(after.widgets[0].config.title).toBe('New title');
+      expect(after.widgets[0].x).toBe(6);
+      expect(after.isDirty).toBe(true);
+      expect(after.mutationGeneration).toBe(before.mutationGeneration + 1);
+      expect(after.history).toHaveLength(before.history.length + 1);
+    });
+
+    it('does not resurrect a widget removed after a layout callback was queued', () => {
+      useDashboardStore.getState().createDashboard('Board');
+      const id = useDashboardStore.getState().addWidget(widgetData());
+      const removed = useDashboardStore.getState().getWidgetById(id)!;
+      useDashboardStore.getState().deleteWidget(id);
+      useDashboardStore.getState().setDirty(false);
+      useDashboardStore.getState().updateLayout([{ ...removed, x: 6 }]);
+      expect(useDashboardStore.getState().widgets).toEqual([]);
+      expect(useDashboardStore.getState().isDirty).toBe(false);
+    });
     it('replaces widgets array and marks dirty', () => {
       useDashboardStore.getState().createDashboard('Board');
       const id = useDashboardStore.getState().addWidget(widgetData());

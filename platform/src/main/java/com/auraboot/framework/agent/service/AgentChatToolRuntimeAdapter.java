@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RequiredArgsConstructor
 class AgentChatToolRuntimeAdapter {
@@ -28,6 +29,11 @@ class AgentChatToolRuntimeAdapter {
     private final List<AgentContextBlock> contextBlocks;
     private final AgentChatTurnOutcomeAdapter outcomeAdapter;
     private final AgentChatToolExecutionAdapter toolExecutionAdapter;
+    private final Set<String> allowedToolCodes;
+
+    private boolean permits(ToolDefinition definition) {
+        return allowedToolCodes == null || definition != null && allowedToolCodes.contains(definition.getToolCode());
+    }
 
     ChatTurnRuntime.ChatToolLoopCallbacks callbacks() {
         return new ChatTurnRuntime.ChatToolLoopCallbacks() {
@@ -56,7 +62,12 @@ class AgentChatToolRuntimeAdapter {
 
             @Override
             public boolean allowToolInCatalog(ChatTurnRuntime.ChatToolLoopRound round, ToolDefinition definition) {
-                return owner.allowToolInCatalog(round, definition);
+                return permits(definition) && owner.allowToolInCatalog(round, definition);
+            }
+
+            @Override
+            public boolean allowToolExecution(ChatTurnRuntime.ChatToolCall call, ToolDefinition definition) {
+                return permits(definition);
             }
 
             @Override

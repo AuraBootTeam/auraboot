@@ -227,7 +227,7 @@ metrics:
           ).status(),
         ).toBe(403);
         const statuses = [];
-        for (const format of ['json', 'excel', 'pdf']) {
+        for (const format of ['json', 'excel', 'pdf', 'markdown', 'html']) {
           const response = await session.page.request.post(`/api/reports/export/${format}`, {
             data: { reportPid: pid },
           });
@@ -316,7 +316,7 @@ metrics:
           await retried;
           await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
           await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
-          for (const format of ['JSON', 'Excel', 'PDF'])
+          for (const format of ['JSON', 'Excel', 'PDF', 'Markdown', 'HTML'])
             await expect(
               session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
             ).toBeDisabled();
@@ -416,7 +416,7 @@ metrics:
             await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
             await rejected;
             await expect(session.page.getByText('导出未完成。请检查数据源和访问权限后重试。', { exact: true })).toBeVisible();
-            for (const format of ['json', 'excel', 'pdf']) {
+            for (const format of ['json', 'excel', 'pdf', 'markdown', 'html']) {
               const denied = await session.page.request.post(`/api/reports/export/${format}`, {
                 data: { reportPid: pid },
               });
@@ -425,7 +425,7 @@ metrics:
             await session.page.reload();
             await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
             await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
-            for (const format of ['JSON', 'Excel', 'PDF']) {
+            for (const format of ['JSON', 'Excel', 'PDF', 'Markdown', 'HTML']) {
               await expect(
                 session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
               ).toBeDisabled();
@@ -592,7 +592,7 @@ test('named-query reports require source and declared resource permissions', asy
         mode !== 'resource-denied',
       );
       const statuses = [];
-      for (const format of ['json', 'excel', 'pdf']) {
+      for (const format of ['json', 'excel', 'pdf', 'markdown', 'html']) {
         const response = await session.page.request.post(`/api/reports/export/${format}`, {
           data: { reportPid: pid },
         });
@@ -727,7 +727,7 @@ test('named-query reports require source and declared resource permissions', asy
         await retried;
         await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
-        for (const format of ['JSON', 'Excel', 'PDF'])
+        for (const format of ['JSON', 'Excel', 'PDF', 'Markdown', 'HTML'])
           await expect(
             session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
           ).toBeDisabled();

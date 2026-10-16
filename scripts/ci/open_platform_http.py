@@ -4,6 +4,7 @@ Importing this module never provisions fixtures, logs in, or contacts a server.
 """
 
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,13 +14,71 @@ class ProtocolError(RuntimeError):
     """A safe diagnostic that never includes response bodies or credentials."""
 
 
+def bind_physical_fixture_fields(request, admin, definition, model):
+    """Materialize physical fixture fields through the real metadata APIs.
+
+    Inline model fields describe metadata; physical publication requires actual
+    library bindings. Virtual models keep their inline projection definitions.
+    """
+    if definition.get("sourceType", "physical") != "physical":
+        return
+    fields = definition.get("fields", [])
+    if not fields:
+        return
+    pid = model.get("pid") if isinstance(model, dict) else None
+    if not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", pid):
+        raise ProtocolError("physical fixture model identity invalid")
+
+    def human(path, method="GET", body=None):
+        _, response, _ = request(path, method=method, body=body, headers=admin)
+        if not isinstance(response, dict) or str(response.get("code")) != "0":
+            raise ProtocolError("physical fixture field administration failed")
+        return response.get("data")
+
+    for field in fields:
+        code, kind = field.get("code"), field.get("dataType")
+        if (not isinstance(code, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,99}", code)
+                or not isinstance(kind, str) or not kind):
+            raise ProtocolError("physical fixture field definition invalid")
+        _, lookup, _ = request("/api/meta/fields/key/" + code, headers=admin)
+        if not isinstance(lookup, dict):
+            raise ProtocolError("physical fixture field lookup invalid")
+        if str(lookup.get("code")) == "0":
+            stored = lookup.get("data")
+        elif str(lookup.get("code")) == "1" and lookup.get("data") is None:
+            stored = human("/api/meta/fields", "POST", {
+                "code": code, "dataType": kind, "autoPublish": True,
+                "feature": {key: bool(field.get(key, False)) for key in ["filterable", "sortable"]},
+            })
+        else:
+            raise ProtocolError("physical fixture field lookup refused")
+        if (not isinstance(stored, dict) or stored.get("code") != code
+                or str(stored.get("dataType", "")).lower() != kind.lower()
+                or not isinstance(stored.get("pid"), str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", stored["pid"])):
+            raise ProtocolError("physical fixture library field mismatch")
+        human(f"/api/meta/models/{pid}/fields/bind", "POST", {
+            "fieldPid": stored["pid"], "required": bool(field.get("required", False)),
+            "nullable": not bool(field.get("required", False)), "visible": True,
+            "editable": bool(field.get("editable", True)),
+            "readonly": not bool(field.get("editable", True)),
+        })
+    bound = human(f"/api/meta/models/{pid}/fields")
+    if not isinstance(bound, list):
+        raise ProtocolError("physical fixture field readback invalid")
+    for field in fields:
+        matches = [row for row in bound if isinstance(row, dict) and row.get("code") == field["code"]]
+        if len(matches) != 1 or str(matches[0].get("dataType", "")).lower() != field["dataType"].lower():
+            raise ProtocolError("physical fixture field binding not persisted")
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
 
 class Client:
-    def __init__(self, base_url, *, timeout=90, max_requests=250, opener=None):
+    def __init__(self, base_url, *, timeout=90, max_requests=250, opener=None, allow_expected_rate_limit=False):
         parsed = urllib.parse.urlsplit(base_url)
         if (parsed.scheme not in {"http", "https"} or not parsed.hostname
                 or parsed.username is not None or parsed.password is not None
@@ -27,6 +86,9 @@ class Client:
             raise ValueError("base URL must be an HTTP(S) origin without credentials")
         if timeout <= 0 or max_requests <= 0:
             raise ValueError("timeout and request budget must be positive")
+        if type(allow_expected_rate_limit) is not bool:
+            raise ValueError("expected rate-limit probe opt-in must be boolean")
+        self.allow_expected_rate_limit = allow_expected_rate_limit
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_requests = max_requests
@@ -34,7 +96,9 @@ class Client:
         self.stopped = False
         self.opener = opener or urllib.request.build_opener(NoRedirect())
 
-    def request(self, path, method="GET", body=None, headers=None, form=None, raw=None, expected=(200,)):
+    def request(self, path, method="GET", body=None, headers=None, form=None, raw=None, expected=(200,), response_type="json"):
+        if response_type not in {"json", "text"}:
+            raise ValueError("response type must be explicitly JSON or text")
         if not path.startswith("/") or path.startswith("//") or "#" in path:
             raise ValueError("request path must be origin-relative")
         if self.stopped or self.request_count >= self.max_requests:
@@ -66,7 +130,7 @@ class Client:
             status = response.code
             raw = response.read(4 * 1024 * 1024 + 1)
             response_headers = dict(response.headers)
-        if status == 429:
+        if status == 429 and not (self.allow_expected_rate_limit and expected == (429,)):
             self.stopped = True
             raise ProtocolError("HTTP 429: transport stopped; no retry")
         if status not in expected:
@@ -74,7 +138,13 @@ class Client:
         if len(raw) > 4 * 1024 * 1024:
             raise ProtocolError("response exceeds byte budget")
         try:
-            parsed = json.loads(raw) if raw else None
+            if response_type == "text":
+                content_type = next((value for key,value in response_headers.items() if key.lower()=="content-type"), "")
+                if not content_type.lower().startswith("text/plain"):
+                    raise ProtocolError("expected bounded plain-text artifact")
+                parsed = raw.decode("utf-8")
+            else:
+                parsed = json.loads(raw) if raw else None
         except (ValueError, UnicodeError):
             raise ProtocolError(f"{method}: HTTP {status} response is not JSON") from None
         return status, parsed, response_headers

@@ -201,6 +201,7 @@ public class NamedQueryController {
         return ApiResponse.success(result);
     }
 
+    @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "query.execute", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.QUERY, version = "1", name = "Execute named query", chineseName = "执行命名查询")
     @PostMapping("/{code}/execute")
     @RequirePermission(MetaPermission.QUERY_READ)
     public ApiResponse<PaginationResult<Map<String, Object>>> executeQuery(

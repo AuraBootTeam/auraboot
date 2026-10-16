@@ -64,6 +64,30 @@ public class ReportExportController {
                 .body(file.getBytes());
     }
 
+    @PostMapping("/export/markdown")
+    @Operation(summary = "Export report as Markdown")
+    @RequirePermission(MetaPermission.REPORT_EXPORT_EXECUTE)
+    public ResponseEntity<byte[]> exportMarkdown(@Valid @RequestBody ReportExportRequest request) {
+        ReportExportFile file = reportExportService.exportMarkdown(request);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(file.getFilename(), StandardCharsets.UTF_8).build().toString())
+                .body(file.getBytes());
+    }
+
+    @PostMapping("/export/html")
+    @Operation(summary = "Export report as self-contained HTML")
+    @RequirePermission(MetaPermission.REPORT_EXPORT_EXECUTE)
+    public ResponseEntity<byte[]> exportHtml(@Valid @RequestBody ReportExportRequest request) {
+        ReportExportFile file = reportExportService.exportHtml(request);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(file.getFilename(), StandardCharsets.UTF_8).build().toString())
+                .body(file.getBytes());
+    }
+
     @PostMapping("/export/json")
     @Operation(summary = "Export report as JSON", description = "Exports a saved Report Designer DSL and resolved data sets as JSON")
     @RequirePermission(MetaPermission.REPORT_EXPORT_EXECUTE)

@@ -76,6 +76,30 @@ class TransportTests(unittest.TestCase):
             client.request("/api")
         self.assertEqual(len(opener.requests), 1)
 
+    def test_private_fixture_can_observe_exact_expected_429_once_without_retry(self):
+        opener = Opener(urllib.error.HTTPError("https://example.test", 429, "limited",
+            {"Retry-After": "60"}, io.BytesIO(b'{"code":"open_api_query_rate_limited"}')))
+        client = Client("https://example.test", opener=opener, allow_expected_rate_limit=True)
+        status, body, headers = client.request("/quota", expected=(429,))
+        self.assertEqual((status, body["code"], headers["Retry-After"]), (429, "open_api_query_rate_limited", "60"))
+        self.assertEqual(len(opener.requests), 1)
+        self.assertFalse(client.stopped)
+        opener.response = Response(b'{"code":0}')
+        self.assertEqual(client.request("/audit")[0], 200)
+        self.assertEqual(client.request_count, 2)
+
+    def test_fixture_opt_in_does_not_accept_unexpected_or_mixed_429(self):
+        for expected in [(200,), (200, 429)]:
+            with self.subTest(expected=expected):
+                opener = Opener(urllib.error.HTTPError("https://example.test", 429, "limited", {}, io.BytesIO(b"{}")))
+                client = Client("https://example.test", opener=opener, allow_expected_rate_limit=True)
+                with self.assertRaisesRegex(ProtocolError, "429"):
+                    client.request("/api", expected=expected)
+                self.assertTrue(client.stopped)
+                self.assertEqual(len(opener.requests), 1)
+        with self.assertRaises(ValueError):
+            Client("https://example.test", allow_expected_rate_limit="true")
+
     def test_budget_and_path_boundaries(self):
         opener = Opener(Response(b"{}"))
         client = Client("https://example.test", max_requests=1, opener=opener)
@@ -89,6 +113,17 @@ class TransportTests(unittest.TestCase):
     def test_html_is_not_api_success(self):
         with self.assertRaisesRegex(ProtocolError, "not JSON"):
             Client("https://example.test", opener=Opener(Response(b"<html>fallback</html>"))).request("/health")
+
+    def test_plain_text_artifacts_require_explicit_type_and_do_not_accept_html(self):
+        response = Response(b'export type EndpointResult = string;')
+        response.headers = {'Content-Type':'text/plain;charset=UTF-8'}
+        client = Client("https://example.test",opener=Opener(response))
+        self.assertEqual(client.request('/types',response_type='text')[1], 'export type EndpointResult = string;')
+        response = Response(b'<html>fallback</html>');response.headers = {'Content-Type':'text/html'}
+        with self.assertRaisesRegex(ProtocolError,'plain-text artifact'):
+            Client("https://example.test",opener=Opener(response)).request('/types',response_type='text')
+        with self.assertRaises(ValueError):
+            Client("https://example.test").request('/types',response_type='auto')
 
     def test_redirect_does_not_forward_bearer(self):
         from open_platform_http import NoRedirect

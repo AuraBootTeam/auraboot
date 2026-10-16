@@ -26,7 +26,7 @@ function fixture() {
       environment: { POSTGRES_DB: plan.database, REDIS_DATABASE: plan.redisDatabase } } };
 }
 test('returns only the bound backend and retained LLM mode for unchanged launch inputs', () => {
-  assert.deepEqual(verifyResumeState(fixture()), { backend: '/state/artifacts/backend.jar', llmStubMode: 'true' });
+  assert.deepEqual(verifyResumeState(fixture()), { backend: '/state/artifacts/backend.jar', llmStubMode: 'true', redisHost: '127.0.0.1', telemetryEnvironment: {} });
 });
 const mutations = {
   'Workspace drift': f => { f.report.verdict = 'invalid'; },
@@ -99,7 +99,7 @@ function privateFixture(t, lifecycle = 'resuming') {
 }
 test('public loader accepts unchanged private fixtures only inside the lifecycle transaction', t => {
   const { f, cli } = privateFixture(t);
-  assert.deepEqual(loadResumeState('owned', f.repo, cli), { backend: f.plan.backend.path, llmStubMode: 'true' });
+  assert.deepEqual(loadResumeState('owned', f.repo, cli), { backend: f.plan.backend.path, llmStubMode: 'true', redisHost: '127.0.0.1', telemetryEnvironment: {} });
 });
 test('public loader refuses an open runtime before any launch can begin', t => {
   const { f, cli } = privateFixture(t, 'open');
@@ -148,4 +148,18 @@ test('public loader refuses a logging config absent from the frozen legacy recip
   const { f, cli, plugins } = privateFixture(t);
   writeFileSync(join(plugins, '..', 'backend-logback.xml'), '<configuration>unbound</configuration>');
   assert.throws(() => loadResumeState('owned', f.repo, cli), /Retained logging input changed/);
+});
+
+
+test('retains an explicitly disabled Redis host and the telemetry configuration', () => {
+  const f = fixture();
+  f.plan.redisHost = '';
+  f.plan.telemetryEnvironment = { MANAGEMENT_TRACING_ENABLED: 'true', OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://127.0.0.1:14318/v1/traces' };
+  const value = verifyResumeState(f);
+  assert.equal(value.redisHost, '');
+  assert.deepEqual(value.telemetryEnvironment, f.plan.telemetryEnvironment);
+  for (const environment of [{ SESSION_SECRET: 'must-not-be-replayed' }, { MANAGEMENT_TRACING_ENABLED: 'true\nUNSAFE=value' }]) {
+    f.plan.telemetryEnvironment = environment;
+    assert.throws(() => verifyResumeState(f), /Invalid telemetry/);
+  }
 });

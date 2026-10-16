@@ -12,6 +12,20 @@ class ToolMetadataRegistryTest {
     private final ToolMetadataRegistry registry = new ToolMetadataRegistry();
 
     @Test
+    void authoritativeMutationAndExternalTypesCannotBeDisguisedByReadLikeNames() {
+        for (String prefix : java.util.List.of("get_", "list_", "nq_")) {
+            for (String type : java.util.List.of("DSL_COMMAND", "API_CALL", "MCP")) {
+                var expected = "DSL_COMMAND".equals(type) ? ToolEffectType.INTERNAL_WRITE : ToolEffectType.EXTERNAL_ACTION;
+                var provider = ToolDefinition.builder().toolCode(prefix + "customer_update").toolType(type).build();
+                var agent = com.auraboot.framework.agent.dto.AgentToolDefinition.builder()
+                        .name(prefix + "customer_update").toolType(type).build();
+                assertThat(registry.from(provider, ToolMetadataTrustLevel.VERIFIED).getEffectType()).isEqualTo(expected);
+                assertThat(registry.from(agent, ToolMetadataTrustLevel.VERIFIED).getEffectType()).isEqualTo(expected);
+            }
+        }
+    }
+
+    @Test
     void formDraftHasNoBusinessSideEffectsButOtherPlatformToolsRemainWrites() {
         for (String name : java.util.List.of("platform.fill_form", "platform_fill_form")) {
             ToolMetadata metadata = registry.from(ToolDefinition.builder()

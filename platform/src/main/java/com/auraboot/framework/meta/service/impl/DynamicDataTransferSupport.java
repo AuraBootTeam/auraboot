@@ -61,6 +61,8 @@ final class DynamicDataTransferSupport extends BaseMetaService {
 
     private final MapSortFieldsOperation mapSortFieldsOperation;
 
+    private final java.util.function.BiFunction<String, Map<String, Object>, Map<String, Object>> createOperation;
+
     @FunctionalInterface
     interface BuildFieldLabelMapOperation { Map<String, String> execute(List<FieldDefinition> fieldDefs); }
 
@@ -340,6 +342,7 @@ final class DynamicDataTransferSupport extends BaseMetaService {
 
             // Batch insert
             int batchSize = importRequest.getBatchSize() != null ? importRequest.getBatchSize() : 100;
+            if (batchSize < 1 || batchSize > 1000) throw new MetaServiceException("Import batch size must be between 1 and 1000");
             int successCount = 0;
             int failedCount = 0;
             List<ImportResult.ImportError> errors = new ArrayList<>();
@@ -352,20 +355,8 @@ final class DynamicDataTransferSupport extends BaseMetaService {
                 for (int j = 0; j < batch.size(); j++) {
                     int rowIndex = i + j;
                     try {
-                        Map<String, Object> record = batch.get(j);
-                        FieldWriterGuard.assertCreateAllowed(model, record);
-                        // Add system columns
-                        Map<String, Object> columnData = toColumnData(model, record);
-                        columnData.put("tenant_id", tenantId);
-                        columnData.put("created_at", Instant.now());
-                        columnData.put("created_by", getCurrentUserId());
-
-                        Set<String> batchJsonbCols = JsonbFieldHelper.getJsonbHostColumns(model);
-                        if (batchJsonbCols.isEmpty()) {
-                            dynamicDataMapper.insert(model.getTableName(), columnData);
-                        } else {
-                            dynamicDataMapper.insertWithJsonb(model.getTableName(), columnData, batchJsonbCols);
-                        }
+                        // Common owner write path supplies PID, normalization, validation and reliable events.
+                        createOperation.apply(modelCode, new LinkedHashMap<>(batch.get(j)));
                         successCount++;
                     } catch (Exception e) {
                         failedCount++;

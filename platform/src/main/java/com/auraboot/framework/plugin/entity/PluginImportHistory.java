@@ -17,7 +17,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("ab_plugin_import_history")
+@TableName(value = "ab_plugin_import_history", autoResultMap = true)
 public class PluginImportHistory {
 
     @TableId(type = IdType.AUTO)
@@ -80,7 +80,8 @@ public class PluginImportHistory {
     private Map<String, Object> options;
 
     /**
-     * Complete manifest snapshot for rollback.
+     * Versioned public-import plugin metadata before/after snapshot.
+     * Resource and physical schema restoration use their own lifecycle contracts.
      */
     @TableField(typeHandler = com.auraboot.framework.plugin.typehandler.PluginSettingsTypeHandler.class)
     private Map<String, Object> manifestSnapshot;

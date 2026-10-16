@@ -45,16 +45,33 @@ public class ReportRenderClient {
         if (!properties.isEnabled() || properties.getCommand().isEmpty()) {
             return null;
         }
+        return render(reportDsl, dataSets, false);
+    }
+
+    public byte[] renderHtml(Map<String, Object> reportDsl,
+                             Map<String, List<Map<String, Object>>> dataSets) {
+        if (!properties.isEnabled() || properties.getCommand().isEmpty()) {
+            throw new ReportRenderException("HTML export requires the configured report renderer");
+        }
+        return render(reportDsl, dataSets, true);
+    }
+
+    private byte[] render(Map<String, Object> reportDsl,
+                           Map<String, List<Map<String, Object>>> dataSets, boolean html) {
 
         Path outFile = null;
         Path errFile = null;
         Path requestFile = null;
         Process process = null;
         try {
-            outFile = Files.createTempFile("auraboot-report-", ".pdf");
+            outFile = Files.createTempFile("auraboot-report-", html ? ".html" : ".pdf");
             errFile = Files.createTempFile("auraboot-report-", ".log");
 
             List<String> command = new ArrayList<>(properties.getCommand());
+            if (html) {
+                command.add("--format");
+                command.add("html");
+            }
             command.add("--out");
             command.add(outFile.toString());
 
@@ -86,9 +103,9 @@ public class ReportRenderClient {
             }
 
             byte[] pdf = Files.readAllBytes(outFile);
-            if (!isPdf(pdf)) {
+            if (html ? !new String(pdf, StandardCharsets.UTF_8).toLowerCase(java.util.Locale.ROOT).startsWith("<!doctype html>") : !isPdf(pdf)) {
                 throw new ReportRenderException(
-                        "report renderer did not produce a PDF (" + pdf.length + " bytes): " + tailStderr(errFile));
+                        (html ? "report renderer did not produce HTML (" : "report renderer did not produce a PDF (") + pdf.length + " bytes): " + tailStderr(errFile));
             }
             return pdf;
         } catch (IOException e) {

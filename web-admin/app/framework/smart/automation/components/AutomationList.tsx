@@ -13,6 +13,9 @@ import {
 import { useI18n } from '~/contexts/I18nContext';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
+import { TemplateImportDialog } from './TemplateImportDialog';
+import type { AutomationTemplateDocument } from '../services/automationTemplateIO';
+import { AUTOMATION_TEMPLATE_MAX_BYTES, AutomationTemplateError, parseAutomationTemplate } from '../services/automationTemplateIO';
 
 export interface AutomationListProps {
   className?: string;
@@ -36,6 +39,7 @@ export function AutomationList({
   const [automations, setAutomations] = useState(initialAutomations);
   const [logDialogAutomation, setLogDialogAutomation] = useState<Automation | null>(null);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [pendingImport, setPendingImport] = useState<AutomationTemplateDocument | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const authHeaders: HeadersInit = token
@@ -168,24 +172,41 @@ export function AutomationList({
   const handleImportAutomation = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const errorMessage = st({ zh: '导入自动化失败，请检查文件及权限后重试。', en: 'Automation import failed. Check the file and your permissions, then retry.' });
     try {
+      if (file.size > AUTOMATION_TEMPLATE_MAX_BYTES) throw new AutomationTemplateError('size');
       const text = await file.text();
-      const data = JSON.parse(text);
+      const data = parseAutomationTemplate(text);
+      if (data.templateParameters?.length) {
+        setPendingImport(data);
+        return;
+      }
       const response = await fetch('/api/automations', {
         method: 'post',
         headers: authHeaders,
         body: JSON.stringify({
-          name: data.name || `Imported - ${file.name}`,
-          description: data.description || 'Imported automation',
-          flowConfig: data.flowConfig || data.flowData,
+          name: data.name,
+          description: data.description,
+          flowConfig: data.flowConfig,
           enabled: false,
         }),
       });
-      if (!response.ok) throw new Error('Failed to import automation');
-      showSuccessToast(`Imported "${data.name || file.name}"`);
+      if (!response.ok) throw new Error(errorMessage);
+      const result = await response.json();
+      const created = result?.data as Automation | undefined;
+      if (String(result?.code) !== '0' || typeof created?.pid !== 'string'
+        || !created.pid.trim() || created.enabled !== false) {
+        throw new Error(errorMessage);
+      }
+      showSuccessToast(st({ zh: `已导入“${created.name || file.name}”`, en: `Imported "${created.name || file.name}"` }));
       revalidator.revalidate();
-    } catch (err) {
-      showErrorToast(err instanceof Error ? err.message : 'Import failed. Check JSON format.');
+    } catch (error) {
+      const labels = {
+        size: {zh: '自动化设计文件不能超过 2 MB。', en: 'Automation design files must be smaller than 2 MB.'},
+        version: {zh: '不支持此自动化设计文件版本，请使用版本 1。', en: 'Unsupported automation design version. Use version 1.'},
+        invalid: {zh: '自动化设计文件无效，请选择 AuraBoot 导出的 JSON 并检查节点和连线。', en: 'Invalid automation design file. Select an AuraBoot JSON export with valid nodes and connections.'},
+      };
+      showErrorToast(error instanceof AutomationTemplateError ? st(labels[error.reason]) : errorMessage);
     } finally {
       // Reset the input so re-importing the same file works
       if (importInputRef.current) importInputRef.current.value = '';
@@ -214,6 +235,9 @@ export function AutomationList({
 
   return (
     <div className={cn('rounded-lg bg-white shadow', className)}>
+      {pendingImport && <TemplateImportDialog document={pendingImport} headers={authHeaders}
+        onCancel={() => setPendingImport(null)}
+        onImported={() => { setPendingImport(null); revalidator.revalidate(); showSuccessToast(st({zh: '已导入停用副本，请检查后再启用。', en: 'Disabled copy imported. Review it before enabling.'})); }} />}
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h2 className="text-lg font-semibold text-gray-900" data-testid="page-title">
@@ -270,22 +294,22 @@ export function AutomationList({
               className="px-6 py-4 transition-colors hover:bg-gray-50"
               data-testid={`automation-row-${automation.pid}`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-2xl text-gray-400">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <span className="shrink-0 font-mono text-2xl text-gray-400">
                     {getTriggerIcon(automation.triggerType)}
                   </span>
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to={`/automation/${automation.pid}`}
-                        className="font-medium text-gray-900 hover:text-blue-600"
+                        className="min-w-0 break-words font-medium text-gray-900 hover:text-blue-600"
                       >
                         {automation.name}
                       </Link>
                       <span
                         className={cn(
-                          'rounded px-2 py-0.5 text-xs font-medium',
+                          'shrink-0 whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium',
                           automation.enabled
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-600',
@@ -298,7 +322,7 @@ export function AutomationList({
                       </span>
                     </div>
                     {automation.description && (
-                      <p className="mt-1 text-sm text-gray-500">{automation.description}</p>
+                      <p className="mt-1 line-clamp-2 break-words text-sm text-gray-500" title={automation.description}>{automation.description}</p>
                     )}
                     {automation.lastRunAt && (
                       <p className="mt-1 text-xs text-gray-400">
@@ -309,7 +333,7 @@ export function AutomationList({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 self-end lg:self-center [&>a]:whitespace-nowrap [&>button]:whitespace-nowrap">
                   <button
                     onClick={() => handleToggleEnabled(automation)}
                     disabled={!hydrated}

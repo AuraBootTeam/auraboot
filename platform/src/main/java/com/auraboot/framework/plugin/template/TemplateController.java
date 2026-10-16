@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.template;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
@@ -29,6 +30,7 @@ import java.util.Map;
 @RequestMapping("/api/templates")
 @RequiredArgsConstructor
 @Tag(name = "Template Center", description = "Browse, preview, and install application templates")
+@AuthenticatedAccess("unguarded handlers are read-only template listing and dry-run preview only")
 public class TemplateController {
 
     private final TemplateRegistry templateRegistry;

@@ -50,6 +50,10 @@ public class ModelDefinitionDTO {
      */
     private String modelType;
 
+    /** Explicit runtime capabilities; omission preserves the existing model capability state. */
+    private com.auraboot.framework.meta.dto.ModelCapabilities capabilities;
+
+
     /**
      * Business object category: DOCUMENT, MASTER, TRANSACTION, ACTIVITY, REFERENCE, ENTITY.
      */

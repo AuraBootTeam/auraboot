@@ -103,9 +103,11 @@ class DefaultEnvironmentConcurrencyIT {
     static class Stack {
         @Bean DataSource dataSource() {
             String url = System.getenv("TEST_DATABASE_URL");
-            if (url == null || !url.matches("jdbc:postgresql://[^/]+/auraboot_[0-9]+")) {
-                throw new IllegalStateException("This IT requires an owned auraboot slot database");
-            }
+            // Slot-named local DBs are always owned; under the CI runner the compose-provisioned
+            // aura_boot database is this run's fresh, disposable slot (AURA_CI_JOB_ID contract).
+            com.auraboot.framework.test.util.OwnedTestDatabase.require(url,
+                    com.auraboot.framework.test.util.OwnedTestDatabase.AURABOOT_SLOT_PATTERN,
+                    "This IT requires an owned auraboot slot database");
             return new DriverManagerDataSource(url, System.getenv("TEST_DATABASE_USERNAME"),
                 System.getenv().getOrDefault("TEST_DATABASE_PASSWORD", ""));
         }

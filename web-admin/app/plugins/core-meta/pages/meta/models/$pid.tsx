@@ -2,6 +2,7 @@ import { getPublishText, buildPermissionReplayContext, buildSlaNodeReplayContext
 import { getPolicyHeading, getMigrationPlanMessage, getHistoricalPolicyMessage } from './modelPublishPolicyMessages';
 import { useModelDetailText, type ModelDetailTextFn, type ModelDetailTextKey } from './modelDetailText';
 import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
+import { isModelPageStub, primaryModelPreview, resolveModelPageRoute } from './modelPageNavigation';
 /**
  * Model详情页面
  *
@@ -156,17 +157,6 @@ function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
   return 'custom';
 }
 
-function resolvePageRoute(page: RelatedPage): string {
-  if (typeof page.route === 'string' && page.route.startsWith('/')) {
-    return page.route;
-  }
-  const pageKey = page.pageKey || page.code || page.name;
-  if (pageKey) {
-    return `/p/${pageKey}`;
-  }
-  return '/p/page_schema';
-}
-
 /**
  * Loader函数 - 加载Model数据
  */
@@ -303,6 +293,7 @@ export default function ModelDetailPage() {
       form: null,
     };
     for (const page of pages as RelatedPage[]) {
+      if (isModelPageStub(page)) continue;
       const kind = normalizePageKind(page);
       if (kind !== 'custom' && !grouped[kind]) {
         grouped[kind] = page;
@@ -361,7 +352,7 @@ export default function ModelDetailPage() {
     return sorted[0] ?? null;
   }, [pages]);
 
-  const hasGeneratedPages = pages.length > 0;
+  const hasGeneratedPages = (pages as RelatedPage[]).some((page) => !isModelPageStub(page));
   const hasStandardPages = Boolean(
     standardPages.list || standardPages.detail || standardPages.form,
   );
@@ -875,7 +866,7 @@ export default function ModelDetailPage() {
 
   const handleOpenPage = useCallback(
     (page: RelatedPage) => {
-      const destination = resolvePageRoute(page);
+      const destination = resolveModelPageRoute(page);
       if (typeof window !== 'undefined' && destination.startsWith('/')) {
         window.location.assign(destination);
         return;
@@ -901,16 +892,9 @@ export default function ModelDetailPage() {
   }, [handleOpenCrudWizard, handleOpenPageDesigner, hasGeneratedPages]);
 
   const handlePrimaryPreview = useCallback(() => {
-    if (standardPages.detail) {
-      handleOpenPage(standardPages.detail);
-      return;
-    }
-    if (standardPages.list) {
-      handleOpenPage(standardPages.list);
-      return;
-    }
-    if (standardPages.form) {
-      handleOpenPage(standardPages.form);
+    const primary = primaryModelPreview(standardPages);
+    if (primary) {
+      handleOpenPage(primary);
       return;
     }
     showSuccessToast(text('noPreviewablePage'));
@@ -1585,7 +1569,7 @@ export default function ModelDetailPage() {
                           <div className="text-sm font-medium text-gray-900">
                             {getRelatedPageTitle(page, text)}
                           </div>
-                          <div className="mt-1 text-xs text-gray-500">{resolvePageRoute(page)}</div>
+                          <div className="mt-1 text-xs text-gray-500">{resolveModelPageRoute(page)}</div>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                             <span
                               className={`rounded-full px-2 py-1 font-medium ${getPageStatusClass(page)}`}

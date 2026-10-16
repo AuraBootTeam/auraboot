@@ -1,0 +1,46 @@
+{
+  "command": "scripts/check-oss-no-internal-docs.sh",
+  "exitCode": 1,
+  "reason": "11 pre-existing local-path matches in three unchanged files; no newly added match",
+  "baseCommit": "3dd3cdff692d58cc0ad7ab35c9507bcf7947bdfe",
+  "blobProof": [
+    {
+      "file": "docs/archive/handover/2026-05/HANDOVER-2026-05-29-designer-t4-b2c-complete.md",
+      "baseBlob": "e0951b97fcbd2edabdcc029d755e0f66a233fcc6",
+      "headBlob": "e0951b97fcbd2edabdcc029d755e0f66a233fcc6",
+      "unchanged": true
+    },
+    {
+      "file": "docs/archive/handover/2026-05/HANDOVER-2026-05-30-t4-closure-golden-e2e-reliability-spike.md",
+      "baseBlob": "d2f907aeb4042ef59e301814c45cea7ec859a60d",
+      "headBlob": "d2f907aeb4042ef59e301814c45cea7ec859a60d",
+      "unchanged": true
+    },
+    {
+      "file": "platform/platform-storage-cos/README.md",
+      "baseBlob": "68ea33f98bcb67b78ca245411677fa0b6fded183",
+      "headBlob": "68ea33f98bcb67b78ca245411677fa0b6fded183",
+      "unchanged": true
+    }
+  ],
+  "governanceWholeGit": {
+    "command": "node scripts/check-docs-governance.mjs --strict --git",
+    "exitCode": 1,
+    "errors": 0,
+    "warnings": 2,
+    "blobProof": [
+      {
+        "file": "docs/archive/handover/2026-10/HANDOVER-2026-10-13-oss-gate-followups.md",
+        "baseBlob": "b50749c3832ca070d4b7d8d571c2136852c76786",
+        "headBlob": "b50749c3832ca070d4b7d8d571c2136852c76786",
+        "unchanged": true
+      },
+      {
+        "file": "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md",
+        "baseBlob": "c4e6f8d68f644ca88481e9b6c7b22af5c54d6e98",
+        "headBlob": "c4e6f8d68f644ca88481e9b6c7b22af5c54d6e98",
+        "unchanged": true
+      }
+    ]
+  }
+}

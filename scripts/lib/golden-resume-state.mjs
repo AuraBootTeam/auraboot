@@ -6,6 +6,9 @@ import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
 
+const TELEMETRY_KEYS = ['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED',
+  'MANAGEMENT_TRACING_SAMPLING_PROBABILITY', 'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG',
+  'VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'VITE_OTEL_TRACES_SAMPLE_RATE'];
 const need = (condition, message) => { if (!condition) throw new Error(message); };
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 function run(cli, args) {
@@ -60,7 +63,12 @@ export function verifyResumeState({ report, repo, plan, planHash, manifest, depe
   need(!/[\r\n]/.test(plan.backend.path), 'Unsupported backend path');
   if (plan.logging || logging) need(plan.logging && logging && plan.logging.path === logging.path &&
     plan.logging.hash === logging.hash, 'Retained logging input changed');
+  need(typeof (plan.redisHost ?? '127.0.0.1') === 'string' && !/[\r\n]/.test(plan.redisHost || ''), 'Invalid Redis host');
+  for (const [key, value] of Object.entries(plan.telemetryEnvironment || {})) {
+    need(TELEMETRY_KEYS.includes(key) && typeof value === 'string' && !/[\r\n]/.test(value), 'Invalid telemetry environment');
+  }
   return { backend: plan.backend.path, llmStubMode: plan.llmStubMode,
+    redisHost: plan.redisHost ?? '127.0.0.1', telemetryEnvironment: plan.telemetryEnvironment || {},
     ...(plan.logging ? { loggingConfig: plan.logging.path } : {}) };
 }
 
@@ -83,12 +91,17 @@ export function recordResumeState(name, repo, cli) {
   const file = join(root, 'manifest.json'), manifest = JSON.parse(readFileSync(file, 'utf8'));
   const backend = report.processes.find(item => item.key === 'backend');
   need(backend?.status === 'ok', 'Verified backend is missing');
-  const llmStubMode = liveEnvironment(backend.expected.pid).AGENT_LLM_STUB_MODE;
+  const backendEnv = liveEnvironment(backend.expected.pid);
+  const web = report.processes.find(item => item.key === 'web');
+  const liveEnv = { ...backendEnv, ...(web ? liveEnvironment(web.expected.pid) : {}) };
+  const llmStubMode = backendEnv.AGENT_LLM_STUB_MODE;
   need(['true', 'false'].includes(llmStubMode), 'Live LLM mode is not reproducible');
   const plan = { schemaVersion: 1, runtime: name, repo, sourceCommit: manifest.sourceCommit,
     backend: manifest.backendArtifact, llmStubMode,
     ports: Object.fromEntries(Object.entries(report.ports).map(([key, item]) => [key, item.port])),
     database: manifest.database, redisDatabase: manifest.redisDatabase,
+    redisHost: backendEnv.SPRING_DATA_REDIS_HOST ?? '',
+    telemetryEnvironment: Object.fromEntries(TELEMETRY_KEYS.filter(key => liveEnv[key] !== undefined).map(key => [key, liveEnv[key]])),
     logging: loggingInput(report, name),
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
     plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')) };
@@ -119,9 +132,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     const [action, name, repo, cli] = process.argv.slice(2);
     if (action === 'record') recordResumeState(name, repo, cli);
-    else if (action === 'load') {
+    else if (action === 'load-env') {
       const state = loadResumeState(name, repo, cli);
-      console.log(state.backend); console.log(state.llmStubMode); console.log(state.loggingConfig || '');
+      for (const [key,value] of Object.entries(state.telemetryEnvironment)) console.log(`${key}=${value}`);
+    } else if (action === 'load') {
+      const state = loadResumeState(name, repo, cli);
+      console.log(state.backend); console.log(state.llmStubMode); console.log(state.loggingConfig || ''); console.log(state.redisHost);
     } else throw new Error('Unknown resume action');
   } catch { console.error('Retained golden launch identity refused; no database initialization performed'); process.exitCode = 1; }
 }

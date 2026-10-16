@@ -1,0 +1,143 @@
+{
+  "pageKey": "tpm_customer_ai_intake",
+  "name:zh-CN": "AI整理客户资料",
+  "name:en": "AI customer intake",
+  "modelCode": "tpm_customer",
+  "kind": "form",
+  "schemaVersion": 4,
+  "title": {
+    "zh-CN": "AI整理客户资料",
+    "en": "AI customer intake"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "customer_intake_ai",
+      "blockType": "ai-fill-banner",
+      "placeholder": {
+        "zh-CN": "例如：华辰制造有限公司，联系人张经理，采购部；请整理客户名称和联系人。",
+        "en": "Example: Acorn Manufacturing Ltd; contact Alex in Procurement. Extract the customer name and contact."
+      },
+      "examples": [
+        "华辰制造有限公司，联系人张经理，采购部。请整理客户名称和客户联系人。"
+      ]
+    },
+    {
+      "id": "customer_intake_identity",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "核对客户档案",
+        "en": "Review the customer draft"
+      },
+      "fields": [
+        {
+          "field": "tpm_cu_name",
+          "required": true,
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：华辰制造有限公司",
+              "en": "e.g. Acorn Manufacturing Ltd"
+            },
+            "helpText": {
+              "zh-CN": "按原始资料核对公司名称；没有可靠名称时请手工补充。",
+              "en": "Check the company name against the source. Enter it manually when no reliable name is available."
+            }
+          }
+        },
+        {
+          "field": "tpm_cu_contact",
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：张经理 · 采购部",
+              "en": "e.g. Alex · Procurement"
+            },
+            "helpText": {
+              "zh-CN": "保留姓名与部门等明确资料，确认后可直接修改。",
+              "en": "Keep explicit contact and department details; edit them after review."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "customer_intake_buttons",
+      "blockType": "form-buttons",
+      "area": "footer",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tpm:create_customer",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存客户",
+            "en": "Save customer"
+          }
+        }
+      ]
+    }
+  ],
+  "extension": {
+    "presentation": "workspace",
+    "backTo": "/p/tpm_customer",
+    "afterSubmitRedirect": "/p/tpm_customer",
+    "pageDescription": {
+      "zh-CN": "把零散资料整理成客户草稿，核对后再保存。",
+      "en": "Turn rough notes into a customer draft, review it, then save."
+    },
+    "footerNote": {
+      "zh-CN": "AI只整理当前草稿。请核对原文与字段后保存。",
+      "en": "AI only edits this draft. Review the source and fields before saving."
+    },
+    "formGuidance": {
+      "title": {
+        "zh-CN": "从资料到客户档案",
+        "en": "From notes to a customer record"
+      },
+      "description": {
+        "zh-CN": "先提取，再核对，最后保存。",
+        "en": "Extract, review, and save."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh-CN": "粘贴客户资料",
+            "en": "Paste customer notes"
+          },
+          "description": {
+            "zh-CN": "提供明确的公司名称、联系人和部门。",
+            "en": "Include the company, contact and department explicitly."
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "核对并完善",
+            "en": "Review and refine"
+          },
+          "description": {
+            "zh-CN": "查看字段依据；可撤销AI填写或直接修改。",
+            "en": "Review field evidence; undo AI changes or edit directly."
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "确认后保存",
+            "en": "Save after confirmation"
+          },
+          "description": {
+            "zh-CN": "只有保存才会创建客户，提取不会写入客户档案。",
+            "en": "Saving creates the customer; extraction does not write customer records."
+          }
+        }
+      ],
+      "note": {
+        "zh-CN": "当前空间权限仍然适用，提取失败可继续手工填写。",
+        "en": "Current-space permissions apply. You can fill the form manually if extraction fails."
+      }
+    }
+  }
+}

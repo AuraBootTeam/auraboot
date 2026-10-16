@@ -95,22 +95,19 @@ public class ToolMetadataRegistry {
         if ("llm_native".equals(type)) {
             return ToolEffectType.NONE;
         }
-        if ("dsl_query".equals(type) || startsWithAny(name, "nq:", "nq_", "list:", "list_", "get:", "get_")
-                || "platform_execute_sql".equals(name) || "platform.execute_sql".equals(name)) {
+        // Authoritative mutation/external types must win over read-like names.
+        if ("mcp".equals(type) || "api_call".equals(type)) return ToolEffectType.EXTERNAL_ACTION;
+        if ("dsl_command".equals(type) || "aurabot_skill".equals(type)) return ToolEffectType.INTERNAL_WRITE;
+        if ("dsl_query".equals(type)) return ToolEffectType.INTERNAL_READ;
+        if ("platform".equals(type)) {
+            if ("platform_execute_sql".equals(name) || "platform.execute_sql".equals(name)) {
+                return ToolEffectType.INTERNAL_READ;
+            }
+            return ToolEffectType.INTERNAL_WRITE;
+        }
+        if (startsWithAny(name, "mcp:", "mcp_", "api:", "api_")) return ToolEffectType.EXTERNAL_ACTION;
+        if (type.isBlank() && startsWithAny(name, "nq:", "nq_", "list:", "list_", "get:", "get_")) {
             return ToolEffectType.INTERNAL_READ;
-        }
-        if ("mcp".equals(type) || "api_call".equals(type) || startsWithAny(name, "mcp:", "mcp_", "api:", "api_")) {
-            return ToolEffectType.EXTERNAL_ACTION;
-        }
-        if ("dsl_command".equals(type) || startsWithAny(name, "cmd:", "cmd_")) {
-            return ToolEffectType.INTERNAL_WRITE;
-        }
-        if ("platform".equals(type) && (name.contains("create") || name.contains("update")
-                || name.contains("delete") || name.contains("execute"))) {
-            return ToolEffectType.INTERNAL_WRITE;
-        }
-        if ("aurabot_skill".equals(type) || "aurabot_skill".equalsIgnoreCase(String.valueOf(toolType))) {
-            return ToolEffectType.INTERNAL_WRITE;
         }
         return ToolEffectType.INTERNAL_WRITE;
     }

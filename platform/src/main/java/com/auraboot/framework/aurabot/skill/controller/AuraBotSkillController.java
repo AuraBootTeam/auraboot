@@ -18,6 +18,7 @@ import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -75,6 +76,7 @@ import java.util.Set;
 @Slf4j
 @RestController
 @RequestMapping("/api/aurabot/v2")
+@AuthenticatedAccess("every request is authorized dynamically against the caller's permission set (SkillRequestValidator + UserPermissionService) and tenant via MetaContext; discovery is already filtered per user")
 public class AuraBotSkillController {
 
     /** Plan §11 contract: undo tokens expire 30 minutes after creation. */

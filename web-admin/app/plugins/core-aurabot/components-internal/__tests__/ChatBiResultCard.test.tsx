@@ -97,6 +97,7 @@ it('saves an executable report query and links to the persisted report', async (
         chartType: 'table',
         columns: ['region', 'revenue'],
         records: [{ region: 'East', revenue: 120 }],
+        interpretation: 'East revenue is 120. <script>not executable</script>',
       }}
     />,
   );
@@ -111,6 +112,10 @@ it('saves an executable report query and links to the persisted report', async (
       { field: 'region', label: 'region' },
       { field: 'revenue', label: 'revenue · 合计' },
     ],
+  });
+  expect(report.body[1]).toMatchObject({
+    blockType: 'rich-text',
+    content: 'East revenue is 120. <script>not executable</script>',
   });
   expect(await screen.findByTestId('chatbi-saved-report')).toHaveAttribute(
     'href',

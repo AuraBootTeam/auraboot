@@ -281,9 +281,10 @@ Full user documentation lives at **[auraboot.com/docs](https://auraboot.com/docs
 getting started, core concepts, guides, use cases & industry solutions, API
 reference, plugin development, and deployment.
 
-This repository intentionally keeps no `docs/` tree beyond code-coupled test
+This repository keeps code-coupled references, verification evidence and test
 fixtures; the documentation site is the single source of truth for user-facing
-docs. A high-level system overview lives in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+docs. See [OSS performance and tracing](docs/system-reference/oss-web-performance-and-tracing.md)
+for the instrumentation contract and reproducible measurements. A high-level system overview lives in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Community & Enterprise
 

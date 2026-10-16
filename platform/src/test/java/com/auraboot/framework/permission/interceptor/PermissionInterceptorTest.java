@@ -187,7 +187,9 @@ class PermissionInterceptorTest {
     }
 
     @Test
-    void preHandle_noAnnotation_allowsAccess() throws Exception {
+    void preHandle_allowMode_noAnnotation_allowsAccess() throws Exception {
+        // Default mode is deny (default-deny flip); this test pins the legacy allow mode.
+        interceptor.setUnannotatedMode("allow");
         HandlerMethod hm = handlerMethod(StaticHandler.class, "noAnnotation");
         boolean ok = interceptor.preHandle(request, response, hm);
         assertThat(ok).isTrue();

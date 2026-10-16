@@ -41,6 +41,11 @@ class OutboxWorkerImplCoverageIT {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    // This IT measures explicit worker invocations. Prevent a background timer from
+    // consuming the same committed fixtures; the worker, mapper and fenced state service stay real.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.auraboot.framework.scheduler.service.impl.DatabaseSchedulerEngine scheduler;
+
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, 991_900_002L, "outbox-test-pid", "outbox-test-user");
@@ -70,17 +75,25 @@ class OutboxWorkerImplCoverageIT {
     @Test
     @DisplayName("pollAndDispatch claims a ready event and increments retry when it cannot deserialize")
     void pollRetriesUndeliverable() {
-        String eventId = seedPendingBad();
+        var eventIds = new java.util.ArrayList<String>();
+        for (int index = 0; index < 501; index++) eventIds.add(seedPendingBad());
         outboxWorker.pollAndDispatch();
-        // the bad event must have been claimed and retried (retry_count bumped or an error recorded)
-        Integer retry = jdbcTemplate.queryForObject(
-                "SELECT retry_count FROM ab_outbox WHERE tenant_id = ? AND event_id = ?",
-                Integer.class, TENANT_ID, eventId);
-        String lastError = jdbcTemplate.queryForObject(
-                "SELECT last_error FROM ab_outbox WHERE tenant_id = ? AND event_id = ?",
-                String.class, TENANT_ID, eventId);
-        assertTrue((retry != null && retry >= 1) || lastError != null,
-                "expected the undeliverable event to be retried; retry=" + retry + " lastError=" + lastError);
+        int touched = 0;
+        for (String eventId : eventIds) {
+            var state = jdbcTemplate.queryForMap(
+                    "SELECT status,retry_count,last_error,lease_token FROM ab_outbox WHERE tenant_id=? AND event_id=?",
+                    TENANT_ID, eventId);
+            int retries = ((Number) state.get("retry_count")).intValue();
+            if (retries > 0) {
+                touched++;
+                assertTrue(state.get("last_error") != null);
+                assertTrue(state.get("lease_token") == null, "failed source lease must be released");
+                assertTrue(!"processing".equals(state.get("status")));
+            }
+        }
+        assertTrue(touched >= 101, "a full source batch must not impose another scheduling interval; touched=" + touched);
+        assertTrue(touched <= 400, "one poll must yield with remaining backlog; touched=" + touched);
+        assertTrue(touched < eventIds.size(), "a continuously full queue must remain bounded");
     }
 
     @Test

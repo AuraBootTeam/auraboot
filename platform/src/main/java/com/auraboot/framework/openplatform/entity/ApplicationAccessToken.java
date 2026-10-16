@@ -19,7 +19,15 @@ public class ApplicationAccessToken {
     private Long tenantId;
     private Long installationId;
     private Long credentialId;
+    @lombok.ToString.Exclude
     private String tokenHash;
+    private String tokenKind = "oauth";
+    private String tokenName;
+    private Boolean neverExpires = false;
+    private Instant acceptUntil;
+    private Instant rotatedAt;
+    private String replacedByPid;
+    private String managementKey;
     @TableField(value = "scopes", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String scopes;
     private String audience;

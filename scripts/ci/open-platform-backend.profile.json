@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "id": "open-platform-backend-v1",
+  "requirements": [
+    "DOP-01",
+    "DOP-02",
+    "DOP-03",
+    "DOP-04",
+    "DOP-05",
+    "DOP-06",
+    "DOP-07",
+    "DOP-10",
+    "DOP-11",
+    "QAT-02",
+    "QAT-03",
+    "QAT-04",
+    "QAT-05",
+    "QAT-01",
+    "QAT-06",
+    "QAT-08",
+    "QAT-09",
+    "CEP-01",
+    "CEP-02",
+    "CEP-03",
+    "CEP-04",
+    "CEP-06",
+    "CEP-07"
+  ],
+  "packages": [
+    "com.auraboot.framework.openplatform"
+  ],
+  "classes": [
+    "com.auraboot.framework.integration.agent.NamedQueryShadowInvokerIntegrationTest",
+    "com.auraboot.framework.meta.service.NamedQueryServiceIntegrationTest",
+    "com.auraboot.framework.meta.service.executor.NamedQueryModelExecutorIntegrationTest",
+    "com.auraboot.framework.meta.service.executor.NamedQueryModelExecutorTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryColumnLineageTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryExportDefinitionTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryFieldProtectionAuthorizationTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryKeywordFilterTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryKeywordPredicateIntegrationTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryMachineProtectionTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryRateLimiterTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryRowSetDigestTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryServiceImplIntegrationTest",
+    "com.auraboot.framework.meta.service.impl.NamedQueryServiceImplTest",
+    "com.auraboot.framework.meta.service.impl.NamedQuerySourceModelsTest",
+    "com.auraboot.framework.meta.service.impl.NamedQuerySourceScopeRewriterTest",
+    "com.auraboot.framework.plugin.validation.NamedQueryFieldValidatorBoundaryTest",
+    "com.auraboot.framework.plugin.validation.NamedQueryFieldValidatorTest",
+    "com.auraboot.framework.meta.service.AggregateQueryServiceIntegrationTest",
+    "com.auraboot.framework.application.security.ExternalMachineAuthenticationFilterTest",
+    "com.auraboot.framework.meta.service.AggregateQueryServiceTest",
+    "com.auraboot.framework.meta.service.impl.AggregateQueryFilterTreeTest",
+    "com.auraboot.framework.meta.service.impl.AggregateQueryServiceImplDataScopeTest",
+    "com.auraboot.framework.meta.service.impl.CommandPermitDataAccessTest",
+    "com.auraboot.framework.meta.service.impl.SemanticAggregateAdapterTest",
+    "com.auraboot.framework.meta.cache.AggregateQueryCacheInterceptorTest",
+    "com.auraboot.framework.webhook.service.WebhookSignatureTest",
+    "com.auraboot.framework.webhook.service.WebhookRequestTraceTest",
+    "com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest",
+    "com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest",
+    "com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest",
+    "com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT",
+    "com.auraboot.framework.meta.service.impl.MetaModelServiceCustomColumnMappingTest",
+    "com.auraboot.framework.plugin.service.impl.PluginResourceImporterFieldReimportTest"
+  ],
+  "coverage": {
+    "minimumLinePercent": 80,
+    "sourcePackages": [
+      "com.auraboot.framework.openplatform.service",
+      "com.auraboot.framework.openplatform.security"
+    ],
+    "classes": [
+      "com.auraboot.framework.meta.service.impl.NamedQueryServiceImpl",
+      "com.auraboot.framework.meta.service.impl.AggregateQueryServiceImpl",
+      "com.auraboot.framework.webhook.service.WebhookReceiverKey"
+    ],
+    "nonExecutableClasses": [
+      "com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor",
+      "com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate"
+    ]
+  }
+}

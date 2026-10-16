@@ -28,4 +28,12 @@ public interface ApplicationInstallationMapper extends BaseMapper<ApplicationIns
             """)
     ApplicationInstallation findByTenantAndPid(@Param("tenantId") Long tenantId,
                                                 @Param("pid") String pid);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT i.* FROM ab_application_installation i
+            JOIN ab_external_application a ON a.id = i.application_id AND a.owner_tenant_id = i.tenant_id
+            WHERE i.tenant_id = #{tenantId} AND i.pid = #{pid} AND i.status = 'active' AND a.status = 'active'
+            """)
+    ApplicationInstallation findActiveByTenantAndPid(@Param("tenantId") Long tenantId, @Param("pid") String pid);
 }

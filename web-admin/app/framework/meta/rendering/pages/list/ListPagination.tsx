@@ -10,6 +10,7 @@ import { BulkActionToolbar } from '~/framework/smart/components/bulk/BulkActionT
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 
 export interface ListPaginationProps {
+  workspace?: boolean;
   current: number;
   pageSize: number;
   total: number;
@@ -31,6 +32,7 @@ export interface ListPaginationProps {
 }
 
 export function ListPagination({
+  workspace = false,
   current,
   pageSize,
   total,
@@ -54,6 +56,9 @@ export function ListPagination({
       {/* Pagination (hidden in print) */}
       <div className="print-hide" data-print="hide">
         <Pagination
+          alwaysVisible={workspace}
+          compact={workspace}
+          showPageSizeSelector={!workspace}
           current={current}
           pageSize={pageSize}
           total={total}

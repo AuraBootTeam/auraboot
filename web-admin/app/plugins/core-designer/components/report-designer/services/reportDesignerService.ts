@@ -122,6 +122,32 @@ export const reportDesignerService = {
     return response.blob();
   },
 
+  async exportMarkdown(reportPid: string, parameters?: Record<string, unknown>): Promise<Blob> {
+    const response = await fetch('/api/reports/export/markdown', {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportPid, parameters, usageId: crypto.randomUUID() }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `Markdown export failed: ${response.status}`);
+    }
+    return response.blob();
+  },
+
+  async exportHtml(reportPid: string, parameters?: Record<string, unknown>): Promise<Blob> {
+    const response = await fetch('/api/reports/export/html', {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportPid, parameters, usageId: crypto.randomUUID() }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `HTML export failed: ${response.status}`);
+    }
+    return response.blob();
+  },
+
   /**
    * Export report as JSON via report export endpoint
    */

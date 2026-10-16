@@ -9,6 +9,7 @@ import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -42,6 +43,7 @@ import java.util.Map;
 @RequestMapping("/api/tenant")
 @Tag(name = "Tenant Invitations")
 @RequiredArgsConstructor
+@AuthenticatedAccess("invitation acceptance: the Bearer JWT is parsed and validated in-controller to resolve the caller, membership and invitation-defined roles are created server-side, and a tenant-scoped session is issued")
 public class TenantInvitationAcceptanceController {
 
     private final TenantInviteService tenantInviteService;

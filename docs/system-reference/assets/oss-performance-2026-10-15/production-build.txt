@@ -1,0 +1,1074 @@
+
+> auraboot-app@ build $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin
+> pnpm sync-plugins && pnpm typecheck && react-router build && pnpm verify:production-react-runtime
+
+
+> auraboot-app@ sync-plugins $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin
+> bash ../scripts/sync-platform-plugins.sh && node ../scripts/generate-plugin-routes.mjs
+
+Platform plugin sync complete.
+Generating platform plugin routes...
+Found 0 platform plugin(s)
+Generated $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin/app/plugins/_public-routes.ts
+No platform plugins found. Wrote empty PLUGIN_PUBLIC_ROUTES stub.
+
+> auraboot-app@ typecheck $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin
+> react-router typegen && tsc
+
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+vite v8.0.16 building client environment for production...
+
+transforming...✓ 5802 modules transformed.
+rendering chunks...
+computing gzip size...
+build/client/.vite/manifest.json                                         261.12 kB │ gzip:  28.15 kB
+build/client/assets/PageDesignerEditorImpl-Bxk-9fU7.css                    1.33 kB │ gzip:   0.41 kB
+build/client/assets/dist-5lpMX5As.css                                      3.29 kB │ gzip:   1.06 kB
+build/client/assets/DashboardViewer-Lji8bJta.css                           3.61 kB │ gzip:   0.95 kB
+build/client/assets/AuthAppearanceShell-DApoux-u.css                       4.73 kB │ gzip:   1.37 kB
+build/client/assets/style-CK1-TTF3.css                                    15.27 kB │ gzip:   2.54 kB
+build/client/assets/root-DSn8H9IH.css                                    484.38 kB │ gzip:  64.41 kB
+build/client/assets/api.address-data-BvRk9kiK.js                           0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.end-impersonation-BvRk9kiK.js                      0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.start-impersonation-BvRk9kiK.js                    0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.switch-actor-BvRk9kiK.js                           0.00 kB │ gzip:   0.02 kB
+build/client/assets/api.switch-space-BvRk9kiK.js                           0.00 kB │ gzip:   0.02 kB
+build/client/assets/dynamic._tableName-BvRk9kiK.js                         0.00 kB │ gzip:   0.02 kB
+build/client/assets/dynamic._tableName.edit-BvRk9kiK.js                    0.00 kB │ gzip:   0.02 kB
+build/client/assets/dynamic._tableName.new-BvRk9kiK.js                     0.00 kB │ gzip:   0.02 kB
+build/client/assets/dynamic._tableName.view-BvRk9kiK.js                    0.00 kB │ gzip:   0.02 kB
+build/client/assets/AdminLayout-RWFSHGBx.js                                0.06 kB │ gzip:   0.08 kB
+build/client/assets/DefaultLayout-RWFSHGBx.js                              0.06 kB │ gzip:   0.08 kB
+build/client/assets/team-dsl-edit-CYlyXbgI.js                              0.07 kB │ gzip:   0.08 kB
+build/client/assets/team-dsl-new-CYlyXbgI.js                               0.07 kB │ gzip:   0.08 kB
+build/client/assets/components-shell-CSwQ25e_.js                           0.07 kB │ gzip:   0.07 kB
+build/client/assets/root-data-DPr9wvQB.js                                  0.09 kB │ gzip:   0.11 kB
+build/client/assets/_index--wYxlfvb.js                                     0.10 kB │ gzip:   0.11 kB
+build/client/assets/admin._-B_KjOEG-.js                                    0.10 kB │ gzip:   0.11 kB
+build/client/assets/admin._index-B2v2VeHs.js                               0.10 kB │ gzip:   0.11 kB
+build/client/assets/page-designer-B_KjOEG-.js                              0.10 kB │ gzip:   0.11 kB
+build/client/assets/confirmDialog-C9caupaB.js                              0.13 kB │ gzip:   0.12 kB
+build/client/assets/deriveTestId-Oc4q4xDu.js                               0.16 kB │ gzip:   0.13 kB
+build/client/assets/chartLabels-Cno19gnI.js                                0.18 kB │ gzip:   0.15 kB
+build/client/assets/useHydrated-B133LWC4.js                                0.20 kB │ gzip:   0.18 kB
+build/client/assets/types-gRpMTMGB.js                                      0.21 kB │ gzip:   0.18 kB
+build/client/assets/http-client-B0CeVhv7.js                                0.21 kB │ gzip:   0.18 kB
+build/client/assets/ResetPassword-CHurCiHl.js                              0.24 kB │ gzip:   0.21 kB
+build/client/assets/ForgotPassword-HoR1XoHn.js                             0.24 kB │ gzip:   0.21 kB
+build/client/assets/oauth-state-BqtUhLA7.js                                0.24 kB │ gzip:   0.17 kB
+build/client/assets/middleware-FJs-1T0y.js                                 0.26 kB │ gzip:   0.20 kB
+build/client/assets/drillDownFilters-P2rC75f6.js                           0.26 kB │ gzip:   0.21 kB
+build/client/assets/queryBuilderService-D0p5BK7t.js                        0.27 kB │ gzip:   0.18 kB
+build/client/assets/team-dsl-list-mrP8X72z.js                              0.27 kB │ gzip:   0.23 kB
+build/client/assets/p.c._pageKey-AG7nAQ1c.js                               0.28 kB │ gzip:   0.23 kB
+build/client/assets/tenantPreferenceService-D49rDNil.js                    0.28 kB │ gzip:   0.22 kB
+build/client/assets/visibleWhen-CVjd8S2Z.js                                0.28 kB │ gzip:   0.22 kB
+build/client/assets/publicRecordId-BCdxfimC.js                             0.29 kB │ gzip:   0.19 kB
+build/client/assets/team-dsl-form-DHRBY1bz.js                              0.30 kB │ gzip:   0.24 kB
+build/client/assets/use-contribution-Dv3um7w2.js                           0.31 kB │ gzip:   0.24 kB
+build/client/assets/p.c._pageKey.edit-CD8jREhk.js                          0.32 kB │ gzip:   0.25 kB
+build/client/assets/team-dsl-detail-B2OvSKkH.js                            0.32 kB │ gzip:   0.25 kB
+build/client/assets/i18n-admin-response-DNmh_85z.js                        0.32 kB │ gzip:   0.21 kB
+build/client/assets/view._pageKey-DaODV2SA.js                              0.34 kB │ gzip:   0.26 kB
+build/client/assets/BomUploadReview-DXeos0Z0.js                            0.34 kB │ gzip:   0.23 kB
+build/client/assets/WorkspacePageLayout-BqtT0z7R.js                        0.35 kB │ gzip:   0.20 kB
+build/client/assets/accessPolicy-Wu-HocWD.js                               0.36 kB │ gzip:   0.23 kB
+build/client/assets/userPreferenceService-C7ZMuxX4.js                      0.36 kB │ gzip:   0.27 kB
+build/client/assets/p._pageKey-CNwIywTU.js                                 0.37 kB │ gzip:   0.27 kB
+build/client/assets/p._pageKey.new-CFtNtnot.js                             0.37 kB │ gzip:   0.27 kB
+build/client/assets/ListSchemaContext-DUXrL4O0.js                          0.39 kB │ gzip:   0.27 kB
+build/client/assets/TenantSelectionLayout-ZDKI7BB-.js                      0.39 kB │ gzip:   0.29 kB
+build/client/assets/FieldListSchemaContext-B_G2slAq.js                     0.39 kB │ gzip:   0.27 kB
+build/client/assets/p._pageKey.edit-Ck_Nwp1w.js                            0.40 kB │ gzip:   0.28 kB
+build/client/assets/p._pageKey.view-DdAT6A4T.js                            0.40 kB │ gzip:   0.28 kB
+build/client/assets/createFieldRenderer-h94PRqbz.js                        0.40 kB │ gzip:   0.28 kB
+build/client/assets/cn-CDiwFCkT.js                                         0.41 kB │ gzip:   0.25 kB
+build/client/assets/jsx-runtime-fxz41vB3.js                                0.43 kB │ gzip:   0.31 kB
+build/client/assets/types-DjYNYm3o.js                                      0.44 kB │ gzip:   0.31 kB
+build/client/assets/avatar-utils-Dy0D91I0.js                               0.45 kB │ gzip:   0.30 kB
+build/client/assets/LoadingSpinner-CWOY6w0s.js                             0.47 kB │ gzip:   0.30 kB
+build/client/assets/Spin-BdJo9eZm.js                                       0.51 kB │ gzip:   0.35 kB
+build/client/assets/I18nText-B0wJBchS.js                                   0.51 kB │ gzip:   0.34 kB
+build/client/assets/chartDataService-BocMkPai.js                           0.52 kB │ gzip:   0.30 kB
+build/client/assets/XMarkIcon-BtqNg9yh.js                                  0.54 kB │ gzip:   0.39 kB
+build/client/assets/CheckIcon-MCG030S4.js                                  0.54 kB │ gzip:   0.39 kB
+build/client/assets/PlusIcon-D561YqZM.js                                   0.54 kB │ gzip:   0.39 kB
+build/client/assets/report-designer-Axmyr7Wg.js                            0.55 kB │ gzip:   0.36 kB
+build/client/assets/ChevronRightIcon-B54M4D7N.js                           0.55 kB │ gzip:   0.38 kB
+build/client/assets/ChevronDownIcon-CZCZE60F.js                            0.55 kB │ gzip:   0.39 kB
+build/client/assets/ChevronUpIcon-DYdQCcuI.js                              0.55 kB │ gzip:   0.39 kB
+build/client/assets/PauseIcon-D0wD-DZJ.js                                  0.55 kB │ gzip:   0.39 kB
+build/client/assets/ArrowLeftIcon-CdmSDuiM.js                              0.56 kB │ gzip:   0.40 kB
+build/client/assets/ArrowRightIcon-C7uJ6r2T.js                             0.56 kB │ gzip:   0.40 kB
+build/client/assets/Bars3Icon-C19lPxIR.js                                  0.57 kB │ gzip:   0.40 kB
+build/client/assets/ClockIcon-D66fq2dD.js                                  0.57 kB │ gzip:   0.41 kB
+build/client/assets/PlusCircleIcon-IQPtiMRn.js                             0.57 kB │ gzip:   0.41 kB
+build/client/assets/report-designer._id-C4951GZH.js                        0.58 kB │ gzip:   0.37 kB
+build/client/assets/PauseCircleIcon-lamyh-pb.js                            0.58 kB │ gzip:   0.41 kB
+build/client/assets/BoltIcon-CsDlbysa.js                                   0.58 kB │ gzip:   0.41 kB
+build/client/assets/CheckCircleIcon-DE3n-0qR.js                            0.58 kB │ gzip:   0.41 kB
+build/client/assets/ArrowUpCircleIcon-DmU7qpK9.js                          0.59 kB │ gzip:   0.42 kB
+build/client/assets/ErrorAlert-BTJgZ6tt.js                                 0.59 kB │ gzip:   0.39 kB
+build/client/assets/query-builder-Ch5JVRq6.js                              0.59 kB │ gzip:   0.38 kB
+build/client/assets/XCircleIcon-DohdSBVD.js                                0.59 kB │ gzip:   0.42 kB
+build/client/assets/CodeBracketIcon-DMuKsPyD.js                            0.59 kB │ gzip:   0.42 kB
+build/client/assets/ArrowsRightLeftIcon-CGC2g0CO.js                        0.60 kB │ gzip:   0.41 kB
+build/client/assets/MagnifyingGlassIcon-DPM07jQY.js                        0.60 kB │ gzip:   0.42 kB
+build/client/assets/useResourceOwner-DAg3dmn3.js                           0.60 kB │ gzip:   0.42 kB
+build/client/assets/CubeIcon-CS7FsQh_.js                                   0.61 kB │ gzip:   0.42 kB
+build/client/assets/FlowDesigner-iH3q0TYa.js                               0.61 kB │ gzip:   0.41 kB
+build/client/assets/PaperAirplaneIcon-BcI0alaJ.js                          0.62 kB │ gzip:   0.44 kB
+build/client/assets/automation._id-DImqWIlF.js                             0.63 kB │ gzip:   0.41 kB
+build/client/assets/ArrowUpTrayIcon-kTBOp_NS.js                            0.63 kB │ gzip:   0.43 kB
+build/client/assets/ArrowDownTrayIcon-DqB-OeV2.js                          0.63 kB │ gzip:   0.43 kB
+build/client/assets/Tag-CIYXWwlL.js                                        0.63 kB │ gzip:   0.39 kB
+build/client/assets/page-designer._id-Bbxfzbcw.js                          0.64 kB │ gzip:   0.42 kB
+build/client/assets/PlayIcon-DLI6HU5g.js                                   0.65 kB │ gzip:   0.44 kB
+build/client/assets/i18n-CQ7bbreM.js                                       0.65 kB │ gzip:   0.39 kB
+build/client/assets/ArrowTopRightOnSquareIcon-BHyOk218.js                  0.65 kB │ gzip:   0.44 kB
+build/client/assets/CloudIcon-B93q_0fz.js                                  0.66 kB │ gzip:   0.45 kB
+build/client/assets/CloudArrowUpIcon-CScCCjSV.js                           0.67 kB │ gzip:   0.46 kB
+build/client/assets/flow-designer-5iuGl1Dp.js                              0.67 kB │ gzip:   0.43 kB
+build/client/assets/CommandLineIcon-CT3J2vn5.js                            0.67 kB │ gzip:   0.45 kB
+build/client/assets/IcpComplianceFooter-BF00C_GS.js                        0.67 kB │ gzip:   0.42 kB
+build/client/assets/InformationCircleIcon-CRwJFmNg.js                      0.67 kB │ gzip:   0.46 kB
+build/client/assets/RichTextBlockRenderer-DG_8yZPl.js                      0.68 kB │ gzip:   0.45 kB
+build/client/assets/PaperClipIcon-D_JJ2YcJ.js                              0.68 kB │ gzip:   0.47 kB
+build/client/assets/PencilIcon-CvQK82My.js                                 0.69 kB │ gzip:   0.47 kB
+build/client/assets/dist--4OOvfk6.js                                       0.69 kB │ gzip:   0.42 kB
+build/client/assets/DevicePhoneMobileIcon-ChAtybjI.js                      0.69 kB │ gzip:   0.45 kB
+build/client/assets/ArrowPathIcon-BCL59_45.js                              0.69 kB │ gzip:   0.47 kB
+build/client/assets/LinkIcon-DkhXID_l.js                                   0.69 kB │ gzip:   0.44 kB
+build/client/assets/LockClosedIcon-o5rWXzpy.js                             0.70 kB │ gzip:   0.45 kB
+build/client/assets/dashboard-designer._id-Ct5fHo9w.js                     0.70 kB │ gzip:   0.45 kB
+build/client/assets/ExclamationTriangleIcon-DrY5t2bS.js                    0.70 kB │ gzip:   0.49 kB
+build/client/assets/CreditCardIcon-CT03vb7F.js                             0.70 kB │ gzip:   0.45 kB
+build/client/assets/BuildingOfficeIcon-DeBKgzNX.js                         0.70 kB │ gzip:   0.47 kB
+build/client/assets/DescriptionBlockRenderer-DJYy3Ycf.js                   0.71 kB │ gzip:   0.46 kB
+build/client/assets/Datetime.readonly.test-5O1dspL8.js                     0.71 kB │ gzip:   0.46 kB
+build/client/assets/i18nFieldHelper-DKOCL42O.js                            0.71 kB │ gzip:   0.43 kB
+build/client/assets/react-Jd8fFo-d.js                                      0.71 kB │ gzip:   0.45 kB
+build/client/assets/RouteLoadingFallback-B6FJvHlY.js                       0.72 kB │ gzip:   0.46 kB
+build/client/assets/UserCircleIcon-DHMKVApn.js                             0.72 kB │ gzip:   0.47 kB
+build/client/assets/useDictTree-B5fG9uQc.js                                0.72 kB │ gzip:   0.46 kB
+build/client/assets/KeyIcon-0ybsDJdE.js                                    0.73 kB │ gzip:   0.51 kB
+build/client/assets/ShieldCheckIcon-_s6GDsit.js                            0.73 kB │ gzip:   0.51 kB
+build/client/assets/BellIcon-DqK_kckw.js                                   0.74 kB │ gzip:   0.49 kB
+build/client/assets/ShieldExclamationIcon-CxYcIGKD.js                      0.74 kB │ gzip:   0.51 kB
+build/client/assets/DemoPage-I0xnCAb1.js                                   0.75 kB │ gzip:   0.40 kB
+build/client/assets/BookOpenIcon-CNQVo1Ox.js                               0.76 kB │ gzip:   0.49 kB
+build/client/assets/LanguageIcon-BqWDACX3.js                               0.76 kB │ gzip:   0.53 kB
+build/client/assets/LoadingOverlay-CsFkJSXO.js                             0.76 kB │ gzip:   0.50 kB
+build/client/assets/MoneyInput.test-CnLV6ScG.js                            0.77 kB │ gzip:   0.48 kB
+build/client/assets/StarIcon-BL1n7dNg.js                                   0.77 kB │ gzip:   0.53 kB
+build/client/assets/EnvelopeIcon-Bz9JuGsR.js                               0.78 kB │ gzip:   0.47 kB
+build/client/assets/PencilSquareIcon-DAVA_92s.js                           0.78 kB │ gzip:   0.51 kB
+build/client/assets/FolderIcon-Qvikqc_Z.js                                 0.78 kB │ gzip:   0.48 kB
+build/client/assets/TraceStatusBadge-B-hh1pxC.js                           0.79 kB │ gzip:   0.41 kB
+build/client/assets/dashboard-designer-CCEPzznw.js                         0.79 kB │ gzip:   0.51 kB
+build/client/assets/CpuChipIcon-BoiWfljD.js                                0.79 kB │ gzip:   0.49 kB
+build/client/assets/eventPolicyFormText-DO8S30Fh.js                        0.80 kB │ gzip:   0.51 kB
+build/client/assets/DocumentTextIcon-B4Su0Nn7.js                           0.80 kB │ gzip:   0.52 kB
+build/client/assets/EyeIcon-B5DXBrgb.js                                    0.82 kB │ gzip:   0.51 kB
+build/client/assets/SignalIcon-CpXgsLs_.js                                 0.82 kB │ gzip:   0.51 kB
+build/client/assets/FunnelIcon-BHEoODlI.js                                 0.82 kB │ gzip:   0.53 kB
+build/client/assets/rolldown-runtime-M0oDzQ_3.js                           0.82 kB │ gzip:   0.47 kB
+build/client/assets/SourceTypeBadge-Du0ADdvU.js                            0.82 kB │ gzip:   0.44 kB
+build/client/assets/DecisionRolloutMonitorBlock-DwLIY_sC.js                0.83 kB │ gzip:   0.46 kB
+build/client/assets/ChatBubbleLeftIcon-ChUBCldR.js                         0.83 kB │ gzip:   0.57 kB
+build/client/assets/textarea-C8eq9nIv.js                                   0.84 kB │ gzip:   0.43 kB
+build/client/assets/AutoSaveIndicator-DuXZquqK.js                          0.85 kB │ gzip:   0.45 kB
+build/client/assets/CircleStackIcon-C5hnGpnK.js                            0.88 kB │ gzip:   0.50 kB
+build/client/assets/InboxIcon-CAD82KPU.js                                  0.89 kB │ gzip:   0.52 kB
+build/client/assets/StarIcon-BpmDiVcK.js                                   0.89 kB │ gzip:   0.54 kB
+build/client/assets/EnvelopeOpenIcon-DW-ei-Bt.js                           0.89 kB │ gzip:   0.52 kB
+build/client/assets/ServerStackIcon-CAJmbKlX.js                            0.89 kB │ gzip:   0.53 kB
+build/client/assets/UsersIcon-DyxDzmZD.js                                  0.90 kB │ gzip:   0.56 kB
+build/client/assets/DataLimitBanner-Bn9E6Knz.js                            0.90 kB │ gzip:   0.59 kB
+build/client/assets/TrashIcon-jvabaB9C.js                                  0.94 kB │ gzip:   0.59 kB
+build/client/assets/statusLabels-Ce6YY-2J.js                               0.95 kB │ gzip:   0.62 kB
+build/client/assets/RocketLaunchIcon-CUVZHpQ-.js                           0.95 kB │ gzip:   0.59 kB
+build/client/assets/BeakerIcon-Zbwnd-j4.js                                 0.95 kB │ gzip:   0.60 kB
+build/client/assets/CogIcon-ClKRZ0_o.js                                    0.97 kB │ gzip:   0.62 kB
+build/client/assets/RectangleGroupIcon-eWyQaCKX.js                         0.97 kB │ gzip:   0.51 kB
+build/client/assets/useDictCache-Bw67vDCV.js                               0.97 kB │ gzip:   0.59 kB
+build/client/assets/DividerBlockRenderer-BLZ4G8kl.js                       0.98 kB │ gzip:   0.50 kB
+build/client/assets/ReportPageSkeleton-BLsf5Pxu.js                         0.98 kB │ gzip:   0.37 kB
+build/client/assets/GlobeAltIcon-BzgnCrIN.js                               1.00 kB │ gzip:   0.60 kB
+build/client/assets/Modal-DQ83P8jD.js                                      1.01 kB │ gzip:   0.53 kB
+build/client/assets/sanitizeHtml-CmWCJ5Ge.js                               1.02 kB │ gzip:   0.59 kB
+build/client/assets/DynamicPageUnavailable-DPMw-2MI.js                     1.02 kB │ gzip:   0.65 kB
+build/client/assets/Squares2X2Icon-CUpgJP9V.js                             1.02 kB │ gzip:   0.50 kB
+build/client/assets/FormBlockRenderer-XDG_FFr9.js                          1.03 kB │ gzip:   0.60 kB
+build/client/assets/UserGroupIcon-CRhukd2l.js                              1.03 kB │ gzip:   0.61 kB
+build/client/assets/type-BeSj-euE.js                                       1.04 kB │ gzip:   0.48 kB
+build/client/assets/ChatBubbleLeftRightIcon-DtbrimBv.js                    1.04 kB │ gzip:   0.67 kB
+build/client/assets/WrenchScrewdriverIcon-DHg9XmQC.js                      1.04 kB │ gzip:   0.66 kB
+build/client/assets/teamService-Buj35Qo4.js                                1.06 kB │ gzip:   0.39 kB
+build/client/assets/ThemeContext-ERzfWJtL.js                               1.06 kB │ gzip:   0.56 kB
+build/client/assets/index-UTTPWfDz.js                                      1.06 kB │ gzip:   0.61 kB
+build/client/assets/ClipboardDocumentCheckIcon-CFlw0lz8.js                 1.06 kB │ gzip:   0.65 kB
+build/client/assets/useTreeData-DD3iPfvA.js                                1.08 kB │ gzip:   0.61 kB
+build/client/assets/ClipboardDocumentIcon-D2k5gt4a.js                      1.08 kB │ gzip:   0.64 kB
+build/client/assets/dndUtils-yKhl341p.js                                   1.10 kB │ gzip:   0.62 kB
+build/client/assets/useListUrlState-CYG_z0Z3.js                            1.11 kB │ gzip:   0.62 kB
+build/client/assets/fieldService-CjpPo1zu.js                               1.13 kB │ gzip:   0.45 kB
+build/client/assets/SparklesIcon-BugI6pU9.js                               1.13 kB │ gzip:   0.60 kB
+build/client/assets/FileAttachmentField.test-DDYSbffI.js                   1.13 kB │ gzip:   0.57 kB
+build/client/assets/inboxService-DuejNB94.js                               1.15 kB │ gzip:   0.54 kB
+build/client/assets/contributed-components-YkcoczvE.js                     1.17 kB │ gzip:   0.65 kB
+build/client/assets/index-SweYozq-.js                                      1.18 kB │ gzip:   0.65 kB
+build/client/assets/decisionOutputSchema-BAoc8QrE.js                       1.18 kB │ gzip:   0.50 kB
+build/client/assets/PermissionGuard-DA5t7k_n.js                            1.18 kB │ gzip:   0.61 kB
+build/client/assets/index-CayrRYz3.js                                      1.18 kB │ gzip:   0.65 kB
+build/client/assets/SmartIframe-DuQk9T2X.js                                1.24 kB │ gzip:   0.62 kB
+build/client/assets/settings-VQ74nVei.js                                   1.24 kB │ gzip:   0.65 kB
+build/client/assets/PowerIcon-B1lzjmbS.js                                  1.26 kB │ gzip:   0.55 kB
+build/client/assets/PagePresentationContext-DH0NTQdC.js                    1.27 kB │ gzip:   0.64 kB
+build/client/assets/TabsBlockRenderer-Blizt-xY.js                          1.28 kB │ gzip:   0.75 kB
+build/client/assets/SmartMapChart-DBX76jnj.js                              1.31 kB │ gzip:   0.83 kB
+build/client/assets/useModelCapabilities-btAuQ6GX.js                       1.32 kB │ gzip:   0.79 kB
+build/client/assets/SubformBlockRenderer-CVUu6LcH.js                       1.33 kB │ gzip:   0.72 kB
+build/client/assets/AuthRecoveryHelp-DnNMp6BB.js                           1.37 kB │ gzip:   0.79 kB
+build/client/assets/Display-BUeuhRV2.js                                    1.37 kB │ gzip:   0.71 kB
+build/client/assets/reportTemplateService-CY36hRBl.js                      1.37 kB │ gzip:   0.50 kB
+build/client/assets/EmbeddedListBlockRenderer-Bl-FKyom.js                  1.44 kB │ gzip:   0.78 kB
+build/client/assets/OwnerSelect.test-UuIR9ACH.js                           1.49 kB │ gzip:   0.70 kB
+build/client/assets/RatingField-CoBiTNqR.js                                1.50 kB │ gzip:   0.89 kB
+build/client/assets/actionSchemaFields-B95dW7-_.js                         1.51 kB │ gzip:   0.66 kB
+build/client/assets/ProgressField-DXciff2P.js                              1.53 kB │ gzip:   0.72 kB
+build/client/assets/SmartImage-oYZwA7sw.js                                 1.53 kB │ gzip:   0.70 kB
+build/client/assets/TimezoneContext-DDuLG-9J.js                            1.53 kB │ gzip:   0.78 kB
+build/client/assets/JsonEditor.test-Bh_ReRM8.js                            1.56 kB │ gzip:   0.79 kB
+build/client/assets/label-DuTWZcox.js                                      1.56 kB │ gzip:   0.78 kB
+build/client/assets/button-DVYkUpgL.js                                     1.57 kB │ gzip:   0.72 kB
+build/client/assets/TenantThemeContext-i_TPwZw6.js                         1.57 kB │ gzip:   0.80 kB
+build/client/assets/SelectionInfoBlockRenderer-89UNpH-X.js                 1.58 kB │ gzip:   0.77 kB
+build/client/assets/open-api-publications-BXQg1N1v.js                      1.58 kB │ gzip:   0.62 kB
+build/client/assets/Cog6ToothIcon-CfLwuJvl.js                              1.63 kB │ gzip:   0.87 kB
+build/client/assets/i18nResolver-fvuRJ3YA.js                               1.66 kB │ gzip:   0.92 kB
+build/client/assets/ImpactGraphPanel-DxWQZKP2.js                           1.66 kB │ gzip:   0.60 kB
+build/client/assets/session-B0KnRvG4.js                                    1.67 kB │ gzip:   0.86 kB
+build/client/assets/with-selector-DrmxOBVv.js                              1.68 kB │ gzip:   0.80 kB
+build/client/assets/SmartRichText-CALSfszF.js                              1.71 kB │ gzip:   0.86 kB
+build/client/assets/TableCellsIcon-BI5VUiMt.js                             1.75 kB │ gzip:   0.65 kB
+build/client/assets/StatCardBlockRenderer-C2FpmarH.js                      1.78 kB │ gzip:   0.93 kB
+build/client/assets/icon-resolver-PspeGucm.js                              1.79 kB │ gzip:   0.97 kB
+build/client/assets/statusTone-DK9m2P2j.js                                 1.89 kB │ gzip:   1.01 kB
+build/client/assets/Select.create.test-ZjuL59V3.js                         1.93 kB │ gzip:   0.78 kB
+build/client/assets/RecordInspectorBlockRenderer-BJ2PHFYA.js               1.95 kB │ gzip:   0.95 kB
+build/client/assets/SunIcon-CmOChSdd.js                                    1.97 kB │ gzip:   0.71 kB
+build/client/assets/reportDesignerService-BPUeV8LE.js                      2.00 kB │ gzip:   0.68 kB
+build/client/assets/fieldLibraryService-DGEA2nwl.js                        2.02 kB │ gzip:   0.66 kB
+build/client/assets/Button-DvEPWFaF.js                                     2.04 kB │ gzip:   1.04 kB
+build/client/assets/I18nTextInput-CF32IZWv.js                              2.08 kB │ gzip:   1.12 kB
+build/client/assets/useDesignerSelection-XdGqPxv9.js                       2.12 kB │ gzip:   0.88 kB
+build/client/assets/DslFormFillContext-DM73v9GA.js                         2.15 kB │ gzip:   1.04 kB
+build/client/assets/Checkbox-Bsf5lpDM.js                                   2.17 kB │ gzip:   1.10 kB
+build/client/assets/displayLabels-BWeBaZ2X.js                              2.24 kB │ gzip:   1.32 kB
+build/client/assets/actionAvailability-CBHpnet9.js                         2.25 kB │ gzip:   0.92 kB
+build/client/assets/semanticApi-DSpOpmE0.js                                2.26 kB │ gzip:   1.03 kB
+build/client/assets/PuzzlePieceIcon-PYZ_HGD4.js                            2.27 kB │ gzip:   0.98 kB
+build/client/assets/FormButtonsBlockRenderer-sb3QsZ9J.js                   2.29 kB │ gzip:   1.20 kB
+build/client/assets/ExecutionLogTracePresentation.test-_aaTPWsH.js         2.31 kB │ gzip:   1.08 kB
+build/client/assets/TimePicker-UyvbscFB.js                                 2.37 kB │ gzip:   1.16 kB
+build/client/assets/MemberPicker.test-KYhN55sM.js                          2.39 kB │ gzip:   1.00 kB
+build/client/assets/DecisionIntegrationImpactBlock.test-DZLsbMX9.js        2.40 kB │ gzip:   0.84 kB
+build/client/assets/Logout--97B0z-N.js                                     2.41 kB │ gzip:   1.04 kB
+build/client/assets/dist-BHTGY9jz.js                                       2.42 kB │ gzip:   1.16 kB
+build/client/assets/PublicationControls-TScYYMGb.js                        2.44 kB │ gzip:   1.25 kB
+build/client/assets/ColorPickerField-COHUeBaR.js                           2.44 kB │ gzip:   1.03 kB
+build/client/assets/factCatalogAdapter-CEj3VYaj.js                         2.50 kB │ gzip:   1.08 kB
+build/client/assets/AgentDetailTabs.schedules.test-DtBkN8dg.js             2.50 kB │ gzip:   1.13 kB
+build/client/assets/bootstrapTexts-BZgNFc9j.js                             2.54 kB │ gzip:   1.30 kB
+build/client/assets/dialog-Djafu8oA.js                                     2.54 kB │ gzip:   1.05 kB
+build/client/assets/RepeaterBlockRenderer-DR8k359e.js                      2.55 kB │ gzip:   1.14 kB
+build/client/assets/Datetime-CP8Tnsds.js                                   2.58 kB │ gzip:   1.14 kB
+build/client/assets/ToolbarBlockRenderer-D9n1GIwD.js                       2.65 kB │ gzip:   1.48 kB
+build/client/assets/tslib.es6-BcivRJPC.js                                  2.70 kB │ gzip:   1.22 kB
+build/client/assets/security-C6qW8ShP.js                                   2.73 kB │ gzip:   1.19 kB
+build/client/assets/ConfirmDialog-BJRZGFlX.js                              2.73 kB │ gzip:   1.24 kB
+build/client/assets/StageRailBlockRenderer-Dr_BvOdu.js                     2.80 kB │ gzip:   1.29 kB
+build/client/assets/ArtifactTimelineBlockRenderer-jTi4RCpB.js              2.85 kB │ gzip:   1.15 kB
+build/client/assets/I18nContext-BullIpqd.js                                2.89 kB │ gzip:   1.47 kB
+build/client/assets/AiField.test-BbLdr-pk.js                               2.94 kB │ gzip:   1.14 kB
+build/client/assets/namedQueryService-CgQ7Xag-.js                          2.98 kB │ gzip:   0.91 kB
+build/client/assets/emailService-NPI7EygC.js                               3.01 kB │ gzip:   0.71 kB
+build/client/assets/SmartCountdown-oaZ4v0KG.js                             3.01 kB │ gzip:   1.13 kB
+build/client/assets/dictService-Bpfvdl8E.js                                3.02 kB │ gzip:   0.92 kB
+build/client/assets/FormWizardBlockRenderer-COmhgc1P.js                    3.03 kB │ gzip:   1.23 kB
+build/client/assets/dynamicService-DxtgMx4J.js                             3.11 kB │ gzip:   1.08 kB
+build/client/assets/SmartGaugeChart-CqfX53E6.js                            3.17 kB │ gzip:   1.39 kB
+build/client/assets/ImageDisplay-CySQSgQ4.js                               3.19 kB │ gzip:   1.53 kB
+build/client/assets/EventPolicyActionsBlock.test-g4Gl3XU7.js               3.23 kB │ gzip:   1.03 kB
+build/client/assets/AuthContext-PwHpeuk8.js                                3.29 kB │ gzip:   1.26 kB
+build/client/assets/List-Df9sjDqr.js                                       3.33 kB │ gzip:   1.06 kB
+build/client/assets/billing-CvO3kekF.js                                    3.34 kB │ gzip:   1.37 kB
+build/client/assets/SmartFunnelChart-BYYXTdAu.js                           3.36 kB │ gzip:   1.45 kB
+build/client/assets/mutation-LvHAepCl.js                                   3.40 kB │ gzip:   1.15 kB
+build/client/assets/ChartBlockRenderer-COUInkAj.js                         3.40 kB │ gzip:   1.47 kB
+build/client/assets/SmartScatterChart-DGdgx9iQ.js                          3.42 kB │ gzip:   1.39 kB
+build/client/assets/SqlEditor-DkNn8UqK.js                                  3.43 kB │ gzip:   1.66 kB
+build/client/assets/SmartTreemapChart-DGyAjkz2.js                          3.45 kB │ gzip:   1.53 kB
+build/client/assets/EventPolicyDesignerBlock-D5JUWv9F.js                   3.48 kB │ gzip:   1.58 kB
+build/client/assets/SmartRadarChart-DGiO56bw.js                            3.52 kB │ gzip:   1.50 kB
+build/client/assets/SmartAreaChart-DVHuZwdX.js                             3.52 kB │ gzip:   1.47 kB
+build/client/assets/TeamMembersBlock.test-eCHhPzah.js                      3.54 kB │ gzip:   1.33 kB
+build/client/assets/SmartHeatmapChart-QYWMyeOm.js                          3.59 kB │ gzip:   1.62 kB
+build/client/assets/OwnerSelect-BEYkrDnt.js                                3.60 kB │ gzip:   1.56 kB
+build/client/assets/ToastContext-Cjzx65kz.js                               3.62 kB │ gzip:   1.69 kB
+build/client/assets/SmartBarChart-DjCAjhas.js                              3.62 kB │ gzip:   1.59 kB
+build/client/assets/SmartFilterBar-6wT-Uq39.js                             3.65 kB │ gzip:   1.35 kB
+build/client/assets/SmartLineChart-BfI-kD-q.js                             3.66 kB │ gzip:   1.61 kB
+build/client/assets/ChartEmptyState-CCcWvHZK.js                            3.70 kB │ gzip:   1.58 kB
+build/client/assets/expression-parser-7VuFf6-2.js                          3.78 kB │ gzip:   1.41 kB
+build/client/assets/SmartProgress-QSYsaq1Y.js                              3.80 kB │ gzip:   1.53 kB
+build/client/assets/ProcessFeeRuleMatrixBlock.test-BMBDljT5.js             3.86 kB │ gzip:   1.63 kB
+build/client/assets/RelationField-DVIEkSMV.js                              3.86 kB │ gzip:   1.68 kB
+build/client/assets/MultiSelect-FAADd2P2.js                                3.87 kB │ gzip:   1.71 kB
+build/client/assets/SmartWaterfallChart-BOReqd5m.js                        3.88 kB │ gzip:   1.71 kB
+build/client/assets/_pid.edit-W5UpXotS.js                                  3.94 kB │ gzip:   1.51 kB
+build/client/assets/SmartPieChart-C1x_t0V3.js                              3.94 kB │ gzip:   1.83 kB
+build/client/assets/DateRange-CiSQZDtQ.js                                  3.95 kB │ gzip:   1.60 kB
+build/client/assets/FileAttachmentField-By9jZGvY.js                        3.96 kB │ gzip:   1.98 kB
+build/client/assets/SmartLeaderboard-DVgYzoeb.js                           3.98 kB │ gzip:   1.55 kB
+build/client/assets/AuthAppearanceShell-QkqQ29sM.js                        3.98 kB │ gzip:   1.78 kB
+build/client/assets/WorkspaceCells-DRCIOuu9.js                             3.99 kB │ gzip:   1.74 kB
+build/client/assets/FormSectionBlockRenderer-Nc6zhZK2.js                   4.02 kB │ gzip:   1.78 kB
+build/client/assets/SmartNpsChart-Dqbk-FAb.js                              4.02 kB │ gzip:   1.74 kB
+build/client/assets/entry.client-BvPF3NiY.js                               4.03 kB │ gzip:   1.59 kB
+build/client/assets/Layout-DQKwPXKW.js                                     4.03 kB │ gzip:   1.68 kB
+build/client/assets/CodeSnippetBlockRenderer-C0stU8L5.js                   4.07 kB │ gzip:   1.71 kB
+build/client/assets/_-pL7cPlcS.js                                          4.15 kB │ gzip:   1.69 kB
+build/client/assets/SmartParetoChart-CaGVvt_-.js                           4.28 kB │ gzip:   1.97 kB
+build/client/assets/SmartComboChart-CQC9Nvfg.js                            4.28 kB │ gzip:   1.84 kB
+build/client/assets/interrupts-CPIvMMWG.js                                 4.29 kB │ gzip:   1.81 kB
+build/client/assets/dist-CJ6h5CZ_.js                                       4.36 kB │ gzip:   1.60 kB
+build/client/assets/FormView-BavmpdWB.js                                   4.40 kB │ gzip:   2.05 kB
+build/client/assets/AiFillBannerBlockRenderer-Du-4ECZx.js                  4.44 kB │ gzip:   2.00 kB
+build/client/assets/AgentChatEmbed-C_oGFnIg.js                             4.46 kB │ gzip:   1.66 kB
+build/client/assets/AgentDetailTabs.releases.test-XF2G5Z7C.js              4.48 kB │ gzip:   1.41 kB
+build/client/assets/timezone-Lq8_fYK2.js                                   4.50 kB │ gzip:   1.88 kB
+build/client/assets/DecisionTableWorkbenchBlock.test-d-blFHrm.js           4.51 kB │ gzip:   1.63 kB
+build/client/assets/ExportPdfButton-Cck7B9tl.js                            4.52 kB │ gzip:   2.05 kB
+build/client/assets/cloud-config-Cd-z-fa9.js                               4.52 kB │ gzip:   1.76 kB
+build/client/assets/DecisionIntegrationImpactBlock-B0x2A_d2.js             4.65 kB │ gzip:   1.94 kB
+build/client/assets/ViewDiagnostics-DFS83zrV.js                            4.67 kB │ gzip:   1.55 kB
+build/client/assets/ViewEmptyState-JmYeHTy_.js                             4.68 kB │ gzip:   1.78 kB
+build/client/assets/SmartSPCChart-rpp3NTSu.js                              4.71 kB │ gzip:   2.06 kB
+build/client/assets/Select.test-BvBbQtZh.js                                4.79 kB │ gzip:   1.65 kB
+build/client/assets/share._token-Dk0Ma0RG.js                               4.81 kB │ gzip:   1.84 kB
+build/client/assets/PublicValueSchemaEditor-CWNSrArG.js                    4.82 kB │ gzip:   1.94 kB
+build/client/assets/Form-CwEgLF1x.js                                       4.86 kB │ gzip:   2.03 kB
+build/client/assets/DslRegistryContext-DeC2Zceu.js                         4.88 kB │ gzip:   1.83 kB
+build/client/assets/MoneyInput-DwjtuGqn.js                                 4.98 kB │ gzip:   2.02 kB
+build/client/assets/CardGridBlockRenderer-BWRAilZr.js                      5.03 kB │ gzip:   2.24 kB
+build/client/assets/EventPolicyActionsBlock-C8RTUqN8.js                    5.04 kB │ gzip:   1.84 kB
+build/client/assets/SmartGallery-D7IqGep9.js                               5.07 kB │ gzip:   1.97 kB
+build/client/assets/view._code-5zxZedQO.js                                 5.11 kB │ gzip:   2.28 kB
+build/client/assets/branding-Cv8W4z8x.js                                   5.13 kB │ gzip:   2.13 kB
+build/client/assets/AgentToolPicker-CQdnyVom.js                            5.15 kB │ gzip:   2.09 kB
+build/client/assets/SmartKanban-RxKQa0sO.js                                5.18 kB │ gzip:   1.88 kB
+build/client/assets/TreeView-YxuBbTiK.js                                   5.20 kB │ gzip:   2.27 kB
+build/client/assets/dateTimeFormatService-fgE4166v.js                      5.28 kB │ gzip:   2.22 kB
+build/client/assets/GuardrailsEditor-D2_P30xA.js                           5.31 kB │ gzip:   2.03 kB
+build/client/assets/index-CHKGhmxI.js                                      5.33 kB │ gzip:   2.32 kB
+build/client/assets/FiltersBlockRenderer-Dke2pkM_.js                       5.36 kB │ gzip:   2.26 kB
+build/client/assets/AuthLayout-DIX4hi9h.js                                 5.42 kB │ gzip:   2.04 kB
+build/client/assets/Radio-Cri4NEkI.js                                      5.44 kB │ gzip:   1.90 kB
+build/client/assets/fieldDependencies-48jcBPDN.js                          5.45 kB │ gzip:   2.44 kB
+build/client/assets/useChartData-C9QhWHlv.js                               5.56 kB │ gzip:   2.40 kB
+build/client/assets/TimelineView-CXCZjH5E.js                               5.57 kB │ gzip:   2.47 kB
+build/client/assets/TimeRangePicker-oa_VwUGc.js                            5.62 kB │ gzip:   2.12 kB
+build/client/assets/DecisionRuleBindingLocale.test-ClgiwqCi.js             5.63 kB │ gzip:   1.90 kB
+build/client/assets/WorkbenchActionBarBlockRenderer-C3aOO3A4.js            5.70 kB │ gzip:   2.27 kB
+build/client/assets/KernelPluginsPage-B87SvSH7.js                          5.71 kB │ gzip:   1.78 kB
+build/client/assets/modelService-BBqw7-ET.js                               5.73 kB │ gzip:   1.76 kB
+build/client/assets/Navigation-CWvL54sa.js                                 5.78 kB │ gzip:   2.42 kB
+build/client/assets/CascadeSelect-DXXrK95O.js                              5.81 kB │ gzip:   2.52 kB
+build/client/assets/ConversationPanelBlockRenderer-WtVz-mzF.js             5.87 kB │ gzip:   2.50 kB
+build/client/assets/AuthAppearanceEditor.test-C8irYMUv.js                  5.89 kB │ gzip:   1.81 kB
+build/client/assets/GalleryView-Jp8gCHpi.js                                5.89 kB │ gzip:   2.55 kB
+build/client/assets/i18n-coverage-EpHt0QxT.js                              5.97 kB │ gzip:   2.17 kB
+build/client/assets/_pid.edit-BajjZSj5.js                                  6.04 kB │ gzip:   2.17 kB
+build/client/assets/chart-spec-echarts-D2asmj8j.js                         6.05 kB │ gzip:   2.04 kB
+build/client/assets/new-OxT3UfAn.js                                        6.21 kB │ gzip:   2.07 kB
+build/client/assets/FieldRenderer-Bzeefwbj.js                              6.28 kB │ gzip:   2.72 kB
+build/client/assets/RichTextEditor-BQ1rimbV.js                             6.43 kB │ gzip:   2.04 kB
+build/client/assets/HttpClient-B7dWvnjK.js                                 6.43 kB │ gzip:   2.74 kB
+build/client/assets/infrastructure-CXiaUqdz.js                             6.44 kB │ gzip:   2.24 kB
+build/client/assets/SmartGanttChart-BIe5A1OU.js                            6.47 kB │ gzip:   2.93 kB
+build/client/assets/index-C8p75xW0.js                                      6.48 kB │ gzip:   2.37 kB
+build/client/assets/Date-0yv7oBpv.js                                       6.64 kB │ gzip:   1.76 kB
+build/client/assets/CandidateListBlockRenderer-CGFblA0K.js                 6.77 kB │ gzip:   2.66 kB
+build/client/assets/social-callback-E_kWqEyd.js                            6.77 kB │ gzip:   2.37 kB
+build/client/assets/MetricStripBlockRenderer-Bu6AhPV6.js                   6.81 kB │ gzip:   2.56 kB
+build/client/assets/StatusBannerBlockRenderer-CZZoPrCp.js                  6.84 kB │ gzip:   2.85 kB
+build/client/assets/index-Dd7cmbTQ.js                                      6.85 kB │ gzip:   2.32 kB
+build/client/assets/UserSelect-yJx0alQQ.js                                 6.85 kB │ gzip:   2.64 kB
+build/client/assets/EventPolicyDesignerBlock.test-jOagRl13.js              6.90 kB │ gzip:   2.08 kB
+build/client/assets/InlineEditCell-BKI1Rw6L.js                             7.00 kB │ gzip:   2.85 kB
+build/client/assets/about-7sGTrTN0.js                                      7.00 kB │ gzip:   2.55 kB
+build/client/assets/GanttView-B1Yrq35c.js                                  7.06 kB │ gzip:   3.11 kB
+build/client/assets/OrganizationSelect-4PDp4gL3.js                         7.08 kB │ gzip:   2.69 kB
+build/client/assets/index-CrGb57pO.js                                      7.11 kB │ gzip:   2.10 kB
+build/client/assets/new-CD6jq9j9.js                                        7.16 kB │ gzip:   2.12 kB
+build/client/assets/dayjs.min-Dx4jSKtB.js                                  7.21 kB │ gzip:   3.16 kB
+build/client/assets/SmartNumberCard-BUPZp_D9.js                            7.30 kB │ gzip:   2.82 kB
+build/client/assets/conditionAst-BkQCDOxh.js                               7.34 kB │ gzip:   2.63 kB
+build/client/assets/EvidencePanelBlockRenderer-a43uGKgG.js                 7.35 kB │ gzip:   2.43 kB
+build/client/assets/thread._threadId-DbAQq-Sj.js                           7.79 kB │ gzip:   2.37 kB
+build/client/assets/document-Dwmq6MIQ.js                                   7.88 kB │ gzip:   2.38 kB
+build/client/assets/DecisionDefinitionActionsBlock-CZUlDTv7.js             7.91 kB │ gzip:   2.89 kB
+build/client/assets/new-C_LsWcaL.js                                        7.93 kB │ gzip:   2.52 kB
+build/client/assets/DecisionDefinitionActionsBlock.test-UM-TI0aq.js        7.96 kB │ gzip:   2.04 kB
+build/client/assets/ControlledFieldRenderer-CSwSuH55.js                    7.99 kB │ gzip:   3.41 kB
+build/client/assets/social-links-DOl1c-eD.js                               8.05 kB │ gzip:   3.15 kB
+build/client/assets/notification-preferences-D0BFIKaU.js                   8.05 kB │ gzip:   2.84 kB
+build/client/assets/DecisionTableWorkbenchBlock-LIEWJBWk.js                8.10 kB │ gzip:   3.27 kB
+build/client/assets/PluginManagement-B3qZpAkt.js                           8.20 kB │ gzip:   3.03 kB
+build/client/assets/MemberPicker-BqkBO_qg.js                               8.39 kB │ gzip:   2.89 kB
+build/client/assets/ApiService-CQbaLiWC.js                                 8.42 kB │ gzip:   2.59 kB
+build/client/assets/AiField-hAgd1H21.js                                    8.43 kB │ gzip:   3.40 kB
+build/client/assets/DecisionFieldImpactBlock-CB1LP3kh.js                   8.50 kB │ gzip:   2.92 kB
+build/client/assets/chunk-ZA36QIGN-CeoC9XhD.js                             8.58 kB │ gzip:   3.68 kB
+build/client/assets/soul-profiles-admin-DxY4XpTr.js                        8.61 kB │ gzip:   3.20 kB
+build/client/assets/workbenchBlockUtils-D9aCBocj.js                        8.61 kB │ gzip:   3.54 kB
+build/client/assets/TraceGraphBlockRenderer-DVg3eBMD.js                    8.64 kB │ gzip:   3.33 kB
+build/client/assets/BaseFormulaEditor-C9K8dKfl.js                          8.96 kB │ gzip:   3.23 kB
+build/client/assets/workbench-BfMZN0Hs.js                                  9.02 kB │ gzip:   3.37 kB
+build/client/assets/settings-CQLLjyJN.js                                   9.04 kB │ gzip:   2.71 kB
+build/client/assets/new-MkBlpAD3.js                                        9.08 kB │ gzip:   3.18 kB
+build/client/assets/compose-BgXUaWcL.js                                    9.12 kB │ gzip:   2.56 kB
+build/client/assets/index-1N45bkO_.js                                      9.25 kB │ gzip:   3.24 kB
+build/client/assets/SmartTableChart-CO_-Thx8.js                            9.34 kB │ gzip:   3.69 kB
+build/client/assets/index-B3HRN5eb.js                                      9.49 kB │ gzip:   3.24 kB
+build/client/assets/RecordListView-CXPIO0FL.js                             9.50 kB │ gzip:   4.15 kB
+build/client/assets/_pid.usage-C3rEIZtf.js                                 9.55 kB │ gzip:   2.30 kB
+build/client/assets/TimezoneSelect-DCp3iRJm.js                             9.56 kB │ gzip:   3.82 kB
+build/client/assets/SetupWizard-BWyvWZsH.js                                9.60 kB │ gzip:   2.77 kB
+build/client/assets/_pid-B2vz2FHO.js                                       9.63 kB │ gzip:   2.80 kB
+build/client/assets/login-channels-BCCANClc.js                             9.69 kB │ gzip:   3.58 kB
+build/client/assets/exchange-rates-mDxElSy1.js                             9.76 kB │ gzip:   2.86 kB
+build/client/assets/BomUploadReviewField-C135klvO.js                       9.80 kB │ gzip:   4.08 kB
+build/client/assets/index-0UMP3FwH.js                                      9.81 kB │ gzip:   2.78 kB
+build/client/assets/_code-7c_7y9KU.js                                      9.89 kB │ gzip:   2.98 kB
+build/client/assets/index-C1zxJdzI.js                                     10.02 kB │ gzip:   3.07 kB
+build/client/assets/dashboardService-fKrtV5KJ.js                          10.12 kB │ gzip:   3.21 kB
+build/client/assets/TeamMembersBlock.i18n.test-1ARMl1j6.js                10.14 kB │ gzip:   3.46 kB
+build/client/assets/my-tasks-DQjNrW5S.js                                  10.14 kB │ gzip:   3.22 kB
+build/client/assets/SignUp-CUKsLmn-.js                                    10.37 kB │ gzip:   2.89 kB
+build/client/assets/FormRef-Bhlk3XHh.js                                   10.41 kB │ gzip:   3.70 kB
+build/client/assets/DashboardModuleTree-uNirYc0t.js                       10.52 kB │ gzip:   3.54 kB
+build/client/assets/diff-CJmVmE2n.js                                      10.57 kB │ gzip:   3.48 kB
+build/client/assets/UpgradeDialog-DzAXuNir.js                             10.62 kB │ gzip:   2.52 kB
+build/client/assets/_pid.impact-CjX5l-Nk.js                               10.83 kB │ gzip:   2.68 kB
+build/client/assets/deactivation-CccLXScn.js                              10.83 kB │ gzip:   2.98 kB
+build/client/assets/SmartCalendar-DdCCM37h.js                             11.09 kB │ gzip:   3.44 kB
+build/client/assets/profile-Cm5-RQr_.js                                   11.44 kB │ gzip:   3.97 kB
+build/client/assets/AgentColleaguesGrid-BgGNs9Mm.js                       11.46 kB │ gzip:   3.09 kB
+build/client/assets/CrossTenantGrantsPage-A156jlIy.js                     11.65 kB │ gzip:   3.37 kB
+build/client/assets/TeamMembersBlock-CvPOIQ2q.js                          11.74 kB │ gzip:   4.18 kB
+build/client/assets/CellRendererRegistry-ONcG5gGv.js                      12.25 kB │ gzip:   4.10 kB
+build/client/assets/ConditionFragmentLibraryBlock.test-CGf-7UAM.js        12.33 kB │ gzip:   3.14 kB
+build/client/assets/DecisionActionPlanBlock-B0cm58G5.js                   12.35 kB │ gzip:   4.55 kB
+build/client/assets/user-preferences-BcLavhBm.js                          12.44 kB │ gzip:   3.73 kB
+build/client/assets/DecisionActionPlanBlock.test-Cn_23Poo.js              12.67 kB │ gzip:   3.16 kB
+build/client/assets/connectors-9ywUQO02.js                                12.74 kB │ gzip:   3.50 kB
+build/client/assets/shadow-runs-D8mHwT3l.js                               12.75 kB │ gzip:   3.91 kB
+build/client/assets/index-D2De2uqi.js                                     13.14 kB │ gzip:   3.71 kB
+build/client/assets/OpenApiInstallationGrantEditor-G2mN3vqs.js            13.21 kB │ gzip:   4.87 kB
+build/client/assets/ProcessFeeRuleMatrixBlock-DmjbFygn.js                 13.32 kB │ gzip:   4.51 kB
+build/client/assets/index-Bd11hYaO.js                                     13.34 kB │ gzip:   3.53 kB
+build/client/assets/learning-drafts-CcM-DKaU.js                           13.47 kB │ gzip:   4.37 kB
+build/client/assets/Upload-DlWypEav.js                                    13.69 kB │ gzip:   5.17 kB
+build/client/assets/index-BoURYmQF.js                                     13.80 kB │ gzip:   3.86 kB
+build/client/assets/Table-Ca5xOa5C.js                                     13.82 kB │ gzip:   4.87 kB
+build/client/assets/TreeSelect-BoVNXm4U.js                                13.86 kB │ gzip:   3.99 kB
+build/client/assets/OpenApiInstallationNotificationEditor-nqpssPZE.js     13.97 kB │ gzip:   5.36 kB
+build/client/assets/knowledge-DwgbVs1O.js                                 14.42 kB │ gzip:   3.74 kB
+build/client/assets/dist-eFjchHPw.js                                      14.68 kB │ gzip:   5.08 kB
+build/client/assets/FormDialog-BtQAIF0Z.js                                14.68 kB │ gzip:   4.53 kB
+build/client/assets/dynamic-route-utils-Fs1IKYGt.js                       14.75 kB │ gzip:   5.16 kB
+build/client/assets/index-tRFN7Eq6.js                                     15.06 kB │ gzip:   5.10 kB
+build/client/assets/_pid-pkJHx5-C.js                                      15.30 kB │ gzip:   4.71 kB
+build/client/assets/QueryClientProvider-9kLX88Ft.js                       15.40 kB │ gzip:   5.43 kB
+build/client/assets/webhooks-MVOm6NY_.js                                  15.82 kB │ gzip:   4.38 kB
+build/client/assets/index-DOnoFXXV.js                                     16.03 kB │ gzip:   4.55 kB
+build/client/assets/i18n-workflow-D7JDAdf4.js                             16.14 kB │ gzip:   4.33 kB
+build/client/assets/index-C7tSG_gJ.js                                     16.87 kB │ gzip:   5.01 kB
+build/client/assets/prompts-BIU3j1EU.js                                   17.02 kB │ gzip:   5.15 kB
+build/client/assets/report-DzZuSJX0.js                                    17.03 kB │ gzip:   5.13 kB
+build/client/assets/index-CjWImHOH.js                                     17.21 kB │ gzip:   4.95 kB
+build/client/assets/magic-string.es-iWjI7MnY.js                           17.99 kB │ gzip:   5.59 kB
+build/client/assets/KanbanView-BWSzxFD1.js                                18.05 kB │ gzip:   6.78 kB
+build/client/assets/virtual-Bv7_2eIY.js                                   18.10 kB │ gzip:   5.56 kB
+build/client/assets/AdminLayout-9vk1sLnv.js                               18.11 kB │ gzip:   6.34 kB
+build/client/assets/AddressField-3gA2PdCV.js                              18.23 kB │ gzip:   5.24 kB
+build/client/assets/_pluginId-C1h0XRLT.js                                 18.26 kB │ gzip:   5.51 kB
+build/client/assets/_sequenceId-DycWFb9E.js                               18.64 kB │ gzip:   4.38 kB
+build/client/assets/index-CRQ8dEwL.js                                     19.09 kB │ gzip:   5.88 kB
+build/client/assets/ConditionBuilder-DfOF9T-L.js                          19.73 kB │ gzip:   6.80 kB
+build/client/assets/SmartWordCloudChart-DN5GiySt.js                       20.01 kB │ gzip:   7.99 kB
+build/client/assets/my-profile-B1DaT-ab.js                                20.14 kB │ gzip:   6.40 kB
+build/client/assets/OpenApiQueryPublicationEditor-QdOHsUSU.js             20.80 kB │ gzip:   7.29 kB
+build/client/assets/AuraBotProvider-Coo8qEr5.js                           20.98 kB │ gzip:   6.08 kB
+build/client/assets/promotions-Ch6n6mZg.js                                21.27 kB │ gzip:   6.08 kB
+build/client/assets/index-DBA8kDbR.js                                     21.28 kB │ gzip:   5.29 kB
+build/client/assets/environments-CPfFL2dn.js                              21.69 kB │ gzip:   5.05 kB
+build/client/assets/DecisionRolloutMonitor-BOtxiwYE.js                    22.01 kB │ gzip:   7.29 kB
+build/client/assets/QueryBuilder-Bd8o4NxI.js                              22.32 kB │ gzip:   5.88 kB
+build/client/assets/dmnDownload-CPfwZQy3.js                               22.44 kB │ gzip:   6.91 kB
+build/client/assets/cloud-config-core-DW2xsGvE.js                         23.13 kB │ gzip:   6.97 kB
+build/client/assets/index-D05P0mAX.js                                     23.32 kB │ gzip:   6.46 kB
+build/client/assets/member-detail-yGC8RoT2.js                             23.36 kB │ gzip:   7.73 kB
+build/client/assets/usePageRuntime-DMBL-NrP.js                            23.46 kB │ gzip:   7.34 kB
+build/client/assets/TableBlockRenderer-BT7D-fFf.js                        23.49 kB │ gzip:   8.63 kB
+build/client/assets/vendor-virtual-CqqJ4xd6.js                            23.58 kB │ gzip:   7.32 kB
+build/client/assets/memory-promotions-BCj6w4Xp.js                         24.11 kB │ gzip:   7.16 kB
+build/client/assets/OpenApiPublicationEditor-BghnMFHg.js                  24.34 kB │ gzip:   8.63 kB
+build/client/assets/AuthAppearanceEditor-BFT-MGrp.js                      24.51 kB │ gzip:   8.53 kB
+build/client/assets/versioning-CnyWAHQN.js                                24.75 kB │ gzip:   8.46 kB
+build/client/assets/ConditionFragmentLibraryBlock-Dveskh1H.js             24.81 kB │ gzip:   7.35 kB
+build/client/assets/providers-D8CxSMbO.js                                 25.66 kB │ gzip:   6.66 kB
+build/client/assets/AgentCreateWizard-B8odOhCT.js                         25.78 kB │ gzip:   7.08 kB
+build/client/assets/entitlements-CQXKiong.js                              25.81 kB │ gzip:   5.26 kB
+build/client/assets/es2015-BsF3iBY2.js                                    26.42 kB │ gzip:   9.60 kB
+build/client/assets/_traceId-DaJplmRQ.js                                  28.00 kB │ gzip:   7.02 kB
+build/client/assets/root-Ml4tcMJX.js                                      29.16 kB │ gzip:  10.92 kB
+build/client/assets/TenantSelection-CkKjjf73.js                           29.37 kB │ gzip:   7.84 kB
+build/client/assets/runs-B9OHau7o.js                                      29.69 kB │ gzip:   8.09 kB
+build/client/assets/purify.es-b5pzB0FB.js                                 30.07 kB │ gzip:  11.63 kB
+build/client/assets/GerberViewerBlockRenderer-BqvSYWRm.js                 30.14 kB │ gzip:  10.57 kB
+build/client/assets/knowledge._kbPid-CHeDlsHu.js                          30.16 kB │ gzip:   7.44 kB
+build/client/assets/authoringRecoveryPolicy-DaPHO1-r.js                   30.50 kB │ gzip:  10.62 kB
+build/client/assets/index-RaLyihFU.js                                     32.02 kB │ gzip:   8.06 kB
+build/client/assets/automations-BIqkZNvb.js                               32.26 kB │ gzip:   9.29 kB
+build/client/assets/ResultContractView-BaY4GXlk.js                        32.74 kB │ gzip:  10.84 kB
+build/client/assets/boot-plugins-DagCbyjg.js                              33.32 kB │ gzip:   8.69 kB
+build/client/assets/dist-BgC6Y1gK.js                                      33.49 kB │ gzip:   9.56 kB
+build/client/assets/Select-ffC7x9BI.js                                    33.83 kB │ gzip:  10.95 kB
+build/client/assets/agent-runs-CimnJSFy.js                                35.58 kB │ gzip:   8.60 kB
+build/client/assets/dist-CXWUohoe.js                                      36.17 kB │ gzip:  11.43 kB
+build/client/assets/ReportPageContent-DiirldSY.js                         36.18 kB │ gzip:   9.91 kB
+build/client/assets/SubTableViewer-CxMWRti_.js                            36.32 kB │ gzip:  11.83 kB
+build/client/assets/Login-BFoGvF-3.js                                     36.47 kB │ gzip:  11.06 kB
+build/client/assets/DecisionRuleBindingBlock.test-DmYeadqP.js             36.57 kB │ gzip:   6.45 kB
+build/client/assets/index-BqMS2PjS.js                                     37.92 kB │ gzip:   8.98 kB
+build/client/assets/init-CWy8tbgS.js                                      42.67 kB │ gzip:   8.49 kB
+build/client/assets/ExecutionLogTraceBlock-CGmBlqHi.js                    42.80 kB │ gzip:  12.22 kB
+build/client/assets/ExecutionLogTraceBlock.test-BIsOfSaf.js               43.55 kB │ gzip:   7.57 kB
+build/client/assets/DecisionRuleBindingBlock-D5n0H7KE.js                  43.85 kB │ gzip:  12.47 kB
+build/client/assets/SharedChartFactory-Byh9ho9O.js                        43.97 kB │ gzip:  12.78 kB
+build/client/assets/index-BCaTa-pZ.js                                     44.37 kB │ gzip:  12.02 kB
+build/client/assets/index-RzTUk8h12.js                                    45.09 kB │ gzip:   9.00 kB
+build/client/assets/AutomationEditPageImpl-CFREIJ46.js                    45.94 kB │ gzip:  12.15 kB
+build/client/assets/designer-oBiBn_5-.js                                  46.18 kB │ gzip:  15.06 kB
+build/client/assets/api-docs-CCRjBwZP.js                                  46.83 kB │ gzip:  11.09 kB
+build/client/assets/useDebouncedValue-ByzzTTWV.js                         47.76 kB │ gzip:  13.76 kB
+build/client/assets/AuraBotPanel-BwB7dS-Q.js                              48.99 kB │ gzip:  13.87 kB
+build/client/assets/nodes-DzU2w21f.js                                     49.29 kB │ gzip:  12.76 kB
+build/client/assets/Header-BM65WhrO.js                                    50.01 kB │ gzip:  13.47 kB
+build/client/assets/ComponentLoader-CqQEWc83.js                           51.12 kB │ gzip:  11.11 kB
+build/client/assets/vendor-charts-DJJKa8ne.js                             52.17 kB │ gzip:  17.77 kB
+build/client/assets/select--Y6kfoFe.js                                    52.48 kB │ gzip:  18.61 kB
+build/client/assets/useActionHandler-C8lvvTP-.js                          53.57 kB │ gzip:  17.65 kB
+build/client/assets/_pid-BCLQ7jt9.js                                      53.92 kB │ gzip:  11.94 kB
+build/client/assets/CommandActionService-gKemGsrZ.js                      56.61 kB │ gzip:  13.44 kB
+build/client/assets/defaultTestSamples-CGW246Vm.js                        58.42 kB │ gzip:  17.96 kB
+build/client/assets/vendor-dnd-kit-KjgJuxzm.js                            61.95 kB │ gzip:  20.70 kB
+build/client/assets/document-upload-Ca24kGio.js                           66.23 kB │ gzip:  24.52 kB
+build/client/assets/SchemaBlockConfigPanel-C_vnXpta.js                    69.17 kB │ gzip:  20.74 kB
+build/client/assets/FormPageContent-BaqexgYr.js                           70.92 kB │ gzip:  23.79 kB
+build/client/assets/DynamicPageRenderer-BABgSIjB.js                       75.14 kB │ gzip:  23.75 kB
+build/client/assets/AgentDetailTabs-B_JaN-cI.js                           75.49 kB │ gzip:  14.77 kB
+build/client/assets/ReviewDrawerBlockRenderer-UUQstDh4.js                 77.53 kB │ gzip:  20.96 kB
+build/client/assets/DecisionOpsConsolePage-BtLAgzbo.js                    81.27 kB │ gzip:  23.67 kB
+build/client/assets/DashboardViewer-DfdlN2CM.js                           84.54 kB │ gzip:  26.94 kB
+build/client/assets/components-CelEK_m3.js                                87.30 kB │ gzip:  19.29 kB
+build/client/assets/PermissionManagement-DrmCNN8m.js                      89.08 kB │ gzip:  23.11 kB
+build/client/assets/i18n-renderer-DaBSZK1A.js                            103.92 kB │ gzip:  31.21 kB
+build/client/assets/projects._projectId-Jw6pYC7I.js                      109.73 kB │ gzip:  23.19 kB
+build/client/assets/DetailPageContent-C-8dsUcW.js                        113.12 kB │ gzip:  33.07 kB
+build/client/assets/module-D0FQjU9F.js                                   117.11 kB │ gzip:  27.79 kB
+build/client/assets/style-DH2VFTcB.js                                    123.61 kB │ gzip:  40.34 kB
+build/client/assets/chunk-62JRHF6Z-B3QEc_XP.js                           127.40 kB │ gzip:  43.20 kB
+build/client/assets/bootstrap-DCkTLqDG.js                                148.23 kB │ gzip:  46.19 kB
+build/client/assets/index.es-BPo84nMx.js                                 153.19 kB │ gzip:  50.55 kB
+build/client/assets/report-designer-BUy6JxSP.js                          155.94 kB │ gzip:  32.74 kB
+build/client/assets/ReviewSection-CYe2HttG.js                            167.79 kB │ gzip:  51.79 kB
+build/client/assets/_pid-CJjMz-aq.js                                     173.48 kB │ gzip:  40.44 kB
+build/client/assets/client-Bdp3vz_D.js                                   179.87 kB │ gzip:  57.28 kB
+build/client/assets/vendor-html2canvas-5Pjrx37B.js                       201.05 kB │ gzip:  47.70 kB
+build/client/assets/CalendarView-hWU4rui4.js                             272.28 kB │ gzip:  80.80 kB
+build/client/assets/ListPageContent-yLQ7hXFL.js                          281.77 kB │ gzip:  79.01 kB
+build/client/assets/unified-designer-Boa-_gRx.js                         331.82 kB │ gzip:  87.31 kB
+build/client/assets/dist-B1Cbf7ZM.js                                     398.36 kB │ gzip: 128.43 kB
+build/client/assets/vendor-jspdf-D7NOIPLd.js                             412.52 kB │ gzip: 135.30 kB
+build/client/assets/PageDesignerEditorImpl-DU4W8KZT.js                   436.17 kB │ gzip:  99.79 kB
+build/client/assets/test.DNmyFkvJ-j1nMZnxC.js                            444.54 kB │ gzip: 117.81 kB
+build/client/assets/xlsx-C47sfIWZ.js                                     500.18 kB │ gzip: 164.38 kB
+build/client/assets/lucide-react-CQiu1mXK.js                             621.88 kB │ gzip: 164.39 kB
+build/client/assets/EChartsHost-hoxLr4kq.js                            1,140.48 kB │ gzip: 386.33 kB
+
+[INVALID_ANNOTATION] A comment "/*#__PURE__*/" in "../node_modules/.pnpm/gantt-task-react@0.3.9_react@19.2.6/node_modules/gantt-task-react/dist/index.modern.js" contains an annotation that Rolldown cannot interpret due to the position of the comment.
+      ╭─[ ../node_modules/.pnpm/gantt-task-react@0.3.9_react@19.2.6/node_modules/gantt-task-react/dist/index.modern.js:1012:25 ]
+      │
+ 1012 │ const _iteratorSymbol = /*#__PURE__*/ typeof Symbol !== "undefined" ? (Symbol.iterator || (Symbol.iterator = Symbol("Symbol.iterator"))) : "@@iterator";
+      │                         ──────┬──────
+      │                               ╰──────── comment ignored due to position
+      │
+      │ Help: For more information on how to use pure annotations correctly, check the documentation: https://rolldown.rs/in-depth/dead-code-elimination#pure
+──────╯
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[INVALID_ANNOTATION] A comment "/*#__PURE__*/" in "../node_modules/.pnpm/gantt-task-react@0.3.9_react@19.2.6/node_modules/gantt-task-react/dist/index.modern.js" contains an annotation that Rolldown cannot interpret due to the position of the comment.
+      ╭─[ ../node_modules/.pnpm/gantt-task-react@0.3.9_react@19.2.6/node_modules/gantt-task-react/dist/index.modern.js:1014:30 ]
+      │
+ 1014 │ const _asyncIteratorSymbol = /*#__PURE__*/ typeof Symbol !== "undefined" ? (Symbol.asyncIterator || (Symbol.asyncIterator = Symbol("Symbol.asyncIterator"))) : "@@asyncIterator";
+      │                              ──────┬──────
+      │                                    ╰──────── comment ignored due to position
+      │
+      │ Help: For more information on how to use pure annotations correctly, check the documentation: https://rolldown.rs/in-depth/dead-code-elimination#pure
+──────╯
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/ui/smart/form/Input.tsx is dynamically imported by app/framework/meta/rendering/components/runtime-component-loaders.ts but also statically imported by app/framework/meta/rendering/components/ComponentLoader.tsx, app/plugins/core-designer/components/studio/workbench/panels/properties/InputPropertyPanel.tsx, app/ui/smart/layout/Form.tsx, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/ui/smart/form/NumberInput.tsx is dynamically imported by app/framework/meta/rendering/components/runtime-component-loaders.ts but also statically imported by app/framework/meta/rendering/components/ComponentLoader.tsx, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/ui/smart/datetime/DatePicker.tsx is dynamically imported by app/framework/meta/rendering/components/runtime-component-loaders.ts but also statically imported by app/framework/meta/rendering/components/ComponentLoader.tsx, app/ui/shared/RecordShareDialog.tsx, app/ui/smart/layout/Form.tsx, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/ui/smart/form/Switch.tsx is dynamically imported by app/framework/meta/rendering/components/runtime-component-loaders.ts but also statically imported by app/framework/meta/rendering/components/ComponentLoader.tsx, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/ui/smart/form/Textarea.tsx is dynamically imported by app/framework/meta/rendering/components/runtime-component-loaders.ts but also statically imported by app/framework/meta/rendering/components/ComponentLoader.tsx, app/ui/smart/layout/Form.tsx, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/ui/smart/form/JsonEditor.tsx is dynamically imported by app/framework/meta/rendering/components/runtime-component-loaders.ts but also statically imported by app/framework/meta/rendering/components/ComponentLoader.tsx, app/ui/smart/form/__tests__/JsonEditor.test.tsx, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/framework/meta/runtime/actions/ActionRegistry.ts is dynamically imported by app/framework/meta/hooks/useActionHandler.ts, app/framework/meta/rendering/blocks/workbenchBlockUtils.ts but also statically imported by app/framework/meta/hooks/executeRegistryAction.ts, app/framework/meta/hooks/useActionHandler.ts, app/framework/meta/rendering/blocks/SubTableViewer.tsx, app/framework/meta/rendering/pages/ListPageContent.tsx, app/framework/meta/runtime/schema-runtime.ts, dynamic import will not move module into another chunk.
+
+[PLUGIN_TIMINGS] Your build spent significant time in plugins. Here is a breakdown:
+  - react-router:dot-server (36%)
+  - react-router:virtual-modules (35%)
+  - vite-tsconfig-paths (9%)
+  - react-router:inject-hmr-runtime (6%)
+  - react-router (3%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+
+✓ built in 4.95s
+  ⚠️  Future Flag Warning: Route module splitting behavior is changing in React Router v8.
+     You can use the `future.v8_splitRouteModules` flag to opt in early.
+     -> https://reactrouter.com/v7/upgrading/future#futurev8_splitroutemodules
+  ⚠️  Future Flag Warning: Vite Environment API usage is changing in React Router v8.
+     You can use the `future.v8_viteEnvironmentApi` flag to opt in early.
+     -> https://reactrouter.com/v7/upgrading/future#futurev8_viteenvironmentapi
+  ⚠️  Future Flag Warning: Request handling behavior is changing in React Router v8.
+     You can use the `future.v8_passThroughRequests` flag to opt in early.
+     -> https://reactrouter.com/v7/upgrading/future#futurev8_passthroughrequests
+  ⚠️  Future Flag Warning: Data request URL formats are changing in React Router v8.
+     You can use the `future.v8_trailingSlashAwareDataRequests` flag to opt in early.
+     -> https://reactrouter.com/v7/upgrading/future#futurev8_trailingslashawaredatarequests
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+vite v8.0.16 building ssr environment for production...
+
+transforming...✓ 1604 modules transformed.
+rendering chunks...
+
+✓ 11 assets cleaned from React Router server build.
+build/client/assets/AuthAppearanceShell-DApoux-u.css
+build/client/assets/DashboardViewer-Lji8bJta.css
+build/client/assets/style-CK1-TTF3.css
+build/server/assets/AuthAppearanceShell-DApoux-u.css
+build/server/assets/GanttView-5lpMX5As.css
+build/server/assets/DashboardViewer-Lji8bJta.css
+build/server/assets/style-CK1-TTF3.css
+build/server/assets/style-CK1-TTF3.css
+build/server/assets/style-CK1-TTF3.css
+build/server/assets/server-build-DSn8H9IH.css
+build/server/assets/PageDesignerEditorImpl-Bxk-9fU7.css
+✓ 1 asset moved from React Router server build to client assets.
+build/client/assets/GanttView-5lpMX5As.css
+
+computing gzip size...
+build/server/.vite/manifest.json                                       123.46 kB │ gzip:  16.33 kB
+build/server/assets/PageDesignerEditorImpl-Bxk-9fU7.css                  1.33 kB │ gzip:   0.41 kB
+build/server/assets/GanttView-5lpMX5As.css                               3.29 kB │ gzip:   1.06 kB
+build/server/assets/DashboardViewer-Lji8bJta.css                         3.61 kB │ gzip:   0.95 kB
+build/server/assets/AuthAppearanceShell-DApoux-u.css                     4.73 kB │ gzip:   1.37 kB
+build/server/assets/style-CK1-TTF3.css                                  15.27 kB │ gzip:   2.54 kB
+build/server/assets/server-build-DSn8H9IH.css                          484.38 kB │ gzip:  64.41 kB
+build/server/assets/http-client-BvRk9kiK.js                              0.00 kB │ gzip:   0.02 kB
+build/server/assets/cn-D_Lv0cNl.js                                       0.06 kB │ gzip:   0.08 kB
+build/server/assets/bootstrap-9PNUcBP8.js                                0.06 kB │ gzip:   0.08 kB
+build/server/assets/Modal-DBQvQ5Uj.js                                    0.07 kB │ gzip:   0.08 kB
+build/server/assets/Textarea-bg5nGqsT.js                                 0.07 kB │ gzip:   0.08 kB
+build/server/assets/ComponentLoader-Mz7S5d5i.js                          0.07 kB │ gzip:   0.07 kB
+build/server/assets/Switch-DNB7Mnim.js                                   0.07 kB │ gzip:   0.08 kB
+build/server/assets/KanbanView-BwALrb51.js                               0.07 kB │ gzip:   0.08 kB
+build/server/assets/SmartImage-s0UNoNi0.js                               0.07 kB │ gzip:   0.08 kB
+build/server/assets/FormView-Bk6rJ1lQ.js                                 0.07 kB │ gzip:   0.08 kB
+build/server/assets/TreeView-B0B6LZa8.js                                 0.07 kB │ gzip:   0.08 kB
+build/server/assets/GanttView-DgX5bDDX.js                                0.08 kB │ gzip:   0.08 kB
+build/server/assets/ReportPageContent-CYA5jOTS.js                        0.08 kB │ gzip:   0.08 kB
+build/server/assets/SmartMapChart-kv1-wwoE.js                            0.08 kB │ gzip:   0.08 kB
+build/server/assets/SmartProgress-DAHUC0Wq.js                            0.08 kB │ gzip:   0.08 kB
+build/server/assets/GalleryView-CkIV4XUr.js                              0.08 kB │ gzip:   0.08 kB
+build/server/assets/NumberInput-CDgS_US0.js                              0.08 kB │ gzip:   0.08 kB
+build/server/assets/SmartIframe-BSRpScZy.js                              0.08 kB │ gzip:   0.08 kB
+build/server/assets/SmartFilterBar-DBhcMvs_.js                           0.08 kB │ gzip:   0.08 kB
+build/server/assets/CalendarView-D2sujuvh.js                             0.08 kB │ gzip:   0.08 kB
+build/server/assets/MemberPicker-CHMwSqad.js                             0.08 kB │ gzip:   0.08 kB
+build/server/assets/TimelineView-DEncNQEi.js                             0.08 kB │ gzip:   0.08 kB
+build/server/assets/SmartGaugeChart-BO7MkTAy.js                          0.08 kB │ gzip:   0.08 kB
+build/server/assets/SmartTableChart-lQEmmUuc.js                          0.08 kB │ gzip:   0.08 kB
+build/server/assets/SmartBarChart-vc9g_eZb.js                            0.08 kB │ gzip:   0.09 kB
+build/server/assets/SmartCalendar-CHj99fSj.js                            0.08 kB │ gzip:   0.09 kB
+build/server/assets/SmartPieChart-mhtRlLsI.js                            0.08 kB │ gzip:   0.09 kB
+build/server/assets/SmartRichText-BTzZD4v1.js                            0.08 kB │ gzip:   0.09 kB
+build/server/assets/SmartSPCChart-D5TCxNKX.js                            0.08 kB │ gzip:   0.09 kB
+build/server/assets/SmartAreaChart-DlpnLthd.js                           0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartCountdown-CIH7ag8I.js                           0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartLineChart-BqrkJkV8.js                           0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartHeatmapChart-B7zVBkZR.js                        0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartGanttChart-CKyuVozr.js                          0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartNumberCard-CWMu9r7J.js                          0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartRadarChart-BWiLG5-I.js                          0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartFunnelChart--qjn-U0X.js                         0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartLeaderboard-Dodo8EPd.js                         0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartParetoChart-DpUMKhd7.js                         0.09 kB │ gzip:   0.09 kB
+build/server/assets/clientErrorReporter-lF-26rib.js                      0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartWaterfallChart-CJfs4URC.js                      0.09 kB │ gzip:   0.09 kB
+build/server/assets/root-data-C7GmJdrn.js                                0.09 kB │ gzip:   0.10 kB
+build/server/assets/SmartScatterChart-Hz4gf8ut.js                        0.09 kB │ gzip:   0.09 kB
+build/server/assets/SmartTreemapChart-BBYUZiKI.js                        0.09 kB │ gzip:   0.09 kB
+build/server/assets/Input-2oF4z-0U.js                                    0.09 kB │ gzip:   0.09 kB
+build/server/assets/ExecutionLogTraceBlock-DB8Dy1Tz.js                   0.10 kB │ gzip:   0.09 kB
+build/server/assets/DecisionRuleBindingBlock-C5RI_-N7.js                 0.11 kB │ gzip:   0.10 kB
+build/server/assets/DatePicker-BPGN8QCw.js                               0.11 kB │ gzip:   0.10 kB
+build/server/assets/Select-CgBzkIwE.js                                   0.13 kB │ gzip:   0.12 kB
+build/server/assets/confirmDialog-C9caupaB.js                            0.13 kB │ gzip:   0.12 kB
+build/server/assets/ActionRegistry-BltsRZXy.js                           0.14 kB │ gzip:   0.13 kB
+build/server/assets/http-client-BVuc_UOJ.js                              0.14 kB │ gzip:   0.14 kB
+build/server/assets/JsonEditor-BkhskEnY.js                               0.15 kB │ gzip:   0.12 kB
+build/server/assets/PublicationControls-BDMYxTSQ.js                      0.15 kB │ gzip:   0.12 kB
+build/server/assets/deriveTestId-Oc4q4xDu.js                             0.16 kB │ gzip:   0.13 kB
+build/server/assets/contributed-components-DU9Equ_t.js                   0.17 kB │ gzip:   0.13 kB
+build/server/assets/chartLabels-Cno19gnI.js                              0.18 kB │ gzip:   0.15 kB
+build/server/assets/types-gRpMTMGB.js                                    0.21 kB │ gzip:   0.18 kB
+build/server/assets/use-contribution-D6whqZ-q.js                         0.22 kB │ gzip:   0.17 kB
+build/server/assets/field-action-group-BoxUoZ_E.js                       0.25 kB │ gzip:   0.20 kB
+build/server/assets/drillDownFilters-P2rC75f6.js                         0.26 kB │ gzip:   0.21 kB
+build/server/assets/queryBuilderService-BYwl47gw.js                      0.27 kB │ gzip:   0.18 kB
+build/server/assets/createFieldRenderer-B2MeWMLr.js                      0.28 kB │ gzip:   0.22 kB
+build/server/assets/visibleWhen-DHZwcYJA.js                              0.28 kB │ gzip:   0.22 kB
+build/server/assets/useSmartFieldMeta-D2r0DGzv.js                        0.29 kB │ gzip:   0.23 kB
+build/server/assets/publicRecordId-BCdxfimC.js                           0.29 kB │ gzip:   0.19 kB
+build/server/assets/BomUploadReview-B1_xr0M5.js                          0.33 kB │ gzip:   0.22 kB
+build/server/assets/LoadingSpinner-CWJT679O.js                           0.34 kB │ gzip:   0.23 kB
+build/server/assets/WorkspacePageLayout-ByIrU8iO.js                      0.35 kB │ gzip:   0.20 kB
+build/server/assets/Spin-B3gM819g.js                                     0.38 kB │ gzip:   0.27 kB
+build/server/assets/I18nText-Dri1NULT.js                                 0.39 kB │ gzip:   0.27 kB
+build/server/assets/domProps-CpJ0YzPf.js                                 0.41 kB │ gzip:   0.29 kB
+build/server/assets/textarea-3zNWRnWs.js                                 0.44 kB │ gzip:   0.31 kB
+build/server/assets/types-DjYNYm3o.js                                    0.44 kB │ gzip:   0.31 kB
+build/server/assets/avatar-utils-Dy0D91I0.js                             0.45 kB │ gzip:   0.30 kB
+build/server/assets/label-BRerBxil.js                                    0.45 kB │ gzip:   0.30 kB
+build/server/assets/field-control-DwzbDVGD.js                            0.46 kB │ gzip:   0.32 kB
+build/server/assets/input-BwQMOUmW.js                                    0.46 kB │ gzip:   0.31 kB
+build/server/assets/ErrorAlert-CV1-Z8f8.js                               0.46 kB │ gzip:   0.33 kB
+build/server/assets/useSmartFieldContract-CBW3xGzg.js                    0.46 kB │ gzip:   0.30 kB
+build/server/assets/FlowDesigner-C_B6OyET.js                             0.48 kB │ gzip:   0.34 kB
+build/server/assets/Tag-BySHKa2o.js                                      0.50 kB │ gzip:   0.31 kB
+build/server/assets/chartDataService-Ds__FqG1.js                         0.52 kB │ gzip:   0.30 kB
+build/server/assets/i18n-CQQ7EYev.js                                     0.55 kB │ gzip:   0.33 kB
+build/server/assets/RichTextBlockRenderer-B1UE3MTG.js                    0.57 kB │ gzip:   0.39 kB
+build/server/assets/DescriptionBlockRenderer-D07-HsnK.js                 0.59 kB │ gzip:   0.40 kB
+build/server/assets/i18n-renderer-tJOd_Khz.js                            0.61 kB │ gzip:   0.40 kB
+build/server/assets/useDictTree-DIpz8oxU.js                              0.63 kB │ gzip:   0.40 kB
+build/server/assets/Datetime.readonly.test-BGUDeCrD.js                   0.63 kB │ gzip:   0.41 kB
+build/server/assets/LoadingOverlay-CT4yLZJ7.js                           0.63 kB │ gzip:   0.43 kB
+build/server/assets/DemoPage-6t_CXy5o.js                                 0.67 kB │ gzip:   0.38 kB
+build/server/assets/MoneyInput.test-O0ElS5I7.js                          0.70 kB │ gzip:   0.43 kB
+build/server/assets/eventPolicyFormText-BkqNccRC.js                      0.71 kB │ gzip:   0.46 kB
+build/server/assets/i18nFieldHelper-DKOCL42O.js                          0.71 kB │ gzip:   0.43 kB
+build/server/assets/DecisionRolloutMonitorBlock-9oT2YScv.js              0.72 kB │ gzip:   0.38 kB
+build/server/assets/AutoSaveIndicator-Cz2H7SOL.js                        0.73 kB │ gzip:   0.38 kB
+build/server/assets/field-action-button-BIyiaHZd.js                      0.77 kB │ gzip:   0.45 kB
+build/server/assets/dateTimeFormatService-Dzb2-UYE.js                    0.78 kB │ gzip:   0.42 kB
+build/server/assets/ReportPageSkeleton-DvFr1zQh.js                       0.79 kB │ gzip:   0.31 kB
+build/server/assets/DataLimitBanner-DETUMx8R.js                          0.79 kB │ gzip:   0.53 kB
+build/server/assets/field-styles-B6hO33YQ.js                             0.80 kB │ gzip:   0.36 kB
+build/server/assets/Modal-DwQittZS.js                                    0.80 kB │ gzip:   0.43 kB
+build/server/assets/DividerBlockRenderer-XWSRc3oY.js                     0.84 kB │ gzip:   0.44 kB
+build/server/assets/useDictCache-BLT8XYxF.js                             0.87 kB │ gzip:   0.54 kB
+build/server/assets/FormBlockRenderer-Whdr1Lf7.js                        0.88 kB │ gzip:   0.54 kB
+build/server/assets/contributed-components-80pG_nEZ.js                   0.89 kB │ gzip:   0.53 kB
+build/server/assets/statusLabels-Nt1nnjev.js                             0.95 kB │ gzip:   0.62 kB
+build/server/assets/useTreeData-Dca2tP6z.js                              0.96 kB │ gzip:   0.55 kB
+build/server/assets/sanitizeHtml-C3ri8vAj.js                             1.00 kB │ gzip:   0.58 kB
+build/server/assets/SmartIframe-giiDSMMQ.js                              1.01 kB │ gzip:   0.53 kB
+build/server/assets/type-BeSj-euE.js                                     1.04 kB │ gzip:   0.48 kB
+build/server/assets/useListUrlState-BklQiEjh.js                          1.04 kB │ gzip:   0.55 kB
+build/server/assets/teamService-Cubkbk5i.js                              1.06 kB │ gzip:   0.39 kB
+build/server/assets/FileAttachmentField.test-DD4YX9Pk.js                 1.06 kB │ gzip:   0.52 kB
+build/server/assets/SmartMapChart-Caq88uiO.js                            1.12 kB │ gzip:   0.74 kB
+build/server/assets/FieldListSchemaContext-VLXJdxru.js                   1.13 kB │ gzip:   0.52 kB
+build/server/assets/dndUtils-DONzxmaE.js                                 1.15 kB │ gzip:   0.64 kB
+build/server/assets/TabsBlockRenderer-CLyV73Y2.js                        1.15 kB │ gzip:   0.68 kB
+build/server/assets/decisionOutputSchema-BAoc8QrE.js                     1.18 kB │ gzip:   0.50 kB
+build/server/assets/SubformBlockRenderer-BDEQw78q.js                     1.18 kB │ gzip:   0.66 kB
+build/server/assets/useModelCapabilities-Df8Ge1rJ.js                     1.18 kB │ gzip:   0.73 kB
+build/server/assets/EChartsHost-CUBGvH0r.js                              1.22 kB │ gzip:   0.65 kB
+build/server/assets/Display-DPftycIB.js                                  1.25 kB │ gzip:   0.64 kB
+build/server/assets/SmartImage-D76crZu8.js                               1.29 kB │ gzip:   0.61 kB
+build/server/assets/EmbeddedListBlockRenderer-CUx1Zxeo.js                1.30 kB │ gzip:   0.72 kB
+build/server/assets/ProgressField-DZ6Gpdrn.js                            1.36 kB │ gzip:   0.65 kB
+build/server/assets/RatingField-tQmTsBK2.js                              1.37 kB │ gzip:   0.84 kB
+build/server/assets/OwnerSelect.test-N-BZp2u7.js                         1.40 kB │ gzip:   0.66 kB
+build/server/assets/SelectionInfoBlockRenderer-C4G1g8Lv.js               1.44 kB │ gzip:   0.70 kB
+build/server/assets/JsonEditor.test-CohUEjFu.js                          1.47 kB │ gzip:   0.74 kB
+build/server/assets/ImpactGraphPanel-DaubeKlt.js                         1.48 kB │ gzip:   0.58 kB
+build/server/assets/SmartRichText-DveUa1Xf.js                            1.50 kB │ gzip:   0.77 kB
+build/server/assets/actionSchemaFields-B95dW7-_.js                       1.51 kB │ gzip:   0.66 kB
+build/server/assets/open-api-publications-BXQg1N1v.js                    1.58 kB │ gzip:   0.62 kB
+build/server/assets/TimezoneContext-CPjMcHjG.js                          1.60 kB │ gzip:   0.84 kB
+build/server/assets/clientErrorReporter-D6XNeFJ6.js                      1.61 kB │ gzip:   0.78 kB
+build/server/assets/field-base-9JfL8cfO.js                               1.61 kB │ gzip:   0.70 kB
+build/server/assets/StatCardBlockRenderer-Ru8EXR6P.js                    1.65 kB │ gzip:   0.87 kB
+build/server/assets/icon-resolver-75Q9BfS5.js                            1.66 kB │ gzip:   0.89 kB
+build/server/assets/i18nResolver-fvuRJ3YA.js                             1.66 kB │ gzip:   0.92 kB
+build/server/assets/statusTone-CkLKG3DE.js                               1.76 kB │ gzip:   0.95 kB
+build/server/assets/RecordInspectorBlockRenderer-B7_U8Yq-.js             1.77 kB │ gzip:   0.88 kB
+build/server/assets/Select.create.test-qlVYhAs6.js                       1.84 kB │ gzip:   0.73 kB
+build/server/assets/Button-DAABLvBl.js                                   1.87 kB │ gzip:   0.97 kB
+build/server/assets/I18nTextInput-BycERwiV.js                            1.91 kB │ gzip:   1.06 kB
+build/server/assets/Textarea-0-nZgtBE.js                                 1.91 kB │ gzip:   0.99 kB
+build/server/assets/reportDesignerService-BPUeV8LE.js                    2.00 kB │ gzip:   0.68 kB
+build/server/assets/DslFormFillContext-CY7koJE0.js                       2.02 kB │ gzip:   0.98 kB
+build/server/assets/DynamicPageUnavailable-C4lXmwVS.js                   2.05 kB │ gzip:   1.13 kB
+build/server/assets/PublicationControls-DvFNT5E7.js                      2.14 kB │ gzip:   1.14 kB
+build/server/assets/FormButtonsBlockRenderer-CGxfgzRl.js                 2.14 kB │ gzip:   1.12 kB
+build/server/assets/ColorPickerField-M2OCT82k.js                         2.17 kB │ gzip:   0.96 kB
+build/server/assets/Checkbox-XmiDOdmt.js                                 2.18 kB │ gzip:   1.09 kB
+build/server/assets/displayLabels-BWeBaZ2X.js                            2.24 kB │ gzip:   1.32 kB
+build/server/assets/actionAvailability-D6oKA8S9.js                       2.25 kB │ gzip:   0.92 kB
+build/server/assets/RepeaterBlockRenderer-DFpzgOJx.js                    2.28 kB │ gzip:   1.08 kB
+build/server/assets/MemberPicker.test-Cntg8W-J.js                        2.32 kB │ gzip:   0.97 kB
+build/server/assets/TimePicker-B4ztnEM1.js                               2.32 kB │ gzip:   1.14 kB
+build/server/assets/ExecutionLogTracePresentation.test-BneGE72c.js       2.33 kB │ gzip:   1.08 kB
+build/server/assets/Datetime-Ns5Yv5lY.js                                 2.34 kB │ gzip:   1.06 kB
+build/server/assets/DecisionIntegrationImpactBlock.test-BlZhgoJ6.js      2.40 kB │ gzip:   0.84 kB
+build/server/assets/dialog-Bf0MKqo6.js                                   2.40 kB │ gzip:   1.01 kB
+build/server/assets/Switch-CYf3ryzW.js                                   2.45 kB │ gzip:   1.18 kB
+build/server/assets/ToolbarBlockRenderer-Bq3BH51A.js                     2.50 kB │ gzip:   1.39 kB
+build/server/assets/factCatalogAdapter-CEj3VYaj.js                       2.50 kB │ gzip:   1.08 kB
+build/server/assets/AgentDetailTabs.schedules.test-BRRIq1YA.js           2.53 kB │ gzip:   1.15 kB
+build/server/assets/StageRailBlockRenderer-B9PEPJAn.js                   2.61 kB │ gzip:   1.23 kB
+build/server/assets/ArtifactTimelineBlockRenderer-DbCS0xnj.js            2.62 kB │ gzip:   1.08 kB
+build/server/assets/SmartCountdown-DaJVCEX1.js                           2.67 kB │ gzip:   1.04 kB
+build/server/assets/FormWizardBlockRenderer-U1SJ5mp6.js                  2.74 kB │ gzip:   1.16 kB
+build/server/assets/select-BTLPZIb3.js                                   2.83 kB │ gzip:   1.13 kB
+build/server/assets/I18nContext-Bwlneor1.js                              2.86 kB │ gzip:   1.50 kB
+build/server/assets/AiField.test-CRnqsJai.js                             2.86 kB │ gzip:   1.10 kB
+build/server/assets/SmartGaugeChart-CovNXLy2.js                          2.89 kB │ gzip:   1.29 kB
+build/server/assets/ImageDisplay-vEZfkCdk.js                             2.95 kB │ gzip:   1.46 kB
+build/server/assets/List-CImlXaET.js                                     2.98 kB │ gzip:   0.97 kB
+build/server/assets/AuthContext-CdgJJPnU.js                              3.06 kB │ gzip:   1.17 kB
+build/server/assets/SmartFunnelChart-Dbj4-XnC.js                         3.07 kB │ gzip:   1.35 kB
+build/server/assets/dynamicService-DhNQ9o_A.js                           3.11 kB │ gzip:   1.08 kB
+build/server/assets/SmartScatterChart-CO2Liahb.js                        3.14 kB │ gzip:   1.29 kB
+build/server/assets/ChartBlockRenderer-BRpQiyvb.js                       3.16 kB │ gzip:   1.42 kB
+build/server/assets/SmartTreemapChart-D55sCeIp.js                        3.17 kB │ gzip:   1.44 kB
+build/server/assets/EventPolicyActionsBlock.test-BisM7Ac5.js             3.22 kB │ gzip:   1.02 kB
+build/server/assets/SmartAreaChart-JTxco2o_.js                           3.24 kB │ gzip:   1.39 kB
+build/server/assets/SmartRadarChart-CB0RL_QI.js                          3.24 kB │ gzip:   1.41 kB
+build/server/assets/SmartFilterBar-C7aqGycl.js                           3.29 kB │ gzip:   1.25 kB
+build/server/assets/EventPolicyDesignerBlock-C-W3TOte.js                 3.30 kB │ gzip:   1.50 kB
+build/server/assets/OwnerSelect-B9aUzBU3.js                              3.30 kB │ gzip:   1.50 kB
+build/server/assets/SmartHeatmapChart-BsOlY-2B.js                        3.32 kB │ gzip:   1.53 kB
+build/server/assets/SmartBarChart-CAFrWWJ8.js                            3.33 kB │ gzip:   1.50 kB
+build/server/assets/ToastContext-Df6ami1s.js                             3.35 kB │ gzip:   1.63 kB
+build/server/assets/SmartLineChart-Bwvv1p0U.js                           3.37 kB │ gzip:   1.52 kB
+build/server/assets/ChartEmptyState-zEL2vdm7.js                          3.40 kB │ gzip:   1.51 kB
+build/server/assets/SmartProgress-BMKUzNXZ.js                            3.44 kB │ gzip:   1.43 kB
+build/server/assets/RelationField-t_yMdlx-.js                            3.53 kB │ gzip:   1.62 kB
+build/server/assets/TeamMembersBlock.test-DQRdGQqo.js                    3.57 kB │ gzip:   1.34 kB
+build/server/assets/SmartWordCloudChart-X7_j97aS.js                      3.58 kB │ gzip:   1.66 kB
+build/server/assets/SmartWaterfallChart-DbAZM7qz.js                      3.58 kB │ gzip:   1.62 kB
+build/server/assets/SmartLeaderboard-DZvPK9Oi.js                         3.60 kB │ gzip:   1.45 kB
+build/server/assets/SmartPieChart-2rpzflvD.js                            3.65 kB │ gzip:   1.73 kB
+build/server/assets/JsonEditor-CLCRlc0v.js                               3.69 kB │ gzip:   1.73 kB
+build/server/assets/FileAttachmentField-DsSRRP6m.js                      3.72 kB │ gzip:   1.93 kB
+build/server/assets/WorkspaceCells-w3w1dbt4.js                           3.74 kB │ gzip:   1.68 kB
+build/server/assets/NumberInput-C0T3YV8v.js                              3.76 kB │ gzip:   1.71 kB
+build/server/assets/MultiSelect-wXpMzHXJ.js                              3.78 kB │ gzip:   1.70 kB
+build/server/assets/SmartNpsChart-BBUGDybL.js                            3.80 kB │ gzip:   1.67 kB
+build/server/assets/expression-parser-DvQNiWvB.js                        3.80 kB │ gzip:   1.41 kB
+build/server/assets/FormSectionBlockRenderer-BgW7btQx.js                 3.81 kB │ gzip:   1.73 kB
+build/server/assets/CodeSnippetBlockRenderer-BU23N_1Q.js                 3.83 kB │ gzip:   1.64 kB
+build/server/assets/Layout-CeKebqyh.js                                   3.88 kB │ gzip:   1.62 kB
+build/server/assets/ProcessFeeRuleMatrixBlock.test-BMcU-wAI.js           3.89 kB │ gzip:   1.64 kB
+build/server/assets/SmartParetoChart-CWQuvd4u.js                         3.99 kB │ gzip:   1.88 kB
+build/server/assets/AgentChatEmbed-BHGlYIt_.js                           4.01 kB │ gzip:   1.56 kB
+build/server/assets/DateRange-PlRVc5z_.js                                4.01 kB │ gzip:   1.63 kB
+build/server/assets/FormView-BZ4IAjY-.js                                 4.03 kB │ gzip:   1.97 kB
+build/server/assets/SmartComboChart-BMo13phX.js                          4.06 kB │ gzip:   1.78 kB
+build/server/assets/ExportPdfButton-DCogHybl.js                          4.08 kB │ gzip:   1.90 kB
+build/server/assets/CalendarView-CR0ApStF.js                             4.10 kB │ gzip:   2.10 kB
+build/server/assets/AiFillBannerBlockRenderer-Bhn1OEeY.js                4.18 kB │ gzip:   1.94 kB
+build/server/assets/DecisionIntegrationImpactBlock-BQhAgs54.js           4.27 kB │ gzip:   1.84 kB
+build/server/assets/ViewDiagnostics-Ef7gSdw8.js                          4.36 kB │ gzip:   1.48 kB
+build/server/assets/ViewEmptyState-DzVx6am8.js                           4.37 kB │ gzip:   1.72 kB
+build/server/assets/SmartSPCChart-ovwVtgWk.js                            4.43 kB │ gzip:   1.97 kB
+build/server/assets/AgentDetailTabs.releases.test-C1DR37cr.js            4.49 kB │ gzip:   1.43 kB
+build/server/assets/useSmartComponent-CQDZ2Bqh.js                        4.53 kB │ gzip:   2.11 kB
+build/server/assets/DecisionTableWorkbenchBlock.test-D7FgVQaG.js         4.54 kB │ gzip:   1.63 kB
+build/server/assets/PublicValueSchemaEditor-S7HweD3f.js                  4.61 kB │ gzip:   1.92 kB
+build/server/assets/Select.test-r61qk7LQ.js                              4.64 kB │ gzip:   1.60 kB
+build/server/assets/Form-DZRuzpRb.js                                     4.67 kB │ gzip:   2.01 kB
+build/server/assets/SmartGallery-DHNvFMiR.js                             4.72 kB │ gzip:   1.91 kB
+build/server/assets/EventPolicyActionsBlock-b2bQZugh.js                  4.72 kB │ gzip:   1.77 kB
+build/server/assets/TreeView-CYWToKHO.js                                 4.73 kB │ gzip:   2.17 kB
+build/server/assets/MoneyInput-Bh8Vtdps.js                               4.76 kB │ gzip:   2.01 kB
+build/server/assets/CardGridBlockRenderer-h_AId36S.js                    4.81 kB │ gzip:   2.15 kB
+build/server/assets/SmartKanban-WZPi8-sc.js                              4.81 kB │ gzip:   1.82 kB
+build/server/assets/AgentToolPicker-CG85O9QD.js                          4.86 kB │ gzip:   2.07 kB
+build/server/assets/Input-D4uQ2gco.js                                    4.97 kB │ gzip:   1.83 kB
+build/server/assets/GuardrailsEditor-RY3dbcfp.js                         5.02 kB │ gzip:   1.99 kB
+build/server/assets/FiltersBlockRenderer-B7rLhHjj.js                     5.06 kB │ gzip:   2.20 kB
+build/server/assets/Radio-ECdS6j1q.js                                    5.19 kB │ gzip:   1.86 kB
+build/server/assets/TimelineView-YYtItSIa.js                             5.25 kB │ gzip:   2.37 kB
+build/server/assets/useChartData-5DUk85mU.js                             5.29 kB │ gzip:   2.35 kB
+build/server/assets/TimeRangePicker-DcMnHrB4.js                          5.40 kB │ gzip:   2.10 kB
+build/server/assets/GalleryView-BEM6ys6G.js                              5.42 kB │ gzip:   2.46 kB
+build/server/assets/WorkbenchActionBarBlockRenderer-BcP62GUE.js          5.44 kB │ gzip:   2.20 kB
+build/server/assets/CascadeSelect-QlZZ8YdV.js                            5.45 kB │ gzip:   2.47 kB
+build/server/assets/Navigation-CzOAoWmb.js                               5.49 kB │ gzip:   2.38 kB
+build/server/assets/ConversationPanelBlockRenderer-BDPkOMtf.js           5.50 kB │ gzip:   2.44 kB
+build/server/assets/runtime-kernel-BGR7MZEd.js                           5.54 kB │ gzip:   2.18 kB
+build/server/assets/DecisionRuleBindingLocale.test-D5GBqDmH.js           5.62 kB │ gzip:   1.92 kB
+build/server/assets/modelService-C2DOpPXN.js                             5.73 kB │ gzip:   1.76 kB
+build/server/assets/AuthAppearanceEditor.test-CA8AAfBI.js                5.94 kB │ gzip:   1.83 kB
+build/server/assets/chart-spec-echarts-D2asmj8j.js                       6.05 kB │ gzip:   2.04 kB
+build/server/assets/FieldRenderer-CHZnHJJ_.js                            6.11 kB │ gzip:   2.69 kB
+build/server/assets/SmartGanttChart-DwRHV2Jo.js                          6.17 kB │ gzip:   2.84 kB
+build/server/assets/Date-D-nKrvCn.js                                     6.17 kB │ gzip:   1.66 kB
+build/server/assets/RichTextEditor-MmNJ01c9.js                           6.19 kB │ gzip:   2.03 kB
+build/server/assets/UserSelect-CDb-cL9G.js                               6.43 kB │ gzip:   2.61 kB
+build/server/assets/CandidateListBlockRenderer-BwEArcgF.js               6.49 kB │ gzip:   2.61 kB
+build/server/assets/HttpClient-LaM6FkDI.js                               6.54 kB │ gzip:   2.79 kB
+build/server/assets/StatusBannerBlockRenderer-BlMnCd8e.js                6.55 kB │ gzip:   2.79 kB
+build/server/assets/MetricStripBlockRenderer-CP4rK5Fq.js                 6.56 kB │ gzip:   2.50 kB
+build/server/assets/GanttView-iWI1H2UJ.js                                6.61 kB │ gzip:   3.03 kB
+build/server/assets/InlineEditCell-CxljaPw6.js                           6.65 kB │ gzip:   2.79 kB
+build/server/assets/OrganizationSelect-nwUQkMbe.js                       6.69 kB │ gzip:   2.67 kB
+build/server/assets/SmartNumberCard-D7kDugzM.js                          6.86 kB │ gzip:   2.73 kB
+build/server/assets/EventPolicyDesignerBlock.test-2JfKZj_K.js            6.87 kB │ gzip:   2.08 kB
+build/server/assets/EvidencePanelBlockRenderer-NQu0-dXm.js               6.96 kB │ gzip:   2.35 kB
+build/server/assets/conditionAst-BkQCDOxh.js                             7.34 kB │ gzip:   2.63 kB
+build/server/assets/DecisionTableWorkbenchBlock-BmItWSbU.js              7.39 kB │ gzip:   3.17 kB
+build/server/assets/document-91g_kFXx.js                                 7.39 kB │ gzip:   2.33 kB
+build/server/assets/DecisionDefinitionActionsBlock-BvYuxJGS.js           7.46 kB │ gzip:   2.82 kB
+build/server/assets/DecisionFieldImpactBlock-DkieZiio.js                 7.69 kB │ gzip:   2.83 kB
+build/server/assets/MemberPicker-1qlgk3_X.js                             7.71 kB │ gzip:   2.79 kB
+build/server/assets/ControlledFieldRenderer-qlOBk94b.js                  7.82 kB │ gzip:   3.37 kB
+build/server/assets/AiField-C8fjgIro.js                                  7.89 kB │ gzip:   3.33 kB
+build/server/assets/DecisionDefinitionActionsBlock.test-DgPp9lLz.js      7.98 kB │ gzip:   2.03 kB
+build/server/assets/workbenchBlockUtils-pa_rEStx.js                      8.28 kB │ gzip:   3.44 kB
+build/server/assets/BaseFormulaEditor-D7oJZ8L2.js                        8.31 kB │ gzip:   3.16 kB
+build/server/assets/TraceGraphBlockRenderer-BCrobej4.js                  8.40 kB │ gzip:   3.31 kB
+build/server/assets/ApiService-iX0tu6J9.js                               8.42 kB │ gzip:   2.59 kB
+build/server/assets/SmartTableChart-BFg3VVkI.js                          8.69 kB │ gzip:   3.58 kB
+build/server/assets/DashboardModuleTree-bFsY6eJc.js                      8.71 kB │ gzip:   3.07 kB
+build/server/assets/RecordListView-IjRvfnlY.js                           8.88 kB │ gzip:   4.04 kB
+build/server/assets/DatePicker-BXxFzdHZ.js                               8.90 kB │ gzip:   2.40 kB
+build/server/assets/BomUploadReviewField-DBbAt1kW.js                     9.18 kB │ gzip:   3.98 kB
+build/server/assets/FormRef-h-pVDxJ6.js                                  9.80 kB │ gzip:   3.64 kB
+build/server/assets/AuthAppearanceShell-BOprOpvH.js                      9.84 kB │ gzip:   4.13 kB
+build/server/assets/TeamMembersBlock.i18n.test-HQOpqz2d.js              10.07 kB │ gzip:   3.43 kB
+build/server/assets/dashboardService-dsvQCmak.js                        10.13 kB │ gzip:   3.21 kB
+build/server/assets/SmartCalendar-a0opUmjw.js                           10.28 kB │ gzip:   3.34 kB
+build/server/assets/AgentColleaguesGrid-B2M5reDa.js                     10.42 kB │ gzip:   2.92 kB
+build/server/assets/TeamMembersBlock-jlkmQdH8.js                        11.00 kB │ gzip:   4.10 kB
+build/server/assets/DslValidator-DWXEsRG_.js                            11.42 kB │ gzip:   2.79 kB
+build/server/assets/DecisionActionPlanBlock-I8k3e8zr.js                 11.66 kB │ gzip:   4.48 kB
+build/server/assets/CellRendererRegistry-BXsA8PiM.js                    11.69 kB │ gzip:   4.00 kB
+build/server/assets/DecisionRolloutMonitor-DOf2LDCf.js                  11.94 kB │ gzip:   4.07 kB
+build/server/assets/ConditionFragmentLibraryBlock.test-BHim3_zi.js      12.33 kB │ gzip:   3.15 kB
+build/server/assets/DecisionActionPlanBlock.test-SGlLu3T2.js            12.66 kB │ gzip:   3.17 kB
+build/server/assets/ProcessFeeRuleMatrixBlock-LfBUxHR-.js               12.81 kB │ gzip:   4.45 kB
+build/server/assets/Table-B6ur-Fnt.js                                   12.93 kB │ gzip:   4.78 kB
+build/server/assets/DashboardViewer-CqdI_AJY.js                         12.95 kB │ gzip:   5.38 kB
+build/server/assets/Select-FvmMkgoG.js                                  13.01 kB │ gzip:   4.51 kB
+build/server/assets/Upload-I74cgfOC.js                                  13.08 kB │ gzip:   5.12 kB
+build/server/assets/TreeSelect-BI9Vc-QC.js                              13.16 kB │ gzip:   3.92 kB
+build/server/assets/DataSourceManager-DJINIwBP.js                       13.47 kB │ gzip:   4.33 kB
+build/server/assets/dynamic-route-utils-DulAe7ni.js                     14.20 kB │ gzip:   5.07 kB
+build/server/assets/versioning-B9qAYqjU.js                              15.37 kB │ gzip:   5.24 kB
+build/server/assets/reportTemplateService-C6PY18n5.js                   15.47 kB │ gzip:   4.87 kB
+build/server/assets/KanbanView-BQehxcv5.js                              17.27 kB │ gzip:   6.74 kB
+build/server/assets/evaluator-Ox3ZvIYx.js                               17.41 kB │ gzip:   5.90 kB
+build/server/assets/AddressField-CaQYSfz6.js                            18.07 kB │ gzip:   5.20 kB
+build/server/assets/ConditionBuilder-dE1zDFbF.js                        18.95 kB │ gzip:   6.72 kB
+build/server/assets/OpenApiQueryPublicationEditor-66kK137j.js           19.65 kB │ gzip:   7.18 kB
+build/server/assets/bootstrap-Idg4ZsWZ.js                               19.87 kB │ gzip:   6.04 kB
+build/server/assets/AuraBotProvider-DHqJUBUr.js                         20.54 kB │ gzip:   6.01 kB
+build/server/assets/QueryBuilder-DaPNHmJW.js                            20.64 kB │ gzip:   5.77 kB
+build/server/assets/dmnDownload-D2CDnqWe.js                             21.37 kB │ gzip:   6.81 kB
+build/server/assets/fieldDependencies-BZclmKGv.js                       21.46 kB │ gzip:   7.14 kB
+build/server/assets/ActionRegistry-CFWawd6N.js                          21.99 kB │ gzip:   7.25 kB
+build/server/assets/TableBlockRenderer-Bgg0ZWyY.js                      22.62 kB │ gzip:   8.52 kB
+build/server/assets/OpenApiPublicationEditor-CcGWJmqI.js                23.02 kB │ gzip:   8.51 kB
+build/server/assets/usePageRuntime-CWOMZ2YR.js                          23.14 kB │ gzip:   7.26 kB
+build/server/assets/AuthAppearanceEditor-BUdGNnwd.js                    23.28 kB │ gzip:   8.41 kB
+build/server/assets/ConditionFragmentLibraryBlock-BtMwJOPc.js           23.35 kB │ gzip:   7.25 kB
+build/server/assets/AgentCreateWizard-BUMVSxT4.js                       24.38 kB │ gzip:   6.88 kB
+build/server/assets/GerberViewerBlockRenderer-qPp4d0kJ.js               29.17 kB │ gzip:  10.48 kB
+build/server/assets/useActionHandler-B7YHU4xC.js                        30.49 kB │ gzip:  11.22 kB
+build/server/assets/boot-plugins-Dcmh7DLa.js                            32.79 kB │ gzip:   8.53 kB
+build/server/assets/ComponentLoader-BulNfvRJ.js                         33.16 kB │ gzip:   8.28 kB
+build/server/assets/ReportPageContent-D9tE9tEL.js                       34.22 kB │ gzip:   9.79 kB
+build/server/assets/SubTableViewer-GOklLUsQ.js                          34.64 kB │ gzip:  11.71 kB
+build/server/assets/DecisionRuleBindingBlock.test-CnETvJls.js           36.34 kB │ gzip:   6.45 kB
+build/server/assets/ExecutionLogTraceBlock-DP6T37pj.js                  40.67 kB │ gzip:  12.05 kB
+build/server/assets/DecisionRuleBindingBlock-Q0yT5gQS.js                41.38 kB │ gzip:  12.32 kB
+build/server/assets/SharedChartFactory-DBrU7EtC.js                      41.83 kB │ gzip:  12.93 kB
+build/server/assets/init-CWy8tbgS.js                                    42.67 kB │ gzip:   8.49 kB
+build/server/assets/ExecutionLogTraceBlock.test-C90DeM2Y.js             43.26 kB │ gzip:   7.57 kB
+build/server/assets/AutomationEditPageImpl-D4FqmFbC.js                  44.18 kB │ gzip:  12.04 kB
+build/server/assets/useDebouncedValue-D85moZiy.js                       45.69 kB │ gzip:  13.68 kB
+build/server/assets/nodes-DsxSDggc.js                                   47.77 kB │ gzip:  12.67 kB
+build/server/assets/defaultTestSamples-DTEmxWDX.js                      56.17 kB │ gzip:  17.82 kB
+build/server/assets/CommandActionService-Dnge63fN.js                    61.34 kB │ gzip:  15.00 kB
+build/server/assets/FormPageContent-B4zfnSZI.js                         68.74 kB │ gzip:  23.64 kB
+build/server/assets/AgentDetailTabs-BSTJxaYP.js                         69.19 kB │ gzip:  13.89 kB
+build/server/assets/ReviewDrawerBlockRenderer-JdZXqWr5.js               74.39 kB │ gzip:  20.78 kB
+build/server/assets/components-shell-BV7idHIV.js                        75.93 kB │ gzip:  22.72 kB
+build/server/assets/components-BTRLum0Z.js                              87.30 kB │ gzip:  19.29 kB
+build/server/assets/DetailPageContent-ryFmIezL.js                      104.89 kB │ gzip:  31.61 kB
+build/server/assets/designer-DAC3wHK7.js                               112.06 kB │ gzip:  34.68 kB
+build/server/assets/module-N1_H1LiS.js                                 112.54 kB │ gzip:  27.50 kB
+build/server/assets/PageDesignerEditorImpl-DOdv1WUv.js                 408.83 kB │ gzip:  98.17 kB
+build/server/index.js                                                2,894.42 kB │ gzip: 696.10 kB
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/shared/services/session.ts is dynamically imported by app/shared/services/http-client/RequestContext.ts, app/shared/services/profile.ts but also statically imported by app/auth/Login.tsx, app/auth/Logout.tsx, app/auth/SignUp.tsx, app/middleware/sessionMiddlewareFactory.ts, app/root.tsx, ..., dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] app/plugins/core-designer/components/report-designer/index.ts is dynamically imported by app/routes/report-designer.$id.tsx, app/routes/report-designer.tsx but also statically imported by app/routes/reports/view.$pageKey.tsx, dynamic import will not move module into another chunk.
+
+✓ built in 2.19s
+
+> auraboot-app@ verify:production-react-runtime $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin
+> node scripts/verify-production-react-runtime.mjs
+
+{"status":"PASS","check":"single-production-react-runtime","assetDirectory":"$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin/build/client/assets","forbiddenCount":0}

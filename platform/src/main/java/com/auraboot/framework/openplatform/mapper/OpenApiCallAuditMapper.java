@@ -11,6 +11,20 @@ import java.util.List;
 
 @Mapper
 public interface OpenApiCallAuditMapper extends BaseMapper<OpenApiCallAudit> {
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @org.apache.ibatis.annotations.Insert("""
+            INSERT INTO ab_open_api_call_audit
+                (pid, tenant_id, application_pid, installation_pid, token_pid, request_id,
+                 http_method, request_path, response_status, duration_ms, remote_address, occurred_at, business_details)
+            VALUES (#{audit.pid}, #{audit.tenantId}, #{audit.applicationPid}, #{audit.installationPid},
+                    #{audit.tokenPid}, #{audit.requestId}, #{audit.httpMethod}, #{audit.requestPath},
+                    #{audit.responseStatus}, #{audit.durationMs}, #{audit.remoteAddress}, #{audit.occurredAt},
+                    #{audit.businessDetails,jdbcType=OTHER,typeHandler=com.auraboot.framework.application.typehandler.JsonNodeTypeHandler})
+            """)
+    int insertAuthenticationFailure(@Param("audit") OpenApiCallAudit audit);
+
+    @org.apache.ibatis.annotations.Results({@org.apache.ibatis.annotations.Result(column = "business_details", property = "businessDetails",
+            typeHandler = com.auraboot.framework.application.typehandler.JsonNodeTypeHandler.class)})
     @Select("""
             SELECT * FROM ab_open_api_call_audit
             WHERE tenant_id = #{tenantId} AND installation_pid = #{installationPid}

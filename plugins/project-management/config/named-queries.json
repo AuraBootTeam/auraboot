@@ -5,12 +5,212 @@
     "name:en": "Task Summary by Project",
     "description": "Task counts grouped by status for each project.",
     "purpose": "Provides task breakdown per project for progress tracking dashboards.",
-    "parameter_schema": { "type": "object", "properties": { "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" } }, "required": ["tenantId"] },
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "description": "Tenant ID (auto-injected)"
+        }
+      },
+      "required": [
+        "tenantId"
+      ]
+    },
     "fromSql": "SELECT tpm_ts_project_id AS project_id, tpm_ts_status AS status, COUNT(*) AS count FROM mt_tpm_task WHERE tenant_id = #{params.tenantId} GROUP BY tpm_ts_project_id, tpm_ts_status ORDER BY tpm_ts_project_id, CASE tpm_ts_status WHEN 'todo' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'in_review' THEN 3 WHEN 'done' THEN 4 ELSE 5 END",
     "outputFields": [
-      { "code": "project_id", "columnExpr": "project_id", "dataType": "string", "searchable": true },
-      { "code": "status", "columnExpr": "status", "dataType": "string", "searchable": true },
-      { "code": "count", "columnExpr": "count", "dataType": "number", "sortable": true }
+      {
+        "code": "project_id",
+        "columnExpr": "project_id",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "status",
+        "columnExpr": "status",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "count",
+        "columnExpr": "count",
+        "dataType": "number",
+        "sortable": true
+      }
+    ]
+  },
+  {
+    "code": "tpm_delivery_progress",
+    "name:zh-CN": "交付进度",
+    "name:en": "Delivery progress",
+    "description": "Reached milestone ratio for exactly one tenant-scoped project.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "projectPid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "projectPid"
+      ]
+    },
+    "fromSql": "SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE tpm_ms_status = 'reached') AS reached, COUNT(*) FILTER (WHERE tpm_ms_status = 'pending') AS pending, COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE tpm_ms_status = 'reached') / NULLIF(COUNT(*), 0)), 0) AS progress FROM mt_tpm_milestone WHERE tenant_id = #{params.tenantId} AND tpm_ms_project_id = #{params.projectPid}",
+    "outputFields": [
+      {
+        "code": "total",
+        "columnExpr": "total",
+        "dataType": "number"
+      },
+      {
+        "code": "reached",
+        "columnExpr": "reached",
+        "dataType": "number"
+      },
+      {
+        "code": "pending",
+        "columnExpr": "pending",
+        "dataType": "number"
+      },
+      {
+        "code": "progress",
+        "columnExpr": "progress",
+        "dataType": "number"
+      }
+    ],
+    "resourceCode": "tpm_milestone",
+    "actionCode": "read"
+  },
+  {
+    "code": "tpm_delivery_activity",
+    "name:zh-CN": "里程碑动态",
+    "name:en": "Milestone activity",
+    "description": "Persisted milestone completion facts; historical records without a completion timestamp are not backfilled.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "projectPid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "projectPid"
+      ]
+    },
+    "fromSql": "SELECT pid, tpm_ms_reached_at AS occurred_at, 'STATE_CHANGE' AS activity_type, tpm_ms_name AS subject, tpm_ms_description AS content FROM mt_tpm_milestone WHERE tenant_id = #{params.tenantId} AND tpm_ms_project_id = #{params.projectPid} AND tpm_ms_status = 'reached' AND tpm_ms_reached_at IS NOT NULL ORDER BY tpm_ms_reached_at DESC",
+    "outputFields": [
+      {
+        "code": "pid",
+        "columnExpr": "pid",
+        "dataType": "string"
+      },
+      {
+        "code": "occurred_at",
+        "columnExpr": "occurred_at",
+        "dataType": "string"
+      },
+      {
+        "code": "activity_type",
+        "columnExpr": "activity_type",
+        "dataType": "string"
+      },
+      {
+        "code": "subject",
+        "columnExpr": "subject",
+        "dataType": "string"
+      },
+      {
+        "code": "content",
+        "columnExpr": "content",
+        "dataType": "string"
+      }
+    ],
+    "resourceCode": "tpm_milestone",
+    "actionCode": "read"
+  },
+  {
+    "code": "tpm_delivery_brief",
+    "name:zh-CN": "客户项目交付简报",
+    "name:en": "Customer project delivery brief",
+    "description": "Current-space project facts and active owner labels. No AI interpretation.",
+    "resourceCode": "tpm_project",
+    "actionCode": "read",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId"
+      ]
+    },
+    "fromSql": "SELECT p.pid, p.tpm_pj_code AS project_code, p.tpm_pj_name AS project_name, c.tpm_cu_name AS customer_name, CASE WHEN m.id IS NOT NULL THEN COALESCE(NULLIF(u.nick_name, ''), u.user_name) ELSE '待分配' END AS owner_name, CASE p.tpm_pj_status WHEN 'planning' THEN '需求确认' WHEN 'active' THEN '实施中' WHEN 'acceptance' THEN '待验收' WHEN 'completed' THEN '已交付' WHEN 'on_hold' THEN '已暂停' WHEN 'cancelled' THEN '已取消' ELSE '未分类' END AS delivery_stage, p.tpm_pj_progress AS progress, p.tpm_pj_end_date AS delivery_date, p.tpm_pj_budget AS budget, p.tpm_pj_risk_summary AS risk_summary, p.tpm_pj_next_action AS next_action FROM mt_tpm_project p LEFT JOIN mt_tpm_customer c ON c.pid = p.tpm_pj_customer_id AND c.tenant_id = p.tenant_id LEFT JOIN ab_user u ON u.pid = p.tpm_pj_owner_user AND u.deleted_flag = false LEFT JOIN ab_tenant_member m ON m.user_id = u.id AND m.tenant_id = p.tenant_id AND m.status = 'active' AND m.deleted_flag = false WHERE p.tenant_id = #{params.tenantId} ORDER BY p.tpm_pj_end_date ASC, p.tpm_pj_code ASC",
+    "outputFields": [
+      {
+        "code": "pid",
+        "columnExpr": "pid",
+        "dataType": "string"
+      },
+      {
+        "code": "project_code",
+        "columnExpr": "project_code",
+        "dataType": "string"
+      },
+      {
+        "code": "project_name",
+        "columnExpr": "project_name",
+        "dataType": "string"
+      },
+      {
+        "code": "customer_name",
+        "columnExpr": "customer_name",
+        "dataType": "string"
+      },
+      {
+        "code": "owner_name",
+        "columnExpr": "owner_name",
+        "dataType": "string"
+      },
+      {
+        "code": "delivery_stage",
+        "columnExpr": "delivery_stage",
+        "dataType": "string"
+      },
+      {
+        "code": "progress",
+        "columnExpr": "progress",
+        "dataType": "number"
+      },
+      {
+        "code": "delivery_date",
+        "columnExpr": "delivery_date",
+        "dataType": "date"
+      },
+      {
+        "code": "budget",
+        "columnExpr": "budget",
+        "dataType": "number"
+      },
+      {
+        "code": "risk_summary",
+        "columnExpr": "risk_summary",
+        "dataType": "string"
+      },
+      {
+        "code": "next_action",
+        "columnExpr": "next_action",
+        "dataType": "string"
+      }
     ]
   }
 ]

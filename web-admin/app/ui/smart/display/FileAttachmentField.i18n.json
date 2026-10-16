@@ -6,5 +6,9 @@
   "uploading": {
     "zh-CN": "上传中…",
     "en-US": "Uploading…"
+  },
+  "uploadFailed": {
+    "zh-CN": "上传失败，请重试",
+    "en": "Upload failed. Try again."
   }
 }

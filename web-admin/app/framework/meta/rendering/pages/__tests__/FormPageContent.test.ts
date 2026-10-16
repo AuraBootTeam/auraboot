@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFormCommandPayload,
+  buildDynamicCrudFormPayload,
+  collectAttachmentRelationIds,
   getBomUploadReviewError,
   canRenderFormButton,
   isFormAuthoringDenied,
@@ -19,6 +21,7 @@ import {
   resolveFormBackLink,
   resolveValidationToastMessage,
   resolveFormSubmitEndpoint,
+  resolveDynamicCrudFormOperation,
   resolveCreateSubTableEmptyState,
   resolveSubmitCommandCode,
   shouldBypassFormSubmit,
@@ -781,5 +784,71 @@ describe('BOM review submission validation', () => {
     expect(getBomUploadReviewError(review(true, ['mpn', 'quantity']), 'Invalid BOM')).toBeNull();
     expect(getBomUploadReviewError(null, 'Invalid BOM')).toBeNull();
     expect(getBomUploadReviewError('file-id', 'Invalid BOM')).toBeNull();
+  });
+});
+
+
+describe('attachment sharing serialization contract', () => {
+  it('uses public file identifiers from either native or serialized JSON collections', () => {
+    const files = [{ name: 'notes.txt', fileId: 'public-file-1' }];
+    expect(collectAttachmentRelationIds(files)).toEqual(['public-file-1']);
+    expect(collectAttachmentRelationIds(JSON.stringify(files))).toEqual(['public-file-1']);
+  });
+  it('allows an explicit empty collection to clear record relations', () => {
+    expect(collectAttachmentRelationIds('[]')).toEqual([]);
+  });
+  it('rejects missing identifiers and malformed collections rather than skipping sharing', () => {
+    expect(() => collectAttachmentRelationIds('[{"name":"unlinked.txt"}]')).toThrow();
+    expect(() => collectAttachmentRelationIds('{}')).toThrow();
+  });
+});
+
+describe('resolveDynamicCrudFormOperation', () => {
+  it.each(['save', 'submit'])('persists %s as create when no public record PID exists', action => {
+    expect(resolveDynamicCrudFormOperation(action, null)).toBe('create');
+    expect(resolveDynamicCrudFormOperation(action, undefined)).toBe('create');
+  });
+  it.each(['save', 'submit'])('persists %s as update only when editing a public record', action => {
+    expect(resolveDynamicCrudFormOperation(action, '01M4YQEBRTMX5TE0X9N9BS38NG')).toBe('update');
+  });
+  it('retains explicit create and update semantics', () => {
+    expect(resolveDynamicCrudFormOperation('create', '01M4YQEBRTMX5TE0X9N9BS38NG')).toBe('create');
+    expect(resolveDynamicCrudFormOperation('update', null)).toBe('update');
+  });
+  it.each(['command', 'navigate', 'cancel', 'reset', 'delete', ''])('does not route %s through dynamic CRUD', action => {
+    expect(resolveDynamicCrudFormOperation(action, '01M4YQEBRTMX5TE0X9N9BS38NG')).toBeNull();
+  });
+});
+
+describe('buildDynamicCrudFormPayload', () => {
+  const meta = {
+    customer: { dataType: 'string' }, amount: { dataType: 'integer' },
+    notes: { dataType: 'string' }, created_at: { dataType: 'datetime' },
+    updated_at: { dataType: 'datetime' }, row_version: { dataType: 'integer' },
+  };
+  const loaded = {
+    pid: '01M4YQEBRTMX5TE0X9N9BS38NG', customer: '华辰制造', amount: '68000',
+    created_at: '2026-10-15T11:35:02.887+08:00',
+    updated_at: '2026-10-15T11:35:02.887+08:00', row_version: 1,
+  };
+  it('updates only edited business fields, excluding loaded audit dates even if dirty', () => {
+    expect(buildDynamicCrudFormPayload(loaded, meta, new Set(['amount', 'updated_at']), 'update'))
+      .toEqual({ amount: '68000' });
+  });
+  it('preserves an explicit null clear and does not resubmit unchanged customer data', () => {
+    expect(buildDynamicCrudFormPayload({ ...loaded, notes: null }, meta, new Set(['notes']), 'update'))
+      .toEqual({ notes: null });
+  });
+  it('preserves the dynamic JSON payload representation and excludes unknown fields', () => {
+    expect(buildDynamicCrudFormPayload({ config: { theme: 'blue' }, unknown: 'no' },
+      { config: { dataType: 'json' } }, new Set(['config', 'unknown']), 'update'))
+      .toEqual({ config: { theme: 'blue' } });
+  });
+  it('does not send anything for an unchanged edit', () => {
+    expect(buildDynamicCrudFormPayload(loaded, meta, new Set(), 'update')).toEqual({});
+  });
+  it('creates business fields while excluding audit and public identity fields', () => {
+    expect(buildDynamicCrudFormPayload(loaded, meta, new Set(), 'create'))
+      .toEqual({ customer: '华辰制造', amount: '68000' });
   });
 });

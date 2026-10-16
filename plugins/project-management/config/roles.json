@@ -1,0 +1,49 @@
+[
+  {
+    "code": "tpm_delivery_viewer",
+    "name:zh-CN": "项目交付只读",
+    "name:en": "Delivery viewer",
+    "description": "Read-only access to delivery projects and milestones.",
+    "permissions": [
+      "tpm.project.read",
+      "tpm.milestone.read",
+      "model.tpm_project.read",
+      "model.tpm_milestone.read",
+      "data.datasource.read",
+      "model.tpm_customer.read",
+      "tpm.task.read",
+      "model.tpm_task.read"
+    ]
+  },
+  {
+    "code": "tpm_delivery_manager",
+    "name:zh-CN": "项目交付负责人",
+    "name:en": "Delivery manager",
+    "description": "Manage project plans and milestone completion.",
+    "permissions": [
+      "tpm.project.read",
+      "tpm.project.manage",
+      "tpm.milestone.read",
+      "tpm.milestone.manage",
+      "meta.command.execute",
+      "model.tpm_project.read",
+      "model.tpm_project.create",
+      "model.tpm_project.update",
+      "model.tpm_milestone.read",
+      "model.tpm_milestone.create",
+      "model.tpm_milestone.update",
+      "data.datasource.read",
+      "model.tpm_customer.read",
+      "model.tpm_customer.create",
+      "model.tpm_customer.update",
+      "sys.file.read",
+      "sys.file.upload",
+      "sys.file.relation.manage",
+      "tpm.task.read",
+      "model.tpm_task.read",
+      "tpm.task.manage",
+      "model.tpm_task.create",
+      "model.tpm_task.update"
+    ]
+  }
+]

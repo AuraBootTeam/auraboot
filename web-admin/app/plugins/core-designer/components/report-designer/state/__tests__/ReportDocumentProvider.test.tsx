@@ -146,3 +146,14 @@ describe('ReportDocumentProvider', () => {
     expect(result.current.isDirty).toBe(true);
   });
 });
+
+it('template import preserves the clean baseline and is one undoable whole-document action', () => {
+  const { result } = renderHook(() => useReportDocument(), { wrapper: ReportDocumentProvider });
+  const original = createEmptyReport('Original');
+  const imported = { ...createEmptyReport('Imported'), body: [{ id: 'imported-note', blockType: 'rich-text' as const, content: 'Customer follow-up' }] };
+  act(() => result.current.loadDocument(original));
+  act(() => result.current.importDocument(imported));
+  expect(result.current.report).toEqual(imported); expect(result.current.isDirty).toBe(true);
+  act(() => result.current.undo()); expect(result.current.report).toEqual(original); expect(result.current.isDirty).toBe(false);
+  act(() => result.current.redo()); expect(result.current.report).toEqual(imported); expect(result.current.isDirty).toBe(true);
+});

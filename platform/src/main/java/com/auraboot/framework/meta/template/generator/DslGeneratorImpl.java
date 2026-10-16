@@ -412,17 +412,12 @@ public class DslGeneratorImpl implements DslGenerator {
     private Map<String, Object> buildCreateButton(Model model) {
         Map<String, Object> button = new LinkedHashMap<>();
         button.put("code", "create");
-        button.put("action", "create");
+        button.put("action", Map.of("type", "builtin", "name", "new"));
+        button.put("label", Map.of("zh-CN", "新建", "en", "New"));
         // Label resolved by frontend: action.create.label
         button.put("primary", true);
-        // 权限码格式: DYNAMIC.{modelCode}.create
-        button.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".create')}");
-
-        Map<String, Object> events = new LinkedHashMap<>();
-        Map<String, Object> onClick = new LinkedHashMap<>();
-        onClick.put("handler", "openCreateForm");
-        events.put("onClick", onClick);
-        button.put("events", events);
+        // 权限码格式: model.{modelCode}.create
+        button.put("permissionCode", "model." + model.getCode() + ".create");
 
         return button;
     }
@@ -432,8 +427,8 @@ public class DslGeneratorImpl implements DslGenerator {
         button.put("code", "export");
         button.put("action", "export");
         // Label resolved by frontend: action.export.label
-        // 权限码格式: DYNAMIC.{modelCode}.export
-        button.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".export')}");
+        // 权限码格式: model.{modelCode}.export
+        button.put("permissionCode", "model." + model.getCode() + ".export");
 
         Map<String, Object> events = new LinkedHashMap<>();
         Map<String, Object> onClick = new LinkedHashMap<>();
@@ -449,8 +444,8 @@ public class DslGeneratorImpl implements DslGenerator {
         button.put("code", "import");
         button.put("action", "import");
         // Label resolved by frontend: action.import.label
-        // 权限码格式: DYNAMIC.{modelCode}.import
-        button.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".import')}");
+        // 权限码格式: model.{modelCode}.import
+        button.put("permissionCode", "model." + model.getCode() + ".import");
 
         Map<String, Object> events = new LinkedHashMap<>();
         Map<String, Object> onClick = new LinkedHashMap<>();
@@ -467,8 +462,8 @@ public class DslGeneratorImpl implements DslGenerator {
         button.put("action", "deleteSelected");
         // Label resolved by frontend: action.deleteSelected
         button.put("danger", true);
-        // 权限码格式: DYNAMIC.{modelCode}.delete
-        button.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".delete')}");
+        // 权限码格式: model.{modelCode}.delete
+        button.put("permissionCode", "model." + model.getCode() + ".delete");
         button.put("enableWhen", "${state.selectedIds.length > 0}");
 
         Map<String, Object> events = new LinkedHashMap<>();
@@ -617,33 +612,20 @@ public class DslGeneratorImpl implements DslGenerator {
         // View button
         Map<String, Object> viewBtn = new LinkedHashMap<>();
         viewBtn.put("code", "view");
-        viewBtn.put("action", "view");
+        viewBtn.put("action", Map.of("type", "builtin", "name", "view"));
+        viewBtn.put("label", Map.of("zh-CN", "查看", "en", "View"));
+        viewBtn.put("permissionCode", "model." + model.getCode() + ".read");
         // Label resolved by frontend: action.view.label
-        Map<String, Object> viewEvents = new LinkedHashMap<>();
-        Map<String, Object> viewOnClick = new LinkedHashMap<>();
-        viewOnClick.put("handler", "openDetailDrawer");
-        Map<String, Object> viewArgs = new LinkedHashMap<>();
-        viewArgs.put("id", "${row.id}");
-        viewOnClick.put("args", viewArgs);
-        viewEvents.put("onClick", viewOnClick);
-        viewBtn.put("events", viewEvents);
         buttons.add(viewBtn);
 
         // Edit button
         Map<String, Object> editBtn = new LinkedHashMap<>();
         editBtn.put("code", "edit");
-        editBtn.put("action", "update");
+        editBtn.put("action", Map.of("type", "builtin", "name", "edit"));
+        editBtn.put("label", Map.of("zh-CN", "编辑", "en", "Edit"));
         // Label resolved by frontend: action.update
-        // 权限码格式: DYNAMIC.{modelCode}.update
-        editBtn.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".update')}");
-        Map<String, Object> editEvents = new LinkedHashMap<>();
-        Map<String, Object> editOnClick = new LinkedHashMap<>();
-        editOnClick.put("handler", "openEditForm");
-        Map<String, Object> editArgs = new LinkedHashMap<>();
-        editArgs.put("id", "${row.id}");
-        editOnClick.put("args", editArgs);
-        editEvents.put("onClick", editOnClick);
-        editBtn.put("events", editEvents);
+        // 权限码格式: model.{modelCode}.update
+        editBtn.put("permissionCode", "model." + model.getCode() + ".update");
         buttons.add(editBtn);
 
         // Delete button
@@ -652,8 +634,8 @@ public class DslGeneratorImpl implements DslGenerator {
         deleteBtn.put("action", "delete");
         // Label resolved by frontend: action.delete.label
         deleteBtn.put("danger", true);
-        // 权限码格式: DYNAMIC.{modelCode}.delete
-        deleteBtn.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".delete')}");
+        // 权限码格式: model.{modelCode}.delete
+        deleteBtn.put("permissionCode", "model." + model.getCode() + ".delete");
         Map<String, Object> deleteEvents = new LinkedHashMap<>();
         Map<String, Object> deleteOnClick = new LinkedHashMap<>();
         deleteOnClick.put("handler", "deleteSingle");
@@ -822,15 +804,11 @@ public class DslGeneratorImpl implements DslGenerator {
         Map<String, Object> submitBtn = new LinkedHashMap<>();
         submitBtn.put("code", "submit");
         submitBtn.put("action", "save");
+        submitBtn.put("label", Map.of("zh-CN", "保存", "en", "Save"));
         // Label resolved by frontend: action.save.label
         submitBtn.put("primary", true);
-        // 权限码格式: DYNAMIC.{modelCode}.create/update
-        submitBtn.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".create') || hasPermission('DYNAMIC." + model.getCode() + ".update')}");
-        Map<String, Object> submitEvents = new LinkedHashMap<>();
-        Map<String, Object> submitOnClick = new LinkedHashMap<>();
-        submitOnClick.put("handler", "submitForm");
-        submitEvents.put("onClick", submitOnClick);
-        submitBtn.put("events", submitEvents);
+        // 权限码格式: model.{modelCode}.create/update
+        submitBtn.put("visibleWhen", "${hasPermission('model." + model.getCode() + ".create') || hasPermission('model." + model.getCode() + ".update')}");
         buttons.add(submitBtn);
 
         // Reset button
@@ -838,11 +816,6 @@ public class DslGeneratorImpl implements DslGenerator {
         resetBtn.put("code", "reset");
         resetBtn.put("action", "reset");
         // Label resolved by frontend: action.reset.label
-        Map<String, Object> resetEvents = new LinkedHashMap<>();
-        Map<String, Object> resetOnClick = new LinkedHashMap<>();
-        resetOnClick.put("handler", "resetForm");
-        resetEvents.put("onClick", resetOnClick);
-        resetBtn.put("events", resetEvents);
         buttons.add(resetBtn);
 
         // Cancel button
@@ -850,11 +823,6 @@ public class DslGeneratorImpl implements DslGenerator {
         cancelBtn.put("code", "cancel");
         cancelBtn.put("action", "cancel");
         // Label resolved by frontend: action.cancel.label
-        Map<String, Object> cancelEvents = new LinkedHashMap<>();
-        Map<String, Object> cancelOnClick = new LinkedHashMap<>();
-        cancelOnClick.put("handler", "cancelForm");
-        cancelEvents.put("onClick", cancelOnClick);
-        cancelBtn.put("events", cancelEvents);
         buttons.add(cancelBtn);
 
         buttonsBlock.put("buttons", buttons);
@@ -980,11 +948,12 @@ public class DslGeneratorImpl implements DslGenerator {
         // Edit button
         Map<String, Object> editBtn = new LinkedHashMap<>();
         editBtn.put("code", "edit");
-        editBtn.put("action", "update");
+        editBtn.put("action", Map.of("type", "builtin", "name", "edit"));
+        editBtn.put("label", Map.of("zh-CN", "编辑", "en", "Edit"));
         // Label resolved by frontend: action.update
         editBtn.put("primary", true);
-        // 权限码格式: DYNAMIC.{modelCode}.update
-        editBtn.put("visibleWhen", "${hasPermission('DYNAMIC." + model.getCode() + ".update')}");
+        // 权限码格式: model.{modelCode}.update
+        editBtn.put("permissionCode", "model." + model.getCode() + ".update");
         Map<String, Object> editEvents = new LinkedHashMap<>();
         Map<String, Object> editOnClick = new LinkedHashMap<>();
         editOnClick.put("handler", "openEditForm");

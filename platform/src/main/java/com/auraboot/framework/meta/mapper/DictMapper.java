@@ -41,6 +41,16 @@ public interface DictMapper extends BaseMapper<Dict> {
         """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertIdempotent(Dict dict);
+
+    /**
+     * Revive a soft-deleted current-version dict (left behind by a previous
+     * uninstall): findCurrentByCode deliberately has no deleted_flag filter so
+     * the import's existence check finds the retired row, and the update-in-place
+     * branch must therefore flip it back to live instead of refreshing a dead row.
+     */
+    @Update("UPDATE ab_dict SET deleted_flag = FALSE, updated_at = NOW() "
+            + "WHERE code = #{code} AND is_current = TRUE AND deleted_flag = TRUE")
+    int reviveRetiredByCode(@Param("code") String code);
     
     // ==================== 投影辅助方法 ====================
     

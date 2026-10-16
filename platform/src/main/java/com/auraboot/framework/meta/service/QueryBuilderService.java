@@ -96,6 +96,9 @@ public interface QueryBuilderService {
         List<String> getSelectFields();
         QueryBuilder addCondition(String field, String operator, Object value);
         QueryBuilder addRawCondition(String rawSql);
+        default QueryBuilder addKeysetCondition(String field, String direction, Object value, String pid) {
+            throw new UnsupportedOperationException("Composite keyset conditions are not supported by this query builder");
+        }
         /** Adds an OR group: (col1 ILIKE :pattern OR col2 ILIKE :pattern ...). Pattern must already include wildcards. */
         QueryBuilder addOrIlikeConditions(List<String> columns, String pattern);
         QueryBuilder addOrderBy(String field, String direction);

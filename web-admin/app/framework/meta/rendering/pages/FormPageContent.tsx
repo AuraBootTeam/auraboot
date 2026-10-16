@@ -1,3 +1,6 @@
+import { WorkspaceGuidance } from './form/WorkspaceGuidance';
+import { usePresentationNavigation } from '~/shared/layout/PagePresentationContext';
+import { FormSection } from './form/FormSection';
 /**
  * FormPageContent - Extracted form rendering logic for DSL-driven form pages
  *
@@ -29,7 +32,10 @@ import { uploadCommandFile } from '~/framework/meta/utils/promptUpload';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
 import { scrollToFormField } from '~/framework/meta/rendering/pages/form/scrollToFormField';
-import { buildConstraintFieldMessage, buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
+import {
+  buildConstraintFieldMessage,
+  buildRequiredFieldMessage,
+} from '~/framework/meta/utils/validationMessages';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
@@ -378,13 +384,52 @@ export function buildFormCommandPayload(
   );
 }
 
-export function resolveAsyncCommandDispatch(responseData: any, submitMode?: unknown): { taskCode: string } | null {
+/** Pure CRUD writes business changes, including reviewed AI drafts; audit data stays display-only. */
+export function buildDynamicCrudFormPayload(
+  record: Record<string, any>,
+  modelFields: Record<string, Pick<FieldMetaInfo, 'dataType'>>,
+  dirtyFields: ReadonlySet<string>,
+  operation: 'create' | 'update',
+  initialRecord?: Record<string, any> | null,
+): Record<string, any> {
+  const systemFields = new Set([
+    'id', 'pid', 'tenant_id', 'created_at', 'created_by', 'updated_at', 'updated_by',
+    'deleted_flag', 'deleted_at', 'deleted_by', 'row_version',
+  ]);
+  const hasFieldMetadata = Object.keys(modelFields).length > 0;
+  return Object.fromEntries(Object.entries(record).flatMap(([key, rawValue]) => {
+    if (systemFields.has(key) || key.startsWith('_') ||
+        (hasFieldMetadata && !modelFields[key])) return [];
+    const dataType = modelFields[key]?.dataType;
+    const value = normalizePayloadValue(rawValue, dataType);
+    // Persistence tracks changed business values independently of manual-edit
+    // protection. AI apply/undo uses setFormData and must not acquire a manual lock.
+    const hasInitialRecord = initialRecord != null;
+    const changed = hasInitialRecord
+      ? JSON.stringify(value) !== JSON.stringify(normalizePayloadValue(initialRecord[key], dataType))
+      : dirtyFields.has(key);
+    if (operation === 'update' && !changed) return [];
+    const explicitNull = value === null && (dirtyFields.has(key) || (operation === 'update' && hasInitialRecord && changed));
+    if (isEmptySubmittedValue(value) && !explicitNull) return [];
+    return [[key, value]];
+  }));
+}
+
+export function resolveAsyncCommandDispatch(
+  responseData: any,
+  submitMode?: unknown,
+): { taskCode: string } | null {
   const dispatch =
     responseData?.data && typeof responseData.data === 'object' ? responseData.data : responseData;
   // A configured task-detail page owns progress polling after durable admission.
   // A generic async acknowledgement without a task record must still be awaited.
-  if (submitMode === 'redirect' && dispatch?.queued === true &&
-      typeof dispatch?.taskId === 'string' && dispatch.taskId.trim()) return null;
+  if (
+    submitMode === 'redirect' &&
+    dispatch?.queued === true &&
+    typeof dispatch?.taskId === 'string' &&
+    dispatch.taskId.trim()
+  )
+    return null;
   const taskCode = dispatch?.taskCode;
   if (dispatch?.async === true && typeof taskCode === 'string' && taskCode.trim()) {
     return { taskCode: taskCode.trim() };
@@ -654,6 +699,18 @@ function resolveComponentByFieldMeta(
   return DATA_TYPE_TO_COMPONENT[String(dataType).toLowerCase()];
 }
 
+/** Decode the persisted JSON collection before registering public file relations. */
+export function collectAttachmentRelationIds(value: unknown): string[] {
+  const decoded = typeof value === 'string' ? JSON.parse(value) : value;
+  if (!Array.isArray(decoded)) throw new Error('Attachment collection must be an array.');
+  return decoded.map(item => {
+    if (!item || typeof item !== 'object' || typeof item.fileId !== 'string' || !item.fileId) {
+      throw new Error('Attachment collection requires public file identifiers.');
+    }
+    return item.fileId;
+  });
+}
+
 export function normalizePayloadValue(rawValue: any, dataType?: string) {
   if (isDatetimeDataType(dataType)) {
     return normalizeDateTimePayloadValue(rawValue);
@@ -777,8 +834,11 @@ export function isFormAuthoringDenied(
   hasPermission: (permissionCode: string) => boolean,
 ): boolean {
   const primaryActions = activeButtons.filter((button) => button.primary === true);
-  return primaryActions.length > 0 && primaryActions.every(
-    (button) => !!button.permissionCode && !hasPermission(button.permissionCode),
+  return (
+    primaryActions.length > 0 &&
+    primaryActions.every(
+      (button) => !!button.permissionCode && !hasPermission(button.permissionCode),
+    )
   );
 }
 
@@ -923,6 +983,16 @@ function replaceSubmitEndpointPlaceholders(
     return replaceRecordEndpointPlaceholders(template, String(pid));
   }
   return template.replace(/\/+$/, '');
+}
+
+/** Pure model forms use public record identity to resolve save/submit into CRUD. */
+export function resolveDynamicCrudFormOperation(
+  actionType: string,
+  recordPid: string | null | undefined,
+): 'create' | 'update' | null {
+  if (actionType === 'create' || actionType === 'update') return actionType;
+  if (actionType === 'save' || actionType === 'submit') return recordPid ? 'update' : 'create';
+  return null;
 }
 
 export function resolveFormSubmitEndpoint(
@@ -1095,6 +1165,7 @@ function mergeFieldValidationRules(
  * expression-driven visibility, and action dispatch.
  */
 export function FormPageContent(props: PageContentProps) {
+  const { sidebarWidth } = usePresentationNavigation();
   const {
     schema,
     tableName,
@@ -1446,12 +1517,22 @@ export function FormPageContent(props: PageContentProps) {
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   const [fieldMetaLoaded, setFieldMetaLoaded] = useState(false);
-  const aiFields = useMemo(() => collectFormFillFields(schema, modelFields, fieldPermissions,
-    (value) => getLocalizedText(value as any, locale, t) || t('ai.fill.field')),
-    [schema, modelFields, fieldPermissions, locale, t]);
+  const aiFields = useMemo(
+    () =>
+      collectFormFillFields(
+        schema,
+        modelFields,
+        fieldPermissions,
+        (value) => getLocalizedText(value as any, locale, t) || t('ai.fill.field'),
+      ),
+    [schema, modelFields, fieldPermissions, locale, t],
+  );
   const aiFill = useFormFill(
     `${schema?.id ?? schema?.pageKey ?? tableName}:${routeRecordPid ?? 'new'}`,
-    schema?.modelCode || tableName, aiFields, formData, setFormData,
+    schema?.modelCode || tableName,
+    aiFields,
+    formData,
+    setFormData,
     mainRecordLoaded && fieldMetaLoaded,
   );
 
@@ -1474,6 +1555,7 @@ export function FormPageContent(props: PageContentProps) {
         refTarget?: Record<string, any> | null;
         referenceModelCode?: string;
         extension?: any;
+        uiSchema?: { label?: string };
         required?: boolean;
         feature?: Record<string, any>;
         ruleSchema?: Record<string, any>;
@@ -1487,7 +1569,7 @@ export function FormPageContent(props: PageContentProps) {
         if (fieldsResp && ResultHelper.isSuccess(fieldsResp) && Array.isArray(fieldsResp.data)) {
           const map: Record<string, FieldMetaInfo> = {};
           for (const f of fieldsResp.data) {
-            const displayName = resolveExtensionDisplayName(f.extension, f.code, locale);
+            const displayName = resolveExtensionDisplayName(f.extension, f.code, locale, f.uiSchema?.label);
             // Merge constraints from extension.extension.constraints into feature.validation
             // Plugin imports store constraints (min, max, maxLength, minLength, pattern)
             // in extension.extension.constraints, but mergeFieldValidationRules reads from
@@ -1959,7 +2041,6 @@ export function FormPageContent(props: PageContentProps) {
       }
       setFieldErrors({});
       setSummaryErrors([]);
-      const modelFieldEntries = Object.entries(modelFields);
       const commandPayload = buildFormCommandPayload(
         dispatchActionRecord,
         modelFields,
@@ -2048,7 +2129,10 @@ export function FormPageContent(props: PageContentProps) {
               // The reason a command refused the submit lives in context.detail.
               throw new Error(resolveCommandErrorMessage(result, effectiveCommandCode, t));
             }
-            const asyncDispatch = resolveAsyncCommandDispatch(result.data, schema?.extension?.asyncSubmitMode);
+            const asyncDispatch = resolveAsyncCommandDispatch(
+              result.data,
+              schema?.extension?.asyncSubmitMode,
+            );
             const responseData = asyncDispatch
               ? await (async () => {
                   const message = t('common.asyncProcessing');
@@ -2060,6 +2144,23 @@ export function FormPageContent(props: PageContentProps) {
                   return pollFormAsyncCommandTask(asyncDispatch.taskCode, token || undefined);
                 })()
               : result.data;
+            if (schema.extension?.linkFileAttachments === true) {
+              const extractPid = (value: any): string | undefined => {
+                if (!value || typeof value !== 'object') return undefined;
+                const pid = value.recordPid || value.recordId || value.pid;
+                return typeof pid === 'string' ? pid : extractPid(value.data);
+              };
+              const savedPid = recordPid || extractPid(responseData);
+              if (!savedPid) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但未取得附件关联目标。请重新打开项目检查。', en: 'Saved, but attachment target is missing. Reopen the record to check.' }, locale, t));
+              for (const [field, meta] of Object.entries(modelFields)) {
+                if (!schema.extension?.attachmentFields?.includes(field) || commandPayload[field] === undefined) continue;
+                let fileIds: string[];
+                try { fileIds = collectAttachmentRelationIds(commandPayload[field]); }
+                catch { throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但附件信息不完整。请重新上传附件。', en: 'Saved, but attachment metadata is incomplete. Upload the files again.' }, locale, t)); }
+                const relation = await fetchResult('/api/file/relation', { method: 'post', token: token || undefined, params: { entityType: schema.modelCode || tableName, entityId: savedPid, fieldName: field, fileIds } });
+                if (!ResultHelper.isSuccess(relation)) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但附件共享关联失败。请重新打开项目检查附件。', en: 'Saved, but attachment sharing failed. Reopen the record to check files.' }, locale, t));
+              }
+            }
             setFieldErrors({});
             setSummaryErrors([]);
             dirtyFieldsRef.current.clear();
@@ -2081,55 +2182,21 @@ export function FormPageContent(props: PageContentProps) {
       }
 
       // MODEL form path: when no commandCode is provided, persist via dynamic CRUD API.
-      if (
-        !effectiveButton.commandCode &&
-        (effectiveActionType === 'create' || effectiveActionType === 'update')
-      ) {
+      const dynamicCrudOperation = resolveDynamicCrudFormOperation(effectiveActionType, recordPid);
+      if (!effectiveButton.commandCode && dynamicCrudOperation) {
         const targetModelCode = schema?.modelCode || tableName;
         const endpoint =
-          effectiveActionType === 'update'
+          dynamicCrudOperation === 'update'
             ? `/api/dynamic/${targetModelCode}/${recordPid}`
             : `/api/dynamic/${targetModelCode}`;
-        const method = effectiveActionType === 'update' ? 'put' : 'post';
-        const payload =
-          modelFieldEntries.length > 0
-            ? Object.fromEntries(
-                Object.entries(actionRecord).flatMap(([key, rawValue]) => {
-                  if (!modelFields[key]) return [];
-                  const value = normalizePayloadValue(rawValue, modelFields[key].dataType);
-                  if (Array.isArray(value) && value.length === 0) return [];
-                  if (
-                    value &&
-                    typeof value === 'object' &&
-                    !Array.isArray(value) &&
-                    Object.keys(value).length === 0
-                  )
-                    return [];
-                  return [[key, value]];
-                }),
-              )
-            : Object.fromEntries(
-                Object.entries(actionRecord).filter(
-                  ([key]) =>
-                    key !== 'id' &&
-                    key !== 'pid' &&
-                    key !== 'tenant_id' &&
-                    key !== 'created_at' &&
-                    key !== 'created_by' &&
-                    key !== 'updated_at' &&
-                    key !== 'updated_by' &&
-                    !key.startsWith('_'),
-                ),
-              );
-        const normalizedPayload =
-          effectiveActionType === 'update' && initialFormData
-            ? Object.fromEntries(
-                Object.entries(payload).filter(([key, value]) => {
-                  const initialValue = initialFormData[key];
-                  return JSON.stringify(value) !== JSON.stringify(initialValue);
-                }),
-              )
-            : payload;
+        const method = dynamicCrudOperation === 'update' ? 'put' : 'post';
+        const normalizedPayload = buildDynamicCrudFormPayload(
+          actionRecord,
+          modelFields,
+          dirtyFieldsRef.current,
+          dynamicCrudOperation,
+          initialFormData,
+        );
 
         setSubmitting(true);
         return fetchResult(endpoint, {
@@ -2258,6 +2325,7 @@ export function FormPageContent(props: PageContentProps) {
           refTarget?: Record<string, any> | null;
           referenceModelCode?: string;
           extension?: any;
+          uiSchema?: { label?: string };
         }>
       >(`/api/dynamic/${normalizedModel}/field-meta`, {
         method: 'get',
@@ -2281,7 +2349,7 @@ export function FormPageContent(props: PageContentProps) {
           for (const f of fieldsResp.data) {
             fieldMap[f.code] = {
               dataType: f.dataType,
-              displayName: resolveExtensionDisplayName(f.extension, f.code, locale),
+              displayName: resolveExtensionDisplayName(f.extension, f.code, locale, f.uiSchema?.label),
               dictCode: f.dictCode,
               refTarget: mergeRefTarget(f.refTarget, f.extension?.refTarget),
               referenceModelCode:
@@ -2509,6 +2577,7 @@ export function FormPageContent(props: PageContentProps) {
   const miscFormBlocks = allBlocks.filter(
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
   );
+  const workspace = schema.extension?.presentation === 'workspace';
   const backLink = resolveFormBackLink(schema, tableName);
   const activeButtons = (effectiveButtonBlock?.buttons || []).filter(
     (button: any) => !button.visibleWhen || evaluateCondition(button.visibleWhen, pageContext),
@@ -2525,16 +2594,17 @@ export function FormPageContent(props: PageContentProps) {
           wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
           a comfortable 2-column line length while staying roomy for sub-tables. */}
         <div
-          className="mx-auto w-full max-w-6xl px-2 py-3"
+          className={workspace ? 'min-h-[calc(100vh-56px)] bg-[#F7F7F8] px-6 pt-7 pb-24 lg:px-8' : `mx-auto w-full px-2 py-3 ${schema.extension?.formWidth === 'comfortable' ? 'max-w-4xl' : 'max-w-6xl'}`}
           data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
         >
-          <div className="rounded-card bg-panel shadow-sm">
+          <div className="bg-transparent">
             {/* Page Header */}
-            <div className="border-border border-b px-6 py-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-text text-lg font-medium">
-                  {getLocalizedText(schema.title, locale, t)}
+            <div className="pt-2 pb-5">
+              <div className="flex items-start justify-between">
+                <div><h2 className="text-text text-2xl font-semibold tracking-tight">
+                  {getLocalizedText((isEditMode ? schema.extension?.editTitle : schema.extension?.createTitle) || schema.title, locale, t)}
                 </h2>
+                {workspace && schema.extension?.pageDescription && <p className="text-text-2 mt-2 text-xs">{getLocalizedText(schema.extension.pageDescription, locale, t)}</p>}</div>
                 {onCancelOverride ? (
                   <button
                     type="button"
@@ -2556,6 +2626,8 @@ export function FormPageContent(props: PageContentProps) {
               </div>
             </div>
 
+            <div className={workspace ? 'grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_246px]' : ''}>
+            <div className="min-w-0">
             {/* Error Summary */}
             {summaryErrors.length > 0 ? (
               <div
@@ -2606,7 +2678,11 @@ export function FormPageContent(props: PageContentProps) {
             )}
 
             {/* Form Content - Using ComponentLoader Pattern */}
-            <form className="p-6" data-testid="dynamic-form" onSubmit={(e) => e.preventDefault()}>
+            <form
+              className="space-y-4"
+              data-testid="dynamic-form"
+              onSubmit={(e) => e.preventDefault()}
+            >
               {!formInteractionReady ? (
                 <div
                   className="text-text-3 py-8 text-center text-sm"
@@ -2618,13 +2694,6 @@ export function FormPageContent(props: PageContentProps) {
                 <>
                   {/* B-003: top-level non-whitelist blocks (ai-fill-banner etc.) via the kernel
                     BlockRenderer, rendered above the form so operators see them first. */}
-                  {runtime && !miscFormBlocks.some((block: any) => block.blockType === 'ai-fill-banner')
-                    && aiFields.some((field) => !field.locked) && (
-                    <div className="mb-4">
-                      <BlockRenderer block={{ id: 'form-ai-fill', blockType: 'ai-fill-banner' } as any}
-                        runtime={runtime} areaId="form-ai-fill" />
-                    </div>
-                  )}
                   {runtime &&
                     miscFormBlocks.map((block: any, idx: number) => (
                       <div
@@ -2635,7 +2704,14 @@ export function FormPageContent(props: PageContentProps) {
                         <BlockRenderer block={block} runtime={runtime} areaId="form-misc" />
                       </div>
                     ))}
-                  {aiFill.receipt && <FormFillReceipt receipt={aiFill.receipt} fields={aiFields} t={t} onUndo={aiFill.undo} />}
+                  {aiFill.receipt && (
+                    <FormFillReceipt
+                      receipt={aiFill.receipt}
+                      fields={aiFields}
+                      t={t}
+                      onUndo={aiFill.undo}
+                    />
+                  )}
                   {customBlocks.length > 0 &&
                     customBlocks.map((block: any) => {
                       // Honour DSL visibility condition (matches form-section behavior below).
@@ -2694,41 +2770,22 @@ export function FormPageContent(props: PageContentProps) {
                         const isSettingsCard = displayVariant === 'settings-card';
 
                         return (
-                          <div
+                          <FormSection
                             key={block.id || `block-${blockIndex}`}
-                            data-testid={
-                              isSettingsCard && block.id ? `settings-card-${block.id}` : undefined
-                            }
-                            className={
-                              isSettingsCard
-                                ? 'form-section overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm'
-                                : 'form-section'
+                            title={blockTitle}
+                            index={workspace && !block.extension?.collapsible ? String(blockIndex + 1).padStart(2, '0') : undefined}
+                            description={blockDescription}
+                            collapsible={block.extension?.collapsible === true}
+                            defaultCollapsed={block.extension?.defaultCollapsed === true}
+                            hasError={(block.fields || []).some((field: any) =>
+                              Boolean(fieldErrors[field.field]),
+                            )}
+                            testId={
+                              isSettingsCard && block.id
+                                ? `settings-card-${block.id}`
+                                : `form-section-${block.id || blockIndex}`
                             }
                           >
-                            {/* Section Title */}
-                            {blockTitle && (
-                              <div
-                                className={
-                                  isSettingsCard
-                                    ? 'border-b border-slate-100 bg-slate-50 px-5 py-4'
-                                    : 'border-border mb-4 border-b pb-2'
-                                }
-                              >
-                                <h3
-                                  className={
-                                    isSettingsCard
-                                      ? 'text-base font-semibold text-slate-900'
-                                      : 'text-text text-base font-semibold'
-                                  }
-                                >
-                                  {blockTitle}
-                                </h3>
-                                {isSettingsCard && blockDescription ? (
-                                  <p className="mt-1 text-sm text-slate-500">{blockDescription}</p>
-                                ) : null}
-                              </div>
-                            )}
-
                             {/* Section Fields */}
                             {block.fields && block.fields.length > 0 && (
                               <div
@@ -2818,7 +2875,7 @@ export function FormPageContent(props: PageContentProps) {
 
                                   // Calculate column span based on field layout or DSL span
                                   const colSpan =
-                                    field.layout?.colSpan || (field.span ? field.span * 6 : 6);
+                                    field.layout?.colSpan || field.colSpan || (field.span ? field.span * 6 : 6);
                                   const isFullWidth = colSpan >= 12;
 
                                   return (
@@ -2839,7 +2896,7 @@ export function FormPageContent(props: PageContentProps) {
                                 })}
                               </div>
                             )}
-                          </div>
+                          </FormSection>
                         );
                       })}
                     </div>
@@ -2925,8 +2982,11 @@ export function FormPageContent(props: PageContentProps) {
                 effectiveButtonBlock &&
                 effectiveButtonBlock.buttons &&
                 effectiveButtonBlock.buttons.length > 0 && (
-                  <div className="border-border mt-6 flex justify-end space-x-3 border-t pt-6">
-                    {effectiveButtonBlock.buttons.map((button: any) => {
+                  <div className={workspace ? 'border-border bg-panel fixed right-0 bottom-0 z-30 flex flex-wrap items-center justify-end gap-3 border-t px-8 py-4' : 'border-border bg-panel rounded-card sticky bottom-0 z-20 mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm'}
+                    style={workspace ? { left: sidebarWidth } : undefined}
+                    data-testid="form-action-footer">
+                    {workspace && schema.extension?.footerNote && <p className="text-text-3 mr-auto text-xs">{getLocalizedText(schema.extension.footerNote, locale, t)}</p>}
+                    {[...effectiveButtonBlock.buttons].sort((a: any, b: any) => workspace ? Number(Boolean(a.primary)) - Number(Boolean(b.primary)) : 0).map((button: any) => {
                       if (!canRenderFormButton(button, hasPermission)) return null;
                       // Check button visibility condition
                       if (button.visibleWhen) {
@@ -2972,6 +3032,9 @@ export function FormPageContent(props: PageContentProps) {
                   </div>
                 )}
             </form>
+            </div>
+            {workspace && schema.extension?.formGuidance && <WorkspaceGuidance config={(isEditMode && schema.extension?.editGuidance) || schema.extension.formGuidance} locale={locale} t={t} />}
+            </div>
           </div>
         </div>
       </DslFormFillProvider>

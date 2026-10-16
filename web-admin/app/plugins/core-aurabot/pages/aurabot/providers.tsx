@@ -2,7 +2,7 @@
  * AuraBot — LLM Provider Management (Card Grid UX)
  *
  * Modern card-grid layout with provider picker, side-panel editor,
- * and inline test-connection. Replaces the flat-list + modal approach.
+ * and inline configuration validation. Replaces the flat-list + modal approach.
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -143,12 +143,12 @@ function slugify(name: string): string {
 function getProviderStatus(config: CloudConfig): 'active' | 'unconfigured' | 'ready' | 'disabled' {
   const parsed = safeParseJSON(config.config);
   if (!parsed.apiKey) return 'unconfigured';
-  if (!config.enabled) return 'ready'; // has key but not yet tested/activated
+  if (!config.enabled) return 'ready'; // configured; activation is an explicit owner action
   return 'active';
 }
 
 function StatusDot({ status }: { status: 'active' | 'unconfigured' | 'ready' | 'disabled' }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const colors = {
     active: 'bg-emerald-500',
     unconfigured: 'bg-gray-400',
@@ -156,9 +156,9 @@ function StatusDot({ status }: { status: 'active' | 'unconfigured' | 'ready' | '
     disabled: 'bg-gray-400',
   };
   const labels = {
-    active: t('ai.providers.status.active', undefined, 'Active'),
+    active: t('ai.providers.status.enabled', undefined, locale === 'zh-CN' ? '已启用' : 'Enabled'),
     unconfigured: t('ai.providers.status.unconfigured', undefined, 'No API Key'),
-    ready: t('ai.providers.status.ready', undefined, 'Ready to Test'),
+    ready: t('ai.providers.status.configuredDisabled', undefined, locale === 'zh-CN' ? '已配置，未启用' : 'Configured, disabled'),
     disabled: t('ai.providers.status.disabled', undefined, 'Disabled'),
   };
   return (
@@ -185,7 +185,7 @@ export function meta() {
 // ---------------------------------------------------------------------------
 
 export default function LlmProvidersPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { hasPermission, hasRole } = useAuth();
   const canManagePlatform = hasRole('platform_admin');
   const canManageProviders = hasPermission('ai_center');
@@ -288,29 +288,40 @@ export default function LlmProvidersPage() {
     setLocalTestingPid(config.pid);
     try {
       const result = await post('/api/llm-config/{pid}/test', { pid: config.pid });
-      if (ResultHelper.isSuccess(result)) {
-        // Auto-enable provider after successful test
-        if (!config.enabled) {
-          await handleToggleEnabled(config);
-          showSuccessToast(
-            t(
-              'ai.providers.toast.testPassedActivated',
-              undefined,
-              'Connection test passed — provider activated',
-            ),
-          );
-        } else {
-          showSuccessToast(t('ai.providers.toast.testPassed', undefined, 'Connection test passed'));
-        }
+      const validation = result.data as { status?: unknown; message?: unknown } | null;
+      if (ResultHelper.isSuccess(result) && validation?.status === 'ok') {
+        // The current endpoint only validates configuration. It does not contact
+        // the LLM vendor, so it must never activate a provider or claim connectivity.
+        showSuccessToast(
+          t(
+            'ai.providers.toast.configValidated',
+            undefined,
+            locale === 'zh-CN'
+              ? '配置校验通过，未请求模型服务。请手动启用，再实际提问验证。'
+              : 'Configuration validated; no model request was made. Enable manually, then verify with a real question.',
+          ),
+        );
       } else {
         showErrorToast(
-          result.desc ||
-            t('ai.providers.toast.testFailed', undefined, 'Connection test failed'),
+          typeof validation?.message === 'string' && validation.message.trim()
+            ? validation.message
+            : result.desc ||
+                t(
+                  'ai.providers.toast.configValidationFailed',
+                  undefined,
+                  locale === 'zh-CN' ? '配置校验失败' : 'Configuration validation failed',
+                ),
         );
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       showErrorToast(
-        e.message || t('ai.providers.toast.testFailed', undefined, 'Connection test failed'),
+        e instanceof Error
+          ? e.message
+          : t(
+              'ai.providers.toast.configValidationFailed',
+              undefined,
+              locale === 'zh-CN' ? '配置校验失败' : 'Configuration validation failed',
+            ),
       );
     } finally {
       setLocalTestingPid(null);
@@ -501,7 +512,7 @@ function ProviderCard({
   onTest: () => void;
   onToggle: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const parsed = safeParseJSON(config.config);
   const status = getProviderStatus(config);
   const icon = PROVIDER_ICONS[config.providerCode] || '\u{2699}\uFE0F';
@@ -583,7 +594,7 @@ function ProviderCard({
               onClick={onTest}
               disabled={testing}
               className="rounded-md p-1.5 text-gray-400 transition-colors hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-emerald-400"
-              title={t('ai.providers.action.testConnection', undefined, 'Test Connection')}
+              title={t('ai.providers.action.validateConfig', undefined, locale === 'zh-CN' ? '校验配置' : 'Validate configuration')}
               data-testid={`provider-test-${config.providerCode}`}
             >
               {testing ? (
@@ -773,7 +784,7 @@ function EditSidePanel({
   onTest: (config: CloudConfig) => void;
   testing: string | null;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const existingParsed = config ? safeParseJSON(config.config) : {};
 
   // --- Form state ---
@@ -1099,7 +1110,7 @@ function EditSidePanel({
               </button>
             </div>
 
-            {/* Test Connection button (only for existing configs) */}
+            {/* Configuration validation button (saved configuration only) */}
             {config && (
               <button
                 type="button"
@@ -1111,12 +1122,12 @@ function EditSidePanel({
                 {testing === config.pid ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-emerald-600" />
-                    {t('ai.providers.action.testing', undefined, 'Testing...')}
+                    {t('ai.providers.action.validatingConfig', undefined, locale === 'zh-CN' ? '校验中…' : 'Validating configuration...')}
                   </>
                 ) : (
                   <>
                     <BeakerIcon className="h-4 w-4" />
-                    {t('ai.providers.action.testConnection', undefined, 'Test Connection')}
+                    {t('ai.providers.action.validateConfig', undefined, locale === 'zh-CN' ? '校验配置' : 'Validate configuration')}
                   </>
                 )}
               </button>

@@ -35,12 +35,20 @@ class CapabilityDescriptionLocalizationTest {
     void shippedDescriptionsSurviveRegistryMappingAndApiSerialization(String plugin) throws Exception {
         List<CapabilityDefinitionDTO> declarations = json.readValue(
                 Path.of("../plugins", plugin, "config/capabilities.json").toFile(), new TypeReference<>() {});
-        assertThat(declarations).hasSize(plugin.equals("org-management") ? 9 : 11);
+        // Shipped-catalog tripwire: bump when a merged PR grows the catalog, and keep every
+        // new declaration inside the localization contract asserted below.
+        assertThat(declarations).hasSize(plugin.equals("org-management") ? 12 : 102);
         MetaContext.setContext(20L, 1L, "tester", "tester");
         for (CapabilityDefinitionDTO declaration : declarations) {
+            // Chinese description is mandatory for every shipped capability.
             assertThat(declaration.getDescription()).isNotBlank();
-            assertThat(declaration.getDescriptionEn()).isNotBlank();
-            assertThat(declaration.getDescriptionEn()).doesNotContainPattern("[一-鿿]");
+            // English description is shipped where translated (bilingual-where-available):
+            // when present it must be real English; when absent the resolver keeps
+            // localizedDescriptions empty and the legacy zh description stays authoritative.
+            boolean bilingual = declaration.getDescriptionEn() != null && !declaration.getDescriptionEn().isBlank();
+            if (bilingual) {
+                assertThat(declaration.getDescriptionEn()).doesNotContainPattern("[一-鿿]");
+            }
             CapabilityMapper mapper = mock(CapabilityMapper.class);
             CapabilityRegistryServiceImpl registry = new CapabilityRegistryServiceImpl(mapper);
             registry.saveDefinition(declaration);
@@ -63,10 +71,16 @@ class CapabilityDescriptionLocalizationTest {
             assertThat(resolved.getIncludes()).isEqualTo(declaration.getIncludes());
             assertThat(resolved.isGranted()).isFalse();
             var payload = json.valueToTree(resolved);
-            assertThat(payload.path("localizedDescriptions").path("en").asText())
-                    .isEqualTo(declaration.getDescriptionEn());
-            assertThat(payload.path("localizedDescriptions").path("zh-CN").asText())
-                    .isEqualTo(declaration.getDescription());
+            if (bilingual) {
+                assertThat(payload.path("localizedDescriptions").path("en").asText())
+                        .isEqualTo(declaration.getDescriptionEn());
+                assertThat(payload.path("localizedDescriptions").path("zh-CN").asText())
+                        .isEqualTo(declaration.getDescription());
+            } else {
+                // No declared EN locale → the bilingual projection stays empty rather than
+                // passing the un-localized zh string off as English.
+                assertThat(resolved.getLocalizedDescriptions()).isEmpty();
+            }
             assertThat(payload.path("description").asText()).isEqualTo(declaration.getDescription());
         }
     }

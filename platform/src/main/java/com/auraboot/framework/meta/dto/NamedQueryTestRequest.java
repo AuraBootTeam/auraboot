@@ -16,6 +16,39 @@ import java.util.Map;
 @Data
 public class NamedQueryTestRequest {
 
+    /** Server-only source pin; clients cannot supply it to internal query endpoints. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String expectedDefinitionFingerprint;
+
+    /** Server-only public output selection; never expands the canonical field whitelist. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private java.util.Set<String> publishedOutputFields;
+
+    /** Monotonic execution deadline supplied by a trusted public query service. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Long executionDeadlineNanos;
+
+    /** Trusted virtual-resource row boundaries; independent of caller filter operator choices. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private java.util.List<ResourceCondition> resourceConditions;
+
+    /** Typed, server-validated public filters; JDBC temporal and decimal values stay intact. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private java.util.List<ResourceCondition> resourceFilters;
+
+    public record ResourceCondition(String field, String operator, Object value) {}
+
+    /** Trusted resource keyset continuation, bound to the current source grants by the public facade. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String resourceCursor;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private DynamicQueryRequest.KeysetContinuation resourceContinuation;
+
+    /** Trusted virtual-resource identity invariant; never accepted from public query JSON. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private boolean requireUniqueResourcePid;
+
     /**
      * 测试参数
      */

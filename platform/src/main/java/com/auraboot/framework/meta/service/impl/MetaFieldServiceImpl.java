@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
+import com.auraboot.framework.meta.entity.payload.FieldUiSchemaBean;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
@@ -126,6 +127,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setDataSourceId(request.getDataSourceId());
         entity.setFeature(mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
         entity.setRefTarget(mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
+        entity.setUiSchema(mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
         entity.setStatus(Boolean.TRUE.equals(request.getAutoPublish()) ? "published"
@@ -252,6 +254,8 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setDataSourceId(request.getDataSourceId());
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
+        entity.setUiSchema(request.getUiSchema() == null ? existingEntity.getUiSchema()
+                : mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
         entity.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : StatusConstants.DRAFT);
         entity.setTenantId(MetaContext.getCurrentTenantId());
         entity.setCreatedAt(Instant.now());
@@ -743,6 +747,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
                 .feature(beanToMap(entity.getFeature()))
                 .refTarget(beanToMap(entity.getRefTarget()))
+                .uiSchema(beanToMap(entity.getUiSchema()))
                 .extension(extensionConverter.toMap(entity.getExtension())) // ✅ 使用ExtensionConverter将ExtensionBean转换为Map
                 .createdAt(DateUtil.toUtcLocalDateTime(entity.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(entity.getUpdatedAt()))

@@ -10,6 +10,7 @@ import {
   useLoaderData,
   type LoaderFunctionArgs,
 } from 'react-router';
+import { context as traceContext, propagation as tracePropagation } from '@opentelemetry/api';
 import React, { useEffect, useState } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
 
@@ -131,7 +132,10 @@ export async function resolveDeploymentBrandingFromBff(
   return payload.branding;
 }
 
-export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
+export async function loader({
+  request,
+  context,
+}: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const requestUrl = new URL(request.url);
@@ -144,13 +148,14 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
-  const branding = await resolveDeploymentBrandingFromBff(process.env);
   const buildIdentity = resolveBuildIdentity(process.env);
-
-  // Bootstrap status: never redirect; inject into loader data so the banner can render
-  const bootstrapStatus = await fetchBootstrapStatus();
-  const accessPolicy = await fetchAccessPolicy();
-  const token = await getTokenFromRequest(request);
+  // These reads are independent. Keep every request fresh without serial network waits.
+  const [branding, bootstrapStatus, accessPolicy, token] = await Promise.all([
+    resolveDeploymentBrandingFromBff(process.env),
+    fetchBootstrapStatus(),
+    fetchAccessPolicy(),
+    getTokenFromRequest(request),
+  ]);
 
   // Public runtime shells must never load admin user, permissions, or menus.
   // This includes logged-in browser sessions visiting a storefront or checkout
@@ -218,7 +223,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const [{ user, permissions, preferences }, i18nData, spaces] = await Promise.all([
-    getUserInfo(request),
+    getUserInfo(request, context),
     getI18nData(locale, request),
     fetchSpaces(),
   ]);
@@ -255,7 +260,10 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const edition = process.env.EDITION || 'enterprise';
+  const traceCarrier: Record<string, string> = {};
+  tracePropagation.inject(traceContext.active(), traceCarrier);
   const rootData: RootLoaderData = {
+    traceparent: traceCarrier.traceparent,
     runtimeProfile,
     user,
     permissions,
@@ -318,13 +326,15 @@ export function resolveBrandingDocumentLinks(branding: BrandingConfig) {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
+  const rootData = useRootLoaderData();
+  const branding = rootData?.branding ?? COMMUNITY_BRANDING;
   return (
     <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
+        {rootData?.traceparent && <meta name="traceparent" content={rootData.traceparent} />}
         <Meta />
         <Links />
         {resolveBrandingDocumentLinks(branding).map((link) => (

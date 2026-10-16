@@ -41,6 +41,10 @@ public interface NamedQueryService {
      */
     NamedQueryDTO findByCode(String code);
 
+    /** Fresh definition and resolved SQL sources from the same runtime catalog used by execution. */
+    record ExecutionDefinition(NamedQueryDTO definition, String fingerprint, java.util.Set<String> sourceModels) { }
+    ExecutionDefinition describeExecution(String code);
+
     // ==================== List queries ====================
 
     /**

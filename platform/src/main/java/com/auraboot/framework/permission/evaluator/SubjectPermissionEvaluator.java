@@ -233,6 +233,14 @@ public class SubjectPermissionEvaluator {
             subjectIds
         );
         
+        // With no declarations every requested subject is visible under the existing policy.
+        // Do not resolve roles/permissions when they cannot affect the result.
+        if (allDeclarations.isEmpty()) {
+            Map<Long, Boolean> results = new HashMap<>();
+            subjectIds.forEach(id -> results.put(id, true));
+            return results;
+        }
+
         // 2. 查询用户Permission（只查一次）
         Set<Long> userPermissions = userPermissionService.getUserPermissionIds(userId);
         

@@ -11,6 +11,7 @@ import FILE_ATTACHMENT_TEXT from './FileAttachmentField.i18n.json';
 
 interface FileItem {
   name: string;
+  fileId?: string;
   url: string;
   size?: number;
   type?: string;
@@ -26,6 +27,12 @@ interface FileAttachmentFieldProps {
   maxSize?: number;
   onChange?: (value: FileItem[]) => void;
   context?: any;
+}
+
+export function attachmentDownloadUrl(value: string): string | null {
+  if (/^\/download\/[A-Za-z0-9_-]+$/.test(value)) return `/api/file${value}`;
+  if (/^\/api\/file\/download\/[A-Za-z0-9_-]+$/.test(value)) return value;
+  try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; } catch { return null; }
 }
 
 function parseValue(value: any): FileItem[] {
@@ -81,22 +88,25 @@ export function FileAttachmentField({
         try {
           const res = await uploadFile(file);
           const json = await res.json();
-          if (json.code === '0' && json.data) {
+          if (json.code === '0' && json.data?.fileId) {
             newFiles.push({
               name: file.name,
-              url: json.data.url || json.data,
+              fileId: json.data.fileId,
+              url: `/api/file/download/${encodeURIComponent(json.data.fileId)}`,
               size: file.size,
               type: file.type,
             });
+          } else {
+            throw new Error(json.message || json.desc || uploadText('uploadFailed'));
           }
         } catch (err) {
-          console.error(`[FileAttachmentField] Upload failed: ${file.name}`, err);
+          showErrorToast(`${file.name}: ${uploadText('uploadFailed')}`);
         }
       }
       setUploading(false);
       onChange?.([...files, ...newFiles]);
     },
-    [files, maxSize, onChange],
+    [files, maxSize, onChange, showErrorToast, uploadText],
   );
 
   const handleRemove = useCallback(
@@ -109,16 +119,19 @@ export function FileAttachmentField({
   if (readOnly) {
     if (files.length === 0) return <span className="text-text-3 text-sm">—</span>;
     return (
-      <div className="space-y-1">
+      <div className="flex flex-wrap gap-x-8 gap-y-4">
         {files.map((f, i) => (
           <a
             key={i}
-            href={f.url}
-            target="_blank"
+            href={attachmentDownloadUrl(f.url) || undefined}
+            download={f.name}
+            aria-disabled={!attachmentDownloadUrl(f.url)}
+            data-testid={`attachment-download-${i}`}
+            target="_self"
             rel="noopener noreferrer"
             className="text-accent flex items-center gap-2 text-sm hover:underline"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="border-border bg-subtle text-text-3 h-8 w-7 shrink-0 rounded border p-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -126,7 +139,7 @@ export function FileAttachmentField({
                 d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
               />
             </svg>
-            {f.name} {f.size ? `(${formatSize(f.size)})` : ''}
+<span><strong className="text-text block text-xs font-medium">{f.name}</strong>{f.size != null && <small className="text-text-3 mt-1 block text-[11px]">{formatSize(f.size)}</small>}</span>
           </a>
         ))}
       </div>

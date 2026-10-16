@@ -12,6 +12,7 @@ import com.auraboot.framework.email.model.EmailRecordLink;
 import com.auraboot.framework.email.service.EmailRecordLinkService;
 import com.auraboot.framework.email.service.EmailSendService;
 import com.auraboot.framework.email.service.EmailTrackingService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -37,6 +38,7 @@ import java.util.Map;
 @RequestMapping("/api/email/messages")
 @RequiredArgsConstructor
 @Tag(name = "Email Messages", description = "Inbox, send, and CRM linking for email messages")
+@AuthenticatedAccess("inbox/send/CRM-link endpoints operate on the caller's tenant email data and connected accounts via MetaContext")
 public class EmailMessageController {
 
     private final EmailMessageMapper     emailMessageMapper;

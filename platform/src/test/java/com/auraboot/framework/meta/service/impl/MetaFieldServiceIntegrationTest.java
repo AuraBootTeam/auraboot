@@ -214,4 +214,29 @@ public class MetaFieldServiceIntegrationTest extends BaseIntegrationTest {
                 "首次创建不能丢失 transient 特性，否则动态查询会访问不存在的物理列");
     }
 
+    @Test
+    @Order(10)
+    @DisplayName("Business labels survive field creation, readback and version updates")
+    public void testBusinessLabelPersistence() {
+        MetaFieldCreateRequest request = new MetaFieldCreateRequest();
+        request.setCode("launch_label_" + System.currentTimeMillis());
+        request.setDataType("string");
+        request.setUiSchema(Map.of("label", "Customer name", "placeholder", "Enter a customer name"));
+        MetaFieldDTO created = metaFieldService.create(request);
+        assertEquals("Customer name", created.getDisplayName());
+        MetaFieldDTO persisted = metaFieldService.findByPid(created.getPid());
+        assertEquals("Customer name", persisted.getUiSchema().get("label"));
+        assertEquals("Enter a customer name", persisted.getUiSchema().get("placeholder"));
+
+        MetaFieldUpdateRequest update = new MetaFieldUpdateRequest();
+        update.setDataType("string");
+        MetaFieldDTO next = metaFieldService.update(created.getPid(), update);
+        assertNotEquals(created.getPid(), next.getPid());
+        assertEquals("Customer name", metaFieldService.findByPid(next.getPid()).getDisplayName());
+
+        update.setUiSchema(Map.of("label", "Customer organization"));
+        MetaFieldDTO renamed = metaFieldService.update(next.getPid(), update);
+        assertEquals("Customer organization", metaFieldService.findByPid(renamed.getPid()).getDisplayName());
+    }
+
 }

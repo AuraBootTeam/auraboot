@@ -85,5 +85,15 @@
     "extension": {
       "multiline": true
     }
+  },
+  {
+    "code": "tpm_ms_reached_at",
+    "displayName:zh-CN": "完成时间",
+    "displayName:en": "Completed at",
+    "dataType": "datetime",
+    "description": "Server time recorded by the milestone completion command.",
+    "extension": {
+      "readOnly": true
+    }
   }
 ]

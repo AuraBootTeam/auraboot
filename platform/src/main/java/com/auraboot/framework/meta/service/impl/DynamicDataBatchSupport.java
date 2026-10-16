@@ -58,6 +58,10 @@ final class DynamicDataBatchSupport extends BaseMetaService {
 
     private final ToColumnDataOperation toColumnDataOperation;
 
+    private final ModelMutationObserver mutationObserver;
+
+    private final java.util.function.BiConsumer<String, String> deleteOperation;
+
     @FunctionalInterface
     interface GetByIdOperation { Map<String, Object> execute(String modelCode, String recordId); }
 
@@ -239,6 +243,9 @@ final class DynamicDataBatchSupport extends BaseMetaService {
                     "Bulk create expected " + dataList.size() + " rows inserted but got " + inserted);
         }
 
+        for (var row : createdRecords) {
+            mutationObserver.observe(model, row.get(primaryKey.getCode()).toString(), ModelMutationObserver.Operation.CREATED);
+        }
         return createdRecords;
     }
 
@@ -302,6 +309,15 @@ final class DynamicDataBatchSupport extends BaseMetaService {
 
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertDeleteAllowed(model);
+        if (new HashSet<>(recordIds).size() != recordIds.size()) {
+            throw new MetaServiceException("Batch delete cannot contain duplicate record IDs");
+        }
+        if (model.isSoftDelete()) {
+            // The owning batch transaction covers all rows. Reuse the guarded single
+            // delete so tombstones, row versions and before-delete events stay aligned.
+            recordIds.forEach(recordId -> deleteOperation.accept(modelCode, recordId));
+            return;
+        }
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(
@@ -355,6 +371,9 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             }
         }
 
+        for (String recordId : recordIds) {
+            mutationObserver.observe(model, recordId, ModelMutationObserver.Operation.DELETED);
+        }
         int affected = dynamicDataMapper.deleteByQuery(sql.toString(), params);
         if (affected != recordIds.size()) {
             throw new MetaServiceException(

@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.decision.ast.ConditionAstEvaluator;
 import com.auraboot.framework.decision.ast.ConditionNode;
@@ -112,6 +113,8 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
     @Override
     public String buildRowFilter(Long tenantId, String modelCode, String actionCode, Long userId) {
+        // Machine paths must use bound constraints; unadapted SQL callers cannot inherit human defaults.
+        if (MachineDataAccessContext.isActive()) return "AND 1 = 0";
         // Phase 2: findEffectivePolicies joins ab_user_role on member_id.
         // Get memberId from MetaContext; fall back to userId for backward compat (scheduled tasks etc.)
         Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
@@ -223,6 +226,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @Override
     public boolean canAccessRecord(Long tenantId, String modelCode, String actionCode, Long userId,
                                    Map<String, Object> record) {
+        if (MachineDataAccessContext.isActive()) {
+            var decision = MachineDataAccessContext.requireDecision(modelCode);
+            decision.requireAction(actionCode);
+            return decision.permits(record);
+        }
         if (record == null) {
             return false;
         }

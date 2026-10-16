@@ -98,7 +98,13 @@ public class AutomationCommandEventBridge {
         try {
             switch (operationType.toLowerCase()) {
                 case "create" -> handleCreate(event, modelCode, recordPid);
-                case "update" -> handleUpdate(event, modelCode, recordPid);
+                case "update" -> {
+                    if (configuredTransition(event) != null) {
+                        handleStateTransition(event, modelCode, recordPid);
+                    } else {
+                        handleUpdate(event, modelCode, recordPid);
+                    }
+                }
                 case "state_transition" -> handleStateTransition(event, modelCode, recordPid);
                 case "delete" -> {
                     // delete triggers are not currently modelled in AutomationTriggerService;
@@ -155,15 +161,27 @@ public class AutomationCommandEventBridge {
         }
     }
 
+    private static Map<?, ?> configuredTransition(CommandCompletedEvent event) {
+        Object value = event.getMetadata() == null ? null : event.getMetadata().get("commandStateTransition");
+        if (value instanceof Map<?, ?> transition
+                && transition.get("stateField") instanceof String stateField && StringUtils.hasText(stateField)
+                && transition.get("toState") instanceof String toState && StringUtils.hasText(toState)) {
+            return transition;
+        }
+        return null;
+    }
+
     private void handleStateTransition(CommandCompletedEvent event, String modelCode, String recordPid) {
         Map<String, Object> metadata = event.getMetadata();
         Map<String, Object> payload = event.getPayload();
 
         // Determine the state field for this model so we can extract from/to state values.
-        String stateField = commandStateCheckExecutor.getStateFieldForModel(modelCode);
+        Map<?, ?> transition = configuredTransition(event);
+        String stateField = transition != null ? (String) transition.get("stateField")
+                : commandStateCheckExecutor.getStateFieldForModel(modelCode);
 
         String fromState = null;
-        String toState = null;
+        String toState = transition != null ? (String) transition.get("toState") : null;
 
         if (StringUtils.hasText(stateField)) {
             @SuppressWarnings("unchecked")
@@ -174,7 +192,7 @@ public class AutomationCommandEventBridge {
             if (beforeSnapshot != null && beforeSnapshot.get(stateField) != null) {
                 fromState = String.valueOf(beforeSnapshot.get(stateField));
             }
-            if (payload != null && payload.get(stateField) != null) {
+            if (toState == null && payload != null && payload.get(stateField) != null) {
                 toState = String.valueOf(payload.get(stateField));
             }
         }

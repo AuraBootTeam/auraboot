@@ -13,6 +13,8 @@ import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.PageSchemaService;
@@ -41,6 +43,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -64,6 +68,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
     private final com.auraboot.framework.rbac.service.RoleService roleService;
     private final UserRoleService userRoleService;
     private final PageSchemaService pageSchemaService;
+    private final PageSchemaMapper pageSchemaMapper;
     private final ObjectMapper objectMapper;
     private final UserPermissionService userPermissionService;
     
@@ -81,6 +86,9 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         if (modelDTO == null) {
             throw new BusinessException(ResponseCode.BadParam, "Model not found: " + modelCode);
         }
+        // Validate and lock all selected existing pages before any resource writes.
+        // The outer transaction rolls every page back if subsequent generation fails.
+        Map<String, PageSchemaDTO> targets = preparePageTargets(modelDTO, config);
         
         // 3. Load entity-level objects for DslGenerator
         Model modelEntity = metaModelMapper.findCurrentByCode(modelCode);
@@ -103,17 +111,17 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
 
         if (config.isGenerateList()) {
             PageSchema listSchema = dslGenerator.generateListPage(modelEntity, bindings, fieldEntities, config);
-            PageSchemaDTO listPage = saveGeneratedPageSchema(listSchema, modelDTO);
+            PageSchemaDTO listPage = saveGeneratedPageSchema(listSchema, modelDTO, targets.get("list"));
             generatedPages.add(buildGeneratedPage(listPage, modelDTO.getCode(), "list"));
         }
         if (config.isGenerateForm()) {
             PageSchema formSchema = dslGenerator.generateFormPage(modelEntity, bindings, fieldEntities, config);
-            PageSchemaDTO formPage = saveGeneratedPageSchema(formSchema, modelDTO);
+            PageSchemaDTO formPage = saveGeneratedPageSchema(formSchema, modelDTO, targets.get("form"));
             generatedPages.add(buildGeneratedPage(formPage, modelDTO.getCode(), "form"));
         }
         if (config.isGenerateDetail()) {
             PageSchema detailSchema = dslGenerator.generateDetailPage(modelEntity, bindings, fieldEntities, config);
-            PageSchemaDTO detailPage = saveGeneratedPageSchema(detailSchema, modelDTO);
+            PageSchemaDTO detailPage = saveGeneratedPageSchema(detailSchema, modelDTO, targets.get("detail"));
             generatedPages.add(buildGeneratedPage(detailPage, modelDTO.getCode(), "detail"));
         }
         
@@ -183,7 +191,40 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
     }
     
     
-    private PageSchemaDTO saveGeneratedPageSchema(PageSchema pageSchema, MetaModelDTO model) {
+    private Map<String, PageSchemaDTO> preparePageTargets(MetaModelDTO model, CrudTemplateConfig config) {
+        List<String> kinds = new ArrayList<>();
+        if (config.isGenerateList()) kinds.add("list");
+        if (config.isGenerateForm()) kinds.add("form");
+        if (config.isGenerateDetail()) kinds.add("detail");
+        Map<String, PageSchemaDTO> targets = new LinkedHashMap<>();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        for (String kind : kinds) {
+            String key = model.getCode() + "_" + kind;
+            PageSchemaDTO existing = pageSchemaService.findByPageKey(key);
+            if (existing == null) continue;
+            Object flag = existing.getExtension() == null ? null : existing.getExtension().get("auto_created");
+            if (!(Boolean.TRUE.equals(flag) || "true".equals(flag))
+                    || tenantId == null || !Objects.equals(tenantId, existing.getTenantId())
+                    || !Objects.equals(tenantId, model.getTenantId())
+                    || !Objects.equals(model.getCode(), existing.getModelCode())
+                    || !Objects.equals(kind, existing.getKind()) || !Objects.equals(key, existing.getPageKey())) {
+                throw new ConflictException("Existing page is not an unchanged platform placeholder: " + key);
+            }
+            targets.put(kind, existing);
+        }
+        for (Map.Entry<String, PageSchemaDTO> entry : targets.entrySet()) {
+            PageSchemaDTO existing = entry.getValue();
+            int rowVersion = existing.getRowVersion() == null ? 1 : existing.getRowVersion();
+            String locked = pageSchemaMapper.lockAutoCreatedPage(existing.getPid(), tenantId,
+                    model.getCode(), entry.getKey(), existing.getPageKey(), rowVersion);
+            if (!Objects.equals(existing.getPid(), locked)) {
+                throw new ConflictException("Page changed during template generation: " + existing.getPageKey());
+            }
+        }
+        return targets;
+    }
+
+    private PageSchemaDTO saveGeneratedPageSchema(PageSchema pageSchema, MetaModelDTO model, PageSchemaDTO existing) {
         PageSchemaCreateRequest request = new PageSchemaCreateRequest();
 
         // kind should be lowercase: list, form, detail
@@ -199,10 +240,12 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         request.setName(pageSchema.getName());
         request.setTitle(pageSchema.getTitle());
         request.setKind(kind);
+        request.setSchemaVersion(pageSchema.getSchemaVersion() != null ? pageSchema.getSchemaVersion()
+                : com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         request.setProfile(pageSchema.getProfile());
         request.setDescription(pageSchema.getDescription() != null
                 ? pageSchema.getDescription()
-                : "Auto-generated page for " + model.getDisplayName());
+                : "Auto-generated page for " + model.getCode());
         request.setIsTemplate(false);
 
         // Convert V2 blocks JSON string to List
@@ -229,7 +272,30 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             }
         }
 
-        PageSchemaDTO page = pageSchemaService.create(request);
+        PageSchemaDTO page;
+        if (existing == null) {
+            page = pageSchemaService.create(request);
+        } else {
+            // Follow the existing lifecycle; publish rejects an already-published page.
+            // All lifecycle changes stay inside the generation transaction and row lock.
+            if ("published".equals(existing.getStatus())) pageSchemaService.unpublish(existing.getPid());
+            PageSchemaUpdateRequest update = new PageSchemaUpdateRequest();
+            update.setRowVersion(existing.getRowVersion() == null ? 1 : existing.getRowVersion());
+            update.setPageKey(request.getPageKey());
+            update.setModelCode(request.getModelCode());
+            update.setName(request.getName());
+            update.setTitle(request.getTitle());
+            update.setDescription(request.getDescription());
+            update.setKind(request.getKind());
+            update.setProfile(request.getProfile());
+            update.setLayout(request.getLayout());
+            update.setBlocks(request.getBlocks());
+            update.setSchemaVersion(request.getSchemaVersion());
+            Map<String, Object> extension = new LinkedHashMap<>(existing.getExtension());
+            extension.remove("auto_created");
+            update.setExtension(extension);
+            page = pageSchemaService.update(existing.getPid(), update);
+        }
 
         // Auto-publish the page
         page = pageSchemaService.publish(page.getPid());
@@ -243,7 +309,11 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             .pid(page.getPid())
             .pageName(page.getName())
             .kind(kind)
-            .route("/dynamic/" + modelCode)
+            .route(switch (kind) {
+                case "form" -> "/p/" + modelCode + "/new";
+                case "detail" -> "/p/" + modelCode + "/view/:recordPid";
+                default -> "/p/" + modelCode;
+            })
             .createdAt(page.getCreatedAt() != null ? page.getCreatedAt().toString() : Instant.now().toString())
             .build();
     }
@@ -254,7 +324,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         Menu menu = new Menu();
         menu.setPid(UniqueIdGenerator.generate());
         menu.setName(config.getMenuName());
-        menu.setPath("/dynamic/" + model.getCode());
+        menu.setPath("/p/" + model.getCode());
         menu.setIcon(config.getMenuIcon());
         menu.setType(1); // MENU = 1
         menu.setOrderNo(100);
@@ -292,7 +362,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         String[] actions = {"read", "create", "update", "delete"};
         for (String action : actions) {
             PermissionCreateRequest request = new PermissionCreateRequest();
-            request.setCode("dynamic." + resourceCode + "." + action);
+            request.setCode("model." + resourceCode + "." + action);
             request.setName(model.getDisplayName() + " - " + action);
             request.setResourceType(resourceType);
             request.setResourceCode(resourceCode);
@@ -314,7 +384,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         // Export permission
         if (config.isEnableExport()) {
             PermissionCreateRequest request = new PermissionCreateRequest();
-            request.setCode("dynamic." + resourceCode + ".export");
+            request.setCode("model." + resourceCode + ".export");
             request.setName(model.getDisplayName() + " - export");
             request.setResourceType(resourceType);
             request.setResourceCode(resourceCode);
@@ -336,7 +406,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         // Import permission
         if (config.isEnableImport()) {
             PermissionCreateRequest request = new PermissionCreateRequest();
-            request.setCode("dynamic." + resourceCode + ".import");
+            request.setCode("model." + resourceCode + ".import");
             request.setName(model.getDisplayName() + " - import");
             request.setResourceType(resourceType);
             request.setResourceCode(resourceCode);
@@ -425,9 +495,9 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
     ) {
         // Build access links
         AccessLinks accessLinks = AccessLinks.builder()
-            .listPage("/dynamic/" + model.getCode())
-            .formPage("/dynamic/" + model.getCode() + "/new")
-            .detailPage("/dynamic/" + model.getCode() + "/:id")
+            .listPage("/p/" + model.getCode())
+            .formPage("/p/" + model.getCode() + "/new")
+            .detailPage("/p/" + model.getCode() + "/view/:recordPid")
             .build();
         
         // Build generated resources

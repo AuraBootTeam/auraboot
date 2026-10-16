@@ -15,9 +15,22 @@
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "provides": [
-    {"type": "model", "code": "tpm_project"},
-    {"type": "model", "code": "tpm_task"},
-    {"type": "model", "code": "tpm_milestone"}
+    {
+      "type": "model",
+      "code": "tpm_project"
+    },
+    {
+      "type": "model",
+      "code": "tpm_task"
+    },
+    {
+      "type": "model",
+      "code": "tpm_milestone"
+    },
+    {
+      "type": "model",
+      "code": "tpm_customer"
+    }
   ],
   "requires": [],
   "resourceDirs": {
@@ -30,7 +43,8 @@
     "permissions": "config/permissions.json",
     "menus": "config/menus.json",
     "i18n": "config/i18n.json",
-    "namedQueries": "config/named-queries.json"
+    "namedQueries": "config/named-queries.json",
+    "roles": "config/roles.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

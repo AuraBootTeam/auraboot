@@ -8,6 +8,7 @@ import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.D
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayRequest;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayResult;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +25,7 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/api/admin/reliable-integration/dead-letters")
 @RequiredArgsConstructor
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; inspects and replays the tenant's integration dead-letter messages")
 public class ReliableIntegrationOperatorController {
 
     private final ReliableIntegrationOperatorService service;

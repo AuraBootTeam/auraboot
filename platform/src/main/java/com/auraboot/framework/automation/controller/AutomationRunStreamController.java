@@ -2,6 +2,7 @@ package com.auraboot.framework.automation.controller;
 
 import com.auraboot.framework.agent.dto.LlmChunk;
 import com.auraboot.framework.automation.event.AutomationRunStreamPublisher;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/automation-runs")
+@AuthenticatedAccess("admin-surface SSE stream of live automation-run LLM chunks; guarded by AdminRoleInterceptor tenant-admin check")
 public class AutomationRunStreamController {
 
     /** Long-poll keepalive: 30 minutes is well above any realistic LLM call. */

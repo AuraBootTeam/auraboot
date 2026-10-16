@@ -343,6 +343,7 @@ dependencies {
     runtimeOnly project(':platform-storage-minio')
     runtimeOnly project(':platform-storage-s3')
     runtimeOnly project(':platform-storage-oss')
+    runtimeOnly project(':platform-storage-cos')
 
     // XXL-JOB scheduler engine is opt-in only (-PwithSchedulerXxl=true): xxl-job-core
     // is GPL-3.0 and must never enter the default distribution. See
@@ -663,7 +664,24 @@ test {
     }
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
-    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    // Task-owned CI may use a smaller worker under its enforced container budget.
+    // Development defaults remain unchanged; malformed explicit limits fail configuration.
+    def testMemory = [auraTestMaxHeap: '6g', auraTestMinHeap: '2g']
+    testMemory.each { key, fallback ->
+        def value = project.hasProperty(key) ? project.property(key).toString() : fallback
+        if (!(value ==~ /[1-9][0-9]*[mMgG]/)) {
+            throw new GradleException("Invalid test memory limit: ${key}")
+        }
+        testMemory[key] = value
+    }
+    jvmArgs "-Xmx${testMemory.auraTestMaxHeap}", "-Xms${testMemory.auraTestMinHeap}", '-XX:+UseG1GC'
+    if (project.hasProperty('auraTestMaxMetaspace')) {
+        def metaspace = project.property('auraTestMaxMetaspace').toString()
+        if (!(metaspace ==~ /[1-9][0-9]*[mMgG]/)) {
+            throw new GradleException('Invalid test memory limit: auraTestMaxMetaspace')
+        }
+        jvmArgs "-XX:MaxMetaspaceSize=${metaspace}"
+    }
 
     // TestContainers: Docker Desktop 29+ requires API v1.44+. The api.version
     // property in src/test/resources/docker-java.properties pins docker-java
@@ -1252,4 +1270,18 @@ tasks.register('integrationTest', Test) {
 // Ensure IT compile errors surface during `./gradlew check`.
 tasks.named('check').configure {
     dependsOn 'compileIntegrationTestJava'
+}
+
+// Local enforcement of the controller-authz fail-open ratchet: any `check` run (test chains
+// included) fails when a NEW write/sensitive controller appears with no @RequirePermission /
+// @AuthenticatedAccess / @RequirePlatformAdmin. Deliberately wired outside GitHub Actions —
+// Actions stays disabled on this repository; this is the enforcement point.
+tasks.register('controllerAuthzCheck', Exec) {
+    group = 'verification'
+    description = 'Fails when a new un-annotated write/sensitive controller appears (scripts/check-controller-authz.mjs).'
+    workingDir = rootDir.parentFile
+    commandLine 'node', 'scripts/check-controller-authz.mjs'
+}
+tasks.named('check').configure {
+    dependsOn 'controllerAuthzCheck'
 }

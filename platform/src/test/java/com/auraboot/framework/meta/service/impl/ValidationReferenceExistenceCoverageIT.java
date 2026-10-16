@@ -129,9 +129,11 @@ class ValidationReferenceExistenceCoverageIT {
     static class Stack {
         @Bean DataSource dataSource() {
             String url = System.getenv("TEST_DATABASE_URL");
-            if (url == null || !url.matches("jdbc:postgresql://[^/]+/aura_bpm_[0-9]+(?:\\?.*)?")) {
-                throw new IllegalStateException("TEST_DATABASE_URL must identify an owned aura_bpm slot database");
-            }
+            // Slot-named local DBs are always owned; under the CI runner the compose-provisioned
+            // aura_boot database is this run's fresh, disposable slot (AURA_CI_JOB_ID contract).
+            com.auraboot.framework.test.util.OwnedTestDatabase.require(url,
+                    com.auraboot.framework.test.util.OwnedTestDatabase.AURA_BPM_SLOT_PATTERN,
+                    "TEST_DATABASE_URL must identify an owned aura_bpm slot database");
             return new DriverManagerDataSource(url, System.getenv("TEST_DATABASE_USERNAME"),
                     System.getenv().getOrDefault("TEST_DATABASE_PASSWORD", ""));
         }

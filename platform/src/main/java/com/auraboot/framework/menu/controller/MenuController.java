@@ -7,6 +7,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +28,7 @@ import java.util.Map;
 @Controller
 @RequestMapping("/api/menu")
 @Tag(name = "Menu", description = "User menu tree and menu management APIs")
+@AuthenticatedAccess("user menu tree, permission-check and menu-listing reads for the authenticated caller; write operations carry method-level @RequirePermission(MENU_MANAGE)")
 public class MenuController {
 
     @Autowired

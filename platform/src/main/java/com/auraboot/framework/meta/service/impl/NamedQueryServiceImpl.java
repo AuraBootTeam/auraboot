@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
@@ -89,6 +90,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
     @org.springframework.beans.factory.annotation.Autowired
     private NamedQueryFieldProtection fieldProtection;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate deadlineJdbc;
 
     private final NamedQueryMapper namedQueryMapper;
     private final NamedQueryFieldMapper namedQueryFieldMapper;
@@ -305,6 +309,23 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         var fields = readFields(definition);
         dto.setFields(fields.stream().map(this::toFieldDTO).toList());
         dto.setFieldCount(fields.size());
+        return dto;
+    }
+
+    @Override
+    public ExecutionDefinition describeExecution(String code) {
+        var definition = readDefinition(code);
+        if (definition == null) throw new MetaServiceException("Named query not found: " + code);
+        var fields = readFields(definition);
+        var dto = executionDTO(definition.query(), fields);
+        var sources = definition.query().isConnectorType() ? Set.<String>of()
+                : fieldProtection.resolveSourceModels(definition.query(), fields);
+        return new ExecutionDefinition(dto, com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(dto), sources);
+    }
+
+    private NamedQueryDTO executionDTO(NamedQuery query, List<NamedQueryField> fields) {
+        var dto = toDTO(query, false);
+        dto.setFields(fields.stream().map(this::toFieldDTO).toList()); dto.setFieldCount(fields.size());
         return dto;
     }
 
@@ -701,11 +722,16 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 policy, authorizationParams, MetaContext.getCurrentMemberId());
         authorizeDeclaredResource(query, policy, authorizationParams);
 
+        List<NamedQueryField> fields = readFields(definition);
+        if (request.getExpectedDefinitionFingerprint() != null && !request.getExpectedDefinitionFingerprint().equals(
+                com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(executionDTO(query, fields)))) {
+            throw new com.auraboot.framework.meta.exception.NamedQuerySourceChangedException();
+        }
+
         // 2. Rate limit check
         if (policy.isRateLimitEnabled()) {
             if (!rateLimiter.tryAcquire(tenantId, code, policy.getRateLimitPerMinute())) {
-                throw new MetaServiceException("Rate limit exceeded for query: " + code
-                        + " (max " + policy.getRateLimitPerMinute() + " per minute)");
+                throw new com.auraboot.framework.meta.exception.NamedQueryRateLimitException(code, policy.getRateLimitPerMinute());
             }
         }
 
@@ -715,13 +741,19 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         // 3. Get field whitelist
-        List<NamedQueryField> fields = readFields(definition);
         validatePublicOutputAliases(fields);
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
+        List<NamedQueryField> selectedFields = fields;
+        if (request.getPublishedOutputFields() != null) {
+            var selected = request.getPublishedOutputFields();
+            if (selected.isEmpty() || !fieldMap.keySet().containsAll(selected)) throw new AccessDeniedException("Invalid published query output selection");
+            selectedFields = fields.stream().filter(field -> selected.contains(field.getFieldCode())).toList();
+        }
+
         // 4. Build SELECT columns (validate expressions to prevent SQL injection via admin config)
-        List<String> selectColumns = fields.stream()
+        List<String> selectColumns = selectedFields.stream()
                 .map(f -> {
                     SqlSafetyUtils.validateSqlFragment(f.getColumnExpr());
                     SqlSafetyUtils.validateIdentifier(f.getFieldCode(), "NQ field code");
@@ -762,6 +794,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
         }
 
+        appendResourceBoundaries(request, fieldMap, whereClauses, params);
+
         // 8. Add tenant isolation and current user context (override any caller-supplied values)
         params.put("tenantId", tenantId);
         Long userId = getCurrentUserId();
@@ -771,7 +805,14 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         boolean rootRecordGrant = authorizeRootRecord(query, policy, params);
         boolean aggregateRootGrant = collaboratorGrant || rootRecordGrant;
 
-        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list", aggregateRootGrant);
+        applyExecutionDeadline(request);
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, selectedFields, "list", aggregateRootGrant);
+        if (MachineDataAccessContext.isActive()) {
+            protection.parameters().forEach((key, value) -> {
+                if (params.containsKey(key)) throw new AccessDeniedException("Reserved machine named query parameter");
+                params.put(key, value);
+            });
+        }
         // Masked values must not be inferable through keyword matching or result counts.
         Set<String> maskedAliases = protection.protections().stream()
                 .flatMap(group -> group.aliases().keySet().stream()).collect(Collectors.toSet());
@@ -808,23 +849,122 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
+        fieldProtection.validateMachineSql(protection, sql.toString());
         sql = new StringBuilder(fieldProtection.rewrite(protection, sql.toString()));
 
         // Count total
         // The shared source rewrite already applies tenant and row scopes before counting.
         // TenantLineInterceptor fails on deeply nested subqueries wrapped by the NQ engine.
-        String countSql = "SELECT COUNT(*) FROM (" + sql + ") AS _count_query";
+        if (request.isRequireUniqueResourcePid()
+                && (!MachineDataAccessContext.isActive() || request.getPublishedOutputFields() == null
+                    || !request.getPublishedOutputFields().contains("pid"))) {
+            throw new AccessDeniedException("Trusted machine resource PID projection required");
+        }
+        // Check the complete scoped result before LIMIT: a duplicate may lie beyond the first page.
+        String countExpression = request.isRequireUniqueResourcePid()
+                ? "CASE WHEN COUNT(*) = COUNT(DISTINCT \"pid\") THEN COUNT(*) ELSE -1 END" : "COUNT(*)";
+        String countSql = "SELECT " + countExpression + " FROM (" + sql + ") AS _count_query";
+        applyExecutionDeadline(request);
         Long total = dynamicDataMapper.countByQueryWithoutTenant(countSql, params);
+        if (request.isRequireUniqueResourcePid() && (total == null || total < 0)) {
+            throw new com.auraboot.framework.meta.exception.NamedQueryResourceIdentityException();
+        }
 
         // Add LIMIT/OFFSET
         sql.append(" LIMIT ").append(pageSize).append(" OFFSET ").append(offset);
 
         // 11. Execute (bypass tenant interceptor — tenant isolation is in the NQ SQL itself)
+        applyExecutionDeadline(request);
         List<Map<String, Object>> records = dropEmptyRowNullEntries(
                 dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params));
 
         records = fieldProtection.apply(protection, records);
         return PaginationResult.of(records, total, pageNum, pageSize);
+    }
+
+    private void appendResourceBoundaries(NamedQueryTestRequest request, Map<String, NamedQueryField> fields,
+                                          List<String> clauses, Map<String, Object> params) {
+        appendTypedResourceConditions(request.getResourceConditions(), fields, clauses, params, true);
+        appendTypedResourceConditions(request.getResourceFilters(), fields, clauses, params, false);
+        var continuation = request.getResourceContinuation();
+        String cursor = request.getResourceCursor();
+        if (continuation == null && (cursor == null || cursor.isEmpty())) return;
+        var pid = fields.get("pid");
+        if (pid == null || !pid.checkSortable()) throw new AccessDeniedException("Resource PID is not sortable");
+        String pidExpr = pid.getColumnExpr(); SqlSafetyUtils.validateSqlFragment(pidExpr);
+        params.put("resource_cursor_pid", continuation == null ? cursor : continuation.pid());
+        String afterPid = pidExpr + " > #{params.resource_cursor_pid}";
+        if (continuation == null) { clauses.add(afterPid); return; }
+        var field = fields.get(continuation.field());
+        if (field == null || !field.checkSortable() || !Set.of("ASC", "DESC").contains(continuation.direction())) {
+            throw new AccessDeniedException("Invalid resource sort continuation");
+        }
+        String expr = field.getColumnExpr(); SqlSafetyUtils.validateSqlFragment(expr);
+        if (continuation.value() == null) {
+            clauses.add("(" + expr + " IS NULL AND " + afterPid
+                    + ("DESC".equals(continuation.direction()) ? " OR " + expr + " IS NOT NULL" : "") + ")");
+        } else {
+            params.put("resource_cursor_value", continuation.value());
+            String value = "#{params.resource_cursor_value}";
+            clauses.add("(" + expr + ("ASC".equals(continuation.direction()) ? " > " : " < ") + value
+                    + ("ASC".equals(continuation.direction()) ? " OR " + expr + " IS NULL" : "")
+                    + " OR (" + expr + " = " + value + " AND " + afterPid + "))");
+        }
+    }
+
+    private void appendTypedResourceConditions(List<NamedQueryTestRequest.ResourceCondition> conditions,
+                                               Map<String, NamedQueryField> fields, List<String> clauses,
+                                               Map<String, Object> params, boolean boundary) {
+        if (conditions == null) return;
+        int index = 0;
+        for (var condition : conditions) {
+            var field = fields.get(condition.field());
+            String operator = condition.operator();
+            if (field == null || operator == null
+                    || (boundary && !Set.of("eq", "in").contains(operator))
+                    || (!boundary && field.hasOperators() && !field.supportsOperator(operator))) {
+                throw new AccessDeniedException("Invalid resource condition");
+            }
+            String column = field.getColumnExpr();
+            SqlSafetyUtils.validateSqlFragment(column);
+            String key = (boundary ? "resource_row_" : "resource_filter_") + index++;
+            if ("is_null".equals(operator)) {
+                clauses.add(column + " IS NULL");
+            } else if ("in".equals(operator)) {
+                if (!(condition.value() instanceof List<?> values) || values.isEmpty()) {
+                    throw new AccessDeniedException("Invalid resource IN condition");
+                }
+                List<String> placeholders = new ArrayList<>();
+                for (int i = 0; i < values.size(); i++) {
+                    String itemKey = key + "_" + i;
+                    params.put(itemKey, values.get(i));
+                    placeholders.add("#{params." + itemKey + "}");
+                }
+                clauses.add(column + " IN (" + String.join(", ", placeholders) + ")");
+            } else {
+                String sqlOperator = switch (operator) {
+                    case "eq" -> "=";
+                    case "ne" -> "!=";
+                    case "gt" -> ">";
+                    case "ge", "gte" -> ">=";
+                    case "lt" -> "<";
+                    case "le", "lte" -> "<=";
+                    case "like" -> "LIKE";
+                    default -> throw new AccessDeniedException("Invalid resource filter operator");
+                };
+                params.put(key, "like".equals(operator) ? "%" + condition.value() + "%" : condition.value());
+                clauses.add(column + " " + sqlOperator + " #{params." + key + "}");
+            }
+        }
+    }
+
+    private void applyExecutionDeadline(NamedQueryTestRequest request) {
+        if (request.getExecutionDeadlineNanos() == null) return;
+        long remaining = request.getExecutionDeadlineNanos() - System.nanoTime();
+        if (remaining <= 0) throw new org.springframework.dao.QueryTimeoutException("Named query execution deadline expired");
+        long millis = Math.max(1, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(remaining));
+        // The remaining budget applies to each SQL stage, so count + projection share one deadline.
+        deadlineJdbc.queryForObject("SELECT set_config('statement_timeout', ?, true)", String.class, millis + "ms");
     }
 
     /**
@@ -849,6 +989,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             Map<String, Object> params) {
         String resourceCode = trimToNull(query.getResourceCode());
         String actionCode = trimToNull(query.getActionCode());
+        if (MachineDataAccessContext.isActive()) {
+            if (resourceCode == null || actionCode == null) throw new AccessDeniedException("Machine query source authority required");
+            MachineDataAccessContext.requireDecision(resourceCode).requireAction(actionCode);
+            return;
+        }
         if (resourceCode == null || actionCode == null) {
             return;
         }
@@ -880,6 +1025,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             NamedQueryPolicy policy,
             Map<String, Object> params,
             Long memberId) {
+        if (MachineDataAccessContext.isActive()) return false;
         NamedQueryPolicy.RootAccess root = policy == null ? null : policy.getRootAccess();
         if (root == null || !Boolean.TRUE.equals(root.getAllowCollaborator())) return false;
         String modelCode = trimToNull(root.getModelCode());
@@ -919,6 +1065,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (recordPid == null || recordPid.isBlank()) {
             throw new MetaServiceException(
                     "Named query root record pid parameter is required: " + pidParam);
+        }
+
+        if (MachineDataAccessContext.isActive()) {
+            MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
+            dynamicDataServiceProvider.getObject().getById(modelCode, recordPid);
+            // Every joined source still requires its own scoped machine grant.
+            return false;
         }
 
         Long memberId = MetaContext.getCurrentMemberId();

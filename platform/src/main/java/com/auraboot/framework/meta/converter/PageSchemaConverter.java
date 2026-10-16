@@ -305,6 +305,18 @@ public abstract class PageSchemaConverter {
             if (titleString.isEmpty()) {
                 return null;
             }
+            if (titleString.startsWith("{")) {
+                try {
+                    Map<String, Object> localized = objectMapper.readValue(titleString, Map.class);
+                    if (!localized.isEmpty()
+                            && localized.keySet().stream().allMatch(key -> key.matches("^[a-z]{2}(-[A-Z]{2})?$"))
+                            && localized.values().stream().allMatch(value -> value instanceof String)) {
+                        return objectMapper.writeValueAsString(localized);
+                    }
+                } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+                    // A plain title may start with a brace; retain its existing literal semantics.
+                }
+            }
             return objectMapper.writeValueAsString(Map.of("en", titleString));
         } catch (Exception e) {
             // CATCH: non-transactional JSON serialisation, safe to handle

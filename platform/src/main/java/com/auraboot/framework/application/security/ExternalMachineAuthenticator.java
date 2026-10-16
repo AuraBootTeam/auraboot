@@ -21,6 +21,10 @@ public interface ExternalMachineAuthenticator {
                             int status, long durationMillis) {
     }
 
+    default void recordAuthenticationFailure(HttpServletRequest request, int status,
+                                             String code, long durationMillis) {
+    }
+
     record MachinePrincipal(Long tenantId, String subjectPid, String subjectName, Set<String> scopes,
                             String applicationPid, String installationPid,
                             String environment, String tokenPid) {
