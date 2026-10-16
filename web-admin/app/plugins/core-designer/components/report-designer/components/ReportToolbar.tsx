@@ -104,7 +104,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
       title={report.title}
       aria-label={text({ zh: '报表标题', en: 'Report Title' })}
       onChange={(e) => updateTitle(e.target.value)}
-      className="w-64 max-w-full min-w-0 border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
+      className="w-80 max-w-full min-w-0 border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
       placeholder={text({ zh: '报表标题', en: 'Report Title' })}
     />
   );

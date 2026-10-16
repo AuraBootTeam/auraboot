@@ -43,6 +43,19 @@ test('delivery brief imports through the designer and exports the same governed 
  await expect(page.getByTestId('report-designer-toolbar-btn-save')).toBeDisabled();
  await page.reload();await expect(page.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(updatedTitle);
  await page.screenshot({path:join(evidence,'report-save-update-same-pid.png'),fullPage:true});
+ await page.setViewportSize({width:1280,height:900});
+ const reportTitle=page.getByRole('textbox',{name:'报表标题',exact:true});
+ await expect.poll(async()=>Math.round((await reportTitle.boundingBox())!.width)).toBeGreaterThanOrEqual(300);
+ const layout=await page.getByTestId('report-designer-toolbar').evaluate(toolbar=>{
+  const bounds=toolbar.getBoundingClientRect();
+  return {width:toolbar.clientWidth,scrollWidth:toolbar.scrollWidth,buttons:[...toolbar.querySelectorAll('button')].map(button=>({left:button.getBoundingClientRect().left-bounds.left,right:button.getBoundingClientRect().right-bounds.right}))};
+ });
+ expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width+1);
+ for(const button of layout.buttons){expect(button.left).toBeGreaterThanOrEqual(0);expect(button.right).toBeLessThanOrEqual(1);}
+ await page.screenshot({path:join(evidence,'report-toolbar-compact-title.png'),fullPage:true});
+ await writeFile(join(evidence,'report-toolbar-layout.json'),JSON.stringify(layout,null,2));
+ await page.setViewportSize({width:1440,height:1000});
+
  const toolbar=page.getByTestId('report-designer-toolbar');
  const query=page.waitForResponse(r=>r.url().includes('tpm_delivery_brief')&&r.request().method()==='GET');
  await toolbar.getByRole('button',{name:'预览',exact:true}).click();const queried=await query;expect(queried.status()).toBe(200);const response=await queried.json();expect(String(response.code)).toBe('0');
