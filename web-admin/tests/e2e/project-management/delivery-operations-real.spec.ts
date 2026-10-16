@@ -27,15 +27,15 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  const audits=new Map<string,any[]>(); const sla:any[]=[];for(const a of acceptances.records){if(a.tpm_ac_process){const rows=await data(await page.request.get(`/api/bpm/monitor/instances/${a.tpm_ac_process}/sla`));sla.push(...rows);audits.set(a.pid,await data(await page.request.get(`/api/bpm/monitor/instances/${a.tpm_ac_process}/audit`)));}}
  const oracle={pending_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='submitted').length,returned_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='returned').length,overdue_count:sla.filter(a=>a.status==='overdue').length,late_completed_count:sla.filter(a=>a.status==='completed'&&Date.parse(a.completedTime)>Date.parse(a.deadlineTime)).length};
  const widgetResponses:Promise<any>[]=[];
- page.on('response',r=>{if(/\/api\/dashboards\/[^/]+\/widgets\/[^/]+\/data$/.test(new URL(r.url()).pathname))widgetResponses.push(data(r).then(body=>({path:new URL(r.url()).pathname,body})));});
+ page.on('response',r=>{if(new URL(r.url()).pathname==='/api/meta/chart-data'&&r.request().postDataJSON()?.queryCode?.startsWith('tdo_'))widgetResponses.push(data(r).then(body=>({queryCode:r.request().postDataJSON().queryCode,body})));});
  await page.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();
  await expect(page.getByRole('heading',{name:'交付经营看板',exact:true})).toBeVisible();
  await expect(page.getByText('交付行动清单 · 点击行定位验收单',{exact:true})).toBeVisible();
  await expect(page.getByText('数据加载失败',{exact:true})).toHaveCount(0);
  await expect.poll(()=>widgetResponses.length).toBeGreaterThanOrEqual(7);
- const widgets=await Promise.all(widgetResponses);const summary=widgets.find(w=>w.path.includes('/pending_count/')).body.rows[0];
+ const widgets=await Promise.all(widgetResponses);const summary=widgets.find(w=>w.queryCode==='tdo_delivery_summary').body.rows[0];
  for(const [key,value]of Object.entries(oracle))expect(Number(summary[key]),key).toBe(value);
- const factRows=widgets.find(w=>w.path.includes('/delivery-actions/')).body.rows;
+ const factRows=widgets.find(w=>w.queryCode==='tdo_delivery_facts').body.rows;
  expect(factRows).toHaveLength(acceptances.records.length);expect(new Set(factRows.map((r:any)=>r.acceptance_pid)).size).toBe(factRows.length);
  for(const a of acceptances.records){const f=factRows.find((r:any)=>r.acceptance_pid===a.pid);expect(f.acceptance_name).toBe(a.tpm_ac_name);expect(Number(f.amount)).toBe(Number(a.tpm_ac_amount));expect(f.acceptance_status).toBe(a.tpm_ac_status);
  const audit=(audits.get(a.pid)||[]).filter(r=>['task_approve','task_reject','task_complete'].includes(r.operation)&&r.result==='success').sort((x,y)=>Date.parse(y.createdAt)-Date.parse(x.createdAt));
@@ -84,7 +84,7 @@ test('OP source grants independently protect native SLA and verification facts i
   const identity=await login(actor,email,tenant);expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
   for(const missing of [null,'bpm.monitor.read','model.tdv_check.read']){
    await grant(missing);await actor.reload();
-   const queries:Promise<any>[]=[];const observe=(r:Response)=>{if(/\/api\/dashboards\/[^/]+\/widgets\/[^/]+\/data$/.test(new URL(r.url()).pathname))queries.push(r.finished().then(()=>({status:r.status()})));};actor.on('response',observe);
+   const queries:Promise<any>[]=[];const observe=(r:Response)=>{if(new URL(r.url()).pathname==='/api/meta/chart-data'&&r.request().postDataJSON()?.queryCode?.startsWith('tdo_'))queries.push(r.finished().then(()=>({status:r.status()})));};actor.on('response',observe);
    await actor.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect.poll(()=>queries.length).toBeGreaterThanOrEqual(7);const outcomes=await Promise.all(queries);actor.off('response',observe);
    for(const result of outcomes)expect(result.status).toBe(missing?403:200);
    if(missing)await expect(actor.getByTestId('dashboard-block-delivery-actions').getByRole('alert')).toBeVisible();else await expect(actor.getByTestId('dashboard-block-delivery-actions')).toContainText(receipt.factRows[0].acceptance_name);
