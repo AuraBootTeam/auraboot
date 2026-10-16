@@ -102,11 +102,11 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
 
 test('OP source grants independently protect native SLA and verification facts in dashboard and all report formats',async({page,browser})=>{
  test.setTimeout(240000);const admin=await login(page);const tenant=String(admin.user.tenantId);
- const receipt=JSON.parse(await readFile(join(evidence!,'operations-receipt.json'),'utf8'));const reportPid=receipt.reportPid;
+ const receipt=JSON.parse(await readFile(process.env.AURA_OPERATIONS_REPORT_RECEIPT||join(evidence!,'operations-receipt.json'),'utf8'));const reportPid=receipt.reportPid;
  const tree=await data(await page.request.get('/api/permissions/tree'));const ids=new Map<string,number>();const collect=(nodes:any[])=>nodes.forEach(n=>{ids.set(n.code,n.id);collect(n.children||[]);});collect(tree);
  const suffix=crypto.randomUUID().replaceAll('-','').slice(0,12),code=`tdo_review_${suffix}`;
  const role=await data(await page.request.post('/api/roles',{data:{code,name:'交付复盘审阅',type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}}));
- const grants=['dashboard.read','meta.query.read','report.definition.view','report.export.execute','model.tpm_acceptance.read','model.tpm_project.read','model.tdv_check.read','bpm.monitor.read','tpm.project.read','tpm.acceptance.read'];
+ const grants=JSON.parse(await readFile(join(root!,'plugins/project-delivery-operations/config/roles.json'),'utf8'))[0].permissions as string[];expect(grants).toContain('data.datasource.read');expect(grants).not.toContain('report.definition.manage');
  for(const code of grants)expect(ids.has(code),code).toBe(true);
  const grant=async(missing:string|null)=>{await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>({permissionId:ids.get(code),granted:code!==missing}))}));};
  await grant(null);const email=`${code}@e2e.local`;await data(await page.request.post('/api/admin/users',{data:{email,displayName:'交付复盘审阅员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
@@ -134,7 +134,7 @@ test('OP source grants independently protect native SLA and verification facts i
 test('OP empty business space cannot query another tenant or open its retrospective',async({page})=>{
  test.setTimeout(180000);page.setDefaultTimeout(20000);
  const fixture=process.env.AURA_VERIFICATION_EVIDENCE_DIR;if(!fixture||!process.env.AURA_BPM_PROJECT_ROOT)throw Error('Run the verification profile first and bind its tenant-isolation receipt and owned BPM source.');
- const tenants=JSON.parse(await readFile(join(fixture,'verification-tenant-isolation.json'),'utf8'));const receipt=JSON.parse(await readFile(join(evidence!,'operations-receipt.json'),'utf8'));
+ const tenants=JSON.parse(await readFile(join(fixture,'verification-tenant-isolation.json'),'utf8'));const receipt=JSON.parse(await readFile(process.env.AURA_OPERATIONS_REPORT_RECEIPT||join(evidence!,'operations-receipt.json'),'utf8'));
  const identity=await login(page,process.env.ADMIN_EMAIL!,String(tenants.foreignTenant));expect(String(identity.user.tenantId)).toBe(String(tenants.foreignTenant));
  for(const directory of [join(process.env.AURA_CORE_PROJECT_ROOT!,'plugins/core-dashboard'),join(process.env.AURA_BPM_PROJECT_ROOT!,'plugin'),join(root!,'plugins/project-delivery-operations')]){const r=await page.request.post('/api/plugins/import/import-directory-sync',{data:{path:directory,conflictStrategy:'OVERWRITE',deferReferenceValidation:true},timeout:180000});expect(r.status()).toBe(200);expect((await r.json()).success).toBe(true);}
  await page.reload();await page.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect(page.getByTestId('dashboard-block-delivery-actions')).toContainText('暂无交付验收，请先创建并提交验收单');await expect(page.getByTestId('dashboard-block-pending_count').getByText('0',{exact:true})).toBeVisible();
