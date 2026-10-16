@@ -75,10 +75,10 @@ async function createCheck(page:Page,name:string,acceptanceName:string) {
 // All acceptance/check creation and verification below still use real UI actions.
 async function prepareProject(page:Page) {
   const projects=await data(await page.request.get('/api/dynamic/tpm_project/list',{params:{pageSize:500}}));
-  if(projects.records.some((row:any)=>row.tpm_pj_name===projectName))return;
+  const existing=projects.records.find((row:any)=>row.tpm_pj_name===projectName);if(existing)return existing.pid;
   const source=projects.records.find((row:any)=>row.tpm_pj_name==='华辰制造 · 供应链协同平台');expect(source).toBeTruthy();
   const created=await data(await page.request.post('/api/meta/commands/execute/tpm:create_project',{data:{operationType:'create',payload:{tpm_pj_name:projectName,tpm_pj_customer_id:source.tpm_pj_customer_id,tpm_pj_owner_user:source.tpm_pj_owner_user,tpm_pj_budget:128000}}}));
-  expect(created.data.recordPid).toBeTruthy();
+  expect(created.data.recordPid).toBeTruthy();return created.data.recordPid;
 }
 async function verify(page:Page,pid:string,expected:'passed'|'blocked') {
   const before=await data(await page.request.get('/api/dynamic/tdv_check/list',{params:{pageSize:500}}));
@@ -93,11 +93,11 @@ async function verify(page:Page,pid:string,expected:'passed'|'blocked') {
 }
 
 test('optional PF4J verifier reads stored evidence and recomputes after actual form correction @critical',async({page})=>{
-  const user=await login(page);await prepareProject(page);await menu(page,'交付核验');
+  const user=await login(page);const projectPid=await prepareProject(page);await menu(page,'交付核验');
   await expect(page).toHaveURL(/\/p\/tdv_check$/);
   await expect(page.getByRole('main')).toContainText('还没有交付核验');
   expect((await data(await page.request.get('/api/dynamic/tpm_project/list'))).total).toBe(9);
-  expect((await data(await page.request.get('/api/dynamic/tpm_acceptance/list'))).total).toBe(0);
+  expect((await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:500}}))).records.filter((row:any)=>row.tpm_ac_project===projectPid)).toHaveLength(0);
   expect((await data(await page.request.get('/api/dynamic/tdv_check/list'))).total).toBe(0);await shot(page,'v01');
   const name=prefix+' · 补齐材料';const acceptance=await createAcceptance(page,user,name,68000,false);
   const pid=await createCheck(page,name,name);let result=await verify(page,pid,'blocked');
