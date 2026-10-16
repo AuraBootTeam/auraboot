@@ -18,7 +18,8 @@ test('delivery brief imports through the designer and exports the same governed 
  await expect(page.getByTestId('report-template-import')).toBeVisible();
  const chooser=page.waitForEvent('filechooser');await page.getByTestId('report-template-import').click();await(await chooser).setFiles(templatePath);
  await expect(page.getByTestId('report-template-imported')).toBeVisible();
- const title=`客户项目交付简报 · 验证 ${Date.now()}`;await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);
+ const issue=new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
+ const title=`客户项目交付简报 · ${issue}`;await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);
  let creates=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/api/report-definitions'&&request.method()==='POST')creates++;});
  const save=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/report-definitions'&&r.request().method()==='POST');
  await page.getByTestId('report-designer-toolbar-btn-save').click();const saved=await save;expect(saved.status()).toBe(200);
@@ -32,7 +33,7 @@ test('delivery brief imports through the designer and exports the same governed 
  const reloaded=await reload;expect(reloaded.status()).toBe(200);
  expect((await reloaded.json()).data.dsl.dataSources.projects.queryCode).toBe('tpm_delivery_brief');
  await page.screenshot({path:join(evidence,'report-save-first-save-refresh.png'),fullPage:true});
- const updatedTitle=title+' · 已更新';
+ const updatedTitle=title+' · 周报';
  await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(updatedTitle);
  const update=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/report-definitions/${pid}`&&r.request().method()==='PUT');
  await page.getByTestId('report-designer-toolbar-btn-save').click();const updated=await update;

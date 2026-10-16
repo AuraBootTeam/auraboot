@@ -475,7 +475,7 @@ test('portable archive template selects a task once and binds every reference be
   const workspace = process.env.AURA_WORKSPACE_PROJECT_ROOT;
   expect(workspace, 'Bind the owned workspace source containing the portable template').toBeTruthy();
   const template = JSON.parse(fs.readFileSync(path.join(workspace!, 'docs/product-docs/strategy/enterprise-seven-scenario-assets/task-archive.automation.json'), 'utf8'));
-  const name = `导入参数归档-${run}`; const title = `【演示】参数选择-${run}`;
+  const name = `交付材料完成后归档-${run}`; const title = `交付材料检查-${run}`;
   expect(process.env.DELIVERY_PROJECT_PID).toMatch(/^[0-9A-Z]{26}$/);
   await page.goto('/');
   const taskPid = await setupTask(page, title, process.env.DELIVERY_PROJECT_PID!);

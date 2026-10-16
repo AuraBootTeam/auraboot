@@ -205,7 +205,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const listUrl = page.url();
   const customerField = `${code}_customer_name`;
   const amountField = `${code}_opportunity_amount`;
-  const customerName = `华辰客户跟进 ${Date.now()}`;
+  const customerName = '晨桥设备有限公司';
   await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('toolbar-btn-create').click();
   await page.getByTestId(`form-field-${customerField}`).locator('input').fill(customerName);
