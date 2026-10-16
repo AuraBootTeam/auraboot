@@ -335,13 +335,13 @@ class ReportExportServiceTest {
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("unavailable");
         assertThatThrownBy(() -> reportExportService.exportJson(request))
-                .isInstanceOf(ValidationException.class).hasMessageContaining("Report not found");
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("Report not found");
         ReportEntity other = new ReportEntity();
         other.setTenantId(999L);
         other.setDsl("{}");
         when(reportStorageService.findByPid("unavailable")).thenReturn(other);
         assertThatThrownBy(() -> reportExportService.exportJson(request))
-                .isInstanceOf(ValidationException.class).hasMessageContaining("Report not found");
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("Report not found");
         verify(auditTrailService, never()).recordAudit(any());
     }
 

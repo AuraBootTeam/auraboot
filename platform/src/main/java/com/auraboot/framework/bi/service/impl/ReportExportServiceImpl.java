@@ -10,6 +10,7 @@ import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.branding.BrandingProvider;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.SortField;
@@ -476,7 +477,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private Map<String, Object> loadReportDsl(String reportPid) {
         ReportEntity report = reportStorageService.findByPid(reportPid);
         if (report == null || !java.util.Objects.equals(MetaContext.getCurrentTenantId(), report.getTenantId())) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found");
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Report not found");
         }
         if (!StringUtils.hasText(report.getDsl())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Report DSL not found");
