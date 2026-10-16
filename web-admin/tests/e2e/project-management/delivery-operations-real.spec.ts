@@ -18,8 +18,32 @@ async function login(page:Page,email=process.env.ADMIN_EMAIL!,tenant?:string){
 async function shot(page:Page,id:string){await mkdir(join(evidence!,'screenshots'),{recursive:true});await page.screenshot({path:join(evidence!,'screenshots',`${id}.png`),fullPage:true});}
 const compact=(s:string)=>s.normalize('NFKC').replace(/\s+/g,'');
 
+async function menu(page:Page,name:string){await page.getByRole('navigation').getByRole('link',{name,exact:true}).click();}
+async function openAcceptance(page:Page,name:string){await menu(page,'交付验收');await page.getByRole('row').filter({hasText:name}).getByRole('button',{name:/查看|详情/}).click();await expect(page.getByRole('main')).toContainText(name);}
+async function createAcceptance(page:Page,user:any,name:string){
+ await menu(page,'交付验收');await page.getByRole('button',{name:'新建验收',exact:true}).click();await page.locator('#tpm_ac_name').fill(name);await page.getByTestId('select-trigger-tpm_ac_project').click();await page.getByRole('option',{name:'华辰制造 · 供应链协同平台',exact:true}).click();
+ await page.locator('#tpm_ac_scope').fill('完成供应商数据联调，核对交付清单、权限和验收材料。');await page.locator('#tpm_ac_amount').fill('18000');await page.getByTestId('select-trigger-tpm_ac_risk').click();await page.getByRole('option',{name:'高风险',exact:true}).click();await page.getByTestId('user-select-trigger-tpm_ac_reviewer').click();await page.getByTestId(`user-select-option-tpm_ac_reviewer-${user.pid}`).click();
+ const upload=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/file/upload'&&r.request().method()==='POST');await page.getByTestId('form-field-tpm_ac_files').locator('input[type=file]').setInputFiles({name:'供应商联调验收清单.txt',mimeType:'text/plain',buffer:Buffer.from('Delivered: supplier integration, access review, training. Reviewed evidence attached.')});expect((await data(await upload)).fileId).toBeTruthy();
+ const save=page.waitForResponse(r=>r.url().includes('/execute/tpm:create_acceptance')&&r.request().method()==='POST');await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();const pid=(await data(await save)).data.recordPid;await expect(page).not.toHaveURL(/\/new$/);await openAcceptance(page,name);
+ const submit=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');await page.getByTestId('toolbar-btn-submit_acceptance').click();await data(await submit);await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+ const rows=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:'500'}}));return rows.records.find((a:any)=>a.pid===pid);
+}
+async function prepareOperations(page:Page,user:any){
+ const returned=await createAcceptance(page,user,'华辰制造 · 供应商联调补正');
+ await page.getByTestId('bpm-operations-reject').click();await page.getByTestId('bpm-reject-comment').fill('缺少供应商对账差异说明，请补齐后重新提交。');const rejected=page.waitForResponse(r=>r.url().includes('/api/bpm/tasks/')&&r.url().endsWith('/reject')&&r.request().method()==='POST');await page.getByTestId('bpm-reject-confirm').click();await data(await rejected);await expect(page.getByRole('main')).toContainText('缺少供应商对账差异说明');
+ const configs=await data(await page.request.get('/api/bpm/sla-configs'));const config=configs.find((c:any)=>c.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
+ await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:{...config,deadlineMode:'FIXED',deadlineValue:'PT30S',ruleBinding:{...config.ruleBinding,enabled:false}}}));
+ let pending:any;
+ try{pending=await createAcceptance(page,user,'华辰制造 · 第二阶段交接审核');}finally{await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:config}));}
+ await expect.poll(async()=>{const sla=await data(await page.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));return sla[0]?.status;},{timeout:65000,intervals:[3000]}).toBe('overdue');
+ const checks=await data(await page.request.get('/api/dynamic/tdv_check/list',{params:{pageSize:'500'}}));const passed=checks.records.find((c:any)=>c.tdv_ck_status==='passed');expect(passed).toBeTruthy();
+ const acceptances=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:'500'}}));const source=acceptances.records.find((a:any)=>a.pid===passed.tdv_ck_acceptance);expect(source.tpm_ac_status).toBe('draft');
+ await openAcceptance(page,source.tpm_ac_name);await page.getByTestId('toolbar-btn-edit').click();await page.locator('#tpm_ac_scope').fill('补充第二阶段交付范围：增加供应商对账核对；原核验快照需重新确认。');const update=page.waitForResponse(r=>r.url().includes('/execute/tpm:update_acceptance')&&r.request().method()==='POST');await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();await data(await update);await expect(page).not.toHaveURL(/\/edit\//);
+ await writeFile(join(evidence!,'operations-created-cases.json'),JSON.stringify({returned,pending,staleAcceptance:source.pid,checkPid:passed.pid},null,2));
+}
+
 test('OP delivery dashboard drills into real acceptances and its report exports the same approval SLA verification facts',async({page},info)=>{
- test.setTimeout(240000);await login(page);
+ test.setTimeout(240000);page.setDefaultTimeout(20000);await mkdir(evidence!,{recursive:true});const identity=await login(page);await prepareOperations(page,identity.user);
  const acceptances=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageNum:'1',pageSize:'500'}}));
  const checks=await data(await page.request.get('/api/dynamic/tdv_check/list',{params:{pageNum:'1',pageSize:'500'}}));
  expect(acceptances.records.length).toBeGreaterThan(0);expect(Number(acceptances.total)).toBe(acceptances.records.length);
@@ -36,7 +60,7 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  const widgets=await Promise.all(widgetResponses);const summary=widgets.find(w=>w.queryCode==='tdo_delivery_summary').body.rows[0];
  for(const [key,value]of Object.entries(oracle))expect(Number(summary[key]),key).toBe(value);
  const factRows=widgets.find(w=>w.queryCode==='tdo_delivery_facts').body.rows;
- expect(factRows).toHaveLength(acceptances.records.length);expect(new Set(factRows.map((r:any)=>r.acceptance_pid)).size).toBe(factRows.length);
+ expect(factRows).toHaveLength(acceptances.records.length);expect(new Set(factRows.map((r:any)=>r.acceptance_pid)).size).toBe(factRows.length);expect(Number(summary.pending_count)).toBeGreaterThan(0);expect(Number(summary.overdue_count)).toBeGreaterThan(0);expect(Number(summary.returned_count)).toBeGreaterThan(0);expect(Number(summary.late_completed_count)).toBeGreaterThan(0);expect(factRows.some((r:any)=>r.verification_result==='资料已更新 · 需复核')).toBe(true);
  for(const a of acceptances.records){const f=factRows.find((r:any)=>r.acceptance_pid===a.pid);expect(f.acceptance_name).toBe(a.tpm_ac_name);expect(Number(f.amount)).toBe(Number(a.tpm_ac_amount));expect(f.acceptance_status).toBe(a.tpm_ac_status);
  const audit=(audits.get(a.pid)||[]).filter(r=>['task_approve','task_reject','task_complete'].includes(r.operation)&&r.result==='success').sort((x,y)=>Date.parse(y.createdAt)-Date.parse(x.createdAt));
  if(audit.length){expect(f.approval_result).toBe({task_approve:'同意',task_reject:'退回',task_complete:'已处理'}[audit[0].operation as 'task_approve']);expect(f.approval_comment).toBe(audit[0].details?.comment||'未填写意见');expect(Number(f.approval_minutes)).toBeGreaterThanOrEqual(0);}
@@ -98,4 +122,18 @@ test('OP source grants independently protect native SLA and verification facts i
    }
   }
  }finally{await context.close();}
+});
+
+test('OP empty business space cannot query another tenant or open its retrospective',async({page})=>{
+ test.setTimeout(180000);page.setDefaultTimeout(20000);
+ const fixture=process.env.AURA_VERIFICATION_EVIDENCE_DIR;if(!fixture||!process.env.AURA_BPM_PROJECT_ROOT)throw Error('Run the verification profile first and bind its tenant-isolation receipt and owned BPM source.');
+ const tenants=JSON.parse(await readFile(join(fixture,'verification-tenant-isolation.json'),'utf8'));const receipt=JSON.parse(await readFile(join(evidence!,'operations-receipt.json'),'utf8'));
+ const identity=await login(page,process.env.ADMIN_EMAIL!,String(tenants.foreignTenant));expect(String(identity.user.tenantId)).toBe(String(tenants.foreignTenant));
+ for(const directory of [join(process.env.AURA_CORE_PROJECT_ROOT!,'plugins/core-dashboard'),join(process.env.AURA_BPM_PROJECT_ROOT!,'plugin'),join(root!,'plugins/project-delivery-operations')]){const r=await page.request.post('/api/plugins/import/import-directory-sync',{data:{path:directory,conflictStrategy:'OVERWRITE',deferReferenceValidation:true},timeout:180000});expect(r.status()).toBe(200);expect((await r.json()).success).toBe(true);}
+ await page.reload();await page.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect(page.getByTestId('dashboard-block-delivery-actions')).toContainText('暂无交付验收，请先创建并提交验收单');await expect(page.getByTestId('dashboard-block-pending_count').getByText('0',{exact:true})).toBeVisible();
+ await expect(page.getByRole('main')).not.toContainText(receipt.factRows[0].acceptance_name);await shot(page,'OP06');
+ const response=await page.request.post('/api/meta/named-queries/tdo_delivery_facts/execute',{data:{params:{tenantId:String(tenants.originalTenant)},page:1,pageSize:500}});const results=await data(response);expect(results.records).toEqual([]);
+ const foreignReport=await page.request.get(`/api/report-definitions/${receipt.reportPid}`);expect(foreignReport.status()).toBe(404);
+ for(const format of ['markdown','html','pdf']){const denied=await page.request.post(`/api/reports/export/${format}`,{data:{reportPid:receipt.reportPid}});expect(denied.status()).toBe(404);expect(await denied.text()).not.toContain(receipt.factRows[0].acceptance_name);}
+ await writeFile(join(evidence!,'operations-tenant-isolation.json'),JSON.stringify({originalTenant:tenants.originalTenant,foreignTenant:tenants.foreignTenant,forgedTenantRows:results.records.length,foreignReport:foreignReport.status()},null,2));
 });
