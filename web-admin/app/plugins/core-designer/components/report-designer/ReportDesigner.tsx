@@ -46,9 +46,10 @@ const AUTO_SAVE_DELAY = 30000; // 30 seconds
 interface ReportDesignerProps {
   reportId?: string;
   initialTitle?: string;
+  onSaveComplete?: (reportPid: string) => void;
 }
 
-const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
+const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle, onSaveComplete }) => {
   const text = useSmartText();
   const { showErrorToast } = useToastContext();
   const notifyExportFailure = useCallback(() => {
@@ -117,12 +118,13 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       setPageId(pid);
       markSaved();
       setSaving(false);
+      onSaveComplete?.(pid);
       return pid;
     } catch (error) {
       setSaving(false);
       throw error;
     }
-  }, [report, pageId, setSaving, setPageId, markSaved, canManage]);
+  }, [report, pageId, setSaving, setPageId, markSaved, canManage, onSaveComplete]);
 
   // Version history management
   const versioning = useVersioning({
@@ -187,9 +189,9 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       lastSaveTimeRef.current = Date.now();
     } catch (error) {
       console.error('Save failed:', error);
-      alert(error instanceof Error ? error.message : 'Save failed');
+      showErrorToast(text({ zh: '保存失败，草稿已保留，请重试。', en: 'Save failed. Your draft is preserved. Please retry.' }));
     }
-  }, [saveReport, versioning.viewingVersionPid, canManage]);
+  }, [saveReport, versioning.viewingVersionPid, canManage, showErrorToast, text]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
