@@ -304,3 +304,14 @@ T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/pat
 | `ci/verify_openapi_artifacts.py` | 1 | 2026-10-14 | Validate actual generated OpenAPI structure, component schemas, payloads and formats with a fixed case receipt. |
 
 | `ci/collect-open-platform-jfr.sh` | 1 | 2026-10-15 | Collect request-correlated JFR evidence from the owned Open Platform release container without changing latency thresholds. |
+
+## Scenario performance entry points
+
+These local measurement helpers require an explicitly configured runtime and credentials; this index does not certify performance results.
+
+| script | purpose |
+|---|---|
+| `performance/measure-api.mjs` | Measure authenticated API latency with recorded source identity. |
+| `performance/measure-crud.mjs` | Measure create, update, detail and delete request latency on test records. |
+| `performance/measure-home.mjs` | Measure browser home-page loading in the configured environment. |
+| `performance/seed-api.mjs` | Prepare the explicitly selected local API measurement fixture. |

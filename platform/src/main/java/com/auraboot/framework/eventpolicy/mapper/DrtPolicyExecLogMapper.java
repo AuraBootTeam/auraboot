@@ -52,14 +52,23 @@ public interface DrtPolicyExecLogMapper extends BaseMapper<DrtPolicyExecLogEntit
     DrtPolicyExecLogEntity findByTenantAndKey(@Param("tenantId") Long tenantId, @Param("key") String key);
 
     @Select("""
+            <script>
             SELECT * FROM ab_drt_policy_exec_log
             WHERE tenant_id = #{tenantId}
-              AND (
-                (#{correlationId} IS NOT NULL AND #{correlationId} <> '' AND correlation_id = #{correlationId})
-                OR
-                (#{decisionTraceId} IS NOT NULL AND #{decisionTraceId} <> '' AND decision_trace_id = #{decisionTraceId})
-              )
+            <choose>
+              <when test="correlationId != null and correlationId != '' and decisionTraceId != null and decisionTraceId != ''">
+                AND (correlation_id = #{correlationId} OR decision_trace_id = #{decisionTraceId})
+              </when>
+              <when test="correlationId != null and correlationId != ''">
+                AND correlation_id = #{correlationId}
+              </when>
+              <when test="decisionTraceId != null and decisionTraceId != ''">
+                AND decision_trace_id = #{decisionTraceId}
+              </when>
+              <otherwise>AND 1 = 0</otherwise>
+            </choose>
             ORDER BY executed_at ASC, id ASC
+            </script>
             """)
     @ResultMap("policyExecLogMap")
     List<DrtPolicyExecLogEntity> findByTraceLink(

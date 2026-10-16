@@ -34,8 +34,8 @@
       "sortable": true
     },
     "extension": {
-      "placeholder:zh-CN": "请输入任务标题",
-      "placeholder:en": "Enter task title"
+      "placeholder:zh-CN": "例如：交付材料检查",
+      "placeholder:en": "e.g. Delivery material review"
     }
   },
   {
@@ -49,6 +49,11 @@
     },
     "extension": {
       "referenceModelCode": "tpm_project"
+    },
+    "refTarget": {
+      "targetModel": "tpm_project",
+      "targetField": "tpm_pj_name",
+      "valueField": "pid"
     }
   },
   {

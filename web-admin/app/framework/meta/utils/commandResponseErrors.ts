@@ -72,6 +72,19 @@ export function resolveCommandErrorMessage(
       body.desc,
     ) || fallbackMessage || `Command ${commandCode} failed`;
 
+  // Engine configuration errors must remain actionable on every DSL business
+  // surface. The original response and server audit retain the technical cause.
+  if (/unable to resolve (?:variable|token)/i.test(resolved)) {
+    return locale?.toLowerCase().startsWith('zh')
+      ? '流程所需的数据不完整，请管理员检查规则输出与流程变量映射后重试。'
+      : 'Required workflow data is missing. Ask an administrator to check rule outputs and workflow variable mappings, then retry.';
+  }
+  if (/transaction rolled back.*rollback-only/i.test(resolved)) {
+    return locale?.toLowerCase().startsWith('zh')
+      ? '本次操作未能提交，数据已回滚。请管理员检查流程或规则配置后重试。'
+      : 'The operation could not be committed and its data changes were rolled back. Ask an administrator to check workflow or rule configuration, then retry.';
+  }
+
   if (/Record not found: .* in model:/i.test(resolved)) {
     return locale?.toLowerCase().startsWith('zh')
       ? '关联记录不存在或不可访问，请重新选择后再提交。'

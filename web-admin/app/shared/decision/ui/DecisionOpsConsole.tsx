@@ -1,3 +1,4 @@
+import './decision-workbench.css';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DecisionDefinitionListPage, type DefinitionSummary } from './DecisionDefinitionListPage';
@@ -178,6 +179,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     .map((definition) => ({
       code: definition.decisionCode,
       name: definition.decisionName,
+      scopeType: definition.scopeType,
     }));
   const factCatalogFields = factCatalogToFieldOptions(factCatalogQuery.data);
   const legacyStrategyFields = modelFieldsToFieldOptions(modelFieldData);
@@ -312,7 +314,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
   };
 
   return (
-    <div className="decisionops-shell" data-testid="decisionops-console">
+    <div className={`decisionops-shell ${tab === 'studio' ? 'decisionops-shell--studio' : ''}`} data-testid="decisionops-console">
       <header className="decisionops-page-header">
         <div>
           <p className="decisionops-eyebrow">{headerEyebrow}</p>

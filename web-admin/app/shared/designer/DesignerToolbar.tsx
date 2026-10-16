@@ -70,7 +70,7 @@ export function DesignerToolbar({
       )}
     >
       {/* Left: Title + Subtitle + Status + Dirty indicator */}
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 basis-80 grow items-center gap-3">
         {titleElement || (
           <h1 className="shrink-0 whitespace-nowrap text-xl font-semibold text-gray-900">{title}</h1>
         )}

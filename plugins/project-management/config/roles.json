@@ -12,7 +12,9 @@
       "data.datasource.read",
       "model.tpm_customer.read",
       "tpm.task.read",
-      "model.tpm_task.read"
+      "model.tpm_task.read",
+      "tpm.acceptance.read",
+      "model.tpm_acceptance.read"
     ]
   },
   {
@@ -43,7 +45,12 @@
       "model.tpm_task.read",
       "tpm.task.manage",
       "model.tpm_task.create",
-      "model.tpm_task.update"
+      "model.tpm_task.update",
+      "tpm.acceptance.read",
+      "model.tpm_acceptance.read",
+      "tpm.acceptance.manage",
+      "model.tpm_acceptance.create",
+      "model.tpm_acceptance.update"
     ]
   }
 ]

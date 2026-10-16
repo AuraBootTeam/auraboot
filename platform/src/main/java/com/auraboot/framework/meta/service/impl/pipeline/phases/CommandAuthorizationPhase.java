@@ -54,6 +54,16 @@ public class CommandAuthorizationPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        Object rawOptions = ctx.getExecConfig().get("options");
+        if (rawOptions instanceof java.util.Map<?, ?> options
+                && Boolean.TRUE.equals(options.get("workflowOnly"))) {
+            var invocation = com.auraboot.framework.plugin.extension.WorkflowCommandScope.current();
+            if (invocation == null || !invocation.owns(ctx.getTenantId(), ctx.getRequest().getTargetRecordId())) {
+                applyVerdict(ctx, CommandAuthorizationVerdict.denied(List.of("workflow-owned-command")));
+                throw new BusinessException(ResponseCode.FORBIDDEN,
+                        "This command requires the owning workflow execution");
+            }
+        }
         List<String> requiredPermissions = extractPermissions(ctx.getExecConfig().get("permissions"));
         if (requiredPermissions.isEmpty()) {
             reportUndeclared(ctx.getCommandCode());

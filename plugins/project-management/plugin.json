@@ -30,6 +30,10 @@
     {
       "type": "model",
       "code": "tpm_customer"
+    },
+    {
+      "type": "model",
+      "code": "tpm_acceptance"
     }
   ],
   "requires": [],

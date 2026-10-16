@@ -1823,13 +1823,23 @@
 }
 
 .strategy-operation-status {
-  border: 1px solid var(--color-status-green);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 10px;
+}
+.strategy-operation-status[data-tone="success"] {
+  border-color: var(--color-status-green);
   background: var(--color-status-green-bg);
   color: var(--color-status-green);
-  font-size: 13px;
-  font-weight: 800;
-  padding: 8px 10px;
+}
+.strategy-operation-status[data-tone="error"] {
+  border-color: var(--color-status-red);
+  background: var(--color-status-red-bg);
+  color: var(--color-status-red);
 }
 
 .strategy-scenarios {
@@ -5855,3 +5865,9 @@
     overflow-x: auto;
   }
 }
+
+.strategy-studio-header label, [data-testid="strategy-test-inputs"] label { display: grid; gap: 6px; font-size: 12px; margin-top: 8px; }
+.strategy-studio-header select, [data-testid="strategy-test-inputs"] input { min-height: 36px; border: 1px solid var(--color-border); border-radius: 6px; padding: 6px 10px; background: var(--color-bg-primary); color: var(--color-text-primary); }
+.strategy-test-outputs { display: flex; flex-wrap: wrap; gap: 20px; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; }
+.strategy-test-outputs dt { font-size: 12px; color: var(--color-text-secondary); }
+.strategy-test-outputs dd { margin: 4px 0 0; font-weight: 600; }

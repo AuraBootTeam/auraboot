@@ -18,7 +18,8 @@ test('delivery brief imports through the designer and exports the same governed 
  await expect(page.getByTestId('report-template-import')).toBeVisible();
  const chooser=page.waitForEvent('filechooser');await page.getByTestId('report-template-import').click();await(await chooser).setFiles(templatePath);
  await expect(page.getByTestId('report-template-imported')).toBeVisible();
- const title=`客户项目交付简报 · 验证 ${Date.now()}`;await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);
+ const issue=new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
+ const title=`客户项目交付简报 · ${issue}`;await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);
  let creates=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/api/report-definitions'&&request.method()==='POST')creates++;});
  const save=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/report-definitions'&&r.request().method()==='POST');
  await page.getByTestId('report-designer-toolbar-btn-save').click();const saved=await save;expect(saved.status()).toBe(200);
@@ -32,7 +33,7 @@ test('delivery brief imports through the designer and exports the same governed 
  const reloaded=await reload;expect(reloaded.status()).toBe(200);
  expect((await reloaded.json()).data.dsl.dataSources.projects.queryCode).toBe('tpm_delivery_brief');
  await page.screenshot({path:join(evidence,'report-save-first-save-refresh.png'),fullPage:true});
- const updatedTitle=title+' · 已更新';
+ const updatedTitle=title+' · 周报';
  await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(updatedTitle);
  const update=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/report-definitions/${pid}`&&r.request().method()==='PUT');
  await page.getByTestId('report-designer-toolbar-btn-save').click();const updated=await update;
@@ -42,6 +43,19 @@ test('delivery brief imports through the designer and exports the same governed 
  await expect(page.getByTestId('report-designer-toolbar-btn-save')).toBeDisabled();
  await page.reload();await expect(page.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(updatedTitle);
  await page.screenshot({path:join(evidence,'report-save-update-same-pid.png'),fullPage:true});
+ await page.setViewportSize({width:1280,height:900});
+ const reportTitle=page.getByRole('textbox',{name:'报表标题',exact:true});
+ await expect.poll(async()=>Math.round((await reportTitle.boundingBox())!.width)).toBeGreaterThanOrEqual(300);
+ const layout=await page.getByTestId('report-designer-toolbar').evaluate(toolbar=>{
+  const bounds=toolbar.getBoundingClientRect();
+  return {width:toolbar.clientWidth,scrollWidth:toolbar.scrollWidth,buttons:[...toolbar.querySelectorAll('button')].map(button=>({left:button.getBoundingClientRect().left-bounds.left,right:button.getBoundingClientRect().right-bounds.right}))};
+ });
+ expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width+1);
+ for(const button of layout.buttons){expect(button.left).toBeGreaterThanOrEqual(0);expect(button.right).toBeLessThanOrEqual(1);}
+ await page.screenshot({path:join(evidence,'report-toolbar-compact-title.png'),fullPage:true});
+ await writeFile(join(evidence,'report-toolbar-layout.json'),JSON.stringify(layout,null,2));
+ await page.setViewportSize({width:1440,height:1000});
+
  const toolbar=page.getByTestId('report-designer-toolbar');
  const query=page.waitForResponse(r=>r.url().includes('tpm_delivery_brief')&&r.request().method()==='GET');
  await toolbar.getByRole('button',{name:'预览',exact:true}).click();const queried=await query;expect(queried.status()).toBe(200);const response=await queried.json();expect(String(response.code)).toBe('0');
@@ -93,4 +107,59 @@ test('a new report auto-saves to its canonical URL and survives immediate refres
  await page.reload();await expect(page.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(title);
  await page.screenshot({path:join(evidence,'report-save-autosave.png'),fullPage:true});
  await writeFile(join(evidence,'report-autosave-receipt.json'),JSON.stringify({pid,title,manualSaveClicks:0,directRefresh:true},null,2));
+});
+
+test('a rejected report save retains the draft and can recover after the fixture role is restored',async({page,browser})=>{
+ test.setTimeout(120000);
+ const evidence=process.env.AURA_EVIDENCE_DIR!;expect(evidence).toBeTruthy();
+ await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
+ await page.locator('#identifier').fill(process.env.ADMIN_EMAIL!);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
+ await page.locator('form button[type=submit]').click();await page.waitForURL(url=>!url.pathname.includes('/login'));
+ const me=await page.request.get('/api/auth/me');expect(me.status()).toBe(200);const tenant=String((await me.json()).data.user.tenantId);
+ const permissions=await page.request.get('/api/permissions/tree');expect(permissions.status()).toBe(200);
+ const ids=new Map<string,number>();const collect=(rows:any[])=>rows.forEach(row=>{ids.set(row.code,row.id);collect(row.children||[]);});collect((await permissions.json()).data);
+ const grants=['report.definition.view','report.definition.manage'];for(const code of grants)expect(ids.has(code)).toBe(true);
+ const suffix=crypto.randomUUID().replaceAll('-','').slice(0,12);const roleCode=`report_recovery_${suffix}`;
+ const role=await page.request.post('/api/roles',{data:{code:roleCode,name:roleCode,type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}});
+ expect(role.status()).toBe(200);const rolePid=(await role.json()).data.pid;
+ const setGrant=async(granted:boolean)=>{
+  const result=await page.request.put(`/api/permissions/matrix/${rolePid}/batch`,{data:grants.map(code=>({permissionId:ids.get(code),granted:code==='report.definition.manage'?granted:true}))});
+  expect(result.status()).toBe(200);expect(String((await result.json()).code)).toBe('0');
+ };
+ await setGrant(true);
+ const email=`${roleCode}@e2e.local`;const password='Test2026x';
+ const user=await page.request.post('/api/admin/users',{data:{email,displayName:roleCode,initialPassword:password,roleCodes:[roleCode],sendInviteEmail:false}});
+ expect(user.status()).toBe(200);
+ const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+ const actor=await context.newPage();const title=`保存失败恢复验证 ${suffix}`;const description='权限恢复前保留当前交付草稿，恢复后保存并核对。';
+ try{
+  await actor.goto('/login');await expect(actor.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
+  await actor.locator('#identifier').fill(email);await actor.locator('#password').fill(password);await actor.locator('form button[type=submit]').click();await actor.waitForURL(url=>!url.pathname.includes('/login'));
+  if(new URL(actor.url()).pathname==='/tenant-selection')await actor.getByTestId(`space-business-${tenant}`).click();
+  const identity=await actor.request.get('/api/auth/me');expect(identity.status()).toBe(200);const beforeIdentity=(await identity.json()).data;
+  expect(String(beforeIdentity.user.tenantId)).toBe(tenant);expect(beforeIdentity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
+  expect(beforeIdentity.permissions.permissionCodes).toContain('report.definition.manage');
+  await navigateToMenuByClick(actor,['元数据管理','报表管理']);await actor.getByRole('button',{name:'新建报表',exact:true}).click();
+  await actor.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);await actor.getByPlaceholder('报表描述...').fill(description);
+  await setGrant(false);
+  const revoked=await actor.request.get('/api/auth/me');expect(revoked.status()).toBe(200);expect((await revoked.json()).data.permissions.permissionCodes).not.toContain('report.definition.manage');
+  const denied=actor.waitForResponse(r=>new URL(r.url()).pathname==='/api/report-definitions'&&r.request().method()==='POST');
+  await actor.getByTestId('report-designer-toolbar-btn-save').click();const failure=await denied;expect(failure.status()).toBe(403);
+  const deniedCode=failure.request().postDataJSON().code;expect(deniedCode).toMatch(/^report_/);
+  await expect(actor.getByText('保存失败，草稿已保留，请重试。',{exact:true})).toBeVisible();
+  await expect(actor).toHaveURL(/\/report-designer$/);await expect(actor.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(title);
+  await expect(actor.getByPlaceholder('报表描述...')).toHaveValue(description);await expect(actor.getByTestId('report-designer-toolbar-btn-save')).toBeEnabled();
+  const absent=await page.request.get(`/api/report-definitions/by-code/${deniedCode}`);expect(absent.status()).toBe(404);
+  await actor.screenshot({path:join(evidence,'report-save-denied.png'),fullPage:true});
+  await setGrant(true);
+  const savedPromise=actor.waitForResponse(r=>new URL(r.url()).pathname==='/api/report-definitions'&&r.request().method()==='POST');
+  await actor.getByTestId('report-designer-toolbar-btn-save').click();const saved=await savedPromise;expect(saved.status()).toBe(200);
+  const pid=(await saved.json()).data.pid;expect(saved.request().postDataJSON().dsl.description).toBe(description);
+  await expect(actor).toHaveURL(new RegExp(`/report-designer/${pid}$`));await expect(actor.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(title);
+  await actor.reload();await expect(actor.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue(title);await expect(actor.getByPlaceholder('报表描述...')).toHaveValue(description);
+  const listed=await page.request.get('/api/report-definitions');expect(listed.status()).toBe(200);
+  expect((await listed.json()).data.filter((row:any)=>row.title===title).map((row:any)=>row.pid)).toEqual([pid]);
+  await actor.screenshot({path:join(evidence,'report-save-recovered.png'),fullPage:true});
+  await writeFile(join(evidence,'report-save-recovery-receipt.json'),JSON.stringify({pid,title,description,rolePid,email,failedSaveStatus:failure.status(),failedCodeAbsent:true,recoveredSaveStatus:saved.status(),directRefresh:true,adminRoleChanged:false},null,2));
+ }finally{await setGrant(true);await context.close();}
 });

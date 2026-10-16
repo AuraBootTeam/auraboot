@@ -32,6 +32,7 @@ export type DecisionVersionPolicy =
 
 export interface DecisionOption {
   code: string;
+  scopeType?: string;
   name?: string;
   outputs?: DecisionOutputSchemaSource[];
   outputSchemaJson?: unknown;

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:smart="http://smartengine.org/schema/process" targetNamespace="http://auraboot.com/bpm">
+<process id="tpm_delivery_acceptance" name="客户交付验收 · 风险分级与时限" isExecutable="true">
+<startEvent id="start" name="提交交付材料"/>
+<exclusiveGateway id="risk_route" name="风险与金额分级"><extensionElements><smart:properties><smart:property name="aura.ruleBinding" value="{&quot;consumerType&quot;: &quot;BPM&quot;, &quot;consumerCode&quot;: &quot;tpm_delivery_acceptance&quot;, &quot;consumerNodeId&quot;: &quot;risk_route&quot;, &quot;bindingKind&quot;: &quot;DECISION_REF&quot;, &quot;enabled&quot;: true, &quot;decisionBinding&quot;: {&quot;decisionCode&quot;: &quot;tpm_acceptance_route&quot;, &quot;versionPolicy&quot;: &quot;LATEST_PUBLISHED&quot;, &quot;inputMappings&quot;: [{&quot;input&quot;: &quot;tpm_ac_amount&quot;, &quot;source&quot;: {&quot;kind&quot;: &quot;FIELD&quot;, &quot;scope&quot;: &quot;record&quot;, &quot;path&quot;: &quot;data.tpm_ac_amount&quot;}}, {&quot;input&quot;: &quot;tpm_ac_risk&quot;, &quot;source&quot;: {&quot;kind&quot;: &quot;FIELD&quot;, &quot;scope&quot;: &quot;record&quot;, &quot;path&quot;: &quot;data.tpm_ac_risk&quot;}}], &quot;outputMappings&quot;: [{&quot;output&quot;: &quot;route&quot;, &quot;target&quot;: {&quot;kind&quot;: &quot;PROCESS_VARIABLE&quot;, &quot;path&quot;: &quot;route&quot;}}], &quot;fallbackPolicy&quot;: {&quot;mode&quot;: &quot;FAIL_CLOSED&quot;}, &quot;traceMode&quot;: &quot;ALWAYS&quot;, &quot;enabled&quot;: true}}"/></smart:properties></extensionElements></exclusiveGateway>
+<userTask id="tpm_standard_review" name="交付负责人 · 常规验收" smart:assigneeType="expression" smart:assignee="#tpm_ac_reviewer"/>
+<userTask id="tpm_enhanced_review" name="验收负责人 · 加强审核" smart:assigneeType="expression" smart:assignee="#tpm_ac_reviewer"/>
+<exclusiveGateway id="review_result" name="验收结果"/>
+<serviceTask id="accepted" name="回写验收通过" smart:class="commandServiceTaskDelegate" smart:commandCode="tpm:accept_acceptance" smart:operationType="update" smart:targetRecordPid="${processBusinessKey}"/>
+<serviceTask id="returned" name="退回补正材料" smart:class="commandServiceTaskDelegate" smart:commandCode="tpm:return_acceptance" smart:operationType="update" smart:targetRecordPid="${processBusinessKey}"/>
+<endEvent id="end" name="保存结果与关闭时限"/>
+<sequenceFlow id="f0" sourceRef="start" targetRef="risk_route"></sequenceFlow>
+<sequenceFlow id="f1" sourceRef="risk_route" targetRef="tpm_standard_review"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${route == 'standard'}]]></conditionExpression></sequenceFlow>
+<sequenceFlow id="f2" sourceRef="risk_route" targetRef="tpm_enhanced_review"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${route == 'enhanced'}]]></conditionExpression></sequenceFlow>
+<sequenceFlow id="f3" sourceRef="tpm_standard_review" targetRef="review_result"></sequenceFlow>
+<sequenceFlow id="f4" sourceRef="tpm_enhanced_review" targetRef="review_result"></sequenceFlow>
+<sequenceFlow id="f5" sourceRef="review_result" targetRef="accepted"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${_action == 'approve'}]]></conditionExpression></sequenceFlow>
+<sequenceFlow id="f6" sourceRef="review_result" targetRef="returned"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${_action == 'reject'}]]></conditionExpression></sequenceFlow>
+<sequenceFlow id="f7" sourceRef="accepted" targetRef="end"></sequenceFlow>
+<sequenceFlow id="f8" sourceRef="returned" targetRef="end"></sequenceFlow>
+</process>
+</definitions>

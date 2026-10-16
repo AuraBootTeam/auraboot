@@ -1,0 +1,69 @@
+/* Operational designer layout: one navigation rail and one primary canvas. */
+.decisionops-shell { padding:24px; gap:20px; background:var(--color-subtle,#f5f6f8); }
+.decisionops-shell .decisionops-page-header { border:0; padding:0; background:transparent; box-shadow:none; align-items:center; }
+.decisionops-shell .decisionops-page-header h1 { font-size:24px; font-weight:650; }
+.decisionops-shell .decisionops-eyebrow { font-weight:400; }
+.decisionops-shell .decisionops-header-meta span { border:0; background:transparent; padding:0 12px; font-weight:400; }
+.decisionops-shell .decisionops-layout { display:block; }
+.decisionops-shell .decisionops-layout .decisionops-nav { display:flex; flex-wrap:nowrap; overflow-x:auto; gap:24px; padding:0; border:0; border-bottom:1px solid var(--color-border); border-radius:0; background:transparent; box-shadow:none; margin-bottom:20px; }
+.decisionops-shell .decisionops-layout .decisionops-nav a { display:block; flex:0 0 auto; width:auto; min-height:42px; padding:10px 2px; border:0; border-bottom:2px solid transparent; border-radius:0; white-space:nowrap; }
+.decisionops-shell .decisionops-layout .decisionops-nav a[aria-selected=true] { border:0; border-bottom:2px solid var(--color-accent,#2563eb); background:transparent; }
+.decisionops-shell .decisionops-layout .decisionops-nav-desc { display:none; }
+.decisionops-shell .decisionops-layout .decisionops-nav-label { font-weight:500; }
+.decisionops-shell--studio .decisionops-section-head { display:none; }
+.decisionops-shell .strategy-studio { gap:18px; }
+.decisionops-shell .strategy-studio-header { background:var(--color-panel,#fff); border-radius:10px; padding:18px 20px; }
+.decisionops-shell .strategy-studio-header p { display:none; }
+.decisionops-shell .strategy-studio-header h3 { font-weight:600; margin-bottom:10px; }
+.decisionops-shell .strategy-studio-header label { display:flex; align-items:center; gap:12px; font-size:12px; color:var(--color-text-2); }
+.decisionops-shell .strategy-studio-header select { min-height:32px; min-width:230px; border:1px solid var(--color-border); border-radius:6px; padding:4px 10px; color:var(--color-text); background:var(--color-panel); }
+.decisionops-shell .strategy-workspace-tabs { display:flex; gap:24px; border-bottom:1px solid var(--color-border); }
+.decisionops-shell .strategy-workspace-tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; padding:10px 0; min-height:40px; font-weight:500; }
+.decisionops-shell .strategy-workspace-tabs button[aria-pressed=true] { background:transparent; border-bottom-color:var(--color-accent,#2563eb); color:var(--color-accent); }
+.decisionops-shell .strategy-workspace-tabs strong { display:none; }
+.decisionops-shell .strategy-studio-body { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start; }
+.decisionops-shell .strategy-studio-grid,.decisionops-shell .strategy-studio-center { display:block; min-width:0; }
+.decisionops-shell .strategy-workspace-panel[data-active=false] { display:none; }
+.decisionops-shell .strategy-studio-panel { border-radius:10px; padding:20px; }
+.decisionops-shell .strategy-studio-panel-head { margin-bottom:16px; }
+.decisionops-shell .strategy-studio-panel-head strong { font-size:15px; font-weight:600; }
+.decisionops-shell .strategy-test-panel { background:var(--color-panel,#fff); border:1px solid var(--color-border); border-radius:10px; padding:20px; display:grid; gap:16px; min-width:0; position:sticky; top:16px; }
+.decisionops-shell .strategy-test-panel h4 { font-size:15px; font-weight:600; margin:0 0 6px; }
+.decisionops-shell .strategy-test-panel p { margin:0; font-size:12px; line-height:1.7; color:var(--color-text-2); }
+.decisionops-shell .strategy-test-panel [data-testid=strategy-test-inputs] { display:grid; grid-template-columns:1fr; gap:14px; }
+.decisionops-shell .strategy-test-panel label { display:grid; gap:7px; font-size:12px; color:var(--color-text-2); }
+.decisionops-shell .strategy-test-panel input { min-height:36px; border:1px solid var(--color-border); border-radius:6px; width:100%; padding:7px 10px; font-size:14px; color:var(--color-text); background:var(--color-panel); }
+.decisionops-shell .strategy-test-panel [data-testid=strategy-run-test] { grid-row:3; min-height:36px; background:var(--color-accent,#2563eb); color:white; border-color:transparent; font-weight:500; }
+.decisionops-shell .strategy-operation-status { font-weight:400; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.decisionops-shell .strategy-test-outputs { display:grid; gap:10px; margin:0; border:1px solid var(--color-border); padding:14px; border-radius:8px; background:var(--color-subtle); }
+.decisionops-shell .strategy-test-outputs dt { font-size:12px; color:var(--color-text-2); }
+.decisionops-shell .strategy-test-outputs dd { font-size:20px; margin:5px 0 0; font-weight:600; }
+.decisionops-shell .strategy-test-readiness { border-top:1px solid var(--color-border); padding-top:16px; }
+.decisionops-shell .strategy-test-readiness .strategy-studio-panel { border:0; padding:0; }
+.decisionops-shell .strategy-test-readiness .strategy-studio-panel-head { display:block; }
+.decisionops-shell .strategy-test-readiness .strategy-studio-panel-head span { display:block; margin-top:7px; white-space:normal; }
+.decisionops-shell .strategy-check-list { display:grid; gap:7px; margin-top:12px; }
+.decisionops-shell .strategy-check-list span { white-space:normal; font-weight:400; line-height:1.6; }
+.decisionops-shell .strategy-context { border-top:1px solid var(--color-border); padding-top:14px; }
+.decisionops-shell .strategy-context>summary { cursor:pointer; font-size:12px; color:var(--color-text-2); margin-bottom:14px; }
+.decisionops-shell .strategy-context .strategy-studio-metrics { margin-top:14px; }
+.decisionops-shell .decision-table--compact { display:flex; flex-direction:column; gap:14px; }
+.decisionops-shell .decision-table--compact .dt-hitpolicy { border:0; padding:0; background:transparent; }
+.decisionops-shell .decision-table--compact .dt-settings { order:4; }
+.decisionops-shell .decision-table--compact .dt-exchange { order:5; }
+.decisionops-shell .decision-table--compact .dt-grid-scroll { order:2; border:1px solid var(--color-border); border-radius:8px; }
+.decisionops-shell .decision-table--compact .dt-toolbar { order:3; margin:0; }
+.decisionops-shell .decision-table--compact>button { order:3; align-self:flex-start; }
+.decisionops-shell .decision-table--compact summary { padding:10px 0; color:var(--color-text-2); cursor:pointer; font-size:12px; border-top:1px solid var(--color-border); }
+.decisionops-shell .decision-table--compact .dt-grid { min-width:520px; width:100%; }
+.decisionops-shell .decision-table--compact .dt-grid th { background:var(--color-subtle); font-weight:500; padding:12px; font-size:12px; }
+.decisionops-shell .decision-table--compact .dt-grid td { padding:12px; vertical-align:top; }
+.decisionops-shell .decision-table--compact .dt-grid input,.decisionops-shell .decision-table--compact .dt-grid select { max-width:100%; width:100%; min-width:0; font-size:12px; }
+.decisionops-shell .decision-table--compact .dt-dmn-panel textarea { min-height:100px; }
+@media(max-width:1100px){ .decisionops-shell .strategy-studio-body{grid-template-columns:minmax(0,1fr) 270px;gap:14px;} .decisionops-shell{padding:20px;} }
+@media(max-width:800px){ .decisionops-shell .strategy-studio-body{grid-template-columns:1fr;} .decisionops-shell .strategy-test-panel{position:static;} .decisionops-shell .strategy-studio-header{align-items:flex-start;flex-direction:column;} .decisionops-shell .strategy-workspace-tabs{gap:16px;overflow:auto;} }
+
+.decisionops-shell--studio .decisionops-content-card{padding:0;border:0;background:transparent;box-shadow:none;}
+.decisionops-shell .decision-table--compact .dt-cell-expression>summary{border:0;padding:4px 0 0;font-size:10px;color:var(--color-text-3);}
+.decisionops-shell .strategy-test-trace{font-size:11px;color:var(--color-text-3);overflow-wrap:anywhere;}
+.decisionops-shell .strategy-test-trace summary{cursor:pointer;}

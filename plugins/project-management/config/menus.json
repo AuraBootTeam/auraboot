@@ -63,5 +63,17 @@
     "permissionCode": "tpm.project.manage",
     "orderNo": 4,
     "visible": true
+  },
+  {
+    "code": "tpm_acceptances",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "交付验收",
+    "name:en": "Delivery acceptance",
+    "path": "/p/tpm_acceptance",
+    "icon": "IconClipboardCheck",
+    "type": 1,
+    "permissionCode": "tpm.acceptance.read",
+    "orderNo": 4,
+    "visible": true
   }
 ]
