@@ -211,6 +211,14 @@ public interface CommandHandlerExtension extends ExtensionPoint {
          * Get the DataAccessor from the settings map.
          * Returns null if not available.
          */
+        /** Present only during a host-authorized installed integration command. */
+        public com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding installedIntegration() {
+            Object binding = settings == null ? null : settings.get(
+                    com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding.SETTINGS_KEY);
+            return binding instanceof com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding value
+                    ? value : null;
+        }
+
         public DataAccessor dataAccessor() {
             Object da = settings != null ? settings.get(DATA_ACCESSOR_KEY) : null;
             return da instanceof DataAccessor ? (DataAccessor) da : null;
