@@ -1054,7 +1054,7 @@ export function StrategyStudioWorkbench({
   const [tableDmnStatuses, setTableDmnStatuses] = useState<Partial<Record<string, string | null>>>({})
   const [tableDmnBusy, setTableDmnBusy] = useState(false)
   const [activeWorkspacePanel, setActiveWorkspacePanel] =
-    useState<StrategyWorkspacePanelKey>('rule')
+    useState<StrategyWorkspacePanelKey>('dmn')
   const scenario = SCENARIOS.find((candidate) => candidate.key === scenarioKey) ?? SCENARIOS[0]
   const conditionFragmentRows = useMemo(
     () => [...conditionFragments, ...Object.values(conditionFragmentDrafts)],
@@ -1678,13 +1678,7 @@ export function StrategyStudioWorkbench({
           >
             {text('impactAction')}
           </button>
-          <button
-            type="button"
-            data-testid="strategy-run-test"
-            onClick={() => void runTest()}
-          >
-            {text('runTestAction')}
-          </button>
+
           <button
             type="button"
             data-testid="strategy-save-draft"
@@ -1702,52 +1696,6 @@ export function StrategyStudioWorkbench({
           </button>
         </div>
       </header>
-      {selectedDecisionCode && <div className="strategy-studio-metrics" data-testid="strategy-test-inputs">{scenarioTable.inputs.map((input) => <label key={input.id}>{input.label || input.id}<input aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => { setStatus(null); setTestOutputs(null); setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value })) }} /></label>)}</div>}
-      {operationStatus && (
-        <div className="strategy-operation-status" data-testid="strategy-operation-status" data-tone={operationTone} role={operationTone === 'error' ? 'alert' : 'status'}>
-          {operationStatus}
-        </div>
-      )}
-
-      {testOutputs && <dl className="strategy-test-outputs" data-testid="strategy-test-outputs">{Object.entries(testOutputs).map(([key, value]) => <div key={key}><dt>{scenarioTable.outputs.find((output) => output.id === key)?.label || key}</dt><dd>{typeof value === 'object' ? text('structuredOutput') : String(value)}</dd></div>)}</dl>}
-      <div className="strategy-scenarios" aria-label={text('scenarioGroupLabel')}>
-        {SCENARIOS.map((candidate) => (
-          <button
-            key={candidate.key}
-            type="button"
-            data-testid={`strategy-scenario-${candidate.key}`}
-            aria-pressed={candidate.key === activeScenario.key}
-            onClick={() => selectScenario(candidate)}
-          >
-            <span>{text(SCENARIO_TEXT[candidate.key].label)}</span>
-            <strong>{text(SCENARIO_TEXT[candidate.key].trigger)}</strong>
-          </button>
-        ))}
-      </div>
-
-      <div className="strategy-studio-metrics">
-        <div data-testid="strategy-consumer-summary">
-          <span>{text('metricConsumer')}</span>
-          <strong>{selectedDecisionCode ? scenarioScopeLabel(activeScenario.key) : text(SCENARIO_TEXT[activeScenario.key].consumer)}</strong>
-          <small>{selectedDecisionCode ? text('actualUsageHint') : text(SCENARIO_TEXT[activeScenario.key].trigger)}</small>
-        </div>
-        <div>
-          <span>{text('metricFields')}</span>
-          <strong>{scenarioFields.length}</strong>
-          <small>{text('metricFieldsHint')}</small>
-        </div>
-        <div>
-          <span>{text(selectedDecisionCode ? 'metricOutputs' : 'metricActions')}</span>
-          <strong>{selectedDecisionCode ? scenarioTable.outputs.length : scenarioActions.length}</strong>
-          <small>{text(selectedDecisionCode ? 'actualOutputHint' : 'metricActionsHint')}</small>
-        </div>
-        <div>
-          <span>{text('metricBlockers')}</span>
-          <strong>{checksCurrent ? Number(!draftValid) + Number(!impactChecked) + Number(!fragmentReady) : '—'}</strong>
-          <small>{publishStatus}</small>
-        </div>
-      </div>
-
       <div className="strategy-workspace-tabs" aria-label={text('workspaceGroupLabel')}>
         {WORKSPACE_PANELS.map((panel) => (
           <button
@@ -1763,6 +1711,7 @@ export function StrategyStudioWorkbench({
         ))}
       </div>
 
+      <div className="strategy-studio-body">
       <div className="strategy-studio-grid">
         <aside
           className="strategy-studio-panel strategy-workspace-panel"
@@ -1844,6 +1793,8 @@ export function StrategyStudioWorkbench({
             <div className="strategy-table-panel">
               <DecisionTableEditor
                 key={activeScenario.key}
+                compact
+                compactLabels={{ columns: text('tableSettings'), xml: text('xmlTools') }}
                 value={scenarioTable}
                 onChange={(next) => updateScenarioTable(studioTableKey(activeScenario), next)}
                 analysis={tableAnalyses[studioTableKey(activeScenario)] ?? null}
@@ -1933,7 +1884,26 @@ export function StrategyStudioWorkbench({
             </ol>
           </section>}
 
-          <section className="strategy-studio-panel">
+
+        </aside>
+      </div>
+      <aside className="strategy-test-panel" data-testid="strategy-test-panel">
+        <header><h4>{text('testPanelTitle')}</h4><p>{text('testPanelHint')}</p></header>
+      {selectedDecisionCode && <div className="strategy-studio-metrics" data-testid="strategy-test-inputs">{scenarioTable.inputs.map((input) => <label key={input.id}>{input.label || input.id}<input aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => { setStatus(null); setTestOutputs(null); setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value })) }} /></label>)}</div>}
+      {operationStatus && (
+        <div className="strategy-operation-status" data-testid="strategy-operation-status" data-tone={operationTone} role={operationTone === 'error' ? 'alert' : 'status'}>
+          {operationStatus}
+        </div>
+      )}
+
+      {testOutputs && <dl className="strategy-test-outputs" data-testid="strategy-test-outputs">{Object.entries(testOutputs).map(([key, value]) => <div key={key}><dt>{scenarioTable.outputs.find((output) => output.id === key)?.label || key}</dt><dd>{typeof value === 'object' ? text('structuredOutput') : String(value)}</dd></div>)}</dl>}
+          <button
+            type="button"
+            data-testid="strategy-run-test"
+            onClick={() => void runTest()}
+          >
+            {text('runTestAction')}
+          </button>        <div className="strategy-test-readiness">          <section className="strategy-studio-panel">
             <div className="strategy-studio-panel-head">
               <strong>{text('publishCheckTitle')}</strong>
               <span>
@@ -1948,9 +1918,48 @@ export function StrategyStudioWorkbench({
                 {text(impactChecked ? 'checkImpactConfirmed' : 'impactCheckPending')}
               </span>
             </div>
-          </section>
-        </aside>
+          </section></div>
+      </aside>
       </div>
+      <details className="strategy-context"><summary>{text('contextTitle')}</summary>      <div className="strategy-scenarios" aria-label={text('scenarioGroupLabel')}>
+        {SCENARIOS.map((candidate) => (
+          <button
+            key={candidate.key}
+            type="button"
+            data-testid={`strategy-scenario-${candidate.key}`}
+            aria-pressed={candidate.key === activeScenario.key}
+            onClick={() => selectScenario(candidate)}
+          >
+            <span>{text(SCENARIO_TEXT[candidate.key].label)}</span>
+            <strong>{text(SCENARIO_TEXT[candidate.key].trigger)}</strong>
+          </button>
+        ))}
+      </div>
+
+      <div className="strategy-studio-metrics">
+        <div data-testid="strategy-consumer-summary">
+          <span>{text('metricConsumer')}</span>
+          <strong>{selectedDecisionCode ? scenarioScopeLabel(activeScenario.key) : text(SCENARIO_TEXT[activeScenario.key].consumer)}</strong>
+          <small>{selectedDecisionCode ? text('actualUsageHint') : text(SCENARIO_TEXT[activeScenario.key].trigger)}</small>
+        </div>
+        <div>
+          <span>{text('metricFields')}</span>
+          <strong>{scenarioFields.length}</strong>
+          <small>{text('metricFieldsHint')}</small>
+        </div>
+        <div>
+          <span>{text(selectedDecisionCode ? 'metricOutputs' : 'metricActions')}</span>
+          <strong>{selectedDecisionCode ? scenarioTable.outputs.length : scenarioActions.length}</strong>
+          <small>{text(selectedDecisionCode ? 'actualOutputHint' : 'metricActionsHint')}</small>
+        </div>
+        <div>
+          <span>{text('metricBlockers')}</span>
+          <strong>{checksCurrent ? Number(!draftValid) + Number(!impactChecked) + Number(!fragmentReady) : '—'}</strong>
+          <small>{publishStatus}</small>
+        </div>
+      </div>
+
+</details>
     </section>
   )
 }

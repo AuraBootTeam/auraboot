@@ -666,5 +666,25 @@
   "actualOutputHint": {
     "zh-CN": "由消费方绑定解释并执行",
     "en": "Interpreted and executed by consumer bindings"
+  },
+  "testPanelTitle": {
+    "zh-CN": "测试与发布检查",
+    "en": "Test and readiness"
+  },
+  "testPanelHint": {
+    "zh-CN": "使用当前草稿验证业务输入与决策结果。",
+    "en": "Evaluate business inputs against the current draft."
+  },
+  "contextTitle": {
+    "zh-CN": "消费场景与上下文",
+    "en": "Consumers and context"
+  },
+  "tableSettings": {
+    "zh-CN": "字段与输出配置",
+    "en": "Inputs and outputs"
+  },
+  "xmlTools": {
+    "zh-CN": "DMN 交换与高级工具",
+    "en": "DMN exchange and advanced tools"
   }
 }

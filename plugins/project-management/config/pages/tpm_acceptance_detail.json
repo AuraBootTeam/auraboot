@@ -42,26 +42,23 @@
       ]
     },
     {
-      "id": "outcome",
-      "blockType": "detail-section",
+      "id": "approval",
+      "blockType": "workflow-panel",
       "title": {
-        "zh-CN": "当前处理状态",
-        "en": "Current outcome"
+        "zh-CN": "审批进展与执行记录",
+        "en": "Approval progress and execution history"
       },
-      "fields": [
-        {
-          "field": "tpm_ac_code",
-          "colSpan": 6
-        },
-        {
-          "field": "tpm_ac_status",
-          "colSpan": 6
-        },
-        {
-          "field": "tpm_ac_result",
-          "colSpan": 12
-        }
-      ]
+      "bpmPanel": {
+        "processKey": "tpm_delivery_acceptance",
+        "sections": [
+          "status",
+          "operations",
+          "history"
+        ],
+        "businessView": true
+      },
+      "area": "main",
+      "permissionCode": "bpm.process.read"
     },
     {
       "id": "identity",
@@ -72,28 +69,6 @@
       },
       "fields": [
         {
-          "field": "tpm_ac_name",
-          "colSpan": 12,
-          "required": true,
-          "props": {
-            "placeholder": {
-              "zh-CN": "例如：会员门户 · 第一阶段验收",
-              "en": "e.g. Member portal · Phase one acceptance"
-            }
-          }
-        },
-        {
-          "field": "tpm_ac_project",
-          "colSpan": 6,
-          "required": true,
-          "props": {
-            "placeholder": {
-              "zh-CN": "选择本次验收所属项目",
-              "en": "Select the delivery project"
-            }
-          }
-        },
-        {
           "field": "tpm_ac_scope",
           "colSpan": 12,
           "props": {
@@ -102,59 +77,38 @@
               "en": "Describe deliverables and verifiable completion criteria"
             }
           }
-        }
-      ],
-      "area": "main",
-      "readOnly": true
-    },
-    {
-      "id": "risk",
-      "blockType": "detail-section",
-      "title": {
-        "zh-CN": "风险与审批",
-        "en": "Risk and approval"
-      },
-      "fields": [
-        {
-          "field": "tpm_ac_amount",
-          "colSpan": 6,
-          "required": true,
-          "props": {
-            "placeholder": {
-              "zh-CN": "例如：68000",
-              "en": "e.g. 68000"
-            }
-          }
         },
         {
           "field": "tpm_ac_risk",
-          "colSpan": 6,
-          "required": true,
-          "props": {
-            "helpText": {
-              "zh-CN": "高风险或金额达到10万元进入加强审批；普通8小时，加强2小时。",
-              "en": "High risk or at least CNY 100,000 requires enhanced review: 2 hours; standard review: 8 hours."
-            }
-          }
-        },
-        {
-          "field": "tpm_ac_reviewer",
-          "colSpan": 12,
-          "required": true,
-          "props": {
-            "placeholder": {
-              "zh-CN": "选择具有审批权限的空间成员",
-              "en": "Select a space member with workflow permission"
-            },
-            "helpText": {
-              "zh-CN": "审批任务仅分配给所选成员；提交人不能代替他人审批。",
-              "en": "Only the selected member receives this review task."
-            }
-          }
+          "colSpan": 6
         }
       ],
       "area": "main",
-      "readOnly": true
+      "readOnly": true,
+      "extension": {
+        "displayVariant": "object"
+      }
+    },
+    {
+      "id": "outcome",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "当前处理状态",
+        "en": "Current outcome"
+      },
+      "fields": [
+        {
+          "field": "tpm_ac_status",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_ac_result",
+          "colSpan": 12
+        }
+      ],
+      "extension": {
+        "displayVariant": "object"
+      }
     },
     {
       "id": "materials",
@@ -176,26 +130,74 @@
         }
       ],
       "area": "main",
-      "readOnly": true
-    },
-    {
-      "id": "approval",
-      "blockType": "workflow-panel",
-      "title": {
-        "zh-CN": "审批进展与执行记录",
-        "en": "Approval progress and execution history"
-      },
-      "bpmPanel": {
-        "processKey": "tpm_delivery_acceptance",
-        "sections": [
-          "status",
-          "operations",
-          "history"
-        ],
-        "businessView": true
-      },
-      "area": "main",
-      "permissionCode": "bpm.process.read"
+      "readOnly": true,
+      "extension": {
+        "displayVariant": "object"
+      }
     }
-  ]
+  ],
+  "extension": {
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目交付",
+      "en": "Project delivery"
+    },
+    "headerTitleField": "tpm_ac_name",
+    "headerSubtitleFields": [
+      "tpm_ac_code",
+      "tpm_ac_project"
+    ],
+    "headerStatusField": "tpm_ac_status",
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showPdfExport": false,
+    "detailAsideBlockIds": [
+      "outcome",
+      "materials"
+    ],
+    "objectSummary": [
+      {
+        "field": "tpm_ac_project_display",
+        "label": {
+          "zh-CN": "所属项目",
+          "en": "Project"
+        },
+        "presentation": {
+          "kind": "object"
+        }
+      },
+      {
+        "field": "tpm_ac_reviewer",
+        "label": {
+          "zh-CN": "验收审批人",
+          "en": "Reviewer"
+        },
+        "presentation": {
+          "kind": "member"
+        }
+      },
+      {
+        "field": "tpm_ac_amount",
+        "label": {
+          "zh-CN": "交付金额",
+          "en": "Amount"
+        },
+        "presentation": {
+          "kind": "currency",
+          "currencyCode": "CNY"
+        }
+      },
+      {
+        "field": "tpm_ac_code",
+        "label": {
+          "zh-CN": "验收编号",
+          "en": "Reference"
+        },
+        "presentation": {
+          "kind": "object"
+        }
+      }
+    ]
+  }
 }

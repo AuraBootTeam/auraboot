@@ -29,8 +29,7 @@ async function menu(page: Page, name: string) {
 }
 async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), {recursive:true});
-  if (['d01','d04'].includes(id)) await page.getByTestId('strategy-check-readiness').evaluate(el=>el.scrollIntoView({block:'center'}));
-  if (['d02','d03','d02-published'].includes(id)) await page.getByTestId('strategy-test-inputs').evaluate(el=>el.scrollIntoView({block:'start'}));
+  if (['d01','d02','d03','d04','d02-published','d02-compact'].includes(id)) await page.getByTestId('decisionops-console').evaluate(el=>el.scrollIntoView({block:'start'}));
   if (['d13','d13-assigned'].includes(id)) await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
   await page.screenshot({path:join(evidence!, 'screenshots', `${id}.png`),fullPage:true});
@@ -101,7 +100,8 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
-  await page.getByTestId('bpm-panel').getByText('规则执行追踪',{exact:true}).click();
+  const traceDetails=page.getByTestId('bpm-panel').locator('details').filter({has:page.getByText('规则执行追踪',{exact:true})});
+  if(await traceDetails.getAttribute('open')===null) await traceDetails.getByText('规则执行追踪',{exact:true}).click();
   await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
   await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
   return sla[0];
@@ -147,6 +147,16 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     expect(response.request().postDataJSON().context.record.data.tpm_ac_amount).toBe(Number(amount));
     await expect(page.getByTestId('strategy-test-outputs')).toContainText(route);
   }
+  for(const width of [1280,1440]) {
+    await page.setViewportSize({width,height:1000});
+    const panel=await page.getByTestId('strategy-test-panel').boundingBox();
+    const editor=await page.getByTestId('strategy-dmn-panel').boundingBox();
+    expect(panel).toBeTruthy();expect(editor).toBeTruthy();
+    expect(editor!.x+editor!.width).toBeLessThanOrEqual(panel!.x);
+    expect(panel!.x+panel!.width).toBeLessThanOrEqual(width);
+    expect(editor!.width).toBeGreaterThan(450);
+    if(width===1280) await shot(page,'d02-compact');
+  }
   await shot(page,'d02');
   await page.getByLabel('feel-1-amount',{exact:true}).fill('>< invalid');
   const invalid=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/decision/test-run'&&r.request().method()==='POST');
@@ -156,6 +166,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
   await page.getByLabel('feel-1-amount',{exact:true}).fill('');
   await page.getByTestId('strategy-check-readiness').click();
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
+  await page.getByText('字段与输出配置',{exact:true}).click();
   await page.getByLabel('input-label-0').fill('交付金额（草稿修改）');
   await expect(page.getByTestId('strategy-studio')).toContainText('草稿尚未验证或已修改');
   await shot(page,'d04');
@@ -164,6 +175,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
   const published=page.waitForResponse(r=>/\/api\/decision\/versions\/[^/]+\/publish$/.test(new URL(r.url()).pathname)&&r.request().method()==='POST');
   await page.getByTestId('strategy-publish').click();const version=await data(await published);expect(version.status).toBe('PUBLISHED');
   await page.reload();await page.getByTestId('strategy-business-decision').selectOption('tpm_acceptance_route');
+  await page.getByText('字段与输出配置',{exact:true}).click();
   await expect(page.getByLabel('input-label-0',{exact:true})).toHaveValue('交付金额（草稿修改）');
   await shot(page,'d02-published');
 });
@@ -222,7 +234,7 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
     let action:any;await expect.poll(async()=>{const logs=await data(await page.request.get(`/api/event-policy/action-logs?size=100&correlationId=sla:${sla.pid}`));action=logs.find((item:any)=>item.correlationId===`sla:${sla.pid}`);return action?.status;},{timeout:10000}).toBe('SUCCESS');
     expect(action.resultPayload.sentCount).toBeGreaterThan(0);
     await writeFile(join(evidence!,'sla-notification-evidence.json'),JSON.stringify({notifications:actual,action},null,2));
-    await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('30秒');await shot(page,'d11');
+    await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('30秒');await expect(page.getByTestId('sla-record-row').filter({hasText:name})).toContainText('逾期');await shot(page,'d11');
     await openRecord(page,name);await decide(page,pid,'approve');
     const completed=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));
     const closedAt=Date.parse(completed.completedTime);

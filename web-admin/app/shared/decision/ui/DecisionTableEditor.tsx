@@ -18,6 +18,8 @@ import {
 } from './displayLabels';
 
 export interface DecisionTableEditorProps {
+  compact?: boolean;
+  compactLabels?: { columns: string; xml: string };
   value: DecisionTable;
   onChange: (next: DecisionTable) => void;
   analysis?: DecisionTableAnalysis | null;
@@ -169,6 +171,8 @@ function move<T>(items: T[], from: number, to: number): T[] {
 }
 
 export function DecisionTableEditor({
+  compact = false,
+  compactLabels,
   value,
   onChange,
   analysis,
@@ -409,7 +413,7 @@ export function DecisionTableEditor({
   };
 
   return (
-    <div data-testid="decision-table-editor">
+    <div data-testid="decision-table-editor" className={compact ? 'decision-table--compact' : undefined}>
       <div className="dt-hitpolicy">
         <label htmlFor="dt-hp">命中策略</label>
         <select
@@ -435,6 +439,8 @@ export function DecisionTableEditor({
         )}
       </div>
 
+      <details className="dt-settings" open={compact ? undefined : true}>
+        <summary hidden={!compact}>{compactLabels?.columns}</summary>
       <section className="dt-column-manager" aria-label="decision-table-columns">
         <div>
           <h4>输入列</h4>
@@ -583,6 +589,7 @@ export function DecisionTableEditor({
           <button type="button" data-testid="dt-add-output" onClick={addOutput}>添加输出列</button>
         </div>
       </section>
+      </details>
 
       <div className="dt-toolbar">
         <button
@@ -642,6 +649,8 @@ export function DecisionTableEditor({
         </section>
       )}
 
+      <details className="dt-exchange" open={compact ? undefined : true}>
+        <summary hidden={!compact}>{compactLabels?.xml}</summary>
       <section className="dt-dmn-panel" data-testid="dt-dmn-panel" aria-label="decision-table-xml-tools">
         <div className="dt-dmn-actions">
           <button
@@ -678,6 +687,7 @@ export function DecisionTableEditor({
           onChange={(e) => onDmnXmlChange?.(e.target.value)}
         />
       </section>
+      </details>
 
       <div className="dt-grid-scroll">
         <table className="dt-grid">
