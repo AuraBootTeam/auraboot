@@ -184,6 +184,8 @@ export interface WidgetConfig {
   showPagination?: boolean;
   sortable?: boolean;
   striped?: boolean;
+  /** Localized guidance for an empty table data source. */
+  emptyMessage?: DashboardText;
   /**
    * Multi-KPI configuration for `smart-number-card`. Each entry binds one column from
    * the data source row to a labelled tile; `label` carries the human-readable eyebrow
