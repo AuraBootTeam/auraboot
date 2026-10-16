@@ -31,7 +31,8 @@ async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), {recursive:true});
   if (['d01','d04'].includes(id)) await page.getByTestId('strategy-check-readiness').evaluate(el=>el.scrollIntoView({block:'center'}));
   if (['d02','d03','d02-published'].includes(id)) await page.getByTestId('strategy-test-inputs').evaluate(el=>el.scrollIntoView({block:'start'}));
-  if (['d07','d08-pending'].includes(id)) await expect(page.getByText('保存成功',{exact:true})).toHaveCount(0,{timeout:15000});
+  if (['d13','d13-assigned'].includes(id)) await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
   await page.screenshot({path:join(evidence!, 'screenshots', `${id}.png`),fullPage:true});
 }
 async function row(page: Page, pid: string) {
@@ -289,7 +290,8 @@ test('missing route and deadline rules fail closed and can recover after configu
   const failSubmit=async()=>{
     const rejected=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');
     await page.getByTestId('toolbar-btn-submit_acceptance').click();const response=await rejected;expect(response.ok()).toBe(false);
-    await expect(page.getByTestId('ab:detail:tpm_acceptance:action-error')).toBeVisible();
+    await expect(page.getByTestId('ab:detail:tpm_acceptance:action-error')).toContainText('请管理员检查');
+    await expect(page.getByTestId('ab:detail:tpm_acceptance:action-error')).not.toContainText(/rollback-only|unable to resolve/);
     const unchanged=await row(page,pid);expect(unchanged.tpm_ac_status).toBe('draft');expect(unchanged.tpm_ac_process).toBeFalsy();
     await shot(page,'d14');await page.getByRole('button',{name:'关闭',exact:true}).click();
   };
