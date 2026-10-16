@@ -1,5 +1,5 @@
 import {test, expect, type Page, type APIResponse} from '@playwright/test';
-import {mkdir, writeFile} from 'node:fs/promises';
+import {mkdir, writeFile, readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
 const evidence = process.env.AURA_EVIDENCE_DIR;
@@ -11,13 +11,17 @@ async function data(response: APIResponse) {
   expect(String(body.code)).toBe('0');
   return body.data;
 }
-async function login(page: Page) {
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant?: string) {
   await page.goto('/login');
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(process.env.ADMIN_EMAIL!);
+  await page.locator('#identifier').fill(email);
   await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
   await page.getByRole('button', {name:'立即登录', exact:true}).click();
   await page.waitForURL(url => !url.pathname.includes('/login'));
+  if (new URL(page.url()).pathname === '/tenant-selection') {
+    expect(tenant).toBeTruthy();await page.getByTestId(`space-business-${tenant}`).click();
+    await expect(page).not.toHaveURL(/tenant-selection/);
+  }
   return (await data(await page.request.get('/api/auth/me'))).user;
 }
 async function menu(page: Page, name: string) {
@@ -38,7 +42,8 @@ async function openRecord(page: Page, name: string) {
   const record = page.getByRole('row').filter({hasText:name});
   await expect(record).toHaveCount(1);
   await record.getByRole('button', {name:/查看|详情/}).click();
-  await expect(page.getByTestId('toolbar-btn-edit')).toBeVisible();
+  await expect(page).toHaveURL(/\/p\/tpm_acceptance\/view\//);
+  await expect(page.getByRole('main')).toContainText(name);
 }
 async function create(page: Page, user: any, name: string, amount: number, risk: string, attachment: boolean) {
   await menu(page, '交付验收');
@@ -61,7 +66,7 @@ async function create(page: Page, user: any, name: string, amount: number, risk:
   const payload = response.request().postDataJSON().payload;
   expect(payload.tpm_ac_name).toBe(name);
   expect(String(payload.tpm_ac_reviewer)).toBe(user.pid);
-  const pid = result.recordPid;
+  const pid = result.data.recordPid;
   expect(pid).toBeTruthy();
   await expect(page).not.toHaveURL(/\/new$/);
   await openRecord(page,name);
@@ -78,9 +83,6 @@ async function upload(page: Page) {
 async function submit(page: Page, pid: string, minutes: number, node: string) {
   const sent = page.waitForResponse(r => r.url().includes('/execute/tpm:submit_delivery_acceptance') && r.request().method()==='POST');
   await page.getByTestId('toolbar-btn-submit_acceptance').click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button',{name:/确认|确定/}).click();
   const response = await sent;
   expect(response.request().postDataJSON().targetRecordPid).toBe(pid);
   await data(response);
@@ -133,22 +135,35 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     await expect(page.getByTestId('strategy-test-outputs')).toContainText(route);
   }
   await shot(page,'d02');
+  await page.getByLabel('feel-0-amount',{exact:true}).fill('>< invalid');
+  const invalid=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/decision/test-run'&&r.request().method()==='POST');
+  await page.getByTestId('strategy-run-test').click();expect((await data(await invalid)).status).toBe('ERROR');
+  await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','error');
+  await expect(page.getByTestId('strategy-operation-status')).toContainText('Invalid FEEL');await shot(page,'d03');
+  await page.getByLabel('feel-0-amount',{exact:true}).fill('');
   await page.getByTestId('strategy-check-readiness').click();
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
   await page.getByLabel('input-label-0').fill('交付金额（草稿修改）');
   await expect(page.getByTestId('strategy-studio')).toContainText('草稿尚未验证或已修改');
   await shot(page,'d04');
+  await page.getByTestId('strategy-check-readiness').click();
+  await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
+  const published=page.waitForResponse(r=>/\/api\/decision\/versions\/[^/]+\/publish$/.test(new URL(r.url()).pathname)&&r.request().method()==='POST');
+  await page.getByTestId('strategy-publish').click();const version=await data(await published);expect(version.status).toBe('PUBLISHED');
+  await page.reload();await page.getByTestId('strategy-business-decision').selectOption('tpm_acceptance_route');
+  await expect(page.getByLabel('input-label-0',{exact:true})).toHaveValue('交付金额（草稿修改）');
+  await shot(page,'d02-published');
 });
 
 test('standard delivery enforces materials, blocks forged outcomes, approves and closes SLA @critical',async({page})=>{
-  const user=await login(page);const name=`华辰制造 · 第一阶段验收 ${Date.now()}`;
+  const user=await login(page);const name='华辰制造 · 供应链平台第一阶段验收';
   const pid=await create(page,user,name,68000,'普通',false);
   const denied=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');
   await page.getByTestId('toolbar-btn-submit_acceptance').click();
-  await page.getByRole('dialog').getByRole('button',{name:/确认|确定/}).click();
   const rejection=await denied;expect(rejection.ok()).toBe(false);
-  await expect(page.getByText('请上传交付材料后再提交验收。',{exact:false})).toBeVisible();
+  await expect(page.getByTestId('ab:detail:tpm_acceptance:action-error')).toContainText('请上传交付材料后再提交验收。');
   expect((await row(page,pid)).tpm_ac_status).toBe('draft');await shot(page,'d06');
+  await page.getByRole('button',{name:'关闭',exact:true}).click();
   await page.getByTestId('toolbar-btn-edit').click();await upload(page);
   const updated=page.waitForResponse(r=>r.url().includes('/execute/tpm:update_acceptance')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();await data(await updated);
@@ -163,7 +178,7 @@ test('standard delivery enforces materials, blocks forged outcomes, approves and
 });
 
 test('high-risk rejection can be corrected and resubmitted through a new owned instance @critical',async({page})=>{
-  const user=await login(page);const name=`华辰制造 · 风险补正验收 ${Date.now()}`;
+  const user=await login(page);const name='华辰制造 · 高风险交付补正';
   const pid=await create(page,user,name,68000,'高风险',true);
   const first=await submit(page,pid,120,'tpm_enhanced_review');await shot(page,'d07');
   await decide(page,pid,'reject');await shot(page,'d09-returned');
@@ -184,7 +199,7 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
   const change=async(value:any)=>data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:value}));
   await change({...config,name:'加强审核 · 30秒加速验证',deadlineMode:'FIXED',deadlineValue:'PT30S'});
   try {
-    const name=`SLA 加速验证 · 30秒 ${Date.now()}`;const pid=await create(page,user,name,100000,'普通',true);
+    const name='SLA 加速验证 · 30秒交付验收';const pid=await create(page,user,name,100000,'普通',true);
     const sla=await submit(page,pid,0.5,'tpm_enhanced_review');await shot(page,'d10');
     let expired:any;
     await expect.poll(async()=>{expired=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));return expired.status;},{timeout:65000,intervals:[3000]}).toBe('overdue');
@@ -196,4 +211,74 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
     await expect.poll(async()=>{const next=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));expect(next.status).toBe('completed');expect(next.warningHistory).toEqual(completed.warningHistory);return Date.now()-closedAt;},{timeout:25000,intervals:[3000]}).toBeGreaterThan(16000);
     receipts.push({accelerated:true,sla:expired,completed});await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   } finally { await change(config); }
+});
+
+
+test('readonly viewers and unassigned reviewers cannot change another acceptance @critical',async({page,browser})=>{
+  const admin=await login(page);const name='华辰制造 · 验收协作权限验证';
+  const pid=await create(page,admin,name,68000,'普通',true);const sla=await submit(page,pid,480,'tpm_standard_review');
+  const tree=await data(await page.request.get('/api/permissions/tree'));const ids=new Map<string,number>();
+  const collect=(nodes:any[])=>nodes.forEach(node=>{ids.set(node.code,node.id);collect(node.children||[]);});collect(tree);
+  for(const reviewer of [false,true]) {
+    const code=`acceptance_${reviewer?'unassigned':'readonly'}_${Date.now()}`;
+    const role=await data(await page.request.post('/api/roles',{data:{code,name:code,type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}}));
+    const grants=['tpm.acceptance.read','model.tpm_acceptance.read','tpm.project.read','model.tpm_project.read',...(reviewer?['tpm.acceptance.manage','bpm.process.read','bpm.process.execute']:[])];
+    await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>{expect(ids.has(code),code).toBe(true);return {permissionId:ids.get(code),granted:true};})}));
+    const email=`${code}@e2e.local`;
+    await data(await page.request.post('/api/admin/users',{data:{email,displayName:reviewer?'验收协作成员':'交付只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
+    const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+    try {
+      const actor=await context.newPage();await login(actor,email,String(admin.tenantId));
+      const identity=await data(await actor.request.get('/api/auth/me'));expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
+      await openRecord(actor,name);
+      if(reviewer) {
+        await expect(actor.getByTestId('bpm-operations-approve')).toBeDisabled();
+        const refused=await actor.request.post(`/api/bpm/tasks/${sla.taskId}/approve`,{data:{comment:'An unassigned reviewer must be refused',variables:{}}});expect(refused.status()).toBe(403);
+      } else {
+        await expect(actor.getByTestId('toolbar-btn-edit')).toHaveCount(0);
+        await expect(actor.getByTestId('toolbar-btn-submit_acceptance')).toHaveCount(0);
+        await expect(actor.getByTestId('bpm-panel')).toHaveCount(0);
+        const refused=await actor.request.post('/api/meta/commands/execute/tpm:accept_acceptance',{data:{operationType:'update',targetRecordPid:pid,payload:{}}});expect(refused.status()).toBe(403);
+      }
+      expect((await row(page,pid)).tpm_ac_status).toBe('submitted');await shot(actor,reviewer?'d13':'d13-readonly');
+    } finally {await context.close();}
+  }
+  await decide(page,pid,'approve');
+});
+
+test('missing route and deadline rules fail closed and can recover after configuration is restored @critical',async({page})=>{
+  const user=await login(page);const root=process.env.AURA_CORE_PROJECT_ROOT!;
+  const bundle=JSON.parse(await readFile(join(root,'plugins/project-management/examples/acceptance-workflow.bpm-package.json'),'utf8'));
+  const process=(await data(await page.request.get('/api/bpm/process-definitions?size=1000'))).records.find((p:any)=>p.processKey===bundle.processKey);
+  const deploy=async(value:any)=>{
+    await data(await page.request.post('/api/bpm/import/execute',{data:{package:value,strategy:'overwrite'}}));
+    await data(await page.request.post(`/api/bpm/process-definitions/${process.pid}/deploy`,{data:{}}));
+  };
+  const broken=JSON.parse(JSON.stringify(bundle));
+  broken.processDefinition.bpmnContent=broken.processDefinition.bpmnContent.replaceAll('tpm_acceptance_route','absent_acceptance_route');
+  // The canonical graph drives package import and deploy; keep it aligned with XML.
+  broken.processDefinition.extension.designerJson=broken.processDefinition.extension.designerJson.replaceAll('tpm_acceptance_route','absent_acceptance_route');
+  const pid=await create(page,user,'华辰制造 · 规则故障恢复验证',68000,'普通',true);
+  const failSubmit=async()=>{
+    const rejected=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');
+    await page.getByTestId('toolbar-btn-submit_acceptance').click();const response=await rejected;expect(response.ok()).toBe(false);
+    await expect(page.getByTestId('ab:detail:tpm_acceptance:action-error')).toBeVisible();
+    const unchanged=await row(page,pid);expect(unchanged.tpm_ac_status).toBe('draft');expect(unchanged.tpm_ac_process).toBeFalsy();
+    await shot(page,'d14');await page.getByRole('button',{name:'关闭',exact:true}).click();
+  };
+  try {await deploy(broken);await failSubmit();} finally {await deploy(bundle);}
+  const config=(await data(await page.request.get('/api/bpm/sla-configs'))).find((c:any)=>c.targetKey==='tpm_standard_review');
+  const set=async(value:any)=>data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:value}));
+  try {
+    await set({...config,deadlineValue:'absent_deadline_rule'});await failSubmit();
+  } finally {await set(config);}
+  await submit(page,pid,480,'tpm_standard_review');await decide(page,pid,'approve');
+});
+
+test('accepted project list form and detail remain available through their existing menu @smoke',async({page})=>{
+  await login(page);await menu(page,'项目');await expect(page.getByRole('row').filter({hasText:'华辰制造 · 供应链协同平台'})).toBeVisible();
+  await shot(page,'d15-list');await page.getByRole('button',{name:'新建项目',exact:true}).click();await expect(page.locator('#tpm_pj_name')).toBeVisible();
+  await expect(page.getByTestId('ai-fill-banner')).toHaveCount(0);await shot(page,'d15-form');await page.getByTestId('form-btn-cancel').click();
+  await page.getByRole('row').filter({hasText:'华辰制造 · 供应链协同平台'}).getByRole('button',{name:/查看|详情/}).click();
+  await expect(page.getByTestId('object-summary')).toContainText('华辰制造');await expect(page.getByTestId('collection-completion')).toBeVisible();await shot(page,'d15');
 });

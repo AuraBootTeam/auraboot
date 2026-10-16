@@ -191,7 +191,8 @@
           "status",
           "operations",
           "history"
-        ]
+        ],
+        "businessView": true
       },
       "area": "main",
       "permissionCode": "bpm.process.read"

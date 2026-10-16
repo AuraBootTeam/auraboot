@@ -654,5 +654,17 @@
   "backToTemplate": {
     "zh-CN": "返回场景模板",
     "en": "Back to scenario templates"
+  },
+  "metricOutputs": {
+    "zh-CN": "决策输出",
+    "en": "Decision outputs"
+  },
+  "actualUsageHint": {
+    "zh-CN": "查看影响面，确认已登记的实际引用",
+    "en": "Inspect impact for registered consumers"
+  },
+  "actualOutputHint": {
+    "zh-CN": "由消费方绑定解释并执行",
+    "en": "Interpreted and executed by consumer bindings"
   }
 }

@@ -1095,8 +1095,8 @@ export function StrategyStudioWorkbench({
     [catalogActions],
   )
   const scenarioActions = useMemo(
-    () => resolveScenarioActions(activeScenario, actionsByType),
-    [actionsByType, activeScenario],
+    () => selectedDecisionCode ? [] : resolveScenarioActions(activeScenario, actionsByType),
+    [actionsByType, activeScenario, selectedDecisionCode],
   )
   const scenarioFields = useMemo(() => {
     const fragmentFields = fieldsFromFragment(selectedFragment)
@@ -1494,9 +1494,9 @@ export function StrategyStudioWorkbench({
       inputSchemaJson: { fields: tableInputRefs(table) },
       outputSchemaJson: {
         outputs: tableOutputSchema(table),
-        actions: actionOutputSchema(resolveScenarioActions(target, actionsByType)),
+        actions: actionOutputSchema(selectedDecisionCode ? [] : resolveScenarioActions(target, actionsByType)),
       },
-      contextSchemaJson: { sample: sampleContext() },
+      contextSchemaJson: { sample: selectedDecisionCode ? testContext() : sampleContext() },
     })
     if (draft.pid) {
       setDraftVersionPids((current) => ({ ...current, [studioTableKey(target)]: draft.pid }))
@@ -1597,7 +1597,7 @@ export function StrategyStudioWorkbench({
       const conditionFragmentPid = await saveConditionFragmentDraft(target)
       const decisionPid = await saveDecisionTableDraft(target)
       setOperationStatus(
-        text('draftSaved', { title: text(SCENARIO_TEXT[target.key].title) }),
+        text('draftSaved', { title: selectedDecisionCode ? activeDecisionName : text(SCENARIO_TEXT[target.key].title) }), 'success',
       )
       return { decisionPid, conditionFragmentPid }
     } catch (error) {
@@ -1646,7 +1646,7 @@ export function StrategyStudioWorkbench({
         throw new Error(text('publishNoResult'))
       }
       setOperationStatus(
-        text('publishSucceeded', { consumer: text(SCENARIO_TEXT[activeScenario.key].consumer) }),
+        text('publishSucceeded', { consumer: selectedDecisionCode ? activeDecisionName : text(SCENARIO_TEXT[activeScenario.key].consumer) }), 'success',
       )
     } catch (error) {
       setOperationStatus(text('publishFailed', { message: errorMessage(error, text) }), 'error')
@@ -1728,8 +1728,8 @@ export function StrategyStudioWorkbench({
       <div className="strategy-studio-metrics">
         <div data-testid="strategy-consumer-summary">
           <span>{text('metricConsumer')}</span>
-          <strong>{text(SCENARIO_TEXT[activeScenario.key].consumer)}</strong>
-          <small>{text(SCENARIO_TEXT[activeScenario.key].trigger)}</small>
+          <strong>{selectedDecisionCode ? scenarioScopeLabel(activeScenario.key) : text(SCENARIO_TEXT[activeScenario.key].consumer)}</strong>
+          <small>{selectedDecisionCode ? text('actualUsageHint') : text(SCENARIO_TEXT[activeScenario.key].trigger)}</small>
         </div>
         <div>
           <span>{text('metricFields')}</span>
@@ -1737,9 +1737,9 @@ export function StrategyStudioWorkbench({
           <small>{text('metricFieldsHint')}</small>
         </div>
         <div>
-          <span>{text('metricActions')}</span>
-          <strong>{scenarioActions.length}</strong>
-          <small>{text('metricActionsHint')}</small>
+          <span>{text(selectedDecisionCode ? 'metricOutputs' : 'metricActions')}</span>
+          <strong>{selectedDecisionCode ? scenarioTable.outputs.length : scenarioActions.length}</strong>
+          <small>{text(selectedDecisionCode ? 'actualOutputHint' : 'metricActionsHint')}</small>
         </div>
         <div>
           <span>{text('metricBlockers')}</span>
@@ -1916,7 +1916,7 @@ export function StrategyStudioWorkbench({
             </ul>
           </section>
 
-          <section className="strategy-studio-panel" data-testid="strategy-action-plan">
+          {!selectedDecisionCode && <section className="strategy-studio-panel" data-testid="strategy-action-plan">
             <div className="strategy-studio-panel-head">
               <strong>{text('actionOutputTitle')}</strong>
               <span>{scenarioActions.length}</span>
@@ -1931,7 +1931,7 @@ export function StrategyStudioWorkbench({
                 </li>
               ))}
             </ol>
-          </section>
+          </section>}
 
           <section className="strategy-studio-panel">
             <div className="strategy-studio-panel-head">
