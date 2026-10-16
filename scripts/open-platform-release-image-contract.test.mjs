@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,6 +18,8 @@ assert.match(gate, /open-platform-openapi-wheels\/\$OPENAPI_WHEEL_LOCK/);
 assert.match(gate, /verify_openapi_artifacts\.py/);
 assert.match(gate, /OpenAPI contract validation failed/);
 assert.match(gate, /Generated OpenAPI declaration consumer failed/);
+assert.match(gate, /verify_endpoint_artifacts\.py/);
+assert.match(gate, /Controller endpoint OpenAPI validation failed/);
 assert.match(gate, /"openapi": json\.load\(open\("\$ARTIFACTS\/openapi-receipt\.json"\)\)/);
 assert.match(gate, /uname -s.*Linux/);
 assert.match(gate, /uname -m.*x86_64/);
@@ -45,7 +48,7 @@ assert.match(gate, /chmod 0600 "\$CREDENTIAL_ARTIFACT"/);
 assert.match(gate, /cleanup\(\)[\s\S]*rm -f "\$CREDENTIAL_ARTIFACT"/);
 assert.match(gate, /RUNNER_UID="\$\(id -u\)"/);
 assert.match(gate, /RUNNER_GID="\$\(id -g\)"/);
-assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) ?? []).length, 3);
+assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) ?? []).length, 4);
 assert.match(gate, /node \/sdk\/toolchain\/node_modules\/typescript\/bin\/tsc/);
 assert.match(gate, /PROFILE=production/);
 assert.match(gate, /collect-open-platform-jfr\.sh" start/);
@@ -371,3 +374,31 @@ assert.ok(gate.indexOf('available JUnit evidence retained') > gate.indexOf('cp "
 assert.match(probe, /run_integration_token_probe\(clients\["integrationTokens"\]\.request/);
 assert.match(probe, /run_office_probe\(clients\["officeGuide"\]\.request/);
 assert.match(probe, /protocol-request-counts\.json/);
+
+// Every declared Gradle subproject must retain its actual build and implementation
+// in the image context. Empty projects can resolve without shipping any provider.
+const platformRoot = new URL('../platform/', import.meta.url);
+const settings = fs.readFileSync(new URL('settings.gradle', platformRoot), 'utf8');
+const subprojects = [...settings.matchAll(/^include ['"]([^'"]+)['"]/gm)].map(match => match[1]);
+function assertSubprojectInputs(text) {
+  assert.ok(subprojects.length > 0, 'Declared subprojects required');
+  const copies = text.split('\n').map(line => line.trim());
+  for (const name of subprojects) {
+    for (const input of ['build.gradle', 'src']) {
+      assert.ok(fs.existsSync(new URL(`${name}/${input}`, platformRoot)), `Missing source input ${name}/${input}`);
+      assert.ok(copies.includes(`COPY platform/${name}/${input} ${name}/${input}`), `Image omits ${name}/${input}`);
+    }
+  }
+}
+test('backend image includes every declared subproject build and implementation', () => {
+  assertSubprojectInputs(dockerfile);
+});
+test('subproject packaging contract rejects each omitted build or source input', () => {
+  for (const name of subprojects) {
+    for (const input of ['build.gradle', 'src']) {
+      const line = `COPY platform/${name}/${input} ${name}/${input}`;
+      assert.ok(dockerfile.includes(line), `Mutation input missing: ${line}`);
+      assert.throws(() => assertSubprojectInputs(dockerfile.replace(line, '# removed input')), /Image omits/);
+    }
+  }
+});
