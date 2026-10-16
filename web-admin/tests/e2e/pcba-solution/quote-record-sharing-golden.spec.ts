@@ -304,6 +304,27 @@ test('quote sharing release gate: multiple members, role access and revocation t
       expect(imported.status(), pluginId).toBe(200);
       expect((await imported.json()).success, pluginId).toBe(true);
     }
+    // A newly imported tenant has no product command entitlement yet. Use the
+    // original runtime-scoped product initialization, keeping entitlement and
+    // tenant isolation enforcement enabled for the own-record positive control.
+    const entitlementLogPath = testInfo.outputPath('foreign-product-initialization.log');
+    const entitlementLog = createWriteStream(entitlementLogPath);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn('bash', [path.join(quoteRoot!, 'scripts/quote-bom-env.sh'),
+          'start', process.env.AURA_RUNTIME_NAME!, '--no-reset', '--phase=import'], {
+          cwd: quoteRoot!, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        child.stdout.pipe(entitlementLog, { end: false });
+        child.stderr.pipe(entitlementLog, { end: false });
+        child.once('error', reject);
+        child.once('close', code => code === 0 ? resolve() : reject(new Error(
+          `Foreign product initialization failed (${code}); evidence: ${entitlementLogPath}`)));
+      });
+    } finally { entitlementLog.end(); }
+    await testInfo.attach('foreign-product-initialization', {
+      path: entitlementLogPath, contentType: 'text/plain',
+    });
     const foreignSchema = await foreign.page.request.get('/api/pages/key/qo_quote_common_detail');
     expect(foreignSchema.status()).toBe(200);
     expect(String((await foreignSchema.json()).code)).toBe('0');
