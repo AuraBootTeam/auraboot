@@ -77,6 +77,10 @@ public class ExternalEventIngressService {
                 "installationPid", principal.installationPid(),
                 "sourceCode", sourceCode,
                 "externalEventId", event.id()));
+        if (installed) {
+            traceHeaders.put("externalSubjectType",event.subjectType());
+            traceHeaders.put("externalSubjectPid",event.subjectPid());
+        }
         if (requestId != null && !requestId.isBlank()) {
             traceHeaders.put("requestId", requestId);
         }

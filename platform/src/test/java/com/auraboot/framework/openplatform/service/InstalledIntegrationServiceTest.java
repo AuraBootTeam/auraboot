@@ -100,7 +100,7 @@ class InstalledIntegrationServiceTest {
     IntegrationEventEnvelope event(Map<String,Object> payload) {
         return new IntegrationEventEnvelope("1.0","ext:inst:"+source+":evt-1","external."+source+".inquiry.requested.v1",
                 "open-platform/inst/"+source,"purchase-requisition/10",Instant.parse("2026-10-16T00:00:00Z"),42L,"trace",null,"purchase-requisition/10",0,payload,
-                Map.of("applicationPid","app","installationPid","inst","sourceCode",source,"externalEventId","evt-1"));
+                Map.of("applicationPid","app","installationPid","inst","sourceCode",source,"externalEventId","evt-1","externalSubjectType","purchase-requisition","externalSubjectPid","10"));
     }
     InstalledIntegrationReceiptMapper.Receipt acceptedReceipt() {
         var captured=ArgumentCaptor.forClass(InstalledIntegrationReceiptMapper.Receipt.class);verify(receipts).claim(captured.capture());var r=captured.getValue();
@@ -111,9 +111,18 @@ class InstalledIntegrationServiceTest {
         MetaContext.setContext(77L,8L,"caller","caller");
         var accepted=service.accept(principal,source,event());assertEquals("request-pid",accepted.recordPid());assertFalse(accepted.duplicate());
         var request=ArgumentCaptor.forClass(CommandExecuteRequest.class);verify(executor).execute(eq(accept),request.capture());
-        assertEquals("evt-1",request.getValue().getPayload().get("requestId"));assertNull(request.getValue().getTargetRecordPid());
+        assertEquals("evt-1",request.getValue().getPayload().get("requestId"));
+        assertEquals(Map.of("type","purchase-requisition","pid","10"),request.getValue().getPayload().get("externalSubject"));assertNull(request.getValue().getTargetRecordPid());
         assertEquals(77L,MetaContext.getCurrentTenantId());assertEquals("caller",MetaContext.getCurrentUserPid());assertFalse(InstalledIntegrationExecution.active());
     }
+    @Test void clientCannotOverrideHostSubjectAndConsumerCannotChangeItsOrderingIdentity() {
+        assertThrows(IllegalArgumentException.class,()->service.accept(principal,source,event(Map.of("externalSubject",Map.of("type","forged","pid","99")))));
+        verify(executor,never()).execute(anyString(),any());
+        var original=event();var tampered=new IntegrationEventEnvelope(original.schemaVersion(),original.eventId(),original.eventType(),original.source(),
+                original.subject(),original.occurredAt(),original.tenantId(),original.correlationId(),null,"purchase-requisition/99",0,original.payload(),original.headers());
+        assertThrows(SecurityException.class,()->service.accept(principal,source,tampered));
+    }
+
     @Test void genericAutomationScopeDoesNotGrantBusinessCapability() {
         var weak=new MachinePrincipal(42L,"t","a",Set.of("automation.events.write"),"app","inst","test","t");
         assertThrows(SecurityException.class,()->service.accept(weak,source,event()));verifyNoInteractions(executor,receipts);

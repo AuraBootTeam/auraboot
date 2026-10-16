@@ -146,8 +146,12 @@ public class InstalledIntegrationService {
             }
             if (envelope.payload().containsKey("requestId") && !external.equals(envelope.payload().get("requestId")))
                 throw new IllegalArgumentException("External event id must equal business requestId");
+            if (envelope.payload().containsKey("externalSubject"))
+                throw new IllegalArgumentException("External subject is host-owned");
             Map<String,Object> payload = new LinkedHashMap<>(envelope.payload());
             payload.put("requestId", external);
+            payload.put("externalSubject",Map.of("type",envelope.headers().get("externalSubjectType"),
+                    "pid",envelope.headers().get("externalSubjectPid")));
             Map<String,Object> data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false);
             Object record = data.get("recordPid");
             if (!(record instanceof String pid) || !pid.matches("[A-Za-z0-9_-]{1,100}")
@@ -235,7 +239,10 @@ public class InstalledIntegrationService {
                 || !("open-platform/" + binding.installationPid() + "/" + binding.sourceCode()).equals(event.source())
                 || !binding.installationPid().equals(event.headers().get("installationPid"))
                 || !Objects.equals(binding.applicationPid(),event.headers().get("applicationPid"))
-                || !binding.sourceCode().equals(event.headers().get("sourceCode"))) throw denied();
+                || !binding.sourceCode().equals(event.headers().get("sourceCode"))
+                || event.headers().get("externalSubjectType") == null || event.headers().get("externalSubjectPid") == null
+                || !(event.headers().get("externalSubjectType")+"/"+event.headers().get("externalSubjectPid")).equals(event.subject())
+                || !event.subject().equals(event.orderingKey())) throw denied();
     }
     private void verifyReceipt(Resolved resolved, IntegrationEventEnvelope event, InstalledIntegrationReceiptMapper.Receipt r, boolean replay) {
         if (r != null && !r.envelopeSha256().equals(envelopeHash(event))) {
@@ -267,7 +274,8 @@ public class InstalledIntegrationService {
         return hash(List.of(event.schemaVersion(),event.eventId(),event.eventType(),event.source(),event.subject(),
                 event.occurredAt().toString(),event.tenantId(),event.orderingKey(),event.sequence(),event.payload(),
                 Map.of("applicationPid",event.headers().get("applicationPid"),"installationPid",event.headers().get("installationPid"),
-                       "sourceCode",event.headers().get("sourceCode"),"externalEventId",event.headers().get("externalEventId"))));
+                       "sourceCode",event.headers().get("sourceCode"),"externalEventId",event.headers().get("externalEventId"),
+                       "externalSubjectType",event.headers().get("externalSubjectType"),"externalSubjectPid",event.headers().get("externalSubjectPid"))));
     }
     String hash(Object value) {
         try { return codec.sha256(json.copy().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS,true).writeValueAsString(value)); }

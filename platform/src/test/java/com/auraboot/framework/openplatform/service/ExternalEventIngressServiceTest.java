@@ -109,7 +109,10 @@ class ExternalEventIngressServiceTest {
         assertEquals("request-pid",response.recordPid());
         var sequence=org.mockito.Mockito.inOrder(installed,accessor,idempotencyMapper);
         sequence.verify(installed).accept(eq(principal),eq("erp"),any());
-        sequence.verify(accessor).enqueue(any());
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);
+        sequence.verify(accessor).enqueue(envelope.capture());
+        assertEquals("order",envelope.getValue().headers().get("externalSubjectType"));
+        assertEquals("ord_1",envelope.getValue().headers().get("externalSubjectPid"));
         sequence.verify(idempotencyMapper).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
     }
 
