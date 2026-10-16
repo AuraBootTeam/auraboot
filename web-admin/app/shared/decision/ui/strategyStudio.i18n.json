@@ -642,5 +642,17 @@
   "structuredOutput": {
     "zh-CN": "结构化输出（见执行追踪）",
     "en": "Structured output (see execution trace)"
+  },
+  "tableUnavailable": {
+    "zh-CN": "此决策没有可读取的决策表版本，已停止加载。",
+    "en": "This decision has no readable decision table version."
+  },
+  "tableLoading": {
+    "zh-CN": "正在读取真实决策版本…",
+    "en": "Loading the saved decision version…"
+  },
+  "backToTemplate": {
+    "zh-CN": "返回场景模板",
+    "en": "Back to scenario templates"
   }
 }

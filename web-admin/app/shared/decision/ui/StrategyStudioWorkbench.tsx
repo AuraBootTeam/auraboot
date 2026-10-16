@@ -1045,7 +1045,7 @@ export function StrategyStudioWorkbench({
   )
   const tableDraftsRef = useRef(tableDrafts)
   const dirtyScenarioTablesRef = useRef<Set<string>>(new Set())
-  const restoredScenarioTablesRef = useRef<Set<string>>(new Set())
+  const [tableLoadErrors, setTableLoadErrors] = useState<Record<string, string>>({})
   const [tableAnalyses, setTableAnalyses] = useState<Partial<Record<string, DecisionTableAnalysis | null>>>({})
   const [tableAnalysisErrors, setTableAnalysisErrors] = useState<Partial<Record<string, string | null>>>({})
   const [tableAnalyzing, setTableAnalyzing] = useState(false)
@@ -1159,8 +1159,7 @@ export function StrategyStudioWorkbench({
   useEffect(() => {
     if (typeof api.listVersions !== 'function') return
     const restoreKey = `${activeScenario.key}:${activeScenario.decisionCode}`
-    if (restoredScenarioTablesRef.current.has(restoreKey)) return
-    restoredScenarioTablesRef.current.add(restoreKey)
+    if (tableDraftsRef.current[restoreKey]) return
 
     let cancelled = false
     api.listVersions(activeScenario.decisionCode)
@@ -1168,7 +1167,10 @@ export function StrategyStudioWorkbench({
         if (cancelled) return
         if (dirtyScenarioTablesRef.current.has(studioTableKey(activeScenario))) return
         const latest = latestRestorableTableVersion(versions)
-        if (!latest || !isDecisionTable(latest.contentJson)) return
+        if (!latest || !isDecisionTable(latest.contentJson)) {
+          if (selectedDecisionCode) setTableLoadErrors((current) => ({ ...current, [restoreKey]: text('tableUnavailable') }))
+          return
+        }
         const restoredTable = normalizeRestoredTable(latest.contentJson, buildScenarioTable(activeScenario))
         const drafts = {
           ...tableDraftsRef.current,
@@ -1180,8 +1182,8 @@ export function StrategyStudioWorkbench({
           setDraftVersionPids((current) => ({ ...current, [studioTableKey(activeScenario)]: latest.pid }))
         }
       })
-      .catch(() => {
-        // Strategy Studio can still work from the scenario template when no saved table exists.
+      .catch((error) => {
+        if (!cancelled && selectedDecisionCode) setTableLoadErrors((current) => ({ ...current, [restoreKey]: errorMessage(error, text) }))
       })
     return () => { cancelled = true }
   }, [api, activeScenario.key, activeScenario.decisionCode])
@@ -1215,6 +1217,8 @@ export function StrategyStudioWorkbench({
   }
 
   const updateScenarioTable = (key: string, next: DecisionTable) => {
+    setStatus(null)
+    setTestOutputs(null)
     dirtyScenarioTablesRef.current.add(key)
     const drafts = { ...tableDraftsRef.current, [key]: next }
     tableDraftsRef.current = drafts
@@ -1503,6 +1507,7 @@ export function StrategyStudioWorkbench({
   const saveConditionFragmentDraft = async (
     target: StrategyScenario,
   ): Promise<string | null> => {
+    if (selectedDecisionCode && !selectedFragment) return null
     const fragment = target.key === activeScenario.key ? selectedFragment : undefined
     const defaultCode = defaultFragmentCode(target)
     let existingDefaultFragment =
@@ -1648,13 +1653,22 @@ export function StrategyStudioWorkbench({
     }
   }
 
+  if (selectedDecisionCode && !tableDrafts[studioTableKey(activeScenario)]) {
+    const loadError = tableLoadErrors[studioTableKey(activeScenario)]
+    return <section className="strategy-studio" data-testid="strategy-studio">
+      <h3>{decisionDisplayName(decisions, selectedDecisionCode, selectedDecisionCode)}</h3>
+      <p role={loadError ? 'alert' : 'status'}>{loadError || text('tableLoading')}</p>
+      <button type="button" onClick={() => setSelectedDecisionCode('')}>{text('backToTemplate')}</button>
+    </section>
+  }
+
   return (
     <section id="strategy-workbench" className="strategy-studio" data-testid="strategy-studio">
       <header className="strategy-studio-header">
         <div>
           <p>{studioEyebrow}</p>
           <h3>{selectedDecisionCode ? decisionDisplayName(decisions, selectedDecisionCode, selectedDecisionCode) : text(SCENARIO_TEXT[activeScenario.key].title)}</h3>
-          <label>{text('selectBusinessDecision')}<select data-testid="strategy-business-decision" value={selectedDecisionCode} onChange={(event) => { setSelectedDecisionCode(event.target.value); setSelectedFragmentCode(null) }}><option value="">{text('scenarioTemplate')}</option>{decisions.map((decision) => <option key={decision.code} value={decision.code}>{decision.name || decision.code}</option>)}</select></label>
+          <label>{text('selectBusinessDecision')}<select data-testid="strategy-business-decision" value={selectedDecisionCode} onChange={(event) => { const code = event.target.value; setSelectedDecisionCode(code); setSelectedFragmentCode(null); setStatus(null); setTestOutputs(null); const scope = decisions.find((decision) => decision.code === code)?.scopeType; if (SCENARIOS.some((candidate) => candidate.key === scope)) setScenarioKey(scope as StrategyScenarioKey) }}><option value="">{text('scenarioTemplate')}</option>{decisions.map((decision) => <option key={decision.code} value={decision.code}>{decision.name || decision.code}</option>)}</select></label>
         </div>
         <div className="strategy-studio-actions">
           <button
@@ -1688,7 +1702,7 @@ export function StrategyStudioWorkbench({
           </button>
         </div>
       </header>
-      {selectedDecisionCode && <div className="strategy-studio-metrics" data-testid="strategy-test-inputs">{scenarioTable.inputs.map((input) => <label key={input.id}>{input.label || input.id}<input aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value }))} /></label>)}</div>}
+      {selectedDecisionCode && <div className="strategy-studio-metrics" data-testid="strategy-test-inputs">{scenarioTable.inputs.map((input) => <label key={input.id}>{input.label || input.id}<input aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => { setStatus(null); setTestOutputs(null); setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value })) }} /></label>)}</div>}
       {operationStatus && (
         <div className="strategy-operation-status" data-testid="strategy-operation-status" data-tone={operationTone} role={operationTone === 'error' ? 'alert' : 'status'}>
           {operationStatus}

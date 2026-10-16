@@ -23,13 +23,14 @@ class AssertPhaseTest {
 
     @Test
     void requiredEvidenceRejectsNullBlankAndEmptyCollectionsButAcceptsActualContent() {
-        for (Object empty : List.of("", "  \n\t", List.of(), Map.of(), new String[0])) {
+        for (Object empty : List.of("", "  \n\t", "[]", "{}", "null", List.of(), Map.of(), new String[0])) {
             assertFalse(phase.evaluatePrecondition("not_empty", empty, null));
         }
         assertFalse(phase.evaluatePrecondition("not_empty", null, null));
         assertFalse(phase.evaluatePrecondition("not_empty", 0, null));
         assertTrue(phase.evaluatePrecondition("not_empty", "Delivery checklist", null));
         assertTrue(phase.evaluatePrecondition("not_empty", List.of(Map.of("filePid", "owned-file")), null));
+        assertTrue(phase.evaluatePrecondition("not_empty", "[{\"fileId\":\"owned-file\"}]", null));
     }
 
     @Test

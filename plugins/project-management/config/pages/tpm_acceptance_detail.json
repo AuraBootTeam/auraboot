@@ -25,17 +25,19 @@
           "label": {
             "zh-CN": "编辑补正",
             "en": "Edit draft"
-          }
+          },
+          "visibleWhen": "form.tpm_ac_status === 'draft' || form.tpm_ac_status === 'returned'"
         },
         {
           "code": "submit_acceptance",
-          "commandCode": "tpm:submit_acceptance",
+          "commandCode": "tpm:submit_delivery_acceptance",
           "permissionCode": "tpm.acceptance.manage",
           "primary": true,
           "label": {
             "zh-CN": "提交验收",
             "en": "Submit acceptance"
-          }
+          },
+          "visibleWhen": "form.tpm_ac_status === 'draft' || form.tpm_ac_status === 'returned'"
         }
       ]
     },
@@ -175,6 +177,24 @@
       ],
       "area": "main",
       "readOnly": true
+    },
+    {
+      "id": "approval",
+      "blockType": "workflow-panel",
+      "title": {
+        "zh-CN": "审批进展与执行记录",
+        "en": "Approval progress and execution history"
+      },
+      "bpmPanel": {
+        "processKey": "tpm_delivery_acceptance",
+        "sections": [
+          "status",
+          "operations",
+          "history"
+        ]
+      },
+      "area": "main",
+      "permissionCode": "bpm.process.read"
     }
   ]
 }

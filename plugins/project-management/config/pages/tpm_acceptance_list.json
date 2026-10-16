@@ -21,7 +21,6 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "commandCode": "tpm:create_acceptance",
           "permissionCode": "tpm.acceptance.manage",
           "label": {
             "zh-CN": "新建验收",
@@ -117,12 +116,20 @@
         {
           "field": "tpm_ac_status",
           "width": 120,
-          "sortable": true
+          "sortable": true,
+          "dictCode": "tpm_acceptance_status",
+          "presentation": {
+            "kind": "badge"
+          }
         },
         {
           "field": "tpm_ac_risk",
           "width": 120,
-          "sortable": true
+          "sortable": true,
+          "dictCode": "tpm_acceptance_risk",
+          "presentation": {
+            "kind": "badge"
+          }
         },
         {
           "field": "tpm_ac_amount",

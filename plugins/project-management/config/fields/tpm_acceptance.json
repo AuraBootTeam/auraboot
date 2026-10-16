@@ -34,8 +34,9 @@
       "required": true
     },
     "refTarget": {
-      "targetModel": "tpm_project",
-      "targetField": "tpm_pj_name",
+      "targetEntity": "tpm_project",
+      "targetField": "pid",
+      "displayField": "tpm_pj_name",
       "valueField": "pid"
     },
     "extension": {
@@ -130,9 +131,13 @@
       "required": true
     },
     "refTarget": {
-      "targetModel": "sys_user",
-      "targetField": "username",
+      "targetEntity": "sys_user",
+      "targetField": "pid",
+      "displayField": "nick_name",
       "valueField": "pid"
+    },
+    "extension": {
+      "renderComponent": "userselect"
     }
   }
 ]

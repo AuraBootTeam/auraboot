@@ -329,3 +329,17 @@ describe('Strategy Studio truthful readiness', () => {
     expect(api.testRun).toHaveBeenCalledWith(expect.objectContaining({ contentJson: expect.any(Object) }));
   });
 });
+
+describe('Strategy Studio saved decision load failures', () => {
+  it('never evaluates a template in place of an unreadable business decision', async () => {
+    const api = createApi();
+    vi.mocked(api.listVersions).mockRejectedValue(new Error('Decision access denied'));
+    render(<StrategyStudioWorkbench api={api} fields={[]} decisions={[{code: 'owned_business_rule', name: 'Delivery review', scopeType: 'BPM'}]} />);
+    fireEvent.change(screen.getByTestId('strategy-business-decision'), {target: {value: 'owned_business_rule'}});
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Decision access denied'));
+    expect(screen.queryByTestId('strategy-run-test')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('strategy-publish')).not.toBeInTheDocument();
+    expect(api.testRun).not.toHaveBeenCalled();
+    expect(api.publishVersion).not.toHaveBeenCalled();
+  });
+});

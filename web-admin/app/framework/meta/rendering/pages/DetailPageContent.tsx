@@ -2477,7 +2477,7 @@ function DetailBlockRenderer({
   }
 
   if (block.blockType === 'workflow-panel') {
-    return <LazyContributedComponent contributionId="workflow-panel" block={block as any} record={recordData} recordPid={recordPid} />;
+    return <LazyContributedComponent contributionId="workflow-panel" block={block as any} record={recordData} recordPid={recordPid} onDataChange={onDataChange} />;
   }
 
   if (block.blockType === 'monthly-grid' && block.monthlyGrid) {

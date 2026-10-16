@@ -178,6 +178,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     .map((definition) => ({
       code: definition.decisionCode,
       name: definition.decisionName,
+      scopeType: definition.scopeType,
     }));
   const factCatalogFields = factCatalogToFieldOptions(factCatalogQuery.data);
   const legacyStrategyFields = modelFieldsToFieldOptions(modelFieldData);

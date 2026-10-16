@@ -106,7 +106,7 @@
     ],
     "idempotent": false,
     "reversible": false,
-    "code": "tpm:submit_acceptance",
+    "code": "tpm:submit_delivery_acceptance",
     "displayName:zh-CN": "提交验收",
     "displayName:en": "Submit acceptance",
     "type": "state_transition",

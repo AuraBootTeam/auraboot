@@ -14,8 +14,8 @@
 <sequenceFlow id="f2" sourceRef="risk_route" targetRef="tpm_enhanced_review"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${route == 'enhanced'}]]></conditionExpression></sequenceFlow>
 <sequenceFlow id="f3" sourceRef="tpm_standard_review" targetRef="review_result"></sequenceFlow>
 <sequenceFlow id="f4" sourceRef="tpm_enhanced_review" targetRef="review_result"></sequenceFlow>
-<sequenceFlow id="f5" sourceRef="review_result" targetRef="accepted"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${reviewResult == 'approve'}]]></conditionExpression></sequenceFlow>
-<sequenceFlow id="f6" sourceRef="review_result" targetRef="returned"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${reviewResult == 'reject'}]]></conditionExpression></sequenceFlow>
+<sequenceFlow id="f5" sourceRef="review_result" targetRef="accepted"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${_action == 'approve'}]]></conditionExpression></sequenceFlow>
+<sequenceFlow id="f6" sourceRef="review_result" targetRef="returned"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${_action == 'reject'}]]></conditionExpression></sequenceFlow>
 <sequenceFlow id="f7" sourceRef="accepted" targetRef="end"></sequenceFlow>
 <sequenceFlow id="f8" sourceRef="returned" targetRef="end"></sequenceFlow>
 </process>
