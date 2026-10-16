@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "b0b22585f",
+    "commit": "8609d94ca",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -6397,6 +6397,7 @@
             "web-admin/tests/e2e/permission/role-default-scope-golden.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-formats-real.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-permissions-real.spec.ts",
+            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
             "web-admin/tests/e2e/showcase/customer-designers-journey.spec.ts",
             "web-admin/tests/e2e/showcase/oss-performance.spec.ts",

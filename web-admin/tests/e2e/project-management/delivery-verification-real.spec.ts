@@ -14,13 +14,19 @@ async function data(response:APIResponse|Response) {
   expect(response.status()).toBe(200);const result=await response.json();expect(String(result.code)).toBe('0');return result.data;
 }
 async function login(page:Page, email=process.env.ADMIN_EMAIL!,tenant?:string) {
+  page.setDefaultTimeout(20000);
   await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
   await page.locator('#identifier').fill(email);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
   await page.getByRole('button',{name:'立即登录',exact:true}).click();await page.waitForURL(url=>!url.pathname.includes('/login'));
   if(new URL(page.url()).pathname==='/tenant-selection') {expect(tenant).toBeTruthy();await page.getByTestId(`space-business-${tenant}`).click();await expect(page).not.toHaveURL(/tenant-selection/);}
   return (await data(await page.request.get('/api/auth/me'))).user;
 }
-async function menu(page:Page,name:string) {await page.getByRole('navigation').getByRole('link',{name,exact:true}).click();}
+async function menu(page:Page,name:string) {
+  const link=page.getByRole('navigation').getByRole('link',{name,exact:true});
+  const href=await link.getAttribute('href');expect(href).toBeTruthy();
+  const pathname=new URL(href!,page.url()).pathname;await link.click();
+  await expect(page).toHaveURL(url=>url.pathname===pathname);
+}
 async function shot(page:Page,id:string) {
   await mkdir(join(evidence!,'screenshots'),{recursive:true});
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
@@ -32,7 +38,7 @@ async function record(page:Page,model:string,pid:string) {
 }
 async function open(page:Page,menuName:string,name:string) {
   await menu(page,menuName);const row=page.getByRole('row').filter({hasText:name});await expect(row).toHaveCount(1);
-  await row.getByRole('button',{name:'查看',exact:true}).click();await expect(page.getByRole('main')).toContainText(name);
+  await row.getByRole('button',{name:'查看',exact:true}).click();await expect(page).toHaveURL(/\/view\/[^/]+$/);await expect(page.getByRole('main')).toContainText(name);
 }
 async function upload(page:Page) {
   const sent=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/file/upload'&&r.request().method()==='POST');
@@ -49,7 +55,7 @@ async function createAcceptance(page:Page,user:any,name:string,amount:number,fil
   await page.getByTestId(`user-select-option-tpm_ac_reviewer-${user.pid}`).click();if(files)await upload(page);
   const sent=page.waitForResponse(r=>r.url().includes('/execute/tpm:create_acceptance')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();const result=await data(await sent);const pid=result.data.recordPid;
-  expect(pid).toBeTruthy();await open(page,'交付验收',name);return pid;
+  expect(pid).toBeTruthy();await expect(page).not.toHaveURL(/\/new$/);await open(page,'交付验收',name);return pid;
 }
 async function createCheck(page:Page,name:string,acceptanceName:string) {
   await menu(page,'交付核验');await page.getByRole('button',{name:'新建核验',exact:true}).click();
@@ -62,7 +68,7 @@ async function createCheck(page:Page,name:string,acceptanceName:string) {
   const sent=page.waitForResponse(r=>r.url().includes(`/execute/${createCommand}`)&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存核验记录',exact:true}).click();const response=await sent;
   expect(response.request().postDataJSON().payload.tdv_ck_acceptance).toBeTruthy();const pid=(await data(response)).data.recordPid;
-  expect(pid).toBeTruthy();await open(page,'交付核验',name);expect(new URL(page.url()).pathname.startsWith('/p/tdv_check/view/')).toBe(true);return pid;
+  expect(pid).toBeTruthy();await expect(page).not.toHaveURL(/\/new$/);await open(page,'交付核验',name);await expect(page).toHaveURL(/\/p\/tdv_check\/view\/[^/]+$/);return pid;
 }
 
 // API setup isolates budget accounting from the neighboring approval/SLA profile.
@@ -98,12 +104,17 @@ test('optional PF4J verifier reads stored evidence and recomputes after actual f
   await open(page,'交付验收',name);await page.getByTestId('toolbar-btn-edit').click();await upload(page);
   const updated=page.waitForResponse(r=>r.url().includes('/execute/tpm:update_acceptance')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();await data(await updated);
-  await open(page,'交付核验',name);result=await verify(page,pid,'passed');expect(result.tdv_ck_passed).toBe(4);
+  await expect(page).not.toHaveURL(/\/edit\//);await open(page,'交付核验',name);result=await verify(page,pid,'passed');expect(result.tdv_ck_passed).toBe(4);
   expect(Number(result.tdv_ck_amount)).toBe(68000);expect((await record(page,'tpm_acceptance',acceptance)).tpm_ac_status).toBe('draft');await shot(page,'v06');
   await verify(page,pid,'passed');
   const activities=await data(await page.request.get('/api/activities',{params:{objectModel:'tdv_check',objectRecord:pid,limit:100}}));
   expect(activities.length).toBeGreaterThan(0);await writeFile(join(evidence!,'verification-activity.json'),JSON.stringify(activities,null,2));
-  await menu(page,'交付核验');await expect(page.getByRole('row').filter({hasText:name})).toContainText('核验通过');await shot(page,'v02');
+  await menu(page,'交付核验');await expect(page.getByRole('row').filter({hasText:name})).toContainText('核验通过');
+  await page.getByTestId('tab-passed').click();await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(1);
+  for(const tab of ['pending','blocked']) {await page.getByTestId(`tab-${tab}`).click();await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(0);}
+  await page.getByTestId('tab-all').click();await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(1);
+  await page.getByTestId('list-search-input').fill('不存在的交付核验');await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(0);
+  await page.getByTestId('list-search-input').fill('');await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(1);await shot(page,'v02');
 });
 
 test('accepted delivery reduces budget and one cent over the exact allowance blocks verification @critical',async({page})=>{
@@ -120,7 +131,7 @@ test('accepted delivery reduces budget and one cent over the exact allowance blo
   await open(page,'交付验收',name);await page.getByTestId('toolbar-btn-edit').click();await page.locator('#tpm_ac_amount').fill('68000.01');
   const saved=page.waitForResponse(r=>r.url().includes('/execute/tpm:update_acceptance')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();await data(await saved);
-  await open(page,'交付核验',name);result=await verify(page,pid,'blocked');
+  await expect(page).not.toHaveURL(/\/edit\//);await open(page,'交付核验',name);result=await verify(page,pid,'blocked');
   expect(result.tdv_ck_passed).toBe(3);expect(result.tdv_ck_budget_check).toBe('blocked');
   await expect(page.getByRole('main')).toContainText('超出可用预算');await shot(page,'v08');
 });
@@ -165,7 +176,11 @@ test('another business space cannot read or execute an existing verification tar
     const actor=await context.newPage();await login(actor,process.env.ADMIN_EMAIL!,String(original.tenantId));
     const created=await data(await actor.request.post('/api/tenant-selection/process',{data:{action:'create',tenantName:prefix+'隔离空间',displayName:'核验隔离验证'}}));
     expect(created.tenantId).toBeTruthy();expect(String(created.tenantId)).not.toBe(String(original.tenantId));
-    await actor.goto('/tenant-selection');await actor.getByTestId(`space-business-${created.tenantId}`).click();await expect(actor).not.toHaveURL(/tenant-selection/);
+    await actor.goto('/home');await actor.getByTestId('user-menu').getByRole('button').first().click();
+    await expect(actor.getByTestId('user-dropdown')).toBeVisible();
+    const switched=actor.waitForResponse(r=>new URL(r.url()).pathname==='/_action/switch-space'&&r.request().method()==='POST');
+    await actor.getByTestId(`tenant-switch-${created.tenantId}`).click();expect((await switched).status()).toBe(302);
+    await actor.waitForLoadState('load');
     const identity=await data(await actor.request.get('/api/auth/me'));expect(String(identity.user.tenantId)).toBe(String(created.tenantId));
     for(const plugin of ['project-management','project-delivery-verification']) {
       const response=await actor.request.post('/api/plugins/import/import-directory-sync',{data:{path:join(process.env.AURA_CORE_PROJECT_ROOT!,'plugins',plugin),conflictStrategy:'OVERWRITE',deferReferenceValidation:true},timeout:180000});
