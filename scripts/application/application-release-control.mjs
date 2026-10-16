@@ -229,12 +229,20 @@ export async function publishApplicationRelease({
   return plan;
 }
 
+function exactTenantIdentifier(value) {
+  requireValue(typeof value !== 'number' || Number.isSafeInteger(value), 'unsafe numeric tenant ID');
+  const id = String(value);
+  requireValue(/^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= 9223372036854775807n,
+    'exact positive decimal tenant ID required');
+  return id;
+}
+
 /** Resume only the exact recorded binding request; the server owns compatibility and authorization. */
 export async function upgradeTenantApplicationRelease({ applicationCode, tenantId, expectedCurrentReleaseId,
   expectedVersion, targetReleaseId, targetDigest, baseUrl, token, receiptPath,
   fetchImpl = fetch, timeoutMs = 30_000 }) {
   requireValue(APPLICATION_CODE.test(applicationCode ?? ''), 'valid application code required');
-  requireValue(Number.isSafeInteger(tenantId) && tenantId > 0, 'exact positive tenant ID required');
+  tenantId = exactTenantIdentifier(tenantId);
   requireValue(Number.isSafeInteger(expectedVersion) && expectedVersion > 0 && expectedVersion < Number.MAX_SAFE_INTEGER,
     'exact bounded source binding version required');
   for (const value of [expectedCurrentReleaseId, targetReleaseId])
@@ -259,7 +267,7 @@ export async function upgradeTenantApplicationRelease({ applicationCode, tenantI
     writeFileSync(file, JSON.stringify(receipt, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   }
   requireValue(['planned', 'completed'].includes(receipt.status), 'invalid upgrade receipt state');
-  const matches = binding => binding?.tenantId === tenantId && binding.releaseId === targetReleaseId
+  const matches = binding => binding && exactTenantIdentifier(binding.tenantId) === tenantId && binding.releaseId === targetReleaseId
     && binding.releaseDigest === targetDigest && binding.status === 'active' && binding.version === expectedVersion + 1;
   if (receipt.status === 'completed') {
     requireValue(matches(receipt.binding), 'completed upgrade receipt has an invalid binding');

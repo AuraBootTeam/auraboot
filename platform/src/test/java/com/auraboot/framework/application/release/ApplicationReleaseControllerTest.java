@@ -174,6 +174,17 @@ class ApplicationReleaseControllerTest {
         verifyNoInteractions(control);
     }
 
+    @Test
+    void upgradeSerializesLargeIdentifiersAsExactDecimalStrings() {
+        var binding = new ApplicationReleaseControlService.Binding(369448397205278720L, 369448397205278721L,
+                RELEASE_ID, "sha256:" + "c".repeat(64), 1, "active", 2L);
+        var response = ApplicationReleaseController.UpgradeTenantBindingResponse.from(binding);
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(response);
+        org.junit.jupiter.api.Assertions.assertTrue(json.get("tenantId").isTextual());
+        org.junit.jupiter.api.Assertions.assertEquals("369448397205278720", json.get("tenantId").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("369448397205278721", json.get("applicationId").asText());
+    }
+
     private static DefinitionShadowComparisonService.Report report(
             DefinitionShadowComparisonService.Classification classification) {
         return new DefinitionShadowComparisonService.Report(

@@ -158,3 +158,13 @@ test('binding upgrade rejects a forged completed receipt and invalid source iden
   writeFileSync(input.receiptPath, JSON.stringify(receipt));
   await assert.rejects(upgradeTenantApplicationRelease(input), /invalid binding/);
 });
+
+test('binding upgrade preserves full 64-bit decimal tenant IDs and refuses rounded JSON numbers', async () => {
+  const input = {...upgradeInput(mkdtempSync(join(tmpdir(), 'binding-upgrade-id-'))), tenantId: '369448397205278720'};
+  const receipt = await upgradeTenantApplicationRelease({...input, fetchImpl: async url => {
+    assert.ok(url.includes('/tenant-bindings/369448397205278720/upgrade'));
+    return {ok: true, status: 200, text: async () => JSON.stringify({code: '0', data: upgradedBinding(input)})};
+  }});
+  assert.equal(receipt.binding.tenantId, '369448397205278720');
+  await assert.rejects(upgradeTenantApplicationRelease({...input, tenantId: Number(input.tenantId)}), /unsafe numeric tenant ID/);
+});
