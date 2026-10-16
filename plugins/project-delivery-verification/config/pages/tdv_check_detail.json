@@ -71,19 +71,39 @@
       "fields": [
         {
           "field": "tdv_ck_budget",
-          "colSpan": 6
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
         },
         {
           "field": "tdv_ck_accepted",
-          "colSpan": 6
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
         },
         {
           "field": "tdv_ck_available",
-          "colSpan": 6
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
         },
         {
           "field": "tdv_ck_amount",
-          "colSpan": 6
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
         }
       ],
       "extension": {
@@ -130,7 +150,10 @@
         "zh-CN": "核验操作记录",
         "en": "Verification activity"
       },
-      "permissionCode": "audit.field_audit.read"
+      "permissionCode": "audit.field_audit.read",
+      "extension": {
+        "density": "compact"
+      }
     }
   ],
   "extension": {

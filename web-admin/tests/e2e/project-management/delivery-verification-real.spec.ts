@@ -96,11 +96,17 @@ test('optional PF4J verifier reads stored evidence and recomputes after actual f
   const user=await login(page);await prepareProject(page);await menu(page,'交付核验');
   await expect(page).toHaveURL(/\/p\/tdv_check$/);
   await expect(page.getByRole('main')).toContainText('还没有交付核验');
+  expect((await data(await page.request.get('/api/dynamic/tpm_project/list'))).total).toBe(9);
+  expect((await data(await page.request.get('/api/dynamic/tpm_acceptance/list'))).total).toBe(0);
   expect((await data(await page.request.get('/api/dynamic/tdv_check/list'))).total).toBe(0);await shot(page,'v01');
   const name=prefix+' · 补齐材料';const acceptance=await createAcceptance(page,user,name,68000,false);
   const pid=await createCheck(page,name,name);let result=await verify(page,pid,'blocked');
   expect(result.tdv_ck_materials).toBe('blocked');expect(result.tdv_ck_passed).toBe(3);
-  await expect(page.getByRole('main')).toContainText('请上传交付材料');await shot(page,'v05');
+  await expect(page.getByRole('main')).toContainText('请上传交付材料');
+  await expect(page.getByTestId('object-section-source')).not.toContainText(/\d{4}-\d{2}-\d{2}T/);
+  await expect(page.getByTestId('object-section-source')).toContainText(/\d{4}年\d{2}月\d{2}日/);
+  await expect(page.getByTestId('object-section-budget')).toContainText('128,000.00');
+  await expect(page.getByTestId('activity-timeline')).not.toContainText('客户互动时间线');await shot(page,'v05');
   await open(page,'交付验收',name);await page.getByTestId('toolbar-btn-edit').click();await upload(page);
   const updated=page.waitForResponse(r=>r.url().includes('/execute/tpm:update_acceptance')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();await data(await updated);
