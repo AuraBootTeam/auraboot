@@ -1,0 +1,61 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+Configuration on demand is an incubating feature.
+> Task :platform-storage-s3:processResources NO-SOURCE
+> Task :platform-storage-minio:processResources NO-SOURCE
+> Task :platform-storage-cos:processResources NO-SOURCE
+> Task :platform-mq-kafka:processResources NO-SOURCE
+> Task :platform-storage-oss:processResources NO-SOURCE
+> Task :bootBuildInfo UP-TO-DATE
+> Task :platform-plugin-api:compileJava UP-TO-DATE
+> Task :platform-plugin-api:processResources NO-SOURCE
+> Task :platform-plugin-api:classes UP-TO-DATE
+> Task :platform-plugin-api:jar UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :jar UP-TO-DATE
+> Task :platform-mq-kafka:compileJava UP-TO-DATE
+> Task :platform-mq-kafka:classes UP-TO-DATE
+> Task :platform-storage-cos:compileJava UP-TO-DATE
+> Task :platform-storage-cos:classes UP-TO-DATE
+> Task :platform-mq-kafka:jar UP-TO-DATE
+> Task :platform-storage-cos:jar UP-TO-DATE
+> Task :platform-storage-s3:compileJava UP-TO-DATE
+> Task :platform-storage-oss:compileJava UP-TO-DATE
+> Task :platform-storage-s3:classes UP-TO-DATE
+> Task :platform-storage-oss:classes UP-TO-DATE
+> Task :platform-storage-s3:jar UP-TO-DATE
+> Task :platform-storage-oss:jar UP-TO-DATE
+> Task :platform-storage-minio:compileJava UP-TO-DATE
+> Task :platform-storage-minio:classes UP-TO-DATE
+> Task :platform-storage-minio:jar UP-TO-DATE
+> Task :compileTestJava FROM-CACHE
+> Task :instrumentMainOffline UP-TO-DATE
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+JwtFreshUserSnapshotIT > oldTokenObservesDisableSecurityVersionAndSessionRevocation() PASSED
+
+-2026-10-15T12:21:18.256Z - INFO 59580 --- [ionShutdownHook] [,,t=,u=] c.a.f.s.s.impl.DatabaseSchedulerEngine   : Stopping scheduler engine...
+--2026-10-15T12:21:18.257Z - INFO 59580 --- [ionShutdownHook] [,,t=,u=] c.a.f.c.jdbc.service.JdbcDataSourcePool  : JdbcDataSourcePool shutdown
+--2026-10-15T12:21:18.272Z - INFO 59580 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Shutting down plugin manager...
+--2026-10-15T12:21:18.272Z - INFO 59580 --- [ionShutdownHook] [,,t=,u=] c.a.f.plugin.pf4j.AuraPluginManager      : Plugin manager shutdown complete
+--2026-10-15T12:21:18.295Z - INFO 59580 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown initiated...
+--2026-10-15T12:21:18.297Z - INFO 59580 --- [ionShutdownHook] [,,t=,u=] com.zaxxer.hikari.HikariDataSource       : AuraBootPool - Shutdown completed.
+-
+> Task :jacocoTestReport
+
+[Incubating] Problems report is available at: file://$SOURCE_ROOT/platform/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 33s
+21 actionable tasks: 2 executed, 1 from cache, 18 up-to-date

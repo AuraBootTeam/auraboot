@@ -163,3 +163,19 @@ test('retains an explicitly disabled Redis host and the telemetry configuration'
     assert.throws(() => verifyResumeState(f), /Invalid telemetry/);
   }
 });
+
+
+test('production resume requires the exact compiled frontend bytes and mode', () => {
+  const f = fixture();
+  f.plan.telemetryEnvironment = { AURA_WEB_MODE: 'production' };
+  f.plan.frontendBuild = { root: '/oss/web-admin/build', hash: 'compiled-client-and-ssr' };
+  f.frontendBuild = { ...f.plan.frontendBuild };
+  f.plan.sessionSecretFile = { root: '/owned/session-secret', hash: 'private-input-hash' };
+  f.sessionSecretFile = { ...f.plan.sessionSecretFile };
+  assert.equal(verifyResumeState(f).telemetryEnvironment.AURA_WEB_MODE, 'production');
+  f.frontendBuild.hash = 'changed';
+  assert.throws(() => verifyResumeState(f), /production frontend changed/);
+  f.frontendBuild = { ...f.plan.frontendBuild };
+  f.plan.telemetryEnvironment.AURA_WEB_MODE = 'development';
+  assert.throws(() => verifyResumeState(f), /production frontend changed/);
+});

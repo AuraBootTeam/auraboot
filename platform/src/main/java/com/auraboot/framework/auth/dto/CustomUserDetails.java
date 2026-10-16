@@ -13,6 +13,7 @@ public class CustomUserDetails implements UserDetails {
     private final Long userId;
     private final String userPid;
     private Long memberId;
+    private int securityVersion;
 
     private final Collection<? extends GrantedAuthority> authorities;
     private final boolean accountNonExpired;

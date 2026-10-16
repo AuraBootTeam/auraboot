@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "implementationCommit": "5e1cc2e3b93c0a3cce93dfc17ebcbef094d6cea1",
+  "backendSuites": [
+    {
+      "group": "backend-unit-xml",
+      "name": "com.auraboot.framework.application.config.CacheConfigTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "productionCachesHaveBoundedPassiveExpiryWithoutRedis()"
+      ],
+      "rawXmlSha256": "d261514a25d55b8cb41e8abf9ceff010a3700fc04e7d957d7b3ebacb4489d5b0"
+    },
+    {
+      "group": "backend-unit-xml",
+      "name": "com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest",
+      "tests": 29,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "securityVersionMismatch_rejects()",
+        "shouldNotFilter_optionsMethodSkips()",
+        "validToken_setsAuthentication_andChainsForward()",
+        "appearanceAssetsAreAnonymousButManagementAndSiblingPathsRequireJwt()",
+        "validToken_putsTenantAndUserIntoMdc_andClearsAfter()",
+        "onboardingStageCannotReachOrdinaryBusinessApi()",
+        "sessionInvalid_rejects()",
+        "unrelatedPublicHealthRequest_preservesItsAuthenticationBypass()",
+        "shouldNotFilter_pluginPublicSubpathSkipsJwtAuth_butNonPublicDoesNot()",
+        "languagePackRejectsMalformedCredentialsInsteadOfReturningAnonymousData()",
+        "invalidJwt_returns401()",
+        "sessionCheckThrows_failsClosed()",
+        "rbacLookupFailure_doesNotPropagate()",
+        "languagePacksAllowAnonymousRequestsButValidateSuppliedCredentials()",
+        "shouldNotFilter_automationWebhookSkipsJwtAuth_butOtherAutomationRoutesDoNot()",
+        "shouldNotFilter_goodsTicketMobileApiSkipsJwtAuth()",
+        "anonymousI18nRemainsPublicWithoutInventingTenantContext()",
+        "anonymousI18nRequests_remainPublicWithoutTenantContext()",
+        "tokenForDeletedUser_returns401_notA500()",
+        "partyTokenRevalidatesMembershipAndAddsOnlyPartyScopedRoles()",
+        "invalidI18nCredentialsCannotFallBackToAnonymousSuccess()",
+        "invalidI18nBearer_isRejectedBeforeDictionaryAccess()",
+        "validI18nTokenBindsItsTenantBeforeLoadingTranslations()",
+        "i18nWithCredentialsMustRunJwtValidation()",
+        "expiredJwt_returns401()",
+        "onboardingStage_reachesLegacyBindSchoolCompatibilityRoute()",
+        "missingAuthorizationHeader_returns401AndDoesNotChain()",
+        "authenticatedI18nRequest_exposesVerifiedTenantOnlyInsideTheChain()",
+        "onboardingStage_reachesTenantInvitationAcceptance()"
+      ],
+      "rawXmlSha256": "373fb57ed05f4a3d62a5c9889eb288b8f3b2a13cdcbd2c35f3a0732ae64ef799"
+    },
+    {
+      "group": "backend-unit-xml",
+      "name": "com.auraboot.framework.auth.service.UnifiedUserDetailsServiceTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "missingPidFailsClosedWithoutAnAliasFallback()",
+        "loadUserById_existingUser_returnsDetails()",
+        "loadUserByUsername_userNameIdentifier_resolvesViaUserNameBeforePid()",
+        "pidSnapshotsObserveChangedSecurityStateOnTheNextRequest()",
+        "loadUserByUsername_phoneIdentifier_throwsUnsupported()",
+        "loadUserByUsername_pidIdentifier_resolvesViaPid()",
+        "loadUserByUsername_emailIdentifier_resolvesViaEmail()",
+        "loadUserById_missingUser_throws()",
+        "loadUserByUsername_userNotFound_throws()",
+        "jwtPidLookupReadsOnceAndNeverResolvesAliases()"
+      ],
+      "rawXmlSha256": "be9ae78c3d3148ce26ea78451759977da9e8b7d905b84985781f10a951d811f1"
+    },
+    {
+      "group": "backend-unit-xml",
+      "name": "com.auraboot.framework.permission.listener.PermissionCacheEvictionListenerTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "definitionEventEvictsTenantCatalogIncludingNegativeEntries()",
+        "userRoleEventEvictsOnlyTheTenantUserSnapshot()",
+        "permissionEventsBumpTheDataAccessCacheEpoch()",
+        "legacyEventsFallBackToCurrentContextMethods()",
+        "rolePermissionEventEvictsTenantRoleAndDerivedSnapshots()"
+      ],
+      "rawXmlSha256": "0d20e45a3adcc29806a47712c45755661a40e5edf2405083c5556f99a5b64be0"
+    },
+    {
+      "group": "backend-unit-xml",
+      "name": "com.auraboot.framework.permission.service.impl.PermissionSnapshotCacheTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "usersSharingRoleReuseRoleGrantSnapshot()",
+        "returnedSnapshotsAreImmutable()",
+        "permissionCodesPreserveCanonicalDatabaseCase()",
+        "permissionCatalogLoadsOnceAndIncludesNegativeLookups()",
+        "permissionCatalogEvictionRefreshesPreviouslyMissingCode()",
+        "tenantAndUserKeysPreventCrossTenantSnapshotReuse()",
+        "permissionCatalogKeysAreTenantIsolated()",
+        "roleEvictionRefreshesPreviouslyMissingBaselineRole()",
+        "permissionCatalogIgnoresDefinitionsOwnedByOtherTenants()",
+        "repeatedEffectiveResolutionLoadsEveryDatabaseLayerOnce()",
+        "contributedRolesJoinDirectRolesAndAreCached()",
+        "passiveExpiryRefreshesNegativeCatalogWithoutAnEvent()",
+        "emptyRoleAndPermissionResultsAreCachedFailClosed()",
+        "concurrentMissesCollapseIntoSingleDatabaseLoad()",
+        "permissionCatalogPreservesTheCompleteDefinitionForPolicyEvaluation()",
+        "roleEvictionReloadsGrantAndDerivedEffectiveSnapshot()",
+        "userEvictionReloadsMembershipButReusesUnchangedRoleGrant()"
+      ],
+      "rawXmlSha256": "a9db12e07f400c3d5ca415077f8170cb8fed797e0291ae2ced09fca999f19ee7"
+    },
+    {
+      "group": "backend-real-stack-xml",
+      "name": "P5 command metadata mutations evict command cache projections",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "binding rule removal evicts cached binding rules",
+        "command update evicts cached command definition",
+        "command publish evicts cached command definition"
+      ],
+      "rawXmlSha256": "ec05e9d2b5a11363895184737992b547ec5f21b6dd8d65aec9b5d6b080079cfc"
+    },
+    {
+      "group": "backend-real-stack-xml",
+      "name": "P5 metadata model mutations evict model definition caches",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "saveDefinition persists immutable and partial updates cannot unset it",
+        "delete evicts cached current model definition",
+        "saveDefinition evicts cached current model definition",
+        "rollbackToVersion evicts cached current model definition",
+        "model field projection reuses the cached assembled definition"
+      ],
+      "rawXmlSha256": "b8f1bc7cc078a26785ca70ad1ea34b2f3e30b897172eec6528969482839919cd"
+    },
+    {
+      "group": "backend-real-stack-xml",
+      "name": "P5 metadata field version mutations refresh model definitions",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "field update moves bindings to the new current field version and evicts model definitions"
+      ],
+      "rawXmlSha256": "8ca5691203329131e97b25f1f878be81aa56bb71a7154dc356fe06fa12047483"
+    },
+    {
+      "group": "backend-real-stack-xml",
+      "name": "UserPermissionService Integration Tests",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "UP-01: getUserPermissionIds returns set containing bound permission",
+        "UP-02: hasPermission by ID returns true for bound, false for unbound",
+        "UP-02b: hasPermission by code returns true for bound code, false for unknown",
+        "UP-03: evictUserPermissions does not throw and subsequent load still works",
+        "UP-04: clearPermissionCodeCache does not throw",
+        "UP-05: evictRoleUsers does not throw",
+        "UP-06: hasAllPermissions returns correct AND logic result",
+        "UP-07: hasAnyPermission returns correct OR logic result",
+        "UP-08: batchGetUserPermissionIds returns correct map",
+        "UP-09: batchGetUserPermissionIds with empty input returns empty map",
+        "UP-10: hasPermission with null arguments returns false gracefully",
+        "UP-11: repeated authorization checks load each database snapshot once",
+        "UP-12: creating a permission invalidates a cached missing code",
+        "UP-13: revoking a role grant invalidates an already cached authorization",
+        "UP-14: future role grants remain unavailable until effective",
+        "UP-15: revocation evicts after commit, while rollback keeps the valid grant"
+      ],
+      "rawXmlSha256": "702b9d2158bd6502f2e4ce8cfb8309462fb2139abb792665613919c7ea4b75b0"
+    },
+    {
+      "group": "fresh-user-xml",
+      "name": "com.auraboot.framework.auth.JwtFreshUserSnapshotIT",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testcases": [
+        "oldTokenObservesDisableSecurityVersionAndSessionRevocation()"
+      ],
+      "rawXmlSha256": "c531fe6951a513047cac38ef8edfa9a483d5cbf8445c70260f2a3d67fd643586"
+    }
+  ],
+  "logs": [
+    {
+      "file": "backend-unit-final-green.log",
+      "rawSha256": "e058fe604ee32516cd9c54a4fbb3fae9bdaf7c136c1e8e0ed0468ab63f30975e"
+    },
+    {
+      "file": "backend-real-stack.log",
+      "rawSha256": "ba32c947bebf2ac7ede55b61ddfccd7223ae55990d0f8e882bfdbf9051035ea8"
+    },
+    {
+      "file": "fresh-user-real-stack-legacy-context.log",
+      "rawSha256": "ad25c1eab04d860df15da4358a212ae88974af223d1a920f69e2fa44383ee900"
+    },
+    {
+      "file": "backend-alias-mutation-red.log",
+      "rawSha256": "63b6b63381946d2f5b34c91a7bf1362fb42868ed9dcf2c5f9dd9ad14f452ab97"
+    },
+    {
+      "file": "oss-home-readiness-mutation-red.log",
+      "rawSha256": "cb298f5dce525ccbc1b0a32f95fac512fdf74e42567ae00fc7a1b00bac657a3f"
+    },
+    {
+      "file": "harness-complete.log",
+      "rawSha256": "22cafa0628bcbe86941e3e8f59f776d2d891279f72c521327930f915ccd46a18"
+    },
+    {
+      "file": "harness-lifecycle-final.log",
+      "rawSha256": "83ed84629656033938c044ae3268fec9c13186a7f523e17e2199553848e9ecbd"
+    },
+    {
+      "file": "auth-refresh.log",
+      "rawSha256": "f46bf4547a177c33b43655b8f4f8191c333edd6cb46755eb7f5352d285ef5549"
+    },
+    {
+      "file": "ui.log",
+      "rawSha256": "d6631278bc93ef46888c393020f38c5fe9e632d9921e0c3fdf9a8ec1f4497555"
+    },
+    {
+      "file": "candidate-verified.log",
+      "rawSha256": "0cf2f9c8645cd3add49f9385cfad20d8145b7bf700dc303d343915e74485935b"
+    }
+  ],
+  "javaTests": 88,
+  "nodeCommands": [
+    {
+      "log": "harness-complete.txt",
+      "executed": 73,
+      "passed": 73,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "log": "harness-lifecycle-final.txt",
+      "executed": 64,
+      "passed": 64,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "browser": {
+    "collected": 2,
+    "executed": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "didNotRun": 0,
+    "scenarios": 13,
+    "retries": 0
+  },
+  "mutation": {
+    "redundantAliasLookupExit": 1,
+    "delayedReadinessObserverExit": 1,
+    "restoredGreen": true
+  }
+}

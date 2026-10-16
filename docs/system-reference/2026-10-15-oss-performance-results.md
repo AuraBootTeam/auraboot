@@ -5,6 +5,8 @@ status: active
 
 # OSS performance evidence: 2026-10-15
 
+This historical report uses the development server and the earlier runner-observed home timing. Use the [next-round production report](2026-10-15-oss-production-performance-results.md) for the corrected browser-side readiness contract and production client/SSR baseline. Do not compare their absolute home timings as an application speedup.
+
 The measured change reduces redundant work: list MyBatis calls fall from **18 to 15**, and the initial browser workbench-configuration request falls from **1 to 0**. Latency is mixed; the data does **not** establish a general API speedup or a production performance SLO.
 
 ## Source and measurement conditions

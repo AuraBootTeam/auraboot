@@ -1,0 +1,62 @@
+{
+  "workspaceCommit": "54f320f083a26a6f860abe137de9eaa8ce1b0265",
+  "applicationBase": "b14cf4870de3ef4df8537365163054622c75941b",
+  "baselineHarnessCommit": "19610df1bf7473695ca89a038052c70a13045719",
+  "candidateCommit": "5e1cc2e3b93c0a3cce93dfc17ebcbef094d6cea1",
+  "runtime": "oss-performance-production",
+  "slot": 283,
+  "sessionSecret": "SET, private input not published",
+  "phases": [
+    {
+      "phase": "baseline-off",
+      "commit": "19610df1bf7473695ca89a038052c70a13045719",
+      "artifactHash": "4410fd81e2869e8c1407038d912a573d57e713e0effc2aa7ad2708b7d3fb3df5",
+      "frontendBuild": {
+        "root": "$SOURCE_ROOT/web-admin/build",
+        "hash": "1bb24fdf82ef94d8c845a146f575b5e1dcd4aa64804704d6f622e37e6db6e4cf"
+      },
+      "redisHostConfigured": false,
+      "tracing": false,
+      "sourceFingerprint": "clean",
+      "rawRuntimeManifestSha256": "c3fac21a8ff7fc8086bec5d084a1bb62a0cc6ce71bb5593fe638ec463f434681"
+    },
+    {
+      "phase": "baseline-on",
+      "commit": "19610df1bf7473695ca89a038052c70a13045719",
+      "artifactHash": "4410fd81e2869e8c1407038d912a573d57e713e0effc2aa7ad2708b7d3fb3df5",
+      "frontendBuild": {
+        "root": "$SOURCE_ROOT/web-admin/build",
+        "hash": "a2d2e323ba22489a2134a8369524ebe204a8f298a97f9d9546efe748346eebb0"
+      },
+      "redisHostConfigured": false,
+      "tracing": true,
+      "sourceFingerprint": "clean",
+      "rawRuntimeManifestSha256": "687e761f45410d04b596b2eb1854e57c95d4698c335ac7f2f8e21807438ae830",
+      "rawCollectorSha256": "3fce9f3767b5fa457163e2be8b263d88517caab39b0e332493fc9e13764bf2d3"
+    },
+    {
+      "phase": "after-off",
+      "commit": "5e1cc2e3b93c0a3cce93dfc17ebcbef094d6cea1",
+      "artifactHash": "8b800743781ad690999fa878e6cd7533d71325eb05676f4b3b8be195082e25ac",
+      "frontendBuild": null,
+      "redisHostConfigured": false,
+      "tracing": false,
+      "sourceFingerprint": "clean",
+      "rawRuntimeManifestSha256": "a37567c4e7850c6defed91748b4f2eaff59c7ed098d9a57f6481179a801b0857"
+    },
+    {
+      "phase": "after-on",
+      "commit": "5e1cc2e3b93c0a3cce93dfc17ebcbef094d6cea1",
+      "artifactHash": "8b800743781ad690999fa878e6cd7533d71325eb05676f4b3b8be195082e25ac",
+      "frontendBuild": {
+        "root": "$SOURCE_ROOT/web-admin/build",
+        "hash": "4e04d5a0ceaf26d4e4b023cd1b0ce779b9c3b05fb92982ca78eea1f9ca9fd21a"
+      },
+      "redisHostConfigured": false,
+      "tracing": true,
+      "sourceFingerprint": "clean",
+      "rawRuntimeManifestSha256": "5920f6ceb2b25565d40c8506ea99c75740361a861f34e0e077bdc6fb2578f112",
+      "rawCollectorSha256": "bfdf318d0d3ae61a6396be48641e41b0910e5011f529aff34cd2428beda7e578"
+    }
+  ]
+}

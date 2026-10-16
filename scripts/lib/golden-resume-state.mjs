@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
 
-const TELEMETRY_KEYS = ['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED',
+const TELEMETRY_KEYS = ['SESSION_SECRET_FILE', 'AURA_WEB_MODE', 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED',
   'MANAGEMENT_TRACING_SAMPLING_PROBABILITY', 'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG',
   'VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'VITE_OTEL_TRACES_SAMPLE_RATE'];
 const need = (condition, message) => { if (!condition) throw new Error(message); };
@@ -35,7 +35,7 @@ export function fingerprintDirectory(root) {
   return { root: realpathSync(root), hash: digest.digest('hex') };
 }
 
-export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins, logging = null }) {
+export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins, logging = null, frontendBuild = null, sessionSecretFile = null }) {
   need(report.verdict === 'ok', 'Workspace identity verification failed');
   need(plan.schemaVersion === 1 && plan.runtime === report.runtime && plan.repo === repo,
     'Resume plan owner mismatch');
@@ -63,6 +63,13 @@ export function verifyResumeState({ report, repo, plan, planHash, manifest, depe
   need(!/[\r\n]/.test(plan.backend.path), 'Unsupported backend path');
   if (plan.logging || logging) need(plan.logging && logging && plan.logging.path === logging.path &&
     plan.logging.hash === logging.hash, 'Retained logging input changed');
+  if (plan.frontendBuild) {
+    need(plan.telemetryEnvironment?.AURA_WEB_MODE === 'production' && frontendBuild &&
+      plan.frontendBuild.root === frontendBuild.root && plan.frontendBuild.hash === frontendBuild.hash,
+      'Retained production frontend changed');
+    need(plan.sessionSecretFile && sessionSecretFile && plan.sessionSecretFile.root === sessionSecretFile.root &&
+      plan.sessionSecretFile.hash === sessionSecretFile.hash, 'Retained production session configuration changed');
+  }
   need(typeof (plan.redisHost ?? '127.0.0.1') === 'string' && !/[\r\n]/.test(plan.redisHost || ''), 'Invalid Redis host');
   for (const [key, value] of Object.entries(plan.telemetryEnvironment || {})) {
     need(TELEMETRY_KEYS.includes(key) && typeof value === 'string' && !/[\r\n]/.test(value), 'Invalid telemetry environment');
@@ -105,10 +112,16 @@ export function recordResumeState(name, repo, cli) {
     logging: loggingInput(report, name),
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
     plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')) };
+  if (liveEnv.AURA_WEB_MODE === 'production') {
+    plan.frontendBuild = fingerprintDirectory(join(repo, 'web-admin/build'));
+    need(Boolean(liveEnv.SESSION_SECRET_FILE), 'Production session input missing');
+    plan.sessionSecretFile = fingerprintDirectory(liveEnv.SESSION_SECRET_FILE);
+    manifest.frontendBuild = plan.frontendBuild;
+  }
   const planFile = join(root, 'resume.json');
   const planHash = hash(JSON.stringify(plan, null, 2) + '\n');
   verifyResumeState({ report, repo, plan, planHash, manifest: { ...manifest, resumePlan: { hash: planHash } },
-    dependencies: plan.dependencies, plugins: plan.plugins, logging: plan.logging });
+    dependencies: plan.dependencies, plugins: plan.plugins, logging: plan.logging, frontendBuild: plan.frontendBuild, sessionSecretFile: plan.sessionSecretFile });
   atomicJson(planFile, plan);
   manifest.resumePlan = { hash: hash(readFileSync(planFile)) };
   atomicJson(file, manifest);
@@ -126,7 +139,8 @@ export function loadResumeState(name, repo, cli) {
   return verifyResumeState({ report, repo, plan, planHash: hash(bytes), manifest,
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
     plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')),
-    logging: loggingInput(report, name) });
+    logging: loggingInput(report, name), frontendBuild: plan.frontendBuild ? fingerprintDirectory(join(repo, 'web-admin/build')) : null,
+    sessionSecretFile: plan.sessionSecretFile ? fingerprintDirectory(plan.sessionSecretFile.root) : null });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {

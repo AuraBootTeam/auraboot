@@ -36,17 +36,25 @@ public class UnifiedUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("Invalid identifier: " + identifier);
         }
 
-        return new CustomUserDetails(
-                identifier,        // 保持登录时使用的标识符
-                user.getPassword(),
-                user.getId(),
-                user.getPid(),     // 这是关键的稳定标识符
-                null,
-                user.isAccountNonExpired(),
-                user.isAccountNonLocked(),
-                user.isCredentialsNonExpired(),
-                user.isEnabled()
-        );
+        return snapshot(identifier, user);
+    }
+
+    /** Load a fresh authentication snapshot using the stable JWT subject, without login aliases. */
+    public CustomUserDetails loadUserByPid(String userPid) throws UsernameNotFoundException {
+        User user = userPid == null || userPid.isBlank() ? null : userService.findByPid(userPid);
+        if (user == null) {
+            throw new UsernameNotFoundException("Invalid user PID: " + userPid);
+        }
+        return snapshot(userPid, user);
+    }
+
+    private CustomUserDetails snapshot(String identifier, User user) {
+        CustomUserDetails details = new CustomUserDetails(
+                identifier, user.getPassword(), user.getId(), user.getPid(), null,
+                user.isAccountNonExpired(), user.isAccountNonLocked(),
+                user.isCredentialsNonExpired(), user.isEnabled());
+        details.setSecurityVersion(user.getSecurityVersion() == null ? 0 : user.getSecurityVersion());
+        return details;
     }
 
     private User findUserByIdentifier(String identifier) {
@@ -78,17 +86,7 @@ public class UnifiedUserDetailsService implements UserDetailsService {
         if (user == null) {
             throw new UsernameNotFoundException("Invalid userId: " + userId);
         }
-        return new CustomUserDetails(
-                user.getPid(),     // 使用pid作为username
-                user.getPassword(),
-                user.getId(),
-                user.getPid(),
-                null,
-                user.isAccountNonExpired(),
-                user.isAccountNonLocked(),
-                user.isCredentialsNonExpired(),
-                user.isEnabled()
-        );
+        return snapshot(user.getPid(), user);
     }
 
 }

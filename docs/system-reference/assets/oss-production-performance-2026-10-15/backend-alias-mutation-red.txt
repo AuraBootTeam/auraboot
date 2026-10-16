@@ -1,0 +1,66 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+Configuration on demand is an incubating feature.
+> Task :platform-storage-oss:processResources NO-SOURCE
+> Task :platform-mq-kafka:processResources NO-SOURCE
+> Task :platform-storage-s3:processResources NO-SOURCE
+> Task :platform-storage-cos:processResources NO-SOURCE
+> Task :platform-storage-minio:processResources NO-SOURCE
+> Task :bootBuildInfo UP-TO-DATE
+> Task :platform-plugin-api:compileJava UP-TO-DATE
+> Task :platform-plugin-api:processResources NO-SOURCE
+> Task :platform-plugin-api:classes UP-TO-DATE
+> Task :platform-plugin-api:jar UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :compileJava
+> Task :classes
+> Task :jar
+> Task :platform-storage-oss:compileJava UP-TO-DATE
+> Task :platform-storage-s3:compileJava UP-TO-DATE
+> Task :platform-storage-cos:compileJava UP-TO-DATE
+> Task :platform-storage-cos:classes UP-TO-DATE
+> Task :platform-storage-oss:classes UP-TO-DATE
+> Task :platform-storage-s3:classes UP-TO-DATE
+> Task :platform-storage-cos:jar UP-TO-DATE
+> Task :platform-storage-oss:jar UP-TO-DATE
+> Task :platform-storage-s3:jar UP-TO-DATE
+> Task :platform-mq-kafka:compileJava UP-TO-DATE
+> Task :platform-mq-kafka:classes UP-TO-DATE
+> Task :platform-mq-kafka:jar UP-TO-DATE
+> Task :platform-storage-minio:compileJava UP-TO-DATE
+> Task :platform-storage-minio:classes UP-TO-DATE
+> Task :platform-storage-minio:jar UP-TO-DATE
+> Task :compileTestJava UP-TO-DATE
+> Task :instrumentMainOffline
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+UnifiedUserDetailsServiceTest > jwtPidLookupReadsOnceAndNeverResolvesAliases() FAILED
+    org.mockito.exceptions.verification.NoInteractionsWanted at UnifiedUserDetailsServiceTest.java:95
+
+1 test completed, 1 failed
+
+> Task :test FAILED
+
+[Incubating] Problems report is available at: file://$SOURCE_ROOT/platform/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file://$SOURCE_ROOT/platform/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 17s
+20 actionable tasks: 4 executed, 16 up-to-date
