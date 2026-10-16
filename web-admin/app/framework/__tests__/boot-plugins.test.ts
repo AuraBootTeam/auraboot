@@ -24,6 +24,7 @@ const pluginLoader = {
   install: vi.fn(),
   enable: vi.fn(),
   activateAll: vi.fn(async () => ['core-demo']),
+  registerHostAction: vi.fn(),
 }
 
 vi.mock('../bootstrap.js', () => ({
@@ -53,6 +54,7 @@ describe('bootCorePlugins', () => {
     expect(pluginLoader.enable).toHaveBeenCalledWith('core-decisionops')
     expect(pluginLoader.activateAll).toHaveBeenCalledTimes(1)
     expect(activated).toEqual(['core-demo'])
+    expect(pluginLoader.registerHostAction).not.toHaveBeenCalled()
     expect(getKernel).toHaveBeenCalledTimes(2)
   })
 

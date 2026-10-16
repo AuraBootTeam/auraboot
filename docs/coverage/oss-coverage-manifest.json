@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "3b9e0e4fe",
+    "commit": "2dc411152",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -3743,12 +3743,14 @@
         {
           "id": "tpm:create_customer",
           "action": "tpm:create_customer",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/customer-ai-intake-config.test.mjs"
+          ],
+          "assertion": "test reference registered below the UI; execution not verified",
+          "verdict": "partial"
         },
         {
           "id": "tpm:create_milestone",
@@ -3767,6 +3769,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/delivery-brief-config.test.mjs",
             "web-admin/tests/e2e/templates/templates-smoke.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -3778,9 +3781,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "tpm:delete_milestone",
@@ -3914,9 +3919,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "tpm:start_task",
@@ -3924,9 +3931,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "tpm:submit_acceptance",
@@ -3972,12 +3981,14 @@
         {
           "id": "tpm:update_project",
           "action": "tpm:update_project",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/delivery-brief-config.test.mjs"
+          ],
+          "assertion": "test reference registered below the UI; execution not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -3990,6 +4001,17 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:tpm_customer_ai_intake",
+          "action": "tpm_customer_ai_intake",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tpm_customer"
         },
         {
           "id": "page:tpm_customer_detail",
@@ -4096,9 +4118,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=tpm_task"
         },
         {
@@ -4287,6 +4311,7 @@
             "web-admin/tests/e2e/platform/showcase-form-validation.spec.ts",
             "web-admin/tests/e2e/showcase/ga-showcase-saved-view-deep.spec.ts",
             "web-admin/tests/e2e/showcase/list-ux-features.spec.ts",
+            "web-admin/tests/e2e/showcase/oss-performance.spec.ts",
             "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
             "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
@@ -5058,7 +5083,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/crm/pipeline-journey-golden.spec.ts"
+            "web-admin/tests/e2e/dynamic/stage-rail-journey-golden.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -5694,6 +5719,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts",
+            "web-admin/tests/e2e/dashboard/customer-delivery-dashboard.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-crud-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-hifi-golden.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
@@ -6017,6 +6044,9 @@
             "web-admin/tests/e2e/designer/report-designer-ops-golden.spec.ts",
             "web-admin/tests/e2e/designer/report-hifi-golden.spec.ts",
             "web-admin/tests/e2e/designer-ux-improvements.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-analysis-report-live.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-report-formats-real.spec.ts",
+            "web-admin/tests/e2e/project-management/delivery-brief-real.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
             "web-admin/tests/e2e/report-designer-history-golden.spec.ts",
             "web-admin/tests/e2e/report-designer-readswitch-golden.spec.ts",
@@ -6189,6 +6219,7 @@
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-business-write-guard-golden.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-personalization-promotion-golden.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-release-golden.spec.ts",
+            "web-admin/tests/e2e/dashboard/customer-delivery-permissions-real.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-fact-metadata-trace.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-field-impact-preflight.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
@@ -6199,6 +6230,7 @@
             "web-admin/tests/e2e/decisionops/dmn-table-editor-deep.spec.ts",
             "web-admin/tests/e2e/decisionops/event-policy-complex-condition.spec.ts",
             "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts",
+            "web-admin/tests/e2e/designer/customer-bpm-roundtrip.spec.ts",
             "web-admin/tests/e2e/home/oss-workbench.spec.ts",
             "web-admin/tests/e2e/organization/member-lifecycle-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/bom-rule-center-crud.spec.ts",
@@ -6207,7 +6239,11 @@
             "web-admin/tests/e2e/pcba-solution/team-data-scope-runtime.spec.ts",
             "web-admin/tests/e2e/permission/capability-save-ui-golden.spec.ts",
             "web-admin/tests/e2e/permission/role-default-scope-golden.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-report-formats-real.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-report-permissions-real.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
+            "web-admin/tests/e2e/showcase/customer-designers-journey.spec.ts",
+            "web-admin/tests/e2e/showcase/oss-performance.spec.ts",
             "web-admin/tests/e2e/workbench/workbench-redesign.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
@@ -6324,6 +6360,7 @@
             "web-admin/tests/e2e/plugin/plugin-slot-system.spec.ts",
             "web-admin/tests/e2e/plugin-productization/managed-badge.spec.ts",
             "web-admin/tests/e2e/search/command-palette-docs.spec.ts",
+            "web-admin/tests/e2e/showcase/customer-designers-journey.spec.ts",
             "web-admin/tests/e2e/showcase/model-creation-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/model-creation-full-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/model-field-change-page-sync-e2e.spec.ts",
@@ -6863,8 +6900,8 @@
   ],
   "stats": {
     "commands": 261,
-    "untested": 176,
-    "pages": 178,
+    "untested": 171,
+    "pages": 179,
     "pagesUntested": 110,
     "platformPages": 95,
     "platformPagesUntested": 37
