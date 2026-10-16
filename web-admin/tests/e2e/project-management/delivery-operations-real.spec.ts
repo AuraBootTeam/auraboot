@@ -78,9 +78,9 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  await shot(page,'OP01');await page.getByTestId('dashboard-block-approval-results').scrollIntoViewIfNeeded();await shot(page,'OP13');await page.getByTestId('dashboard-block-verification-results').scrollIntoViewIfNeeded();await expect(page.getByTestId('dashboard-block-verification-results')).toContainText('资料已更新 · 需复核');await shot(page,'OP14');await page.getByRole('heading',{name:'交付经营看板',exact:true}).scrollIntoViewIfNeeded();
  const before=widgetResponses.length;await page.getByRole('button',{name:'刷新',exact:true}).click();await expect.poll(()=>widgetResponses.length).toBeGreaterThanOrEqual(before+7);await shot(page,'OP03');
  await page.setViewportSize({width:1280,height:900});await expect(page.getByRole('heading',{name:'交付经营看板',exact:true})).toBeVisible();await shot(page,'OP04');await page.setViewportSize({width:1440,height:1000});
- const target=factRows[0];
+ const target=factRows.find((row:any)=>Number(row.current_overdue)>0);expect(target).toBeTruthy();await expect(page.getByTestId('dashboard-block-delivery-actions').locator('tbody tr').first()).toContainText(target.acceptance_name);
  // Use the first actual rendered business row; the server fact is an independent identity oracle.
- const firstRow=page.getByRole('row').filter({hasText:target.acceptance_name}).first();await firstRow.click();
+ const firstRow=page.getByTestId('dashboard-block-delivery-actions').getByRole('row').filter({hasText:target.acceptance_name});await firstRow.click();
  await expect(page).toHaveURL(/\/p\/tpm_acceptance\?/);await expect(page.getByRole('row').filter({hasText:target.acceptance_name})).toHaveCount(1);
  await page.getByRole('row').filter({hasText:target.acceptance_name}).getByRole('button',{name:/查看|详情/}).click();await expect(page).toHaveURL(new RegExp(`/p/tpm_acceptance/view/${target.acceptance_pid}$`));await shot(page,'OP02');
  await navigateToMenuByClick(page,['元数据管理','报表管理']);await page.getByRole('button',{name:'新建报表',exact:true}).click();
