@@ -3,6 +3,7 @@ package com.auraboot.framework.auth.controller;
 import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.service.TenantLoginChannelService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/auth/login")
 @RequiredArgsConstructor
+@AuthenticatedAccess("pre-authentication login-page metadata listing the tenant's enabled login channels")
 public class LoginChannelController {
 
     private final TenantLoginChannelService channelService;

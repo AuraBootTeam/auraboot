@@ -6,6 +6,7 @@ import com.auraboot.framework.email.model.EmailSequence;
 import com.auraboot.framework.email.model.EmailSequenceEnrollment;
 import com.auraboot.framework.email.model.EmailSequenceStep;
 import com.auraboot.framework.email.service.EmailSequenceService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import java.util.Map;
 @RequestMapping("/api/email/sequences")
 @RequiredArgsConstructor
 @Tag(name = "Email Sequences", description = "Drip campaign sequences, steps, and enrollment management")
+@AuthenticatedAccess("drip-campaign sequence/step/enrollment management scoped to the caller's tenant (MetaContext tenantId)")
 public class EmailSequenceController {
 
     private final EmailSequenceService emailSequenceService;

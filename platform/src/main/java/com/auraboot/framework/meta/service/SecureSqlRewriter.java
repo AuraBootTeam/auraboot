@@ -6,7 +6,7 @@ import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.Function;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
-import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
@@ -42,6 +42,12 @@ import java.util.regex.Pattern;
 @Service
 public class SecureSqlRewriter {
 
+    /** Scope every physical source, including subqueries and joins, before evaluating caller predicates. */
+    public String rewriteForTenant(String sql) {
+        return new com.auraboot.framework.meta.service.impl.NamedQuerySourceScopeRewriter()
+                .forTenant(sql, referencedTables(sql));
+    }
+
     private static final Pattern MYBATIS_PARAM_PATTERN =
             Pattern.compile("#\\{params\\.([a-zA-Z0-9_]+)\\}");
 
@@ -71,7 +77,7 @@ public class SecureSqlRewriter {
             log.debug("Rewriting SQL for COUNT: {}", originalSql);
 
             NormalizedSql normalized = normalizeMybatisParams(originalSql);
-            Statement stmt = CCJSqlParserUtil.parse(normalized.sql);
+            Statement stmt = JsqlParserGlobal.parse(normalized.sql);
             
             if (!(stmt instanceof Select)) {
                 throw new IllegalArgumentException("Not a SELECT statement: " + originalSql);
@@ -153,7 +159,7 @@ public class SecureSqlRewriter {
             log.debug("Rewriting SQL for DELETE from table {}: {}", tableName, selectSql);
 
             NormalizedSql normalized = normalizeMybatisParams(selectSql);
-            Statement stmt = CCJSqlParserUtil.parse(normalized.sql);
+            Statement stmt = JsqlParserGlobal.parse(normalized.sql);
             
             if (!(stmt instanceof Select)) {
                 throw new IllegalArgumentException("Not a SELECT statement: " + selectSql);
@@ -213,7 +219,7 @@ public class SecureSqlRewriter {
     public java.util.Set<String> referencedTables(String sql) {
         if (sql == null || sql.isBlank()) throw new MetaServiceException("SQL source is required");
         try {
-            Statement statement = CCJSqlParserUtil.parse(normalizeMybatisParams(sql).sql);
+            Statement statement = JsqlParserGlobal.parse(normalizeMybatisParams(sql).sql);
             if (!(statement instanceof Select)) throw new MetaServiceException("A SELECT source is required");
             java.util.Set<String> tables = new java.util.LinkedHashSet<>();
             StringBuilder output = new StringBuilder();
@@ -244,7 +250,7 @@ public class SecureSqlRewriter {
         
         try {
             NormalizedSql normalized = normalizeMybatisParams(sql);
-            Statement stmt = CCJSqlParserUtil.parse(normalized.sql);
+            Statement stmt = JsqlParserGlobal.parse(normalized.sql);
             return stmt instanceof Select;
         } catch (Exception e) {
             log.debug("Failed to parse SQL: {}", sql, e);
@@ -265,7 +271,7 @@ public class SecureSqlRewriter {
 
         try {
             NormalizedSql normalized = normalizeMybatisParams(selectSql);
-            Statement stmt = CCJSqlParserUtil.parse(normalized.sql);
+            Statement stmt = JsqlParserGlobal.parse(normalized.sql);
 
             if (!(stmt instanceof Select)) {
                 throw new MetaServiceException("Unsupported statement type: " + stmt.getClass().getSimpleName());

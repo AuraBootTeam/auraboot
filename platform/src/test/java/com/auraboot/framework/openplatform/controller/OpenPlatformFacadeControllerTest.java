@@ -38,7 +38,10 @@ class OpenPlatformFacadeControllerTest {
             "unit-test-open-platform-signing-key-at-least-32-bytes", "test", Clock.systemUTC());
     private final OpenApiEventPublisher eventPublisher = mock(OpenApiEventPublisher.class);
     private final OpenPlatformFacadeController controller = new OpenPlatformFacadeController(
-            publications, dataService, commandExecutor, tokenCodec, new OpenApiEventCatalog(), eventPublisher);
+            publications, dataService, commandExecutor, tokenCodec, new OpenApiEventCatalog(), eventPublisher,
+            mock(com.auraboot.framework.openplatform.service.OpenApiResourceService.class),
+            new com.auraboot.framework.openplatform.service.OpenApiLegacyAuthority(
+                mock(com.auraboot.framework.meta.service.CommandService.class), new com.fasterxml.jackson.databind.ObjectMapper()));
 
     @Test
     void commandUsesInstallationScopedIdempotencyAndNarrowMachineGrant() {
@@ -132,11 +135,27 @@ class OpenPlatformFacadeControllerTest {
 
     @Test
     void mapsFacadeValidationFailuresToStablePublicError() {
-        var response = controller.invalidRequest(new IllegalArgumentException("Invalid Idempotency-Key"));
+        var response = new OpenApiResourceErrorHandler().invalid(new IllegalArgumentException("Invalid Idempotency-Key"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("success", false)
                 .containsEntry("code", "invalid_request")
                 .containsEntry("message", "Invalid Idempotency-Key");
+        var timeout = new OpenApiResourceErrorHandler().queryDeadline();
+        assertThat(timeout.getStatusCode()).isEqualTo(HttpStatus.GATEWAY_TIMEOUT);
+        assertThat(timeout.getBody()).isEqualTo(Map.of("success", false, "code", "open_api_query_timeout",
+                "message", "Published query execution deadline exceeded"));
+        var privateCause = new org.springframework.dao.QueryTimeoutException("Private source SQL and credentials");
+        var typed = new com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryDeadlineExceededException(privateCause);
+        assertThat(typed).hasCause(privateCause).hasMessageContaining("504").hasMessageContaining("open_api_query_timeout")
+                .hasMessageNotContaining("Private");
+        var unavailable = new OpenApiResourceErrorHandler().queryUnavailable();
+        assertThat(unavailable.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(unavailable.getBody()).isEqualTo(Map.of("success", false, "code", "open_api_query_unavailable",
+                "message", "Published query execution is unavailable"));
+        var sourceFailure = new org.springframework.dao.DataIntegrityViolationException("Private source SQL and credentials");
+        var publicFailure = new com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryExecutionUnavailableException(sourceFailure);
+        assertThat(publicFailure).hasCause(sourceFailure).hasMessageContaining("503").hasMessageContaining("open_api_query_unavailable")
+                .hasMessageNotContaining("Private");
     }
 }

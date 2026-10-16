@@ -22,6 +22,7 @@ import {
   ensurePageConfig,
 } from './state/ReportDocumentProvider';
 import { ReportToolbar } from './components/ReportToolbar';
+import { ReportTemplateActions } from './components/ReportTemplateActions';
 import { BlockPalette } from './components/BlockPalette';
 import { ReportTableBlock } from './blocks/ReportTableBlock';
 import { ReportGroupedTableBlock } from './blocks/ReportGroupedTableBlock';
@@ -45,9 +46,10 @@ const AUTO_SAVE_DELAY = 30000; // 30 seconds
 interface ReportDesignerProps {
   reportId?: string;
   initialTitle?: string;
+  onSaveComplete?: (reportPid: string) => void;
 }
 
-const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
+const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle, onSaveComplete }) => {
   const text = useSmartText();
   const { showErrorToast } = useToastContext();
   const notifyExportFailure = useCallback(() => {
@@ -116,12 +118,13 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       setPageId(pid);
       markSaved();
       setSaving(false);
+      onSaveComplete?.(pid);
       return pid;
     } catch (error) {
       setSaving(false);
       throw error;
     }
-  }, [report, pageId, setSaving, setPageId, markSaved, canManage]);
+  }, [report, pageId, setSaving, setPageId, markSaved, canManage, onSaveComplete]);
 
   // Version history management
   const versioning = useVersioning({
@@ -186,9 +189,9 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       lastSaveTimeRef.current = Date.now();
     } catch (error) {
       console.error('Save failed:', error);
-      alert(error instanceof Error ? error.message : 'Save failed');
+      showErrorToast(text({ zh: '保存失败，草稿已保留，请重试。', en: 'Save failed. Your draft is preserved. Please retry.' }));
     }
-  }, [saveReport, versioning.viewingVersionPid, canManage]);
+  }, [saveReport, versioning.viewingVersionPid, canManage, showErrorToast, text]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -307,6 +310,42 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     previewQuery.canExport,
     previewQuery.appliedParameters,
   ]);
+
+  const handleExportText = useCallback(
+    async (format: 'markdown' | 'html') => {
+      if (!canExport || !pageId || isDirty || isSaving || (viewing && !previewQuery.canExport))
+        return;
+      try {
+        const parameters = viewing ? previewQuery.appliedParameters : undefined;
+        const blob =
+          format === 'markdown'
+            ? await reportDesignerService.exportMarkdown(pageId, parameters)
+            : await reportDesignerService.exportHtml(pageId, parameters);
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${report?.title || 'report'}.${format === 'markdown' ? 'md' : 'html'}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        // CATCH: download failure has no persistence side effect; show the existing localized error.
+        notifyExportFailure();
+      }
+    },
+    [
+      canExport,
+      pageId,
+      isDirty,
+      isSaving,
+      viewing,
+      previewQuery.canExport,
+      previewQuery.appliedParameters,
+      report?.title,
+      notifyExportFailure,
+    ],
+  );
 
   // PDF Export
   const handleExportPdf = useCallback(async () => {
@@ -434,6 +473,8 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
           onExportPdf={handleExportPdf}
           onExportExcel={handleExportExcel}
           onExportJson={handleExportJson}
+          onExportMarkdown={() => handleExportText('markdown')}
+          onExportHtml={() => handleExportText('html')}
           onToggleVersionHistory={versioning.togglePanel}
           versionCount={versioning.versions.length}
         />
@@ -455,9 +496,12 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         onExportPdf={handleExportPdf}
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
+        onExportMarkdown={() => handleExportText('markdown')}
+        onExportHtml={() => handleExportText('html')}
         onToggleVersionHistory={versioning.togglePanel}
         versionCount={versioning.versions.length}
       />
+      <ReportTemplateActions disabled={!canManage || isSaving || isLoading} />
       <div className="flex flex-1 overflow-hidden">
         <BlockPalette />
         <ReportCanvas />

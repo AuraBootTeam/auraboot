@@ -2,14 +2,14 @@
   {
     "code": "tpm_root",
     "parentCode": null,
-    "name:zh-CN": "项目管理",
-    "name:en": "Projects",
+    "name:zh-CN": "项目交付",
+    "name:en": "Project delivery",
     "path": null,
     "component": null,
     "icon": "IconBriefcase",
     "type": 0,
     "permissionCode": null,
-    "orderNo": 810,
+    "orderNo": 50,
     "visible": true
   },
   {
@@ -49,6 +49,19 @@
     "type": 1,
     "permissionCode": "tpm.milestone.read",
     "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "tpm_customer_ai_intake",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "AI整理客户资料",
+    "name:en": "AI customer intake",
+    "path": "/p/c/tpm_customer_ai_intake",
+    "component": null,
+    "icon": "sparkles",
+    "type": 1,
+    "permissionCode": "tpm.project.manage",
+    "orderNo": 4,
     "visible": true
   }
 ]

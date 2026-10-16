@@ -3,6 +3,7 @@ package com.auraboot.framework.auth.controller;
 import com.auraboot.framework.auth.dto.SendCodeRequest;
 import com.auraboot.framework.auth.service.VerificationCodeService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/auth/verify-code")
+@AuthenticatedAccess("public pre-authentication OTP send/verify supporting login-by-code and password reset; no user session exists yet by design")
 public class VerifyCodeController {
 
     private final VerificationCodeService verificationCodeService;

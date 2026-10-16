@@ -62,10 +62,13 @@ class OpenPlatformTokenServiceTest {
                 .thenReturn(activeCredential(passwordEncoder.encode(secret)));
         when(scopeMapper.findScopes(42L, 9L)).thenReturn(Set.of("records.read"));
 
-        assertThrows(OpenPlatformTokenService.InvalidScopeException.class,
+        var deniedScope = assertThrows(OpenPlatformTokenService.InvalidScopeException.class,
                 () -> service.issue("client_credentials", "client", secret, "orders.write"));
-        assertThrows(OpenPlatformTokenService.InvalidClientException.class,
+        assertEquals(new OpenPlatformTokenService.AuditIdentity(42L, "app", "inst"), deniedScope.auditIdentity());
+        var deniedSecret = assertThrows(OpenPlatformTokenService.InvalidClientException.class,
                 () -> service.issue("client_credentials", "client", "wrong", "records.read"));
+        org.junit.jupiter.api.Assertions.assertNull(deniedSecret.auditIdentity());
+        org.mockito.Mockito.verifyNoInteractions(tokenMapper);
     }
 
     private OpenPlatformAuthMapper.CredentialAuthRecord activeCredential(String hash) {

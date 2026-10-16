@@ -8,6 +8,7 @@ import com.auraboot.framework.agent.service.UserSoulProfileEditor;
 import com.auraboot.framework.agent.service.UserSoulProfileEditor.EditResult;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -56,7 +57,7 @@ import java.util.Objects;
 @Slf4j
 @RestController
 @RequestMapping(UserSoulProfileController.BASE_PATH)
-@com.auraboot.framework.permission.annotation.AuthenticatedAccess(
+@AuthenticatedAccess(
         "user endpoints are tenant + user scoped (MetaContext); a user sees only their own profile")
 public class UserSoulProfileController {
 

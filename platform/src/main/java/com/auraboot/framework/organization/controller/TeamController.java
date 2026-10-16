@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.organization.service.TeamService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/org/teams")
 @Tag(name = "Teams", description = "Team management")
+@AuthenticatedAccess("team list reads are tenant-scoped and current-user teams are scoped to the caller's own membership")
 public class TeamController {
 
     @Autowired

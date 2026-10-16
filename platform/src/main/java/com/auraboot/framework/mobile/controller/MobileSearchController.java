@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.mobile.dto.MobileSearchResult;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +25,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/mobile/search")
 @RequiredArgsConstructor
+@AuthenticatedAccess("mobile global search backed by DynamicDataService tenant-isolated, permission-checked queries")
 public class MobileSearchController {
 
     private static final int MAX_HITS_PER_MODEL = 3;

@@ -51,14 +51,20 @@ public class ExternalMachineAuthenticationFilter extends OncePerRequestFilter {
         try {
             principal = authenticator.authenticate(request);
         } catch (ExternalMachineAuthException exception) {
+            authenticator.recordAuthenticationFailure(request, exception.status(), exception.code(),
+                    (System.nanoTime() - startedAt) / 1_000_000L);
             writeError(response, exception.status(), exception.code());
             return;
         } catch (RuntimeException exception) {
+            authenticator.recordAuthenticationFailure(request, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token",
+                    (System.nanoTime() - startedAt) / 1_000_000L);
             writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token");
             return;
         }
 
         if (principal == null || principal.tenantId() == null || principal.subjectPid() == null) {
+            authenticator.recordAuthenticationFailure(request, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token",
+                    (System.nanoTime() - startedAt) / 1_000_000L);
             writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token");
             return;
         }
@@ -69,16 +75,20 @@ public class ExternalMachineAuthenticationFilter extends OncePerRequestFilter {
         var authentication = new UsernamePasswordAuthenticationToken(
                 principal, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), principal.subjectName());
+        MetaContext.setContext(principal.tenantId(), null, null, null);
+        MetaContext.setMemberId(null);
         request.setAttribute(AUTHENTICATED_ATTRIBUTE, Boolean.TRUE);
         MDC.put("tenantId", String.valueOf(principal.tenantId()));
 
-        try {
+        boolean completed = false;
+        try (var machineScope = MachineDataAccessContext.begin(principal)) {
             filterChain.doFilter(request, response);
+            completed = true;
         } finally {
             long durationMillis = (System.nanoTime() - startedAt) / 1_000_000L;
             try {
-                authenticator.recordCall(principal, request, response.getStatus(), durationMillis);
+                authenticator.recordCall(principal, request,
+                        completed ? response.getStatus() : HttpServletResponse.SC_INTERNAL_SERVER_ERROR, durationMillis);
             } finally {
                 MetaContext.clear();
                 MDC.remove("tenantId");

@@ -5,7 +5,8 @@ import org.springframework.stereotype.Component;
 import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.ArrayDeque;
+import java.util.function.LongSupplier;
 
 /**
  * Sliding-window rate limiter for named query execution.
@@ -17,6 +18,15 @@ public class NamedQueryRateLimiter {
     private static final long WINDOW_MS = 60_000L;
 
     private final Map<String, Deque<Long>> windows = new ConcurrentHashMap<>();
+    private final LongSupplier clock;
+
+    public NamedQueryRateLimiter() {
+        this(System::currentTimeMillis);
+    }
+
+    NamedQueryRateLimiter(LongSupplier clock) {
+        this.clock = clock;
+    }
 
     /**
      * Try to acquire a permit for the given key.
@@ -32,22 +42,15 @@ public class NamedQueryRateLimiter {
         }
 
         String key = tenantId + ":" + queryCode;
-        long now = System.currentTimeMillis();
-        long cutoff = now - WINDOW_MS;
-
-        Deque<Long> timestamps = windows.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
-
-        // Evict expired entries
-        while (!timestamps.isEmpty() && timestamps.peekFirst() < cutoff) {
-            timestamps.pollFirst();
+        Deque<Long> timestamps = windows.computeIfAbsent(key, k -> new ArrayDeque<>());
+        // Admission and recording are atomic for this tenant/query window.
+        synchronized (timestamps) {
+            long now = clock.getAsLong();
+            evictExpired(timestamps, now);
+            if (timestamps.size() >= maxPerMinute) return false;
+            timestamps.addLast(now);
+            return true;
         }
-
-        if (timestamps.size() >= maxPerMinute) {
-            return false;
-        }
-
-        timestamps.addLast(now);
-        return true;
     }
 
     /**
@@ -58,10 +61,14 @@ public class NamedQueryRateLimiter {
         Deque<Long> timestamps = windows.get(key);
         if (timestamps == null) return 0;
 
-        long cutoff = System.currentTimeMillis() - WINDOW_MS;
-        while (!timestamps.isEmpty() && timestamps.peekFirst() < cutoff) {
-            timestamps.pollFirst();
+        synchronized (timestamps) {
+            evictExpired(timestamps, clock.getAsLong());
+            return timestamps.size();
         }
-        return timestamps.size();
+    }
+
+    private void evictExpired(Deque<Long> timestamps, long now) {
+        long cutoff = now - WINDOW_MS;
+        while (!timestamps.isEmpty() && timestamps.peekFirst() < cutoff) timestamps.pollFirst();
     }
 }

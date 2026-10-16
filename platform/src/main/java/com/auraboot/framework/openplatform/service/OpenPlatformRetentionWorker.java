@@ -35,7 +35,7 @@ public class OpenPlatformRetentionWorker {
                 "DELETE FROM ab_open_api_rate_window WHERE window_start < ?",
                 Timestamp.from(now.minus(Duration.ofDays(2))));
         int tokens = jdbcTemplate.update(
-                "DELETE FROM ab_application_access_token WHERE expires_at < ?",
+                "DELETE FROM ab_application_access_token WHERE LEAST(expires_at, accept_until, revoked_at) < ?",
                 Timestamp.from(now.minus(Duration.ofDays(7))));
         int idempotency = jdbcTemplate.update(
                 "DELETE FROM ab_open_api_idempotency WHERE expires_at < ?",

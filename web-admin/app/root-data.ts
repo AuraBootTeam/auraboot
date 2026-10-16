@@ -7,6 +7,7 @@ import type { AccessPolicy } from '~/services/accessPolicy';
 import type { ImpersonationSessionInfo } from '~/shared/services/session';
 
 export interface RootLoaderData {
+  traceparent?: string;
   runtimeProfile: RuntimeProfile;
   user: any;
   permissions: any;

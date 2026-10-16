@@ -82,7 +82,12 @@
     "output_description": "Returns milestone with status REACHED.",
     "example_input": {},
     "idempotent": false,
-    "reversible": false
+    "reversible": false,
+    "autoSetFields": {
+      "tpm_ms_reached_at": {
+        "strategy": "current_datetime"
+      }
+    }
   },
   {
     "code": "tpm:miss_milestone",

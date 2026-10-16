@@ -19,6 +19,7 @@ import type {
   ValidationError,
 } from '../types';
 import { dashboardService } from '../services/dashboardService';
+import { parseDashboardDocument } from '../utils/dashboardDocument';
 import { aggregateModelField, hasAggregateModel } from '~/framework/smart/utils/aggregateModel';
 
 /**
@@ -70,6 +71,7 @@ interface DashboardStore {
   // Actions - Dashboard
   loadDashboard: (pid: string) => Promise<void>;
   createDashboard: (title: string, scope?: DashboardScope) => void;
+  importDocument: (text: string) => void;
   updateDashboardMeta: (meta: {
     title?: string;
     description?: string;
@@ -212,6 +214,21 @@ export const useDashboardStore = create<DashboardStore>()(
           state.isDirty = true;
           state.selectedWidgetId = null;
           state.history = [[]];
+          state.historyIndex = 0;
+        });
+      },
+
+      importDocument: (text: string) => {
+        const { dashboard: draft } = parseDashboardDocument(text);
+        set((state) => {
+          state.dashboard = { ...draft, scope: 'personal', status: 'draft' };
+          state.widgets = draft.widgets;
+          state.layoutConfig = draft.layoutConfig;
+          state.selectedWidgetId = null;
+          state.isDirty = true;
+          state.mutationGeneration += 1;
+          state.validationResult = null;
+          state.history = [JSON.parse(JSON.stringify(draft.widgets))];
           state.historyIndex = 0;
         });
       },
@@ -403,8 +420,20 @@ export const useDashboardStore = create<DashboardStore>()(
       // ==================== Layout Actions ====================
 
       updateLayout: (widgets: Widget[]) => {
+        const positions = new Map(widgets.map((widget) => [widget.id, widget]));
+        const changed = get().widgets.some((widget) => {
+          const next = positions.get(widget.id);
+          return next && (widget.x !== next.x || widget.y !== next.y || widget.w !== next.w || widget.h !== next.h);
+        });
+        // GridLayout also emits on mount. An unchanged layout is not an edit
+        // and must not disable publishing immediately after a successful save.
+        if (!changed) return;
         set((state) => {
-          state.widgets = widgets;
+          state.widgets = state.widgets.map((widget) => {
+            const next = positions.get(widget.id);
+            // A delayed layout callback only owns geometry, never newer config.
+            return next ? { ...widget, x: next.x, y: next.y, w: next.w, h: next.h } : widget;
+          });
           state.isDirty = true;
           state.mutationGeneration += 1;
 

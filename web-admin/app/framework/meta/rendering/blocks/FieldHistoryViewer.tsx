@@ -25,6 +25,9 @@ interface FieldChangeLog {
 }
 
 export interface FieldHistoryViewerProps {
+  compact?: boolean;
+  units?: Record<string, string>;
+  fields?: string[];
   modelCode: string;
   recordPid: string; // public record PID
   token?: string;
@@ -37,6 +40,9 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   recordPid,
   token,
   locale = 'zh-CN',
+  compact = false,
+  units,
+  fields,
 }) => {
   const [changes, setChanges] = useState<FieldChangeLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +104,8 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
     );
   }
 
-  if (changes.length === 0) {
+  const visibleChanges = changes.filter(change => (!fields || fields.includes(change.fieldCode)) && (!compact || change.changeType.toLowerCase() === 'modified'));
+  if (visibleChanges.length === 0) {
     return (
       <div className="text-text-3 py-12 text-center text-sm" data-testid="field-history-empty">
         {locale === 'zh-CN' ? '暂无变更记录' : 'No change history'}
@@ -107,18 +114,18 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   }
 
   // Group changes by changedAt timestamp (same second = same batch)
-  const groups = groupByTimestamp(changes);
+  const groups = groupByTimestamp(visibleChanges).slice(0, compact ? 4 : undefined);
 
   return (
     <div className="relative" data-testid="field-history">
       {/* Timeline line */}
-      <div className="absolute top-0 bottom-0 left-4 w-px bg-border" />
+      <div className={compact ? 'absolute top-0 bottom-0 left-1 w-px bg-border' : 'absolute top-0 bottom-0 left-4 w-px bg-border'} />
 
-      <div className="space-y-6 pl-10">
+      <div className={compact ? 'space-y-4 pl-5' : 'space-y-6 pl-10'}>
         {groups.map((group, gi) => (
           <div key={gi} className="relative" data-testid={`field-history-group-${gi}`}>
             {/* Timeline dot */}
-            <div className="rounded-pill border-accent bg-panel absolute top-1 -left-10 h-3 w-3 border-2" />
+            <div className={compact ? 'rounded-pill bg-border-strong absolute top-1 -left-5 h-2 w-2' : 'rounded-pill border-accent bg-panel absolute top-1 -left-10 h-3 w-3 border-2'} />
 
             {/* Header: actor + time */}
             <div className="text-text-2 mb-2 flex items-center gap-2 text-xs">
@@ -133,11 +140,11 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
               {group.entries.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-start gap-3 px-3 py-2 text-sm"
+                  className={compact ? 'flex items-start gap-2 px-2 py-2 text-xs' : 'flex items-start gap-3 px-3 py-2 text-sm'}
                   data-testid={`field-history-entry-${entry.id}`}
                   data-field-code={entry.fieldCode}
                 >
-                  <ChangeTypeBadge type={entry.changeType} locale={locale} />
+                  {!compact && <ChangeTypeBadge type={entry.changeType} locale={locale} />}
                   <div className="min-w-0 flex-1">
                     <span className="text-text-2 font-medium">
                       {entry.fieldLabel || entry.fieldCode}
@@ -148,14 +155,14 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                           className="text-status-green max-w-[200px] truncate"
                           title={entry.newValue || ''}
                         >
-                          {entry.newValue || '—'}
+                          {entry.newValue == null ? '—' : `${entry.newValue}${units?.[entry.fieldCode] || ''}`}
                         </span>
                       ) : entry.changeType.toLowerCase() === 'removed' ? (
                         <span
                           className="text-status-red max-w-[200px] truncate line-through"
                           title={entry.oldValue || ''}
                         >
-                          {entry.oldValue || '—'}
+                          {entry.oldValue == null ? '—' : `${entry.oldValue}${units?.[entry.fieldCode] || ''}`}
                         </span>
                       ) : (
                         <>
@@ -163,7 +170,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                             className="text-status-red max-w-[140px] truncate line-through"
                             title={entry.oldValue || ''}
                           >
-                            {entry.oldValue || '—'}
+                            {entry.oldValue == null ? '—' : `${entry.oldValue}${units?.[entry.fieldCode] || ''}`}
                           </span>
                           <svg
                             className="text-text-3 h-3 w-3 flex-shrink-0"
@@ -178,7 +185,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                             className="text-status-green max-w-[140px] truncate"
                             title={entry.newValue || ''}
                           >
-                            {entry.newValue || '—'}
+                            {entry.newValue == null ? '—' : `${entry.newValue}${units?.[entry.fieldCode] || ''}`}
                           </span>
                         </>
                       )}

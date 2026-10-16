@@ -62,7 +62,7 @@ class CommandSideEffectBatchTest {
 
     @BeforeEach
     void setUp() {
-        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
+        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper, org.mockito.Mockito.mock(CommandModelMutationSupport.class));
     }
 
     @AfterEach
@@ -901,7 +901,7 @@ class CommandSideEffectBatchTest {
             // Physical schema fallback returns empty (model metadata is the source of truth here)
             when(dynamicDataMapper.findJsonbColumns("mt_target_model")).thenReturn(Set.of());
             when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of());
-            when(dynamicDataMapper.updateWithJsonb(anyString(), anyMap(), anyMap(), anySet())).thenReturn(1);
+            when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
 
             Map<String, Object> currentRecord = Map.of("related_id", "pid-001");
             Map<String, Object> fieldMapping = Map.of(
@@ -916,12 +916,15 @@ class CommandSideEffectBatchTest {
             Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
 
             // Act
-            executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID,
-                    null, null, null);
+            MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
+            MetaContext.runWithCommandPermitScope("ALL", () -> executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID,
+                    null, null, null));
 
             // Assert: must call updateWithJsonb, NOT plain update
-            verify(dynamicDataMapper).updateWithJsonb(
-                    eq("mt_target_model"), anyMap(), anyMap(), eq(Set.of("config")));
+            var sql = ArgumentCaptor.forClass(String.class);
+            verify(dynamicDataMapper).updateByQuery(sql.capture(), anyMap());
+            assertTrue(sql.getValue().contains("::jsonb"));
+            assertTrue(sql.getValue().contains("row_version = row_version + 1"));
             verify(dynamicDataMapper, never()).update(eq("mt_target_model"), anyMap(), anyMap());
         }
 
@@ -939,7 +942,7 @@ class CommandSideEffectBatchTest {
             when(metaModelService.getTableName("target_model")).thenReturn("mt_target_model");
             when(dynamicDataMapper.findJsonbColumns("mt_target_model")).thenReturn(Set.of());
             when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of());
-            when(dynamicDataMapper.update(anyString(), anyMap(), anyMap())).thenReturn(1);
+            when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
 
             Map<String, Object> currentRecord = Map.of("related_id", "pid-001");
             Map<String, Object> effect = Map.of(
@@ -950,10 +953,14 @@ class CommandSideEffectBatchTest {
             );
             Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
 
-            executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID,
-                    null, null, null);
+            MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
+            MetaContext.runWithCommandPermitScope("ALL", () -> executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID,
+                    null, null, null));
 
-            verify(dynamicDataMapper).update(eq("mt_target_model"), anyMap(), anyMap());
+            var sql = ArgumentCaptor.forClass(String.class);
+            verify(dynamicDataMapper).updateByQuery(sql.capture(), anyMap());
+            assertFalse(sql.getValue().contains("::jsonb"));
+            assertTrue(sql.getValue().contains("row_version = row_version + 1"));
             verify(dynamicDataMapper, never()).updateWithJsonb(anyString(), anyMap(), anyMap(), anySet());
         }
 
@@ -988,11 +995,12 @@ class CommandSideEffectBatchTest {
         @DisplayName("BATCH_UPDATE_RECORD routes to updateWithJsonb when model has jsonb column")
         void batchUpdateRecord_routesToUpdateWithJsonb_whenModelHasJsonbColumn() {
             ModelDefinition modelDef = modelWithJsonbColumn("parser_config");
+            modelDef.setCode("site_profile"); modelDef.setTableName("mt_site_profile");
             when(metaModelService.getModelDefinition("site_profile"))
                     .thenReturn(Optional.of(modelDef));
             when(metaModelService.getTableName("site_profile")).thenReturn("mt_site_profile");
             when(dynamicDataMapper.findJsonbColumns("mt_site_profile")).thenReturn(Set.of());
-            when(dynamicDataMapper.updateWithJsonb(anyString(), anyMap(), anyMap(), anySet())).thenReturn(1);
+            when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
 
             List<Map<String, Object>> items = List.of(
                     Map.of("site_pid", "s-001", "parser_config", Map.of("type", "css")),
@@ -1009,11 +1017,17 @@ class CommandSideEffectBatchTest {
             );
             Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
 
-            executor.executeSideEffectPhase(execConfig, payload, TENANT_ID, USER_ID,
-                    null, null, null);
+            MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
+            MetaContext.runWithCommandPermitScope("ALL", () -> executor.executeSideEffectPhase(execConfig, payload, TENANT_ID, USER_ID,
+                    null, null, null));
 
-            verify(dynamicDataMapper, times(2)).updateWithJsonb(
-                    eq("mt_site_profile"), anyMap(), anyMap(), eq(Set.of("parser_config")));
+            var sql = ArgumentCaptor.forClass(String.class);
+            verify(dynamicDataMapper, times(2)).updateByQuery(sql.capture(), anyMap());
+            for (String statement : sql.getAllValues()) {
+                assertTrue(statement.contains("UPDATE mt_site_profile SET"));
+                assertTrue(statement.contains("::jsonb"));
+                assertTrue(statement.contains("row_version = row_version + 1"));
+            }
             verify(dynamicDataMapper, never()).update(eq("mt_site_profile"), anyMap(), anyMap());
         }
 
@@ -1029,7 +1043,7 @@ class CommandSideEffectBatchTest {
             when(dynamicDataMapper.findJsonbColumns("mt_target_model")).thenReturn(Set.of());
             when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))
                     .thenReturn(List.of(Map.of("status", "OLD")));
-            when(dataPermissionEngine.buildRowFilter(TENANT_ID, "target_model", USER_ID))
+            when(dataPermissionEngine.buildRowFilter(TENANT_ID, "target_model", "update", USER_ID))
                     .thenReturn("AND owner_id = 100");
             when(dataDomainService.buildDomainFilter("target_model", USER_ID))
                     .thenReturn("AND domain_id = 7");
@@ -1111,7 +1125,7 @@ class CommandSideEffectBatchTest {
                 documentFlowService,
                 objectMapper,
                 dataPermissionEngine,
-                dataDomainService);
+                dataDomainService, org.mockito.Mockito.mock(CommandModelMutationSupport.class));
     }
 
     private void withScopedUser() {

@@ -7,6 +7,7 @@ import com.auraboot.framework.currency.dto.*;
 import com.auraboot.framework.currency.service.CurrencyService;
 import com.auraboot.framework.currency.service.TimezoneService;
 import com.auraboot.framework.currency.service.impl.EcbRateFetcher;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.tenant.service.TenantPreferenceService;
 import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -30,6 +31,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/admin/exchange-rates")
 @RequiredArgsConstructor
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; manages tenant exchange rates, base currency, conversion, and ECB sync")
 public class ExchangeRateController {
 
     private final CurrencyService currencyService;

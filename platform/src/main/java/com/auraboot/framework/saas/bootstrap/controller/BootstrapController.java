@@ -2,6 +2,7 @@ package com.auraboot.framework.saas.bootstrap.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.application.bootstrap.PlatformSeedService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.saas.bootstrap.BootstrapEngineService;
 import com.auraboot.framework.saas.bootstrap.constant.BootstrapMissingPart;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
@@ -29,6 +30,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/bootstrap")
 @RequiredArgsConstructor
+@AuthenticatedAccess("first-run system initialization; whitelisted by design because no user exists before bootstrap, and /setup is rejected once the system is initialized")
 public class BootstrapController {
 
     static final String ERR_ALREADY_INITIALIZED = "System is already initialized";

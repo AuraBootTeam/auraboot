@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 
@@ -34,6 +35,7 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/user-soul-profiles")
+@AuthenticatedAccess("admin surface guarded by the /api/admin/** AdminRoleInterceptor; metadata-only tenant-scoped reads are audit-logged and the forget mutation carries method-level @RequirePermission(ACP_PROFILE_ADMIN)")
 public class UserSoulProfileAdminController {
 
     public static final String BASE_PATH = "/api/admin/user-soul-profiles";

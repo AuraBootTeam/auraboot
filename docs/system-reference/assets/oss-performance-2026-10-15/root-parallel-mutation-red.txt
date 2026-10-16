@@ -1,0 +1,44 @@
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+
+ RUN  v4.1.11 $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin
+
+ × app/__tests__/root-loader-auth.test.ts > root loader authentication guard > starts independent shell reads before bootstrap finishes 215ms 63 MB heap used
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > redirects anonymous private routes even when route middleware is bypassed
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > does not destroy an authenticated session when user resolution is temporarily unavailable
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > destroys an authenticated session only after an authoritative auth rejection
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps anonymous public routes available without user or menu fetches
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > injects ICP settings from the BFF runtime environment
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > loads commercial branding through the BFF-only runtime boundary
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > fails closed when commercial branding cannot be resolved by the BFF
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > refreshes published branding on a public-route cache hit without mutating the cached locale bundle
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > always emits a stable product title when ICP mode is disabled
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps commercial branding in the title when ICP records are enabled
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > declares browser identity links from the resolved branding contract
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps storefront runtime public even when an admin token exists
+ ↓ app/__tests__/root-loader-auth.test.ts > root loader authentication guard > keeps checkout runtime public and isolated from admin menus
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  app/__tests__/root-loader-auth.test.ts > root loader authentication guard > starts independent shell reads before bootstrap finishes
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ app/__tests__/root-loader-auth.test.ts:135:39
+    133|     await vi.waitFor(() => expect(mocks.fetchBootstrapStatus).toHaveBe…
+    134|     try {
+    135|       expect(mocks.fetchAccessPolicy).toHaveBeenCalledTimes(1);
+       |                                       ^
+    136|     } finally {
+    137|       release(null);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  18:22:13
+   Duration  858ms (transform 113ms, setup 114ms, import 13ms, tests 216ms, environment 443ms)
+
+JSON report written to $WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin/test-results/results.json
+undefined
+$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/web-admin:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run app/__tests__/root-loader-auth.test.ts -t starts independent shell reads

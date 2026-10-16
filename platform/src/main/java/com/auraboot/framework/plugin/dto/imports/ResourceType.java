@@ -21,7 +21,9 @@ public enum ResourceType {
     DICT_ITEM("ab_dict_item", "字典项", OwnershipType.USER_CLAIMED),
     SAVED_VIEW("ab_saved_view", "保存视图", OwnershipType.SHARED),
     NOTIFICATION_TEMPLATE("ab_notification_template", "通知模板", OwnershipType.SHARED),
-    I18N("ab_i18n_resource", "国际化资源", OwnershipType.SHARED);
+    I18N("ab_i18n_resource", "国际化资源", OwnershipType.SHARED),
+    PUBLIC_RESOURCE("ab_open_api_publication", "公共资源", OwnershipType.SHARED),
+    PUBLIC_QUERY("ab_open_api_publication", "公共查询", OwnershipType.SHARED);
 
     private final String tableName;
     private final String displayName;
@@ -61,7 +63,13 @@ public enum ResourceType {
             case SAVED_VIEW -> 82;
             case NOTIFICATION_TEMPLATE -> 85;
             case I18N -> 95;
+            case PUBLIC_RESOURCE -> 110;
+            case PUBLIC_QUERY -> 120;
         };
+    }
+
+    public boolean isPublicPublication() {
+        return this == PUBLIC_RESOURCE || this == PUBLIC_QUERY;
     }
 
     public static ResourceType fromCode(String code) {

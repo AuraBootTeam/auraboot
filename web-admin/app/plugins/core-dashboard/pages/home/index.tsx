@@ -4,10 +4,11 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router';
+import { Link, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
-import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
+import { fetchResult } from '~/shared/services/http-client';
+import { dashboardService, normalizeDashboard } from '~/plugins/core-dashboard/services/dashboardService';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { get } from '~/shared/services/http-client';
@@ -15,13 +16,22 @@ import { listInboxItems } from '~/shared/services/inboxService';
 import { fetchRecentVisits } from '~/plugins/core-dashboard/widgets/workbench/useRecentVisits';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  const result = await fetchResult<Dashboard>('/api/dashboards/workbench', {}, request);
+  return result.code === '0' && result.data
+    ? { dashboard: normalizeDashboard(result.data), loadError: null }
+    : { dashboard: null, loadError: result.message || 'Unable to load workbench' };
+}
+
 export default function WorkbenchPage() {
+  const initialData = useLoaderData<typeof loader>();
   const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [retryDashboard, setDashboard] = useState<Dashboard | null | undefined>(undefined);
+  const dashboard = retryDashboard === undefined ? initialData.dashboard : retryDashboard;
+  const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialData.loadError);
   const [todayLabel, setTodayLabel] = useState('');
 
   // The browser's calendar day may differ from the SSR host's. Both initial
@@ -46,9 +56,6 @@ export default function WorkbenchPage() {
     }
   }, []);
 
-  useEffect(() => {
-    loadWorkbench();
-  }, [loadWorkbench]);
 
   // Workbench snapshot export: multi-sheet XLSX with the widget inventory plus
   // the same live data the widgets render (stats, inbox, recent visits). Client

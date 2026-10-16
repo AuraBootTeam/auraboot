@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { FieldAdapter } from '~/ui/field-adapter';
-import { fetchDictOptions, fetchFieldOptions } from '~/shared/services/resourceSelectService';
+import { fetchDictOptions, fetchFieldOptions, fetchFieldDictOptions } from '~/shared/services/resourceSelectService';
 import { useFlowStore } from '~/plugins/core-designer/components/flow-designer-sdk/store';
 import type { ResourceOption } from '~/ui/base-fields/BaseResourceSelect';
 import { useSmartText } from '~/utils/i18n';
@@ -22,7 +22,7 @@ export interface DependentMultiSelectProps {
   dependsOnKey?: string;
   /** Source of options: 'fields' fetches model fields, 'dict' fetches dict items */
   optionSource?: 'fields' | 'dict';
-  /** Required when optionSource === 'dict' */
+  /** Optional explicit dictionary; otherwise resolve the selected model field's dictionary. */
   dictCode?: string;
 }
 
@@ -39,6 +39,10 @@ export function DependentMultiSelect({
   const node = nodes.find((n) => n.id === selectedNodeId);
   const parentValue = (node?.data.config?.[dependsOnKey] as string) || '';
 
+  const modelCode = (node?.data.config?.modelCode as string) || '';
+  const dependencyKey = optionSource === 'dict' && !dictCode ? `${modelCode}\0${parentValue}` : parentValue;
+  const requestGeneration = useRef(0);
+
   const st = useSmartText();
   // Stable ref so doFetch callback does not need st as a dependency
   const stRef = useRef(st);
@@ -51,25 +55,28 @@ export function DependentMultiSelect({
   const [isOpen, setIsOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const prevParentRef = useRef(parentValue);
+  const prevParentRef = useRef(dependencyKey);
 
   const selectedValues = Array.isArray(adapter.value) ? (adapter.value as string[]) : [];
 
   // Clear selection when parent value changes
   useEffect(() => {
-    if (prevParentRef.current && prevParentRef.current !== parentValue) {
+    if (prevParentRef.current && prevParentRef.current !== dependencyKey) {
       adapter.setValue([] as any);
       setOptions([]);
       setLoadError(null);
     }
-    prevParentRef.current = parentValue;
-  }, [parentValue, adapter]);
+    prevParentRef.current = dependencyKey;
+  }, [dependencyKey, adapter]);
 
   // Fetch options when parentValue changes
   const doFetch = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    setOptions([]);
     if (!parentValue) {
       setOptions([]);
       setLoadError(null);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -77,22 +84,26 @@ export function DependentMultiSelect({
     try {
       let fetched: ResourceOption[] = [];
       if (optionSource === 'dict') {
-        const code = dictCode || parentValue;
-        fetched = await fetchDictOptions(code);
+        fetched = dictCode
+          ? await fetchDictOptions(dictCode)
+          : await fetchFieldDictOptions(modelCode, parentValue);
       } else {
         fetched = await fetchFieldOptions(parentValue);
       }
-      setOptions(fetched);
+      if (generation === requestGeneration.current) setOptions(fetched);
     } catch (err) {
       console.error('[DependentMultiSelect] failed to load options', err);
-      setLoadError(stRef.current('$i18n:common.options_load_failed', 'Failed to load options'));
+      if (generation === requestGeneration.current) {
+        setLoadError(stRef.current('$i18n:common.options_load_failed', 'Failed to load options'));
+      }
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [parentValue, optionSource, dictCode]);
+  }, [parentValue, modelCode, optionSource, dictCode]);
 
   useEffect(() => {
     doFetch();
+    return () => { requestGeneration.current += 1; };
   }, [doFetch]);
 
   // Close dropdown on outside click

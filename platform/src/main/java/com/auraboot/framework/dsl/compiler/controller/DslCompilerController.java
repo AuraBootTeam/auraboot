@@ -4,6 +4,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.dsl.compiler.DslCompilerRegistry;
 import com.auraboot.framework.dsl.compiler.model.CompiledPlan;
 import com.auraboot.framework.dsl.compiler.model.DslDefinition;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/dsl/compile")
 @RequiredArgsConstructor
+@AuthenticatedAccess("stateless compilation utility over caller-supplied DSL payloads; compilation reads and writes no tenant data (cache stats/clear are operational endpoints)")
 public class DslCompilerController {
 
     private final DslCompilerRegistry registry;

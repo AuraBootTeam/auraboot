@@ -60,3 +60,43 @@ describe('canonical report persistence', () => {
     },
   );
 });
+
+describe('report text artifacts', () => {
+  it.each(['markdown', 'html'] as const)(
+    'exports %s with current parameters and a unique receipt',
+    async (format) => {
+      const fetchMock = vi
+        .fn()
+        .mockImplementation(async () => new Response('artifact', { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+      const exporter =
+        format === 'markdown'
+          ? reportDesignerService.exportMarkdown
+          : reportDesignerService.exportHtml;
+      await exporter('public-report-pid', { region: 'east' });
+      await exporter('public-report-pid', { region: 'east' });
+      const first = JSON.parse(fetchMock.mock.calls[0][1].body);
+      const second = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(fetchMock.mock.calls[0][0]).toBe(`/api/reports/export/${format}`);
+      expect(first).toEqual({
+        reportPid: 'public-report-pid',
+        parameters: { region: 'east' },
+        usageId: expect.any(String),
+      });
+      expect(first.usageId).not.toBe(second.usageId);
+    },
+  );
+  it.each(['markdown', 'html'] as const)('rejects permission denial for %s', async (format) => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ message: 'Denied' }), { status: 403 })),
+    );
+    const exporter =
+      format === 'markdown'
+        ? reportDesignerService.exportMarkdown
+        : reportDesignerService.exportHtml;
+    await expect(exporter('report-pid')).rejects.toThrow('Denied');
+  });
+});

@@ -4,6 +4,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.notification.dto.NotificationTemplateCreateRequest;
 import com.auraboot.framework.notification.entity.NotificationTemplate;
 import com.auraboot.framework.notification.service.NotificationTemplateService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/notification-templates")
 @RequiredArgsConstructor
+@AuthenticatedAccess("template listing and render preview are read-only operations for any authenticated user")
 public class NotificationTemplateController {
 
     private final NotificationTemplateService templateService;

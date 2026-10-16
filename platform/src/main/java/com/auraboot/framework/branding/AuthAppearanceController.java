@@ -1,6 +1,7 @@
 package com.auraboot.framework.branding;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
+@AuthenticatedAccess("public login-page branding reads (published appearance and asset files) by design; admin draft, publish and rollback mutations carry method-level @RequirePlatformAdmin")
 public class AuthAppearanceController {
     private final AuthAppearanceService service;
     private final AuthAppearanceAssetService assetService;

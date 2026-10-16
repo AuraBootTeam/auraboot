@@ -27,7 +27,7 @@ class OpenPlatformBearerAuthenticatorTest {
     private final OpenPlatformBearerAuthenticator authenticator = new OpenPlatformBearerAuthenticator(
             mock(OpenApiCallAuditMapper.class), rateLimitMapper,
             new OpenApiCapabilityRegistry(List.of()),
-            codec, new ObjectMapper());
+            codec, new ObjectMapper(), mock(com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper.class));
 
     @Test
     void derivesTenantFromTokenAndIgnoresSpoofedTenantHeader() {

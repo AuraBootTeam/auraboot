@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FormulaEditor } from '~/framework/smart/components/formula/FormulaEditor';
 import { useDslRegistry } from '~/contexts/DslRegistryContext';
+import { useSmartText } from '~/utils/i18n';
 
 interface FieldCreationFormProps {
   modelPid: string;
@@ -17,6 +18,7 @@ interface FieldCreationFormProps {
 export interface FieldCreationFormData {
   code: string;
   dataType: string;
+  uiSchema: { label: string };
   feature?: {
     required?: boolean;
     unique?: boolean;
@@ -51,6 +53,7 @@ export function FieldCreationForm({
   onChange,
 }: FieldCreationFormProps) {
   const { ensureLoaded, getEnumOptions } = useDslRegistry();
+  const text = useSmartText();
   useEffect(() => {
     ensureLoaded();
   }, [ensureLoaded]);
@@ -60,6 +63,7 @@ export function FieldCreationForm({
   const [formData, setFormData] = useState<FieldCreationFormData>({
     code: '',
     dataType: 'string',
+    uiSchema: { label: '' },
     feature: {
       required: false,
       unique: false,
@@ -85,6 +89,10 @@ export function FieldCreationForm({
       newErrors.code = '字段编码不能为空';
     }
 
+    if (!formData.uiSchema.label.trim()) {
+      newErrors.label = text({ zh: '请输入业务显示名称', en: 'Enter a business display name' });
+    }
+
     // Validate data type
     if (!formData.dataType) {
       newErrors.dataType = '数据类型不能为空';
@@ -101,9 +109,12 @@ export function FieldCreationForm({
     onValidationChange?.(isValid);
 
     if (isValid) {
-      onChange?.(formData);
+      onChange?.({
+        ...formData,
+        uiSchema: { ...formData.uiSchema, label: formData.uiSchema.label.trim() },
+      });
     }
-  }, [formData, onValidationChange, onChange]);
+  }, [formData, onValidationChange, onChange, text]);
 
   const handleChange = (field: keyof FieldCreationFormData, value: any) => {
     setFormData((prev) => ({
@@ -127,6 +138,40 @@ export function FieldCreationForm({
 
   return (
     <div className="space-y-4">
+      <div>
+        <label
+          htmlFor="new-field-display-name"
+          className="text-text-2 mb-1 block text-sm font-medium"
+        >
+          {text({ zh: '业务显示名称', en: 'Business display name' })}{' '}
+          <span className="text-status-red">*</span>
+        </label>
+        <input
+          id="new-field-display-name"
+          data-testid="field-create-display-name"
+          type="text"
+          value={formData.uiSchema.label}
+          onChange={(event) => handleChange('uiSchema', { label: event.target.value })}
+          placeholder={text({
+            zh: '例如：客户名称、商机金额',
+            en: 'For example: Customer name, Opportunity amount',
+          })}
+          aria-invalid={Boolean(errors.label)}
+          aria-describedby="new-field-display-name-help"
+          className="rounded-control border-border-strong w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <p id="new-field-display-name-help" className="text-text-2 mt-1 text-xs">
+          {text({
+            zh: '用于业务表单和列表的字段标签；字段编码用于配置和集成。',
+            en: 'Used as the field label in business forms and lists; the code is for configuration and integrations.',
+          })}
+        </p>
+        {errors.label && (
+          <p role="alert" className="text-status-red mt-1 text-sm">
+            {errors.label}
+          </p>
+        )}
+      </div>
       {/* Field Code */}
       <div>
         <label className="text-text-2 mb-1 block text-sm font-medium">

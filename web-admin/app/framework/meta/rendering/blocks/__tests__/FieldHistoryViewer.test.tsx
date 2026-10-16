@@ -28,6 +28,16 @@ describe('field history API contract and business feedback', () => {
     expect(history).toHaveTextContent('仓库管理员');
     expect(history).not.toHaveTextContent('inv:update_lot');
   });
+  it('keeps compact history scoped to declared business fields', async () => {
+    request.mockResolvedValue({ code: '0', desc: 'OK', data: [
+      { id: 1, fieldCode: 'progress', fieldLabel: 'Progress', oldValue: '60', newValue: '68', changeType: 'modified', actorName: 'Alex', changedAt: '2026-10-14T09:00:00Z' },
+      { id: 2, fieldCode: 'owner_id', fieldLabel: 'Internal owner', oldValue: 'PRIVATE', newValue: 'SECRET', changeType: 'modified', actorName: 'Alex', changedAt: '2026-10-14T09:00:00Z' },
+    ] });
+    render(<FieldHistoryViewer modelCode="orders" recordPid={pid} fields={['progress']} compact locale="en" />);
+    expect(await screen.findByTestId('field-history')).toHaveTextContent('60');
+    expect(screen.getByTestId('field-history')).toHaveTextContent('68');
+    expect(screen.getByTestId('field-history')).not.toHaveTextContent('SECRET');
+  });
   it('does not present a business failure as empty audit history', async () => {
     request.mockResolvedValue({ code: '35000', desc: 'Business error', data: null });
     render(<FieldHistoryViewer modelCode="inv_lot" recordPid={pid} />);

@@ -46,4 +46,7 @@ public interface WebhookService {
      * delivery is missing or not in a replayable state.
      */
     boolean replayDelivery(String deliveryPid);
+
+    /** Replay only a delivery belonging to the named subscription in the current tenant. */
+    boolean replayDelivery(String subscriptionPid, String deliveryPid);
 }

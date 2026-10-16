@@ -319,6 +319,18 @@ public class AgentChatPortImpl implements AgentChatPort {
             return new TurnOutcome.Failed(msg, null);
         }
         AgentProfile profile = agentProfileResolver.resolve(objectMapper, agentDef);
+        if (overrides != null && overrides.readOnlyExecution()) {
+            var policy = profile.contextPolicy();
+            var ceiling = policy.capabilityCeiling() == com.auraboot.framework.agent.runtime.policy.ToolCapabilityCeiling.NO_TOOLS
+                    ? policy.capabilityCeiling() : com.auraboot.framework.agent.runtime.policy.ToolCapabilityCeiling.READ_ONLY;
+            var exposure = policy.toolExposure() == com.auraboot.framework.agent.runtime.policy.ToolExposure.ANSWER_ONLY
+                    ? policy.toolExposure() : com.auraboot.framework.agent.runtime.policy.ToolExposure.READ_ONLY_CATALOG;
+            profile = new AgentProfile(profile.agentCode(), profile.profilePermissions(),
+                    new com.auraboot.framework.agent.runtime.policy.AgentContextPolicy(policy.scopes(), false,
+                            ceiling, exposure, com.auraboot.framework.agent.runtime.policy.DurabilityPreference.NONE),
+                    profile.evidenceFirst());
+            recordOverrideUsage("readOnlyExecution");
+        }
 
         // Resolve provider + model from agent definition
         String providerCode = LlmRuntimeResolver.resolveAgentProviderCode(objectMapper, providerFactory, agentDef);
@@ -392,6 +404,21 @@ public class AgentChatPortImpl implements AgentChatPort {
         // to extraTools (caller knows conversation-scope semantics).
         toolDefs = mergeExtraTools(toolDefs, extraToolsForMerge);
         toolDefs = toLlmFacingToolDefinitions(toolDefs);
+        Set<String> scopedQueryAllowlist = null;
+        if (overrides != null && overrides.scopedModelQueryOnly()) {
+            scopedQueryAllowlist = new LinkedHashSet<>();
+            for (ToolDefinition definition : toolDefs) {
+                if (isScopedModelQuery(definition)) {
+                    Set<String> required = new LinkedHashSet<>(definition.getRequiredPermissions() == null
+                            ? Set.of() : definition.getRequiredPermissions());
+                    required.add("model." + definition.getModelCode() + ".read");
+                    definition.setRequiredPermissions(Set.copyOf(required));
+                    scopedQueryAllowlist.add(definition.getToolCode());
+                }
+            }
+            scopedQueryAllowlist = Set.copyOf(scopedQueryAllowlist);
+            recordOverrideUsage("scopedModelQueryOnly");
+        }
         List<LlmChatRequest.Tool> tools = toLlmTools(toolDefs);
 
         // Build conversation: prefer the persisted multi-turn tape (so any prior
@@ -425,7 +452,7 @@ public class AgentChatPortImpl implements AgentChatPort {
             recordOverrideUsage("effectivePermissions");
         }
         Set<String> effectivePermissions = overridePermissions != null
-                ? overridePermissions
+                ? restrictOverrideToProfile(overridePermissions, profile.profilePermissions())
                 : resolveProfileEffectivePermissions(
                         ctx,
                         profile.profilePermissions(),
@@ -445,7 +472,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         // Run the tool loop
         return doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
                 systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink,
-                effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks);
+                effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks, scopedQueryAllowlist);
     }
 
     // =========================================================================
@@ -579,7 +606,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         AgentProfile profile,
                                         boolean persistTape,
                                         boolean requireInitialToolCall,
-                                        List<AgentContextBlock> contextBlocks) {
+                                        List<AgentContextBlock> contextBlocks, Set<String> scopedQueryAllowlist) {
         return chatTurnRuntime.runToolLoop(
                 new ChatTurnRuntime.ChatToolLoopSpec(
                         ctx,
@@ -605,7 +632,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                         AgentChatTurnOutcomeAdapter.HANDOFF_TOOL_NAME,
                         null,
                         objectMapper),
-                toolRuntimeAdapterFactory.callbacks(this, contextBlocks));
+                toolRuntimeAdapterFactory.callbacks(this, contextBlocks, scopedQueryAllowlist));
     }
 
     boolean defersPolicyUntilToolResult(ToolDefinition definition) {
@@ -743,6 +770,22 @@ public class AgentChatPortImpl implements AgentChatPort {
         return merged;
     }
 
+    private boolean isScopedModelQuery(ToolDefinition definition) {
+        if (definition == null || !"dsl".equalsIgnoreCase(definition.getProviderCode())
+                || !"dsl_query".equalsIgnoreCase(definition.getToolType())
+                || !"query".equalsIgnoreCase(definition.getOperationKind())
+                || definition.getModelCode() == null || definition.getModelCode().isBlank()) return false;
+        String code = definition.getToolCode();
+        return code != null && (code.startsWith("nq_") || code.startsWith("list_") || code.startsWith("get_"));
+    }
+
+    private Set<String> restrictOverrideToProfile(Set<String> overridePermissions, Set<String> profilePermissions) {
+        if (profilePermissions == null) return Set.copyOf(overridePermissions);
+        LinkedHashSet<String> intersection = new LinkedHashSet<>(overridePermissions);
+        intersection.retainAll(profilePermissions);
+        return Set.copyOf(intersection);
+    }
+
     private Set<String> resolveProfileEffectivePermissions(TurnContext ctx,
                                                            Set<String> profilePermissions,
                                                            List<ToolDefinition> toolDefs) {
@@ -820,6 +863,8 @@ public class AgentChatPortImpl implements AgentChatPort {
                     .providerCode(def.getProviderCode())
                     .toolType(def.getToolType())
                     .sourceCode(sourceCode)
+                    .modelCode(def.getModelCode())
+                    .operationKind(def.getOperationKind())
                     .riskLevel(def.getRiskLevel())
                     .requiredPermissions(def.getRequiredPermissions())
                     .confirmationPolicy(def.getConfirmationPolicy())

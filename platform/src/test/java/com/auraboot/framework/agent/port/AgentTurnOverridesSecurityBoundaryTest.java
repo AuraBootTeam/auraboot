@@ -50,7 +50,10 @@ class AgentTurnOverridesSecurityBoundaryTest {
             "messagesOverride",
             "toolDefsOverride",
             "extraTools",
-            "persistSessionTape");
+            "persistSessionTape",
+            "effectivePermissions",
+            "readOnlyExecution",
+            "scopedModelQueryOnly");
 
     @Test
     @DisplayName("ChatRequest declares NONE of the AgentTurnOverrides field names")

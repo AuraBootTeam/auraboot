@@ -1,0 +1,112 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+Configuration on demand is an incubating feature.
+> Task :platform-storage-cos:processResources NO-SOURCE
+> Task :platform-storage-oss:processResources NO-SOURCE
+> Task :platform-storage-minio:processResources NO-SOURCE
+> Task :platform-storage-s3:processResources NO-SOURCE
+> Task :platform-mq-kafka:processResources NO-SOURCE
+> Task :bootBuildInfo UP-TO-DATE
+> Task :platform-plugin-api:compileJava UP-TO-DATE
+> Task :platform-plugin-api:processResources NO-SOURCE
+> Task :platform-plugin-api:classes UP-TO-DATE
+> Task :platform-plugin-api:jar UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :jar UP-TO-DATE
+> Task :platform-mq-kafka:compileJava UP-TO-DATE
+> Task :platform-mq-kafka:classes UP-TO-DATE
+> Task :platform-mq-kafka:jar UP-TO-DATE
+> Task :platform-storage-minio:compileJava UP-TO-DATE
+> Task :platform-storage-minio:classes UP-TO-DATE
+> Task :platform-storage-cos:compileJava UP-TO-DATE
+> Task :platform-storage-cos:classes UP-TO-DATE
+> Task :platform-storage-minio:jar UP-TO-DATE
+> Task :platform-storage-s3:compileJava UP-TO-DATE
+> Task :platform-storage-s3:classes UP-TO-DATE
+> Task :platform-storage-cos:jar UP-TO-DATE
+> Task :platform-storage-s3:jar UP-TO-DATE
+> Task :platform-storage-oss:compileJava UP-TO-DATE
+> Task :platform-storage-oss:classes UP-TO-DATE
+> Task :platform-storage-oss:jar UP-TO-DATE
+> Task :compileTestJava
+> Task :instrumentMainOffline
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate multiple logic groups with OR between groups PASSED
+
+SubjectPermissionEvaluator Unit Tests > batchWithoutDeclarationsDoesNotLoadUserPermissions() FAILED
+    org.mockito.exceptions.verification.NoInteractionsWanted at SubjectPermissionEvaluatorTest.java:215
+
+SubjectPermissionEvaluator Unit Tests > Should batch evaluate multiple subjects PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate OR logic group correctly - one satisfied PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should return true when no declarations exist (default visible) PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate AND logic group correctly - one not satisfied PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate OR logic group correctly - none satisfied PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate is_negated correctly PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should deny visibility when logic group has inconsistent types (fail-secure) PASSED
+
+SubjectPermissionEvaluator Unit Tests > Should evaluate AND logic group correctly - all satisfied PASSED
+
+FieldPermissionServiceImplTest > readsFieldPermissionFromNestedExtensionMap() FAILED
+    org.mockito.exceptions.misusing.UnnecessaryStubbingException at MockitoExtension.java:200
+
+FieldPermissionServiceImplTest > hidesFieldWhenMemberRoleNotInViewList() FAILED
+    org.mockito.exceptions.misusing.UnnecessaryStubbingException at MockitoExtension.java:200
+
+FieldPermissionServiceImplTest > treatsFieldWithoutPermissionAsFullyAccessible() PASSED
+
+FieldPermissionServiceImplTest > allowsViewButNotEditWhenOnlyInViewList() FAILED
+    org.opentest4j.AssertionFailedError at FieldPermissionServiceImplTest.java:191
+
+FieldPermissionServiceImplTest > reusesFieldPermissionsInsideDynamicDataQueryScope() FAILED
+    org.mockito.exceptions.verification.NoInteractionsWanted at FieldPermissionServiceImplTest.java:90
+
+FieldPermissionServiceImplTest > unionsAccessAcrossMultipleRoles() FAILED
+    org.opentest4j.AssertionFailedError at FieldPermissionServiceImplTest.java:215
+
+FieldPermissionServiceImplTest > readsFieldPermissionFromDynamicPropertiesExtensionMap() FAILED
+    org.opentest4j.AssertionFailedError at FieldPermissionServiceImplTest.java:170
+
+FieldPermissionServiceImplTest > skipsRolesWhenRoleServiceReturnsNull() FAILED
+    org.mockito.exceptions.misusing.UnnecessaryStubbingException at MockitoExtension.java:200
+
+FieldPermissionServiceImplTest > returnsAllAllowedWhenModelHasNoFields() FAILED
+    org.mockito.exceptions.verification.NoInteractionsWanted at FieldPermissionServiceImplTest.java:75
+
+FieldPermissionServiceImplTest > emptyAllowedListIsTreatedAsAllowed() PASSED
+
+20 tests completed, 9 failed
+
+> Task :test FAILED
+
+[Incubating] Problems report is available at: file://$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/platform/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file://$WORKSPACE/.workspace/worktrees/oss-performance/auraboot/platform/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 22s
+20 actionable tasks: 3 executed, 17 up-to-date

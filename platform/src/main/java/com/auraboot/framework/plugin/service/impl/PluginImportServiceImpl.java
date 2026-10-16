@@ -99,7 +99,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -166,7 +165,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
     private final ObjectMapper objectMapper = createObjectMapper();
-    private final AtomicBoolean pluginResourceTypeConstraintChecked = new AtomicBoolean(false);
+    private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
 
     // Cache for in-progress imports (importId -> manifest)
     private final Map<String, ImportContext> importContextCache = new ConcurrentHashMap<>();
@@ -623,6 +622,9 @@ public class PluginImportServiceImpl implements PluginImportService {
         String pluginId = context.getManifest().getPluginId();
         String importId = context.getHistory().getImportId();
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (!Objects.equals(tenantId, context.getHistory().getTenantId())) {
+            throw new PluginException("Import tenant does not match preview owner");
+        }
         String lockKey = "plugin-import:" + tenantId + ":" + pluginId;
 
         // Guard: clean up stale IMPORTING records (>10 min old)
@@ -761,8 +763,34 @@ public class PluginImportServiceImpl implements PluginImportService {
             // to flow to the post-import quality score below.
             pageSchemaImportGate.enforce(manifest);
 
+            boolean publicImport = (manifest.getPublicResources() != null && !manifest.getPublicResources().isEmpty())
+                    || (manifest.getPublicQueries() != null && !manifest.getPublicQueries().isEmpty());
+            PluginMetadataRollbackSnapshot.Metadata previousMetadata = null;
+            if (publicImport) {
+                var previous = pluginRecordMapper.findByTenantAndPluginId(manifest.getPluginId());
+                if (previous != null) {
+                    var locked = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, previous.getPid());
+                    if (locked == null || !Objects.equals(tenantId, locked.getTenantId())
+                            || !Objects.equals(manifest.getPluginId(), locked.getPluginId())) {
+                        throw new PluginException("Public plugin metadata owner changed before import");
+                    }
+                    previousMetadata = pluginMetadata(locked);
+                }
+            }
+
             // Create or update plugin record
             String pluginPid = createOrUpdatePlugin(manifest, tenantId);
+            if (publicImport) {
+                var installed = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, pluginPid);
+                if (installed == null || !Objects.equals(tenantId, installed.getTenantId())
+                        || !Objects.equals(manifest.getPluginId(), installed.getPluginId())) {
+                    throw new PluginException("Public plugin metadata owner is missing after import");
+                }
+                var snapshot = new PluginMetadataRollbackSnapshot(1, tenantId, pluginPid,
+                        previousMetadata, pluginMetadata(installed));
+                context.getHistory().setManifestSnapshot(objectMapper.convertValue(snapshot,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
+            }
             result.setPluginPid(pluginPid);
 
             // Import resources in dependency order
@@ -1054,6 +1082,17 @@ public class PluginImportServiceImpl implements PluginImportService {
         importFieldMasks(manifest);
         importCapabilities(manifest);
 
+        // Capabilities are explicit model declarations, normalized against the final bound field set.
+        if (manifest.getModels() != null) {
+            for (var declared : manifest.getModels()) {
+                if (declared.getCapabilities() == null || !importedModelCodes.contains(declared.getCode())) continue;
+                var definition = metaModelService.getModelDefinition(declared.getCode())
+                        .orElseThrow(() -> new PluginException("Imported capability model is missing: " + declared.getCode()));
+                definition.setCapabilities(declared.getCapabilities());
+                metaModelService.saveDefinition(definition);
+            }
+        }
+
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
 
@@ -1105,6 +1144,11 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
             if (cmdCount > 0) log.info("Post-import: auto-published {} draft commands", cmdCount);
+        }
+
+        if (manifest.getPublicResources() != null && !manifest.getPublicResources().isEmpty()
+                || manifest.getPublicQueries() != null && !manifest.getPublicQueries().isEmpty()) {
+            publicPublicationLifecycle.importDeclarations(manifest, request, result, pluginPid, importId, tenantId);
         }
 
         // Post-processing: Auto-link menus to pages by pageKey
@@ -1417,6 +1461,37 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw new PluginException("Can only rollback successful imports");
         }
 
+        if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
+            throw new PluginException("Rollback tenant does not match import owner");
+        }
+
+        PluginMetadataRollbackSnapshot metadataRollback = null;
+        boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()
+                .anyMatch(resource -> resource.getResourceTypeEnum().isPublicPublication());
+        if (hasPublicPublications) {
+            var currentPlugin = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
+            if (currentPlugin == null) {
+                throw new PluginException("Public publication plugin owner is missing");
+            }
+            var latest = importHistoryMapper.findLastSuccessful(history.getTenantId(), history.getPluginId());
+            if (latest == null || !importId.equals(latest.getImportId())) {
+                throw new PluginException("Only the latest successful public publication import can be rolled back");
+            }
+            if ("upgrade".equals(history.getImportType())) {
+                if (history.getManifestSnapshot() == null) {
+                    throw new PluginException("Public plugin metadata rollback snapshot is missing");
+                }
+                metadataRollback = objectMapper.convertValue(history.getManifestSnapshot(), PluginMetadataRollbackSnapshot.class);
+                if (metadataRollback.schemaVersion() != 1 || metadataRollback.before() == null
+                        || !Objects.equals(history.getTenantId(), metadataRollback.tenantId())
+                        || !Objects.equals(history.getPluginPid(), metadataRollback.pluginPid())
+                        || !Objects.equals(history.getPluginId(), metadataRollback.before().pluginId())
+                        || !Objects.equals(pluginMetadata(currentPlugin), metadataRollback.after())) {
+                    throw new PluginException("Public plugin metadata changed after import or rollback snapshot is invalid");
+                }
+            }
+        }
+
         ImportExecuteResult result = ImportExecuteResult.builder()
                 .importId(importId)
                 .pluginId(history.getPluginId())
@@ -1427,7 +1502,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         try {
             // Get resources in reverse order
-            List<PluginResource> createdResources = pluginResourceMapper.findCreatedResourcesForRollback(history.getPluginPid());
+            List<PluginResource> createdResources = pluginResourceMapper.findCreatedResourcesForRollback(history.getTenantId(), history.getPluginPid(), importId);
 
             // Delete created resources in reverse order
             for (PluginResource resource : createdResources) {
@@ -1435,13 +1510,24 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
 
             // Restore updated resources
-            List<PluginResource> updatedResources = pluginResourceMapper.findUpdatedResourcesForRollback(history.getPluginPid());
+            List<PluginResource> updatedResources = pluginResourceMapper.findUpdatedResourcesForRollback(history.getTenantId(), history.getPluginPid(), importId);
             for (PluginResource resource : updatedResources) {
                 resourceImporter.restoreResource(resource);
             }
 
             // Clean up resource tracking
-            pluginResourceMapper.deleteByPluginPid(history.getPluginPid());
+            for (PluginResource resource : pluginResourceMapper.findByImportId(importId)) {
+                if (Objects.equals(history.getTenantId(), resource.getTenantId())
+                        && Objects.equals(history.getPluginPid(), resource.getPluginPid())
+                        && !resource.getResourceTypeEnum().isPublicPublication()) {
+                    pluginResourceMapper.deleteById(resource.getId());
+                }
+            }
+
+            if (metadataRollback != null && pluginRecordMapper.restoreImportedMetadata(history.getTenantId(),
+                    history.getPluginPid(), metadataRollback.before()) != 1) {
+                throw new PluginException("Public plugin metadata restore owner mismatch");
+            }
 
             // Update plugin status or delete if it was a fresh install
             if ("install".equals(history.getImportType())) {
@@ -1464,6 +1550,11 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         return result;
+    }
+
+    private PluginMetadataRollbackSnapshot.Metadata pluginMetadata(PluginRecord plugin) {
+        return new PluginMetadataRollbackSnapshot.Metadata(plugin.getPluginId(), plugin.getNamespace(),
+                plugin.getVersion(), plugin.getDisplayName(), plugin.getDescription(), plugin.getManifest());
     }
 
     @Override
@@ -1670,10 +1761,6 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Otherwise, insert a new record.
      */
     private void saveOrUpdatePluginResource(PluginResource resource, Long tenantId) {
-        if (ResourceType.AGENT_DEFINITION.code().equals(resource.getResourceType())) {
-            ensureAgentDefinitionResourceTypeAllowed();
-        }
-
         PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
                 tenantId, resource.getPluginPid(), resource.getResourceType(), resource.getResourceCode());
 
@@ -1703,34 +1790,6 @@ public class PluginImportServiceImpl implements PluginImportService {
             // Insert new record
             pluginResourceMapper.insert(resource);
         }
-    }
-
-    private void ensureAgentDefinitionResourceTypeAllowed() {
-        if (!pluginResourceTypeConstraintChecked.compareAndSet(false, true)) {
-            return;
-        }
-        jdbcTemplate.execute("""
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'chk_resource_type'
-                          AND conrelid = 'ab_plugin_resource'::regclass
-                    ) THEN
-                        ALTER TABLE ab_plugin_resource DROP CONSTRAINT chk_resource_type;
-                    END IF;
-
-                    ALTER TABLE ab_plugin_resource
-                        ADD CONSTRAINT chk_resource_type CHECK (resource_type IN (
-                            'model', 'field', 'model_field_binding', 'command', 'binding_rule',
-                            'permission', 'role', 'role_permission', 'menu', 'process', 'page',
-                            'dict', 'dict_item', 'named_query', 'agent_definition', 'i18n'
-                        ));
-                EXCEPTION
-                    WHEN duplicate_object THEN NULL;
-                END $$;
-                """);
     }
 
     /**

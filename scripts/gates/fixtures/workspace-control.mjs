@@ -14,7 +14,7 @@ export function registerFixtureWorkspace(root, repo) {
   fs.writeFileSync(aura, '#!/usr/bin/env node\n' +
     "const fs=require('node:fs'),path=require('node:path');const args=process.argv.slice(2);\n" +
     "if(args.join(' ')==='control require 1')process.exit(0);\n" +
-    "if(args.slice(0,3).join(' ')==='runtime evidence begin'){console.log(path.join(process.env.AURA_WORKSPACE_STATE_DIR||path.join(process.env.AURA_WORKSPACE_ROOT,'.workspace'),'evidence',args[3],'round-fixture'));process.exit(0);}\n" +
+    "if(args.slice(0,3).join(' ')==='runtime evidence begin'){const base=path.join(process.env.AURA_WORKSPACE_STATE_DIR||path.join(process.env.AURA_WORKSPACE_ROOT,'.workspace'),'evidence',args[3]);fs.mkdirSync(base,{recursive:true});const round=fs.mkdtempSync(path.join(base,'round-fixture-'));console.log(round);process.exit(0);}\n" +
     "const r=require('node:child_process').spawnSync(" + JSON.stringify(implementation) +
     ",args,{stdio:'inherit',env:process.env});process.exit(r.status??2);\n", { mode: 0o755 });
 }

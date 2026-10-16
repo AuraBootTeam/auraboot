@@ -29,6 +29,7 @@ export interface RenderPdfOptions {
   launchBrowser: () => Promise<BrowserLike>;
   /** Page size; defaults to A4. */
   format?: string;
+  landscape?: boolean;
   /** Page margins; must leave room for the running header/footer. */
   margin?: { top?: string; bottom?: string; left?: string; right?: string };
 }
@@ -45,6 +46,7 @@ export async function renderHtmlToPdf(doc: PrintDocument, opts: RenderPdfOptions
     const displayHeaderFooter = Boolean(doc.headerTemplate || doc.footerTemplate);
     const bytes = await page.pdf({
       format: opts.format ?? 'A4',
+      landscape: opts.landscape ?? false,
       printBackground: true,
       displayHeaderFooter,
       headerTemplate: doc.headerTemplate ?? EMPTY_TEMPLATE,

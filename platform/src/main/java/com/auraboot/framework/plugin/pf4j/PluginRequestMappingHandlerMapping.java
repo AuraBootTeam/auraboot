@@ -35,6 +35,17 @@ public final class PluginRequestMappingHandlerMapping extends RequestMappingHand
 
     private final Map<Object, List<RequestMappingInfo>> registrations = new IdentityHashMap<>();
 
+    @Override
+    protected RequestMappingInfo getMatchingMapping(RequestMappingInfo mapping,
+            jakarta.servlet.http.HttpServletRequest request) {
+        // Most routes have an unrelated literal prefix. Reject those before
+        // repeatedly walking security wrappers for method/header conditions.
+        // Eligible paths still undergo Spring's complete condition matching.
+        var paths = mapping.getPathPatternsCondition();
+        if (paths != null && paths.getMatchingCondition(request) == null) return null;
+        return super.getMatchingMapping(mapping, request);
+    }
+
     public PluginRequestMappingHandlerMapping(AdminRoleInterceptor adminRoleInterceptor,
                                               EnvironmentResolverInterceptor environmentResolverInterceptor,
                                               AuthoringBusinessWriteInterceptor authoringBusinessWriteInterceptor,

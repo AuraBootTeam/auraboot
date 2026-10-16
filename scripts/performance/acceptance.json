@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "PERF-01",
+      "feature": "home",
+      "action": "render workbench from SSR",
+      "state": "ready",
+      "expectation": "inbox empty result, shortcuts and numeric stats visible; no browser workbench config request",
+      "screenshot": "home-ready.png"
+    },
+    {
+      "id": "PERF-02",
+      "feature": "menu",
+      "action": "navigate through sidebar",
+      "state": "nonempty",
+      "expectation": "fixture records and 1000 total",
+      "screenshot": "menu-list.png"
+    },
+    {
+      "id": "PERF-03",
+      "feature": "list",
+      "action": "search",
+      "state": "empty",
+      "expectation": "no matching rows, total=0",
+      "screenshot": "list-empty.png"
+    },
+    {
+      "id": "PERF-04",
+      "feature": "list",
+      "action": "next page",
+      "state": "page2",
+      "expectation": "different record identities",
+      "screenshot": "list-page2.png"
+    },
+    {
+      "id": "PERF-05",
+      "feature": "create",
+      "action": "empty submit",
+      "state": "invalid",
+      "expectation": "required name rejects without command",
+      "screenshot": "form-required.png"
+    },
+    {
+      "id": "PERF-06",
+      "feature": "create",
+      "action": "save new record",
+      "state": "saved",
+      "expectation": "command response and persisted name/quantity",
+      "screenshot": "create-saved.png"
+    },
+    {
+      "id": "PERF-07",
+      "feature": "detail",
+      "action": "open created record",
+      "state": "ready",
+      "expectation": "exact created name visible",
+      "screenshot": "record-detail.png"
+    },
+    {
+      "id": "PERF-08",
+      "feature": "update",
+      "action": "edit created record",
+      "state": "editing",
+      "expectation": "persisted values in form",
+      "screenshot": "form-edit.png"
+    },
+    {
+      "id": "PERF-09",
+      "feature": "update",
+      "action": "save and reload",
+      "state": "updated",
+      "expectation": "exact edited name persists",
+      "screenshot": "update-saved.png"
+    },
+    {
+      "id": "PERF-10",
+      "feature": "delete",
+      "action": "request delete",
+      "state": "confirmation",
+      "expectation": "confirm dialog before deletion",
+      "screenshot": "delete-confirm.png"
+    },
+    {
+      "id": "PERF-11",
+      "feature": "delete",
+      "action": "confirm deletion",
+      "state": "removed",
+      "expectation": "record absent after reload",
+      "screenshot": "delete-removed.png"
+    },
+    {
+      "id": "PERF-12",
+      "feature": "auth",
+      "action": "open home without session",
+      "state": "denied",
+      "expectation": "login required",
+      "screenshot": "anonymous-login.png"
+    },
+    {
+      "id": "PERF-13",
+      "feature": "row menu",
+      "action": "open row actions",
+      "state": "expanded",
+      "expectation": "edit and delete are available through the real overflow menu",
+      "screenshot": "row-menu.png"
+    }
+  ]
+}

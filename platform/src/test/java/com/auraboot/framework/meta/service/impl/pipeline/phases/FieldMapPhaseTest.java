@@ -134,6 +134,49 @@ class FieldMapPhaseTest {
         verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
     }
 
+    @Test
+    void laterPersistenceDoesNotReplaceThePreTransitionSnapshot() {
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setTargetRecordId("owned-record");
+        request.setOperationType("UPDATE");
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("orders:complete");
+        command.setModelCode("orders");
+        Map<String, Object> original = Map.of("order_status", "in_review");
+        CommandPipelineContext ctx = CommandPipelineContext.builder().request(request).command(command)
+                .commandCode(command.getCode()).tenantId(99L).beforeSnapshot(original)
+                .execConfig(Map.of("type", "state_transition", "stateField", "order_status", "toState", "done"))
+                .build();
+
+        phase().execute(ctx);
+
+        verifyNoInteractions(snapshotReader);
+        verify(fieldMapExecutor).executeImplicitFieldMapPhase(
+                ctx.getExecConfig(), ctx.getPayload(), 99L, request, command);
+        assertThat(ctx.getBeforeSnapshot()).isSameAs(original);
+    }
+
+    @Test
+    void ordinaryUpdateStillCapturesSnapshotWhenNoEarlierPhaseDid() {
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setTargetRecordId("owned-record");
+        request.setOperationType("UPDATE");
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("orders:update");
+        command.setModelCode("orders");
+        Map<String, Object> original = Map.of("order_title", "Original");
+        CommandPipelineContext ctx = CommandPipelineContext.builder().request(request).command(command)
+                .commandCode(command.getCode()).tenantId(99L).execConfig(Map.of("type", "update")).build();
+        when(snapshotReader.readRecordSnapshot(99L, "orders", "owned-record")).thenReturn(original);
+
+        phase().execute(ctx);
+
+        verify(snapshotReader).readRecordSnapshot(99L, "orders", "owned-record");
+        verify(fieldMapExecutor).executeImplicitFieldMapPhase(
+                ctx.getExecConfig(), ctx.getPayload(), 99L, request, command);
+        assertThat(ctx.getBeforeSnapshot()).isSameAs(original);
+    }
+
     private FieldMapPhase phase() {
         return new FieldMapPhase(fieldMapExecutor, cascadeDeleteExecutor, snapshotReader,
                 extensionRegistry, metaModelService, applicationContext);

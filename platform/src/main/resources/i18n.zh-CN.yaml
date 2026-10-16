@@ -1921,6 +1921,72 @@ notification_rule:
   create_rule: 创建规则
 
 openPlatform:
+  actions:
+    cancel: "取消"
+    chooseResource: "选择已发布资源"
+    chooseSource: "选择业务命令或只读 Handler"
+    close: "关闭编辑"
+    code: "公共接口地址"
+    command: "状态变更命令"
+    concurrency: "同时执行上限"
+    confirm: "确认"
+    confirmation: "业务接口操作确认"
+    conflict: "配置已改变，你的修改已保留。放弃本地修改并重新打开后再继续。"
+    console: "返回开放平台"
+    contract: "业务接口合同"
+    endpoint: "外部调用地址"
+    denied: "需要当前租户的开放平台管理权限。"
+    discardHelp: "放弃未保存的修改并关闭？"
+    draft: "草稿"
+    edit: "编辑业务合同"
+    effects: "受控变更字段"
+    empty: "还没有公共业务接口，请先发布一个资源合同。"
+    failed: "请求失败，请重试。"
+    handler: "只读 Handler"
+    help: "将现有状态流转命令或已注册只读 Handler 绑定到公共资源。外部调用始终受安装 Scope、行范围、字段及业务变更授权约束。"
+    implementation: "已注册实现"
+    inactive: "已停用"
+    invalidArtifact: "合同文件无效，请重新下载。"
+    live: "已发布"
+    loading: "正在读取业务接口…"
+    loadingSource: "正在读取可用实现…"
+    new: "新建业务接口"
+    noSource: "此资源暂无可用实现。状态命令需要修改操作和对应字段，只读 Handler 需要列表操作。"
+    openapi: "下载业务 OpenAPI"
+    optional: "可选"
+    outputs: "只读输出"
+    preconditions: "必须提供目标资源的 If-Match 与幂等键。状态字段变更须在安装中显式授权，不会开放通用字段修改。"
+    publish: "发布业务接口"
+    publishHelp: "发布会固定实现、输入、受控字段与执行预算。安装还需分别授予资源和业务接口权限。确认发布？"
+    published: "业务接口已发布；安装仍需单独授权。"
+    refresh: "刷新目录"
+    required: "必填"
+    resource: "绑定公共资源"
+    resourceHelp: "数据授权和 ETag 均来自此资源。命令需要修改授权，只读 Handler 需要列表授权。"
+    save: "保存并校验业务草稿"
+    saved: "业务接口草稿已保存并通过来源校验。"
+    scope: "接口调用 Scope"
+    signature: "已固定的输入与变更"
+    sourceChanged: "来源已变化或不可用，不能保存或发布。已发布合同请使用新地址重新发布；仍可停用旧接口。"
+    timeout: "执行超时（毫秒）"
+    timeoutHelp: "只读实现的预算须覆盖绑定资源的已发布查询预算；最小值以当前来源为准。"
+    title: "公共业务接口"
+    types: "下载业务类型声明"
+    unavailable: "不满足公开条件"
+    unavailableResource: "当前绑定资源已不可用"
+    version: "合同版本"
+    withdraw: "停用业务接口"
+    withdrawHelp: "停用会立即关闭此接口的后续外部调用和合同下载。确认停用？"
+    withdrawn: "业务接口已停用，外部调用及合同下载已关闭。"
+  installationGrants:
+    actionEffects: "允许的受控变更字段"
+    actionEffectsHelp: "命令需要全部声明字段。状态字段的受控变更不会开放通用修改；资源当前的输入、可读字段与行范围仍生效。"
+    actionExecute: "允许调用此业务接口"
+    actionResource: "绑定资源"
+    actionResourceGranted: "已有所需资源操作授权；调用仍会复核字段、行范围及 Scope。"
+    actionResourceMissing: "缺少绑定资源的当前操作授权，接口调用将被拒绝。"
+    actionScope: "安装缺少此业务接口的调用 Scope。"
+    actions: "公共业务接口"
   eventCatalog: "事件目录"
   eventCatalogHint: "已安装应用只能订阅明确公开的合作伙伴事件。"
   noPublishedEvents: "暂无公开的合作伙伴事件"
@@ -1952,6 +2018,55 @@ openPlatform:
   title: 开放平台
   badge: 系统对系统访问
   subtitle: 创建租户级应用，按最小权限授权，轮换凭据，并查看统一的公共 API 契约。
+  integrationGuide: 接入指南（中文）
+  integrationGuideAlternate: English guide
+  quickStep2: "配置接口权限，生成定期或永久 Token"
+  quickStep3: "直接用 Bearer Token 调用接口"
+  tokens:
+    active: "有效"
+    appIdHelp: "应用标识保持不变；认证使用 Token，不需要额外的 appId 请求头。"
+    cancel: "取消"
+    close: "关闭 Token 管理"
+    confirm: "确认"
+    copied: "已复制。"
+    copy: "复制 Token"
+    copyFailed: "复制失败，请手动选择并保存 Token。"
+    create: "生成 Token"
+    days: "有效天数"
+    daysHelp: "默认 30 天，可选 1–90 天；服务端校验并返回实际到期时间。"
+    denied: "需要此应用的运行管理权限。"
+    empty: "还没有快捷接入 Token。"
+    expired: "已到期"
+    expiresAt: "到期时间"
+    failed: "请求失败，请查看清单确认结果。"
+    fixed: "定期"
+    grace: "旧 Token 宽限分钟数"
+    graceHelp: "0 为立即切换，默认 1440，最多 10080；不会延长原到期时间。"
+    help: "直接用 Bearer Token 调用已授权接口，无需换取 OAuth Token。权限始终以安装当前授权为准。"
+    inactive: "应用或安装已停用，只能查看或撤销。"
+    lastUsed: "最近使用"
+    loading: "正在读取 Token…"
+    mode: "有效期模式"
+    name: "Token 名称"
+    never: "永久"
+    neverWarning: "永久 Token 不会自然到期；请妥善保存，定期轮换，泄漏时立即撤销。"
+    oldCutoff: "旧 Token 接受截止"
+    once: "仅显示一次，请立即保存。关闭或刷新页面后无法再次读取。"
+    open: "快捷接入 Token"
+    permanent: "永久有效（仍可撤销和轮换）"
+    refresh: "刷新清单"
+    replaced: "已替换"
+    revoke: "撤销 Token"
+    revokeWarning: "撤销后使用此 Token 的新请求立即失败，其他 Token 不受影响。此操作不可恢复。"
+    revoked: "Token 已撤销，后续请求将被拒绝。"
+    revokedStatus: "已撤销"
+    rotate: "轮换 Token"
+    rotating: "轮换宽限中"
+    saved: "已保存，关闭原文"
+    secret: "新 Token"
+    title: "快捷接入 Token"
+    unused: "尚未使用"
+    working: "处理中…"
   apiReference: API 参考
   newApplication: 新建应用
   connectionFlow: 接入流程
@@ -1968,6 +2083,7 @@ openPlatform:
   memberRole: 角色
   manageMembers: 管理成员
   removeMember: 移除成员
+  lastOwnerGuidance: 先添加另一位所有者，再移除最后一位所有者。
   memberSaved: 应用成员已保存
   memberSaveFailed: 应用成员保存失败
   memberRemoved: 应用成员已移除
@@ -2004,12 +2120,14 @@ openPlatform:
   rotateTitle: 轮换凭据
   rotateWarning: 现在创建新密钥。旧凭据可在宽限期结束前签发 Token；已签发的 Token 按自身短期 TTL 失效。
   graceMinutes: 宽限期（分钟）
+  graceRange: 请输入 5 至 10080 的整数分钟。
   rotate: 轮换
   noCredentials: 暂无凭据
   secretTitle: 立即保存此凭据
   secretWarning: Client Secret 仅显示一次；AuraBoot 只保存它的哈希值。
   saved: 我已保存
   lastUsed: 最近使用
+  credentialExpires: 到期时间
   revoke: 吊销
   revokeTitle: 确认吊销凭据？
   revokeWarning: 此凭据签发的现有 Access Token 将立即失效。
@@ -2057,9 +2175,7 @@ openPlatform:
   compatible: 兼容
   actionRequired: 需要处理
   eventSchema: 事件版本
-  catalogVersion: 目录版本
   signing: 签名状态
-  rotateBy: 轮换截止时间
   chooseSupportedEventVersion: 请选择受支持的事件版本。
   rotateSigningSecretNow: 请立即轮换签名密钥。
   addSigningSecretBeforeDelivery: 启用投递前请添加签名密钥。

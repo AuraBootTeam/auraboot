@@ -2,6 +2,7 @@ package com.auraboot.framework.email.controller;
 
 import com.auraboot.framework.email.model.EmailConstants;
 import com.auraboot.framework.email.service.EmailTrackingService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +32,7 @@ import java.io.IOException;
 @RequestMapping("/api/email/tracking")
 @RequiredArgsConstructor
 @Tag(name = "Email Tracking", description = "Public open/click tracking endpoints (no auth required)")
+@AuthenticatedAccess("email open/click tracking hit by mail clients with no user session; scoped by the unguessable 32-char tracking token embedded in each email")
 public class EmailTrackingController {
 
     /**

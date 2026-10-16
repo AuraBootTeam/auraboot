@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 
@@ -24,6 +25,7 @@ public final class CommandPermitDataAccess {
 
     /** Whether the command plan grade for {@code modelCode} permits this already-loaded record. */
     public static boolean permitsRecord(String modelCode, Map<String, Object> record, Long userId) {
+        if (MachineDataAccessContext.isActive()) return MachineDataAccessContext.requireDecision(modelCode).permits(record);
         return permitsRecordForScope(
                 MetaContext.getCommandPermitScopeFor(modelCode),
                 MetaContext.getCommandPermitTargetFor(modelCode),
@@ -72,6 +74,7 @@ public final class CommandPermitDataAccess {
      * when that model must use its own policy.
      */
     public static String rowFilter(String modelCode, Long userId) {
+        if (MachineDataAccessContext.isActive()) return null;
         return rowFilterForScope(
                 MetaContext.getCommandPermitScopeFor(modelCode),
                 MetaContext.getCommandPermitTargetFor(modelCode),

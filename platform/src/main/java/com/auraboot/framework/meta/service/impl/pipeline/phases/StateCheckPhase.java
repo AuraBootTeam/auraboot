@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ public class StateCheckPhase implements CommandPhase {
 
     private final CommandStateCheckExecutor stateCheckExecutor;
     private final ExtensionRegistry extensionRegistry;
+    private final RecordSnapshotReader snapshotReader;
 
     @Override
     public String name() {
@@ -36,6 +38,14 @@ public class StateCheckPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        // State validation also persists transitions. Capture the original record
+        // after authorization/version locking, before that first mutation occurs.
+        if (ctx.getBeforeSnapshot() == null && ctx.getRequest() != null
+                && StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+                && StringUtils.hasText(ctx.getCommand().getModelCode())) {
+            ctx.setBeforeSnapshot(snapshotReader.readRecordSnapshot(
+                    ctx.getTenantId(), ctx.getCommand().getModelCode(), ctx.getRequest().getTargetRecordId()));
+        }
         String targetState = stateCheckExecutor.executeStateCheckPhase(
                 ctx.getCommand(), ctx.getPayload(), ctx.getTenantId(),
                 ctx.getRequest(), ctx.getExecConfig());

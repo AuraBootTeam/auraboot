@@ -53,6 +53,8 @@ const STATIC_ASSET_EXT =
 
 export function isPublicRoute(pathname: string): boolean {
   if (pathname === '/') return true;
+  // This packaged guide contains no tenant data or credentials.
+  if (pathname === '/docs/open-platform-integration.html' || pathname === '/docs/open-platform-integration.zh-CN.html') return true;
   if (STATIC_ASSET_EXT.test(pathname)) return true;
   if (isPublicRuntimePathname(pathname)) return true;
   return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));

@@ -7,6 +7,10 @@ import LlmProvidersPage from '../pages/aurabot/providers';
 
 const state = vi.hoisted(() => ({
   platformAdmin: true,
+  post: vi.fn(),
+  successToast: vi.fn(),
+  errorToast: vi.fn(),
+  toggleEnabled: vi.fn(),
   configs: [] as any[],
   useCloudConfigs: vi.fn(),
   save: vi.fn().mockResolvedValue(true),
@@ -14,10 +18,14 @@ const state = vi.hoisted(() => ({
   retryReadback: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock('~/shared/services/http-client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('~/shared/services/http-client')>(), post: state.post,
+}));
+
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({
-    showSuccessToast: vi.fn(),
-    showErrorToast: vi.fn(),
+    showSuccessToast: state.successToast,
+    showErrorToast: state.errorToast,
   }),
 }));
 
@@ -55,7 +63,7 @@ vi.mock('~/shared/admin/cloud-config-core', async (importOriginal) => {
       setLevel: vi.fn(),
       testingPid: null,
       handleDelete: vi.fn(),
-      handleToggleEnabled: vi.fn(),
+      handleToggleEnabled: state.toggleEnabled,
       handleSave: state.save,
       saveReadbackPending: state.readbackPending,
       retrySaveReadback: state.retryReadback,
@@ -66,6 +74,10 @@ vi.mock('~/shared/admin/cloud-config-core', async (importOriginal) => {
 
 afterEach(() => {
   document.body.innerHTML = '';
+  state.post.mockReset();
+  state.successToast.mockReset();
+  state.errorToast.mockReset();
+  state.toggleEnabled.mockReset();
   state.platformAdmin = true;
   state.configs = [];
   state.save.mockReset().mockResolvedValue(true);
@@ -156,5 +168,69 @@ describe('LlmProvidersPage scoped configuration', () => {
     state.save.mockResolvedValue(true);
     fireEvent.click(screen.getByTestId('panel-save-btn'));
     await waitFor(() => expect(screen.queryByTestId('provider-edit-panel')).not.toBeInTheDocument());
+  });
+});
+
+describe('LLM configuration validation is not a live connection test', () => {
+  const renderProvider = () => {
+    state.configs = [
+      {
+        pid: 'existing-llm',
+        configLevel: 'tenant',
+        serviceType: 'llm',
+        providerCode: 'openai',
+        config: '{"apiKey":"****","defaultModel":"fixture-model"}',
+        enabled: false,
+        priority: 1,
+      },
+    ];
+    render(
+      <I18nProvider initialLocale="zh-CN" initialData={{}}>
+        <LlmProvidersPage />
+      </I18nProvider>,
+    );
+  };
+
+  it.each([
+    { code: '0', data: { status: 'error', message: 'Missing required field: apiKey' } },
+    { code: '0', data: null },
+    { code: '0', data: { message: 'missing status' } },
+    { code: '403', desc: 'forbidden', data: { status: 'ok' } },
+  ])('rejects failed or ambiguous validation without enabling the provider: %j', async (result) => {
+    state.post.mockResolvedValue(result);
+    renderProvider();
+    fireEvent.click(screen.getByTestId('provider-test-openai'));
+    await waitFor(() => expect(state.errorToast).toHaveBeenCalledOnce());
+    expect(state.successToast).not.toHaveBeenCalled();
+    expect(state.toggleEnabled).not.toHaveBeenCalled();
+    expect(screen.getByTestId('provider-toggle-openai')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('reports configuration-only validation and leaves activation to the owner', async () => {
+    state.post.mockResolvedValue({
+      code: '0',
+      data: { status: 'ok', message: 'config validated' },
+    });
+    renderProvider();
+    expect(screen.getByTestId('provider-test-openai')).toHaveAttribute('title', '校验配置');
+    fireEvent.click(screen.getByTestId('provider-test-openai'));
+    await waitFor(() => expect(state.successToast).toHaveBeenCalledOnce());
+    expect(state.successToast.mock.calls[0][0]).toContain('未请求模型服务');
+    expect(state.errorToast).not.toHaveBeenCalled();
+    expect(state.toggleEnabled).not.toHaveBeenCalled();
+    expect(screen.getByTestId('provider-toggle-openai')).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(screen.getByTestId('provider-toggle-openai'));
+    expect(state.toggleEnabled).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByTestId('provider-edit-openai'));
+    expect(screen.getByTestId('panel-test-connection')).toHaveTextContent('校验配置');
+  });
+
+  it('surfaces transport failure without enabling the provider', async () => {
+    state.post.mockRejectedValue(new Error('network unavailable'));
+    renderProvider();
+    fireEvent.click(screen.getByTestId('provider-test-openai'));
+    await waitFor(() => expect(state.errorToast).toHaveBeenCalledWith('network unavailable'));
+    expect(state.toggleEnabled).not.toHaveBeenCalled();
+    expect(state.successToast).not.toHaveBeenCalled();
   });
 });

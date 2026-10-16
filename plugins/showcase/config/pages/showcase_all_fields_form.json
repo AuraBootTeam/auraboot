@@ -12,11 +12,11 @@
   },
   "blocks": [
     {
-      "id": "section_basic",
+      "id": "record_info",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "基本信息",
-        "en-US": "Basic Information"
+        "zh-CN": "记录信息",
+        "en-US": "Record information"
       },
       "fields": [
         {
@@ -24,7 +24,11 @@
           "colSpan": 6,
           "required": true,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_name.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_name.placeholder",
+            "helpText": {
+              "zh-CN": "使用容易识别的名称，便于在列表中查找。",
+              "en-US": "Use a recognizable name so the record is easy to find."
+            }
           }
         },
         {
@@ -39,58 +43,82 @@
           "field": "sc_description",
           "colSpan": 12,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_description.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_description.placeholder",
+            "helpText": {
+              "zh-CN": "简述记录用途，帮助团队理解内容。",
+              "en-US": "Summarize the purpose for other team members."
+            }
           }
-        }
-      ]
-    },
-    {
-      "id": "section_numbers",
-      "blockType": "form-section",
-      "title": {
-        "zh-CN": "数值类型",
-        "en-US": "Numeric Fields"
-      },
-      "fields": [
+        },
         {
           "field": "sc_quantity",
           "colSpan": 4,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_quantity.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_quantity.placeholder",
+            "helpText": {
+              "zh-CN": "填写数量，支持整数。",
+              "en-US": "Enter a whole-number quantity."
+            }
           }
         },
         {
           "field": "sc_price",
           "colSpan": 4,
           "props": {
-            "placeholder": "0.00"
+            "placeholder": "0.00",
+            "helpText": {
+              "zh-CN": "填写单价，支持小数。",
+              "en-US": "Enter a unit price; decimals are supported."
+            }
           }
-        },
+        }
+      ],
+      "extension": {
+        "collapsible": false,
+        "defaultCollapsed": false
+      }
+    },
+    {
+      "id": "state_plan",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "状态与计划",
+        "en-US": "Status and schedule"
+      },
+      "fields": [
         {
           "field": "sc_budget",
           "colSpan": 4,
           "props": {
-            "placeholder": "0.00"
+            "placeholder": "0.00",
+            "helpText": {
+              "zh-CN": "填写预算金额，不填写时保持为空。",
+              "en-US": "Enter an optional budget amount."
+            }
           }
         },
         {
           "field": "sc_progress",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "helpText": {
+              "zh-CN": "完成进度，范围为 0–100%。",
+              "en-US": "Completion percentage from 0 to 100."
+            },
+            "placeholder": "0–100"
+          }
         },
         {
           "field": "sc_rating",
-          "colSpan": 6
-        }
-      ]
-    },
-    {
-      "id": "section_enums",
-      "blockType": "form-section",
-      "title": {
-        "zh-CN": "枚举与选择",
-        "en-US": "Enums & Selection"
-      },
-      "fields": [
+          "colSpan": 6,
+          "props": {
+            "helpText": {
+              "zh-CN": "评分范围为 0–5，按实际情况选择。",
+              "en-US": "Choose a rating from 0 to 5."
+            },
+            "placeholder": "0–5"
+          }
+        },
         {
           "field": "sc_status",
           "colSpan": 4,
@@ -116,7 +144,11 @@
           "field": "sc_tags",
           "colSpan": 6,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_tags.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_tags.placeholder",
+            "helpText": {
+              "zh-CN": "输入标签后回车，可添加多个标签。",
+              "en-US": "Press Enter after each tag; multiple tags are supported."
+            }
           }
         },
         {
@@ -128,19 +160,13 @@
           "colSpan": 12,
           "visibleWhen": "record.sc_status === 'active'",
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_advanced_settings.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_advanced_settings.placeholder",
+            "helpText": {
+              "zh-CN": "用于开发者检查结构化设置示例。",
+              "en-US": "A structured-settings example for developers."
+            }
           }
-        }
-      ]
-    },
-    {
-      "id": "section_dates",
-      "blockType": "form-section",
-      "title": {
-        "zh-CN": "日期与时间",
-        "en-US": "Date & Time"
-      },
-      "fields": [
+        },
         {
           "field": "sc_start_date",
           "colSpan": 4
@@ -156,135 +182,198 @@
         },
         {
           "field": "sc_time_slot",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "helpText": {
+              "zh-CN": "选择一天内的时间点。",
+              "en-US": "Choose a time of day."
+            },
+            "placeholder": "09:30"
+          }
         },
         {
           "field": "sc_date_range",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "helpText": {
+              "zh-CN": "选择开始和结束日期。",
+              "en-US": "Choose the start and end dates."
+            },
+            "placeholder": "2026/10/14 – 2026/10/28"
+          }
         },
         {
           "field": "sc_working_hours",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "helpText": {
+              "zh-CN": "选择一天内的工作时间范围。",
+              "en-US": "Choose a working-hours time range."
+            },
+            "placeholder": "09:00 – 18:00"
+          }
         }
-      ]
+      ],
+      "extension": {
+        "collapsible": true,
+        "defaultCollapsed": true
+      }
     },
     {
-      "id": "section_selectors",
+      "id": "related_contact",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "高级选择器",
-        "en-US": "Advanced Selectors"
+        "zh-CN": "关联与联系",
+        "en-US": "References and contact"
       },
       "fields": [
         {
           "field": "sc_cascade_category",
           "colSpan": 6,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_cascade_category.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_cascade_category.placeholder",
+            "helpText": {
+              "zh-CN": "逐级选择分类，上级决定下级选项。",
+              "en-US": "Select categories in order; parents determine child options."
+            }
           }
         },
         {
           "field": "sc_tree_node",
           "colSpan": 6,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_tree_node.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_tree_node.placeholder",
+            "helpText": {
+              "zh-CN": "在树状目录中定位目标节点。",
+              "en-US": "Locate a target node in the directory tree."
+            }
           }
-        }
-      ]
-    },
-    {
-      "id": "section_people",
-      "blockType": "form-section",
-      "title": {
-        "zh-CN": "人员与组织",
-        "en-US": "People & Organization"
-      },
-      "fields": [
+        },
         {
           "field": "sc_assignee",
           "colSpan": 4,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_assignee.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_assignee.placeholder",
+            "helpText": {
+              "zh-CN": "指定这条记录的处理人员。",
+              "en-US": "Assign someone to handle this record."
+            }
           }
         },
         {
           "field": "sc_team_members",
           "colSpan": 4,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_team_members.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_team_members.placeholder",
+            "helpText": {
+              "zh-CN": "选择参与这条记录的团队成员。",
+              "en-US": "Select team members involved in this record."
+            }
           }
         },
         {
           "field": "sc_department",
           "colSpan": 4,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_department.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_department.placeholder",
+            "helpText": {
+              "zh-CN": "指定记录归属的组织部门。",
+              "en-US": "Choose the department responsible for this record."
+            }
           }
         },
         {
           "field": "sc_owner_user",
           "colSpan": 6,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_owner_user.placeholder"
+            "placeholder": {
+              "zh-CN": "按姓名搜索空间成员",
+              "en-US": "Search space members by name"
+            },
+            "helpText": {
+              "zh-CN": "选择负责维护这条记录的成员。",
+              "en-US": "Choose the member responsible for maintaining this record."
+            }
           }
-        }
-      ]
-    },
-    {
-      "id": "section_contact",
-      "blockType": "form-section",
-      "title": {
-        "zh-CN": "联系与地址",
-        "en-US": "Contact & Address"
-      },
-      "fields": [
+        },
         {
           "field": "sc_website",
           "colSpan": 6,
           "props": {
-            "placeholder": "https://example.com"
+            "placeholder": "https://example.com",
+            "helpText": {
+              "zh-CN": "填写完整网址，以 https:// 开头。",
+              "en-US": "Enter a complete URL starting with https://."
+            }
           }
         },
         {
           "field": "sc_email",
           "colSpan": 6,
           "props": {
-            "placeholder": "name@example.com"
+            "placeholder": "name@example.com",
+            "helpText": {
+              "zh-CN": "填写联系邮箱，例如 contact@example.com。",
+              "en-US": "Enter a contact email such as contact@example.com."
+            }
           }
         },
         {
           "field": "sc_phone",
           "colSpan": 6,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_phone.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_phone.placeholder",
+            "helpText": {
+              "zh-CN": "填写联系电话，可包含区号。",
+              "en-US": "Enter a contact number, including area code if needed."
+            }
           }
         },
         {
           "field": "sc_color",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "helpText": {
+              "zh-CN": "用于在记录中显示颜色标记。",
+              "en-US": "Choose a visual color marker for this record."
+            },
+            "placeholder": "#3b82f6"
+          }
         },
         {
           "field": "sc_address",
           "colSpan": 12,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_address.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_address.placeholder",
+            "helpText": {
+              "zh-CN": "选择地区后补充详细地址。",
+              "en-US": "Choose a region and add the street address."
+            }
           }
         }
-      ]
+      ],
+      "extension": {
+        "collapsible": true,
+        "defaultCollapsed": true
+      }
     },
     {
-      "id": "section_rich",
+      "id": "content_notes",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "富内容与附件",
-        "en-US": "Rich Content & Attachments"
+        "zh-CN": "内容与附件",
+        "en-US": "Content and attachments"
       },
       "fields": [
         {
           "field": "sc_richtext_content",
           "colSpan": 12,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_richtext_content.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_richtext_content.placeholder",
+            "helpText": {
+              "zh-CN": "补充带格式的说明，可留空。",
+              "en-US": "Add optional formatted content."
+            }
           }
         },
         {
@@ -299,17 +388,29 @@
           "field": "sc_ai_summary",
           "colSpan": 12,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_ai_summary.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_ai_summary.placeholder",
+            "helpText": {
+              "zh-CN": "可选生成摘要，使用前检查内容。",
+              "en-US": "Optionally generate a summary and review it before saving."
+            }
           }
         },
         {
           "field": "sc_remark",
           "colSpan": 12,
           "props": {
-            "placeholder": "$i18n:model.showcase_all_fields.sc_remark.placeholder"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_remark.placeholder",
+            "helpText": {
+              "zh-CN": "记录需要补充的事项，可留空。",
+              "en-US": "Add optional notes for this record."
+            }
           }
         }
-      ]
+      ],
+      "extension": {
+        "collapsible": true,
+        "defaultCollapsed": true
+      }
     },
     {
       "id": "buttons",

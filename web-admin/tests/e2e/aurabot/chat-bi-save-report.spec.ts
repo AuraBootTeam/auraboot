@@ -312,7 +312,7 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
       })
     ).status(),
   ).toBe(200);
-  for (const format of ['excel', 'pdf'] as const) {
+  for (const format of ['excel', 'pdf', 'markdown', 'html'] as const) {
     const responsePromise = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === `/api/reports/export/${format}` &&
@@ -320,13 +320,16 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
     );
     const filePromise = page.waitForEvent('download');
     await page
-      .getByRole('button', { name: format === 'excel' ? '导出 Excel' : '导出 PDF', exact: true })
+      .getByRole('button', {
+        name: `导出 ${{ excel: 'Excel', pdf: 'PDF', markdown: 'Markdown', html: 'HTML' }[format]}`,
+        exact: true,
+      })
       .click();
     const response = await responsePromise;
     expect(response.status()).toBe(200);
     expect(response.request().postDataJSON().reportPid).toBe(saved.pid);
     const file = await filePromise;
-    const extension = format === 'excel' ? 'xlsx' : 'pdf';
+    const extension = { excel: 'xlsx', pdf: 'pdf', markdown: 'md', html: 'html' }[format];
     expect(file.suggestedFilename()).toBe(`订单数量分析.${extension}`);
     const artifactPath = `${process.env.AURA_EVIDENCE_DIR}/report-data.${extension}`;
     await file.saveAs(artifactPath);
@@ -338,8 +341,19 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
       expect(rows).toContainEqual(['数量', '订单标题']);
       expect(rows).toContainEqual([1, title]);
-    } else {
+    } else if (format === 'pdf') {
       expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+    } else {
+      const document = bytes.toString('utf8');
+      expect(document).toContain('订单数量分析');
+      expect(document).toContain(title);
+      expect(document).toContain('数量');
+      if (format === 'html') {
+        expect(document.toLowerCase()).toContain('<!doctype html>');
+        expect(document).not.toMatch(/<script[^>]+src=/);
+      } else {
+        expect(document).toContain('# 订单数量分析');
+      }
     }
     await shot(format);
   }

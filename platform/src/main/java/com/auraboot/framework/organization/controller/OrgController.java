@@ -13,6 +13,7 @@ import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.service.OrgEmployeeService;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.organization.service.PermittedDepartmentTreeService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 @RequestMapping("/api/org")
 @Tag(name = "Organization Management", description = "Department tree and employee management")
 @RequiredArgsConstructor
+@AuthenticatedAccess("department tree reads and delete pre-check are tenant-scoped read-only lookups, the permitted tree additionally filtered by the caller's data scope")
 public class OrgController {
 
     private static final String MODEL_ORG_DEPARTMENT = "org_department";

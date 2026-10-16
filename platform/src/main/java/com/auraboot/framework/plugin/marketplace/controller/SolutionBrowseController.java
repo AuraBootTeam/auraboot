@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.marketplace.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.plugin.marketplace.dto.SolutionDTO;
 import com.auraboot.framework.plugin.marketplace.dto.SolutionDetailDTO;
 import com.auraboot.framework.plugin.marketplace.service.SolutionBrowseService;
@@ -16,6 +17,7 @@ import java.util.List;
 @RequestMapping("/api/marketplace/solutions")
 @RequiredArgsConstructor
 @Tag(name = "Solution Marketplace", description = "Industry solution browsing APIs")
+@AuthenticatedAccess("public solution catalog browse; installed-solution listing scoped to the current tenant")
 public class SolutionBrowseController {
 
     private final SolutionBrowseService browseService;

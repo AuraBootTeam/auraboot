@@ -1,6 +1,7 @@
 package com.auraboot.module.exchange.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.module.exchange.dto.ExecutionJobDTO;
 import com.auraboot.module.exchange.service.ExecutionJobQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +22,7 @@ import java.util.List;
 @RequestMapping("/api/exchange/jobs")
 @RequiredArgsConstructor
 @Tag(name = "Exchange Jobs", description = "Owner-scoped import, export, and document jobs")
+@AuthenticatedAccess("read-only listing of the caller's own import, export, and document jobs; owner-scoped by tenant+user in the query service")
 public class ExecutionJobController {
 
     private final ExecutionJobQueryService queryService;

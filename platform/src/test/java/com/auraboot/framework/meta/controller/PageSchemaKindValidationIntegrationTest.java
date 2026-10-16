@@ -48,6 +48,15 @@ class PageSchemaKindValidationIntegrationTest {
     @Mock
     private PluginResourceTracker pluginResourceTracker;
 
+    // Runtime page-title localization dependencies of PageSchemaController. The stored
+    // name is kept when no tenant i18n record exists, so the default (null-resource)
+    // mock behavior exercises the fallback path.
+    @Mock
+    private com.auraboot.framework.i18n.util.I18nLocaleResolver i18nLocaleResolver;
+
+    @Mock
+    private com.auraboot.framework.i18n.service.I18nResourceService i18nResourceService;
+
     @InjectMocks
     private PageSchemaController pageSchemaController;
 
@@ -56,6 +65,9 @@ class PageSchemaKindValidationIntegrationTest {
 
     @BeforeEach
     void setup() {
+        org.mockito.Mockito.lenient()
+                .when(i18nLocaleResolver.resolveLocale(org.mockito.ArgumentMatchers.any()))
+                .thenReturn("zh-CN");
         mockMvc = MockMvcBuilders
                 .standaloneSetup(pageSchemaController)
                 .build();

@@ -16,6 +16,7 @@ import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +66,7 @@ class AggregateQueryFilterTreeTest {
     @Mock private MetaModelService metaModelService;
     @Mock private DataPermissionEngine dataPermissionEngine;
     @Mock private DataDomainService dataDomainService;
+    @Mock private PermissionEvaluator permissionEvaluator;
     @Mock private NamedQueryFieldProtection fieldProtection;
 
     @InjectMocks
@@ -75,6 +77,9 @@ class AggregateQueryFilterTreeTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(permissionEvaluator.canAction(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("read"))).thenReturn(true);
         org.mockito.Mockito.lenient().when(fieldProtection.rewrite(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
         org.mockito.Mockito.lenient().when(fieldProtection.prepare(org.mockito.ArgumentMatchers.any(),

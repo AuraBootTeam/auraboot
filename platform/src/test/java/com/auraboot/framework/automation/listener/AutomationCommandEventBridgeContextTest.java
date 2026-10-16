@@ -19,7 +19,8 @@ import static org.mockito.Mockito.*;
 
 class AutomationCommandEventBridgeContextTest {
     private final AutomationTriggerService triggers = mock(AutomationTriggerService.class);
-    private final AutomationCommandEventBridge bridge = new AutomationCommandEventBridge(triggers, mock(CommandStateCheckExecutor.class));
+    private final CommandStateCheckExecutor states = mock(CommandStateCheckExecutor.class);
+    private final AutomationCommandEventBridge bridge = new AutomationCommandEventBridge(triggers, states);
     @AfterEach void cleanup() {
         MetaContext.clear();
         ExecutionPrincipalContext.clear();
@@ -68,6 +69,53 @@ class AutomationCommandEventBridgeContextTest {
         assertThat(MetaContext.snapshot()).isEqualTo(previous);
         assertThat(ExecutionPrincipalContext.current()).contains(principal);
         assertThat(ContextEnvelopeContext.current()).contains(envelope);
+    }
+
+    @Test void updateWithServerTransitionDispatchesStateAndUpdateExactlyOnce() {
+        CommandCompletedEvent event = new CommandCompletedEvent(99L, "owned-record", "orders",
+                Map.of("status", "client-value"), "orders:complete", "UPDATE");
+        event.addMetadata("actorId", 11L);
+        event.addMetadata("beforeSnapshot", Map.of("order_status", "in_review"));
+        event.addMetadata("commandStateTransition", Map.of("stateField", "order_status", "toState", "done"));
+        bridge.onCommandCompleted(event);
+        verify(triggers).onStateChange("orders", "owned-record", "in_review", "done");
+        verifyNoInteractions(states);
+        verify(triggers).onRecordUpdate(eq("orders"), eq("owned-record"), any(), any());
+        verifyNoMoreInteractions(triggers);
+    }
+
+    @Test void ordinaryUpdatePayloadCannotImpersonateServerTransitionMetadata() {
+        CommandCompletedEvent event = new CommandCompletedEvent(99L, "owned-record", "orders",
+                Map.of("commandStateTransition", Map.of("stateField", "order_status", "toState", "done")),
+                "orders:update", "UPDATE");
+        event.addMetadata("actorId", 11L);
+        bridge.onCommandCompleted(event);
+        verify(triggers).onRecordUpdate(eq("orders"), eq("owned-record"), isNull(), any());
+        verifyNoMoreInteractions(triggers);
+    }
+
+    @Test void malformedTransitionMetadataDoesNotPromoteOrdinaryUpdate() {
+        CommandCompletedEvent event = new CommandCompletedEvent(99L, "owned-record", "orders",
+                Map.of(), "orders:update", "UPDATE");
+        event.addMetadata("actorId", 11L);
+        event.addMetadata("commandStateTransition", Map.of("stateField", "order_status", "toState", ""));
+        bridge.onCommandCompleted(event);
+        verify(triggers).onRecordUpdate(eq("orders"), eq("owned-record"), isNull(), any());
+        verifyNoMoreInteractions(triggers);
+    }
+
+    @Test void explicitLegacyTransitionStillResolvesCommittedState() {
+        CommandStateCheckExecutor states = mock(CommandStateCheckExecutor.class);
+        when(states.getStateFieldForModel("orders")).thenReturn("order_status");
+        when(states.readCurrentState(99L, "orders", "owned-record", "order_status")).thenReturn("done");
+        CommandCompletedEvent event = new CommandCompletedEvent(99L, "owned-record", "orders", Map.of(),
+                "orders:complete", "state_transition");
+        event.addMetadata("actorId", 11L);
+        event.addMetadata("beforeSnapshot", Map.of("order_status", "in_review"));
+        new AutomationCommandEventBridge(triggers, states).onCommandCompleted(event);
+        verify(triggers).onStateChange("orders", "owned-record", "in_review", "done");
+        verify(triggers).onRecordUpdate(eq("orders"), eq("owned-record"), any(), any());
+        verifyNoMoreInteractions(triggers);
     }
 
     @Test void missingTenantFailsClosedWithoutDispatch() {

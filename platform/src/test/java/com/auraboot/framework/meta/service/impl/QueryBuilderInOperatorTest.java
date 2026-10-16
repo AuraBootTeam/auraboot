@@ -32,7 +32,7 @@ class QueryBuilderInOperatorTest {
 
     @BeforeEach
     void setUp() {
-        queryBuilderService = new QueryBuilderServiceImpl(null);
+        queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
         
         // 准备测试模型
         testModel = ModelDefinition.builder()

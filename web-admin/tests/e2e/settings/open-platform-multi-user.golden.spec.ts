@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page, request as pwRequest } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 
 // GAP-02: owner / maintainer / viewer / non-member verified with four real
@@ -22,6 +23,8 @@ const ACCOUNTS = {
 };
 const APP_NAME = `开放平台多账号权限验收应用 ${RUN_TAG}`;
 const APP_DESCRIPTION = 'GAP-02 四真实账号权限验证：全部由真实后端裁决';
+const PUBLICATION_MUTATION = process.env.OP_PUBLICATION_AUTHORITY_MUTATION || '';
+if (PUBLICATION_MUTATION && PUBLICATION_MUTATION !== 'admin-principal') throw new Error('Unsupported publication authority mutation');
 
 const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -125,6 +128,72 @@ let appPid: string;
 let installationPid: string;
 let adminPid: string;
 const userPids: Record<string, string> = {};
+let resourceDefinition: Record<string, unknown>;
+let queryDefinition: Record<string, unknown>;
+let resourceCode: string;
+let queryCode: string;
+let modelCode: string;
+let namedCode: string;
+const readField = (source: string, type: string) => ({ source, type, readable: true, writable: false,
+  required: false, nullable: true, operators: [], sortable: false, referenceResource: null, properties: {}, items: null });
+
+async function verifyPublicationDenied(page: Page, session: Session, screenshotPrefix: string) {
+  await expect(page.getByTestId('open-platform-publications-link')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '模型通知', exact: true })).toHaveCount(0);
+  const access = await page.request.get(`${BACKEND_URL}/api/open-platform/access`, { headers: bearer(session) });
+  expect(access.status()).toBe(200);
+  expect((await access.json()).data).toMatchObject({ canManageModelNotifications: false });
+  const adminContext = await pwRequest.newContext();
+  try {
+    const admin = await apiLogin(adminContext, ACCOUNTS.admin.email, ACCOUNTS.admin.password);
+    const baseline = async () => {
+      const result: unknown[] = [];
+      for (const [endpoint, code] of [['publications', resourceCode], ['query-publications', queryCode]]) {
+        const response = await adminContext.get(`${BACKEND_URL}/api/open-platform/${endpoint}`, { headers: bearer(admin) });
+        expect(response.status()).toBe(200); const body = await response.json(); expect(String(body.code)).toBe('0');
+        const row = body.data.find((entry: { code: string }) => entry.code === code);
+        expect(row).toMatchObject({ code, status: 'published', activeVersion: 1, draftRevision: 1 }); result.push(row);
+        for (const kind of ['openapi', 'types']) {
+          const artifact = await adminContext.get(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/${kind}`, { headers: bearer(admin) });
+          expect(artifact.status()).toBe(200); result.push(await artifact.text());
+        }
+      }
+      for (const kind of ['resources', 'queries']) {
+        const grants = await adminContext.get(`${BACKEND_URL}/api/open-platform/installations/${installationPid}/${kind}`, { headers: bearer(admin) });
+        expect(grants.status()).toBe(200); result.push((await grants.json()).data);
+      }
+      return result;
+    };
+    const before = await baseline();
+    const headers = bearer(PUBLICATION_MUTATION === 'admin-principal' ? admin : session);
+    for (const [endpoint, code, definition] of [['publications', resourceCode, resourceDefinition], ['query-publications', queryCode, queryDefinition]] as const) {
+      expect((await page.request.get(`${BACKEND_URL}/api/open-platform/${endpoint}`, { headers })).status()).toBe(403);
+      for (const kind of ['openapi', 'types']) expect((await page.request.get(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/${kind}`, { headers })).status()).toBe(403);
+      expect((await page.request.put(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/draft`, { headers, data: { expectedRevision: 1, definition: { ...definition, schemaVersion: 2 } } })).status()).toBe(403);
+      for (const action of ['publish', 'withdraw']) expect((await page.request.post(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/${action}`, { headers, data: { expectedRevision: 1 } })).status()).toBe(403);
+    }
+    for (const source of [`publication-sources/${modelCode}`, 'query-sources', `query-sources/${namedCode}`]) {
+      expect((await page.request.get(`${BACKEND_URL}/api/open-platform/${source}`, { headers })).status()).toBe(403);
+    }
+    for (const [kind, code, policy] of [['resources', resourceCode, { operations: ['get', 'list'], readableFields: ['pid'], writableFields: [], rowConstraints: [] }],
+      ['queries', queryCode, { readableFields: ['pid'] }]] as const) {
+      const endpoint = `${BACKEND_URL}/api/open-platform/installations/${installationPid}/${kind}`;
+      expect((await page.request.get(endpoint, { headers })).status()).toBe(403);
+      expect((await page.request.put(`${endpoint}/${code}`, { headers, data: policy })).status()).toBe(403);
+      expect((await page.request.delete(`${endpoint}/${code}`, { headers })).status()).toBe(403);
+    }
+    expect(await baseline()).toEqual(before);
+    // A typed address is the denied bypass path after the normal menu hides the entry.
+    for (const [pageKey, testId, kind] of [['open_platform_publications', 'publication-editor', 'resource'], ['open_platform_queries', 'query-publication-editor', 'query']] as const) {
+      await page.goto(`/p/c/${pageKey}`); const editor = page.getByTestId(testId);
+      await expect(editor.getByRole('alert')).toHaveText('当前账号没有开放平台管理权限。');
+      await expect(editor.locator('form')).toHaveCount(0);
+      await expect(editor.getByRole('button', { name: /新建|发布|停用|保存|下载/ })).toHaveCount(0);
+      await capture(page, `${screenshotPrefix}-${kind}-denied`);
+    }
+    expect(await baseline()).toEqual(before);
+  } finally { await adminContext.dispose(); }
+}
 
 test.describe.serial('Open Platform four-real-account authority', () => {
   test.setTimeout(180_000);
@@ -135,6 +204,11 @@ test.describe.serial('Open Platform four-real-account authority', () => {
   });
 
   test.beforeAll(async () => {
+    await mkdir(EVIDENCE_DIR, { recursive: true });
+    if (process.env.AURA_UI_ACCEPTANCE_MATRIX) {
+      const matrix = JSON.parse(await readFile(process.env.AURA_UI_ACCEPTANCE_MATRIX, 'utf8'));
+      await writeFile(path.join(EVIDENCE_DIR, 'acceptance-matrix.json'), JSON.stringify(matrix, null, 2));
+    }
     const admin = await apiLogin(await pwRequest.newContext(), ACCOUNTS.admin.email, ACCOUNTS.admin.password);
     const ctx = await pwRequest.newContext();
 
@@ -188,12 +262,47 @@ test.describe.serial('Open Platform four-real-account authority', () => {
     expect(adminPid).toEqual(expect.any(String));
     expect(listedApp!.members).toHaveLength(4);
 
+    modelCode = `dop_role_${RUN_TAG.replace(/[^a-z0-9]/g, '_')}`;
+    resourceCode = `roles.parts.${Date.now()}`; queryCode = `roles.query.${Date.now()}`; namedCode = `${modelCode}_query`;
+    const createdModel = await ctx.post(`${BACKEND_URL}/api/meta/models`, { headers: bearer(admin), data: {
+      code: modelCode, displayName: `权限验证零件 ${RUN_TAG}`, tableName: modelCode, modelType: 'entity', sourceType: 'physical',
+      capabilities: { list: true, detail: true, create: true, update: true, delete: true, filter: true, sort: true, paginate: true },
+      fields: [{ code: 'dop_role_name', columnName: 'dop_role_name', displayName: '零件名称', dataType: 'string', required: true, editable: true }],
+    } });
+    expect(createdModel.status()).toBe(200); const model = (await createdModel.json()).data;
+    expect(model.tableName).toMatch(/^[a-z][a-z0-9_]+$/);
+    const modelPublished = await ctx.post(`${BACKEND_URL}/api/meta/models/${model.pid}/publish`, { headers: bearer(admin), data: { impactAcknowledged: true } });
+    expect(modelPublished.status()).toBe(200);
+    resourceDefinition = { code: resourceCode, modelCode, schemaVersion: 1, operations: ['get', 'list'], scopes: { get: 'op.role:read', list: 'op.role:read' },
+      dataPolicy: 'tenant_wide', fields: { pid: { ...readField('pid', 'pid'), nullable: false } }, maxPageSize: 20, maxConditions: 8, timeoutMs: 5000, events: [] };
+    const resourceSaved = await ctx.put(`${BACKEND_URL}/api/open-platform/publications/${resourceCode}/draft`, { headers: bearer(admin), data: { expectedRevision: 0, definition: resourceDefinition } });
+    expect(resourceSaved.status()).toBe(200);
+    expect((await ctx.post(`${BACKEND_URL}/api/open-platform/publications/${resourceCode}/publish`, { headers: bearer(admin), data: { expectedRevision: 1 } })).status()).toBe(200);
+    const named = await ctx.post(`${BACKEND_URL}/api/meta/named-queries`, { headers: bearer(admin), data: { code: namedCode, title: `权限验证查询 ${RUN_TAG}`, resourceCode: modelCode, actionCode: 'read',
+      fromSql: `${model.tableName} a`, defaultOrder: [{ field: 'pid', direction: 'asc' }], fields: [{ fieldCode: 'pid', columnExpr: 'a.pid', dataType: 'string', displayName: '记录标识', sortable: true, searchable: false }] } });
+    expect(named.status()).toBe(200); const namedPid = (await named.json()).data.pid;
+    for (const status of ['testing', 'published']) expect((await ctx.put(`${BACKEND_URL}/api/meta/named-queries/${namedPid}/status`, { headers: bearer(admin), data: { status } })).status()).toBe(200);
+    const described = await ctx.get(`${BACKEND_URL}/api/open-platform/query-sources/${namedCode}`, { headers: bearer(admin) });
+    expect(described.status()).toBe(200); const source = (await described.json()).data;
+    queryDefinition = { code: queryCode, queryCode: namedCode, schemaVersion: 1, sourceFingerprint: source.fingerprint, scopes: { execute: 'op.role:query' },
+      sourceResources: { [modelCode]: resourceCode }, parameters: {}, fields: { pid: readField('pid', 'pid') }, maxPageSize: 20, maxRows: 100, timeoutMs: 5000, maxConcurrent: 2 };
+    expect((await ctx.put(`${BACKEND_URL}/api/open-platform/query-publications/${queryCode}/draft`, { headers: bearer(admin), data: { expectedRevision: 0, definition: queryDefinition } })).status()).toBe(200);
+    expect((await ctx.post(`${BACKEND_URL}/api/open-platform/query-publications/${queryCode}/publish`, { headers: bearer(admin), data: { expectedRevision: 1 } })).status()).toBe(200);
+
     const install = await ctx.post(`${BACKEND_URL}/api/open-platform/applications/${appPid}/installations`, {
       headers: bearer(admin),
-      data: { environment: 'production', scopes: ['assets.read'], rateLimitPerMinute: 600 },
+      data: { environment: 'production', scopes: ['assets.read', 'op.role:read', 'op.role:query'], rateLimitPerMinute: 600 },
     });
     expect(install.ok(), `install failed: ${install.status()} ${await install.text()}`).toBeTruthy();
     installationPid = (await install.json()).data.pid;
+    const resourceGrant = await ctx.put(`${BACKEND_URL}/api/open-platform/installations/${installationPid}/resources/${resourceCode}`, {
+      headers: bearer(admin), data: { operations: ['get', 'list'], readableFields: ['pid'], writableFields: [], rowConstraints: [] },
+    });
+    expect(resourceGrant.status()).toBe(200);
+    const queryGrant = await ctx.put(`${BACKEND_URL}/api/open-platform/installations/${installationPid}/queries/${queryCode}`, {
+      headers: bearer(admin), data: { readableFields: ['pid'] },
+    });
+    expect(queryGrant.status()).toBe(200);
   });
 
   test('owner (admin) sees full management surface from the real account menu', async ({ page }) => {
@@ -241,6 +350,7 @@ test.describe.serial('Open Platform four-real-account authority', () => {
       headers: bearer(session),
     });
     expect(denyDisable.status(), 'maintainer must not disable the application').toBe(403);
+    await verifyPublicationDenied(page, session, 'OPX-UI-03-maintainer');
   });
 
   test('viewer is read-only and denied credentials and writes server-side', async ({ page }) => {
@@ -271,6 +381,7 @@ test.describe.serial('Open Platform four-real-account authority', () => {
       { headers: bearer(session), data: { role: 'viewer' } },
     );
     expect(denyWrite.status(), 'viewer must not manage members').toBe(403);
+    await verifyPublicationDenied(page, session, 'OPX-UI-04-viewer');
   });
 
   test('non-member sees an empty console and is denied all app access server-side', async ({ page }) => {
@@ -291,6 +402,7 @@ test.describe.serial('Open Platform four-real-account authority', () => {
       { headers: bearer(session), data: { role: 'owner' } },
     );
     expect(denyWrite.status(), 'non-member must not mutate the application').toBe(403);
+    await verifyPublicationDenied(page, session, 'OPX-UI-05-nonmember');
   });
 
   test('missing and disabled applications return 404 for reads and locked member writes', async () => {

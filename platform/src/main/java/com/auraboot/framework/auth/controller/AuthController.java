@@ -15,6 +15,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.saas.config.service.SystemModeService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 @Tag(name = "Authentication", description = "Login, register, and current user APIs")
 @RequiredArgsConstructor
+@AuthenticatedAccess("pre-authentication login/register/session flows; the JWT session is issued here and /access-policy is a public bootstrap endpoint, so authorization cannot precede these calls")
 public class AuthController {
 
     private final AuthService authService;

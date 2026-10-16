@@ -13,6 +13,7 @@ export interface ResourceOption {
   label: string;
   value: string;
   description?: string;
+  dictCode?: string;
 }
 
 interface PageRecord {
@@ -166,7 +167,17 @@ export async function fetchFieldOptions(modelCode: string): Promise<ResourceOpti
     label: f.extension?.displayName || f.code,
     value: f.code,
     description: f.dataType,
+    ...(f.dictCode ? { dictCode: f.dictCode } : {}),
   }));
+}
+
+/** Resolve the selected model field's dictionary; field codes are not dictionary codes. */
+export async function fetchFieldDictOptions(modelCode: string, fieldCode: string): Promise<ResourceOption[]> {
+  if (!modelCode || !fieldCode) return [];
+  const fields = await fetchFieldOptions(modelCode);
+  const dictCode = fields.find((field) => field.value === fieldCode)?.dictCode;
+  if (!dictCode) throw new Error('Selected field has no dictionary');
+  return fetchDictOptions(dictCode);
 }
 
 export async function fetchDictOptions(dictCode: string): Promise<ResourceOption[]> {
@@ -174,6 +185,9 @@ export async function fetchDictOptions(dictCode: string): Promise<ResourceOption
   const result = await fetchResult<DictItemRecord>(
     `/api/meta/dict/by-code/${encodeURIComponent(dictCode)}/data`,
   );
+  if (result?.code != null && String(result.code) !== '0') {
+    throw new Error('Dictionary options could not be loaded');
+  }
   return (result?.data?.items || []).map((item) => ({
     label: item.label || item.value,
     value: item.value,

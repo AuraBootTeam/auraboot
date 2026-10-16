@@ -39,7 +39,7 @@ public class QueryBuilderInOperatorPropertyTest {
                     .value(values)
                     .build();
 
-            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(null);
+            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
             QueryBuilderService.QueryBuilder builder = queryBuilderService
                     .buildConditionQuery(model, Collections.singletonList(condition));
 
@@ -77,7 +77,7 @@ public class QueryBuilderInOperatorPropertyTest {
                     .value(values)
                     .build();
 
-            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(null);
+            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
             QueryBuilderService.QueryBuilder builder = queryBuilderService
                     .buildConditionQuery(model, Collections.singletonList(condition));
 
@@ -109,7 +109,7 @@ public class QueryBuilderInOperatorPropertyTest {
                 .value(Collections.emptyList())
                 .build();
 
-        QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(null);
+        QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
         QueryBuilderService.QueryBuilder builder = queryBuilderService
                 .buildConditionQuery(model, Collections.singletonList(condition));
 
@@ -137,7 +137,7 @@ public class QueryBuilderInOperatorPropertyTest {
                 .value(Collections.emptyList())
                 .build();
 
-        QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(null);
+        QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
         QueryBuilderService.QueryBuilder builder = queryBuilderService
                 .buildConditionQuery(model, Collections.singletonList(condition));
 
@@ -166,7 +166,7 @@ public class QueryBuilderInOperatorPropertyTest {
                     .value(values)
                     .build();
 
-            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(null);
+            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
             QueryBuilderService.QueryBuilder builder = queryBuilderService
                     .buildConditionQuery(model, Collections.singletonList(condition));
 
@@ -195,7 +195,7 @@ public class QueryBuilderInOperatorPropertyTest {
                     .value(values)
                     .build();
 
-            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(null);
+            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
             QueryBuilderService.QueryBuilder builder = queryBuilderService
                     .buildConditionQuery(model, Collections.singletonList(condition));
 
@@ -225,7 +225,7 @@ public class QueryBuilderInOperatorPropertyTest {
                     .value(values)
                     .build();
 
-            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(null);
+            QueryBuilderService queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
             QueryBuilderService.QueryBuilder builder = queryBuilderService
                     .buildConditionQuery(model, Collections.singletonList(condition));
 

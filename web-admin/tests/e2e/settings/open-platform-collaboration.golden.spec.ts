@@ -185,8 +185,10 @@ test.describe('Open Platform collaboration golden states', () => {
     await page.getByTestId('open-platform-app-name').fill(appName);
     await dialog.getByRole('textbox', { name: '描述' }).fill('真实后端 owner 与成员管理验收');
     await dialog.getByRole('button', { name: '新建' }).click();
-    const application = page.getByTestId('open-platform-application-list')
-      .locator('article').filter({ hasText: appName });
+    const application = page
+      .getByTestId('open-platform-application-list')
+      .locator('article')
+      .filter({ hasText: appName });
     await expect(application).toHaveCount(1);
     await expect(application).toContainText(appName);
     await dismissToasts(page);
@@ -198,9 +200,18 @@ test.describe('Open Platform collaboration golden states', () => {
     await application.getByRole('button', { name: '管理成员' }).click();
     const memberDialog = page.getByRole('dialog', { name: '管理成员' });
     await expect(memberDialog).toBeVisible();
+    await expect(memberDialog.getByText('Admin', { exact: true })).toBeVisible();
+    await expect(memberDialog.getByRole('paragraph').filter({ hasText: /^所有者$/ })).toBeVisible();
+    await expect(memberDialog.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
     await capture(page, 'OPC-UI-03');
     const soleOwnerRemove = memberDialog.getByRole('button', { name: /移除成员/ }).first();
     await expect(soleOwnerRemove).toBeDisabled();
+    await expect(
+      memberDialog.getByText('先添加另一位所有者，再移除最后一位所有者。', { exact: true }),
+    ).toBeVisible();
+    await expect(soleOwnerRemove).toHaveAccessibleDescription(
+      '先添加另一位所有者，再移除最后一位所有者。',
+    );
     await memberDialog.screenshot({ path: path.join(EVIDENCE_DIR, 'OPC-UI-04.png') });
     await memberDialog.getByRole('button', { name: '取消' }).click();
 

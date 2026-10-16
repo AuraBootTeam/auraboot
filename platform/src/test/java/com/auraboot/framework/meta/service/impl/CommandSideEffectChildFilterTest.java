@@ -49,7 +49,7 @@ class CommandSideEffectChildFilterTest {
 
     @BeforeEach
     void setUp() {
-        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
+        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper, org.mockito.Mockito.mock(CommandModelMutationSupport.class));
     }
 
     /**

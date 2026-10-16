@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.Instant;
 
 @Data
-@TableName("ab_open_api_call_audit")
+@TableName(value = "ab_open_api_call_audit", autoResultMap = true)
 public class OpenApiCallAudit {
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -24,4 +24,7 @@ public class OpenApiCallAudit {
     private Long durationMs;
     private String remoteAddress;
     private Instant occurredAt;
+    @com.baomidou.mybatisplus.annotation.TableField(typeHandler = com.auraboot.framework.application.typehandler.JsonNodeTypeHandler.class,
+            jdbcType = org.apache.ibatis.type.JdbcType.OTHER)
+    private com.fasterxml.jackson.databind.JsonNode businessDetails;
 }

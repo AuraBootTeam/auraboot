@@ -21,6 +21,19 @@ import java.util.List;
  */
 @Mapper
 public interface PageSchemaMapper extends BaseMapper<PageSchema> {
+    /** Lock only the exact unchanged platform placeholder, never an authored page. */
+    @Select("""
+        SELECT pid FROM ab_page_schema
+        WHERE pid = #{pid} AND tenant_id = #{tenantId}
+          AND model_code = #{modelCode} AND kind = #{kind} AND page_key = #{pageKey}
+          AND COALESCE(deleted_flag, false) = false
+          AND extension->>'auto_created' = 'true'
+          AND COALESCE(row_version, 1) = #{rowVersion}
+        FOR UPDATE
+        """)
+    String lockAutoCreatedPage(@Param("pid") String pid, @Param("tenantId") Long tenantId,
+                              @Param("modelCode") String modelCode, @Param("kind") String kind,
+                              @Param("pageKey") String pageKey, @Param("rowVersion") int rowVersion);
     /**
      * Keep PageSchema mapper reads off SELECT * so PostgreSQL prepared plans do
      * not become invalid when bootstrap/setup evolves ab_page_schema columns.

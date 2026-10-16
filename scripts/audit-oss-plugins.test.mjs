@@ -122,7 +122,8 @@ describe('OSS plugin config audit', () => {
     before('quality', 'procurement');
     before('procurement', 'pcba-solution');
     before('pcba-solution', 'pcba-sales');
-    before('pcba-solution', 'pcba-manufacturing');
+    before('pcba-manufacturing', 'pcba-solution');
+    before('pcba-compliance', 'pcba-solution');
     before('pcba-industry', 'pcba-manufacturing');
     before('pcba-procurement', 'pcba-warehouse');
     before('pcba-manufacturing', 'pcba-warehouse');
