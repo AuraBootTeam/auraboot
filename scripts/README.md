@@ -159,6 +159,7 @@
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `lib/capability-eval-junit.mjs` | 1 | 2026-07-25 | Fail-closed JUnit receipt for the explicit digital-employee capability suite inventory. |
+| `dev/start-web-stack.sh` | 0 | 2026-10-16 | Launch the existing Web/BFF stack in explicitly selected development or production mode. |
 | `dev/lib/env-loader.sh` | 7 | 2026-05-22 | env-loader.sh — shell counterpart to web-admin/tests/helpers/environments.ts. |
 | `dev/lib/env-registry.mjs` | 4 | 2026-05-22 |  |
 | `dev/lib/health.sh` | 3 | 2026-05-22 | Sourceable health helpers for per-worktree dev stacks. |
@@ -244,6 +245,11 @@
 | `perf-ci/compare-baseline.sh` | 2 | 2026-03-26 | compare-baseline.sh — Compare k6 summary JSON files against a baseline. |
 | `perf-ci/notify.sh` | 1 | 2026-03-26 | notify.sh — Send performance regression result notifications. |
 | `perf-ci/run-perf-regression.sh` | 2 | 2026-05-11 | run-perf-regression.sh — Orchestrate performance regression checks. |
+| `performance/home-readiness.mjs` | 0 | 2026-10-16 | Install browser-side complete-home readiness and timing observations. |
+| `performance/measure-api.mjs` | 0 | 2026-10-16 | Measure authenticated API response times against an explicit performance target. |
+| `performance/measure-crud.mjs` | 0 | 2026-10-16 | Measure authenticated CRUD operations on the isolated performance fixture. |
+| `performance/measure-home.mjs` | 0 | 2026-10-16 | Measure browser home readiness and retain the native performance evidence. |
+| `performance/seed-api.mjs` | 0 | 2026-10-16 | Seed fixtures through the explicit performance API target. |
 | `publish-repos.sh` | 1 | 2026-04-15 |  |
 | `quickstart.sh` | 8 | 2026-07-13 | quickstart.sh — turn a freshly-started AuraBoot stack into a usable one. |
 | `release/bump-version.sh` | 1 | 2026-06-18 | Bump the release version. Single source of truth = VERSION at repo root. |

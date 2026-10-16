@@ -13,6 +13,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // when vi.mock factory runs.
 // ---------------------------------------------------------------------------
 const { fetchResultMock } = vi.hoisted(() => ({ fetchResultMock: vi.fn() }));
+const { workflowProvider } = vi.hoisted(() => ({ workflowProvider: vi.fn() }));
+
+vi.mock('~/framework/bootstrap', () => ({
+  getKernel: () => ({ contributionRegistry: { getPrimaryService: workflowProvider } }),
+}));
 
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: fetchResultMock,
@@ -28,7 +33,38 @@ import {
   fetchFieldDictOptions,
   fetchDictOptions,
   fetchSemanticModelOptions,
+  fetchWorkflowOptions,
 } from '../resourceSelectService';
+
+describe('product-owned workflow discovery', () => {
+  beforeEach(() => {
+    fetchResultMock.mockReset();
+    workflowProvider.mockReset();
+  });
+
+  it('does not issue product HTTP requests when no workflow provider is installed', async () => {
+    expect(await fetchWorkflowOptions()).toEqual([]);
+    expect(workflowProvider).toHaveBeenCalledWith('aura.resource.workflow');
+    expect(fetchResultMock).not.toHaveBeenCalled();
+  });
+
+  it('delegates to the installed product provider without a platform fallback', async () => {
+    const options = [{ label: 'Approval', value: 'approval' }];
+    const fetchOptions = vi.fn().mockResolvedValue(options);
+    workflowProvider.mockReturnValue({ provider: { fetchOptions } });
+    expect(await fetchWorkflowOptions()).toEqual(options);
+    expect(fetchOptions).toHaveBeenCalledOnce();
+    expect(fetchResultMock).not.toHaveBeenCalled();
+  });
+
+  it('propagates provider failures without claiming an empty list or retrying', async () => {
+    const fetchOptions = vi.fn().mockRejectedValue(new Error('Product unavailable'));
+    workflowProvider.mockReturnValue({ provider: { fetchOptions } });
+    await expect(fetchWorkflowOptions()).rejects.toThrow('Product unavailable');
+    expect(fetchOptions).toHaveBeenCalledOnce();
+    expect(fetchResultMock).not.toHaveBeenCalled();
+  });
+});
 
 describe('resourceSelectService — error propagation', () => {
   beforeEach(() => {

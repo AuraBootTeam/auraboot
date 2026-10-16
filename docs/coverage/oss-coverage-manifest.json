@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "8609d94ca",
+    "commit": "363e5f931",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -5239,7 +5239,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/crm/pipeline-journey-golden.spec.ts"
+            "web-admin/tests/e2e/dynamic/stage-rail-journey-golden.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
