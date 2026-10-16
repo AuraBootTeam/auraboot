@@ -119,7 +119,11 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject') {
 }
 
 test('real decision drafts, readiness and boundary outputs from the rule workbench @critical', async({page})=>{
-  await login(page);await menu(page,'策略工作台');
+  await login(page);
+  expect((await data(await page.request.get('/api/dynamic/tpm_acceptance/list'))).records).toHaveLength(0);
+  expect((await data(await page.request.get('/api/dynamic/tpm_project/list'))).records).toHaveLength(8);
+  await menu(page,'策略工作台');await expect(page.getByTestId('strategy-business-decision').locator('option')).toHaveCount(3);
+  await shot(page,'d16');
   await expect(page.getByTestId('strategy-studio')).toContainText('草稿尚未验证或已修改');
   await shot(page,'d01');
   await page.getByTestId('strategy-business-decision').selectOption('tpm_acceptance_route');
