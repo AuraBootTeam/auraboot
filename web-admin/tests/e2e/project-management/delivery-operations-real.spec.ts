@@ -12,7 +12,7 @@ async function data(r:APIResponse|Response){const b=await r.json();expect(r.stat
 async function login(page:Page,email=process.env.ADMIN_EMAIL!,tenant?:string){
  await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
  await page.locator('#identifier').fill(email);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);await page.getByRole('button',{name:'立即登录',exact:true}).click();await page.waitForURL(u=>!u.pathname.includes('/login'));
- if(new URL(page.url()).pathname==='/tenant-selection'){await page.getByTestId(`space-business-${tenant}`).click();await expect(page).not.toHaveURL(/tenant-selection/);}
+ if(new URL(page.url()).pathname==='/tenant-selection'){await page.getByTestId(`space-business-${tenant||process.env.AURA_ADMIN_TENANT_ID}`).click();await expect(page).not.toHaveURL(/tenant-selection/);}
  return data(await page.request.get('/api/auth/me'));
 }
 async function shot(page:Page,id:string){await mkdir(join(evidence!,'screenshots'),{recursive:true});await page.screenshot({path:join(evidence!,'screenshots',`${id}.png`),fullPage:true});}
@@ -24,7 +24,7 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  const checks=await data(await page.request.get('/api/dynamic/tdv_check/list',{params:{pageNum:'1',pageSize:'500'}}));
  expect(acceptances.records.length).toBeGreaterThan(0);expect(Number(acceptances.total)).toBe(acceptances.records.length);
  expect(checks.records.length).toBeGreaterThan(0);
- const sla:any[]=[];for(const a of acceptances.records){if(a.tpm_ac_process){const rows=await data(await page.request.get(`/api/bpm/monitor/instances/${a.tpm_ac_process}/sla`));sla.push(...rows);}}
+ const audits=new Map<string,any[]>(); const sla:any[]=[];for(const a of acceptances.records){if(a.tpm_ac_process){const rows=await data(await page.request.get(`/api/bpm/monitor/instances/${a.tpm_ac_process}/sla`));sla.push(...rows);audits.set(a.pid,await data(await page.request.get(`/api/bpm/monitor/instances/${a.tpm_ac_process}/audit`)));}}
  const oracle={pending_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='submitted').length,returned_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='returned').length,overdue_count:sla.filter(a=>a.status==='overdue').length,late_completed_count:sla.filter(a=>a.status==='completed'&&Date.parse(a.completedTime)>Date.parse(a.deadlineTime)).length};
  const widgetResponses:Promise<any>[]=[];
  page.on('response',r=>{if(/\/api\/dashboards\/[^/]+\/widgets\/[^/]+\/data$/.test(new URL(r.url()).pathname))widgetResponses.push(data(r).then(body=>({path:new URL(r.url()).pathname,body})));});
@@ -37,11 +37,17 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  for(const [key,value]of Object.entries(oracle))expect(Number(summary[key]),key).toBe(value);
  const factRows=widgets.find(w=>w.path.includes('/delivery-actions/')).body.rows;
  expect(factRows).toHaveLength(acceptances.records.length);expect(new Set(factRows.map((r:any)=>r.acceptance_pid)).size).toBe(factRows.length);
- for(const a of acceptances.records){const f=factRows.find((r:any)=>r.acceptance_pid===a.pid);expect(f.acceptance_name).toBe(a.tpm_ac_name);expect(Number(f.amount)).toBe(Number(a.tpm_ac_amount));expect(f.acceptance_status).toBe(a.tpm_ac_status);}
+ for(const a of acceptances.records){const f=factRows.find((r:any)=>r.acceptance_pid===a.pid);expect(f.acceptance_name).toBe(a.tpm_ac_name);expect(Number(f.amount)).toBe(Number(a.tpm_ac_amount));expect(f.acceptance_status).toBe(a.tpm_ac_status);
+ const audit=(audits.get(a.pid)||[]).filter(r=>['task_approve','task_reject','task_complete'].includes(r.operation)&&r.result==='success').sort((x,y)=>Date.parse(y.createdAt)-Date.parse(x.createdAt));
+ if(audit.length){expect(f.approval_result).toBe({task_approve:'同意',task_reject:'退回',task_complete:'已处理'}[audit[0].operation as 'task_approve']);expect(f.approval_comment).toBe(audit[0].details?.comment||'未填写意见');expect(Number(f.approval_minutes)).toBeGreaterThanOrEqual(0);}
+ if(a.tpm_ac_status==='accepted')expect(audit.length,'approved acceptance must have an actual approval decision').toBeGreaterThan(0);
+ const associated=checks.records.filter((c:any)=>c.tdv_ck_acceptance===a.pid).sort((x:any,y:any)=>Date.parse(y.created_at)-Date.parse(x.created_at)||String(y.id).localeCompare(String(x.id)));
+ const check=associated[0];if(check?.tdv_ck_checked_at){expect(f.checks_passed).toBe(check.tdv_ck_passed);if(Date.parse(check.tdv_ck_checked_at)<Date.parse(a.updated_at))expect(f.verification_result).toBe('资料已更新 · 需复核');}
+ }
  await shot(page,'OP01');
  const before=widgetResponses.length;await page.getByRole('button',{name:'刷新',exact:true}).click();await expect.poll(()=>widgetResponses.length).toBeGreaterThanOrEqual(before+7);await shot(page,'OP03');
  await page.setViewportSize({width:1280,height:900});await expect(page.getByRole('heading',{name:'交付经营看板',exact:true})).toBeVisible();await shot(page,'OP04');await page.setViewportSize({width:1440,height:1000});
- const target=factRows[0];const table=page.locator('div').filter({has:page.getByRole('heading',{name:'交付行动清单 · 点击行定位验收单',exact:true})});
+ const target=factRows[0];
  // Use the first actual rendered business row; the server fact is an independent identity oracle.
  const firstRow=page.getByRole('row').filter({hasText:target.acceptance_name}).first();await firstRow.click();
  await expect(page).toHaveURL(/\/p\/tpm_acceptance\?/);await expect(page.getByRole('row').filter({hasText:target.acceptance_name})).toHaveCount(1);
@@ -61,4 +67,35 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
   await writeFile(`${output}.parsed.txt`,text);await shot(page,id);await info.attach(`retrospective-${format}`,{path:output,contentType:exported.headers()['content-type']});artifacts.push({format,path:output,bytes:bytes.length});
  }
  await writeFile(join(evidence!,'operations-receipt.json'),JSON.stringify({reportPid:pid,oracle,summary,factRows,acceptances:acceptances.records,checks:checks.records,sla,artifacts},null,2));
+});
+
+test('OP source grants independently protect native SLA and verification facts in dashboard and all report formats',async({page,browser})=>{
+ test.setTimeout(240000);const admin=await login(page);const tenant=String(admin.user.tenantId);
+ const receipt=JSON.parse(await readFile(join(evidence!,'operations-receipt.json'),'utf8'));const reportPid=receipt.reportPid;
+ const tree=await data(await page.request.get('/api/permissions/tree'));const ids=new Map<string,number>();const collect=(nodes:any[])=>nodes.forEach(n=>{ids.set(n.code,n.id);collect(n.children||[]);});collect(tree);
+ const suffix=crypto.randomUUID().replaceAll('-','').slice(0,12),code=`tdo_review_${suffix}`;
+ const role=await data(await page.request.post('/api/roles',{data:{code,name:'交付复盘审阅',type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}}));
+ const grants=['dashboard.read','meta.query.read','report.definition.view','report.export.execute','model.tpm_acceptance.read','model.tpm_project.read','model.tdv_check.read','bpm.monitor.read','tpm.project.read','tpm.acceptance.read'];
+ for(const code of grants)expect(ids.has(code),code).toBe(true);
+ const grant=async(missing:string|null)=>{await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>({permissionId:ids.get(code),granted:code!==missing}))}));};
+ await grant(null);const email=`${code}@e2e.local`;await data(await page.request.post('/api/admin/users',{data:{email,displayName:'交付复盘审阅员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
+ const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});const actor=await context.newPage();
+ try{
+  const identity=await login(actor,email,tenant);expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
+  for(const missing of [null,'bpm.monitor.read','model.tdv_check.read']){
+   await grant(missing);await actor.reload();
+   const queries:Promise<any>[]=[];const observe=(r:Response)=>{if(/\/api\/dashboards\/[^/]+\/widgets\/[^/]+\/data$/.test(new URL(r.url()).pathname))queries.push(r.finished().then(()=>({status:r.status()})));};actor.on('response',observe);
+   await actor.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect.poll(()=>queries.length).toBeGreaterThanOrEqual(7);const outcomes=await Promise.all(queries);actor.off('response',observe);
+   for(const result of outcomes)expect(result.status).toBe(missing?403:200);
+   if(missing)await expect(actor.getByTestId('dashboard-block-delivery-actions').getByRole('alert')).toBeVisible();else await expect(actor.getByTestId('dashboard-block-delivery-actions')).toContainText(receipt.factRows[0].acceptance_name);
+   await shot(actor,missing==='bpm.monitor.read'?'OP05':'OP05-verification-'+(missing?'denied':'allowed'));
+   for(const format of ['markdown','html','pdf']){const r=await actor.request.post(`/api/reports/export/${format}`,{data:{reportPid}});expect(r.status(),`${missing}: ${format}`).toBe(missing?403:200);if(missing)expect(await r.text()).not.toContain(receipt.factRows[0].acceptance_name);}
+   if(missing){
+    await navigateToMenuByClick(actor,['元数据管理','报表管理']);await actor.getByRole('row').filter({hasText:'客户项目交付复盘'}).last().getByRole('button',{name:/打开|Open/}).click();
+    const toolbar=actor.getByTestId('report-reader-toolbar').filter({visible:true});await expect(toolbar).toBeVisible();
+    for(const format of ['Markdown','HTML','PDF']){const denied=actor.waitForResponse(r=>new URL(r.url()).pathname===`/api/reports/export/${format.toLowerCase()}`&&r.request().method()==='POST');await toolbar.getByRole('button',{name:`导出 ${format}`,exact:true}).click();expect((await denied).status()).toBe(403);}
+    await shot(actor,'OP12-'+missing.replaceAll('.','-'));
+   }
+  }
+ }finally{await context.close();}
 });
