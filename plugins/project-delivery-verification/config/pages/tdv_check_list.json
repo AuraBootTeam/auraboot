@@ -1,0 +1,175 @@
+{
+  "modelCode": "tdv_check",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "pageKey": "tdv_check_list",
+  "name:zh-CN": "交付核验",
+  "name:en": "Delivery verification",
+  "kind": "list",
+  "title": {
+    "zh-CN": "交付核验",
+    "en": "Delivery verification"
+  },
+  "blocks": [
+    {
+      "id": "actions",
+      "blockType": "toolbar",
+      "area": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "action": "create",
+          "primary": true,
+          "permissionCode": "tdv.check.manage",
+          "label": {
+            "zh-CN": "新建核验",
+            "en": "New verification"
+          }
+        }
+      ]
+    },
+    {
+      "id": "queues",
+      "blockType": "tabs",
+      "area": "list-tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          },
+          "filter": null
+        },
+        {
+          "key": "pending",
+          "label": {
+            "zh-CN": "待核验",
+            "en": "Not checked"
+          },
+          "filter": {
+            "field": "tdv_ck_status",
+            "operator": "EQ",
+            "value": "pending"
+          }
+        },
+        {
+          "key": "blocked",
+          "label": {
+            "zh-CN": "需要补正",
+            "en": "Needs correction"
+          },
+          "filter": {
+            "field": "tdv_ck_status",
+            "operator": "EQ",
+            "value": "blocked"
+          }
+        },
+        {
+          "key": "passed",
+          "label": {
+            "zh-CN": "核验通过",
+            "en": "Passed"
+          },
+          "filter": {
+            "field": "tdv_ck_status",
+            "operator": "EQ",
+            "value": "passed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "records",
+      "blockType": "table",
+      "area": "main",
+      "columns": [
+        {
+          "field": "tdv_ck_name",
+          "width": 240,
+          "sortable": true
+        },
+        {
+          "field": "tdv_ck_acceptance",
+          "width": 250
+        },
+        {
+          "field": "tdv_ck_status",
+          "width": 130,
+          "dictCode": "tdv_status",
+          "presentation": {
+            "kind": "badge"
+          }
+        },
+        {
+          "field": "tdv_ck_passed",
+          "width": 110
+        },
+        {
+          "field": "tdv_ck_checked_at",
+          "width": 180,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": {
+            "zh-CN": "操作",
+            "en": "Actions"
+          },
+          "buttons": [
+            {
+              "code": "view",
+              "action": "detail",
+              "navigateTo": "tdv_check_detail",
+              "label": {
+                "zh-CN": "查看",
+                "en": "View"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "tdv_ck_name"
+      ],
+      "searchPlaceholder": {
+        "zh-CN": "搜索项目或核验名称",
+        "en": "Search project or verification name"
+      },
+      "defaultSort": {
+        "field": "tdv_ck_checked_at",
+        "order": "desc"
+      },
+      "empty": {
+        "title": {
+          "zh-CN": "还没有交付核验",
+          "en": "No delivery verifications yet"
+        },
+        "description": {
+          "zh-CN": "先建立交付验收单，再新建核验记录，检查材料、范围、金额和可用预算。",
+          "en": "Create an acceptance first, then verify evidence, scope, amount and available budget."
+        }
+      }
+    }
+  ],
+  "extension": {
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目交付",
+      "en": "Project delivery"
+    },
+    "pageDescription": {
+      "zh-CN": "把材料、验收标准和预算占用核对清楚，再交给审批人判断。",
+      "en": "Check evidence, acceptance criteria and budget before human review."
+    },
+    "hideQuickFilters": true,
+    "hideSavedViews": true,
+    "hideViewAnalysis": true,
+    "hideRowHeight": true,
+    "hideFilterChips": true,
+    "rowHeight": "tall"
+  }
+}

@@ -1,0 +1,223 @@
+[
+  {
+    "code": "tdv_status",
+    "name": "status",
+    "name:zh-CN": "核验结论",
+    "name:en": "status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Not checked",
+        "label:zh-CN": "待核验",
+        "label:en": "Not checked",
+        "sortNo": 0,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "passed",
+        "label": "Passed",
+        "label:zh-CN": "核验通过",
+        "label:en": "Passed",
+        "sortNo": 1,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Needs correction",
+        "label:zh-CN": "需要补正",
+        "label:en": "Needs correction",
+        "sortNo": 2,
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tdv_materials",
+    "name": "materials",
+    "name:zh-CN": "交付材料",
+    "name:en": "materials",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Not checked",
+        "label:zh-CN": "待核验",
+        "label:en": "Not checked",
+        "sortNo": 0,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "passed",
+        "label": "Evidence attached",
+        "label:zh-CN": "已附交付材料",
+        "label:en": "Evidence attached",
+        "sortNo": 1,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Attach delivery evidence",
+        "label:zh-CN": "请上传交付材料",
+        "label:en": "Attach delivery evidence",
+        "sortNo": 2,
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tdv_scope",
+    "name": "scope",
+    "name:zh-CN": "验收范围",
+    "name:en": "scope",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Not checked",
+        "label:zh-CN": "待核验",
+        "label:en": "Not checked",
+        "sortNo": 0,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "passed",
+        "label": "Scope provided",
+        "label:zh-CN": "已填写验收范围",
+        "label:en": "Scope provided",
+        "sortNo": 1,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Provide completion criteria",
+        "label:zh-CN": "请填写完成标准",
+        "label:en": "Provide completion criteria",
+        "sortNo": 2,
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tdv_amount_check",
+    "name": "amount_check",
+    "name:zh-CN": "金额校验",
+    "name:en": "amount_check",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Not checked",
+        "label:zh-CN": "待核验",
+        "label:en": "Not checked",
+        "sortNo": 0,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "passed",
+        "label": "Valid amount",
+        "label:zh-CN": "金额有效",
+        "label:en": "Valid amount",
+        "sortNo": 1,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Amount must be positive",
+        "label:zh-CN": "验收金额须大于零",
+        "label:en": "Amount must be positive",
+        "sortNo": 2,
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      }
+    ]
+  },
+  {
+    "code": "tdv_budget_check",
+    "name": "budget_check",
+    "name:zh-CN": "预算校验",
+    "name:en": "budget_check",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Not checked",
+        "label:zh-CN": "待核验",
+        "label:en": "Not checked",
+        "sortNo": 0,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "passed",
+        "label": "Within available budget",
+        "label:zh-CN": "在可用预算内",
+        "label:en": "Within available budget",
+        "sortNo": 1,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Exceeds available budget",
+        "label:zh-CN": "超出可用预算",
+        "label:en": "Exceeds available budget",
+        "sortNo": 2,
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "missing",
+        "label": "Set the project budget first",
+        "label:zh-CN": "请先填写项目预算",
+        "label:en": "Set the project budget first",
+        "sortNo": 3,
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      }
+    ]
+  }
+]

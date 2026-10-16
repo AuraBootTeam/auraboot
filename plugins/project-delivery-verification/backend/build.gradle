@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+}
+
+group = 'com.auraboot.plugins'
+version = '1.0.0'
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+repositories {
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+    mavenCentral()
+}
+def apiJar = providers.gradleProperty('platformPluginApiJar').orNull
+if (!apiJar || !file(apiJar).isFile()) {
+    throw new GradleException('Supply the exact host -PplatformPluginApiJar=<platform-plugin-api JAR>')
+}
+dependencies {
+    compileOnly files(apiJar)
+    compileOnly 'org.pf4j:pf4j:3.15.1'
+    annotationProcessor 'org.pf4j:pf4j:3.15.1'
+    compileOnly 'org.slf4j:slf4j-api:2.0.18'
+    testImplementation files(apiJar)
+    testImplementation 'org.pf4j:pf4j:3.15.1'
+    testImplementation platform('org.junit:junit-bom:5.14.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+test { useJUnitPlatform(); finalizedBy jacocoTestReport }
+jacocoTestReport { reports { xml.required = true; html.required = true } }
+jar {
+    archiveBaseName = 'delivery-verification-plugin'
+    manifest {
+        attributes('Plugin-Id': 'com.auraboot.project-delivery-verification',
+            'Plugin-Version': version,
+            'Plugin-Class': 'com.auraboot.plugins.delivery.DeliveryVerificationPlugin',
+            'Plugin-Provider': 'AuraBoot Team')
+    }
+}
