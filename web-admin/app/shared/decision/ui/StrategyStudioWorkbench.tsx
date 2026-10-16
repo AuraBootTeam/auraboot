@@ -872,10 +872,12 @@ function buildScenarioTable(scenario: StrategyScenario): DecisionTable {
   }
 }
 
-function initialScenarioTables(): Record<StrategyScenarioKey, DecisionTable> {
+function studioTableKey(scenario: StrategyScenario): string { return `${scenario.key}:${scenario.decisionCode}` }
+
+function initialScenarioTables(): Record<string, DecisionTable> {
   return Object.fromEntries(
-    SCENARIOS.map((scenario) => [scenario.key, buildScenarioTable(scenario)]),
-  ) as Record<StrategyScenarioKey, DecisionTable>
+    SCENARIOS.map((scenario) => [studioTableKey(scenario), buildScenarioTable(scenario)]),
+  ) as Record<string, DecisionTable>
 }
 
 function isDecisionTable(value: unknown): value is DecisionTable {
@@ -1010,8 +1012,18 @@ export function StrategyStudioWorkbench({
   const st = useSmartText()
   const { text } = useStrategyStudioText()
   const [scenarioKey, setScenarioKey] = useState<StrategyScenarioKey>('SLA')
+  const [selectedDecisionCode, setSelectedDecisionCode] = useState<string>('')
+  const [businessTestValues, setBusinessTestValues] = useState<Record<string, string>>({})
+  const [testOutputs, setTestOutputs] = useState<Record<string, unknown> | null>(null)
   const [selectedFragmentCode, setSelectedFragmentCode] = useState<string | null>(null)
-  const [operationStatus, setOperationStatus] = useState<string | null>(null)
+  const [operationStatus, setStatus] = useState<string | null>(null)
+  const [operationTone, setOperationTone] = useState<'info' | 'success' | 'error'>('info')
+  const setOperationStatus = (message: string, tone: 'info' | 'success' | 'error' = 'info') => {
+    setStatus(message)
+    setOperationTone(tone)
+  }
+  const [readiness, setReadiness] = useState<Record<string, { fingerprint: string; valid: boolean; impact: boolean; fragmentValid: boolean }>>({})
+  const [checkingReadiness, setCheckingReadiness] = useState(false)
   const [draftVersionPids, setDraftVersionPids] = useState<Record<string, string>>({})
   const [conditionFragmentDrafts, setConditionFragmentDrafts] =
     useState<Record<string, ConditionFragment>>({})
@@ -1028,18 +1040,18 @@ export function StrategyStudioWorkbench({
   // default (empty) drafts before restoration happens.
   const [draftStoreScope, setDraftStoreScope] = useState('')
   const [catalogActions, setCatalogActions] = useState<DecisionAction[]>([])
-  const [tableDrafts, setTableDrafts] = useState<Record<StrategyScenarioKey, DecisionTable>>(
+  const [tableDrafts, setTableDrafts] = useState<Record<string, DecisionTable>>(
     initialScenarioTables,
   )
   const tableDraftsRef = useRef(tableDrafts)
-  const dirtyScenarioTablesRef = useRef<Set<StrategyScenarioKey>>(new Set())
+  const dirtyScenarioTablesRef = useRef<Set<string>>(new Set())
   const restoredScenarioTablesRef = useRef<Set<string>>(new Set())
-  const [tableAnalyses, setTableAnalyses] = useState<Partial<Record<StrategyScenarioKey, DecisionTableAnalysis | null>>>({})
-  const [tableAnalysisErrors, setTableAnalysisErrors] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
+  const [tableAnalyses, setTableAnalyses] = useState<Partial<Record<string, DecisionTableAnalysis | null>>>({})
+  const [tableAnalysisErrors, setTableAnalysisErrors] = useState<Partial<Record<string, string | null>>>({})
   const [tableAnalyzing, setTableAnalyzing] = useState(false)
-  const [tableDmnXmls, setTableDmnXmls] = useState<Partial<Record<StrategyScenarioKey, string>>>({})
-  const [tableDmnErrors, setTableDmnErrors] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
-  const [tableDmnStatuses, setTableDmnStatuses] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
+  const [tableDmnXmls, setTableDmnXmls] = useState<Partial<Record<string, string>>>({})
+  const [tableDmnErrors, setTableDmnErrors] = useState<Partial<Record<string, string | null>>>({})
+  const [tableDmnStatuses, setTableDmnStatuses] = useState<Partial<Record<string, string | null>>>({})
   const [tableDmnBusy, setTableDmnBusy] = useState(false)
   const [activeWorkspacePanel, setActiveWorkspacePanel] =
     useState<StrategyWorkspacePanelKey>('rule')
@@ -1063,17 +1075,18 @@ export function StrategyStudioWorkbench({
   )
   const selectedFragment = useMemo(
     () =>
-      explicitSelectedFragment ??
-      compatibleFragments.find((fragment) => scenarioForFragment(fragment)?.key === scenario.key),
-    [compatibleFragments, explicitSelectedFragment, scenario.key],
+      selectedDecisionCode
+        ? compatibleFragments.find((fragment) => fragment.decisionRefs?.includes(selectedDecisionCode))
+        : explicitSelectedFragment ?? compatibleFragments.find((fragment) => scenarioForFragment(fragment)?.key === scenario.key),
+    [compatibleFragments, explicitSelectedFragment, scenario.key, selectedDecisionCode],
   )
   const activeScenario = useMemo<StrategyScenario>(
     () => ({
       ...scenario,
-      decisionCode: explicitSelectedFragment?.decisionRefs?.[0] || scenario.decisionCode,
+      decisionCode: selectedDecisionCode || explicitSelectedFragment?.decisionRefs?.[0] || scenario.decisionCode,
       fragment: selectedFragment ? fragmentLabel(selectedFragment) : NO_FRAGMENT_LABEL,
     }),
-    [scenario, explicitSelectedFragment, selectedFragment],
+    [scenario, explicitSelectedFragment, selectedFragment, selectedDecisionCode],
   )
   const studioEyebrow = st('$i18n:decisionops.header.eyebrow', 'Strategy Studio')
   const decisionOptions = useMemo(() => mergeDecisions(decisions, DECISIONS), [decisions])
@@ -1088,12 +1101,12 @@ export function StrategyStudioWorkbench({
   const scenarioFields = useMemo(() => {
     const fragmentFields = fieldsFromFragment(selectedFragment)
     const catalogBackedFields = mergeFields(
-      activeScenario.fields,
-      filterScenarioFields(activeScenario, fragmentFields, fields),
+      selectedDecisionCode ? [] : activeScenario.fields,
+      selectedDecisionCode ? fields : filterScenarioFields(activeScenario, fragmentFields, fields),
     )
     return mergeFields(catalogBackedFields, fragmentFields)
-  }, [activeScenario, fields, selectedFragment])
-  const scenarioTable = tableDrafts[activeScenario.key] ?? buildScenarioTable(activeScenario)
+  }, [activeScenario, fields, selectedFragment, selectedDecisionCode])
+  const scenarioTable = tableDrafts[studioTableKey(activeScenario)] ?? buildScenarioTable(activeScenario)
   const activeDecisionOptions = useMemo(
     () => scenarioDecisionOptions(decisionOptions, activeScenario, scenarioTable),
     [activeScenario, decisionOptions, scenarioTable],
@@ -1153,18 +1166,18 @@ export function StrategyStudioWorkbench({
     api.listVersions(activeScenario.decisionCode)
       .then((versions) => {
         if (cancelled) return
-        if (dirtyScenarioTablesRef.current.has(activeScenario.key)) return
+        if (dirtyScenarioTablesRef.current.has(studioTableKey(activeScenario))) return
         const latest = latestRestorableTableVersion(versions)
         if (!latest || !isDecisionTable(latest.contentJson)) return
         const restoredTable = normalizeRestoredTable(latest.contentJson, buildScenarioTable(activeScenario))
         const drafts = {
           ...tableDraftsRef.current,
-          [activeScenario.key]: restoredTable,
+          [studioTableKey(activeScenario)]: restoredTable,
         }
         tableDraftsRef.current = drafts
         setTableDrafts(drafts)
         if (String(latest.status ?? '').toUpperCase() === 'DRAFT') {
-          setDraftVersionPids((current) => ({ ...current, [activeScenario.key]: latest.pid }))
+          setDraftVersionPids((current) => ({ ...current, [studioTableKey(activeScenario)]: latest.pid }))
         }
       })
       .catch(() => {
@@ -1175,6 +1188,7 @@ export function StrategyStudioWorkbench({
 
   const selectScenario = (next: StrategyScenario, fragment?: ConditionFragment) => {
     setScenarioKey(next.key)
+    setSelectedDecisionCode('')
     setSelectedFragmentCode(fragment?.fragmentCode ?? null)
     setActiveWorkspacePanel('rule')
     setOperationStatus(
@@ -1193,14 +1207,14 @@ export function StrategyStudioWorkbench({
     selectScenario(nextScenario, fragment)
   }
 
-  const clearTableFeedback = (key: StrategyScenarioKey) => {
+  const clearTableFeedback = (key: string) => {
     setTableAnalyses((current) => ({ ...current, [key]: null }))
     setTableAnalysisErrors((current) => ({ ...current, [key]: null }))
     setTableDmnErrors((current) => ({ ...current, [key]: null }))
     setTableDmnStatuses((current) => ({ ...current, [key]: null }))
   }
 
-  const updateScenarioTable = (key: StrategyScenarioKey, next: DecisionTable) => {
+  const updateScenarioTable = (key: string, next: DecisionTable) => {
     dirtyScenarioTablesRef.current.add(key)
     const drafts = { ...tableDraftsRef.current, [key]: next }
     tableDraftsRef.current = drafts
@@ -1209,13 +1223,17 @@ export function StrategyStudioWorkbench({
   }
 
   const getScenarioTable = (target: StrategyScenario): DecisionTable =>
-    tableDraftsRef.current[target.key] ?? buildScenarioTable(target)
+    tableDraftsRef.current[studioTableKey(target)] ?? buildScenarioTable(target)
 
-  const publishStatus =
-    activeScenario.blockers > 0
-      ? text('publishBlockedCount', { count: activeScenario.blockers })
-      : text('publishCheckPassed', { consumer: text(SCENARIO_TEXT[activeScenario.key].consumer) })
-  const activeDecisionName = DECISION_NAME_KEYS[activeScenario.decisionCode]
+  const draftFingerprint = JSON.stringify({ table: scenarioTable, binding: ruleBindingDrafts[ruleBindingKey(activeScenario, selectedFragment)], fragment: selectedFragment })
+  const currentReadiness = readiness[activeScenario.decisionCode]
+  const checksCurrent = currentReadiness?.fingerprint === draftFingerprint
+  const draftValid = checksCurrent && currentReadiness.valid
+  const impactChecked = checksCurrent && currentReadiness.impact
+  const fragmentReady = !selectedFragment || String(selectedFragment.status).toUpperCase() === 'PUBLISHED' || Boolean(checksCurrent && currentReadiness.fragmentValid)
+  const publishReady = Boolean(draftValid && impactChecked && fragmentReady)
+  const publishStatus = text(publishReady ? 'publishReady' : 'checksRequired')
+  const activeDecisionName = !selectedDecisionCode && DECISION_NAME_KEYS[activeScenario.decisionCode]
     ? text(DECISION_NAME_KEYS[activeScenario.decisionCode])
     : decisionDisplayName(
       activeDecisionOptions,
@@ -1271,61 +1289,99 @@ export function StrategyStudioWorkbench({
         }),
       )
     } catch (error) {
-      setOperationStatus(text('impactFailed', { message: errorMessage(error, text) }))
+      setOperationStatus(text('impactFailed', { message: errorMessage(error, text) }), 'error')
     }
+  }
+
+  const checkReadiness = async () => {
+    const code = activeScenario.decisionCode
+    const fingerprint = draftFingerprint
+    setCheckingReadiness(true)
+    setReadiness((current) => ({ ...current, [code]: { fingerprint, valid: false, impact: false, fragmentValid: false } }))
+    try {
+      const validation = await api.validate('DECISION_TABLE', 'PLATFORM_DECISION_TABLE', toRuntimeDecisionTable(getScenarioTable(activeScenario)))
+      if (!validation?.valid) throw new Error(validationMessage(validation, text))
+      setReadiness((current) => ({ ...current, [code]: { fingerprint, valid: true, impact: false, fragmentValid: false } }))
+      if (selectedFragment && String(selectedFragment.status).toUpperCase() !== 'PUBLISHED') {
+        if (!selectedFragment.pid) throw new Error(text('fragmentUnpublished'))
+        const checkedFragment = await api.validateConditionFragmentVersion(selectedFragment.pid)
+        if (!['VALIDATED', 'PUBLISHED'].includes(String(checkedFragment.status).toUpperCase())) throw new Error(text('fragmentUnpublished'))
+      }
+      await api.getDecisionImpact(code)
+      setReadiness((current) => ({ ...current, [code]: { fingerprint, valid: true, impact: true, fragmentValid: true } }))
+      setOperationStatus(text('checksFinished'), 'success')
+    } catch (error) {
+      setOperationStatus(text('checksFailed', { message: errorMessage(error, text) }), 'error')
+    } finally {
+      setCheckingReadiness(false)
+    }
+  }
+
+  const testContext = () => {
+    if (!selectedDecisionCode) return sampleContext()
+    const context: Record<string, Record<string, unknown>> = {}
+    for (const input of scenarioTable.inputs) {
+      const value = businessTestValues[`${activeScenario.decisionCode}:${input.id}`]
+      if (value === undefined || value === '') continue
+      const scope = input.scope ?? 'record'
+      const parts = (input.path ?? '').split('.')
+      if (!parts.length || parts.some((part) => !part || ['__proto__', 'constructor', 'prototype'].includes(part))) continue
+      let target: Record<string, unknown> = context[scope] ??= {}
+      for (const part of parts.slice(0, -1)) target = (target[part] ??= {}) as Record<string, unknown>
+      target[parts[parts.length - 1]] = ['integer', 'decimal', 'number'].includes(input.dataType ?? '') ? Number(value) : value
+    }
+    return context
   }
 
   const runTest = async () => {
     setOperationStatus(text('testRunning'))
+    setTestOutputs(null)
     try {
-      const result = await api.evaluate({
-        decisionCode: activeScenario.decisionCode,
-        binding: 'LATEST',
-        callerType: activeScenario.key,
-        callerRef: activeScenario.ruleCode,
-        context: sampleContext(),
+      const result = await api.testRun({
+        kind: 'DECISION_TABLE',
+        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+        contentJson: toRuntimeDecisionTable(getScenarioTable(activeScenario)),
+        context: testContext(),
       })
-      if (!result) {
-        throw new Error(text('evaluateNoResult'))
-      }
-      setOperationStatus(
-        text('testResult', {
-          result: result.matched ? text('testMatched') : text('testNotMatched'),
-          id: result.traceId ?? result.status,
-        }),
-      )
+      if (!result) throw new Error(text('evaluateNoResult'))
+      if (result.status === 'ERROR') throw new Error(result.errors?.join('; ') || text('evaluateNoResult'))
+      setTestOutputs(result.outputs ?? {})
+      setOperationStatus(text('testResult', {
+        result: result.matched ? text('testMatched') : text('testNotMatched'),
+        id: result.traceId ?? result.status,
+      }), 'success')
     } catch (error) {
-      setOperationStatus(text('testFailed', { message: errorMessage(error, text) }))
+      setOperationStatus(text('testFailed', { message: errorMessage(error, text) }), 'error')
     }
   }
 
   const analyzeScenarioTable = async () => {
     const target = activeScenario
     setTableAnalyzing(true)
-    setTableAnalysisErrors((current) => ({ ...current, [target.key]: null }))
+    setTableAnalysisErrors((current) => ({ ...current, [studioTableKey(target)]: null }))
     try {
       const result = await api.analyzeTable(
         getScenarioTable(target),
         target.decisionCode,
-        draftVersionPids[target.key],
+        draftVersionPids[studioTableKey(target)],
       )
-      setTableAnalyses((current) => ({ ...current, [target.key]: result }))
+      setTableAnalyses((current) => ({ ...current, [studioTableKey(target)]: result }))
     } catch (error) {
-      setTableAnalyses((current) => ({ ...current, [target.key]: null }))
-      setTableAnalysisErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
+      setTableAnalyses((current) => ({ ...current, [studioTableKey(target)]: null }))
+      setTableAnalysisErrors((current) => ({ ...current, [studioTableKey(target)]: errorMessage(error, text) }))
     } finally {
       setTableAnalyzing(false)
     }
   }
 
-  const setScenarioDmnXml = (key: StrategyScenarioKey, xml: string) => {
+  const setScenarioDmnXml = (key: string, xml: string) => {
     setTableDmnXmls((current) => ({ ...current, [key]: xml }))
     setTableDmnErrors((current) => ({ ...current, [key]: null }))
     setTableDmnStatuses((current) => ({ ...current, [key]: null }))
   }
 
   const applyDmnResult = (
-    key: StrategyScenarioKey,
+    key: string,
     result: DecisionTableDmnXmlResult,
     status: string,
     updateModel: boolean,
@@ -1351,20 +1407,20 @@ export function StrategyStudioWorkbench({
   const exportScenarioDmn = async () => {
     const target = activeScenario
     setTableDmnBusy(true)
-    setTableDmnErrors((current) => ({ ...current, [target.key]: null }))
+    setTableDmnErrors((current) => ({ ...current, [studioTableKey(target)]: null }))
     try {
       const result = await api.exportTableDmn(
         getScenarioTable(target),
         target.ruleCode,
         target.decisionCode,
       )
-      applyDmnResult(target.key, result, text('dmnExported'), false)
+      applyDmnResult(studioTableKey(target), result, text('dmnExported'), false)
       if (result.valid && result.dmnXml) {
         downloadDmnXml(target.ruleCode, result.dmnXml)
       }
     } catch (error) {
-      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
-      setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
+      setTableDmnErrors((current) => ({ ...current, [studioTableKey(target)]: errorMessage(error, text) }))
+      setTableDmnStatuses((current) => ({ ...current, [studioTableKey(target)]: null }))
     } finally {
       setTableDmnBusy(false)
     }
@@ -1373,13 +1429,13 @@ export function StrategyStudioWorkbench({
   const importScenarioDmn = async () => {
     const target = activeScenario
     setTableDmnBusy(true)
-    setTableDmnErrors((current) => ({ ...current, [target.key]: null }))
+    setTableDmnErrors((current) => ({ ...current, [studioTableKey(target)]: null }))
     try {
-      const result = await api.importTableDmn(tableDmnXmls[target.key] ?? '')
-      applyDmnResult(target.key, result, text('dmnImported'), true)
+      const result = await api.importTableDmn(tableDmnXmls[studioTableKey(target)] ?? '')
+      applyDmnResult(studioTableKey(target), result, text('dmnImported'), true)
     } catch (error) {
-      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
-      setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
+      setTableDmnErrors((current) => ({ ...current, [studioTableKey(target)]: errorMessage(error, text) }))
+      setTableDmnStatuses((current) => ({ ...current, [studioTableKey(target)]: null }))
     } finally {
       setTableDmnBusy(false)
     }
@@ -1388,17 +1444,17 @@ export function StrategyStudioWorkbench({
   const roundTripScenarioDmn = async () => {
     const target = activeScenario
     setTableDmnBusy(true)
-    setTableDmnErrors((current) => ({ ...current, [target.key]: null }))
+    setTableDmnErrors((current) => ({ ...current, [studioTableKey(target)]: null }))
     try {
       const result = await api.roundTripTableDmn(
         getScenarioTable(target),
         target.ruleCode,
         target.decisionCode,
       )
-      applyDmnResult(target.key, result, text('roundTripPassed'), true)
+      applyDmnResult(studioTableKey(target), result, text('roundTripPassed'), true)
     } catch (error) {
-      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
-      setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
+      setTableDmnErrors((current) => ({ ...current, [studioTableKey(target)]: errorMessage(error, text) }))
+      setTableDmnStatuses((current) => ({ ...current, [studioTableKey(target)]: null }))
     } finally {
       setTableDmnBusy(false)
     }
@@ -1439,7 +1495,7 @@ export function StrategyStudioWorkbench({
       contextSchemaJson: { sample: sampleContext() },
     })
     if (draft.pid) {
-      setDraftVersionPids((current) => ({ ...current, [target.key]: draft.pid }))
+      setDraftVersionPids((current) => ({ ...current, [studioTableKey(target)]: draft.pid }))
     }
     return draft.pid ?? null
   }
@@ -1540,19 +1596,19 @@ export function StrategyStudioWorkbench({
       )
       return { decisionPid, conditionFragmentPid }
     } catch (error) {
-      setOperationStatus(text('saveFailed', { message: errorMessage(error, text) }))
+      setOperationStatus(text('saveFailed', { message: errorMessage(error, text) }), 'error')
       return null
     }
   }
 
   const publish = async () => {
-    if (activeScenario.blockers > 0) {
-      setOperationStatus(publishStatus)
+    if (!publishReady) {
+      setOperationStatus(publishStatus, 'error')
       return
     }
     setOperationStatus(text('publishing'))
     const saved = await saveDraft()
-    const pid = saved?.decisionPid ?? draftVersionPids[activeScenario.key]
+    const pid = saved?.decisionPid ?? draftVersionPids[studioTableKey(activeScenario)]
     if (!pid) return
     try {
       if (saved?.conditionFragmentPid) {
@@ -1574,7 +1630,7 @@ export function StrategyStudioWorkbench({
         throw new Error(text('versionValidationNoResult'))
       }
       if (!validation.valid) {
-        setOperationStatus(text('publishFailed', { message: validationMessage(validation, text) }))
+        setOperationStatus(text('publishFailed', { message: validationMessage(validation, text) }), 'error')
         return
       }
       const published = await api.publishVersion(pid, {
@@ -1588,7 +1644,7 @@ export function StrategyStudioWorkbench({
         text('publishSucceeded', { consumer: text(SCENARIO_TEXT[activeScenario.key].consumer) }),
       )
     } catch (error) {
-      setOperationStatus(text('publishFailed', { message: errorMessage(error, text) }))
+      setOperationStatus(text('publishFailed', { message: errorMessage(error, text) }), 'error')
     }
   }
 
@@ -1597,7 +1653,8 @@ export function StrategyStudioWorkbench({
       <header className="strategy-studio-header">
         <div>
           <p>{studioEyebrow}</p>
-          <h3>{text(SCENARIO_TEXT[activeScenario.key].title)}</h3>
+          <h3>{selectedDecisionCode ? decisionDisplayName(decisions, selectedDecisionCode, selectedDecisionCode) : text(SCENARIO_TEXT[activeScenario.key].title)}</h3>
+          <label>{text('selectBusinessDecision')}<select data-testid="strategy-business-decision" value={selectedDecisionCode} onChange={(event) => { setSelectedDecisionCode(event.target.value); setSelectedFragmentCode(null) }}><option value="">{text('scenarioTemplate')}</option>{decisions.map((decision) => <option key={decision.code} value={decision.code}>{decision.name || decision.code}</option>)}</select></label>
         </div>
         <div className="strategy-studio-actions">
           <button
@@ -1631,12 +1688,14 @@ export function StrategyStudioWorkbench({
           </button>
         </div>
       </header>
+      {selectedDecisionCode && <div className="strategy-studio-metrics" data-testid="strategy-test-inputs">{scenarioTable.inputs.map((input) => <label key={input.id}>{input.label || input.id}<input aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value }))} /></label>)}</div>}
       {operationStatus && (
-        <div className="strategy-operation-status" data-testid="strategy-operation-status">
+        <div className="strategy-operation-status" data-testid="strategy-operation-status" data-tone={operationTone} role={operationTone === 'error' ? 'alert' : 'status'}>
           {operationStatus}
         </div>
       )}
 
+      {testOutputs && <dl className="strategy-test-outputs" data-testid="strategy-test-outputs">{Object.entries(testOutputs).map(([key, value]) => <div key={key}><dt>{scenarioTable.outputs.find((output) => output.id === key)?.label || key}</dt><dd>{typeof value === 'object' ? text('structuredOutput') : String(value)}</dd></div>)}</dl>}
       <div className="strategy-scenarios" aria-label={text('scenarioGroupLabel')}>
         {SCENARIOS.map((candidate) => (
           <button
@@ -1670,8 +1729,8 @@ export function StrategyStudioWorkbench({
         </div>
         <div>
           <span>{text('metricBlockers')}</span>
-          <strong>{activeScenario.blockers}</strong>
-          <small>{activeScenario.blockers > 0 ? text('blockersPending') : text('blockersReady')}</small>
+          <strong>{checksCurrent ? Number(!draftValid) + Number(!impactChecked) + Number(!fragmentReady) : '—'}</strong>
+          <small>{publishStatus}</small>
         </div>
       </div>
 
@@ -1772,16 +1831,16 @@ export function StrategyStudioWorkbench({
               <DecisionTableEditor
                 key={activeScenario.key}
                 value={scenarioTable}
-                onChange={(next) => updateScenarioTable(activeScenario.key, next)}
-                analysis={tableAnalyses[activeScenario.key] ?? null}
+                onChange={(next) => updateScenarioTable(studioTableKey(activeScenario), next)}
+                analysis={tableAnalyses[studioTableKey(activeScenario)] ?? null}
                 analyzing={tableAnalyzing}
-                analysisError={tableAnalysisErrors[activeScenario.key] ?? null}
+                analysisError={tableAnalysisErrors[studioTableKey(activeScenario)] ?? null}
                 onAnalyze={analyzeScenarioTable}
-                dmnXml={tableDmnXmls[activeScenario.key] ?? ''}
+                dmnXml={tableDmnXmls[studioTableKey(activeScenario)] ?? ''}
                 dmnBusy={tableDmnBusy}
-                dmnError={tableDmnErrors[activeScenario.key] ?? null}
-                dmnStatus={tableDmnStatuses[activeScenario.key] ?? null}
-                onDmnXmlChange={(xml) => setScenarioDmnXml(activeScenario.key, xml)}
+                dmnError={tableDmnErrors[studioTableKey(activeScenario)] ?? null}
+                dmnStatus={tableDmnStatuses[studioTableKey(activeScenario)] ?? null}
+                onDmnXmlChange={(xml) => setScenarioDmnXml(studioTableKey(activeScenario), xml)}
                 onExportDmnXml={exportScenarioDmn}
                 onImportDmnXml={importScenarioDmn}
                 onRoundTripDmnXml={roundTripScenarioDmn}
@@ -1864,14 +1923,15 @@ export function StrategyStudioWorkbench({
             <div className="strategy-studio-panel-head">
               <strong>{text('publishCheckTitle')}</strong>
               <span>
-                {activeScenario.blockers > 0 ? text('publishBlocked') : text('publishReady')}
+                {publishStatus}
               </span>
             </div>
+            <button type="button" data-testid="strategy-check-readiness" disabled={checkingReadiness} onClick={() => void checkReadiness()}>{text(checkingReadiness ? 'checkingReadiness' : 'checkReadiness')}</button>
             <div className="strategy-check-list">
-              <span data-state="ok">{text('checkFieldsResolvable')}</span>
-              <span data-state="ok">{text('checkFragmentVersionAvailable')}</span>
-              <span data-state={activeScenario.blockers > 0 ? 'warn' : 'ok'}>
-                {text('checkImpactConfirmed')}
+              <span data-state={draftValid ? 'ok' : 'pending'}>{text(draftValid ? 'checkFieldsResolvable' : 'draftCheckPending')}</span>
+              <span data-state={fragmentReady ? 'neutral' : 'warn'}>{text(!selectedFragment ? 'fragmentNotUsed' : fragmentReady ? 'checkFragmentVersionAvailable' : 'fragmentUnpublished')}</span>
+              <span data-state={impactChecked ? 'ok' : 'pending'}>
+                {text(impactChecked ? 'checkImpactConfirmed' : 'impactCheckPending')}
               </span>
             </div>
           </section>

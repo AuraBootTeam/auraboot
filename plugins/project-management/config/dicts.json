@@ -233,5 +233,89 @@
     ],
     "name": "Project type",
     "dictType": "static"
+  },
+  {
+    "code": "tpm_acceptance_status",
+    "name:zh-CN": "验收状态",
+    "name:en": "Acceptance status",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "label:en": "Draft",
+        "sortNo": 0,
+        "extension": {
+          "color": "gray"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "submitted",
+        "label": "In review",
+        "label:zh-CN": "审批中",
+        "label:en": "In review",
+        "sortNo": 1,
+        "extension": {
+          "color": "blue"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "returned",
+        "label": "Needs revision",
+        "label:zh-CN": "待补正",
+        "label:en": "Needs revision",
+        "sortNo": 2,
+        "extension": {
+          "color": "orange"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "验收通过",
+        "label:en": "Accepted",
+        "sortNo": 3,
+        "extension": {
+          "color": "green"
+        },
+        "status": "enabled"
+      }
+    ],
+    "name": "Acceptance status",
+    "dictType": "static"
+  },
+  {
+    "code": "tpm_acceptance_risk",
+    "name:zh-CN": "验收风险",
+    "name:en": "Acceptance risk",
+    "items": [
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "普通",
+        "label:en": "Normal",
+        "sortNo": 0,
+        "extension": {
+          "color": "blue"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "high",
+        "label": "High risk",
+        "label:zh-CN": "高风险",
+        "label:en": "High risk",
+        "sortNo": 1,
+        "extension": {
+          "color": "red"
+        },
+        "status": "enabled"
+      }
+    ],
+    "name": "Acceptance risk",
+    "dictType": "static"
   }
 ]

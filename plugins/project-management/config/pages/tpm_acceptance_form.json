@@ -1,0 +1,170 @@
+{
+  "pageKey": "tpm_acceptance_form",
+  "name:zh-CN": "交付验收表单",
+  "name:en": "Acceptance form",
+  "modelCode": "tpm_acceptance",
+  "kind": "form",
+  "schemaVersion": 4,
+  "title": {
+    "zh-CN": "交付验收",
+    "en": "Delivery acceptance"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "identity",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "验收范围",
+        "en": "Acceptance scope"
+      },
+      "fields": [
+        {
+          "field": "tpm_ac_name",
+          "colSpan": 12,
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：会员门户 · 第一阶段验收",
+              "en": "e.g. Member portal · Phase one acceptance"
+            },
+            "helpText": {
+              "zh-CN": "用交付范围命名，便于审批人识别本次验收。",
+              "en": "Name the delivery scope so reviewers can identify this acceptance."
+            }
+          }
+        },
+        {
+          "field": "tpm_ac_project",
+          "colSpan": 6,
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "选择本次验收所属项目",
+              "en": "Select the delivery project"
+            },
+            "helpText": {
+              "zh-CN": "引用当前空间真实项目；审批和报告保持同一业务关联。",
+              "en": "Link a project in this space for approval and reporting."
+            }
+          }
+        },
+        {
+          "field": "tpm_ac_scope",
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "列出本次交付内容和可验证的完成标准",
+              "en": "Describe deliverables and verifiable completion criteria"
+            },
+            "helpText": {
+              "zh-CN": "审批人将对照此范围检查交付材料。",
+              "en": "Reviewers compare delivery evidence against these criteria."
+            }
+          }
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "risk",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "风险与审批",
+        "en": "Risk and approval"
+      },
+      "fields": [
+        {
+          "field": "tpm_ac_amount",
+          "colSpan": 6,
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：68000",
+              "en": "e.g. 68000"
+            },
+            "helpText": {
+              "zh-CN": "单位为人民币元；达到10万元进入加强审批。",
+              "en": "Amount in CNY; at least 100,000 requires enhanced review."
+            }
+          }
+        },
+        {
+          "field": "tpm_ac_risk",
+          "colSpan": 6,
+          "required": true,
+          "props": {
+            "helpText": {
+              "zh-CN": "高风险或金额达到10万元进入加强审批；普通8小时，加强2小时。",
+              "en": "High risk or at least CNY 100,000 requires enhanced review: 2 hours; standard review: 8 hours."
+            }
+          }
+        },
+        {
+          "field": "tpm_ac_reviewer",
+          "colSpan": 12,
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "选择具有审批权限的空间成员",
+              "en": "Select a space member with workflow permission"
+            },
+            "helpText": {
+              "zh-CN": "审批任务仅分配给所选成员；提交人不能代替他人审批。",
+              "en": "Only the selected member receives this review task."
+            }
+          }
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "materials",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "交付材料",
+        "en": "Delivery materials"
+      },
+      "fields": [
+        {
+          "field": "tpm_ac_files",
+          "colSpan": 12,
+          "props": {
+            "helpText": {
+              "zh-CN": "草稿可暂不上传；提交验收前必须提供材料。",
+              "en": "Optional for drafts; required before submitting for approval."
+            }
+          }
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "area": "footer",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tpm:create_acceptance",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存验收草稿",
+            "en": "Save draft"
+          }
+        },
+        {
+          "code": "cancel",
+          "action": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -69,5 +69,20 @@
       "icon": "Building",
       "category": "project-management"
     }
+  },
+  {
+    "code": "tpm_acceptance",
+    "displayName:zh-CN": "交付验收",
+    "displayName:en": "Delivery acceptance",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "description": "Delivery acceptance with governed approval and SLA.",
+    "extension": {
+      "titleField": "tpm_ac_name",
+      "subtitleField": "tpm_ac_code",
+      "icon": "ClipboardCheck",
+      "category": "project-management",
+      "activityTimelineEnabled": true
+    }
   }
 ]

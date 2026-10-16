@@ -594,5 +594,53 @@
   "checkImpactConfirmed": {
     "zh-CN": "影响面已确认",
     "en": "Impact confirmed"
+  },
+  "checksRequired": {
+    "zh-CN": "待检查：先保存草稿，再运行发布检查",
+    "en": "Checks required: save a draft, then run publication checks"
+  },
+  "draftCheckPending": {
+    "zh-CN": "草稿尚未验证或已修改",
+    "en": "Draft not validated or changed"
+  },
+  "fragmentNotUsed": {
+    "zh-CN": "未使用条件片段",
+    "en": "No condition fragment used"
+  },
+  "fragmentUnpublished": {
+    "zh-CN": "条件片段尚未发布",
+    "en": "Condition fragment is not published"
+  },
+  "impactCheckPending": {
+    "zh-CN": "影响面尚未检查或已修改",
+    "en": "Impact not checked or changed"
+  },
+  "checkReadiness": {
+    "zh-CN": "检查发布条件",
+    "en": "Check publication readiness"
+  },
+  "checkingReadiness": {
+    "zh-CN": "正在检查…",
+    "en": "Checking…"
+  },
+  "checksFinished": {
+    "zh-CN": "检查完成；请核对影响面后发布",
+    "en": "Checks complete; review impact before publishing"
+  },
+  "checksFailed": {
+    "zh-CN": "检查未通过 · {message}。请保存有效草稿并重试。",
+    "en": "Checks failed · {message}. Save a valid draft and try again."
+  },
+  "selectBusinessDecision": {
+    "zh-CN": "业务决策",
+    "en": "Business decision"
+  },
+  "scenarioTemplate": {
+    "zh-CN": "场景模板（尚未发布）",
+    "en": "Scenario template (not published)"
+  },
+  "structuredOutput": {
+    "zh-CN": "结构化输出（见执行追踪）",
+    "en": "Structured output (see execution trace)"
   }
 }

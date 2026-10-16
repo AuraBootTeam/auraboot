@@ -186,6 +186,7 @@ public class AssertPhase implements CommandPhase {
                 yield true;
             }
             case "NOT_NULL" -> actual != null;
+            case "NOT_EMPTY" -> hasContent(actual);
             case "NULL" -> actual == null;
             case "GT", "GE", "LT", "LE" -> compareNumeric(op, actual, expected);
             case "CONTAINS" -> actual != null && String.valueOf(actual).contains(String.valueOf(expected));
@@ -242,6 +243,18 @@ public class AssertPhase implements CommandPhase {
             case "ends_with", "endswith" -> "ENDS_WITH";
             default -> operator.trim().toUpperCase();
         };
+    }
+
+    private boolean hasContent(Object value) {
+        if (value instanceof CharSequence text) return !text.toString().isBlank();
+        if (value instanceof java.util.Collection<?> collection) return !collection.isEmpty();
+        if (value instanceof Map<?, ?> map) return !map.isEmpty();
+        if (value instanceof com.fasterxml.jackson.databind.JsonNode node) {
+            if (node.isTextual()) return !node.asText().isBlank();
+            return node.isContainerNode() && !node.isEmpty();
+        }
+        return value != null && value.getClass().isArray()
+                && java.lang.reflect.Array.getLength(value) > 0;
     }
 
     private boolean compareNumeric(String op, Object actual, Object expected) {

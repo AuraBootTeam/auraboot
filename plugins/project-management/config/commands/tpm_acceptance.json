@@ -1,0 +1,222 @@
+[
+  {
+    "modelCode": "tpm_acceptance",
+    "permissions": [
+      "tpm.acceptance.manage"
+    ],
+    "idempotent": false,
+    "reversible": false,
+    "code": "tpm:create_acceptance",
+    "displayName:zh-CN": "新建验收",
+    "displayName:en": "Create acceptance",
+    "type": "create",
+    "inputFields": [
+      "tpm_ac_name",
+      "tpm_ac_project",
+      "tpm_ac_amount",
+      "tpm_ac_risk",
+      "tpm_ac_scope",
+      "tpm_ac_files",
+      "tpm_ac_reviewer"
+    ],
+    "autoSetFields": {
+      "tpm_ac_code": {
+        "strategy": "auto_generate",
+        "pattern": "ACC-{yyyyMMdd}-{seq}"
+      },
+      "tpm_ac_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "preconditions": [
+      {
+        "field": "tpm_ac_amount",
+        "operator": "gte",
+        "value": 0,
+        "message:zh-CN": "交付金额必须为非负数。",
+        "message:en": "Delivery amount must be nonnegative."
+      },
+      {
+        "field": "tpm_ac_risk",
+        "operator": "in",
+        "value": [
+          "normal",
+          "high"
+        ],
+        "message:zh-CN": "请选择有效风险等级。",
+        "message:en": "Select a valid risk level."
+      }
+    ]
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "permissions": [
+      "tpm.acceptance.manage"
+    ],
+    "idempotent": false,
+    "reversible": false,
+    "code": "tpm:update_acceptance",
+    "displayName:zh-CN": "编辑验收",
+    "displayName:en": "Edit acceptance",
+    "type": "update",
+    "inputFields": [
+      "tpm_ac_name",
+      "tpm_ac_project",
+      "tpm_ac_amount",
+      "tpm_ac_risk",
+      "tpm_ac_scope",
+      "tpm_ac_files",
+      "tpm_ac_reviewer"
+    ],
+    "preconditions": [
+      {
+        "field": "tpm_ac_status",
+        "operator": "in",
+        "value": [
+          "draft",
+          "returned"
+        ],
+        "message:zh-CN": "只有草稿或待补正验收可以编辑。",
+        "message:en": "Only draft or returned acceptance can be edited."
+      },
+      {
+        "field": "tpm_ac_amount",
+        "operator": "gte",
+        "value": 0,
+        "message:zh-CN": "交付金额必须为非负数。",
+        "message:en": "Delivery amount must be nonnegative."
+      },
+      {
+        "field": "tpm_ac_risk",
+        "operator": "in",
+        "value": [
+          "normal",
+          "high"
+        ],
+        "message:zh-CN": "请选择有效风险等级。",
+        "message:en": "Select a valid risk level."
+      }
+    ]
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "permissions": [
+      "tpm.acceptance.manage"
+    ],
+    "idempotent": false,
+    "reversible": false,
+    "code": "tpm:submit_acceptance",
+    "displayName:zh-CN": "提交验收",
+    "displayName:en": "Submit acceptance",
+    "type": "state_transition",
+    "stateField": "tpm_ac_status",
+    "fromStates": [
+      "draft",
+      "returned"
+    ],
+    "toState": "submitted",
+    "preconditions": [
+      {
+        "field": "tpm_ac_scope",
+        "operator": "not_empty",
+        "message:zh-CN": "请填写验收范围与完成标准。",
+        "message:en": "Describe the acceptance scope and criteria."
+      },
+      {
+        "field": "tpm_ac_files",
+        "operator": "not_empty",
+        "message:zh-CN": "请上传交付材料后再提交验收。",
+        "message:en": "Upload delivery materials before submission."
+      },
+      {
+        "field": "tpm_ac_amount",
+        "operator": "gte",
+        "value": 0,
+        "message:zh-CN": "交付金额必须为非负数。",
+        "message:en": "Delivery amount must be nonnegative."
+      },
+      {
+        "field": "tpm_ac_risk",
+        "operator": "in",
+        "value": [
+          "normal",
+          "high"
+        ],
+        "message:zh-CN": "请选择有效风险等级。",
+        "message:en": "Select a valid risk level."
+      }
+    ],
+    "postActions": [
+      {
+        "type": "start_process",
+        "processKey": "tpm_delivery_acceptance",
+        "businessKey": "${recordPid}",
+        "title": "${payload.tpm_ac_name}",
+        "storeInstanceIdIn": "tpm_ac_process",
+        "variables": {
+          "tpm_ac_amount": "${payload.tpm_ac_amount}",
+          "tpm_ac_risk": "${payload.tpm_ac_risk}",
+          "tpm_ac_name": "${payload.tpm_ac_name}",
+          "tpm_ac_reviewer": "${payload.tpm_ac_reviewer}"
+        }
+      }
+    ]
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "permissions": [
+      "tpm.acceptance.manage"
+    ],
+    "idempotent": false,
+    "reversible": false,
+    "code": "tpm:accept_acceptance",
+    "displayName:zh-CN": "确认验收结果",
+    "displayName:en": "Confirm acceptance result",
+    "type": "state_transition",
+    "stateField": "tpm_ac_status",
+    "fromStates": [
+      "submitted"
+    ],
+    "toState": "accepted",
+    "executionConfig": {
+      "options": {
+        "workflowOnly": true
+      }
+    },
+    "autoSetFields": {
+      "tpm_ac_result": {
+        "strategy": "fixed_value",
+        "value": "审批通过，交付材料已确认。"
+      }
+    }
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "permissions": [
+      "tpm.acceptance.manage"
+    ],
+    "idempotent": false,
+    "reversible": false,
+    "code": "tpm:return_acceptance",
+    "displayName:zh-CN": "退回补正结果",
+    "displayName:en": "Return acceptance result",
+    "type": "state_transition",
+    "stateField": "tpm_ac_status",
+    "fromStates": [
+      "submitted"
+    ],
+    "toState": "returned",
+    "executionConfig": {
+      "options": {
+        "workflowOnly": true
+      }
+    },
+    "autoSetFields": {
+      "tpm_ac_result": {
+        "strategy": "fixed_value",
+        "value": "审批退回，请补充交付材料后重新提交。"
+      }
+    }
+  }
+]

@@ -278,6 +278,38 @@ class CommandAuthorizationPhaseTest {
                 .isEqualTo(CommandPermitPlan.Decision.ABSTAIN);
     }
 
+    @Test
+    void workflowOnlyRejectsForgedPayloadAndCrossRecordOrTenantInvocations() {
+        CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
+        ctx.getExecConfig().put("options", Map.of("workflowOnly", true));
+        ctx.getRequest().setTargetRecordId("record-one");
+        ctx.getRequest().setPayload(Map.of("workflowOnly", true, "processInstanceId", "forged"));
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(BusinessException.class);
+        var otherRecord = new com.auraboot.framework.plugin.extension.WorkflowCommandScope.Invocation(1L, "process-one", "record-two");
+        assertThatThrownBy(() -> com.auraboot.framework.plugin.extension.WorkflowCommandScope.call(otherRecord, () -> { phase().execute(ctx); return null; }))
+                .isInstanceOf(BusinessException.class);
+        var otherTenant = new com.auraboot.framework.plugin.extension.WorkflowCommandScope.Invocation(2L, "process-one", "record-one");
+        assertThatThrownBy(() -> com.auraboot.framework.plugin.extension.WorkflowCommandScope.call(otherTenant, () -> { phase().execute(ctx); return null; }))
+                .isInstanceOf(BusinessException.class);
+        assertThat(com.auraboot.framework.plugin.extension.WorkflowCommandScope.current()).isNull();
+        verifyNoInteractions(userPermissionService);
+    }
+
+    @Test
+    void owningWorkflowStillRequiresDeclaredPermissionAndClearsItsScope() {
+        CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
+        ctx.getExecConfig().put("options", Map.of("workflowOnly", true));
+        ctx.getRequest().setTargetRecordId("record-one");
+        var invocation = new com.auraboot.framework.plugin.extension.WorkflowCommandScope.Invocation(1L, "process-one", "record-one");
+        when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(false);
+        assertThatThrownBy(() -> com.auraboot.framework.plugin.extension.WorkflowCommandScope.call(invocation, () -> { phase().execute(ctx); return null; }))
+                .isInstanceOf(BusinessException.class);
+        when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(true);
+        com.auraboot.framework.plugin.extension.WorkflowCommandScope.call(invocation, () -> { phase().execute(ctx); return null; });
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isTrue();
+        assertThat(com.auraboot.framework.plugin.extension.WorkflowCommandScope.current()).isNull();
+    }
+
     private CommandPipelineContext contextWithPermissions(Object permissions, Long userId) {
         Map<String, Object> execConfig = new HashMap<>();
         if (permissions != null) {
