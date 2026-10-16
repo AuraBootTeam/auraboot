@@ -20,4 +20,14 @@ describe('Referenced business facts', () => {
     render(<WorkspaceRecordSection block={{ id: 'facts', title: 'Information' }} fields={[{ field: 'customer', label: 'Contact', dataType: 'reference', refTarget: { targetEntity: 'customers' }, referenceDisplayField: 'customer_contact' }]} record={{ customer: 'customer-2' }} locale="en" t={(key: string) => key} getDictItems={() => []} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the related object');
   });
+  it('formats a timestamp in the declared workspace timezone and preserves currency cents', () => {
+    render(<WorkspaceRecordSection block={{ id: 'snapshot', title: 'Snapshot' }} fields={[
+      { field: 'checked_at', label: 'Checked at', dataType: 'datetime' },
+      { field: 'budget', label: 'Available', dataType: 'decimal', presentation: { kind: 'currency', currencyCode: 'CNY', precision: 2 } },
+    ]} record={{ checked_at: '2026-10-16T14:42:39.804+00:00', budget: '68000.01' }} locale="zh-CN" timezone="Asia/Shanghai" t={(key: string) => key} getDictItems={() => []} />);
+    expect(screen.getByText('2026年10月16日 22:42:39')).toBeInTheDocument();
+    expect(screen.getByText(/68,000\.01/)).toBeInTheDocument();
+    expect(screen.queryByText(/T14:42/)).not.toBeInTheDocument();
+  });
+
 });

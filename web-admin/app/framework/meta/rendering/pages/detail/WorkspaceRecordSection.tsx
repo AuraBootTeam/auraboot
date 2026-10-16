@@ -4,6 +4,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
+import { WorkspaceCell } from '~/framework/meta/runtime/renderers/WorkspaceCells';
 import { FileAttachmentField } from '~/ui/smart/display/FileAttachmentField';
 
 /** Read-only business facts, including declared attributes of referenced objects. */
@@ -31,6 +32,8 @@ export function WorkspaceRecordSection({ block, fields, record, token, locale, t
       const item = (getDictItems(field.dictCode) || []).find((item: any) => String(item.value) === String(value));
       return item ? getLocalizedText(item.label, locale, t) : '—';
     }
+    if (field.presentation) return <WorkspaceCell value={value} record={record} column={{ ...field, timezone }} locale={locale} />;
+    if (field.dataType === 'datetime' || field.dataType === 'timestamp') return formatInTimezone(value, locale.startsWith('zh') ? 'YYYY年MM月DD日 HH:mm:ss' : 'MMM DD, YYYY HH:mm:ss', timezone);
     if (field.dataType === 'date') return formatInTimezone(value, locale.startsWith('zh') ? 'YYYY年MM月DD日' : 'MMM DD, YYYY', timezone);
     if (typeof value === 'object' || /^[0-9A-HJKMNP-TV-Z]{26}$/.test(String(value))) return '—';
     return String(value);

@@ -1,0 +1,43 @@
+[
+  {
+    "modelCode": "tdv_check",
+    "reversible": false,
+    "idempotent": false,
+    "code": "tdv:create_check",
+    "displayName:zh-CN": "新建核验记录",
+    "displayName:en": "Create verification",
+    "type": "create",
+    "permissions": [
+      "tdv.check.manage"
+    ],
+    "inputFields": [
+      "tdv_ck_name",
+      "tdv_ck_acceptance"
+    ],
+    "autoSetFields": {
+      "tdv_ck_status": {
+        "strategy": "fixed_value",
+        "value": "pending"
+      }
+    }
+  },
+  {
+    "modelCode": "tdv_check",
+    "reversible": false,
+    "idempotent": false,
+    "code": "tdv:verify_delivery",
+    "displayName:zh-CN": "执行交付核验",
+    "displayName:en": "Verify delivery",
+    "type": "custom",
+    "handler": "tdv:verify_delivery",
+    "permissions": [
+      "tdv.check.manage"
+    ],
+    "inputFields": [],
+    "targetModels": [
+      "tdv_check",
+      "tpm_acceptance",
+      "tpm_project"
+    ]
+  }
+]

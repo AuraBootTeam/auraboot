@@ -1,0 +1,15 @@
+[
+  {
+    "code": "tdv_checks",
+    "name:zh-CN": "交付核验",
+    "name:en": "Delivery verification",
+    "parentCode": "tpm_root",
+    "path": "/p/tdv_check",
+    "pageKey": "tdv_check_list",
+    "type": 1,
+    "visible": true,
+    "icon": "ClipboardCheck",
+    "permissionCode": "tdv.check.read",
+    "orderNo": 45
+  }
+]

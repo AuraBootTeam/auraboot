@@ -1,0 +1,90 @@
+{
+  "modelCode": "tdv_check",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "pageKey": "tdv_check_form",
+  "name:zh-CN": "新建交付核验",
+  "name:en": "New verification",
+  "kind": "form",
+  "title": {
+    "zh-CN": "新建交付核验",
+    "en": "New delivery verification"
+  },
+  "blocks": [
+    {
+      "id": "target",
+      "blockType": "form-section",
+      "area": "main",
+      "title": {
+        "zh-CN": "核验对象",
+        "en": "Verification target"
+      },
+      "fields": [
+        {
+          "field": "tdv_ck_name",
+          "required": true,
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：华辰制造 · 第一阶段交付核验",
+              "en": "e.g. Huachen · Phase one delivery verification"
+            },
+            "helpText": {
+              "zh-CN": "用项目与交付范围命名，方便后续查找。",
+              "en": "Use the project and delivery scope for easy retrieval."
+            }
+          }
+        },
+        {
+          "field": "tdv_ck_acceptance",
+          "required": true,
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "选择当前空间的交付验收单",
+              "en": "Select an acceptance in this space"
+            },
+            "helpText": {
+              "zh-CN": "保存后执行核验；每次重新读取验收材料、范围和项目预算。核验结果不替代人工审批。",
+              "en": "Save, then run verification against current evidence, scope and budget. Verification does not replace human approval."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "area": "footer",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tdv:create_check",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存核验记录",
+            "en": "Save verification"
+          }
+        },
+        {
+          "code": "cancel",
+          "action": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          }
+        }
+      ]
+    }
+  ],
+  "extension": {
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目交付",
+      "en": "Project delivery"
+    }
+  }
+}

@@ -1,0 +1,106 @@
+[
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_name",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_acceptance",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_status",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_materials",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_scope",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_amount_check",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_budget_check",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_amount",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_budget",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_accepted",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_available",
+    "sequence": 11,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_passed",
+    "sequence": 12,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tdv_check",
+    "fieldCode": "tdv_ck_checked_at",
+    "sequence": 13,
+    "required": false,
+    "visible": true,
+    "editable": false
+  }
+]

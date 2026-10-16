@@ -315,3 +315,10 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `performance/measure-crud.mjs` | Measure create, update, detail and delete request latency on test records. |
 | `performance/measure-home.mjs` | Measure browser home-page loading in the configured environment. |
 | `performance/seed-api.mjs` | Prepare the explicitly selected local API measurement fixture. |
+
+## Runtime and performance helpers (2026-10-16)
+
+| script | category | purpose |
+|---|---|---|
+| `dev/start-web-stack.sh` | tooling | Start the governed development or production Web/BFF entrypoint. |
+| `performance/home-readiness.mjs` | tooling | Observe browser readiness marks for the home performance runner. |

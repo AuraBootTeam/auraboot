@@ -1,0 +1,140 @@
+[
+  {
+    "code": "tdv_ck_name",
+    "displayName:zh-CN": "核验名称",
+    "displayName:en": "Verification name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    }
+  },
+  {
+    "code": "tdv_ck_acceptance",
+    "displayName:zh-CN": "关联验收单",
+    "displayName:en": "Acceptance",
+    "dataType": "reference",
+    "constraints": {
+      "required": true
+    },
+    "refTarget": {
+      "targetEntity": "tpm_acceptance",
+      "targetField": "pid",
+      "valueField": "pid",
+      "displayField": "tpm_ac_name"
+    },
+    "extension": {
+      "referenceModelCode": "tpm_acceptance"
+    }
+  },
+  {
+    "code": "tdv_ck_status",
+    "displayName:zh-CN": "核验结论",
+    "displayName:en": "Result",
+    "dataType": "enum",
+    "dictCode": "tdv_status",
+    "defaultValue": "pending",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_materials",
+    "displayName:zh-CN": "交付材料",
+    "displayName:en": "Delivery evidence",
+    "dataType": "enum",
+    "dictCode": "tdv_materials",
+    "defaultValue": "pending",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_scope",
+    "displayName:zh-CN": "验收范围",
+    "displayName:en": "Acceptance scope",
+    "dataType": "enum",
+    "dictCode": "tdv_scope",
+    "defaultValue": "pending",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_amount_check",
+    "displayName:zh-CN": "金额校验",
+    "displayName:en": "Amount check",
+    "dataType": "enum",
+    "dictCode": "tdv_amount_check",
+    "defaultValue": "pending",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_budget_check",
+    "displayName:zh-CN": "预算校验",
+    "displayName:en": "Budget check",
+    "dataType": "enum",
+    "dictCode": "tdv_budget_check",
+    "defaultValue": "pending",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_amount",
+    "displayName:zh-CN": "本次验收金额",
+    "displayName:en": "Current acceptance amount",
+    "dataType": "decimal",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_budget",
+    "displayName:zh-CN": "项目预算",
+    "displayName:en": "Project budget",
+    "dataType": "decimal",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_accepted",
+    "displayName:zh-CN": "其他已验收金额",
+    "displayName:en": "Other accepted amounts",
+    "dataType": "decimal",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_available",
+    "displayName:zh-CN": "本次可用预算",
+    "displayName:en": "Available budget",
+    "dataType": "decimal",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_passed",
+    "displayName:zh-CN": "通过项数",
+    "displayName:en": "Passed checks",
+    "dataType": "integer",
+    "defaultValue": 0,
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tdv_ck_checked_at",
+    "displayName:zh-CN": "核验时间",
+    "displayName:en": "Verified at",
+    "dataType": "datetime",
+    "extension": {
+      "readOnly": true
+    }
+  }
+]

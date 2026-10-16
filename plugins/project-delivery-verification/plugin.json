@@ -1,0 +1,49 @@
+{
+  "pluginId": "com.auraboot.project-delivery-verification",
+  "namespace": "tdv",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "hybrid",
+  "displayName:zh-CN": "项目交付核验",
+  "displayName:en": "Delivery verification",
+  "description": "Optional governed PF4J verification over existing project delivery records.",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [
+    "com.auraboot.template.project-management"
+  ],
+  "requires": [
+    {
+      "type": "model",
+      "code": "tpm_acceptance"
+    },
+    {
+      "type": "model",
+      "code": "tpm_project"
+    }
+  ],
+  "backend": {
+    "jarPath": "backend/build/libs/delivery-verification-plugin-1.0.0.jar",
+    "entryClass": "com.auraboot.plugins.delivery.DeliveryVerificationPlugin"
+  },
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields.json",
+    "modelFieldBindings": "config/bindings.json",
+    "dicts": "config/dicts.json",
+    "commands": "config/commands.json",
+    "pages": "config/pages",
+    "permissions": "config/permissions.json",
+    "roles": "config/roles.json",
+    "menus": "config/menus.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "createResourcePermissions": true
+  }
+}
