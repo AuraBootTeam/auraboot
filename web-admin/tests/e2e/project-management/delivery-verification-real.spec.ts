@@ -5,10 +5,11 @@ import {join} from 'node:path';
 const evidence=process.env.AURA_EVIDENCE_DIR;
 if(!evidence || !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.AURA_CORE_PROJECT_ROOT) throw Error('Bind the owned scenario sources, evidence and administrator.');
 const receipts:unknown[]=[];
-const prefix=`交付核验 ${Date.now()}`;
-const projectName=prefix+' · 专项交付项目';
+const prefix='华辰制造';
+const projectName='华辰制造 · 交付核验专项';
 const createCommand='tdv:create_check';
 const verificationCommand='tdv:verify_delivery';
+test.beforeEach(async({page})=>{page.setDefaultTimeout(20000);});
 async function data(response:APIResponse|Response) {
   expect(response.status()).toBe(200);const result=await response.json();expect(String(result.code)).toBe('0');return result.data;
 }
@@ -52,6 +53,7 @@ async function createAcceptance(page:Page,user:any,name:string,amount:number,fil
 }
 async function createCheck(page:Page,name:string,acceptanceName:string) {
   await menu(page,'交付核验');await page.getByRole('button',{name:'新建核验',exact:true}).click();
+  expect(new URL(page.url()).pathname).toBe('/p/tdv_check/new');
   await page.getByRole('button',{name:'保存核验记录',exact:true}).click();await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByTestId('form-field-tdv_ck_name').locator('p.text-status-red')).toContainText('核验名称');
   await expect(page.getByTestId('form-field-tdv_ck_acceptance').locator('p.text-status-red')).toContainText('关联验收单');await shot(page,'v04');
@@ -60,7 +62,7 @@ async function createCheck(page:Page,name:string,acceptanceName:string) {
   const sent=page.waitForResponse(r=>r.url().includes(`/execute/${createCommand}`)&&r.request().method()==='POST');
   await page.getByRole('button',{name:'保存核验记录',exact:true}).click();const response=await sent;
   expect(response.request().postDataJSON().payload.tdv_ck_acceptance).toBeTruthy();const pid=(await data(response)).data.recordPid;
-  expect(pid).toBeTruthy();await open(page,'交付核验',name);await expect(page).toHaveURL(/\/p\/tdv_check\/view\//);return pid;
+  expect(pid).toBeTruthy();await open(page,'交付核验',name);expect(new URL(page.url()).pathname.startsWith('/p/tdv_check/view/')).toBe(true);return pid;
 }
 
 // API setup isolates budget accounting from the neighboring approval/SLA profile.
@@ -86,7 +88,7 @@ async function verify(page:Page,pid:string,expected:'passed'|'blocked') {
 
 test('optional PF4J verifier reads stored evidence and recomputes after actual form correction @critical',async({page})=>{
   const user=await login(page);await prepareProject(page);await menu(page,'交付核验');
-  await expect(page).toHaveURL(/\/p\/tdv_check$/);
+  expect(new URL(page.url()).pathname).toBe('/p/tdv_check');
   await expect(page.getByRole('main')).toContainText('还没有交付核验');
   expect((await data(await page.request.get('/api/dynamic/tdv_check/list'))).total).toBe(0);await shot(page,'v01');
   const name=prefix+' · 补齐材料';const acceptance=await createAcceptance(page,user,name,68000,false);
@@ -170,6 +172,7 @@ test('another business space cannot read or execute an existing verification tar
       expect(response.status()).toBe(200);expect((await response.json()).success).toBe(true);
     }
     const foreign=await data(await actor.request.get('/api/dynamic/tdv_check/list'));expect(foreign.total).toBe(0);
+    await actor.reload();await menu(actor,'交付核验');await expect(actor.getByRole('main')).toContainText('还没有交付核验');await shot(actor,'v10');
     const read=await actor.request.get(`/api/dynamic/tdv_check/${target.pid}`);
     expect([400,403,404]).toContain(read.status());expect(await read.text()).not.toContain(target.tdv_ck_name);
     const denied=await actor.request.post('/api/meta/commands/execute/tdv:verify_delivery',{data:{operationType:'update',targetRecordPid:target.pid,payload:{}}});
