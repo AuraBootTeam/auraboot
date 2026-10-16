@@ -54,6 +54,15 @@ public class CommandAuthorizationPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        Object rawInstalledParams = ctx.getExecConfig().get("handlerParams");
+        @SuppressWarnings("unchecked")
+        java.util.Map<String,Object> installedParams = rawInstalledParams instanceof java.util.Map<?,?> values
+                ? (java.util.Map<String,Object>) values : java.util.Map.of();
+        com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.verify(
+                ctx.getCommandCode(),ctx.getTenantId(),ctx.getCommand() == null ? null : ctx.getCommand().getExecutionConfig(),installedParams);
+        com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.verifyTarget(
+                ctx.getCommandCode(),ctx.getRequest() == null ? null : ctx.getRequest().getTargetRecordId(),
+                ctx.getRequest() == null ? null : ctx.getRequest().getPayload());
         List<String> requiredPermissions = extractPermissions(ctx.getExecConfig().get("permissions"));
         if (requiredPermissions.isEmpty()) {
             reportUndeclared(ctx.getCommandCode());
@@ -62,6 +71,14 @@ public class CommandAuthorizationPhase implements CommandPhase {
             return;
         }
 
+        String installedPermission = MetaContext.getExternalCommandPermission();
+        if (com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
+            // verify above already pinned the real published command/config/tenant. User 0 is audit-only.
+            if (installedPermission == null || !requiredPermissions.equals(List.of(installedPermission)))
+                throw new SecurityException("Installed command permission changed");
+            applyVerdict(ctx,CommandAuthorizationVerdict.authorized(installedPermission));
+            return;
+        }
         Long userId = ctx.getUserId();
         if (userId == null) {
             String externalPermission = com.auraboot.framework.application.tenant.MetaContext

@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -96,6 +97,64 @@ class ExternalEventIngressServiceTest {
         assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
                 () -> service.accept(principal, "erp", "idempotency-0001", body("evt-1")));
     }
+
+    @Test
+    void registeredNativeAcceptancePrecedesEnqueueAndReturnsItsRecord() {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("request-pid",false));
+        when(idempotencyMapper.claim(eq(42L),eq(9L),anyString(),anyString(),anyString(),any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
+        var response=service.accept(principal,"erp","idempotency-0001",strictBody());
+        assertEquals("request-pid",response.recordPid());
+        var sequence=org.mockito.Mockito.inOrder(installed,accessor,idempotencyMapper);
+        sequence.verify(installed).accept(eq(principal),eq("erp"),any());
+        sequence.verify(accessor).enqueue(any());
+        sequence.verify(idempotencyMapper).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
+    }
+
+    @Test
+    void rejectedInstalledAcceptanceCannotEnqueueAndPermanentReplayDoesNotEnqueueAgain() {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        when(idempotencyMapper.claim(eq(42L),eq(9L),anyString(),anyString(),anyString(),any())).thenReturn(1);
+        when(installed.accept(eq(principal),eq("erp"),any())).thenThrow(new SecurityException("denied"));
+        assertThrows(SecurityException.class,()->service.accept(principal,"erp","idempotency-0001",strictBody()));
+        verify(accessor,never()).enqueue(any());
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("original-pid",true));
+        when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
+        var response=service.accept(principal,"erp","idempotency-0001",strictBody());
+        assertTrue(response.duplicate());assertEquals("original-pid",response.recordPid());verify(accessor,never()).enqueue(any());
+    }
+
+    private String strictBody() { return body("evt-1").replace("\"data\":", "\"sequence\":0,\"data\":"); }
+
+    @Test
+    void installedEnvelopeRejectsCoercionUnknownFieldsAndTrailingJsonBeforeClaim() throws Exception {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        var json=new ObjectMapper();
+        for (String field : java.util.List.of("id","type","occurredAt")) {
+            var node=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(strictBody());node.put(field,1);
+            assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp","idempotency-0001",node.toString()));
+        }
+        for (String field : java.util.List.of("schemaVersion","sequence")) {
+            var node=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(strictBody());node.put(field,"1");
+            assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp","idempotency-0001",node.toString()));
+            node.put(field,true);
+            assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp","idempotency-0001",node.toString()));
+        }
+        var unknown=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(strictBody());unknown.put("tenantId",42);
+        assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp","idempotency-0001",unknown.toString()));
+        unknown.remove("tenantId");((com.fasterxml.jackson.databind.node.ObjectNode)unknown.get("subject")).put("extra",true);
+        assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp","idempotency-0001",unknown.toString()));
+        assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp","idempotency-0001",strictBody()+" {}"));
+        assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp","idempotency-0001",
+                strictBody().replace("\"id\":\"evt-1\"","\"id\":\"other\",\"id\":\"evt-1\"")));
+        verifyNoClaim();verify(accessor,never()).enqueue(any());
+    }
+
+    private void verifyNoClaim() { verify(idempotencyMapper,never()).claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any()); }
 
     private String body(String id) {
         return """

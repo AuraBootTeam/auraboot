@@ -540,6 +540,8 @@ public class HandlerPhase implements CommandPhase {
         // Opt-in secondaries chain AFTER the primary (same transaction + context). Empty for every
         // command with no opt-in secondaries, i.e. every command today — so this is a no-op now.
         List<CommandHandlerExtension> secondaryHandlers = extensionRegistry.getSecondaryCommandHandlers(handlerCode);
+        com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.verifyHandler(
+                commandCode, pluginHandler.orElse(null), secondaryHandlers);
         if (pluginHandler.isEmpty() && secondaryHandlers.isEmpty()) {
             // A command whose execution config explicitly declares a handler has a handler contract.
             // Letting the phase return silently here turns every effect of a custom command into a
@@ -624,13 +626,15 @@ public class HandlerPhase implements CommandPhase {
             if (request.getExpectedVersion() != null && expectedVersion != null) {
                 pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY, expectedVersion);
             }
+            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.install(
+                    commandCode, tenantId, pluginSettings);
             com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                     pluginSettings, tenantId, cloudConfigService, objectMapper);
             com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
                     pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
-            if (commandExecutor != null) {
+            if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
                 // Q03-04: nested follow-up commands dispatch through the real
                 // pipeline (validated, invariant-checked, evented, audited)
                 // instead of handlers `new`-ing other handlers directly.
@@ -682,6 +686,7 @@ public class HandlerPhase implements CommandPhase {
             if (recordShareAccessor != null) {
                 pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
             }
+            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.finishSettings(pluginSettings);
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)
                     .namespace(namespace)

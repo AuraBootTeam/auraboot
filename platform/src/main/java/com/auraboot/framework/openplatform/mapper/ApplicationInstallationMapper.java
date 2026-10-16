@@ -11,6 +11,16 @@ import java.util.List;
 
 @Mapper
 public interface ApplicationInstallationMapper extends BaseMapper<ApplicationInstallation> {
+    record ActiveIdentity(Long installationId, String applicationPid) {}
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT i.id AS installation_id,a.pid AS application_pid
+            FROM ab_application_installation i JOIN ab_external_application a ON a.id=i.application_id
+            WHERE i.tenant_id=#{tenantId} AND i.pid=#{pid} AND i.status='active' AND a.status='active'
+            """)
+    ActiveIdentity findActiveIdentity(@Param("tenantId") Long tenantId,@Param("pid") String pid);
+
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
             SELECT i.* FROM ab_application_installation i

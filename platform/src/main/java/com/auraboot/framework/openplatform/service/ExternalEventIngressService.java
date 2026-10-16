@@ -31,6 +31,13 @@ public class ExternalEventIngressService {
     private final OpenPlatformSecretCodec secretCodec;
     private final ObjectMapper objectMapper;
 
+    private InstalledIntegrationService installedIntegrations;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setInstalledIntegrations(InstalledIntegrationService installedIntegrations) {
+        this.installedIntegrations = installedIntegrations;
+    }
+
     @Transactional
     public IngressResult accept(MachinePrincipal principal, String sourceCode,
                                 String idempotencyKey, String rawBody) {
@@ -45,7 +52,8 @@ public class ExternalEventIngressService {
         if (installation == null || !"active".equals(installation.getStatus())) {
             throw new InvalidExternalEventException("installation_not_active");
         }
-        ExternalEvent event = parse(rawBody);
+        boolean installed = installedIntegrations != null && installedIntegrations.registered(sourceCode);
+        ExternalEvent event = installed ? parseInstalled(rawBody) : parse(rawBody);
         String routeCode = "external-event:" + sourceCode;
         String requestHash = secretCodec.sha256(rawBody);
         int claimed = idempotencyMapper.claim(principal.tenantId(), installation.getId(), routeCode,
@@ -56,10 +64,12 @@ public class ExternalEventIngressService {
             if (!requestHash.equals(existingHash)) {
                 throw new IdempotencyConflictException();
             }
-            return new IngressResult(event.id(), true);
+            if (installedIntegrations == null || !installedIntegrations.registered(sourceCode))
+                return new IngressResult(event.id(), true);
         }
 
-        String durableEventId = "ext:" + principal.installationPid() + ":" + event.id();
+        String durableEventId = "ext:" + principal.installationPid() + ":"
+                + (installedIntegrations != null && installedIntegrations.registered(sourceCode) ? sourceCode+":" : "") + event.id();
         String publicEventType = "external." + sourceCode + "." + event.type() + ".v" + event.schemaVersion();
         String requestId = MDC.get("requestId");
         Map<String, String> traceHeaders = new LinkedHashMap<>(Map.of(
@@ -70,21 +80,57 @@ public class ExternalEventIngressService {
         if (requestId != null && !requestId.isBlank()) {
             traceHeaders.put("requestId", requestId);
         }
-        integrationAccessor.enqueue(new IntegrationEventEnvelope(
+        IntegrationEventEnvelope envelope = new IntegrationEventEnvelope(
                 "1.0", durableEventId, publicEventType,
                 "open-platform/" + principal.installationPid() + "/" + sourceCode,
                 event.subjectType() + "/" + event.subjectPid(), event.occurredAt(), principal.tenantId(),
                 requestId == null || requestId.isBlank() ? durableEventId : requestId,
                 null, event.subjectType() + "/" + event.subjectPid(),
-                event.sequence(), event.data(), traceHeaders));
+                event.sequence(), event.data(), traceHeaders);
+        InstalledIntegrationService.Acceptance acceptance = null;
+        if (installedIntegrations != null && installedIntegrations.registered(sourceCode)) {
+            acceptance = installedIntegrations.accept(principal,sourceCode,envelope);
+        }
+        if (acceptance == null || !acceptance.duplicate()) integrationAccessor.enqueue(envelope);
         try {
-            idempotencyMapper.complete(principal.tenantId(), installation.getId(), routeCode,
+            int completed = idempotencyMapper.complete(principal.tenantId(), installation.getId(), routeCode,
                     idempotencyKey, requestHash,
                     objectMapper.writeValueAsString(Map.of("eventId", event.id(), "accepted", true)));
+            if (acceptance != null && completed != 1) throw new IllegalStateException("External acceptance response was not persisted");
         } catch (Exception exception) {
             throw new IllegalStateException("Could not persist external event response", exception);
         }
-        return new IngressResult(event.id(), false);
+        return new IngressResult(event.id(), acceptance != null && acceptance.duplicate(),
+                acceptance == null ? null : acceptance.recordPid());
+    }
+
+    private ExternalEvent parseInstalled(String rawBody) {
+        try {
+            JsonNode root = objectMapper.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readTree(rawBody);
+            if (root == null || !root.isObject() || !keys(root).equals(java.util.Set.of(
+                    "id","type","schemaVersion","occurredAt","subject","sequence","data")))
+                throw new InvalidExternalEventException("invalid_event_body");
+            for (String field : java.util.List.of("id","type","occurredAt"))
+                if (!root.path(field).isTextual()) throw new InvalidExternalEventException("invalid_"+field);
+            if (!root.path("schemaVersion").isIntegralNumber() || !root.path("schemaVersion").canConvertToInt()
+                    || root.path("schemaVersion").asInt() < 1) throw new InvalidExternalEventException("invalid_schema_version");
+            if (!root.path("sequence").isIntegralNumber() || !root.path("sequence").canConvertToLong()
+                    || root.path("sequence").asLong() < 0) throw new InvalidExternalEventException("invalid_sequence");
+            JsonNode subject = root.path("subject");
+            if (!subject.isObject() || !keys(subject).equals(java.util.Set.of("type","pid"))
+                    || !subject.path("type").isTextual() || !subject.path("pid").isTextual())
+                throw new InvalidExternalEventException("invalid_subject");
+            // Reuse existing length, event code, Instant and payload checks after exact typing.
+            return parse(objectMapper.writeValueAsString(root));
+        } catch (InvalidExternalEventException failure) { throw failure; }
+        catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new InvalidExternalEventException("invalid_event_body");
+        }
+    }
+
+    private java.util.Set<String> keys(JsonNode node) {
+        java.util.Set<String> result = new java.util.HashSet<>();node.fieldNames().forEachRemaining(result::add);return result;
     }
 
     private ExternalEvent parse(String rawBody) {
@@ -137,7 +183,9 @@ public class ExternalEventIngressService {
                                  Map<String, Object> data) {
     }
 
-    public record IngressResult(String eventId, boolean duplicate) {
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    public record IngressResult(String eventId, boolean duplicate, String recordPid) {
+        public IngressResult(String eventId, boolean duplicate) { this(eventId,duplicate,null); }
     }
 
     public static class InvalidExternalEventException extends RuntimeException {
