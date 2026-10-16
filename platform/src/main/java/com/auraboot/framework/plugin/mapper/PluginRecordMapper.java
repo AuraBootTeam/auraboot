@@ -4,6 +4,7 @@ import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -22,6 +23,7 @@ public interface PluginRecordMapper extends BaseMapper<PluginRecord> {
      * @param pid business unique identifier
      * @return plugin record or null
      */
+    @ResultMap("mybatis-plus_PluginRecord")
     @Select("SELECT * FROM ab_plugin WHERE pid = #{pid} AND deleted_flag = false")
     PluginRecord findByPid(@Param("pid") String pid);
 
