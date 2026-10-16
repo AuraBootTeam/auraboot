@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "38ecab6c6",
+    "commit": "b0b22585f",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -3744,11 +3744,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts"
-          ],
-          "assertion": "browser page reference registered; execution and assertions not verified",
-          "verdict": "partial",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=form model=tdv_check"
         },
         {
@@ -7060,7 +7058,7 @@
     "commands": 268,
     "untested": 176,
     "pages": 185,
-    "pagesUntested": 112,
+    "pagesUntested": 113,
     "platformPages": 95,
     "platformPagesUntested": 37
   }
