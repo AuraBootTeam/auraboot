@@ -80,6 +80,11 @@
     "test-fixtures": {
       "e2et_crm_opp.create": "API-fixture surface (no UI): legacy CRM-era opportunity twin kept only so fixture reinstall preserves the verb-label command declarations (PR #2073); the OSS UI stage-rail fixture is e2et_stage_record.",
       "e2et_crm_opp.update": "API-fixture surface (no UI): legacy CRM-era opportunity twin kept only so fixture reinstall preserves the verb-label command declarations (PR #2073); the OSS UI stage-rail fixture is e2et_stage_record."
+    },
+    "project-management": {
+      "tpm:update_acceptance": "Reached by the generic edit form: FormPageContent resolves tpm:create_acceptance to tpm:update_acceptance in edit mode; acceptance browser journey asserts the exact request.",
+      "tpm:accept_acceptance": "Workflow-owned service-task callback in examples/acceptance-workflow.bpmn. Deliberately has no direct UI button; workflowOnly denies even direct administrator requests.",
+      "tpm:return_acceptance": "Workflow-owned rejection callback in examples/acceptance-workflow.bpmn. Deliberately has no direct UI button; workflowOnly enforces tenant and business-key ownership."
     }
   },
   "baseline": {

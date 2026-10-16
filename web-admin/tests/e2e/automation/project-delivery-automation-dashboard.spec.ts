@@ -67,6 +67,45 @@ async function setupTask(page: Page, title: string, projectPid: string) {
   );
   return created.recordId;
 }
+async function createReviewTaskThroughUi(page: Page, title: string, projectPid: string) {
+  const fixture = JSON.parse(fs.readFileSync(process.env.DELIVERY_FIXTURE_PATH!, 'utf8'));
+  const project = fixture.projects.find((row: {pid: string}) => row.pid === projectPid);
+  expect(project).toBeDefined();
+  await menu(page, ['项目交付', '任务']);
+  await page.getByRole('button', {name: '新建', exact: true}).click();
+  await page.locator('#tpm_ts_title').fill(title);
+  await page.getByTestId('select-trigger-tpm_ts_project_id').click();
+  await expect(page.getByRole('option', {name: project.name, exact: true})).toBeVisible();
+  await page.screenshot({path: path.join(process.env.AURA_EVIDENCE_DIR!, 'TASK01-project-name-picker.png'), fullPage: true});
+  await page.getByRole('option', {name: project.name, exact: true}).click();
+  await expect(page.getByTestId('select-trigger-tpm_ts_project_id')).toHaveText(project.name);
+  await page.locator('#tpm_ts_description').fill(original);
+  const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/meta/commands/execute/tpm:create_task' && response.request().method() === 'POST');
+  await page.getByRole('button', {name: '保存任务', exact: true}).click();
+  const response = await creating;
+  expect(response.status()).toBe(200);
+  expect(response.request().postDataJSON().payload).toMatchObject({tpm_ts_title: title, tpm_ts_project_id: projectPid});
+  expect((await response.json()).data.phaseReached).toBe('completed');
+  const row = page.getByRole('row').filter({has: page.getByText(title, {exact: true})});
+  await expect(row).toBeVisible();
+  await row.getByRole('button', {name: '查看', exact: true}).click();
+  await expect(page).toHaveURL(/\/p\/tpm_task\/view\/[0-9A-Z]{26}$/);
+  const pid = new URL(page.url()).pathname.split('/').at(-1)!;
+  for (const [command, label, status] of [['tpm:start_task','开始任务','in_progress'],['tpm:review_task','提交审核','in_review']]) {
+    const transition = page.waitForResponse(result => new URL(result.url()).pathname === `/api/meta/commands/execute/${command}` && result.request().method() === 'POST');
+    await page.getByRole('button', {name: label, exact: true}).click();
+    const result = await transition; expect(result.status()).toBe(200);
+    expect(result.request().postDataJSON().targetRecordPid).toBe(pid);
+    expect((await result.json()).data.phaseReached).toBe('completed');
+    expect((await record(page, pid)).tpm_ts_status).toBe(status);
+  }
+  await page.reload();
+  await expect(page.getByText(title, {exact: true})).toBeVisible();
+  const persisted = await record(page, pid);
+  expect(persisted).toMatchObject({tpm_ts_title: title, tpm_ts_project_id: projectPid, tpm_ts_status: 'in_review', tpm_ts_description: original});
+  await page.screenshot({path: path.join(process.env.AURA_EVIDENCE_DIR!, 'TASK02-created-review-task.png'), fullPage: true});
+  return pid;
+}
 async function menu(page: Page, labels: string[]) {
   await ensureSidebarExpanded(page);
   await navigateToMenuByClick(page, labels);
@@ -475,10 +514,11 @@ test('portable archive template selects a task once and binds every reference be
   const workspace = process.env.AURA_WORKSPACE_PROJECT_ROOT;
   expect(workspace, 'Bind the owned workspace source containing the portable template').toBeTruthy();
   const template = JSON.parse(fs.readFileSync(path.join(workspace!, 'docs/product-docs/strategy/enterprise-seven-scenario-assets/task-archive.automation.json'), 'utf8'));
-  const name = `导入参数归档-${run}`; const title = `【演示】参数选择-${run}`;
+  const issue = new Intl.DateTimeFormat('zh-CN', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
+  const name = `交付材料完成后归档 · ${issue}`; const title = `交付材料检查 · ${issue}`;
   expect(process.env.DELIVERY_PROJECT_PID).toMatch(/^[0-9A-Z]{26}$/);
   await page.goto('/');
-  const taskPid = await setupTask(page, title, process.env.DELIVERY_PROJECT_PID!);
+  const taskPid = await createReviewTaskThroughUi(page, title, process.env.DELIVERY_PROJECT_PID!);
   await menu(page, ['系统管理', '自动化']);
   const beforeRows = (await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()).data;
   const upload = async () => page.getByTestId('input-import-automation').setInputFiles({name: '任务归档.automation.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(template))});

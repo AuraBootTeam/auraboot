@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 import { ensureSidebarExpanded, navigateToMenuByClick } from '../helpers';
 
@@ -11,7 +10,6 @@ test.setTimeout(180000);
 const root = path.resolve(process.cwd(), '../plugins/project-management');
 const template = JSON.parse(fs.readFileSync(path.join(root, 'examples/dashboard-customer-delivery.json'), 'utf8'));
 const references: unknown[][] = JSON.parse(fs.readFileSync(path.join(root, 'scripts/reference-projects.json'), 'utf8'));
-const run = randomUUID().slice(0, 8);
 
 async function management(page: Page) {
   await ensureSidebarExpanded(page);
@@ -107,7 +105,7 @@ test('builds a live project metric in the UI and publishes a portable six-widget
   await expect(field).toHaveCount(1);
   await field.selectOption('tpm_pj_code');
   await panel.locator('select').filter({ has: page.locator('option[value="count"]') }).selectOption('count');
-  await title(page, `客户项目指标-${run}`);
+  await title(page, '客户项目数 · 交付指标');
   const authoredPid = await saveNew(page);
   const authored = await detail(page, authoredPid);
   expect(authored.widgets).toHaveLength(1);
@@ -119,7 +117,7 @@ test('builds a live project metric in the UI and publishes a portable six-widget
   // S5: import the reusable design as a separate draft, edit, save, publish and reopen.
   await page.getByTestId('dashboard-design-import-file').setInputFiles({ name: 'customer-delivery.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(template)) });
   await page.getByRole('button', { name: '导入为新草稿', exact: true }).click();
-  const boardTitle = `客户项目交付总览-${run}`;
+  const boardTitle = '客户项目交付总览 · 交付负责人';
   await title(page, boardTitle);
   const boardPid = await saveNew(page);
   expect(boardPid).not.toBe(authoredPid);

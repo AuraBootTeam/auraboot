@@ -41,6 +41,9 @@ public class AssertPhase implements CommandPhase {
     private final DynamicDataMapper dynamicDataMapper;
     private final CommandFieldMapExecutor fieldMapExecutor;
 
+    private static final com.fasterxml.jackson.databind.ObjectReader JSON_CONTAINER_READER =
+            new com.fasterxml.jackson.databind.ObjectMapper().reader();
+
     private static final int MAX_PRECONDITION_EXPRESSION_LENGTH = 500;
     private static final java.util.regex.Pattern DANGEROUS_SPEL_PATTERN = java.util.regex.Pattern.compile(
             "T\\s*\\(|new\\s+|getClass|Runtime|exec\\s*\\(|ProcessBuilder|System\\.|Thread\\.",
@@ -186,6 +189,7 @@ public class AssertPhase implements CommandPhase {
                 yield true;
             }
             case "NOT_NULL" -> actual != null;
+            case "NOT_EMPTY" -> hasContent(actual);
             case "NULL" -> actual == null;
             case "GT", "GE", "LT", "LE" -> compareNumeric(op, actual, expected);
             case "CONTAINS" -> actual != null && String.valueOf(actual).contains(String.valueOf(expected));
@@ -242,6 +246,31 @@ public class AssertPhase implements CommandPhase {
             case "ends_with", "endswith" -> "ENDS_WITH";
             default -> operator.trim().toUpperCase();
         };
+    }
+
+    private boolean hasContent(Object value) {
+        if (value instanceof CharSequence text) {
+            String content = text.toString().trim();
+            if (content.isEmpty() || "null".equals(content)) return false;
+            // Dynamic JSONB snapshots may expose their serialized container form.
+            if (content.startsWith("[") || content.startsWith("{")) {
+                try {
+                    var parsed = JSON_CONTAINER_READER.readTree(content);
+                    if (parsed.isContainerNode()) return !parsed.isEmpty();
+                } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+                    // An ordinary text value beginning with a bracket is still text.
+                }
+            }
+            return true;
+        }
+        if (value instanceof java.util.Collection<?> collection) return !collection.isEmpty();
+        if (value instanceof Map<?, ?> map) return !map.isEmpty();
+        if (value instanceof com.fasterxml.jackson.databind.JsonNode node) {
+            if (node.isTextual()) return !node.asText().isBlank();
+            return node.isContainerNode() && !node.isEmpty();
+        }
+        return value != null && value.getClass().isArray()
+                && java.lang.reflect.Array.getLength(value) > 0;
     }
 
     private boolean compareNumeric(String op, Object actual, Object expected) {

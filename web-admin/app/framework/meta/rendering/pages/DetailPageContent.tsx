@@ -2191,6 +2191,7 @@ function DetailBlockRenderer({
   dataSourceManager?: { getConfig: (id: string) => DataSourceConfig | undefined };
 }) {
   const { timezone, formats } = useTimezone();
+  const { hasPermission: canReadBlock } = useAuth();
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string): string => {
       if (modelCode) {
@@ -2209,6 +2210,7 @@ function DetailBlockRenderer({
     [modelCode, t],
   );
 
+  if (block.permissionCode && !canReadBlock(block.permissionCode)) return null;
   if (block.visibleWhen && evaluateEditableWhen && !evaluateEditableWhen(block.visibleWhen)) {
     return null;
   }
@@ -2482,7 +2484,7 @@ function DetailBlockRenderer({
   }
 
   if (block.blockType === 'workflow-panel') {
-    return <LazyContributedComponent contributionId="workflow-panel" block={block as any} record={recordData} recordPid={recordPid} />;
+    return <LazyContributedComponent contributionId="workflow-panel" block={block as any} record={recordData} recordPid={recordPid} onDataChange={onDataChange} />;
   }
 
   if (block.blockType === 'monthly-grid' && block.monthlyGrid) {

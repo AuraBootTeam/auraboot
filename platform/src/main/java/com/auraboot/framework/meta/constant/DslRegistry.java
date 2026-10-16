@@ -179,6 +179,7 @@ public final class DslRegistry {
         NOT_IN("not_in", "Not in set", "1.0"),
         IS_NULL("is_null", "Is null", "1.0"),
         IS_NOT_NULL("is_not_null", "Is not null", "1.0"),
+        NOT_EMPTY("not_empty", "Has non-empty content", "1.0"),
         BETWEEN("between", "Between range", "1.0"),
         LIKE("like", "Pattern match", "1.0"),
         NOT_LIKE("not_like", "Not pattern match", "1.0"),
