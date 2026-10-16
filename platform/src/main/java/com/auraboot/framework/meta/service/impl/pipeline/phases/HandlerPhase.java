@@ -658,6 +658,8 @@ public class HandlerPhase implements CommandPhase {
                                 tenantId,commandCode,modelCode,effectiveRecordId,
                                 MetaContext.getCurrentUserPid(),handler,projection));
             }
+            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
+                    pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);
             pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
                     new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
                             roleMapper, userRoleService, tenantMemberService, userService));

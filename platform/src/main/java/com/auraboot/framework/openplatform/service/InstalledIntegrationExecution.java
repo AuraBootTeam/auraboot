@@ -10,6 +10,8 @@ import java.util.function.Supplier;
 public final class InstalledIntegrationExecution {
     private record Invocation(String command, String config, InstalledIntegrationBinding binding, boolean query, Object handler, String target) {}
     private static final ThreadLocal<Invocation> CURRENT = new ThreadLocal<>();
+    private static final ThreadLocal<Invocation> VERIFIED = new ThreadLocal<>();
+    private static final ThreadLocal<Invocation> VERIFIED_HANDLER = new ThreadLocal<>();
     private InstalledIntegrationExecution() {}
 
     static <T> T run(String command, String config, InstalledIntegrationBinding binding, boolean query, Object handler, Supplier<T> work) {
@@ -20,7 +22,7 @@ public final class InstalledIntegrationExecution {
                      String target, Supplier<T> work) {
         if (CURRENT.get() != null) throw new SecurityException("Nested installed integration invocation denied");
         CURRENT.set(new Invocation(command, config, binding, query, handler, target));
-        try { return work.get(); } finally { CURRENT.remove(); }
+        try { return work.get(); } finally { VERIFIED_HANDLER.remove(); VERIFIED.remove(); CURRENT.remove(); }
     }
 
     public static void verify(String command, Long tenant, String config, Map<String,Object> params) {
@@ -32,6 +34,7 @@ public final class InstalledIntegrationExecution {
         }
         if (!declared || !value.command().equals(command) || !Objects.equals(tenant, value.binding().tenantId())
                 || !value.config().equals(config)) throw new SecurityException("Installed command identity changed");
+        VERIFIED.set(value);
     }
 
     public static void verifyTarget(String command, String target, Map<String,Object> payload) {
@@ -56,6 +59,43 @@ public final class InstalledIntegrationExecution {
         if (value == null) return;
         if (!value.command().equals(command) || value.handler() == null || value.handler() != handler
                 || !secondaryHandlers.isEmpty()) throw new SecurityException("Installed handler owner changed");
+        VERIFIED_HANDLER.set(value);
+    }
+
+    record WriteProof(Invocation invocation, String rootModel, String rootPid,
+            com.auraboot.framework.plugin.extension.CommandHandlerExtension handler) {
+        String command() { return invocation.command(); }
+        InstalledIntegrationBinding binding() { return invocation.binding(); }
+        void verify() {
+            if (CURRENT.get()!=invocation || VERIFIED.get()!=invocation || VERIFIED_HANDLER.get()!=invocation
+                    || invocation.query() || invocation.target()==null || !invocation.target().equals(rootPid)
+                    || invocation.handler()!=handler || !Objects.equals(MetaContext.getCurrentUserId(),0L)
+                    || !Objects.equals(MetaContext.getCurrentTenantId(),binding().tenantId())
+                    || !("installation:"+binding().installationPid()).equals(MetaContext.getCurrentUserPid())
+                    || !command().equals(MetaContext.getAuthorizedCommandCode())
+                    || !MetaContext.hasCommandPermitScopeFor(rootModel)
+                    || !rootPid.equals(MetaContext.getCommandPermitTargetFor(rootModel)))
+                throw new SecurityException("Installed related write requires its verified process invocation");
+        }
+    }
+
+    public static void installRelatedWriter(Map<String,Object> settings,
+            com.auraboot.framework.meta.service.DynamicDataService data,
+            com.auraboot.framework.plugin.extension.CommandHandlerExtension handler,
+            String rootModel, String rootPid) {
+        Object opted=settings.get(InstalledRelatedWriteAccessor.OPT_IN);
+        if (opted==null || Boolean.FALSE.equals(opted)) return;
+        if (!Boolean.TRUE.equals(opted)) throw new SecurityException("Installed related write policy must be boolean");
+        Invocation invocation=CURRENT.get();
+        if (invocation==null || handler==null || rootModel==null || rootPid==null
+                || !(settings.get(com.auraboot.framework.plugin.extension.CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                     instanceof com.auraboot.framework.plugin.extension.TenantProjectionAccessor reads)
+                || settings.get(InstalledIntegrationBinding.SETTINGS_KEY)!=invocation.binding())
+            throw new SecurityException("Installed related write policy requires its process and tenant projection");
+        WriteProof proof=new WriteProof(invocation,rootModel,rootPid,handler);
+        proof.verify();
+        settings.put(com.auraboot.framework.plugin.extension.CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                new InstalledRelatedWriteAccessor(data,proof,reads));
     }
 
     public static void finishSettings(Map<String,Object> settings) {

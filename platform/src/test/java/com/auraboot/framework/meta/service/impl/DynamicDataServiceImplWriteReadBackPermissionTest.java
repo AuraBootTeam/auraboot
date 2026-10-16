@@ -243,6 +243,37 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     }
 
     @Test
+    void machineChildWriteRequiresExactTargetScopeAndKeepsNativeSqlGuards() {
+        MetaContext.clear();
+        MetaContext.setContext(TENANT_ID,0L,"installation:test","Integration");
+        when(dynamicDataMapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(Map.of(
+                "pid",RECORD_ID,"tenant_id",TENANT_ID,"name","before","row_version",3L)));
+        when(dynamicDataMapper.updateByQuery(anyString(),anyMap())).thenReturn(1);
+        MetaContext.runWithCommandPermitPlan("TARGET",3L,MODEL_CODE,RECORD_ID,()->
+                service.update(MODEL_CODE,RECORD_ID,Map.of("name","after")));
+        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
+        var params=org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(),params.capture());
+        assertThat(sql.getValue()).contains("tenant_id", "row_version = #{params.expectedVersion}",
+                "AND pid = '"+RECORD_ID+"'");
+        assertThat(params.getValue()).containsEntry("expectedVersion",3L).containsEntry("tenantId",TENANT_ID);
+        verifyNoInteractions(permissionFacade);
+        verify(dataPermissionEngine,never()).getNonWritableFields(TENANT_ID,MODEL_CODE,0L);
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+    }
+
+    @Test
+    void ledgerOnlyMachinePermitCannotReadChildForUpdate() {
+        MetaContext.clear();
+        MetaContext.setContext(TENANT_ID,0L,"installation:test","Integration");
+        lenient().when(applicationContext.getBean(TenantMemberService.class)).thenReturn(tenantMemberService);
+        assertThatThrownBy(()->MetaContext.runWithCommandPermitPlan("ALL",7L,"ledger","root",()->
+                service.update(MODEL_CODE,RECORD_ID,Map.of("name","blocked"))))
+                .isInstanceOf(MetaServiceException.class).hasMessageContaining("Permission context missing");
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
+    }
+
+    @Test
     @DisplayName("immutable model rejects direct update before reading or writing the record")
     void update_immutableModel_rejectedAtRuntimeBoundary() {
         model.setImmutable(true);
