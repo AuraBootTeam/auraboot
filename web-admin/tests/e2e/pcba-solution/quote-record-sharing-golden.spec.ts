@@ -6,10 +6,11 @@ import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDet
 import { saveWorkbookDownload } from './workbook-download-evidence';
 import { validateQuoteWorkbook } from './quote-workbook-assertions';
 
+const sharingUid = Date.now().toString();
 const recipients: QuoteRoleUser[] = [
-  {key:'share_a', email:'share-a@e2e.local', displayName:'Sharing Sales A', password:'Test2026x', roleCodes:['qo_sales']},
-  {key:'share_b', email:'share-b@e2e.local', displayName:'Sharing Sales B', password:'Test2026x', roleCodes:['qo_sales']},
-  {key:'share_proc', email:'share-proc@e2e.local', displayName:'Sharing Procurement', password:'Test2026x', roleCodes:['qo_procurement']},
+  makeQuoteRoleUser('share_a', sharingUid, ['qo_sales']),
+  makeQuoteRoleUser('share_b', sharingUid, ['qo_sales']),
+  makeQuoteRoleUser('share_proc', sharingUid, ['qo_procurement']),
 ];
 
 test('quote sharing release gate: multiple members, role access and revocation through UI', async ({ page, browser }, testInfo) => {
@@ -129,6 +130,8 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await revokeAll();
   for(let i=0;i<3;i++) await probe(i,false);
   await refreshRevokedViewer(0);
+  await viewers[1].page.goto(`/p/qo_quote_common/view/${quote.quoteId}`);
+  await refreshRevokedViewer(1);
   await dialog.getByRole('button',{name:'指定角色',exact:true}).click();
   const options = await page.request.get(`/api/record-share/roles?${shareParams}`);
   expect(options.ok()).toBe(true);
@@ -196,15 +199,24 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await viewers[2].page.goto('/p/qo_quote_common');
   await procListLoad;
   await expect(viewers[2].page.getByText(quote.quoteCode, { exact: false })).toHaveCount(0);
-  // Use the public test-profile initializer to create a real second tenant.
-  const seed = await page.request.post('/api/test/seed', {
-    params: { testRunId: `quote-sharing-tenant-${Date.now()}` }, timeout: 90_000,
+  // Create a real isolated tenant through the same public company flow as host-first users.
+  // Company changes invalidate that user's old credentials. Use an independent
+  // fixture actor so provisioning cannot invalidate the owner's session.
+  const foreignContext = await browser.newContext({ storageState: await viewers[0].context.storageState(), locale: 'zh-CN' });
+  const foreign = { context: foreignContext, page: await foreignContext.newPage() };
+  const tenantResponse = await foreign.page.request.post('/api/tenant-selection/process', {
+    data: { action: 'create', tenantName: `quote-sharing-${Date.now()}`, displayName: 'Quote sharing isolation' },
+    timeout: 90_000,
   });
-  expect(seed.status(), await seed.text()).toBe(200);
-  const foreign = await openQuoteRolePage(browser, {
-    key: 'foreign-tenant', email: 'e2e@test.local', displayName: 'E2E Test User',
-    password: 'E2eTestPass2026!', roleCodes: ['tenant_admin'],
+  expect(tenantResponse.status(), await tenantResponse.text()).toBe(200);
+  const tenant = (await tenantResponse.json()).data;
+  expect(tenant.tenantId).toBeTruthy();
+  const switched = await foreign.page.request.post('/_action/switch-space', {
+    form: { tenantId: String(tenant.tenantId), redirectTo: '/' },
+    maxRedirects: 0,
   });
+  expect(switched.status(), await switched.text()).toBe(302);
+  expect(switched.headers()['location']).toBe('/');
   try {
     const ownerIdentity = await page.request.get('/api/auth/me');
     const foreignIdentity = await foreign.page.request.get('/api/auth/me');
@@ -212,11 +224,11 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignIdentity.status()).toBe(200);
     const ownerMe = (await ownerIdentity.json()).data;
     const foreignMe = (await foreignIdentity.json()).data;
-    expect(foreignMe.user.email).toBe('e2e@test.local');
+    expect(foreignMe.user.email).not.toBe(ownerMe.user.email);
     expect(foreignMe.user.tenantId).toBeTruthy();
     expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
     expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
-    // /api/test/seed installs test-fixtures only. The foreign tenant needs the
+    // The freshly created foreign tenant needs the
     // same product page before this journey can exercise the record boundary.
     const quoteRoot = process.env.AURA_QUOTE_ROOT;
     expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
@@ -280,14 +292,14 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const foreignRecord = await deniedRecord;
     expect(foreignRecord.status()).toBe(404);
     expect(await foreignRecord.json()).toMatchObject({
-      code: '404', message: 'Resource not found', data: null, context: null,
+      code: '404', message: 'Record not found', data: null, context: null,
     });
     await expect(foreign.page.getByText('请求的记录不存在或已不可用。', { exact: true })).toBeVisible();
-    await expect(foreign.page.getByText('Resource not found', { exact: true })).toHaveCount(0);
+    await expect(foreign.page.getByText(/^(Resource|Record) not found$/)).toHaveCount(0);
     const absentRecord = await foreign.page.request.get('/api/dynamic/qo_quote_common/01NONEXISTENTQUOTE000000000');
     expect(absentRecord.status()).toBe(404);
     expect(await absentRecord.json()).toMatchObject({
-      code: '404', message: 'Resource not found', data: null, context: null,
+      code: '404', message: 'Record not found', data: null, context: null,
     });
     await expect(foreign.page.getByTestId('ab:detail:qo_quote_common:container')
       .getByRole('heading', { level: 2 })).toHaveText(/记录不存在|未找到记录|Record not found/);
@@ -299,7 +311,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
       });
       expect(deniedQuery.status()).toBe(404);
       expect(await deniedQuery.json()).toMatchObject({
-        code: '404', message: 'Resource not found', data: null, context: null,
+        code: '404', message: 'Record not found', data: null, context: null,
       });
     }
     const foreignFile = await foreign.page.request.get(`/api/file/${sharedQuoteFileId}`);

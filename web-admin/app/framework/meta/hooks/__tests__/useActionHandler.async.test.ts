@@ -1775,10 +1775,14 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
 describe('useActionHandler - explicit confirmation style', () => {
   it.each([
-    [undefined, 'danger'],
-    ['default', 'default'],
-    ['danger', 'danger'],
-  ] as const)('uses %s confirmation style and preserves cancellation', async (variant, expected) => {
+    [{}, 'default'],
+    [{ confirmVariant: 'default' }, 'default'],
+    [{ confirmVariant: 'danger' }, 'danger'],
+    [{ danger: true }, 'danger'],
+    [{ variant: 'danger' }, 'danger'],
+    [{ danger: true, confirmVariant: 'default' }, 'default'],
+    [{ variant: 'default', confirmVariant: 'danger' }, 'danger'],
+  ] as const)('uses %j confirmation intent and preserves cancellation', async (intent, expected) => {
     fetchResultMock.mockReset();
     const confirm = vi.spyOn(confirmations, 'confirmDialog').mockResolvedValue(false);
     try {
@@ -1788,7 +1792,7 @@ describe('useActionHandler - explicit confirmation style', () => {
       }));
       await act(async () => {
         await result.current.handleAction({
-          code: 'restore', confirm: 'Restore this member?', confirmVariant: variant,
+          code: 'restore', confirm: 'Restore this member?', ...intent,
           action: { type: 'command', command: 'admin:restore_member' },
         } as ButtonConfig, { pid: 'MEMBER-1' });
       });
