@@ -189,8 +189,9 @@ public class InstalledIntegrationService {
             if (r == null) throw denied();
             Resolved resolved = resolve(principal,source,eventId,r.durableEventId());
             if (!r.bindingSha256().equals(resolved.bindingHash()) || !r.commandSha256().equals(resolved.commandHash())
-                    || !r.providerSha256().equals(resolved.artifact())) throw denied();
+                    || !providerMatches(resolved,r) || !validRequestPid(r.requestPid())) throw denied();
             Map<String,Object> result = new LinkedHashMap<>(execute(resolved,resolved.registration().resultCommand(),Map.of("requestId",eventId),null,true));
+            if (!r.requestPid().equals(result.get("recordPid"))) throw denied();
             String delivery = receipts.deliveryStatus(r.tenantId(),r.durableEventId());
             if (delivery == null) delivery = "unavailable";
             if (!Set.of("pending","processing","delivered","failed","unavailable").contains(delivery)) throw denied();
@@ -250,8 +251,16 @@ public class InstalledIntegrationService {
             throw denied();
         }
         if (r == null || !r.bindingSha256().equals(resolved.bindingHash())
-                || !r.commandSha256().equals(resolved.commandHash()) || !r.providerSha256().equals(resolved.artifact())
+                || !r.commandSha256().equals(resolved.commandHash()) || !providerMatches(resolved,r)
                 || !r.durableEventId().equals(event.eventId())) throw denied();
+    }
+    private boolean providerMatches(Resolved resolved, InstalledIntegrationReceiptMapper.Receipt receipt) {
+        // Terminal replay never invokes old business code; the current result query is PID-bound.
+        return receipt.providerSha256().equals(resolved.artifact())
+                || ("completed".equals(receipt.state()) && validRequestPid(receipt.requestPid()));
+    }
+    private boolean validRequestPid(String pid) {
+        return pid != null && pid.matches("[A-Za-z0-9_-]{1,100}");
     }
     private <T> T inTenant(Long tenant, String installation, java.util.function.Supplier<T> work) {
         if (tenant == null || tenant <= 0 || installation == null || !installation.matches("[A-Za-z0-9_-]{1,100}")) throw denied();

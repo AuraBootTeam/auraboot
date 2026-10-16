@@ -107,6 +107,70 @@ class InstalledIntegrationServiceTest {
         return new InstalledIntegrationReceiptMapper.Receipt(r.tenantId(),r.installationPid(),r.sourceCode(),r.externalEventId(),r.durableEventId(),
                 r.envelopeSha256(),r.bindingSha256(),r.commandSha256(),r.providerSha256(),"request-pid","accepted");
     }
+    InstalledIntegrationReceiptMapper.Receipt receiptWith(InstalledIntegrationReceiptMapper.Receipt r,
+            String state, String pid, String binding, String command) {
+        return new InstalledIntegrationReceiptMapper.Receipt(r.tenantId(),r.installationPid(),r.sourceCode(),r.externalEventId(),
+                r.durableEventId(),r.envelopeSha256(),binding,command,r.providerSha256(),pid,state);
+    }
+    void upgradeProvider() {
+        String digest="sha256:"+"b".repeat(64);
+        when(registry.registration(source)).thenReturn(Optional.of(Map.entry(registration,digest)));
+        when(plugins.observeLoadedArtifact(any())).thenReturn(Optional.of(new AuraPluginManager.LoadedPluginArtifact(
+                registration.providerPluginId(),java.nio.file.Path.of("provider-new.jar"),digest)));
+    }
+    @Test void completedReceiptSurvivesProviderUpgradeWithoutRepeatingBusinessCommands() {
+        service.accept(principal,source,event());var r=acceptedReceipt();
+        var completed=receiptWith(r,"completed","request-pid",r.bindingSha256(),r.commandSha256());
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        upgradeProvider();clearInvocations(executor,receipts);
+        assertEquals(new InstalledIntegrationService.Acceptance("request-pid",true),service.accept(principal,source,event()));
+        service.consume(event());verifyNoInteractions(executor);
+        verify(receipts,never()).accepted(anyLong(),anyString(),anyString(),anyString(),anyString());
+        verify(receipts,never()).completed(anyLong(),anyString(),anyString(),anyString(),anyString());
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","completed")).build());
+        assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));
+        var query=ArgumentCaptor.forClass(CommandExecuteRequest.class);verify(executor).execute(eq(result),query.capture());
+        assertEquals("QUERY",query.getValue().getOperationType());
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
+                ()->service.accept(principal,source,event(Map.of("title","different"))));
+    }
+    @Test void providerUpgradeNeverMigratesAcceptedOrInvalidTerminalReceipts() {
+        service.accept(principal,source,event());var r=acceptedReceipt();upgradeProvider();clearInvocations(executor);
+        when(receipts.claim(any())).thenReturn(0);
+        for(String state:List.of("accepting","accepted","failed","completed")) {
+            var invalid=receiptWith(r,state,state.equals("completed")?"invalid pid":"request-pid",r.bindingSha256(),r.commandSha256());
+            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(invalid);
+            assertThrows(SecurityException.class,()->service.accept(principal,source,event()),state);
+            assertThrows(SecurityException.class,()->service.consume(event()),state);
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
+        }
+        verifyNoInteractions(executor);
+    }
+    @Test void terminalUpgradeStillRejectsBindingCommandAndForeignAuthorityDrift() {
+        service.accept(principal,source,event());var r=acceptedReceipt();upgradeProvider();clearInvocations(executor);
+        when(receipts.claim(any())).thenReturn(0);
+        for(var changed:List.of(receiptWith(r,"completed","request-pid","changed",r.commandSha256()),
+                receiptWith(r,"completed","request-pid",r.bindingSha256(),"changed"))) {
+            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(changed);
+            assertThrows(SecurityException.class,()->service.accept(principal,source,event()));
+            assertThrows(SecurityException.class,()->service.consume(event()));
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
+        }
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(r,"completed","request-pid",r.bindingSha256(),r.commandSha256()));
+        assertThrows(SecurityException.class,()->service.consume(event(Map.of("title","forged"))));
+        var foreign=new MachinePrincipal(43L,"token","app",principal.scopes(),"app","inst","test","token");
+        assertThrows(SecurityException.class,()->service.result(foreign,source,"evt-1"));
+        verifyNoInteractions(executor);
+    }
+    @Test void currentResultQueryMustReturnExactlyTheOriginalReceiptRecord() {
+        service.accept(principal,source,event());var r=acceptedReceipt();
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        for(Map<String,Object> data:List.<Map<String,Object>>of(Map.of("recordPid","foreign-pid"),Map.of("state","completed"))) {
+            when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(data).build());
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
+        }
+    }
     @Test void nativeAcceptUsesActualCommandAndRestoresCallerIdentity() {
         MetaContext.setContext(77L,8L,"caller","caller");
         var accepted=service.accept(principal,source,event());assertEquals("request-pid",accepted.recordPid());assertFalse(accepted.duplicate());
@@ -156,8 +220,8 @@ class InstalledIntegrationServiceTest {
     @Test void ownerScopedResultAlwaysExecutesReadAndNeverCachesInitialAcceptedState() {
         service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
         when(executor.execute(eq(result),any())).thenReturn(
-            CommandExecuteResult.builder().phaseReached("completed").data(Map.of("state","accepted")).build(),
-            CommandExecuteResult.builder().phaseReached("completed").data(Map.of("state","completed","taskPid","task")).build());
+            CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","accepted")).build(),
+            CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","completed","taskPid","task")).build());
         when(receipts.deliveryStatus(42L,r.durableEventId())).thenReturn("failed");
         var failed=service.result(principal,source,"evt-1");
         assertEquals("accepted",failed.get("state"));assertEquals("failed",failed.get("deliveryStatus"));
