@@ -7,17 +7,20 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Objects;
 
-/** Minimal publication, stable-channel, and initial active-binding control plane. */
+/** Publication, stable-channel and explicitly admitted tenant binding transitions. */
 @Service
 public final class ApplicationReleaseControlService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final ApplicationBindingCapabilityVerifier bindingCapabilities;
+    private final DefinitionShadowComparisonService definitionComparison;
 
     public ApplicationReleaseControlService(JdbcTemplate jdbc,
-                                            ApplicationBindingCapabilityVerifier bindingCapabilities) {
+                                            ApplicationBindingCapabilityVerifier bindingCapabilities,
+                                            DefinitionShadowComparisonService definitionComparison) {
         this.jdbc = Objects.requireNonNull(jdbc);
         this.bindingCapabilities = Objects.requireNonNull(bindingCapabilities);
+        this.definitionComparison = Objects.requireNonNull(definitionComparison);
         var manager = new DataSourceTransactionManager(Objects.requireNonNull(jdbc.getDataSource()));
         transactions = new TransactionTemplate(manager);
         // Keep the database default for standalone control calls and inherit an existing
@@ -117,6 +120,72 @@ public final class ApplicationReleaseControlService {
         }));
     }
 
+    /** Same-epoch upgrade only; schema, model publication and data correction are explicit prior steps. */
+    Binding upgradeStableActive(long tenantId, String applicationCode, String expectedCurrentReleaseId,
+                                Long expectedVersion, String targetReleaseId, String targetDigest,
+                                String actor, String operationId) {
+        require(tenantId > 0, "Positive tenant ID required");
+        validate(applicationCode, expectedCurrentReleaseId, actor, operationId);
+        validate(applicationCode, targetReleaseId, actor, operationId);
+        require(expectedVersion != null && expectedVersion > 0 && expectedVersion < Long.MAX_VALUE,
+                "Positive bounded expected binding version required");
+        require(targetDigest != null && targetDigest.matches("sha256:[0-9a-f]{64}"),
+                "Exact target release digest required");
+        require(!expectedCurrentReleaseId.equals(targetReleaseId), "Upgrade requires a different target release");
+        return transactions.execute(status -> audited(actor, operationId, () -> {
+            var target = publishedStable(applicationCode);
+            require(target.releaseId().equals(targetReleaseId) && target.digest().equals(targetDigest),
+                    "Exact target release is no longer published stable");
+            bindingCapabilities.requireDeployed(applicationCode, targetReleaseId, targetDigest);
+            // Lock the existing tenant pointer before checking replay, so simultaneous retries
+            // observe the committed history instead of racing a duplicate version update.
+            var current = jdbc.query("""
+                    SELECT current_release_id,status,binding_version FROM ab_tenant_application_binding
+                    WHERE tenant_id=? AND application_id=? FOR UPDATE
+                    """, (row, index) -> new BindingPointer(row.getString(1), row.getString(2), row.getLong(3)),
+                    tenantId, target.applicationId());
+            if (current.size() != 1) throw new IllegalStateException("Existing active tenant binding required");
+            var replay = bindingActivationByOperation(tenantId, target.applicationId(), operationId);
+            if (!replay.isEmpty()) {
+                var previous = replay.getFirst();
+                if (!expectedCurrentReleaseId.equals(previous.previousReleaseId())
+                        || !"active".equals(previous.previousStatus())
+                        || !targetReleaseId.equals(previous.binding().releaseId())
+                        || !"active".equals(previous.binding().status())
+                        || previous.binding().version() != expectedVersion + 1
+                        || !targetDigest.equals(previous.binding().releaseDigest())
+                        || !actor.equals(previous.actor())) {
+                    throw new IllegalStateException("Binding operation was already used for a different upgrade");
+                }
+                return previous.binding();
+            }
+            var observed = current.getFirst();
+            if (!expectedCurrentReleaseId.equals(observed.releaseId()) || !"active".equals(observed.status())
+                    || expectedVersion != observed.version()) {
+                throw new IllegalStateException("Tenant binding version or active source release conflict");
+            }
+            var source = release(applicationCode, expectedCurrentReleaseId);
+            require(source.compatibilityEpoch() == target.compatibilityEpoch(),
+                    "Cross-epoch tenant upgrade requires a separately admitted migration");
+            var admission = definitionComparison.admitActiveUpgrade(tenantId, applicationCode,
+                    expectedCurrentReleaseId, targetReleaseId, targetDigest);
+            require(admission != null && admission.tenantId() == tenantId
+                            && applicationCode.equals(admission.applicationCode())
+                            && expectedCurrentReleaseId.equals(admission.sourceReleaseId())
+                            && targetReleaseId.equals(admission.targetReleaseId()) && targetDigest.equals(admission.targetDigest())
+                            && admission.comparedResources() > 0,
+                    "Exact nonempty definition upgrade admission required");
+            int changed = jdbc.update("""
+                    UPDATE ab_tenant_application_binding
+                    SET current_release_id=?,binding_version=binding_version+1
+                    WHERE tenant_id=? AND application_id=? AND current_release_id=?
+                      AND status='active' AND binding_version=?
+                    """, targetReleaseId, tenantId, target.applicationId(), expectedCurrentReleaseId, expectedVersion);
+            if (changed != 1) throw new IllegalStateException("Tenant binding upgrade version conflict");
+            return readBinding(tenantId, target.applicationId());
+        }));
+    }
+
     /** Package-local CAS invoked after the controller proves an exact stable shadow match. */
     Binding activateStableShadow(long tenantId, String applicationCode, String expectedReleaseId,
                                  Long expectedVersion, String actor, String operationId) {
@@ -166,7 +235,8 @@ public final class ApplicationReleaseControlService {
     }
 
     private record Release(long applicationId, String releaseId, String digest, int compatibilityEpoch) {}
-    private record BindingActivation(Binding binding, String previousReleaseId, String previousStatus) {}
+    private record BindingPointer(String releaseId, String status, long version) {}
+    private record BindingActivation(Binding binding, String previousReleaseId, String previousStatus, String actor) {}
 
     private Release release(String applicationCode, String releaseId) {
         var releases = jdbc.query("""
@@ -221,7 +291,7 @@ public final class ApplicationReleaseControlService {
             long tenantId, long applicationId, String operationId) {
         return jdbc.query("""
                 SELECT h.tenant_id,h.application_id,h.current_release_id,r.digest,r.compatibility_epoch,
-                       h.status,h.binding_version,h.previous_release_id,h.previous_status
+                       h.status,h.binding_version,h.previous_release_id,h.previous_status,h.business_actor
                 FROM ab_tenant_application_binding_history h
                 JOIN ab_application_release r
                   ON r.application_id=h.application_id AND r.release_id=h.current_release_id
@@ -229,7 +299,7 @@ public final class ApplicationReleaseControlService {
                 """, (row, index) -> new BindingActivation(
                         new Binding(row.getLong(1), row.getLong(2), row.getString(3), row.getString(4),
                                 row.getInt(5), row.getString(6), row.getLong(7)),
-                        row.getString(8), row.getString(9)), tenantId, applicationId, operationId);
+                        row.getString(8), row.getString(9), row.getString(10)), tenantId, applicationId, operationId);
     }
 
     private Binding readBinding(long tenantId, long applicationId) {

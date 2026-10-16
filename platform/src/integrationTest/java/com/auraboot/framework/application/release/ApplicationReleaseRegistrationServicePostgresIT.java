@@ -26,9 +26,13 @@ class ApplicationReleaseRegistrationServicePostgresIT {
     static class Transactions {}
 
     @Test void concurrentRetriesShareOneRegistrationAndConflictsRollBack() throws Exception {
-        assertEquals("crm-release-foundation", required("AURA_RUNTIME_NAME"));
+        String runtime = required("AURA_RUNTIME_NAME");
+        assertEquals(System.getenv().getOrDefault("RELEASE_REGISTRY_IT_RUNTIME", "crm-release-foundation"), runtime);
         String database = required("POSTGRES_DB");
-        assertEquals("auracrm_" + required("AURA_WORKSPACE_SLOT"), database);
+        assertEquals(System.getenv().getOrDefault("RELEASE_REGISTRY_IT_DATABASE",
+                "auracrm_" + required("AURA_WORKSPACE_SLOT")), database);
+        assertTrue(database.matches("(auracrm|auraedu|auraboot|enterprise)_" + required("AURA_WORKSPACE_SLOT")),
+                "Registry integration tests require an isolated managed slot database");
         String url = "jdbc:postgresql://" + required("POSTGRES_HOST") + ":" + required("POSTGRES_PORT") + "/" + database;
         var admin = new JdbcTemplate(new DriverManagerDataSource(url, required("DATABASE_USERNAME"), required("DATABASE_PASSWORD")));
         String schema = "registration_service_it_" + UUID.randomUUID().toString().replace("-", "");
@@ -188,9 +192,9 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.execute(sql), sql);
         }
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history", Integer.class));
-        verifyShadowStore(jdbc, source, applicationId, first, second, third, other.releaseId());
+        verifyShadowStore(service, jdbc, source, applicationId, first, second, third, other.releaseId());
     }
-    private void verifyShadowStore(JdbcTemplate jdbc, DriverManagerDataSource source, long applicationId,
+    private void verifyShadowStore(ApplicationReleaseRegistrationService service, JdbcTemplate jdbc, DriverManagerDataSource source, long applicationId,
                                    String first, String second, String third, String otherRelease) throws Exception {
         try (var migration = getClass().getResourceAsStream("/db/migration/core/V20260926040000__tenant_binding_operator_audit.sql")) {
             assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
@@ -199,8 +203,9 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
         }
         var store = new TenantApplicationShadowBindingStore(jdbc);
-        var control = new ApplicationReleaseControlService(jdbc,
-                org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationBindingCapabilityVerifier.class));
+        var capabilityVerifier = org.mockito.Mockito.mock(ApplicationBindingCapabilityVerifier.class);
+        var comparison = org.mockito.Mockito.mock(DefinitionShadowComparisonService.class);
+        var control = new ApplicationReleaseControlService(jdbc, capabilityVerifier, comparison);
         java.util.function.Function<String, String> digest = release -> jdbc.queryForObject(
                 "SELECT digest FROM ab_application_release WHERE release_id=?", String.class, release);
         var firstAudit = bindingAudit();
@@ -333,7 +338,102 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 "UPDATE ab_application_channel_target_history SET changed_by='test:forged'"));
         verifyShadowRoles(source, applicationId, first, second);
         verifyShadowLoginPool(source, applicationId, first, second);
+        verifyActiveUpgrade(service, control, capabilityVerifier, comparison, jdbc, source, applicationId, winner, first);
     }
+    private void verifyActiveUpgrade(ApplicationReleaseRegistrationService registration,
+                                     ApplicationReleaseControlService control, ApplicationBindingCapabilityVerifier capabilities,
+                                     DefinitionShadowComparisonService comparison, JdbcTemplate jdbc,
+                                     DriverManagerDataSource source, long applicationId,
+                                     String previousRelease, String targetRelease) throws Exception {
+        String targetDigest = jdbc.queryForObject(
+                "SELECT digest FROM ab_application_release WHERE release_id=?", String.class, targetRelease);
+        String operation = bindingAudit().operationId();
+        String actor = "test:retained-upgrade";
+        jdbc.execute("CREATE TABLE retained_business_proof(tenant_id bigint PRIMARY KEY, payload jsonb NOT NULL)");
+        jdbc.update("INSERT INTO retained_business_proof VALUES (714,?::jsonb)",
+                "{\"score\":17,\"externalReference\":\"original-reference\"}");
+        String retained = jdbc.queryForObject("SELECT payload::text FROM retained_business_proof WHERE tenant_id=714", String.class);
+        assertThrows(IllegalArgumentException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 1L, targetRelease, "sha256:" + "0".repeat(64), actor, operation));
+        assertThrows(IllegalStateException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 2L, targetRelease, targetDigest, actor, operation));
+        assertThrows(IllegalStateException.class, () -> control.upgradeStableActive(
+                715, "aura-edu", previousRelease, 1L, targetRelease, targetDigest, actor, operation));
+        org.mockito.Mockito.when(comparison.admitActiveUpgrade(714, "aura-edu", previousRelease, targetRelease, targetDigest))
+                .thenThrow(new IllegalArgumentException("Tenant-local definition drift"));
+        assertThrows(IllegalArgumentException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 1L, targetRelease, targetDigest, actor, operation));
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT binding_version FROM ab_tenant_application_binding WHERE tenant_id=714", Long.class));
+        var originalContent = content("b");
+        var crossEpoch = registration.register("aura-edu", "retained-upgrade-epoch-two",
+                new Content(2, "2.0", originalContent.sourceLockIdentity(),
+                        originalContent.platformCompatibility(), originalContent.components()), actor);
+        control.publish("aura-edu", crossEpoch.releaseId(), actor, bindingAudit().operationId());
+        control.promoteStable("aura-edu", crossEpoch.releaseId(), 2L, actor, bindingAudit().operationId());
+        assertThrows(IllegalArgumentException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 1L, crossEpoch.releaseId(), crossEpoch.digest(), actor, operation));
+        control.promoteStable("aura-edu", targetRelease, 3L, actor, bindingAudit().operationId());
+        org.mockito.Mockito.doThrow(new IllegalStateException("Required runtime plugin missing"))
+                .when(capabilities).requireDeployed("aura-edu", targetRelease, targetDigest);
+        assertThrows(IllegalStateException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 1L, targetRelease, targetDigest, actor, operation));
+        org.mockito.Mockito.doNothing().when(capabilities).requireDeployed("aura-edu", targetRelease, targetDigest);
+        org.mockito.Mockito.doReturn(new DefinitionShadowComparisonService.UpgradeAdmission(
+                        714, "aura-edu", previousRelease, targetRelease, targetDigest, 1))
+                .when(comparison).admitActiveUpgrade(714, "aura-edu", previousRelease, targetRelease, targetDigest);
+        // An interruption before commit must preserve both the pointer and audit history.
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(new DataSourceTransactionManager(source));
+        transaction.executeWithoutResult(status -> {
+            var transientBinding = control.upgradeStableActive(
+                    714, "aura-edu", previousRelease, 1L, targetRelease, targetDigest, actor, operation);
+            assertEquals(2L, transientBinding.version());
+            status.setRollbackOnly();
+        });
+        assertEquals(previousRelease, jdbc.queryForObject(
+                "SELECT current_release_id FROM ab_tenant_application_binding WHERE tenant_id=714", String.class));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=714", Integer.class));
+        var start = new CountDownLatch(1);
+        ApplicationReleaseControlService.Binding upgraded;
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<ApplicationReleaseControlService.Binding> retry = () -> {
+                assertTrue(start.await(10, TimeUnit.SECONDS));
+                return control.upgradeStableActive(714, "aura-edu", previousRelease, 1L,
+                        targetRelease, targetDigest, actor, operation);
+            };
+            var left = workers.submit(retry);
+            var right = workers.submit(retry);
+            start.countDown();
+            upgraded = left.get(15, TimeUnit.SECONDS);
+            assertEquals(upgraded, right.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(targetRelease, upgraded.releaseId());
+        assertEquals(2L, upgraded.version());
+        assertEquals("active", upgraded.status());
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=714", Integer.class));
+        assertEquals(previousRelease, jdbc.queryForObject(
+                "SELECT previous_release_id FROM ab_tenant_application_binding_history WHERE tenant_id=714 AND binding_version=2", String.class));
+        assertEquals(actor, jdbc.queryForObject(
+                "SELECT business_actor FROM ab_tenant_application_binding_history WHERE tenant_id=714 AND binding_version=2", String.class));
+        assertEquals(operation, jdbc.queryForObject(
+                "SELECT operation_id FROM ab_tenant_application_binding_history WHERE tenant_id=714 AND binding_version=2", String.class));
+        // A lost response retries the same committed operation without incrementing the version.
+        assertEquals(upgraded, control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 1L, targetRelease, targetDigest, actor, operation));
+        assertThrows(IllegalStateException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 2L, targetRelease, targetDigest, actor, operation));
+        assertThrows(IllegalStateException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 1L, targetRelease, targetDigest, "test:other-actor", operation));
+        assertThrows(IllegalStateException.class, () -> control.upgradeStableActive(
+                714, "aura-edu", previousRelease, 1L, targetRelease, targetDigest, actor, bindingAudit().operationId()));
+        assertEquals(retained, jdbc.queryForObject(
+                "SELECT payload::text FROM retained_business_proof WHERE tenant_id=714", String.class));
+        assertEquals(2L, jdbc.queryForObject(
+                "SELECT binding_version FROM ab_tenant_application_binding WHERE tenant_id=714", Long.class));
+    }
+
     private void verifyShadowLoginPool(DriverManagerDataSource source, long applicationId, String first, String second) throws Exception {
         var jdbc = new JdbcTemplate(source);
         String suffix = UUID.randomUUID().toString().replace("-", "");
@@ -932,7 +1032,8 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         var interceptor = new com.auraboot.framework.application.security.AdminRoleInterceptor(roles, mapper, audit, summarizer, null);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
                 .standaloneSetup(new ApplicationReleaseController(service, new ApplicationReleaseControlService(jdbc,
-                        org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationBindingCapabilityVerifier.class)),
+                        org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationBindingCapabilityVerifier.class),
+                org.mockito.Mockito.mock(DefinitionShadowComparisonService.class)),
                         org.mockito.Mockito.mock(DefinitionShadowComparisonService.class),
                         org.mockito.Mockito.mock(TenantApplicationShadowBindingService.class)))
                 .addInterceptors(interceptor).build();
