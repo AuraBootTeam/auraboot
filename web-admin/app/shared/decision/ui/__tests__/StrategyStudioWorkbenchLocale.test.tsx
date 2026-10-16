@@ -214,7 +214,9 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(evaluate).toHaveBeenLastCalledWith(
       expect.objectContaining({ kind: 'DECISION_TABLE', runtimeAdapter: 'PLATFORM_DECISION_TABLE', contentJson: expect.any(Object) }),
     );
-    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过 · trace-locale');
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过');
+    expect(screen.getByTestId('strategy-operation-status')).not.toHaveTextContent('trace-locale');
+    expect(screen.getByText('trace-locale').closest('details')).not.toHaveAttribute('open');
 
     language.locale = 'en-US';
     view.rerender(<StrategyStudioWorkbench api={api} fields={[]} />);
@@ -232,7 +234,7 @@ describe('StrategyStudioWorkbench locale contracts', () => {
       expect.objectContaining({ kind: 'DECISION_TABLE', runtimeAdapter: 'PLATFORM_DECISION_TABLE', contentJson: expect.any(Object) }),
     );
     expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent(
-      'Test matched · trace-locale',
+      'Test matched',
     );
   });
 });
