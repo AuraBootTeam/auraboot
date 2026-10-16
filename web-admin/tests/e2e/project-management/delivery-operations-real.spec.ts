@@ -29,6 +29,8 @@ async function createAcceptance(page:Page,user:any,name:string){
  const rows=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:'500'}}));return rows.records.find((a:any)=>a.pid===pid);
 }
 async function prepareOperations(page:Page,user:any){
+ const control=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:'500'}}));const example=control.records[0];expect(example).toBeTruthy();
+ const tombstone=await data(await page.request.post('/api/meta/commands/execute/tpm:create_acceptance',{data:{operationType:'create',payload:{tpm_ac_name:'已撤销的统计对照',tpm_ac_project:example.tpm_ac_project,tpm_ac_scope:'Source exclusion control',tpm_ac_amount:1,tpm_ac_risk:'normal',tpm_ac_reviewer:user.pid}}}));await data(await page.request.delete(`/api/dynamic/tpm_acceptance/${tombstone.data.recordPid}`));
  const returned=await createAcceptance(page,user,'华辰制造 · 供应商联调补正');
  await page.getByTestId('bpm-operations-reject').click();await page.getByTestId('bpm-reject-comment').fill('缺少供应商对账差异说明，请补齐后重新提交。');const rejected=page.waitForResponse(r=>r.url().includes('/api/bpm/tasks/')&&r.url().endsWith('/reject')&&r.request().method()==='POST');await page.getByTestId('bpm-reject-confirm').click();await data(await rejected);await expect(page.getByRole('main')).toContainText('缺少供应商对账差异说明');
  const configs=await data(await page.request.get('/api/bpm/sla-configs'));const config=configs.find((c:any)=>c.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
@@ -49,7 +51,7 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  expect(acceptances.records.length).toBeGreaterThan(0);expect(Number(acceptances.total)).toBe(acceptances.records.length);
  expect(checks.records.length).toBeGreaterThan(0);
  const audits=new Map<string,any[]>(); const sla:any[]=[];for(const a of acceptances.records){if(a.tpm_ac_process){const rows=await data(await page.request.get(`/api/bpm/monitor/instances/${a.tpm_ac_process}/sla`));sla.push(...rows);audits.set(a.pid,await data(await page.request.get(`/api/bpm/monitor/instances/${a.tpm_ac_process}/audit`)));}}
- const oracle={pending_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='submitted').length,returned_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='returned').length,overdue_count:sla.filter(a=>a.status==='overdue').length,late_completed_count:sla.filter(a=>a.status==='completed'&&Date.parse(a.completedTime)>Date.parse(a.deadlineTime)).length};
+ const oracle={acceptance_count:acceptances.records.length,accepted_amount:acceptances.records.filter((a:any)=>a.tpm_ac_status==='accepted').reduce((n:number,a:any)=>n+Number(a.tpm_ac_amount),0),pending_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='submitted').length,returned_count:acceptances.records.filter((a:any)=>a.tpm_ac_status==='returned').length,overdue_count:sla.filter(a=>a.status==='overdue').length,late_completed_count:sla.filter(a=>a.status==='completed'&&Date.parse(a.completedTime)>Date.parse(a.deadlineTime)).length};
  const widgetResponses:Promise<any>[]=[];
  page.on('response',r=>{if(new URL(r.url()).pathname==='/api/meta/chart-data'&&r.request().postDataJSON()?.queryCode?.startsWith('tdo_'))widgetResponses.push(data(r).then(body=>({queryCode:r.request().postDataJSON().queryCode,body})));});
  await page.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();
@@ -60,7 +62,7 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  const widgets=await Promise.all(widgetResponses);const summary=widgets.find(w=>w.queryCode==='tdo_delivery_summary').body.rows[0];
  for(const [key,value]of Object.entries(oracle))expect(Number(summary[key]),key).toBe(value);
  const factRows=widgets.find(w=>w.queryCode==='tdo_delivery_facts').body.rows;
- expect(factRows).toHaveLength(acceptances.records.length);expect(new Set(factRows.map((r:any)=>r.acceptance_pid)).size).toBe(factRows.length);expect(Number(summary.pending_count)).toBeGreaterThan(0);expect(Number(summary.overdue_count)).toBeGreaterThan(0);expect(Number(summary.returned_count)).toBeGreaterThan(0);expect(Number(summary.late_completed_count)).toBeGreaterThan(0);expect(factRows.some((r:any)=>r.verification_result==='资料已更新 · 需复核')).toBe(true);
+ expect(factRows).toHaveLength(acceptances.records.length);expect(factRows.some((r:any)=>r.acceptance_name==='已撤销的统计对照')).toBe(false);expect(new Set(factRows.map((r:any)=>r.acceptance_pid)).size).toBe(factRows.length);expect(Number(summary.pending_count)).toBeGreaterThan(0);expect(Number(summary.overdue_count)).toBeGreaterThan(0);expect(Number(summary.returned_count)).toBeGreaterThan(0);expect(Number(summary.late_completed_count)).toBeGreaterThan(0);expect(factRows.some((r:any)=>r.verification_result==='资料已更新 · 需复核')).toBe(true);
  for(const a of acceptances.records){const f=factRows.find((r:any)=>r.acceptance_pid===a.pid);expect(f.acceptance_name).toBe(a.tpm_ac_name);expect(Number(f.amount)).toBe(Number(a.tpm_ac_amount));expect(f.acceptance_status).toBe(a.tpm_ac_status);
  const audit=(audits.get(a.pid)||[]).filter(r=>['task_approve','task_reject','task_complete'].includes(r.operation)&&r.result==='success').sort((x,y)=>Date.parse(y.createdAt)-Date.parse(x.createdAt));
  if(audit.length){expect(f.approval_result).toBe({task_approve:'同意',task_reject:'退回',task_complete:'已处理'}[audit[0].operation as 'task_approve']);expect(f.approval_comment).toBe(audit[0].details?.comment||'未填写意见');expect(Number(f.approval_minutes)).toBeGreaterThanOrEqual(0);}
@@ -68,7 +70,7 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  const associated=checks.records.filter((c:any)=>c.tdv_ck_acceptance===a.pid).sort((x:any,y:any)=>Date.parse(y.created_at)-Date.parse(x.created_at)||String(y.id).localeCompare(String(x.id)));
  const check=associated[0];if(check?.tdv_ck_checked_at){expect(f.checks_passed).toBe(check.tdv_ck_passed);if(Date.parse(check.tdv_ck_checked_at)<Date.parse(a.updated_at))expect(f.verification_result).toBe('资料已更新 · 需复核');}
  }
- await shot(page,'OP01');
+ await shot(page,'OP01');await page.getByTestId('dashboard-block-approval-results').scrollIntoViewIfNeeded();await shot(page,'OP13');await page.getByTestId('dashboard-block-verification-results').scrollIntoViewIfNeeded();await expect(page.getByTestId('dashboard-block-verification-results')).toContainText('资料已更新 · 需复核');await shot(page,'OP14');await page.getByRole('heading',{name:'交付经营看板',exact:true}).scrollIntoViewIfNeeded();
  const before=widgetResponses.length;await page.getByRole('button',{name:'刷新',exact:true}).click();await expect.poll(()=>widgetResponses.length).toBeGreaterThanOrEqual(before+7);await shot(page,'OP03');
  await page.setViewportSize({width:1280,height:900});await expect(page.getByRole('heading',{name:'交付经营看板',exact:true})).toBeVisible();await shot(page,'OP04');await page.setViewportSize({width:1440,height:1000});
  const target=factRows[0];
@@ -106,7 +108,7 @@ test('OP source grants independently protect native SLA and verification facts i
  const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});const actor=await context.newPage();
  try{
   const identity=await login(actor,email,tenant);expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
-  for(const missing of [null,'bpm.monitor.read','model.tdv_check.read']){
+  for(const missing of [null,'bpm.monitor.read','model.tdv_check.read',null]){
    await grant(missing);await actor.reload();
    const queries:Promise<any>[]=[];const observe=(r:Response)=>{if(new URL(r.url()).pathname==='/api/meta/chart-data'&&r.request().postDataJSON()?.queryCode?.startsWith('tdo_'))queries.push(r.finished().then(()=>({status:r.status()})));};actor.on('response',observe);
    await actor.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect.poll(()=>queries.length).toBeGreaterThanOrEqual(7);const outcomes=await Promise.all(queries);actor.off('response',observe);
@@ -117,7 +119,7 @@ test('OP source grants independently protect native SLA and verification facts i
    if(missing){
     await navigateToMenuByClick(actor,['元数据管理','报表管理']);await actor.getByRole('row').filter({hasText:'客户项目交付复盘'}).last().getByRole('button',{name:/打开|Open/}).click();
     const toolbar=actor.getByTestId('report-reader-toolbar').filter({visible:true});await expect(toolbar).toBeVisible();
-    for(const format of ['Markdown','HTML','PDF']){const denied=actor.waitForResponse(r=>new URL(r.url()).pathname===`/api/reports/export/${format.toLowerCase()}`&&r.request().method()==='POST');await toolbar.getByRole('button',{name:`导出 ${format}`,exact:true}).click();expect((await denied).status()).toBe(403);}
+    for(const format of ['Markdown','HTML','PDF'])await expect(toolbar.getByRole('button',{name:`导出 ${format}`,exact:true})).toBeDisabled();
     await shot(actor,'OP12-'+missing.replaceAll('.','-'));
    }
   }
