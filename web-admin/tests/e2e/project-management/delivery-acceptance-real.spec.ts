@@ -1,11 +1,11 @@
-import {test, expect, type Page, type APIResponse} from '@playwright/test';
+import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
 import {mkdir, writeFile, readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
 const evidence = process.env.AURA_EVIDENCE_DIR;
 if (!evidence || !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) throw Error('Bind the owned runtime, evidence round and local administrator.');
 const receipts: unknown[] = [];
-async function data(response: APIResponse) {
+async function data(response: APIResponse | Response) {
   const body = await response.json();
   expect(response.status(), JSON.stringify(body)).toBe(200);
   expect(String(body.code)).toBe('0');
@@ -97,9 +97,12 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await page.getByTestId('bpm-panel').getByText('规则执行追踪',{exact:true}).click();
+  await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
+  await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
   return sla[0];
 }
-async function decide(page: Page, pid: string, action: 'approve'|'reject') {
+async function decide(page: Page, pid: string, action: 'approve'|'reject', observer: Page = page) {
   const pending = await row(page,pid);
   const sent = page.waitForResponse(r => new URL(r.url()).pathname.match(new RegExp(`/api/bpm/tasks/[^/]+/${action}$`))!==null && r.request().method()==='POST');
   await page.getByTestId(`bpm-operations-${action}`).click();
@@ -111,10 +114,12 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject') {
   // The detail must update through the contributed block callback, without manual reload.
   await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
-  const sla = await data(await page.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));
+  const sla = await data(await observer.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));
   expect(sla.every((item:any)=>item.status==='completed' && !item.active)).toBe(true);
   await page.reload();
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
+  await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('bpm-history-container')).not.toContainText('Access forbidden');
   return sla;
 }
 
@@ -139,12 +144,12 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     await expect(page.getByTestId('strategy-test-outputs')).toContainText(route);
   }
   await shot(page,'d02');
-  await page.getByLabel('feel-0-risk',{exact:true}).fill('>< invalid');
+  await page.getByLabel('feel-1-amount',{exact:true}).fill('>< invalid');
   const invalid=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/decision/test-run'&&r.request().method()==='POST');
   await page.getByTestId('strategy-run-test').click();expect((await data(await invalid)).status).toBe('ERROR');
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','error');
   await expect(page.getByTestId('strategy-operation-status')).toContainText('Invalid FEEL');await shot(page,'d03');
-  await page.getByLabel('feel-0-risk',{exact:true}).fill('');
+  await page.getByLabel('feel-1-amount',{exact:true}).fill('');
   await page.getByTestId('strategy-check-readiness').click();
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
   await page.getByLabel('input-label-0').fill('交付金额（草稿修改）');
@@ -210,13 +215,16 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
     expect(expired.currentWarningLevel).toBe(2);expect(expired.warningHistory.length).toBeGreaterThanOrEqual(2);
     let actual:any[]=[];
     await expect.poll(async()=>{const notifications=await data(await page.request.get('/api/bpm/notify/received?type=urge'));actual=notifications.filter((item:any)=>item.taskId===sla.taskId);return actual.length;},{timeout:10000}).toBe(2);expect(actual.every((item:any)=>String(item.processInstanceId)===sla.processInstanceId)).toBe(true);
-    let action:any;await expect.poll(async()=>{const logs=await data(await page.request.get(`/api/event-policy/action-logs?size=100&correlationId=sla:${sla.pid}`));action=logs.records.find((item:any)=>item.correlationId===`sla:${sla.pid}`);return action?.status;},{timeout:10000}).toBe('SUCCESS');
+    let action:any;await expect.poll(async()=>{const logs=await data(await page.request.get(`/api/event-policy/action-logs?size=100&correlationId=sla:${sla.pid}`));action=logs.find((item:any)=>item.correlationId===`sla:${sla.pid}`);return action?.status;},{timeout:10000}).toBe('SUCCESS');
+    expect(action.resultPayload.sentCount).toBeGreaterThan(0);
     await writeFile(join(evidence!,'sla-notification-evidence.json'),JSON.stringify({notifications:actual,action},null,2));
     await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('30秒');await shot(page,'d11');
     await openRecord(page,name);await decide(page,pid,'approve');
     const completed=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));
     const closedAt=Date.parse(completed.completedTime);
     await expect.poll(async()=>{const next=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));expect(next.status).toBe('completed');expect(next.warningHistory).toEqual(completed.warningHistory);return Date.now()-closedAt;},{timeout:25000,intervals:[3000]}).toBeGreaterThan(16000);
+    const after=await data(await page.request.get('/api/bpm/notify/received?type=urge'));expect(after.filter((item:any)=>item.taskId===sla.taskId)).toHaveLength(2);
+    const actionAfter=await data(await page.request.get(`/api/event-policy/action-logs?correlationId=sla:${sla.pid}`));expect(actionAfter).toHaveLength(1);
     receipts.push({accelerated:true,sla:expired,completed});await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   } finally { await change(config); }
 });
@@ -254,7 +262,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
         const assignedPid=await create(page,actorUser,assignedName,68000,'普通',true);
         await submit(page,assignedPid,480,'tpm_standard_review');
         await openRecord(actor,assignedName);await expect(actor.getByTestId('bpm-operations-approve')).toBeEnabled();
-        await decide(actor,assignedPid,'approve');await shot(actor,'d13-assigned');
+        await decide(actor,assignedPid,'approve',page);await shot(actor,'d13-assigned');
       }
     } finally {await context.close();}
   }
@@ -266,7 +274,7 @@ test('missing route and deadline rules fail closed and can recover after configu
   const bundle=JSON.parse(await readFile(join(root,'plugins/project-management/examples/acceptance-workflow.bpm-package.json'),'utf8'));
   const workflow=(await data(await page.request.get('/api/bpm/process-definitions?size=1000'))).records.find((p:any)=>p.processKey===bundle.processKey);
   const deploy=async(value:any)=>{
-    await data(await page.request.post('/api/bpm/import/execute',{data:{package:value,strategy:'overwrite'}}));
+    const imported=await page.request.post('/api/bpm/import/execute',{data:{package:value,strategy:'overwrite'}});expect(imported.status()).toBe(200);expect((await imported.json()).success).toBe(true);
     await data(await page.request.post(`/api/bpm/process-definitions/${workflow.pid}/deploy`,{data:{}}));
   };
   const broken=JSON.parse(JSON.stringify(bundle));
