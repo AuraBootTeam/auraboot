@@ -109,7 +109,7 @@ test('OP source grants independently protect native SLA and verification facts i
  try{
   const identity=await login(actor,email,tenant);expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
   for(const missing of [null,'bpm.monitor.read','model.tdv_check.read',null]){
-   await grant(missing);await actor.reload();
+   await grant(missing);await actor.reload();await menu(actor,'项目');
    const queries:Promise<any>[]=[];const observe=(r:Response)=>{if(new URL(r.url()).pathname==='/api/meta/chart-data'&&r.request().postDataJSON()?.queryCode?.startsWith('tdo_'))queries.push(r.finished().then(()=>({status:r.status()})));};actor.on('response',observe);
    await actor.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect.poll(()=>queries.length).toBeGreaterThanOrEqual(7);const outcomes=await Promise.all(queries);actor.off('response',observe);
    for(const result of outcomes)expect(result.status).toBe(missing?403:200);
