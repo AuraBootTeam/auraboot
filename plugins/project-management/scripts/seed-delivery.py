@@ -30,11 +30,12 @@ audit_config=json.loads((Path(__file__).parent/'field-audit-config.json').read_t
 audit_result=req('/api/audit/field-config/bulk','POST',audit_config,h)
 assert str(audit_result['code'])=='0',audit_result
 receipts.append(audit_result)
+context=json.loads((Path(__file__).parent/'delivery-project-context.json').read_text())['customers']
 customers={}
 references=json.loads((Path(__file__).parent/'reference-projects.json').read_text())
 for row in references:
  customer=row[1]
- customers[customer]=pid(cmd('tpm:create_customer',{'tpm_cu_name':customer,'tpm_cu_contact':'张经理 · 采购部' if customer=='华辰制造' else ''}))
+ customers[customer]=pid(cmd('tpm:create_customer',{'tpm_cu_name':customer,'tpm_cu_contact':context[customer]['contact']}))
 owners=[]
 for login,name in [('delivery-lin','林晓'),('delivery-zhou','周宁'),('delivery-chen','陈晨'),('delivery-wang','王越')]:
  v=req('/api/admin/users','POST',{'userName':login,'displayName':name,'initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_manager'],'sendInviteEmail':False},h)
@@ -52,18 +53,27 @@ for index,row in enumerate(references):
  name,customer,code,stage,_,owner_name,_,_,progress,date_text,_,budget=row
  status=states[stage]
  due='2026-'+date_text.replace('月','-').replace('日','')
- desc='整合供应商、采购与入库流程，为采购和仓储团队提供统一的协作工作台。'
- project=pid(cmd('tpm:create_project',{'tpm_pj_code':code,'tpm_pj_name':name,'tpm_pj_customer':customer,'tpm_pj_customer_id':customers[customer],'tpm_pj_budget':int(budget.replace(',','')),'tpm_pj_owner_user':owners[owner_names.index(owner_name)],'tpm_pj_progress':60 if index==0 else progress,'tpm_pj_description':desc+'（虚构示例数据）','tpm_pj_start_date':'2026-09-08','tpm_pj_end_date':due,'tpm_pj_priority':'high' if index==0 else 'medium'}))
+ desc=context[customer]['outcome']
+ project=pid(cmd('tpm:create_project',{'tpm_pj_code':code,'tpm_pj_name':name,'tpm_pj_customer':customer,'tpm_pj_customer_id':customers[customer],'tpm_pj_budget':int(budget.replace(',','')),'tpm_pj_owner_user':owners[owner_names.index(owner_name)],'tpm_pj_progress':60 if index==0 else progress,'tpm_pj_description':desc+'（虚构示例数据）','tpm_pj_start_date':'2026-09-08','tpm_pj_end_date':due,'tpm_pj_priority':'high' if index==0 else 'medium','tpm_pj_risk_summary':context[customer]['risk'],'tpm_pj_next_action':context[customer]['nextAction']}))
  if index==0:cmd('tpm:update_progress',{'tpm_pj_progress':progress},project)
  if status!='planning':cmd('tpm:activate_project',pid=project)
  if status=='acceptance':cmd('tpm:submit_acceptance',pid=project)
  if status=='completed':cmd('tpm:complete_project',pid=project)
  ms=[]
- for j,(title,criteria,target) in enumerate([('需求范围确认','范围文档已由双方确认','2026-09-12'),('原型与方案评审','页面原型与技术方案已通过','2026-09-20'),('核心功能联调','采购与入库模块联调','2026-10-20'),('验收与上线','完成用户验收，准备上线',due)]):
+ due_date=date.fromisoformat(due)
+ for j,(title,criteria,offset) in enumerate([('需求范围确认','范围文档已由双方确认',30),('原型与方案评审','页面原型与技术方案已通过',20),('核心功能联调','核心业务场景与数据校验通过',10),('验收与上线','完成用户验收，准备上线',0)]):
+  target=(due_date-timedelta(days=offset)).isoformat()
   mid=pid(cmd('tpm:create_milestone',{'tpm_ms_name':title,'tpm_ms_project_id':project,'tpm_ms_target_date':target,'tpm_ms_description':criteria}))
   if j < (4 if status=='completed' else 2 if status in ['active','acceptance'] else 0):cmd('tpm:reach_milestone',pid=mid)
   ms.append(mid)
- projects.append({'name':name,'pid':project,'code':code,'progress':progress,'milestones':ms})
+ tasks=[]
+ for title,offset,target_state in [('确认业务范围与验收清单',25,'done' if status!='planning' else 'todo'),('完成核心功能联调',7,'done' if status in ['acceptance','completed'] else 'in_progress' if status=='active' else 'todo'),('组织用户验收与交接',0,'done' if status=='completed' else 'in_review' if status=='acceptance' else 'todo')]:
+  task=pid(cmd('tpm:create_task',{'tpm_ts_title':customer+' · '+title,'tpm_ts_project_id':project,'tpm_ts_assignee':owner_name,'tpm_ts_due_date':(due_date-timedelta(days=offset)).isoformat(),'tpm_ts_description':context[customer]['outcome'],'tpm_ts_priority':'medium'}))
+  if target_state!='todo':cmd('tpm:start_task',pid=task)
+  if target_state in ['in_review','done']:cmd('tpm:review_task',pid=task)
+  if target_state=='done':cmd('tpm:complete_task',pid=task)
+  tasks.append(task)
+ projects.append({'name':name,'pid':project,'code':code,'progress':progress,'milestones':ms,'tasks':tasks})
 # Upload actual PDF fixtures and link them to the project; dates and sizes are real.
 def sample_pdf(label):
  content=('BT /F1 12 Tf 40 760 Td ('+label+') Tj ET').encode('ascii')
@@ -86,4 +96,13 @@ cmd('tpm:update_project',{'tpm_pj_files':files},projects[0]['pid'])
 relation=req('/api/file/relation','POST',{'entityType':'tpm_project','entityId':projects[0]['pid'],'fieldName':'tpm_pj_files','fileIds':[f['fileId'] for f in files]},h)
 assert str(relation['code'])=='0',relation
 receipts.append(relation)
-(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'viewerEmail':viewer_email,'customers':customers,'projects':projects},ensure_ascii=False,indent=2));print('Created the 8 approved reference projects and 32 real milestones through commands')
+report_template=json.loads((Path(__file__).parents[1]/'examples/customer-delivery-brief.report-template.json').read_text())
+report=req('/api/report-definitions','POST',{'code':'customer_delivery_brief','title':report_template['dsl']['title'],'dsl':report_template['dsl']},h)
+assert str(report['code'])=='0',report
+board_template=json.loads((Path(__file__).parents[1]/'examples/dashboard-customer-delivery.json').read_text())
+board=req('/api/dashboards','POST',board_template['dashboard'],h)
+assert str(board['code'])=='0',board
+published=req('/api/dashboards/'+board['data']['pid']+'/publish','POST',{},h)
+assert str(published['code'])=='0',published
+(out/'delivery-assets.json').write_text(json.dumps({'reportPid':report['data']['pid'],'dashboardPid':board['data']['pid']},ensure_ascii=False,indent=2))
+(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'viewerEmail':viewer_email,'customers':customers,'projects':projects},ensure_ascii=False,indent=2));print('Created the 8 reference customers/projects, 24 tasks and 32 milestones through commands')

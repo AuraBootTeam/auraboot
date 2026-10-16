@@ -6,7 +6,7 @@ import { ensureSidebarExpanded, navigateToMenuByClick } from '../helpers';
 
 // No API-created dashboards or injected store state: new widget authoring,
 // publication, template transfer and edits all go through the visible UI.
-test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
+test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || { cookies: [], origins: [] }, locale: 'zh-CN' });
 test.setTimeout(180000);
 const root = path.resolve(process.cwd(), '../plugins/project-management');
 const template = JSON.parse(fs.readFileSync(path.join(root, 'examples/dashboard-customer-delivery.json'), 'utf8'));
@@ -58,6 +58,14 @@ test('builds a live project metric in the UI and publishes a portable six-widget
   expect(fixturePath, 'Set DELIVERY_FIXTURE_PATH to the retained initializer fixture.json').toBeTruthy();
   const fixture = JSON.parse(fs.readFileSync(fixturePath!, 'utf8'));
   expect(fixture.projects.length).toBe(references.length);
+  if (!process.env.PW_ADMIN_STORAGE_STATE) {
+    await page.goto('/login');
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+    await page.locator('#identifier').fill(process.env.ADMIN_EMAIL!);
+    await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
+    await page.locator('form button[type=submit]').click();
+    await page.waitForURL(url => !url.pathname.includes('/login'));
+  }
   await page.goto('/');
   const expected = {
     count: fixture.projects.length,
@@ -127,6 +135,7 @@ test('builds a live project metric in the UI and publishes a portable six-widget
   await expect(canvas.locator('[data-widget-id="project-budget"]')).toContainText(expected.budget.toLocaleString('zh-CN'));
   const table = canvas.locator('[data-widget-id="delivery-projects"]');
   for (const project of fixture.projects) await expect(table.getByText(project.name, { exact: true })).toBeVisible();
+  await expect(table.locator('tr').filter({hasText:fixture.projects[0].name})).toContainText('华辰制造');
   await expect(table.getByText('待验收', { exact: true }).first()).toBeVisible();
   await expect(table.getByText('已交付', { exact: true }).first()).toBeVisible();
   await expect(canvas.locator('[data-widget-id="delivery-stages"] [data-chart-ready="true"]')).toBeVisible();

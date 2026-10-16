@@ -10,7 +10,9 @@
       "model.tpm_project.read",
       "model.tpm_milestone.read",
       "data.datasource.read",
-      "model.tpm_customer.read"
+      "model.tpm_customer.read",
+      "tpm.task.read",
+      "model.tpm_task.read"
     ]
   },
   {
@@ -36,7 +38,12 @@
       "model.tpm_customer.update",
       "sys.file.read",
       "sys.file.upload",
-      "sys.file.relation.manage"
+      "sys.file.relation.manage",
+      "tpm.task.read",
+      "model.tpm_task.read",
+      "tpm.task.manage",
+      "model.tpm_task.create",
+      "model.tpm_task.update"
     ]
   }
 ]

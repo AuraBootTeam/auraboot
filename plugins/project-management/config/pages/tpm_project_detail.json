@@ -208,6 +208,14 @@
                   "field": "tpm_pj_notes",
                   "colSpan": 12,
                   "visibleWhen": "!!form.tpm_pj_notes"
+                },
+                {
+                  "field": "tpm_pj_risk_summary",
+                  "colSpan": 12
+                },
+                {
+                  "field": "tpm_pj_next_action",
+                  "colSpan": 12
                 }
               ],
               "extension": {
@@ -439,6 +447,57 @@
             "en": "Milestones"
           },
           "blocks": [
+            {
+              "id": "delivery_tasks",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "项目任务",
+                "en": "Project tasks"
+              },
+              "subTable": {
+                "childModel": "tpm_task",
+                "parentField": "tpm_ts_project_id",
+                "readOnly": true,
+                "columns": [
+                  {
+                    "field": "tpm_ts_title",
+                    "label": {
+                      "zh-CN": "任务",
+                      "en": "Task"
+                    },
+                    "width": 260
+                  },
+                  {
+                    "field": "tpm_ts_assignee",
+                    "label": {
+                      "zh-CN": "负责人",
+                      "en": "Assignee"
+                    },
+                    "width": 100
+                  },
+                  {
+                    "field": "tpm_ts_due_date",
+                    "label": {
+                      "zh-CN": "截止日期",
+                      "en": "Due date"
+                    },
+                    "dataType": "date",
+                    "width": 120
+                  },
+                  {
+                    "field": "tpm_ts_status",
+                    "label": {
+                      "zh-CN": "状态",
+                      "en": "Status"
+                    },
+                    "dictCode": "tpm_task_status",
+                    "renderType": "tag",
+                    "width": 90
+                  }
+                ],
+                "actions": []
+              }
+            },
             {
               "id": "milestones",
               "blockType": "sub-table",

@@ -210,5 +210,33 @@
     "dictCode": "tpm_project_type",
     "defaultValue": "custom_application",
     "description": "Delivery engagement category."
+  },
+  {
+    "code": "tpm_pj_risk_summary",
+    "displayName:zh-CN": "交付风险",
+    "displayName:en": "Delivery risks",
+    "dataType": "text",
+    "constraints": {
+      "maxLength": 2000
+    },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "例如：客户测试环境尚未开放，可能影响联调",
+      "placeholder:en": "Describe the delivery risk or the next owned action."
+    }
+  },
+  {
+    "code": "tpm_pj_next_action",
+    "displayName:zh-CN": "下一步行动",
+    "displayName:en": "Next action",
+    "dataType": "text",
+    "constraints": {
+      "maxLength": 2000
+    },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "例如：周三前由周宁确认测试环境和联调时间",
+      "placeholder:en": "Describe the delivery risk or the next owned action."
+    }
   }
 ]

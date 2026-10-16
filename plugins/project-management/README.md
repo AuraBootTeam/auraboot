@@ -36,7 +36,7 @@ Sample customer names and projects are fictional and must be labeled as sample d
 | Page / action | User decision | DSL implementation | Runtime evidence |
 | --- | --- | --- | --- |
 | Project list | Which customer delivery needs attention? | Existing list, lifecycle views, customer, owner, due date | Tenant-scoped project records |
-| Project form | What is the promised outcome and delivery date? | Two form sections: customer outcome / delivery plan | Create and update command payloads |
+| Project form | What is the promised outcome and delivery date? | Business sections: project information / delivery plan / risks and next actions / optional attachments | Create and update command payloads |
 | Project detail | What is complete and what comes next? | Object summary, business tabs, milestone collection, attachments and an audit sidebar | NamedQuery counts and real command audit |
 | Complete milestone | Confirm the agreed deliverable is finished | Existing state_transition command and guarded row action | pending -> reached, aggregate and completion facts update immediately and after reload |
 
@@ -89,3 +89,10 @@ The separate **AI整理客户资料 / AI customer intake** menu opens `/p/c/tpm_
 This page is configuration-only: `tpm_customer` → explicit `ai-fill-banner` without an endpoint → the existing `form_draft_fill` conversation skill → review/undo in the current draft → existing `tpm:create_customer` command. Extraction never substitutes for the user's Save action. The page does not grant permissions or add a provider configuration. Its menu requires the existing `tpm.project.manage` permission; backend command and model checks still apply.
 
 The live browser scenario is `web-admin/tests/e2e/project-management/customer-ai-intake-live.spec.ts`. It requires `PW_REQUIRE_LIVE_LLM=1`, the exact `PW_EXPECT_LIVE_PROVIDER` and `PW_EXPECT_LIVE_MODEL`, and a genuinely configured live provider. The browser starts with empty storage and signs in through the real login form. Persisted trace metadata must match the expected provider and model. It contains no stub directives, network mocks or skips. Missing/failed providers fail the test; an unexecuted live test must be reported as `did_not_run`. The pre-existing `form-draft-fill.spec.ts` uses an explicit external-provider stub for plumbing and must not be used as live extraction-quality evidence.
+
+
+## Reproducible Delivery Case
+
+The explicit local seed creates eight fictional customers/projects with complete contacts, 24 assigned tasks, and 32 milestones. Each project has a distinct outcome, delivery risk and owned next action. Project detail shows linked tasks as well as milestones. The seed refuses an already populated project fixture; resume never reruns it.
+
+`examples/customer-delivery-brief.report-template.json` is a portable report design. It queries governed current-space project facts and customers, resolves active owner labels, and renders project progress, budgets, risks and next actions. Import it through Report Designer to edit and export Markdown, HTML or PDF. It contains no stored result rows and does not imply AI analysis.

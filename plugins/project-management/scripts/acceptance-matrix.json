@@ -297,5 +297,20 @@
     },
     "locale": "zh-CN",
     "role": "admin"
+  },
+  {
+    "id": "D3",
+    "page": "delivery-brief",
+    "state": "persisted-preview-and-three-exports",
+    "screenshot": "D3-delivery-brief-preview",
+    "status": "new",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "locale": "zh-CN",
+    "role": "admin",
+    "driver": "delivery-brief-real.spec.ts",
+    "requirement": "D3"
   }
 ]
