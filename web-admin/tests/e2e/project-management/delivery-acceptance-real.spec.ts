@@ -266,6 +266,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
       }
     } finally {await context.close();}
   }
+  await openRecord(page,name);
   await decide(page,pid,'approve');
 });
 
