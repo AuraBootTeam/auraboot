@@ -53,6 +53,17 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     record RelatedDeleteAuthorizationContext(TargetAuthorizationContext root,
             String modelCode, String recordId, Map<String,Object> record) {}
 
+    /** Installed process commands must authorize every related mutation; older handlers deny. */
+    default boolean authorizeInstalledRelatedWrite(InstalledRelatedWriteAuthorizationContext context) {
+        return false;
+    }
+
+    /** Host-loaded identities and immutable records; creation provenance cannot come from payloads. */
+    record InstalledRelatedWriteAuthorizationContext(TargetAuthorizationContext root,
+            com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding binding,
+            String operation, String modelCode, String recordId, Map<String,Object> record,
+            boolean createdInInvocation) {}
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
