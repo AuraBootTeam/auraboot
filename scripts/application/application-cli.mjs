@@ -20,7 +20,7 @@ import {
   loadCatalogWebContributions,
   materializeSourceWebAssets,
 } from './application-graph-adapters.mjs';
-import { publishApplicationRelease } from './application-release-control.mjs';
+import { publishApplicationRelease, upgradeTenantApplicationRelease } from './application-release-control.mjs';
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
@@ -47,6 +47,7 @@ function parseArgs(argv) {
     else if (argument === '--base-url') options.baseUrl = rest[++index];
     else if (argument === '--application-code') options.applicationCode = rest[++index];
     else if (argument === '--application-name') options.applicationName = rest[++index];
+    else if (argument === '--upgrade-plan') options.upgradePlan = resolve(rest[++index]);
     else if (argument === '--registration') options.registration = resolve(rest[++index]);
     else if (argument === '--receipt') options.receipt = resolve(rest[++index]);
     else if (argument === '--token-file') options.tokenFile = resolve(rest[++index]);
@@ -173,12 +174,23 @@ async function main() {
     process.stdout.write(`emitted ${Object.values(routeManifest).flat().length} web routes\n`);
     return;
   }
-  if (options.command === 'publish-release') {
+  if (['publish-release', 'upgrade-tenant'].includes(options.command)) {
     let token = process.env.AURA_RELEASE_TOKEN?.trim();
     if (options.tokenFile) {
       const mode = statSync(options.tokenFile).mode & 0o777;
       if ((mode & 0o077) !== 0) throw new Error('--token-file must not grant group or other permissions');
       token = readFileSync(options.tokenFile, 'utf8').trim();
+    }
+    if (options.command === 'upgrade-tenant') {
+      const plan = JSON.parse(readFileSync(required(options, 'upgradePlan'), 'utf8'));
+      const allowed = ['applicationCode', 'tenantId', 'expectedCurrentReleaseId', 'expectedVersion', 'targetReleaseId', 'targetDigest'];
+      if (Object.keys(plan).some(key => !allowed.includes(key)) || Object.keys(plan).length !== allowed.length) {
+        throw new Error('Upgrade plan must contain exactly the six declared transition fields');
+      }
+      const receipt = await upgradeTenantApplicationRelease({ ...plan,
+        baseUrl: required(options, 'baseUrl'), receiptPath: required(options, 'receipt'), token, timeoutMs: options.timeoutMs });
+      process.stdout.write(`tenant binding upgrade completed: ${receipt.binding.releaseId}, version ${receipt.binding.version}\n`);
+      return;
     }
     const receipt = await publishApplicationRelease({
       applicationCode: required(options, 'applicationCode'),
@@ -194,7 +206,7 @@ async function main() {
     process.stdout.write(`release receipt: ${options.receipt}\n`);
     return;
   }
-  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|retain-definitions|graph|compare-graphs|materialize-assets|emit-route-manifest|publish-release [options]');
+  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|retain-definitions|graph|compare-graphs|materialize-assets|emit-route-manifest|publish-release|upgrade-tenant [options]');
 }
 
 try {
