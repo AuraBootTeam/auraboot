@@ -686,5 +686,17 @@
   "xmlTools": {
     "zh-CN": "DMN 交换与高级工具",
     "en": "DMN exchange and advanced tools"
+  },
+  "expressionTitle": {
+    "zh-CN": "表达式",
+    "en": "Expression"
+  },
+  "anyValue": {
+    "zh-CN": "任意值",
+    "en": "Any value"
+  },
+  "testTraceTitle": {
+    "zh-CN": "执行标识",
+    "en": "Execution reference"
   }
 }

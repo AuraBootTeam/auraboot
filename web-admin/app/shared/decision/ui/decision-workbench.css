@@ -62,3 +62,8 @@
 .decisionops-shell .decision-table--compact .dt-dmn-panel textarea { min-height:100px; }
 @media(max-width:1100px){ .decisionops-shell .strategy-studio-body{grid-template-columns:minmax(0,1fr) 270px;gap:14px;} .decisionops-shell{padding:20px;} }
 @media(max-width:800px){ .decisionops-shell .strategy-studio-body{grid-template-columns:1fr;} .decisionops-shell .strategy-test-panel{position:static;} .decisionops-shell .strategy-studio-header{align-items:flex-start;flex-direction:column;} .decisionops-shell .strategy-workspace-tabs{gap:16px;overflow:auto;} }
+
+.decisionops-shell--studio .decisionops-content-card{padding:0;border:0;background:transparent;box-shadow:none;}
+.decisionops-shell .decision-table--compact .dt-cell-expression>summary{border:0;padding:4px 0 0;font-size:10px;color:var(--color-text-3);}
+.decisionops-shell .strategy-test-trace{font-size:11px;color:var(--color-text-3);overflow-wrap:anywhere;}
+.decisionops-shell .strategy-test-trace summary{cursor:pointer;}

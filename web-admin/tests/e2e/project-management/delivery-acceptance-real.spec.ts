@@ -158,6 +158,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     if(width===1280) await shot(page,'d02-compact');
   }
   await shot(page,'d02');
+  await page.getByTestId('dt-row-1').locator('td').filter({has:page.getByLabel('feel-1-amount',{exact:true})}).getByText('表达式',{exact:true}).click();
   await page.getByLabel('feel-1-amount',{exact:true}).fill('>< invalid');
   const invalid=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/decision/test-run'&&r.request().method()==='POST');
   await page.getByTestId('strategy-run-test').click();expect((await data(await invalid)).status).toBe('ERROR');

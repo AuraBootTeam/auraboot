@@ -19,7 +19,7 @@ import {
 
 export interface DecisionTableEditorProps {
   compact?: boolean;
-  compactLabels?: { columns: string; xml: string };
+  compactLabels?: { columns: string; xml: string; expression: string; any: string };
   value: DecisionTable;
   onChange: (next: DecisionTable) => void;
   analysis?: DecisionTableAnalysis | null;
@@ -375,15 +375,18 @@ export function DecisionTableEditor({
         ) : (
           <input
             aria-label={`val-${idx}-${input.id}`}
+            placeholder={compact && !cell ? compactLabels?.any : undefined}
             value={isCollection ? cellArrayValue(cell?.value).join(', ') : cellScalarValue(cell?.value)}
             onChange={(e) => setCellValue(idx, input.id, isCollection ? splitValues(e.target.value) : e.target.value)}
           />
         )}
+        <details className="dt-cell-expression" open={compact ? undefined : true}>
+          <summary hidden={!compact}>{compactLabels?.expression}</summary>
         <input
           aria-label={`feel-${idx}-${input.id}`}
           value={cell?.feel ?? ''}
           onChange={(e) => setCellFeel(idx, input.id, e.target.value)}
-        />
+        />        </details>
       </>
     );
   };

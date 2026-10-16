@@ -1014,6 +1014,7 @@ export function StrategyStudioWorkbench({
   const [scenarioKey, setScenarioKey] = useState<StrategyScenarioKey>('SLA')
   const [selectedDecisionCode, setSelectedDecisionCode] = useState<string>('')
   const [businessTestValues, setBusinessTestValues] = useState<Record<string, string>>({})
+  const [testTrace, setTestTrace] = useState<string | null>(null)
   const [testOutputs, setTestOutputs] = useState<Record<string, unknown> | null>(null)
   const [selectedFragmentCode, setSelectedFragmentCode] = useState<string | null>(null)
   const [operationStatus, setStatus] = useState<string | null>(null)
@@ -1338,6 +1339,7 @@ export function StrategyStudioWorkbench({
   }
 
   const runTest = async () => {
+    setTestTrace(null)
     setOperationStatus(text('testRunning'))
     setTestOutputs(null)
     try {
@@ -1350,10 +1352,8 @@ export function StrategyStudioWorkbench({
       if (!result) throw new Error(text('evaluateNoResult'))
       if (result.status === 'ERROR') throw new Error(result.errors?.join('; ') || text('evaluateNoResult'))
       setTestOutputs(result.outputs ?? {})
-      setOperationStatus(text('testResult', {
-        result: result.matched ? text('testMatched') : text('testNotMatched'),
-        id: result.traceId ?? result.status,
-      }), 'success')
+      setTestTrace(result.traceId ?? null)
+      setOperationStatus(result.matched ? text('testMatched') : text('testNotMatched'), 'success')
     } catch (error) {
       setOperationStatus(text('testFailed', { message: errorMessage(error, text) }), 'error')
     }
@@ -1794,7 +1794,7 @@ export function StrategyStudioWorkbench({
               <DecisionTableEditor
                 key={activeScenario.key}
                 compact
-                compactLabels={{ columns: text('tableSettings'), xml: text('xmlTools') }}
+                compactLabels={{ columns: text('tableSettings'), xml: text('xmlTools'), expression: text('expressionTitle'), any: text('anyValue') }}
                 value={scenarioTable}
                 onChange={(next) => updateScenarioTable(studioTableKey(activeScenario), next)}
                 analysis={tableAnalyses[studioTableKey(activeScenario)] ?? null}
@@ -1897,6 +1897,7 @@ export function StrategyStudioWorkbench({
       )}
 
       {testOutputs && <dl className="strategy-test-outputs" data-testid="strategy-test-outputs">{Object.entries(testOutputs).map(([key, value]) => <div key={key}><dt>{scenarioTable.outputs.find((output) => output.id === key)?.label || key}</dt><dd>{typeof value === 'object' ? text('structuredOutput') : String(value)}</dd></div>)}</dl>}
+      {testOutputs && testTrace && <details className="strategy-test-trace"><summary>{text('testTraceTitle')}</summary><code>{testTrace}</code></details>}
           <button
             type="button"
             data-testid="strategy-run-test"
