@@ -2018,7 +2018,8 @@ openPlatform:
   title: 开放平台
   badge: 系统对系统访问
   subtitle: 创建租户级应用，按最小权限授权，轮换凭据，并查看统一的公共 API 契约。
-  integrationGuide: 接入指南（英文）
+  integrationGuide: 接入指南（中文）
+  integrationGuideAlternate: English guide
   quickStep2: "配置接口权限，生成定期或永久 Token"
   quickStep3: "直接用 Bearer Token 调用接口"
   tokens:

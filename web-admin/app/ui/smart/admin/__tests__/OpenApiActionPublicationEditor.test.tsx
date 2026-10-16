@@ -2,9 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { OpenApiEndpointPublicationEditor } from '../OpenApiEndpointPublicationEditor';
 import { OpenApiActionPublicationEditor } from '../OpenApiActionPublicationEditor';
 import { OpenApiInstallationGrantEditor } from '../OpenApiInstallationGrantEditor';
-import type { ActionPublicationView, ActionSource, InstallationActionPolicy, PublicAction } from '~/services/open-api-publications';
+import type { ActionPublicationView, ActionSource, InstallationActionPolicy, PublicAction, EndpointPublicationView, EndpointCandidate } from '~/services/open-api-publications';
 
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'en-US', t: (_key: string, _params: unknown, fallback: string) => fallback }) }));
 const ok = (data: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => ({ code: '0', data }) });
@@ -81,7 +82,7 @@ describe('Public business API management blocks', () => {
     const user = userEvent.setup(); let policy: InstallationActionPolicy | null = null;
     vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
       if (url.endsWith('/resources')) return ok([{ code: 'office.devices', status: 'published', contract: { schemaVersion: 1 }, policy: { operations: ['update'] } }]);
-      if (url.endsWith('/queries')) return ok([]);
+      if (url.endsWith('/queries') || url.endsWith('/endpoints')) return ok([]);
       if (url.endsWith('/actions')) return ok([{ code: 'office.devices.assign', status: 'published', policy,
         contract: { resourceCode: 'office.devices', sourceKind: 'command', schemaVersion: 1, scopes: { execute: 'office.devices.assign.execute' }, effectFields: ['assignedTo', 'status'] } }]);
       if (url.endsWith('/actions/office.devices.assign') && init?.method === 'PUT') { policy = JSON.parse(String(init.body)); return ok(null); }
@@ -101,5 +102,73 @@ describe('Public business API management blocks', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Revoke installation authority' })).toBeDisabled());
     expect(screen.getByLabelText('Allow this business API')).not.toBeChecked();
+  });
+  it('publishes an explicitly adapted Controller contract and never accepts a raw internal URL', async () => {
+    const user = userEvent.setup(); let stored: EndpointPublicationView | undefined;
+    const candidate: EndpointCandidate = { code: 'dynamic.get', name: 'Read device', localizedDisplayNames: { 'en-US': 'Read device' },
+      internalMethod: 'GET', internalPath: '/api/dynamic/{pageKey}/{recordPid}', adapterCode: 'resource.get', actionSourceKind: '',
+      externalMethod: 'GET', targetRequired: true, fingerprint: 'a'.repeat(64), available: true, reason: null };
+    vi.stubGlobal('fetch',vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/open-platform/endpoint-publications') return ok(stored ? [stored] : []);
+      if (url.startsWith('/api/open-platform/endpoint-candidates?')) return ok([candidate]);
+      if (url === '/api/open-platform/publications') return ok([{ code: 'office.devices', status: 'published' }]);
+      if (url === '/api/open-platform/action-publications' || url === '/api/open-platform/query-publications') return ok([]);
+      if (url.startsWith('/api/open-platform/endpoint-source?')) return ok({ candidate, bindingCode: 'office.devices', fingerprint: 'b'.repeat(64), minTimeoutMs: 5000 });
+      if (url.endsWith('/draft') && init?.method === 'PUT') {
+        const request = JSON.parse(String(init.body)); stored = { code: request.definition.code, draft: request.definition, draftRevision: 1, activeVersion: null, status: 'draft' }; return ok(stored);
+      }
+      if (url.endsWith('/publish') && stored) { stored = { ...stored, status: 'published', activeVersion: 1 }; return ok(stored); }
+      throw new Error('Unexpected endpoint request');
+    }));
+    render(<OpenApiEndpointPublicationEditor onClose={vi.fn()} />);
+    await user.click(await screen.findByRole('button',{name:'New external endpoint'}));
+    await user.type(screen.getByLabelText('External endpoint code'),'office.devices.lookup');
+    await user.selectOptions(screen.getByLabelText('Internal source endpoint'),'dynamic.get');
+    await user.selectOptions(screen.getByLabelText('Bound public contract'),'office.devices');
+    await user.type(screen.getByLabelText('Endpoint invocation scope'),'office.devices.lookup.invoke');
+    expect(screen.getByRole('button',{name:'Save endpoint draft'})).toBeDisabled();
+    await user.click(screen.getByRole('button',{name:'Validate source and contract'}));
+    await waitFor(() => expect(screen.getByRole('button',{name:'Save endpoint draft'})).toBeEnabled());
+    await user.click(screen.getByRole('button',{name:'Save endpoint draft'}));
+    await waitFor(() => expect(stored?.draft).toMatchObject({ candidateCode:'dynamic.get',adapterCode:'resource.get',bindingCode:'office.devices',sourceFingerprint:'b'.repeat(64) }));
+    await user.click(screen.getByRole('button',{name:'Publish external endpoint'}));
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/publish'), expect.anything());
+    await user.click(screen.getByRole('button',{name:'Cancel',exact:true}));
+    await user.click(screen.getByRole('button',{name:'Publish external endpoint'}));
+    await user.click(screen.getByRole('button',{name:'Confirm',exact:true}));
+    await waitFor(() => expect(stored?.status).toBe('published'));
+    expect(screen.getByLabelText('Internal source endpoint')).toBeDisabled();
+  });
+
+  it.each([403,409])('retains endpoint inputs after source verification HTTP %s and requires successful verification before saving', async status => {
+    const user = userEvent.setup(); let failed = true;
+    const candidate: EndpointCandidate = {code:'dynamic.get',name:'Read device',localizedDisplayNames:{'en-US':'Read device'},internalMethod:'GET',
+      internalPath:'/api/dynamic/{pageKey}/{recordPid}',adapterCode:'resource.get',actionSourceKind:'',externalMethod:'GET',targetRequired:true,fingerprint:'a'.repeat(64),available:true,reason:null};
+    vi.stubGlobal('fetch',vi.fn((url: string) => {
+      if (url === '/api/open-platform/endpoint-publications' || url === '/api/open-platform/action-publications' || url === '/api/open-platform/query-publications') return ok([]);
+      if (url.startsWith('/api/open-platform/endpoint-candidates?')) return ok([candidate]);
+      if (url === '/api/open-platform/publications') return ok([{code:'office.devices',status:'published'}]);
+      if (url.startsWith('/api/open-platform/endpoint-source?')) return failed ? Promise.resolve({ok:false,status,json:async()=>({message:'Controlled denial'})}) : ok({candidate,bindingCode:'office.devices',fingerprint:'b'.repeat(64),minTimeoutMs:5000});
+      throw new Error('Unexpected endpoint mutation');
+    }));
+    render(<OpenApiEndpointPublicationEditor onClose={vi.fn()} />);
+    await user.click(await screen.findByRole('button',{name:'New external endpoint'}));
+    await user.type(screen.getByLabelText('External endpoint code'),'office.devices.lookup');
+    await user.selectOptions(screen.getByLabelText('Internal source endpoint'),'dynamic.get');
+    await user.selectOptions(screen.getByLabelText('Bound public contract'),'office.devices');
+    await user.type(screen.getByLabelText('Endpoint invocation scope'),'office.devices.lookup.invoke');
+    await user.click(screen.getByRole('button',{name:'Validate source and contract'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent(status===403 ? 'management permission' : 'Configuration or source changed');
+    expect(screen.getByRole('button',{name:'Save endpoint draft'})).toBeDisabled();
+    expect(screen.getByRole('button',{name:'Publish external endpoint'})).toBeDisabled();
+    failed=false;
+    if (status===403) await user.click(screen.getByRole('button',{name:'Refresh endpoint catalog'}));
+    expect(await screen.findByLabelText('External endpoint code')).toHaveValue('office.devices.lookup');
+    await user.click(screen.getByRole('button',{name:'Validate source and contract'}));
+    await waitFor(() => expect(screen.getByRole('button',{name:'Save endpoint draft'})).toBeEnabled());
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/draft'),expect.anything());
+    await user.click(screen.getByRole('button',{name:'Close endpoint editor'}));
+    await user.click(screen.getByRole('button',{name:'Confirm',exact:true}));
+    expect(screen.queryByTestId('endpoint-publication-form')).not.toBeInTheDocument();
   });
 });

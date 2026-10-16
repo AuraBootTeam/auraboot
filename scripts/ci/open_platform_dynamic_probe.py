@@ -1191,7 +1191,7 @@ def run_sdk_consumer(fixture, command, *, base_url, evidence_path):
 
 
 def verify_request_counts(counts):
-    limits = {"baseline": 1000, "integrationTokens": 64, "officeGuide": 512}
+    limits = {"baseline": 1000, "integrationTokens": 64, "officeGuide": 512, "controllerEndpoints": 256}
     if not isinstance(counts, dict) or set(counts) != set(limits):
         raise ProtocolError("release phase request counts missing")
     for name, limit in limits.items():
@@ -1223,6 +1223,8 @@ def verify_release_report(report, *, model_event_secret=None):
     verify_integration_token_report(report.get("integrationTokens"))
     from open_platform_office_probe import verify_office_report
     verify_office_report(report.get("officeGuide"), secret=model_event_secret)
+    from open_platform_endpoint_probe import verify_endpoint_report
+    verify_endpoint_report(report.get("controllerEndpoints"))
     return report
 
 
@@ -1277,8 +1279,25 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
         human("/api/open-platform/action-publications/"+code+"/draft","PUT",{"expectedRevision":0,"definition":action})
         human("/api/open-platform/action-publications/"+code+"/publish","POST",{"expectedRevision":1})
         business_actions.append(action)
+    endpoint_contracts = []
+    for suffix, candidate, adapter, binding in [
+        ("list","dynamic.list","resource.list","release.dynamic.parts"),
+        ("get","dynamic.get","resource.get","release.dynamic.parts"),
+        ("create","dynamic.create","resource.create","release.dynamic.parts"),
+        ("update","dynamic.update","resource.update","release.dynamic.parts"),
+        ("delete","dynamic.delete","resource.delete","release.dynamic.parts"),
+        ("query","query.execute","query.execute","release.slo.by-zone"),
+        ("command","command.execute","action.execute","release.slo.command")]:
+        endpoint_source = human("/api/open-platform/endpoint-source?candidateCode="+candidate+"&bindingCode="+binding)
+        code = "release.slo.endpoint."+suffix
+        definition = dict(code=code,candidateCode=candidate,adapterCode=adapter,bindingCode=binding,schemaVersion=1,
+            sourceFingerprint=endpoint_source["fingerprint"],scopes={"invoke":code+".invoke"},timeoutMs=max(5000,endpoint_source["minTimeoutMs"]),maxConcurrent=32)
+        human("/api/open-platform/endpoint-publications/"+code+"/draft","PUT",{"expectedRevision":0,"definition":definition})
+        human("/api/open-platform/endpoint-publications/"+code+"/publish","POST",{"expectedRevision":1})
+        endpoint_contracts.append(definition)
     scopes = ["release.dynamic:" + operation for operation in ["list", "get", "create", "update", "delete"]]
     scopes += ["release.slo:query", "openapi.profile.read"] + [action["scopes"]["execute"] for action in business_actions]
+    scopes += [endpoint["scopes"]["invoke"] for endpoint in endpoint_contracts]
     application = human("/api/open-platform/applications", "POST",
                         {"name": "Dynamic SLO consumer", "description": "Exact-image business capacity qualification only"})
     installation = human(f"/api/open-platform/applications/{application['pid']}/installations", "POST",
@@ -1290,6 +1309,8 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
     human(prefix + "/queries/release.slo.by-zone", "PUT", {"readableFields": ["pid", "name"]})
     for action in business_actions:
         human(prefix+"/actions/"+action["code"],"PUT",{"execute":True,"effectFields":action["effectFields"]})
+    for endpoint in endpoint_contracts:
+        human(prefix+"/endpoints/"+endpoint["code"],"PUT",{"invoke":True})
     _, token_body, _ = request(prefix+"/integration-tokens",method="POST",headers=dict(admin,**{"Idempotency-Key":"slo-"+uuid.uuid4().hex}),
         body={"name":"Direct-token SLO caller","expirationMode":"never"})
     if not isinstance(token_body,dict) or str(token_body.get("code"))!="0": raise ProtocolError("SLO integration token issuance failed")
@@ -1301,14 +1322,14 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
         "resourceCode": consumer_fixture["resourceCode"], "queryCode": query["code"],
         "allowedPid": consumer_fixture["allowedPid"], "hiddenPid": consumer_fixture["hiddenPid"],
         "clientId": credential["clientId"], "clientSecret": credential["clientSecret"],
-        "integrationToken": direct["token"], "commandCode": "release.slo.command", "handlerCode": "release.slo.handler"}
+        "integrationToken": direct["token"], "endpointPrefix": "release.slo.endpoint.", "commandCode": "release.slo.command", "handlerCode": "release.slo.handler"}
     descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(fixture, handle)
     return {"profile": fixture["profile"], "applicationPid": application["pid"], "installationPid": installation["pid"],
             "resourceCode": fixture["resourceCode"], "queryCode": fixture["queryCode"], "maxConcurrent": 20,
             "sourceQueryMaxConcurrent": 2, "sourceQueryRateLimitPerMinute": source["policy"]["rateLimitPerMinute"],
-            "authentication": "integration-token", "businessActions": [action["code"] for action in business_actions],
+            "authentication": "integration-token", "controllerEndpoints": [endpoint["code"] for endpoint in endpoint_contracts], "businessActions": [action["code"] for action in business_actions],
             "rateLimitPerMinute": 100000}
 
 

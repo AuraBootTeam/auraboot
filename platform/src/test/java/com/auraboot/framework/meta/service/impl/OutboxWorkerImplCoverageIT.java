@@ -41,6 +41,11 @@ class OutboxWorkerImplCoverageIT {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    // This IT measures explicit worker invocations. Prevent a background timer from
+    // consuming the same committed fixtures; the worker, mapper and fenced state service stay real.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.auraboot.framework.scheduler.service.impl.DatabaseSchedulerEngine scheduler;
+
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, 991_900_002L, "outbox-test-pid", "outbox-test-user");

@@ -7,7 +7,7 @@ const CLIENT_ID = __ENV.CLIENT_ID || "";
 const CLIENT_SECRET = __ENV.CLIENT_SECRET || "";
 const PROFILE = __ENV.PROFILE || "smoke";
 const fixture = __ENV.BUSINESS_FIXTURE_PATH ? JSON.parse(open(__ENV.BUSINESS_FIXTURE_PATH)) : null;
-const operations = ["create", "replay", "get", "list", "query", "update", "command", "commandReplay", "handler", "delete"];
+const operations = ["create", "replay", "get", "list", "query", "update", "command", "commandReplay", "handler", "endpointCreate", "endpointReplay", "endpointGet", "endpointList", "endpointQuery", "endpointUpdate", "endpointCommand", "endpointCommandReplay", "endpointDelete", "delete"];
 const apiErrors = new Rate("open_api_errors");
 const apiDuration = new Trend("open_api_duration", true);
 const businessErrors = new Rate("business_errors");
@@ -47,7 +47,7 @@ export function setup() {
   if (PROFILE === "production" && !fixture) throw new Error("Production SLO requires the dynamic business fixture");
   if (fixture && (fixture.schemaVersion !== 1 || fixture.profile !== "open-platform-dynamic-slo-v1"
       || fixture.resourceCode !== "release.dynamic.parts" || fixture.queryCode !== "release.slo.by-zone"
-      || !fixture.integrationToken || fixture.commandCode !== "release.slo.command" || fixture.handlerCode !== "release.slo.handler"
+      || fixture.endpointPrefix !== "release.slo.endpoint." || !fixture.integrationToken || fixture.commandCode !== "release.slo.command" || fixture.handlerCode !== "release.slo.handler"
       || !fixture.clientId || !fixture.clientSecret || !fixture.allowedPid || !fixture.hiddenPid
       || fixture.allowedPid === fixture.hiddenPid || !/^slo-[a-f0-9]{20}$/.test(fixture.runId))) {
     throw new Error("Invalid dynamic business fixture");
@@ -85,31 +85,33 @@ function businessCall(data, operation, method, path, payload, extraHeaders, expe
   return accepted ? response : null;
 }
 
-export function business(data) {
-  const path = `/api/open/v1/resources/${fixture.resourceCode}`;
+export function business(data, endpoint = false) {
+  const path = endpoint ? `/api/open/v1/endpoints/${fixture.endpointPrefix}` : `/api/open/v1/resources/${fixture.resourceCode}`;
+  const route = (operation, pid) => endpoint ? path + operation + (pid ? "/" + pid : "") : path + (pid ? "/" + pid : "");
+  const op = operation => endpoint ? "endpoint" + operation[0].toUpperCase() + operation.slice(1) : operation;
   const key = `${data.runId}-${__VU}-${__ITER}`;
   const name = key;
   const intent = { name, zone: "A" };
-  const created = businessCall(data, "create", "POST", path, intent, { "Idempotency-Key": key + "-create" }, 201,
+  const created = businessCall(data, op("create"), "POST", route("create"), intent, { "Idempotency-Key": key + "-create" }, 201,
     r => record(body(r), name) && strongEtag(header(r, "ETag")) && [undefined, "false"].includes(header(r, "Idempotent-Replay"))
-      && header(r, "Location") === path + "/" + body(r).pid);
+      && header(r, "Location") === `/api/open/v1/resources/${fixture.resourceCode}/` + body(r).pid);
   if (!created) return;
   const pid = body(created).pid;
   const etag = header(created, "ETag");
-  const replay = businessCall(data, "replay", "POST", path, intent, { "Idempotency-Key": key + "-create" }, 201,
+  const replay = businessCall(data, op("replay"), "POST", route("create"), intent, { "Idempotency-Key": key + "-create" }, 201,
     r => record(body(r), name, pid) && header(r, "ETag") === etag && header(r, "Idempotent-Replay") === "true");
   if (!replay) return;
-  const read = businessCall(data, "get", "GET", path + "/" + pid, null, {}, 200,
+  const read = businessCall(data, op("get"), "GET", route("get", pid), null, {}, 200,
     r => record(body(r), name, pid) && header(r, "ETag") === etag);
   if (!read) return;
-  const listed = businessCall(data, "list", "GET", path + "?limit=10", null, {}, 200, r => {
+  const listed = businessCall(data, op("list"), "GET", route("list") + "?limit=10", null, {}, 200, r => {
     const page = body(r);
     return page && Array.isArray(page.items) && page.items.length > 0 && page.items.length <= 10
       && page.items.every(item => record(item, item.name))
       && page.items.some(item => item.pid === fixture.allowedPid);
   });
   if (!listed) return;
-  const queried = businessCall(data, "query", "POST", `/api/open/v1/queries/${fixture.queryCode}:execute`,
+  const queried = businessCall(data, op("query"), "POST", endpoint ? route("query") : `/api/open/v1/queries/${fixture.queryCode}:execute`,
     { parameters: { zone: "A" }, limit: 10 }, {}, 200, r => {
       const page = body(r);
       return page && Array.isArray(page.items) && page.items.length > 0 && page.items.length <= 10
@@ -118,28 +120,31 @@ export function business(data) {
         && page.items.some(item => item.pid === fixture.allowedPid);
     });
   if (!queried) return;
-  const updated = businessCall(data, "update", "PATCH", path + "/" + pid, { name: name + "-updated" },
+  const updated = businessCall(data, op("update"), "PATCH", route("update", pid), { name: name + "-updated" },
     { "Idempotency-Key": key + "-update", "If-Match": etag }, 200,
     r => record(body(r), name + "-updated", pid) && strongEtag(header(r, "ETag")) && header(r, "ETag") !== etag);
   if (!updated) return;
-  const commandPath = `/api/open/v1/actions/${fixture.commandCode}:execute`;
+  const commandPath = endpoint ? route("command") : `/api/open/v1/actions/${fixture.commandCode}:execute`;
   const commandIntent = { targetPid: pid, input: { zone: "A" } };
   const commandHeaders = { "Idempotency-Key": key + "-command", "If-Match": header(updated, "ETag") };
-  const command = businessCall(data, "command", "POST", commandPath, commandIntent, commandHeaders, 200,
+  const command = businessCall(data, op("command"), "POST", commandPath, commandIntent, commandHeaders, 200,
     r => body(r) && body(r).action === fixture.commandCode && record(body(r).resource, "Business API qualified", pid)
       && body(r).idempotentReplay === false && strongEtag(header(r, "ETag")) && header(r, "ETag") !== header(updated, "ETag"));
   if (!command) return;
-  const commandReplay = businessCall(data, "commandReplay", "POST", commandPath, commandIntent, commandHeaders, 200,
+  const commandReplay = businessCall(data, op("commandReplay"), "POST", commandPath, commandIntent, commandHeaders, 200,
     r => body(r) && body(r).action === fixture.commandCode && record(body(r).resource, "Business API qualified", pid)
       && body(r).idempotentReplay === true && header(r, "Idempotent-Replay") === "true" && header(r, "ETag") === header(command, "ETag"));
   if (!commandReplay) return;
+  if (!endpoint) {
   const handler = businessCall(data, "handler", "POST", `/api/open/v1/actions/${fixture.handlerCode}:execute`, { input: { limit: 10 } }, {}, 200,
     r => body(r) && Object.keys(body(r)).sort().join(",") === "countOnPage,hasMore" && Number.isInteger(body(r).countOnPage)
       && body(r).countOnPage > 0 && body(r).countOnPage <= 10 && typeof body(r).hasMore === "boolean");
   if (!handler) return;
-  businessCall(data, "delete", "DELETE", path + "/" + pid, null,
+  if (!business(data, true)) return;
+  }
+  return Boolean(businessCall(data, op("delete"), "DELETE", route("delete", pid), null,
     { "Idempotency-Key": key + "-delete", "If-Match": header(command, "ETag") }, 204,
-    r => r.body === "" || r.body === null);
+    r => r.body === "" || r.body === null));
 }
 
 export default function (data) {

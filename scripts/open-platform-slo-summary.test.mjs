@@ -32,11 +32,11 @@ test('standalone and release runners use the sanitized handler instead of the bu
 });
 
 
-function runtime(invalidQuery = false) {
+function runtime(invalidQuery = false, invalidEndpointQuery = false) {
   const observations = [];
   const fixture = { schemaVersion: 1, profile: 'open-platform-dynamic-slo-v1', runId: 'slo-' + 'a'.repeat(20),
     resourceCode: 'release.dynamic.parts', queryCode: 'release.slo.by-zone',
-    allowedPid: 'allowed-pid', hiddenPid: 'hidden-pid', clientId: 'private-client', clientSecret: 'private-secret', integrationToken: 'private-direct-token', commandCode: 'release.slo.command', handlerCode: 'release.slo.handler' };
+    allowedPid: 'allowed-pid', hiddenPid: 'hidden-pid', clientId: 'private-client', clientSecret: 'private-secret', integrationToken: 'private-direct-token', endpointPrefix: 'release.slo.endpoint.', commandCode: 'release.slo.command', handlerCode: 'release.slo.handler' };
   let created;
   const metric = class { constructor(name) { this.name = name; } add(value, tags) { observations.push({ name: this.name, value, tags }); } };
   const response = (status, value, headers) => ({ status, body: status === 204 ? '' : JSON.stringify(value),
@@ -47,7 +47,13 @@ function runtime(invalidQuery = false) {
     http: { expectedStatuses: status => status,
       get: (url, args) => response(200, {}, { 'X-Request-Id': args.headers['X-Request-Id'] }),
       request: (method, url, body, args) => {
-        const operation = args.tags.operation;
+        const tag = args.tags.operation;
+        const endpoint = tag.startsWith('endpoint');
+        const operation = endpoint ? tag[8].toLowerCase()+tag.slice(9) : tag;
+        if (endpoint) {
+          assert.match(url, /\/api\/open\/v1\/endpoints\/release\.slo\.endpoint\./);
+          assert.ok(url.includes('endpoint.' + (operation === 'replay' ? 'create' : operation === 'commandReplay' ? 'command' : operation)));
+        }
         const headers = { 'X-Request-Id': args.headers['X-Request-Id'] };
         if (operation === 'create') {
           created = { ...JSON.parse(body), pid: 'fresh-pid' };
@@ -56,7 +62,7 @@ function runtime(invalidQuery = false) {
         if (operation === 'replay') return response(201, created, { ...headers, ETag: '"v1"', 'Idempotent-Replay': 'true' });
         if (operation === 'get') return response(200, created, { ...headers, ETag: '"v1"' });
         if (operation === 'list') return response(200, { items: [{ pid: 'allowed-pid', name: 'Seed', zone: 'A' }, created] }, headers);
-        if (operation === 'query') return response(200, { items: [{ pid: 'allowed-pid', name: 'Seed', ...(invalidQuery ? { secret: 'private-value' } : {}) }] }, headers);
+        if (operation === 'query') return response(200, { items: [{ pid: 'allowed-pid', name: 'Seed', ...((endpoint ? invalidEndpointQuery : invalidQuery) ? { secret: 'private-value' } : {}) }] }, headers);
         if (operation === 'update') { created = { ...created, ...JSON.parse(body) }; return response(200, created, { ...headers, ETag: '"v2"' }); }
         if (operation === 'command' || operation === 'commandReplay') {
           created = { ...created, name: 'Business API qualified' };
@@ -73,12 +79,12 @@ function runtime(invalidQuery = false) {
   return { context, observations };
 }
 
-test('original k6 workload executes all ten business operations and checks public results', () => {
+test('fixed k6 workload executes all nineteen resource and Controller operations and checks public results', () => {
   const { context, observations } = runtime();
   context.runIteration({ token: 'private-token', businessToken: 'private-machine-token', runId: 'fresh-run' });
   assert.deepEqual(observations.filter(row => row.name === 'business_requests').map(row => row.tags.operation),
-    ['create', 'replay', 'get', 'list', 'query', 'update', 'command', 'commandReplay', 'handler', 'delete']);
-  assert.equal(observations.filter(row => row.name === 'business_errors').length, 10);
+    ['create', 'replay', 'get', 'list', 'query', 'update', 'command', 'commandReplay', 'handler', 'endpointCreate', 'endpointReplay', 'endpointGet', 'endpointList', 'endpointQuery', 'endpointUpdate', 'endpointCommand', 'endpointCommandReplay', 'endpointDelete', 'delete']);
+  assert.equal(observations.filter(row => row.name === 'business_errors').length, 19);
   assert.ok(observations.filter(row => row.name === 'business_errors').every(row => row.value === false));
 });
 
@@ -88,6 +94,13 @@ test('query private field makes the actual workload check red and prevents false
   assert.deepEqual(observations.filter(row => row.name === 'business_requests').map(row => row.tags.operation),
     ['create', 'replay', 'get', 'list', 'query']);
   assert.ok(observations.some(row => row.name === 'business_errors' && row.tags.operation === 'query' && row.value === true));
+});
+
+test('Controller query private field makes its own SLO metric red and stops later writes', () => {
+  const { context, observations } = runtime(false, true);
+  context.runIteration({ token: 'private-token', businessToken: 'private-machine-token', runId: 'fresh-run' });
+  assert.ok(observations.some(row => row.name === 'business_errors' && row.tags.operation === 'endpointQuery' && row.value === true));
+  assert.ok(!observations.some(row => row.name === 'business_requests' && row.tags.operation === 'endpointUpdate'));
 });
 
 test('production fixture cannot silently downgrade to the original identity-only workload', () => {
@@ -112,9 +125,9 @@ test('actual Python SLO verifier rejects missing samples, false green and wrong 
   metric('open_api_errors', { rate: 0, passes: 0, fails: 20 });
   metric('open_api_duration', { 'p(95)': 100, 'p(99)': 150 });
   metric('http_reqs', { rate: 100 });
-  metric('business_requests', { count: 200, rate: 70 });
-  metric('business_errors', { rate: 0, passes: 0, fails: 200 });
-  for (const operation of ['create', 'replay', 'get', 'list', 'query', 'update', 'command', 'commandReplay', 'handler', 'delete']) {
+  metric('business_requests', { count: 380, rate: 70 });
+  metric('business_errors', { rate: 0, passes: 0, fails: 380 });
+  for (const operation of ['create', 'replay', 'get', 'list', 'query', 'update', 'command', 'commandReplay', 'handler', 'endpointCreate', 'endpointReplay', 'endpointGet', 'endpointList', 'endpointQuery', 'endpointUpdate', 'endpointCommand', 'endpointCommandReplay', 'endpointDelete', 'delete']) {
     metric(`business_requests{operation:${operation}}`, { count: 20 });
     metric(`business_errors{operation:${operation}}`, { rate: 0, passes: 0, fails: 20 });
     metric(`business_duration{operation:${operation}}`, { 'p(95)': 100, 'p(99)': 150 });

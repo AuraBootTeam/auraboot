@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 
-OPERATIONS = ("create", "replay", "get", "list", "query", "update", "command", "commandReplay", "handler", "delete")
+OPERATIONS = ("create", "replay", "get", "list", "query", "update", "command", "commandReplay", "handler", "endpointCreate", "endpointReplay", "endpointGet", "endpointList", "endpointQuery", "endpointUpdate", "endpointCommand", "endpointCommandReplay", "endpointDelete", "delete")
 
 
 def verify_summary(summary, *, profile, require_business=True):

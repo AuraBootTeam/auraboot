@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
+import { OpenApiEndpointPublicationEditor } from './OpenApiEndpointPublicationEditor';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, type ActionPublicationView, type ActionSource, type PublicationView, type PublicAction } from '~/services/open-api-publications';
 import { PublicationField, usePublicationConfirmation } from './PublicationControls';
@@ -14,6 +15,7 @@ const initial = (): PublicAction => ({ code: '', resourceCode: '', sourceKind: '
 export function OpenApiActionPublicationEditor() {
   const { t, locale } = useI18n();
   const text = (key: string, zh: string, en: string) => t(`openPlatform.actions.${key}`, undefined, locale.startsWith('zh') ? zh : en);
+  const [endpointMode, setEndpointMode] = useState(false);
   const [views, setViews] = useState<ActionPublicationView[]>([]); const [resources, setResources] = useState<PublicationView[]>([]);
   const [sources, setSources] = useState<ActionSource[]>([]); const [view, setView] = useState<ActionPublicationView>();
   const [draft, setDraft] = useState<PublicAction>(initial); const [editing, setEditing] = useState(false);
@@ -91,10 +93,12 @@ export function OpenApiActionPublicationEditor() {
       document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (cause) { fail(cause); } finally { pending.current = false; setBusy(false); }
   };
+  if (endpointMode) return <OpenApiEndpointPublicationEditor onClose={() => setEndpointMode(false)} />;
   return <div className="space-y-5 text-text" data-testid="action-publication-editor">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-xl font-semibold">{text('title', '公共业务接口', 'Public business APIs')}</h1>
       <p className="mt-2 text-sm text-text-2">{text('help', '将现有状态流转命令或已注册只读 Handler 绑定到公共资源。外部调用始终受安装 Scope、行范围、字段及业务变更授权约束。', 'Bind a state-transition command or registered read-only handler to a public resource. Installation scopes, rows, fields and controlled effects remain enforced.')}</p></div>
       <Link className={BUTTON} to="/settings/api-docs">{text('console', '返回开放平台', 'Back to Open Platform')}</Link></header>
+    {!editing && <button className={BUTTON} type="button" onClick={() => setEndpointMode(true)}>{text('controllerEndpoints', '内部接口对外发布', 'Publish internal endpoints')}</button>}
     {error && <p role="alert" className="rounded-control border border-status-red bg-status-red-bg p-3 text-sm text-status-red">{error}</p>}
     {notice && <p role="status" className="text-sm text-status-green">{notice}</p>}
     {!editing && <section className="space-y-4 rounded-card border border-border bg-panel p-5">

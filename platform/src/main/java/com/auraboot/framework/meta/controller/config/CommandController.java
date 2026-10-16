@@ -141,6 +141,7 @@ public class CommandController {
 
     // ==================== Execute ====================
 
+    @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "command.execute", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.ACTION, version = "1", name = "Execute business command", chineseName = "执行业务命令", actionSourceKind = "command")
     @PostMapping("/execute/{commandCode}")
     @RequirePermission(MetaPermission.COMMAND_EXECUTE)
     @Operation(summary = "Execute a command", description = "Execute a DSL command by code. The payload is passed as the command's input data. Supports idempotency via clientRequestId.")

@@ -36,8 +36,10 @@ COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle
 COPY platform/platform-storage-minio/build.gradle platform-storage-minio/build.gradle
 COPY platform/platform-storage-s3/build.gradle platform-storage-s3/build.gradle
 COPY platform/platform-storage-oss/build.gradle platform-storage-oss/build.gradle
+COPY platform/platform-storage-cos/build.gradle platform-storage-cos/build.gradle
 COPY platform/platform-mq-kafka/build.gradle platform-mq-kafka/build.gradle
 COPY platform/platform-mq-rabbitmq/build.gradle platform-mq-rabbitmq/build.gradle
+COPY platform/platform-scheduler-xxl/build.gradle platform-scheduler-xxl/build.gradle
 
 RUN chmod +x gradlew
 
@@ -50,6 +52,13 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
 # Copy source code
 COPY platform/src ./src
 COPY platform/platform-plugin-api/src platform-plugin-api/src
+COPY platform/platform-storage-minio/src platform-storage-minio/src
+COPY platform/platform-storage-s3/src platform-storage-s3/src
+COPY platform/platform-storage-oss/src platform-storage-oss/src
+COPY platform/platform-storage-cos/src platform-storage-cos/src
+COPY platform/platform-mq-kafka/src platform-mq-kafka/src
+COPY platform/platform-mq-rabbitmq/src platform-mq-rabbitmq/src
+COPY platform/platform-scheduler-xxl/src platform-scheduler-xxl/src
 
 # Copy vendor dependencies if present (use glob pattern to make optional)
 COPY platform/vendor* ./vendor/

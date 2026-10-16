@@ -10,8 +10,13 @@ import java.util.Map;
 
 /** Public resource-specific status contracts; common authentication errors retain the host handler. */
 @Order(0)
-@RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class, OpenApiActionController.class})
+@RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class, OpenApiActionController.class, OpenApiEndpointController.class})
 public class OpenApiResourceErrorHandler {
+    @ExceptionHandler(com.auraboot.framework.openplatform.service.OpenApiEndpointService.SourceChangedException.class)
+    public ResponseEntity<Map<String, Object>> endpointSourceChanged() {
+        return ResponseEntity.status(409).body(Map.of("success", false, "code", "open_api_endpoint_source_changed",
+                "message", "Published endpoint source or bound contract changed"));
+    }
     // Match the root denial before Spring can select its validation cause as a 400.
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<com.auraboot.framework.common.dto.ApiResponse<Object>> denied() {

@@ -71,6 +71,18 @@ def cases(source):
     return result
 
 
+
+def non_executable_declaration(source, name):
+    """Only pure declarations may be excluded; annotation defaults are metadata, never method bodies."""
+    if re.search(r'public\s+interface\s+' + re.escape(name) + r'\b', source):
+        return not re.search(r'\b(?:default|static|class|enum|record)\b|=', source)
+    annotation = re.search(r'public\s+@interface\s+' + re.escape(name) + r'\s*\{([^{}]*)\}\s*$', source, re.S)
+    if not annotation:
+        return False
+    member = r'[A-Za-z_$][\w.$]*\s+[A-Za-z_$][\w$]*\s*\(\s*\)\s*' \
+             r'(?:default\s+(?:"(?:\\.|[^"\\])*"|[A-Za-z_$][\w.$]*|[0-9]+)\s*)?;'
+    return not re.sub(member, '', annotation.group(1)).strip()
+
 def coverage_plan(root, policy):
     minimum = policy['minimumLinePercent']
     require(type(minimum) is int and 80 <= minimum <= 100, "Coverage threshold must be at least 80%")
@@ -95,8 +107,7 @@ def coverage_plan(root, policy):
                'sha256': hashlib.sha256(data).hexdigest()}
         if name in exemptions:
             source = without_comments(data.decode())
-            require(re.search(r'public\s+interface\s+' + re.escape(path.stem) + r'\b', source)
-                    and not re.search(r'\b(?:default|static|class|enum|record)\b|=', source),
+            require(non_executable_declaration(source, path.stem),
                     "Executable code cannot be excluded from coverage")
             excluded.append(row)
         else:

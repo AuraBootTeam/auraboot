@@ -355,6 +355,14 @@ python3 "$STAGE/scripts/ci/open-platform-release-probe.py" \
 python3 "$STAGE/scripts/ci/open_platform_dynamic_probe.py" --verify-release-report "$ARTIFACTS/protocol-probe.json" \
   --model-event-secret-file "$MODEL_EVENT_SECRET_FILE" \
   || fail "dynamic business case reconciliation failed"
+"$OPENAPI_VERIFIER/bin/python" "$STAGE/scripts/ci/verify_endpoint_artifacts.py" \
+  "$ARTIFACTS/controller-endpoints" "$ARTIFACTS/endpoint-openapi-receipt.json" \
+  > "$ARTIFACTS/logs/endpoint-openapi-validation.log" 2>&1 || fail "Controller endpoint OpenAPI validation failed"
+timeout 60 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" \
+  -v "$ARTIFACTS/controller-endpoints":/consumer:ro -v "$SDK_ROOT":/sdk:ro \
+  "$SDK_NODE_IMAGE" node /sdk/toolchain/node_modules/typescript/bin/tsc \
+  --strict --noEmit --module nodenext --target es2022 /consumer/types-consumer.ts \
+  > "$ARTIFACTS/logs/endpoint-types-validation.log" 2>&1 || fail "Controller endpoint types validation failed"
 rm -f "$MODEL_EVENT_SECRET_FILE"
 CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$CREDENTIAL_ARTIFACT")"
 CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
@@ -453,6 +461,8 @@ json.dump({
   "backend": json.load(open("$ARTIFACTS/backend-receipt.json")),
   "quickAccessUi": json.load(open("$ARTIFACTS/quick-ui-receipt.json")),
   "officeGuide": json.load(open("$ARTIFACTS/office-guide/result.json")),
+  "controllerEndpoints": json.load(open("$ARTIFACTS/controller-endpoints/result.json")),
+  "endpointOpenapi": json.load(open("$ARTIFACTS/endpoint-openapi-receipt.json")),
   "openapi": json.load(open("$ARTIFACTS/openapi-receipt.json")), "openapiTypes": "strict-positive-negative-ok",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"

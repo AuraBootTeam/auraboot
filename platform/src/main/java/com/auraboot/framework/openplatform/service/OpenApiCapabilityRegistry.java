@@ -20,6 +20,10 @@ public class OpenApiCapabilityRegistry {
     private OpenApiPublicationService dynamicPublications;
     private OpenApiQueryPublicationService dynamicQueries;
     private OpenApiActionPublicationService dynamicActions;
+    private OpenApiEndpointPublicationService dynamicEndpoints;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void bindEndpoints(OpenApiEndpointPublicationService endpoints) { this.dynamicEndpoints = endpoints; }
 
     @org.springframework.beans.factory.annotation.Autowired
     public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications,
@@ -82,6 +86,7 @@ public class OpenApiCapabilityRegistry {
         dynamicPublications.publishedContracts(tenantId).forEach(contract -> published.addAll(resourceCapabilities(contract)));
         if (dynamicQueries != null) dynamicQueries.published(tenantId).forEach(contract -> published.add(queryCapability(contract)));
         if (dynamicActions != null) dynamicActions.published(tenantId).forEach(contract -> published.add(actionCapability(contract)));
+        if (dynamicEndpoints != null) dynamicEndpoints.published(tenantId).forEach(contract -> published.add(endpointCapability(contract)));
         assertUnique(published);
         return List.copyOf(published);
     }
@@ -99,6 +104,10 @@ public class OpenApiCapabilityRegistry {
         Optional<Capability> fixed = resolve(method, path);
         if (fixed.isPresent() || dynamicPublications == null) return fixed;
         String[] segments = path.split("/", -1);
+        if (dynamicEndpoints != null && (segments.length == 6 || segments.length == 7) && "endpoints".equals(segments[4])) {
+            return dynamicEndpoints.active(tenantId, segments[5]).filter(contract -> contract.kind().target() == (segments.length == 7))
+                    .map(this::endpointCapability).filter(capability -> capability.method().matches(method) && pathMatcher.match(capability.pathPattern(), path));
+        }
         if (dynamicActions != null && segments.length == 6 && "actions".equals(segments[4]) && segments[5].endsWith(":execute")) {
             String code = segments[5].substring(0, segments[5].length() - ":execute".length());
             return dynamicActions.active(tenantId, code).map(this::actionCapability).filter(capability -> capability.method().matches(method));
@@ -120,6 +129,11 @@ public class OpenApiCapabilityRegistry {
     private Capability queryCapability(OpenApiQueryContract contract) {
         return new Capability("query." + contract.code() + ".execute", HttpMethod.POST,
                 "/api/open/v1/queries/" + contract.code() + ":execute", contract.scopes().get("execute"), "source-grants", contract.schemaVersion());
+    }
+
+    private Capability endpointCapability(OpenApiEndpointContract contract) {
+        return new Capability("endpoint." + contract.code() + ".invoke", HttpMethod.valueOf(contract.kind().method()), contract.path(),
+                contract.scopes().get("invoke"), "explicit-endpoint-and-bound-business-grants", contract.schemaVersion());
     }
 
     private Capability actionCapability(OpenApiActionContract contract) {

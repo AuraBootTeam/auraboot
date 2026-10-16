@@ -114,6 +114,17 @@ class TransportTests(unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError, "not JSON"):
             Client("https://example.test", opener=Opener(Response(b"<html>fallback</html>"))).request("/health")
 
+    def test_plain_text_artifacts_require_explicit_type_and_do_not_accept_html(self):
+        response = Response(b'export type EndpointResult = string;')
+        response.headers = {'Content-Type':'text/plain;charset=UTF-8'}
+        client = Client("https://example.test",opener=Opener(response))
+        self.assertEqual(client.request('/types',response_type='text')[1], 'export type EndpointResult = string;')
+        response = Response(b'<html>fallback</html>');response.headers = {'Content-Type':'text/html'}
+        with self.assertRaisesRegex(ProtocolError,'plain-text artifact'):
+            Client("https://example.test",opener=Opener(response)).request('/types',response_type='text')
+        with self.assertRaises(ValueError):
+            Client("https://example.test").request('/types',response_type='auto')
+
     def test_redirect_does_not_forward_bearer(self):
         from open_platform_http import NoRedirect
         request = urllib.request.Request("https://example.test", headers={"Authorization": "Bearer private"})
