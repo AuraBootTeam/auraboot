@@ -2374,7 +2374,9 @@ export async function searchBusinessList(page: Page, listPath: string, keyword: 
   page.on('response', captureInitial);
   try {
     await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-    // Capture early responses, but start the response deadline after navigation.
+    // DOMContentLoaded only establishes the shell; keep early responses while
+    // the existing dynamic-page helper waits for the list to become interactive.
+    await waitForDynamicPageLoad(page);
     const initial = capturedInitial ?? await page.waitForResponse(isListResponse);
     expect(initial.ok(), 'initial list request must succeed').toBe(true);
   } finally {

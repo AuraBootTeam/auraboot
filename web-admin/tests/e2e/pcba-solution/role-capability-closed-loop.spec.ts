@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { test, expect } from '../../fixtures';
-import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator, executeCommandViaApi } from '../helpers';
+import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator, executeCommandViaApi, waitForFormReady } from '../helpers';
 import {
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
@@ -1998,6 +1998,7 @@ for (const domain of ['catalog', 'board', 'rfq', 'dfm', 'margin', 'model'] as co
       }
       for (const form of forms) {
         await member.goto(`/p/${form.model}/edit/${form.pid}?commandCode=${encodeURIComponent(form.command)}`);
+        await waitForFormReady(member);
         const input = member.getByTestId(`form-field-${form.field}`).locator('input, textarea');
         await expect(input).toBeVisible();
         if (form.referenceField) {
@@ -2014,6 +2015,7 @@ for (const domain of ['catalog', 'board', 'rfq', 'dfm', 'margin', 'model'] as co
         expect(String((await saved.json()).code)).toBe('0');
         expect(String(saved.request().postDataJSON().payload[form.field])).toBe(form.value);
         await member.goto(`/p/${form.model}/edit/${form.pid}?commandCode=${encodeURIComponent(form.command)}`);
+        await waitForFormReady(member);
         await expect(member.getByTestId(`form-field-${form.field}`).locator('input, textarea')).toHaveValue(form.value);
         if (form.referenceField) {
           await expect(member.getByTestId(`select-trigger-${form.referenceField}`)).toBeVisible();
