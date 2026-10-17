@@ -289,7 +289,7 @@ public class ChatToolResolver {
             LlmChatRequest.Tool.builder()
                     .name("aurabot_chat-bi")
                     .description("Analyze business data within AuraBot. First use action=catalog for governed metrics, "
-                            + "then action=query with a catalog semanticModelCode, metrics, dimensions and filters. "
+                            + "then action=query with a catalog semanticModelCode, metrics, dimensions and filters. CRITICAL: before any query about records belonging to a named customer/person/business entity, resolve that name with platform_resolve_reference(modelCode, fieldCode, displayValue), then filter the declared reference field EQ returned storedValue. Reference fields store IDs, not labels. Never use a project-name prefix or legacy text to decide customer membership. "
                             + "Ask the user to clarify ambiguous metrics. Preserve timeRange, orderBy and limit. "
                             + "Raw model aggregation is available for explicit ad-hoc exploration; do not substitute "
                             + "raw aggregates for unavailable governed KPIs.")
@@ -302,11 +302,18 @@ public class ChatToolResolver {
      * tools remain the primary path and SQL cannot bypass their safer contracts.
      * chat-bi is always present (universal data-query primitive, never removed).
      */
+    private static final LlmChatRequest.Tool PLATFORM_REFERENCE_TOOL = LlmChatRequest.Tool.builder()
+            .name("platform_resolve_reference")
+            .description("Resolve a customer or other business reference label to its exact stored value using its DSL reference field. Use before filtering reference fields; do not guess IDs or infer relationships from names.")
+            .inputSchema(com.auraboot.framework.meta.service.ModelReferenceLookupService.inputSchema()).build();
+
     private void ensurePlatformTools(List<LlmChatRequest.Tool> tools) {
         Set<String> existing = tools.stream()
                 .map(LlmChatRequest.Tool::getName)
                 .collect(java.util.stream.Collectors.toSet());
 
+        if (!existing.contains(PLATFORM_REFERENCE_TOOL.getName())) tools.add(PLATFORM_REFERENCE_TOOL);
+        cacheSyntheticPlatformTool(PLATFORM_REFERENCE_TOOL, "platform.resolve_reference", true, "L0");
         if (!existing.contains(PLATFORM_FILL_FORM_TOOL.getName())) {
             tools.add(PLATFORM_FILL_FORM_TOOL);
         }

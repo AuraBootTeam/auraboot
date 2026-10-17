@@ -76,6 +76,10 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     reset,
   } = useReportStore();
 
+  const [loadedTarget, setLoadedTarget] = React.useState<string | null>(null);
+  const loadRevisionRef = useRef(0);
+  const targetReady = loadedTarget === (reportId || '');
+
   const viewing = previewMode || !canManage;
 
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,14 +88,18 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   // ── Load / save orchestration (service calls + document-kernel wiring) ──────
   const loadReportById = useCallback(
     async (pid: string) => {
+      const revision = ++loadRevisionRef.current;
       setLoading(true);
       setLoadFailed(false);
       try {
         const result = await reportDesignerService.loadByPid(pid);
+        if (revision !== loadRevisionRef.current) return;
         loadDocument(result.dsl);
         setPageId(result.pid);
+        setLoadedTarget(pid);
         setLoading(false);
       } catch {
+        if (revision !== loadRevisionRef.current) return;
         setLoading(false);
         setLoadFailed(true);
       }
@@ -101,16 +109,21 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   const createReport = useCallback(
     (title: string) => {
+      ++loadRevisionRef.current;
+      setLoadFailed(false);
       loadDocument(createEmptyReport(title));
+      setLoadedTarget('');
+      setLoading(false);
       setPageId(null);
       // A freshly created (unsaved) report is dirty — preserves prior store behavior.
       setDirty(true);
     },
-    [loadDocument, setPageId, setDirty],
+    [loadDocument, setPageId, setDirty, setLoading],
   );
 
   const saveReport = useCallback(async () => {
     if (!canManage) throw new Error('Report is read only');
+    if (!targetReady) throw new Error('Report is still loading');
     if (!report) throw new Error('No report to save');
     setSaving(true);
     try {
@@ -124,7 +137,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       setSaving(false);
       throw error;
     }
-  }, [report, pageId, setSaving, setPageId, markSaved, canManage, onSaveComplete]);
+  }, [report, pageId, setSaving, setPageId, markSaved, canManage, onSaveComplete, targetReady]);
 
   // Version history management
   const versioning = useVersioning({
@@ -147,6 +160,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     }
 
     return () => {
+      ++loadRevisionRef.current;
       reset();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,7 +168,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Auto-save
   useEffect(() => {
-    if (!canManage || !isDirty || isSaving || versioning.viewingVersionPid) {
+    if (!canManage || !targetReady || !isDirty || isSaving || versioning.viewingVersionPid) {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
@@ -179,11 +193,11 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         autoSaveTimerRef.current = null;
       }
     };
-  }, [isDirty, isSaving, saveReport, versioning.viewingVersionPid, canManage]);
+  }, [isDirty, isSaving, saveReport, versioning.viewingVersionPid, canManage, targetReady]);
 
   // Ctrl+S + Undo/Redo
   const handleSave = useCallback(async () => {
-    if (!canManage || versioning.viewingVersionPid) return;
+    if (!canManage || !targetReady || versioning.viewingVersionPid) return;
     try {
       await saveReport();
       lastSaveTimeRef.current = Date.now();
@@ -191,12 +205,12 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('Save failed:', error);
       showErrorToast(text({ zh: '保存失败，草稿已保留，请重试。', en: 'Save failed. Your draft is preserved. Please retry.' }));
     }
-  }, [saveReport, versioning.viewingVersionPid, canManage, showErrorToast, text]);
+  }, [saveReport, versioning.viewingVersionPid, canManage, showErrorToast, text, targetReady]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
-        (!canManage || versioning.viewingVersionPid) &&
+        (!canManage || !targetReady || versioning.viewingVersionPid) &&
         (e.ctrlKey || e.metaKey) &&
         ['s', 'z', 'y'].includes(e.key.toLowerCase())
       ) {
@@ -219,7 +233,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, undo, redo, versioning.viewingVersionPid, canManage]);
+  }, [handleSave, undo, redo, versioning.viewingVersionPid, canManage, targetReady]);
 
   // beforeunload
   useEffect(() => {
@@ -408,12 +422,12 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       </div>
     );
 
-  if (isLoading) {
+  if (isLoading || !targetReady) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-          <p className="text-gray-600">Loading report...</p>
+          <p className="text-gray-600">{text({ zh: '正在加载报表…', en: 'Loading report...' })}</p>
         </div>
       </div>
     );

@@ -13,7 +13,7 @@ vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({ locale: fixture.locale, t: (_key: string, _params?: unknown, fallback?: string) => fallback ?? _key }),
 }));
 vi.mock('../../services/dashboardService', () => ({ dashboardService: { create: fixture.create, findByPid: fixture.findByPid } }));
-vi.mock('../DataSourceConfig', () => ({ DataSourceConfig: () => null }));
+vi.mock('../DataSourceConfig', () => ({ DataSourceConfig: () => <div data-testid="canonical-data-source-editor" /> }));
 vi.mock('../LinkageConfig', () => ({ LinkageConfig: () => null }));
 vi.mock('../StyleConfig', () => ({ StyleConfig: () => null }));
 vi.mock('../RefreshConfig', () => ({ RefreshConfig: () => null }));
@@ -90,8 +90,9 @@ describe('dashboard registry locale flow', () => {
     const id = useDashboardStore.getState().addWidget(createWidgetDraft(widgetRegistry.get('smart-number-card')!, { x: 0, y: 0 }));
     render(<WidgetPropertyPanel />);
     expect(screen.getByRole('heading', { name: 'Number Card' })).toBeVisible();
-    expect(screen.getByText('Data Source Type')).toBeVisible();
-    expect(screen.getByRole('option', { name: 'Aggregate Query' })).toHaveValue('aggregate');
+    expect(screen.getByTestId('canonical-data-source-editor')).toBeVisible();
+    expect(screen.queryByTestId('widget-prop-dataSource-type')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('widget-prop-dataSource-queryCode')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('widget-prop-title-en'), { target: { value: 'My Metric' } });
     fireEvent.click(screen.getByTestId('widget-prop-title-toggle'));
     fireEvent.change(screen.getByTestId('widget-prop-title-zh'), { target: { value: '我的指标' } });

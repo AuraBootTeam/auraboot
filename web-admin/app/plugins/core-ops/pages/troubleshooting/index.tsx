@@ -257,12 +257,12 @@ export default function TroubleshootingPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                        <th className="px-3 py-2">{l('命令', 'Command')}</th>
-                        <th className="px-3 py-2">{l('结果', 'Result')}</th>
-                        <th className="px-3 py-2">{l('阶段', 'Phase')}</th>
-                        <th className="px-3 py-2">{l('耗时', 'Duration')}</th>
-                        <th className="px-3 py-2">{l('阶段耗时 / 错误', 'Phase timings / Error')}</th>
-                        <th className="px-3 py-2">{l('时间', 'Time')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('命令', 'Command')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('结果', 'Result')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('阶段', 'Phase')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('耗时', 'Duration')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('阶段耗时 / 错误', 'Phase timings / Error')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('时间', 'Time')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -271,7 +271,7 @@ export default function TroubleshootingPage() {
                           <td className="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{c.commandCode}</td>
                           <td className="px-3 py-2">
                             <span
-                              className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
+                              className={`inline-flex whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${
                                 c.success
                                   ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                                   : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
@@ -280,8 +280,8 @@ export default function TroubleshootingPage() {
                               {c.success ? l('成功', 'success') : l('失败', 'failed')}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{c.phaseReached || '—'}</td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{c.phaseReached || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">
                             {c.executionTimeMs != null ? `${c.executionTimeMs} ms` : '—'}
                           </td>
                           <td className="px-3 py-2">
@@ -325,22 +325,22 @@ export default function TroubleshootingPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                        <th className="px-3 py-2">{l('厂商', 'Provider')}</th>
-                        <th className="px-3 py-2">{l('模型', 'Model')}</th>
-                        <th className="px-3 py-2">Tokens (in/out)</th>
-                        <th className="px-3 py-2">{l('成本', 'Cost')}</th>
-                        <th className="px-3 py-2">{l('时间', 'Time')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('厂商', 'Provider')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('模型', 'Model')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">Tokens (in/out)</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('成本', 'Cost')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('时间', 'Time')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {view.llmUsage.map((u, i) => (
                         <tr key={i} className="border-b border-gray-100 dark:border-gray-700/50" data-testid="llm-row">
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{u.provider || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{u.provider || '—'}</td>
                           <td className="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{u.responseModel || u.requestModel || '—'}</td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">
                             {(u.inputTokens ?? 0)} / {(u.outputTokens ?? 0)}
                           </td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{fmtCost(u.amount, u.currency)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{fmtCost(u.amount, u.currency)}</td>
                           <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtTime(u.createdAt)}</td>
                         </tr>
                       ))}
@@ -363,20 +363,20 @@ export default function TroubleshootingPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                        <th className="px-3 py-2">{l('事件', 'Event')}</th>
-                        <th className="px-3 py-2">{l('类别', 'Category')}</th>
-                        <th className="px-3 py-2">{l('来源', 'Source')}</th>
-                        <th className="px-3 py-2">{l('页面/元素', 'Page/Element')}</th>
-                        <th className="px-3 py-2">{l('时间', 'Time')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('事件', 'Event')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('类别', 'Category')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('来源', 'Source')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('页面/元素', 'Page/Element')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('时间', 'Time')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {view.behaviorEvents.map((b, i) => (
                         <tr key={i} className="border-b border-gray-100 dark:border-gray-700/50" data-testid="behavior-row">
                           <td className="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{b.eventName || '—'}</td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{b.eventCategory || '—'}</td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{b.source || '—'}</td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{[b.pageId, b.elementCode].filter(Boolean).join(' / ') || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{b.eventCategory || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{b.source || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{[b.pageId, b.elementCode].filter(Boolean).join(' / ') || '—'}</td>
                           <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtTime(b.occurredAt)}</td>
                         </tr>
                       ))}
@@ -399,21 +399,21 @@ export default function TroubleshootingPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                        <th className="px-3 py-2">{l('动作', 'Action')}</th>
-                        <th className="px-3 py-2">{l('资源', 'Resource')}</th>
-                        <th className="px-3 py-2">{l('结果', 'Result')}</th>
-                        <th className="px-3 py-2">{l('原因', 'Reason')}</th>
-                        <th className="px-3 py-2">{l('时间', 'Time')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('动作', 'Action')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('资源', 'Resource')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('结果', 'Result')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('原因', 'Reason')}</th>
+                        <th className="whitespace-nowrap px-3 py-2">{l('时间', 'Time')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {view.auditEvents.map((a, i) => (
                         <tr key={i} className="border-b border-gray-100 dark:border-gray-700/50" data-testid="audit-row">
                           <td className="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{a.actionType || '—'}</td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{a.resourceType || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{a.resourceType || '—'}</td>
                           <td className="px-3 py-2">
                             <span
-                              className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
+                              className={`inline-flex whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${
                                 a.success === false
                                   ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                                   : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
@@ -422,7 +422,7 @@ export default function TroubleshootingPage() {
                               {a.success === false ? l('失败', 'failed') : l('成功', 'success')}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{a.reason || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">{a.reason || '—'}</td>
                           <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtTime(a.createdAt)}</td>
                         </tr>
                       ))}

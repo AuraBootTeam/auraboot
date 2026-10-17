@@ -1,11 +1,13 @@
 // web-admin/app/flow-designer-sdk/core/FlowCanvas.tsx
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
   useReactFlow,
+  useNodesInitialized,
+  useStore,
   type Connection,
   type NodeTypes,
   type EdgeTypes,
@@ -26,6 +28,7 @@ export interface FlowCanvasProps {
   showMinimap?: boolean;
   showControls?: boolean;
   className?: string;
+  fitExistingGraph?: boolean;
 }
 
 /**
@@ -55,11 +58,26 @@ function ScreenToFlowPositionCapture({
   return null;
 }
 
+/** Refit existing graphs when adjacent result panels change the canvas width. */
+function ExistingGraphViewport({ enabled }: { enabled: boolean }) {
+  const { fitView } = useReactFlow();
+  const initialized = useNodesInitialized();
+  const width = useStore(state => state.width);
+  const height = useStore(state => state.height);
+  useEffect(() => {
+    if (enabled && width > 0 && height > 0) {
+      void fitView({ padding: 0.2, maxZoom: 1 });
+    }
+  }, [enabled, initialized, width, height, fitView]);
+  return null;
+}
+
 export function FlowCanvas({
   readOnly = false,
   showMinimap = true,
   showControls = true,
   className,
+  fitExistingGraph,
 }: FlowCanvasProps) {
   const {
     nodes,
@@ -91,7 +109,7 @@ export function FlowCanvas({
     // node drop.
     hadInitialNodesRef.current = nodes.length > 0;
   }
-  const fitViewActive = hadInitialNodesRef.current;
+  const fitViewActive = fitExistingGraph ?? hadInitialNodesRef.current;
 
   // Ref to hold the screenToFlowPosition function captured from inside the
   // ReactFlow context by ScreenToFlowPositionCapture below.
@@ -295,11 +313,13 @@ export function FlowCanvas({
         // (edit mode). On new empty canvases, fitView re-zooms after each
         // drag-drop and pushes newly-added nodes out of the visible viewport.
         fitView={fitViewActive}
+        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
       >
         {/* ScreenToFlowPositionCapture must render inside ReactFlow to access
             its context. It stores screenToFlowPosition in a ref so onDrop
             can convert viewport→flow coordinates at drop time. */}
         <ScreenToFlowPositionCapture onCapture={handleCapture} />
+        <ExistingGraphViewport enabled={fitViewActive} />
         <Background />
         {showControls && <Controls />}
         {showMinimap && <MiniMap />}

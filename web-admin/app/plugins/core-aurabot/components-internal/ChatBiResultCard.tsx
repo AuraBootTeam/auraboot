@@ -374,6 +374,8 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         ref={resultViewRef}
         data-testid="chatbi-result-card"
         data-analysis-id={result.analysisId}
+        data-model-code={result.modelCode || result.dataSource?.modelCode}
+        data-dimensions={(result.dimensions || result.dataSource?.dimensions || []).join(',')}
         data-chart-type={chartType}
         data-row-count={records.length}
         className="w-full max-w-[95%] overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-700 dark:bg-gray-800"

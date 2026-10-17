@@ -9,6 +9,7 @@ import {
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import { applyActionCatalogAvailabilityToAutomationNodes } from '../nodes/actionCatalogMapping';
 import { useSmartText } from '~/utils/i18n';
+import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { AutomationDebugger, useDebugSession } from '../debug';
 import { DesignerToolbar } from '~/shared/designer/DesignerToolbar';
@@ -29,7 +30,17 @@ interface DeclaredAutomationAction {
   config?: Record<string, unknown>;
 }
 
-type SmartTextResolver = (key: string, fallback?: string) => string;
+type SmartTextResolver = ReturnType<typeof useSmartText>;
+
+function runFailureText(message: string, t: SmartTextResolver): string {
+  if (/command permission denied/i.test(message)) {
+    return t({
+      zh: '缺少执行该业务动作所需的权限。请管理员核对操作角色，修正后重新执行。',
+      en: 'This role cannot execute the business action. Ask an administrator to review its permissions, then run again.',
+    });
+  }
+  return message;
+}
 
 interface EvidenceEntry {
   key: string;
@@ -108,8 +119,14 @@ const RESULT_FIELD_ORDER = [
 ];
 
 const RESULT_FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
-  type: { key: '$i18n:automation.editor.resultField.channel', fallback: 'Channel' },
-  sentCount: { key: '$i18n:automation.editor.resultField.sentCount', fallback: 'Sent' },
+  type: {
+    key: '$i18n:automation.editor.resultField.channel',
+    fallback: 'Channel',
+  },
+  sentCount: {
+    key: '$i18n:automation.editor.resultField.sentCount',
+    fallback: 'Sent',
+  },
   recipientCount: {
     key: '$i18n:automation.editor.resultField.recipientCount',
     fallback: 'Recipients',
@@ -118,9 +135,18 @@ const RESULT_FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
     key: '$i18n:automation.editor.resultField.recipientList',
     fallback: 'Recipient List',
   },
-  title: { key: '$i18n:automation.editor.resultField.title', fallback: 'Title' },
-  content: { key: '$i18n:automation.editor.resultField.content', fallback: 'Content' },
-  message: { key: '$i18n:automation.editor.resultField.message', fallback: 'Message' },
+  title: {
+    key: '$i18n:automation.editor.resultField.title',
+    fallback: 'Title',
+  },
+  content: {
+    key: '$i18n:automation.editor.resultField.content',
+    fallback: 'Content',
+  },
+  message: {
+    key: '$i18n:automation.editor.resultField.message',
+    fallback: 'Message',
+  },
   failureReason: {
     key: '$i18n:automation.editor.resultField.failureReason',
     fallback: 'Failure Reason',
@@ -133,7 +159,10 @@ const RESULT_FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
     key: '$i18n:automation.editor.resultField.statusCode',
     fallback: 'HTTP Status',
   },
-  url: { key: '$i18n:automation.editor.resultField.url', fallback: 'Target URL' },
+  url: {
+    key: '$i18n:automation.editor.resultField.url',
+    fallback: 'Target URL',
+  },
   deliveryMode: {
     key: '$i18n:automation.editor.resultField.deliveryMode',
     fallback: 'Delivery Mode',
@@ -146,7 +175,10 @@ const RESULT_FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
     key: '$i18n:automation.editor.resultField.responseBytes',
     fallback: 'Response Bytes',
   },
-  processKey: { key: '$i18n:automation.editor.resultField.processKey', fallback: 'Process' },
+  processKey: {
+    key: '$i18n:automation.editor.resultField.processKey',
+    fallback: 'Process',
+  },
   businessKey: {
     key: '$i18n:automation.editor.resultField.businessKey',
     fallback: 'Business Key',
@@ -155,8 +187,14 @@ const RESULT_FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
     key: '$i18n:automation.editor.resultField.processInstanceId',
     fallback: 'Process Instance',
   },
-  recordPid: { key: '$i18n:automation.editor.resultField.recordPid', fallback: 'Record' },
-  modelCode: { key: '$i18n:automation.editor.resultField.modelCode', fallback: 'Model' },
+  recordPid: {
+    key: '$i18n:automation.editor.resultField.recordPid',
+    fallback: 'Record',
+  },
+  modelCode: {
+    key: '$i18n:automation.editor.resultField.modelCode',
+    fallback: 'Model',
+  },
   updatedFields: {
     key: '$i18n:automation.editor.resultField.updatedFields',
     fallback: 'Updated Fields',
@@ -177,9 +215,18 @@ const RESULT_FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
     key: '$i18n:automation.editor.resultField.stopReason',
     fallback: 'Stop Reason',
   },
-  record: { key: '$i18n:automation.editor.resultField.record', fallback: 'Record' },
-  success: { key: '$i18n:automation.editor.resultField.success', fallback: 'Success' },
-  channel: { key: '$i18n:automation.editor.resultField.channel', fallback: 'Channel' },
+  record: {
+    key: '$i18n:automation.editor.resultField.record',
+    fallback: 'Record',
+  },
+  success: {
+    key: '$i18n:automation.editor.resultField.success',
+    fallback: 'Success',
+  },
+  channel: {
+    key: '$i18n:automation.editor.resultField.channel',
+    fallback: 'Channel',
+  },
   targetPhones: {
     key: '$i18n:automation.editor.resultField.targetPhones',
     fallback: 'Phone Targets',
@@ -200,40 +247,79 @@ const RESULT_FIELD_LABELS: Record<string, { key: string; fallback: string }> = {
     key: '$i18n:automation.editor.resultField.messageIds',
     fallback: 'Message IDs',
   },
-  provider: { key: '$i18n:automation.editor.resultField.smsProvider', fallback: 'SMS Provider' },
+  provider: {
+    key: '$i18n:automation.editor.resultField.smsProvider',
+    fallback: 'SMS Provider',
+  },
   providers: {
     key: '$i18n:automation.editor.resultField.smsProviders',
     fallback: 'SMS Providers',
   },
-  template: { key: '$i18n:automation.editor.resultField.smsTemplate', fallback: 'SMS Template' },
-  delivery: { key: '$i18n:automation.editor.resultField.delivery', fallback: 'Delivery' },
-  itemType: { key: '$i18n:automation.editor.resultField.itemType', fallback: 'Inbox Type' },
+  template: {
+    key: '$i18n:automation.editor.resultField.smsTemplate',
+    fallback: 'SMS Template',
+  },
+  delivery: {
+    key: '$i18n:automation.editor.resultField.delivery',
+    fallback: 'Delivery',
+  },
+  itemType: {
+    key: '$i18n:automation.editor.resultField.itemType',
+    fallback: 'Inbox Type',
+  },
   createdCount: {
     key: '$i18n:automation.editor.resultField.createdCount',
     fallback: 'Created',
   },
-  ccCount: { key: '$i18n:automation.editor.resultField.ccCount', fallback: 'CC Count' },
+  ccCount: {
+    key: '$i18n:automation.editor.resultField.ccCount',
+    fallback: 'CC Count',
+  },
   inboxItemIds: {
     key: '$i18n:automation.editor.resultField.inboxItemIds',
     fallback: 'Inbox Item IDs',
   },
-  commentPid: { key: '$i18n:automation.editor.resultField.commentPid', fallback: 'Comment' },
-  auditPid: { key: '$i18n:automation.editor.resultField.auditPid', fallback: 'Audit Entry' },
+  commentPid: {
+    key: '$i18n:automation.editor.resultField.commentPid',
+    fallback: 'Comment',
+  },
+  auditPid: {
+    key: '$i18n:automation.editor.resultField.auditPid',
+    fallback: 'Audit Entry',
+  },
   ruleCode: {
     key: '$i18n:automation.editor.resultField.ruleCode',
     fallback: 'Rule / Automation',
   },
-  mentions: { key: '$i18n:automation.editor.resultField.mentions', fallback: 'Mentions' },
+  mentions: {
+    key: '$i18n:automation.editor.resultField.mentions',
+    fallback: 'Mentions',
+  },
 };
 
 const STATUS_VALUE_LABELS: Record<string, { key: string; fallback: string }> = {
-  success: { key: '$i18n:automation.editor.status.success', fallback: 'Success' },
-  completed: { key: '$i18n:automation.editor.status.completed', fallback: 'Completed' },
+  success: {
+    key: '$i18n:automation.editor.status.success',
+    fallback: 'Success',
+  },
+  completed: {
+    key: '$i18n:automation.editor.status.completed',
+    fallback: 'Completed',
+  },
   failed: { key: '$i18n:automation.editor.status.failed', fallback: 'Failed' },
   error: { key: '$i18n:automation.editor.status.failed', fallback: 'Failed' },
-  running: { key: '$i18n:automation.editor.status.running', fallback: 'Running' },
-  pending: { key: '$i18n:automation.editor.status.pending', fallback: 'Pending' },
-  skipped: { key: '$i18n:automation.editor.status.skipped', fallback: 'Skipped' },
+  running: {
+    key: '$i18n:automation.editor.status.running',
+    fallback: 'Running',
+  },
+  pending: {
+    key: '$i18n:automation.editor.status.pending',
+    fallback: 'Pending',
+  },
+  skipped: {
+    key: '$i18n:automation.editor.status.skipped',
+    fallback: 'Skipped',
+  },
 };
 
 const CHANNEL_VALUE_LABELS: Record<string, { key: string; fallback: string }> = {
@@ -241,13 +327,22 @@ const CHANNEL_VALUE_LABELS: Record<string, { key: string; fallback: string }> = 
     key: '$i18n:automation.editor.resultValue.channel.inApp',
     fallback: 'In-app notification',
   },
-  sms: { key: '$i18n:automation.editor.resultValue.channel.sms', fallback: 'SMS' },
-  im: { key: '$i18n:automation.editor.resultValue.channel.im', fallback: 'IM message' },
+  sms: {
+    key: '$i18n:automation.editor.resultValue.channel.sms',
+    fallback: 'SMS',
+  },
+  im: {
+    key: '$i18n:automation.editor.resultValue.channel.im',
+    fallback: 'IM message',
+  },
   webhook: {
     key: '$i18n:automation.editor.resultValue.channel.webhook',
     fallback: 'Webhook',
   },
-  email: { key: '$i18n:automation.editor.resultValue.channel.email', fallback: 'Email' },
+  email: {
+    key: '$i18n:automation.editor.resultValue.channel.email',
+    fallback: 'Email',
+  },
 };
 
 const RESULT_VALUE_LABELS: Record<string, Record<string, { key: string; fallback: string }>> = {
@@ -258,11 +353,20 @@ const RESULT_VALUE_LABELS: Record<string, Record<string, { key: string; fallback
     },
   },
   delivery: {
-    inbox: { key: '$i18n:automation.editor.resultValue.delivery.inbox', fallback: 'Inbox' },
+    inbox: {
+      key: '$i18n:automation.editor.resultValue.delivery.inbox',
+      fallback: 'Inbox',
+    },
   },
   itemType: {
-    task: { key: '$i18n:automation.editor.resultValue.itemType.task', fallback: 'Task' },
-    mention: { key: '$i18n:automation.editor.resultValue.itemType.mention', fallback: 'Mention' },
+    task: {
+      key: '$i18n:automation.editor.resultValue.itemType.task',
+      fallback: 'Task',
+    },
+    mention: {
+      key: '$i18n:automation.editor.resultValue.itemType.mention',
+      fallback: 'Mention',
+    },
   },
 };
 
@@ -342,7 +446,8 @@ export function AutomationEditor({
 
   useEffect(() => {
     let cancelled = false;
-    catalogApi.getActionCatalog()
+    catalogApi
+      .getActionCatalog()
       .then((catalog) => {
         if (!cancelled) {
           setActionCatalog(Array.isArray(catalog.actions) ? catalog.actions : []);
@@ -423,10 +528,7 @@ export function AutomationEditor({
    * re-runs when the parent genuinely supplies a new schema (e.g. after a
    * reload from the server), not on every keystroke.
    */
-  const flowDataInitial = useMemo(
-    () => initialData?.flowData,
-    [initialData],
-  );
+  const flowDataInitial = useMemo(() => initialData?.flowData, [initialData]);
   const declaredActions = useMemo(() => extractDeclaredActions(flowData), [flowData]);
 
   const handleDebug = useCallback(() => {
@@ -449,7 +551,14 @@ export function AutomationEditor({
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => null);
-        throw new Error(errData?.desc || `Test run failed (${response.status})`);
+        throw new Error(
+          errData?.message ||
+            errData?.desc ||
+            st({
+              zh: '运行请求失败，请检查权限或稍后重试。',
+              en: 'The run request failed. Check access or try again later.',
+            }),
+        );
       }
       const result = await response.json();
       const log = result.data as AutomationLog | null;
@@ -458,11 +567,26 @@ export function AutomationEditor({
         setResultPanelOpen(true);
       }
       if (log?.status === 'success') {
-        showSuccessToast(`Test run completed successfully (${log.durationMs || 0}ms)`);
+        showSuccessToast(
+          st({
+            zh: '本次运行成功，执行结果已保留。',
+            en: 'The run succeeded and its execution result was retained.',
+          }),
+        );
       } else if (log?.status === 'failed') {
-        showErrorToast(`Test run failed: ${log.errorMessage || 'Unknown error'}`);
+        showErrorToast(
+          st({
+            zh: '本次运行失败，请查看失败步骤与恢复建议。',
+            en: 'The run failed. Review the failed step and recovery guidance.',
+          }),
+        );
       } else {
-        showSuccessToast('Test run triggered. Check logs for results.');
+        showSuccessToast(
+          st({
+            zh: '已发起运行，请查看执行记录。',
+            en: 'The run started. Check its execution record.',
+          }),
+        );
       }
     } catch (err) {
       showErrorToast(err instanceof Error ? err.message : 'Test run failed');
@@ -479,7 +603,9 @@ export function AutomationEditor({
       flowConfig: flowData,
       exportedAt: new Date().toISOString(),
     };
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -493,7 +619,10 @@ export function AutomationEditor({
 
   const config = useMemo(
     () => ({
-      nodeDefinitions: applyActionCatalogAvailabilityToAutomationNodes(automationNodes, actionCatalog),
+      nodeDefinitions: applyActionCatalogAvailabilityToAutomationNodes(
+        automationNodes,
+        actionCatalog,
+      ),
       categoryOrder: automationCategoryOrder,
       showMinimap: false,
       showControls: true,
@@ -576,27 +705,29 @@ export function AutomationEditor({
       )}
 
       {/* Flow Designer */}
-      <div className="min-h-0 flex-1">
-        <FlowDesigner
-          config={config}
-          initialData={flowDataInitial}
-          title={title}
-          onSave={undefined}
-          onChange={handleChange}
-          readOnly={readOnly}
-          nodeStatuses={nodeStatuses}
-        />
-      </div>
+      <div className="flex min-h-0 flex-1 gap-4 overflow-hidden" data-testid="automation-workspace">
+        <div className="min-w-0 flex-1" data-testid="automation-flow-region">
+          <FlowDesigner
+            config={config}
+            initialData={flowDataInitial}
+            title={title}
+            onSave={undefined}
+            onChange={handleChange}
+            readOnly={readOnly}
+            nodeStatuses={nodeStatuses}
+          />
+        </div>
 
-      {lastTestRunLog && resultPanelOpen && (
-        <AutomationTestRunResultPanel
-          log={lastTestRunLog}
-          automationId={automationId}
-          declaredActions={declaredActions}
-          t={st}
-          onClose={() => setResultPanelOpen(false)}
-        />
-      )}
+        {lastTestRunLog && resultPanelOpen && (
+          <AutomationTestRunResultPanel
+            log={lastTestRunLog}
+            automationId={automationId}
+            declaredActions={declaredActions}
+            t={st}
+            onClose={() => setResultPanelOpen(false)}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -611,19 +742,25 @@ function AutomationTestRunResultPanel({
   log: AutomationLog;
   automationId?: string;
   declaredActions: DeclaredAutomationAction[];
-  t: (key: string) => string;
+  t: SmartTextResolver;
   onClose: () => void;
 }) {
+  const { hasPermission } = useAuth();
+  const distributedTraceHref =
+    log.traceId && /^[a-f0-9]{32}$/.test(log.traceId) && hasPermission('system_management')
+      ? `/ops/troubleshooting?traceId=${encodeURIComponent(log.traceId)}`
+      : undefined;
   const actionResults = Array.isArray(log.actionResults) ? log.actionResults : [];
   const decisionTrace = extractDecisionTrace(log.triggerPayload);
   const unifiedTraceHref = automationUnifiedTraceHref(automationId, decisionTrace);
-  const runtimeTraceHref = automationId && log.id
-    ? `/automation/${encodeURIComponent(automationId)}?logId=${encodeURIComponent(String(log.id))}`
-    : undefined;
+  const runtimeTraceHref =
+    automationId && log.id
+      ? `/automation/${encodeURIComponent(automationId)}?logId=${encodeURIComponent(String(log.id))}`
+      : undefined;
 
   return (
     <aside
-      className="absolute top-20 right-4 bottom-4 z-30 flex w-[min(28rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl"
+      className="z-10 my-4 mr-4 flex w-[min(28rem,40vw)] min-w-80 shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
       data-testid="automation-test-run-result"
     >
       <div className="flex items-start justify-between border-b border-gray-200 px-5 py-4">
@@ -631,11 +768,12 @@ function AutomationTestRunResultPanel({
           <h2 className="text-base font-semibold text-gray-900">
             {t('$i18n:automation.editor.testRunResult') || 'Test Run Result'}
           </h2>
-          {log.pid && (
-            <p className="mt-1 text-xs text-gray-500">
-              {t('$i18n:automation.editor.logPid') || 'Log'} {log.pid}
-            </p>
-          )}
+          <p className="mt-1 text-xs text-gray-500">
+            {t({
+              zh: '查看执行步骤与结果，失败记录将保留。',
+              en: 'Review execution steps and outcomes. Failed runs remain available.',
+            })}
+          </p>
         </div>
         <button
           type="button"
@@ -648,15 +786,28 @@ function AutomationTestRunResultPanel({
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
-        {(unifiedTraceHref || runtimeTraceHref) && (
+        {(unifiedTraceHref || runtimeTraceHref || distributedTraceHref) && (
           <div className="flex flex-wrap gap-2">
+            {distributedTraceHref && (
+              <a
+                href={distributedTraceHref}
+                data-testid="automation-distributed-trace-link"
+                className="inline-flex rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              >
+                {t({ zh: '追查调用与审计', en: 'Inspect calls and audit' })}
+              </a>
+            )}
             {unifiedTraceHref && (
               <a
                 href={unifiedTraceHref}
                 className="inline-flex rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
                 data-testid="automation-unified-trace-link"
               >
-                {resolveSmartText(t, '$i18n:automation.editor.openUnifiedTrace', 'Open Unified Trace')}
+                {resolveSmartText(
+                  t,
+                  '$i18n:automation.editor.openUnifiedTrace',
+                  'Open Unified Trace',
+                )}
               </a>
             )}
             {runtimeTraceHref && (
@@ -665,7 +816,11 @@ function AutomationTestRunResultPanel({
                 className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100"
                 data-testid="automation-runtime-trace-link"
               >
-                {resolveSmartText(t, '$i18n:automation.editor.openRuntimeTrace', 'Open Runtime Trace')}
+                {resolveSmartText(
+                  t,
+                  '$i18n:automation.editor.openRuntimeTrace',
+                  'Open Runtime Trace',
+                )}
               </a>
             )}
           </div>
@@ -681,13 +836,13 @@ function AutomationTestRunResultPanel({
             {formatDuration(log.durationMs)}
           </RunSummaryItem>
           <RunSummaryItem label={t('$i18n:automation.editor.recordPid') || 'Record'}>
-            {log.triggerRecordPid || '-'}
+            {log.triggerRecordPid ? t({ zh: '已关联', en: 'Linked' }) : '-'}
           </RunSummaryItem>
         </div>
 
         {log.errorMessage && (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {log.errorMessage}
+            {runFailureText(log.errorMessage, t)}
           </div>
         )}
 
@@ -732,29 +887,28 @@ function AutomationTestRunResultPanel({
           )}
         </section>
 
-        <section>
-          <h3 className="mb-2 text-sm font-semibold text-gray-900">
-            {t('$i18n:automation.editor.triggerPayload') || 'Trigger Context'}
-          </h3>
-          <pre className="max-h-56 overflow-auto rounded-md bg-gray-950 p-3 text-xs text-gray-100">
-            {formatValue(log.triggerPayload ?? {})}
-          </pre>
-        </section>
+        <RawDetails
+          summary={t({ zh: '运行技术详情', en: 'Run technical details' })}
+          value={{
+            logPid: log.pid,
+            recordPid: log.triggerRecordPid,
+            traceId: log.traceId,
+            error: log.errorMessage,
+            triggerContext: log.triggerPayload ?? {},
+          }}
+        />
       </div>
     </aside>
   );
 }
 
-function DecisionTraceCard({
-  trace,
-  t,
-}: {
-  trace: DecisionTraceSummary;
-  t: SmartTextResolver;
-}) {
-  const outputs = trace.outputs && isRecord(trace.outputs)
-    ? Object.entries(trace.outputs).filter(([, value]) => value !== undefined && value !== null && value !== '')
-    : [];
+function DecisionTraceCard({ trace, t }: { trace: DecisionTraceSummary; t: SmartTextResolver }) {
+  const outputs =
+    trace.outputs && isRecord(trace.outputs)
+      ? Object.entries(trace.outputs).filter(
+          ([, value]) => value !== undefined && value !== null && value !== '',
+        )
+      : [];
 
   return (
     <section
@@ -775,9 +929,11 @@ function DecisionTraceCard({
           </p>
         </div>
         <span
-          className={trace.matched === false
-            ? 'inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700'
-            : 'inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700'}
+          className={
+            trace.matched === false
+              ? 'inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700'
+              : 'inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700'
+          }
           data-testid="automation-decision-trace-status"
         >
           {decisionTraceStatusLabel(trace, t)}
@@ -814,7 +970,9 @@ function TraceFact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function extractDecisionTrace(payload: Record<string, unknown> | undefined): DecisionTraceSummary | null {
+function extractDecisionTrace(
+  payload: Record<string, unknown> | undefined,
+): DecisionTraceSummary | null {
   if (!isRecord(payload)) return null;
   const raw = payload.decision;
   if (!isRecord(raw)) return null;
@@ -848,7 +1006,9 @@ function decisionTraceStatusLabel(trace: DecisionTraceSummary, t: SmartTextResol
   if (trace.matched === false) {
     return resolveSmartText(t, '$i18n:automation.editor.decisionNotMatched', 'Not matched');
   }
-  return trace.status ? humanizeType(trace.status) : resolveSmartText(t, '$i18n:automation.editor.status.unknown', 'Unknown');
+  return trace.status
+    ? humanizeType(trace.status)
+    : resolveSmartText(t, '$i18n:automation.editor.status.unknown', 'Unknown');
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -860,14 +1020,16 @@ function extractDeclaredActions(flowData: FlowData | undefined): DeclaredAutomat
   const actions: DeclaredAutomationAction[] = [];
   for (const node of flowData.nodes) {
     const data = node.data as Record<string, unknown> | undefined;
-    const config = data?.config && typeof data.config === 'object' && !Array.isArray(data.config)
-      ? data.config as Record<string, unknown>
-      : {};
-    const actionType = typeof config.actionType === 'string'
-      ? config.actionType
-      : typeof node.type === 'string' && node.type.startsWith('action-')
-        ? node.type.replace(/^action-/, '').replaceAll('-', '_')
-        : '';
+    const config =
+      data?.config && typeof data.config === 'object' && !Array.isArray(data.config)
+        ? (data.config as Record<string, unknown>)
+        : {};
+    const actionType =
+      typeof config.actionType === 'string'
+        ? config.actionType
+        : typeof node.type === 'string' && node.type.startsWith('action-')
+          ? node.type.replace(/^action-/, '').replaceAll('-', '_')
+          : '';
     if (!actionType) continue;
     actions.push({
       label: typeof data?.label === 'string' ? data.label : undefined,
@@ -928,7 +1090,10 @@ function ActionResultCard({
   index: number;
   t: SmartTextResolver;
 }) {
-  const evidence = evidenceEntries(action.result, t);
+  const evidence = evidenceEntries(action.result, t).filter(
+    (entry) =>
+      action.actionType !== 'execute_command' || !['commandCode', 'result'].includes(entry.key),
+  );
 
   return (
     <div
@@ -952,14 +1117,18 @@ function ActionResultCard({
       </div>
       {action.errorMessage && (
         <div className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700">
-          {action.errorMessage}
+          {runFailureText(action.errorMessage, t)}
         </div>
       )}
       {evidence.length > 0 && <EvidenceGrid entries={evidence} />}
-      {action.result !== undefined && (
+      {(action.result !== undefined || action.errorMessage) && (
         <RawDetails
           summary={resolveSmartText(t, '$i18n:automation.editor.rawResult', 'Raw result')}
-          value={action.result}
+          value={
+            action.errorMessage
+              ? { error: action.errorMessage, result: action.result }
+              : action.result
+          }
         />
       )}
     </div>
@@ -1046,7 +1215,10 @@ function formatEvidenceValue(field: string, value: unknown, t: SmartTextResolver
     if (config) return resolveSmartText(t, config.key, config.fallback);
   }
   if (Array.isArray(value)) {
-    return value.map((item) => formatEvidenceValue(field, item, t)).filter(Boolean).join(', ');
+    return value
+      .map((item) => formatEvidenceValue(field, item, t))
+      .filter(Boolean)
+      .join(', ');
   }
   if (typeof value === 'boolean') {
     return value
@@ -1068,7 +1240,9 @@ function statusLabel(status: string | undefined, t: SmartTextResolver) {
   const normalized = String(status || '').toLowerCase();
   const config = STATUS_VALUE_LABELS[normalized];
   if (config) return resolveSmartText(t, config.key, config.fallback);
-  return status ? humanizeType(status) : resolveSmartText(t, '$i18n:automation.editor.status.unknown', 'Unknown');
+  return status
+    ? humanizeType(status)
+    : resolveSmartText(t, '$i18n:automation.editor.status.unknown', 'Unknown');
 }
 
 function sanitizeActionConfig(config: Record<string, unknown> | undefined) {

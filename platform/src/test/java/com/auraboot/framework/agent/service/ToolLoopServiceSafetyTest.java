@@ -295,6 +295,25 @@ class ToolLoopServiceSafetyTest {
     }
 
     @Test
+    void referenceLookupExecutesWithinAReadOnlyEffectGrant() {
+        Map<String,Object> input = Map.of("modelCode","project","fieldCode","customer_ref","displayValue","Manufacturing");
+        var tool = AgentToolDefinition.builder().name("platform.resolve_reference")
+                .toolType("platform").sourceCode("platform.resolve_reference").riskLevel("L0").build();
+        when(runtimeAuthorizationService.authorizeIncremental(any())).thenAnswer(invocation -> {
+            RuntimeAuthorizationService.ToolCallIntent intent = invocation.getArgument(0);
+            return intent.requiredEffects().equals(Set.of(EffectClass.READ_PLATFORM_DATA))
+                    ? RuntimeAuthorizationService.IncrementalAuthorization.grant()
+                    : RuntimeAuthorizationService.IncrementalAuthorization.reject("write denied","read_only");
+        });
+        when(toolProviderRegistry.execute(1L,tool.getName(),input)).thenReturn(
+                ProviderExecutionResult.builder().success(true).data(Map.of("storedValue","customer-pid")).build());
+        String result = service.executeToolCall(1L,"reference-read","task","agent",tool.getName(),input,List.of(tool),null);
+        assertThat(result).contains("\"success\":true").contains("customer-pid");
+        verify(runtimeAuthorizationService).authorizeIncremental(argThat(intent -> intent.requiredEffects().equals(Set.of(EffectClass.READ_PLATFORM_DATA))));
+        verify(toolProviderRegistry).execute(1L,tool.getName(),input);
+    }
+
+    @Test
     @DisplayName("platform provider tools route through ToolProviderRegistry")
     void platformProviderToolsRouteThroughRegistry() {
         Map<String, Object> input = Map.of("keyword", "customer");
