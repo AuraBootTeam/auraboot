@@ -26,7 +26,7 @@ async function login(page: Page) {
   await mkdir(evidence!, {recursive: true});
 }
 async function shot(page: Page, name: string) {
-  await page.screenshot({path: join(evidence!, `${name}.png`), fullPage: true});
+  await page.screenshot({path: join(evidence!, `${name}.png`), fullPage: false});
 }
 
 test('SC10 dashboard template → real donut/title edit → save/publish → reload → exported configuration', async ({page}) => {

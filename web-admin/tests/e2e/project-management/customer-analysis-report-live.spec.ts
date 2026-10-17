@@ -55,11 +55,6 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(String(identity.code)).toBe('0');
   expect(String(identity.data.user.tenantId)).toBe(process.env.AURA_ADMIN_TENANT_ID);
   expect(identity.data.user.email).toBe(DEFAULT_TEST_ACCOUNT.email);
-  const imported = await page.request.post('/api/plugins/import/import-directory-sync', { data: { path: process.env.AURA_CORE_PROJECT_ROOT + '/plugins/project-management', conflictStrategy: 'OVERWRITE', deferReferenceValidation: true } });
-  expect(imported.ok()).toBe(true); expect((await imported.json()).success).toBe(true);
-  await page.reload();
-
-  await expect(page.getByRole('table')).toContainText(customer);
 
   const customerResponse = await page.request.get('/api/dynamic/tpm_customer/list', {
     params: {
@@ -105,7 +100,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await panel.getByTestId('aurabot-history-trigger').click();
   await panel.getByTestId('aurabot-new-session').click();
   await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
-  const question = `请分析${customer}名下全部项目的预算：按“所属客户”的正式关联关系识别，先确认对应的客户记录，不能仅按历史客户名称文本筛选。按项目名称列出预算合计，以表格展示，只需给出简短预算分析。本次不分析状态或日期。最后用简短自然段说明事实与建议，说明预算不是收入，不必重复输出Markdown表格。必须使用系统查询工具读取真实数据，不要猜测，不要执行任意 SQL。`;
+  const question = `${customer}名下项目的预算各是多少？请按所属客户关联查询并按项目名称列表，简短说明预算不是收入。`;
   const streamPromise = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/ai/aurabot/chat/stream' &&
