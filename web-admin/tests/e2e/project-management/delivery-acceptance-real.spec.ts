@@ -30,7 +30,7 @@ async function menu(page: Page, name: string) {
 async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), {recursive:true});
   if (['d01','d02','d03','d04','d02-published','d02-compact'].includes(id)) await page.getByTestId('decisionops-console').evaluate(el=>el.scrollIntoView({block:'start'}));
-  if (['d13','d13-assigned'].includes(id)) await page.getByTestId('detail-persistent-header').scrollIntoViewIfNeeded();
+  if (['d13','d13-assigned'].includes(id)) await page.getByTestId('detail-pdf-target').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
   await page.screenshot({path:join(evidence!, 'screenshots', `${id}.png`),fullPage:true});
 }
@@ -112,7 +112,7 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   await page.reload();
   await expect(page.getByRole('tab',{name:'运行记录',exact:true})).toHaveAttribute('aria-selected','true');
   await page.getByRole('tab',{name:'验收详情',exact:true}).click();
-  await page.getByTestId('detail-persistent-header').scrollIntoViewIfNeeded();
+  await page.getByTestId('detail-pdf-target').scrollIntoViewIfNeeded();
   return sla[0];
 }
 async function decide(page: Page, pid: string, action: 'approve'|'reject', observer: Page = page) {
@@ -132,7 +132,7 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   expect(sla.every((item:any)=>item.status==='completed' && !item.active)).toBe(true);
   await page.reload();
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
-  await page.getByTestId('detail-persistent-header').scrollIntoViewIfNeeded();
+  await page.getByTestId('detail-pdf-target').scrollIntoViewIfNeeded();
   await page.getByRole('tab',{name:'审批记录',exact:true}).click();
   await expect(page.getByTestId('bpm-history-container')).toBeVisible();
   await expect(page.getByTestId('bpm-history-container')).not.toContainText('Access forbidden');
