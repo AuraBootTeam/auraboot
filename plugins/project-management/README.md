@@ -96,3 +96,9 @@ The live browser scenario is `web-admin/tests/e2e/project-management/customer-ai
 The explicit local seed creates eight fictional customers/projects with complete contacts, 24 assigned tasks, and 32 milestones. Each project has a distinct outcome, delivery risk and owned next action. Project detail shows linked tasks as well as milestones. The seed refuses an already populated project fixture; resume never reruns it.
 
 `examples/customer-delivery-brief.report-template.json` is a portable report design. It queries governed current-space project facts and customers, resolves active owner labels, and renders project progress, budgets, risks and next actions. Import it through Report Designer to edit and export Markdown, HTML or PDF. It contains no stored result rows and does not imply AI analysis.
+
+### Acceptance detail tabs
+
+The acceptance detail uses ordinary DSL tabs: acceptance scope and materials are the default, approval history is separate, and execution records require `system_management`. A `workflow-panel` with `detailPlacement: "header"` stays above the tabs and refreshes the business record after an approval action. `bpmPanel.sections: ["status", "operations"]` and `showTechnicalDetails: false` keep this task card focused on the current work. `approval-history` and `rule-trace` independently opt into their respective evidence; legacy `history` keeps its combined behavior.
+
+The verification tab is permission-gated by the optional verification plugin's `tdv.check.read`. Its read-only `tdv_check` sub-table is scoped by `tdv_ck_acceptance` to the current acceptance. Without that plugin/grant, the tab is absent and the child model is not queried. Child queries retain model permissions and tenant isolation; tab visibility does not grant access.

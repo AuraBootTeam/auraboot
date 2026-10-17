@@ -30,7 +30,7 @@ async function menu(page: Page, name: string) {
 async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), {recursive:true});
   if (['d01','d02','d03','d04','d02-published','d02-compact'].includes(id)) await page.getByTestId('decisionops-console').evaluate(el=>el.scrollIntoView({block:'start'}));
-  if (['d13','d13-assigned'].includes(id)) await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  if (['d13','d13-assigned'].includes(id)) await page.getByTestId('detail-persistent-header').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
   await page.screenshot({path:join(evidence!, 'screenshots', `${id}.png`),fullPage:true});
 }
@@ -99,11 +99,18 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   expect((Date.parse(sla[0].deadlineTime)-Date.parse(sla[0].startTime))/60000).toBe(minutes);
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
-  await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
-  const traceDetails=page.getByTestId('bpm-panel').locator('details').filter({has:page.getByText('规则执行追踪',{exact:true})});
-  if(await traceDetails.getAttribute('open')===null) await traceDetails.getByText('规则执行追踪',{exact:true}).click();
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await expect(page.getByRole('tab',{name:'验收详情',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
+  await expect(page.getByTestId('bpm-history-container')).toHaveCount(0);
+  await expect(page.getByTestId('bpm-status-instance-id')).toHaveCount(0);
+  await page.getByRole('tab',{name:'运行记录',exact:true}).click();
   await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
-  await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-operations-approve')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('tab',{name:'运行记录',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
+  await page.getByTestId('detail-persistent-header').scrollIntoViewIfNeeded();
   return sla[0];
 }
 async function decide(page: Page, pid: string, action: 'approve'|'reject', observer: Page = page) {
@@ -116,14 +123,18 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   const expected = action==='approve'?'accepted':'returned';
   await expect.poll(async ()=>(await row(page,pid)).tpm_ac_status).toBe(expected);
   // The detail must update through the contributed block callback, without manual reload.
-  await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
   const sla = await data(await observer.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));
   expect(sla.every((item:any)=>item.status==='completed' && !item.active)).toBe(true);
   await page.reload();
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
-  await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  await page.getByTestId('detail-persistent-header').scrollIntoViewIfNeeded();
+  await page.getByRole('tab',{name:'审批记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-history-container')).toBeVisible();
   await expect(page.getByTestId('bpm-history-container')).not.toContainText('Access forbidden');
+  await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
   return sla;
 }
 
@@ -264,6 +275,8 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
       const actor=await context.newPage();const actorUser=await login(actor,email,String(admin.tenantId));
       const identity=await data(await actor.request.get('/api/auth/me'));expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
       await openRecord(actor,name);
+      await expect(actor.getByRole('tab',{name:'运行记录',exact:true})).toHaveCount(0);
+      await expect(actor.getByRole('tab',{name:'核验结果',exact:true})).toHaveCount(0);
       if(reviewer) {
         await expect(actor.getByTestId('bpm-operations-approve')).toBeDisabled();
         const refused=await actor.request.post(`/api/bpm/tasks/${sla.taskId}/approve`,{data:{comment:'An unassigned reviewer must be refused',variables:{}}});expect(refused.status()).toBe(403);

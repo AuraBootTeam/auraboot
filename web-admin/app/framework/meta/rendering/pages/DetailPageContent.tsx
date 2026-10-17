@@ -647,6 +647,11 @@ export function resolveVisibleDetailTabsFromBlocks(
     );
 }
 
+export function resolvePersistentDetailHeaderBlocks(blocks: BlockConfig[]): BlockConfig[] {
+  return blocks.filter(block => block.blockType !== 'toolbar' && block.blockType !== 'tabs' &&
+    (block as { detailPlacement?: string }).detailPlacement === 'header');
+}
+
 export function resolveVisibleTopLevelDetailBlocks(
   blocks: BlockConfig[],
   isVisible: (visibleWhen: string | undefined) => boolean,
@@ -1232,13 +1237,7 @@ function DetailPageContentInner(props: PageContentProps) {
       onDataChange={refreshDetailAfterChildChange} getDictItems={getDictItems} enrichField={enrichField}
       runtime={runtime as SchemaRuntime} schemaDataSources={schema?.dataSources} dataSourceManager={dataSourceManager} />;
   };
-  const headerMiscBlocks = useMemo(
-    () =>
-      directMiscBlocks.filter(
-        (b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement === 'header',
-      ),
-    [directMiscBlocks],
-  );
+  const headerMiscBlocks = resolvePersistentDetailHeaderBlocks(allBlocks);
 
   // A detail page may expose multiple phase-specific tab groups. Compose every
   // visible group instead of silently dropping all but the first one.
@@ -1540,16 +1539,9 @@ function DetailPageContentInner(props: PageContentProps) {
         {/* Content: Tabs mode or Direct mode */}
         {tabs.length > 0 ? (
           <div>
-            {runtime && headerMiscBlocks.length > 0 && (
-              <div className="space-y-3 p-6 pb-0">
-                {headerMiscBlocks.map((block: BlockConfig, blockIndex: number) => (
-                  <BlockRenderer
-                    key={block.id || `misc-header-${blockIndex}`}
-                    block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
-                    runtime={runtime}
-                    areaId="detail-tabs-header"
-                  />
-                ))}
+            {headerMiscBlocks.length > 0 && (
+              <div className="mb-5 space-y-3" data-testid="detail-persistent-header">
+                {headerMiscBlocks.map(renderWorkspaceBlock)}
               </div>
             )}
 
@@ -1593,7 +1585,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 duplicate DOM and unnecessary dataSource requests. */}
             {activeDetailTab && (
               <div key={activeDetailTab.tab.key || activeDetailTab.index} className={workspace ? '' : 'p-5'}>
-                {workspace ? <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_290px]" data-testid="detail-workspace-layout">
+                {workspace ? <div className={`grid min-w-0 grid-cols-1 items-start gap-5 ${(activeDetailTab.tab.blocks || []).some(block => asideBlockIds.has(block.id) && (!block.permissionCode || hasPermission(block.permissionCode))) ? 'xl:grid-cols-[minmax(0,1fr)_290px]' : ''}`} data-testid="detail-workspace-layout">
                   <div className="min-w-0 space-y-4" data-testid="detail-workspace-main">{(activeDetailTab.tab.blocks || []).filter(block => !asideBlockIds.has(block.id)).map(renderWorkspaceBlock)}</div>
                   {(activeDetailTab.tab.blocks || []).some(block => asideBlockIds.has(block.id)) && <aside className="min-w-0 space-y-4" data-testid="detail-workspace-aside">{(Array.isArray(schema.extension?.detailAsideGroups) ? schema.extension.detailAsideGroups : (activeDetailTab.tab.blocks || []).filter(block => asideBlockIds.has(block.id)).map(block => [block.id])).map((ids: string[], groupIndex: number) => { const group = (activeDetailTab.tab.blocks || []).filter(block => ids.includes(block.id) && (!block.permissionCode || hasPermission(block.permissionCode))); return group.length ? <section key={groupIndex} className="border-border bg-panel rounded-card border p-5">{group.map(renderWorkspaceBlock)}</section> : null; })}</aside>}
                 </div> : (                <LayoutRenderer

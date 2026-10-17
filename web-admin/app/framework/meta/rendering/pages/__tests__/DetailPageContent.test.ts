@@ -23,6 +23,7 @@ import {
   resolveVisibleDetailTabsFromBlocks,
   resolvePermissionHiddenDataSourceIds,
   resolveVisibleTopLevelDetailBlocks,
+  resolvePersistentDetailHeaderBlocks,
   resolveDetailHeaderLayoutClasses,
   resolveDetailPdfFileName,
   shouldRenderDefaultDetailEditAction,
@@ -1130,5 +1131,16 @@ describe('resolvePermissionHiddenDataSourceIds with cross-surface refresh lists'
     expect(resolvePermissionHiddenDataSourceIds(schema, sales)).toEqual(
       new Set(['processFeeMetrics', 'processFeeRuleHits', 'outputReadiness']),
     );
+  });
+});
+
+describe('persistent detail task blocks',()=>{
+  it('keeps specialized workflow headers above tabs without duplicating them in the body',()=>{
+    const task = {id:'task',blockType:'workflow-panel',detailPlacement:'header',permissionCode:'bpm.process.read'};
+    const history = {id:'history',blockType:'workflow-panel'};
+    const tabs = {id:'tabs',blockType:'tabs',detailPlacement:'header'};
+    const blocks = [task, history, tabs] as any;
+    expect(resolvePersistentDetailHeaderBlocks(blocks)).toEqual([task]);
+    expect(resolveVisibleTopLevelDetailBlocks(blocks,()=>true)).toEqual([history]);
   });
 });
