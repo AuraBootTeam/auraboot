@@ -59,7 +59,8 @@
       },
       "area": "main",
       "permissionCode": "bpm.process.read",
-      "detailPlacement": "header"
+      "detailPlacement": "header",
+      "visibleWhen": "form.tpm_ac_status === 'submitted'"
     },
     {
       "id": "acceptance-tabs",
@@ -224,7 +225,17 @@
                     },
                     "dataType": "datetime"
                   }
-                ]
+                ],
+                "emptyState": {
+                  "title": {
+                    "zh-CN": "暂未核验",
+                    "en": "No verification yet"
+                  },
+                  "description": {
+                    "zh-CN": "执行交付核验后，这里将显示本验收单的核验结论与通过项数。",
+                    "en": "Verification results and passed checks for this acceptance will appear here after verification."
+                  }
+                }
               }
             }
           ]
@@ -245,10 +256,20 @@
                 "processKey": "tpm_delivery_acceptance",
                 "sections": [
                   "status",
-                  "rule-trace"
+                  "rule-trace",
+                  "audit-report"
                 ],
                 "businessView": true
               }
+            },
+            {
+              "id": "field-history",
+              "blockType": "field-history",
+              "title": {
+                "zh-CN": "字段变更",
+                "en": "Field changes"
+              },
+              "permissionCode": "audit.field_audit.read"
             }
           ]
         }
@@ -316,6 +337,10 @@
           "kind": "object"
         }
       }
+    ],
+    "showInlineApprovalPanel": false,
+    "hiddenSystemTabs": [
+      "__field_history__"
     ]
   }
 }

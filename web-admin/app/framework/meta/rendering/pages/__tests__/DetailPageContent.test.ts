@@ -24,6 +24,7 @@ import {
   resolvePermissionHiddenDataSourceIds,
   resolveVisibleTopLevelDetailBlocks,
   resolvePersistentDetailHeaderBlocks,
+  shouldRenderInlineDetailApproval,
   resolveDetailHeaderLayoutClasses,
   resolveDetailPdfFileName,
   shouldRenderDefaultDetailEditAction,
@@ -1143,4 +1144,14 @@ describe('persistent detail task blocks',()=>{
     expect(resolvePersistentDetailHeaderBlocks(blocks)).toEqual([task]);
     expect(resolveVisibleTopLevelDetailBlocks(blocks,()=>true)).toEqual([history]);
   });
+});
+
+it('does not reserve persistent header space for hidden or unauthorized task blocks',()=>{
+  const block={id:'task',blockType:'workflow-panel',detailPlacement:'header',permissionCode:'workflow.read',visibleWhen:'submitted'} as any;
+  expect(resolvePersistentDetailHeaderBlocks([block],()=>false,()=>true)).toEqual([]);
+  expect(resolvePersistentDetailHeaderBlocks([block],()=>true,()=>false)).toEqual([]);
+});
+it('lets an explicitly composed detail opt out of the automatic approval report',()=>{
+  expect(shouldRenderInlineDetailApproval({extension:{showInlineApprovalPanel:false}})).toBe(false);
+  expect(shouldRenderInlineDetailApproval({})).toBe(true);
 });

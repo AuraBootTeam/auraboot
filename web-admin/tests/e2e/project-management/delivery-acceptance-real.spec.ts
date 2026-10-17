@@ -103,6 +103,8 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   await expect(page.getByRole('tab',{name:'验收详情',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
   await expect(page.getByTestId('bpm-history-container')).toHaveCount(0);
+  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+  await expect(page.getByRole('tab',{name:'变更历史',exact:true})).toHaveCount(0);
   await expect(page.getByTestId('bpm-status-instance-id')).toHaveCount(0);
   await page.getByRole('tab',{name:'运行记录',exact:true}).click();
   await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
@@ -120,10 +122,11 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   await page.getByTestId(`bpm-${action}-comment`).fill(action==='approve'?'交付范围、完成标准和材料一致，批准验收。':'缺少培训签到记录，请补正后重新提交。');
   await page.getByTestId(`bpm-${action}-confirm`).click();
   await data(await sent);
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
   const expected = action==='approve'?'accepted':'returned';
   await expect.poll(async ()=>(await row(page,pid)).tpm_ac_status).toBe(expected);
   // The detail must update through the contributed block callback, without manual reload.
-  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await expect(page.getByTestId('detail-persistent-header')).toHaveCount(0);
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
   const sla = await data(await observer.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));
   expect(sla.every((item:any)=>item.status==='completed' && !item.active)).toBe(true);
@@ -292,6 +295,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
         const assignedPid=await create(page,actorUser,assignedName,68000,'普通',true);
         await submit(page,assignedPid,480,'tpm_standard_review');
         await openRecord(actor,assignedName);await expect(actor.getByTestId('bpm-operations-approve')).toBeEnabled();
+        await actor.getByRole('tab',{name:'审批记录',exact:true}).click();
         await decide(actor,assignedPid,'approve',page);await shot(actor,'d13-assigned');
       }
     } finally {await context.close();}
@@ -336,4 +340,40 @@ test('accepted project list form and detail remain available through their exist
   await expect(page.getByTestId('ai-fill-banner')).toHaveCount(0);await shot(page,'d15-form');await page.getByTestId('form-btn-cancel').click();
   await page.getByRole('row').filter({hasText:'华辰制造 · 供应链协同平台'}).getByRole('button',{name:/查看|详情/}).click();
   await expect(page.getByTestId('object-summary')).toContainText('林晓');await expect(page.getByRole('main')).toContainText('华辰制造');await expect(page.getByTestId('collection-completion')).toBeVisible();await shot(page,'d15');
+});
+
+test('acceptance detail tabs keep business facts primary and maintenance evidence secondary @critical',async({page})=>{
+  const user=await login(page);
+  const pid=await create(page,user,'华辰制造 · 第二阶段交付验收',68000,'高风险',true);
+  await submit(page,pid,120,'tpm_enhanced_review');
+  await expect(page.getByRole('tab')).toHaveCount(4);
+  await shot(page,'tabs-overview-1440');
+  await page.setViewportSize({width:1280,height:1000});
+  await expect(page.getByTestId('bpm-operations-approve')).toBeVisible();
+  await shot(page,'tabs-overview-1280');
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('tab',{name:'审批记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-history-container')).toContainText('提交业务审批');
+  await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
+  await shot(page,'tabs-approvals');
+  await page.getByRole('tab',{name:'核验结果',exact:true}).click();
+  await expect(page.getByTestId('subtable-empty-state')).toContainText('暂未核验');
+  await shot(page,'tabs-verification-empty');
+  await page.getByRole('tab',{name:'运行记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
+  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+  await shot(page,'tabs-execution');
+  await page.getByTestId('bpm-section-audit-report').locator('summary').click();
+  await expect(page.getByTestId('approval-chain-entry').first()).toBeVisible();
+  const downloading=page.waitForEvent('download');
+  await page.getByTestId('approval-chain-download').click();
+  const download=await downloading;
+  const destination=join(evidence!,'approval-chain-report.json');
+  await download.saveAs(destination);
+  const report=JSON.parse(await readFile(destination,'utf8'));
+  expect(report.processInstanceId).toBe((await row(page,pid)).tpm_ac_process);
+  expect(report.totalSteps).toBe(report.chain.length);expect(report.totalSteps).toBeGreaterThan(0);
+  await shot(page,'tabs-audit-expanded');
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
+  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
 });
