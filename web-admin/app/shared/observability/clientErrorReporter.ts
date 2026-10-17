@@ -1,3 +1,5 @@
+import { recentRouteFailure } from './routeRequestDiagnostics';
+
 /**
  * Global front-end error reporter.
  *
@@ -81,8 +83,17 @@ export function reportClientError(details: ClientErrorReport): void {
   const now = Date.now();
   const signature = `boundary:${details.errorType}:${details.kind ?? ''}:${details.message}`;
   if (!shouldReport(signature, now)) return;
+  const failure =
+    details.errorType === 'boundary' ? recentRouteFailure(details.pageUrl) : undefined;
   send({
     ...details,
+    ...(failure
+      ? {
+          // Persist the request id in the existing searchable message column.
+          message: `${details.message} [requestId=${failure.requestId}${failure.status ? ` status=${failure.status}` : ''}]`,
+          traceId: failure.traceId,
+        }
+      : {}),
     userAgent: navigator.userAgent,
     sessionId: sessionId(),
     clientTimestamp: new Date(now).toISOString(),
@@ -115,7 +126,11 @@ export function installClientErrorReporter(): void {
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
     const reason = event.reason;
     const message =
-      reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : 'Unhandled rejection';
+      reason instanceof Error
+        ? reason.message
+        : typeof reason === 'string'
+          ? reason
+          : 'Unhandled rejection';
     const stack = reason instanceof Error ? reason.stack : undefined;
     const now = Date.now();
     const signature = `rejection:${message}`;

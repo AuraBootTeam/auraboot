@@ -132,15 +132,27 @@ export async function resolveDeploymentBrandingFromBff(
   return payload.branding;
 }
 
-export async function loader({
-  request,
-  context,
-}: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
+export async function loader(args: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
+  const { createLoaderDiagnostics } =
+    await import('~/server/observability/loaderDiagnostics.server');
+  const diagnostics = createLoaderDiagnostics(args.request);
+  return diagnostics.stage('request', () => loadRoot(args, diagnostics));
+}
+
+async function loadRoot(
+  { request, context }: LoaderFunctionArgs,
+  diagnostics: Awaited<
+    ReturnType<
+      (typeof import('~/server/observability/loaderDiagnostics.server'))['createLoaderDiagnostics']
+    >
+  >,
+): Promise<RootLoaderData | Response> {
+  const stage = diagnostics.stage;
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const requestUrl = new URL(request.url);
   const { pathname } = requestUrl;
-  const impersonation = await getImpersonationFromRequest(request);
+  const impersonation = await stage('impersonation', () => getImpersonationFromRequest(request));
   if (impersonation && new Date(impersonation.expiresAt).getTime() <= Date.now()) {
     return redirect(pathname + requestUrl.search, {
       headers: { 'Set-Cookie': await restoreOperatorSession(request) },
@@ -151,10 +163,10 @@ export async function loader({
   const buildIdentity = resolveBuildIdentity(process.env);
   // These reads are independent. Keep every request fresh without serial network waits.
   const [branding, bootstrapStatus, accessPolicy, token] = await Promise.all([
-    resolveDeploymentBrandingFromBff(process.env),
-    fetchBootstrapStatus(),
-    fetchAccessPolicy(),
-    getTokenFromRequest(request),
+    stage('branding', () => resolveDeploymentBrandingFromBff(process.env)),
+    stage('bootstrap', () => fetchBootstrapStatus()),
+    stage('access-policy', () => fetchAccessPolicy()),
+    stage('session', () => getTokenFromRequest(request)),
   ]);
 
   // Public runtime shells must never load admin user, permissions, or menus.
@@ -176,7 +188,7 @@ export async function loader({
       return { ...cached, branding } as RootLoaderData;
     }
 
-    const i18nData = await getI18nData(locale, request, false);
+    const i18nData = await stage('i18n-public', () => getI18nData(locale, request, false));
     const edition = process.env.EDITION || 'enterprise';
     const result: RootLoaderData = {
       runtimeProfile,
@@ -223,9 +235,9 @@ export async function loader({
   }
 
   const [{ user, permissions, preferences }, i18nData, spaces] = await Promise.all([
-    getUserInfo(request, context),
-    getI18nData(locale, request),
-    fetchSpaces(),
+    stage('user-info', () => getUserInfo(request, context)),
+    stage('i18n', () => getI18nData(locale, request)),
+    stage('spaces', () => fetchSpaces()),
   ]);
 
   // Authoritative auth rejection: fetchUserInfo returns null only for a 401.
@@ -246,7 +258,7 @@ export async function loader({
     }
   }
 
-  const menus = user ? await getUserMenus(request) : [];
+  const menus = user ? await stage('menus', () => getUserMenus(request)) : [];
 
   // Tenant guard: routes outside of auth/tenant-selection require a tenant
   if (!isPublicRoute(pathname) && pathname !== '/tenant-selection' && user && !user.tenantId) {
@@ -290,7 +302,7 @@ export async function loader({
   // new token; failures are non-fatal (the current token stays valid until its
   // real deadline, then the normal 401 → login redirect applies).
   if (user && !impersonation) {
-    const renewal = await maybeRenewSession(request);
+    const renewal = await stage('session-renewal', () => maybeRenewSession(request));
     if (renewal.renewed && renewal.setCookie) {
       return new Response(JSON.stringify(rootData), {
         headers: {

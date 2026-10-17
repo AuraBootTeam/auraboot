@@ -64,7 +64,7 @@ export function AuthSessionRevalidator({
     let disposed = false;
     let pendingProbe: AbortController | undefined;
 
-    const attemptRevalidate = async () => {
+    const attemptRevalidate = async (trigger: 'interval' | 'focus' | 'online' | 'visible') => {
       // Offline root-loader failures would dispose page-level reconnect subscriptions.
       if (window.navigator.onLine === false || pendingProbe) return;
       const currentTime = now();
@@ -87,19 +87,42 @@ export function AuthSessionRevalidator({
       // Authoritative auth rejection still goes through normal loader handling.
       const probe = new AbortController();
       pendingProbe = probe;
+      const requestId = crypto.randomUUID();
+      const started = performance.now();
+      const logDeferred = (reason: string, status?: number) => {
+        console.warn('[auth-refresh]', {
+          requestId,
+          trigger,
+          reason,
+          status,
+          durationMs: Math.round(performance.now() - started),
+          action: 'deferred',
+        });
+      };
       const deadline = window.setTimeout(() => probe.abort(), 10_000);
       try {
         const response = await fetch('/api/auth/me', {
           credentials: 'same-origin',
+          headers: { 'X-Request-Id': requestId },
           signal: probe.signal,
         });
         if (!disposed && !probe.signal.aborted && response.status < 500) {
+          console.debug('[auth-refresh]', {
+            trigger,
+            requestId,
+            status: response.status,
+            durationMs: Math.round(performance.now() - started),
+            action: 'revalidate',
+          });
           revalidator.revalidate();
+        } else if (!disposed) {
+          logDeferred('probe-unavailable', response.status);
         }
       } catch (error) {
         // Only transport failures defer this background refresh. Navigation,
         // configuration errors and non-network exceptions retain fail-fast behavior.
         if (!(error instanceof TypeError) && !probe.signal.aborted) throw error;
+        if (!disposed) logDeferred(probe.signal.aborted ? 'probe-timeout' : 'probe-transport');
       } finally {
         window.clearTimeout(deadline);
         if (pendingProbe === probe) pendingProbe = undefined;
@@ -108,21 +131,31 @@ export function AuthSessionRevalidator({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        attemptRevalidate();
+        void attemptRevalidate('visible');
       }
     };
 
-    window.addEventListener('focus', attemptRevalidate);
-    window.addEventListener('online', attemptRevalidate);
+    const onFocus = () => {
+      void attemptRevalidate('focus');
+    };
+    const onOnline = () => {
+      void attemptRevalidate('online');
+    };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     const intervalId =
-      intervalMs > 0 ? window.setInterval(attemptRevalidate, intervalMs) : undefined;
+      intervalMs > 0
+        ? window.setInterval(() => {
+            void attemptRevalidate('interval');
+          }, intervalMs)
+        : undefined;
 
     return () => {
       disposed = true;
       pendingProbe?.abort();
-      window.removeEventListener('focus', attemptRevalidate);
-      window.removeEventListener('online', attemptRevalidate);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (intervalId !== undefined) {
         window.clearInterval(intervalId);
