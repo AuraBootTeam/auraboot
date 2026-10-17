@@ -1026,7 +1026,8 @@ public class ToolLoopService {
             }
             if ("platform.list_models".equals(source)
                     || "platform.execute_sql".equals(source)
-                    || "platform.model_suggest".equals(source)) {
+                    || "platform.model_suggest".equals(source)
+                    || "platform.resolve_reference".equals(source)) {
                 return Set.of(EffectClass.READ_PLATFORM_DATA);
             }
             return Set.of(EffectClass.WRITE_PLATFORM_STATE);
