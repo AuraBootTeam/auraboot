@@ -106,6 +106,8 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g pnpm@9
 
 USER appuser
+RUN mkdir -p /app/logs/traces && chmod 700 /app/logs/traces
+ENV AURA_TRACE_LOG_DIR=/app/logs/traces
 
 # 1. Workspace manifests + lockfile (so `pnpm install --prod` resolves the
 #    same dependency graph used at build time).

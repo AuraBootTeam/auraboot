@@ -295,8 +295,9 @@ management:
     os:
       enabled: true
   tracing:
+    enabled: ${MANAGEMENT_TRACING_ENABLED:true}
     sampling:
-      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:0.1}
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
     propagation:
       type: w3c
   otlp:

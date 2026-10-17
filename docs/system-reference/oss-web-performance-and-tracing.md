@@ -21,25 +21,29 @@ flowchart LR
 
 The development path includes the Vite HTTP proxy. In the local production measurement mode, a loopback ingress forwards to the existing deployment BFF, which serves the compiled client and SSR handler; the document spans therefore use `auraboot-bff`, and the captured chain has three services. Server-side application reads can also reach Java directly through the existing HTTP client configuration; their parent context is propagated by Undici instrumentation. Service names are `auraboot-web`, `auraboot-ssr`, `auraboot-bff` and `auraboot-platform`.
 
-- `web-admin/instrumentation.server.mjs` loads before the server HTTP/fetch modules, using Node's `--import`. The SDK loads only when an OTLP trace endpoint is configured. `dev:web`, `dev:bff` and `start` include this preloader.
-- The root loader injects the active W3C `traceparent` into a document meta tag. The optional browser SDK uses it as the parent of `ui.page`. React Router `.data` fetches open a `ui.navigation` span; same-origin `/api/` and `.data` fetches inject trace headers. Third-party requests are left untouched.
+- `web-admin/instrumentation.server.mjs` loads before the server HTTP/fetch modules, using Node's `--import`. The SDK starts by default, with or without an OTLP endpoint. `dev`, `dev:test`, `dev:web`, `dev:bff`, `start` and the production Docker command include this preloader. Builtin HTTP hooks are activated before ESM entrypoints load, preserving incoming W3C context.
+- The root loader injects the active W3C `traceparent` into a document meta tag. The browser SDK starts by default and uses it as the parent of `ui.page`. React Router `.data` fetches open a `ui.navigation` span; same-origin `/api/` and `.data` fetches inject trace headers. Third-party requests are left untouched.
 - Java keeps the existing W3C propagation and response `X-Trace-Id` contract. `SqlObservationInterceptor` opens `mybatis.execution` within the active observation scope for MyBatis executor query/update calls.
 - `ui.page` ends at window load. It is **not** a business-data-ready metric. The home driver installs a browser-side MutationObserver before navigation and timestamps visible structure, empty inbox, shortcut rows and numeric statistics on an animation frame. Its readiness time is independent of when Playwright reads the mark. It separately checks successful critical API payloads. This controlled DOM-ready marker is not LCP, a paint timestamp, or readiness for every possible widget configuration.
 - MyBatis spans contain mapper identity, operation and database system. SQL text, bind values and raw driver exception messages are not recorded by this interceptor. Its fixed failure diagnostic does not replace the exception returned to application code. SQL observation is not JDBC-wide coverage.
 
-## Opt-in configuration
+## Default tracing and optional remote export
 
 | Variable | Purpose |
 | --- | --- |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Full OTLP HTTP trace URL, e.g. `http://127.0.0.1:4318/v1/traces`; enables Node SDK and configures Java exporter |
-| `MANAGEMENT_TRACING_ENABLED=true` | Enables Java tracing in dev; dev defaults to false |
-| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | Java root sampling, default `0.1`; use `1` only for controlled diagnosis |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Full OTLP HTTP trace URL, e.g. `http://127.0.0.1:4318/v1/traces`; adds Node remote export and configures the Java exporter |
+| `MANAGEMENT_TRACING_ENABLED=true` | Java tracing defaults to true in every runtime profile; false is an explicit override |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | Java root sampling, default `1`; explicitly lower it when accepting incomplete trace coverage |
 | `OTEL_TRACES_SAMPLER=parentbased_traceidratio` | Explicit Node root sampler; SDK honors incoming sampled parents |
 | `OTEL_TRACES_SAMPLER_ARG=0.1` | Node root ratio; **set this with the sampler** for bounded routine collection (Node SDK's own default is broader) |
 | `VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Browser exporter URL, exposed to the browser; must be browser-reachable and allow the exact Web origin with CORS |
-| `VITE_OTEL_TRACES_SAMPLE_RATE` | Browser root ratio, default `0.1`; server parent sampling is honored |
+| `VITE_OTEL_TRACES_SAMPLE_RATE` | Browser root ratio, default `1`; server parent sampling is honored |
 
-`VITE_*` variables are build-time settings for production. Node and Java settings are runtime settings. No endpoint means the optional browser/Node exporter is not installed; Java dev tracing remains opt-in. Do not put collector credentials into `VITE_*` variables. Protect and operate the collector as deployment infrastructure. No third-party collector SaaS is required.
+`VITE_*` variables are build-time settings for production. Node and Java settings are runtime settings. No browser endpoint means context propagation remains enabled, while browser span export is omitted. Node and Java retain local server spans without requiring a collector; an external collector is optional. Do not put collector credentials into `VITE_*` variables. Protect and operate the collector as deployment infrastructure. No third-party collector SaaS is required.
+
+Node and Java write a private JSONL trace index under `AURA_TRACE_LOG_DIR` (default `./logs/traces`), capped at five 10 MiB files per service. Only span identity, parentage, timing, status and whitelisted diagnostic attributes are retained; request bodies, headers, SQL text and automatic instrumentation exception messages are omitted. Pre-sanitized loader exceptions retain their type, message and stack in the local index as well as the original loader log. Local export failure is reported and does not fail a business request. `OTEL_SDK_DISABLED=true` explicitly disables the Node SDK.
+
+The shipped Compose templates enable Java tracing by default and retain backend traces in the existing backend data volume and frontend traces in a dedicated named volume. Replacing containers preserves those volumes; deleting volumes deletes retained evidence. Product-managed local runtimes place both services' trace files under their own evidence directory. Search `traceId` in the JSONL files and then use `request.id` and the loader logs for the original exception.
 
 For a complete sampled diagnostic run, set Java and browser ratios to `1` and Node `OTEL_TRACES_SAMPLER=always_on` before invoking the product launcher. All three settings must match the recorded measurement conditions. Resume state preserves the whitelisted telemetry variables and Redis host; changing a retained source or dependency still fails identity validation.
 
