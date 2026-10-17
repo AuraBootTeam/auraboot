@@ -167,6 +167,30 @@ describe('root loader authentication guard', () => {
     expect(mocks.destroySession).not.toHaveBeenCalled();
   });
 
+  it('marks dependency timeouts as 503 with a correlated stage without destroying the session', async () => {
+    vi.stubEnv('EDITION', 'standard');
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        ),
+    );
+    const { loader } = await import('~/root');
+    await expect(
+      loader({
+        request: new Request('http://localhost/xy/display', {
+          headers: { 'X-Request-Id': 'timeout-test' },
+        }),
+      } as any),
+    ).rejects.toMatchObject({
+      data: { code: 'root_dependency_unavailable', requestId: 'timeout-test', stage: 'branding' },
+      init: { status: 503 },
+    });
+    expect(mocks.destroySession).not.toHaveBeenCalled();
+  });
+
   it('destroys an authenticated session only after an authoritative auth rejection', async () => {
     mocks.getTokenFromRequest.mockResolvedValue('invalid-token');
     mocks.getUserInfo.mockResolvedValue({ user: null, permissions: null, preferences: null });
@@ -272,7 +296,11 @@ describe('root loader authentication guard', () => {
     const { resolveDeploymentBrandingFromBff } = await import('~/root');
     await expect(
       resolveDeploymentBrandingFromBff({ EDITION: 'standard', BFF_PORT: '4001' }),
-    ).rejects.toThrow('Unable to resolve deployment branding from BFF (503).');
+    ).rejects.toMatchObject({
+      name: 'RootDependencyUnavailableError',
+      dependency: 'branding',
+      upstreamStatus: 503,
+    });
   });
 
   it('refreshes published branding on a public-route cache hit without mutating the cached locale bundle', async () => {
@@ -292,25 +320,23 @@ describe('root loader authentication guard', () => {
     };
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockImplementation(
-          async (url: string) =>
-            new Response(
-              JSON.stringify(
-                String(url).endsWith('/api/runtime/branding')
-                  ? {
-                      branding: {
-                        mode: 'commercial',
-                        productName: 'Northstar',
-                        authAppearance: appearance,
-                      },
-                    }
-                  : { code: '0', data: {} },
-              ),
-              { status: 200, headers: { 'Content-Type': 'application/json' } },
+      vi.fn().mockImplementation(
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              String(url).endsWith('/api/runtime/branding')
+                ? {
+                    branding: {
+                      mode: 'commercial',
+                      productName: 'Northstar',
+                      authAppearance: appearance,
+                    },
+                  }
+                : { code: '0', data: {} },
             ),
-        ),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      ),
     );
     const { loader } = await import('~/root');
     const result = await loader({

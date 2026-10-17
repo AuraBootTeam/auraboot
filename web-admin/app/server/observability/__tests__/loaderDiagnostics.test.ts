@@ -5,6 +5,8 @@ import {
   createLoaderDiagnostics,
   requestCorrelation,
   safeLoaderError,
+  isRootDependencyUnavailable,
+  RootDependencyUnavailableError,
 } from '../loaderDiagnostics.server';
 
 describe('loader diagnostics', () => {
@@ -62,5 +64,27 @@ describe('loader diagnostics', () => {
         new Request('http://local/xy/display', { headers: { 'x-request-id': 'bad id' } }),
       ).requestId,
     ).toMatch(/^[a-f0-9-]{36}$/);
+  });
+});
+
+describe('root dependency classification', () => {
+  it('identifies timeouts and transport failures without masking invalid configuration', () => {
+    expect(isRootDependencyUnavailable(new DOMException('timed out', 'TimeoutError'))).toBe(true);
+    expect(isRootDependencyUnavailable(new TypeError('fetch failed'))).toBe(true);
+    expect(isRootDependencyUnavailable(new RootDependencyUnavailableError('branding', 503))).toBe(
+      true,
+    );
+    expect(
+      isRootDependencyUnavailable(
+        Object.assign(new Error('unavailable'), {
+          name: 'UserInfoUnavailableError',
+          code: 'network_error',
+        }),
+      ),
+    ).toBe(true);
+    expect(isRootDependencyUnavailable(new Error('Branding contract missing'))).toBe(false);
+    expect(isRootDependencyUnavailable(new TypeError('Cannot read properties of undefined'))).toBe(
+      false,
+    );
   });
 });

@@ -1,4 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+import type { RootLoaderData } from '~/root-data';
+import { rootT, resolveErrorLocale } from '~/error/root-error-view';
+import {
+  backgroundRefreshUnavailable,
+  subscribeBackgroundRefresh,
+  setBackgroundRefreshUnavailable,
+  runBackgroundRootRefresh,
+} from '~/shared/observability/backgroundRootRefresh';
 import { useRevalidator } from 'react-router';
 
 const DEFAULT_REVALIDATE_INTERVAL_MS = 60_000;
@@ -35,6 +43,7 @@ export function shouldRevalidateAuthSession({
 interface AuthSessionRevalidatorProps {
   enabled: boolean;
   isAuthenticated: boolean;
+  snapshot?: RootLoaderData;
   intervalMs?: number;
   minIntervalMs?: number;
   now?: () => number;
@@ -49,15 +58,24 @@ const defaultNow = () => Date.now();
 export function AuthSessionRevalidator({
   enabled,
   isAuthenticated,
+  snapshot,
   intervalMs = DEFAULT_REVALIDATE_INTERVAL_MS,
   minIntervalMs = DEFAULT_MIN_REVALIDATE_INTERVAL_MS,
   now = defaultNow,
 }: AuthSessionRevalidatorProps) {
   const revalidator = useRevalidator();
   const lastRevalidatedAt = useRef(now());
+  const current = useRef({ revalidator, snapshot });
+  current.current = { revalidator, snapshot };
+  const unavailable = useSyncExternalStore(
+    subscribeBackgroundRefresh,
+    backgroundRefreshUnavailable,
+    () => false,
+  );
 
   useEffect(() => {
     if (!enabled || !isAuthenticated || typeof window === 'undefined') {
+      setBackgroundRefreshUnavailable(false);
       return undefined;
     }
 
@@ -72,7 +90,7 @@ export function AuthSessionRevalidator({
         !shouldRevalidateAuthSession({
           enabled,
           isAuthenticated,
-          revalidatorState: revalidator.state as RevalidatorState,
+          revalidatorState: current.current.revalidator.state as RevalidatorState,
           now: currentTime,
           lastRevalidatedAt: lastRevalidatedAt.current,
           minIntervalMs,
@@ -90,6 +108,7 @@ export function AuthSessionRevalidator({
       const requestId = crypto.randomUUID();
       const started = performance.now();
       const logDeferred = (reason: string, status?: number) => {
+        setBackgroundRefreshUnavailable(true);
         console.warn('[auth-refresh]', {
           requestId,
           trigger,
@@ -114,7 +133,19 @@ export function AuthSessionRevalidator({
             durationMs: Math.round(performance.now() - started),
             action: 'revalidate',
           });
-          revalidator.revalidate();
+          const data = current.current.snapshot;
+          if (data) {
+            await runBackgroundRootRefresh(
+              {
+                url: window.location.href,
+                snapshot: data,
+                isCurrent: () => !disposed && current.current.snapshot === data,
+              },
+              () => current.current.revalidator.revalidate(),
+            );
+          } else {
+            await current.current.revalidator.revalidate();
+          }
         } else if (!disposed) {
           logDeferred('probe-unavailable', response.status);
         }
@@ -161,7 +192,16 @@ export function AuthSessionRevalidator({
         window.clearInterval(intervalId);
       }
     };
-  }, [enabled, isAuthenticated, intervalMs, minIntervalMs, now, revalidator]);
+  }, [enabled, isAuthenticated, intervalMs, minIntervalMs, now]);
 
-  return null;
+  if (!enabled || !isAuthenticated || !unavailable) return null;
+  return (
+    <div
+      role="status"
+      data-testid="background-refresh-unavailable"
+      className="pointer-events-none fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm"
+    >
+      {rootT('backgroundRefreshUnavailable', resolveErrorLocale(snapshot?.locale))}
+    </div>
+  );
 }

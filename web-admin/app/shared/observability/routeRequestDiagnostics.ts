@@ -43,6 +43,12 @@ export function installRouteRequestDiagnostics(): void {
     };
     try {
       const response = await originalFetch(input, { ...init, headers });
+      if (response.ok) {
+        const path = url.pathname.replace(/\.data$/, '');
+        for (let index = failures.length - 1; index >= 0; index--) {
+          if (failures[index].path === path) failures.splice(index, 1);
+        }
+      }
       if (response.status >= 400) {
         const traceId = response.headers.get('X-Trace-Id') || '';
         remember(

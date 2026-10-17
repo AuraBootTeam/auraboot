@@ -1,3 +1,9 @@
+import type { RootLoaderData } from '~/root-data';
+import {
+  loadRootOnClient,
+  setBackgroundRefreshUnavailable,
+} from '~/shared/observability/backgroundRootRefresh';
+import type { ClientLoaderFunctionArgs } from 'react-router';
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -11,7 +17,8 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
 }));
 
-vi.mock('react-router', () => ({
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useRevalidator: () => ({
     state: mocks.state,
     revalidate: mocks.revalidate,
@@ -23,6 +30,7 @@ describe('AuthSessionRevalidator', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T12:00:00.000Z'));
     mocks.state = 'idle';
+    setBackgroundRefreshUnavailable(false);
     mocks.revalidate.mockReset();
     mocks.fetch.mockReset().mockResolvedValue({ status: 200 });
     vi.stubGlobal('fetch', mocks.fetch);
@@ -67,6 +75,55 @@ describe('AuthSessionRevalidator', () => {
     ).toBe(false);
   });
 
+  it('keeps the background snapshot scope alive while the router becomes loading', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mocks.revalidate.mockReturnValue(pending);
+    const snapshot = { user: { id: 'teacher' }, locale: 'zh-CN' } as RootLoaderData;
+    const props = {
+      enabled: true,
+      isAuthenticated: true,
+      snapshot,
+      intervalMs: 1000,
+      minIntervalMs: 0,
+    };
+    const view = render(<AuthSessionRevalidator {...props} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(mocks.revalidate).toHaveBeenCalledTimes(1);
+    mocks.state = 'loading';
+    view.rerender(<AuthSessionRevalidator {...props} />);
+    const outage = {
+      status: 503,
+      statusText: 'Service Unavailable',
+      internal: false,
+      data: { code: 'root_dependency_unavailable', requestId: 'loading-scope', stage: 'branding' },
+    };
+    await act(async () => {
+      expect(
+        await loadRootOnClient({
+          request: new Request(location.href),
+          serverLoader: vi.fn().mockRejectedValue(outage),
+        } as unknown as ClientLoaderFunctionArgs),
+      ).toBe(snapshot);
+      release();
+      await pending;
+    });
+    expect(view.getByTestId('background-refresh-unavailable')).toBeTruthy();
+  });
+
+  it('keeps polling through 24 hours of accelerated timer time', async () => {
+    render(<AuthSessionRevalidator enabled isAuthenticated />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+    });
+    expect(mocks.revalidate).toHaveBeenCalledTimes(1440);
+    expect(mocks.fetch).toHaveBeenCalledTimes(1440);
+  });
+
   it('does not revalidate anonymous runtime sessions', async () => {
     render(
       <AuthSessionRevalidator
@@ -86,14 +143,7 @@ describe('AuthSessionRevalidator', () => {
   });
 
   it('throttles focus-triggered revalidation', async () => {
-    render(
-      <AuthSessionRevalidator
-        enabled
-        isAuthenticated
-        intervalMs={0}
-        minIntervalMs={1_000}
-      />,
-    );
+    render(<AuthSessionRevalidator enabled isAuthenticated intervalMs={0} minIntervalMs={1_000} />);
 
     await act(async () => {
       window.dispatchEvent(new Event('focus'));
@@ -109,14 +159,7 @@ describe('AuthSessionRevalidator', () => {
   });
 
   it('periodically revalidates authenticated admin sessions', async () => {
-    render(
-      <AuthSessionRevalidator
-        enabled
-        isAuthenticated
-        intervalMs={1_000}
-        minIntervalMs={0}
-      />,
-    );
+    render(<AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />);
 
     await act(async () => {
       vi.advanceTimersByTime(1_000);
@@ -127,14 +170,7 @@ describe('AuthSessionRevalidator', () => {
 
   it('does not start another revalidation while React Router is already loading', async () => {
     mocks.state = 'loading';
-    render(
-      <AuthSessionRevalidator
-        enabled
-        isAuthenticated
-        intervalMs={1_000}
-        minIntervalMs={0}
-      />,
-    );
+    render(<AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />);
 
     await act(async () => {
       vi.advanceTimersByTime(1_000);
@@ -156,45 +192,77 @@ describe('AuthSessionRevalidator', () => {
     });
     expect(mocks.revalidate).not.toHaveBeenCalled();
     online.mockReturnValue(true);
-    await act(async () => { window.dispatchEvent(new Event('online')); });
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
     expect(mocks.revalidate).toHaveBeenCalledTimes(1);
     view.unmount();
-    await act(async () => { window.dispatchEvent(new Event('online')); });
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
     expect(mocks.revalidate).toHaveBeenCalledTimes(1);
   });
 
-  it.each([500, 502, 503])('keeps the page alive on backend HTTP %s and refreshes after recovery', async (status) => {
-    mocks.fetch.mockResolvedValueOnce({ status });
-    render(<AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />);
-    await act(async () => { vi.advanceTimersByTime(1_000); });
-    expect(mocks.fetch).toHaveBeenCalledWith('/api/auth/me', expect.objectContaining({ credentials: 'same-origin', signal: expect.any(AbortSignal) }));
-    expect(mocks.revalidate).not.toHaveBeenCalled();
-    await act(async () => { vi.advanceTimersByTime(1_000); });
-    expect(mocks.revalidate).toHaveBeenCalledTimes(1);
-  });
+  it.each([500, 502, 503])(
+    'keeps the page alive on backend HTTP %s and refreshes after recovery',
+    async (status) => {
+      mocks.fetch.mockResolvedValueOnce({ status });
+      render(
+        <AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        '/api/auth/me',
+        expect.objectContaining({ credentials: 'same-origin', signal: expect.any(AbortSignal) }),
+      );
+      expect(mocks.revalidate).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(mocks.revalidate).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('keeps the page alive on transport failure without hiding a subsequent auth rejection', async () => {
     mocks.fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     mocks.fetch.mockResolvedValueOnce({ status: 401 });
     render(<AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />);
-    await act(async () => { vi.advanceTimersByTime(1_000); });
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
     expect(mocks.revalidate).not.toHaveBeenCalled();
-    await act(async () => { vi.advanceTimersByTime(1_000); });
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
     expect(mocks.revalidate).toHaveBeenCalledTimes(1);
   });
 
   it('aborts a pending probe on unmount and never refreshes a disposed identity', async () => {
     let finish!: (value: { status: number }) => void;
-    mocks.fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const view = render(<AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />);
-    await act(async () => { vi.advanceTimersByTime(1_000); });
-    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    mocks.fetch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const view = render(
+      <AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />,
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
     const signal = mocks.fetch.mock.calls[0][1].signal;
     view.unmount();
     expect(signal.aborted).toBe(true);
-    await act(async () => { finish({ status: 200 }); });
+    await act(async () => {
+      finish({ status: 200 });
+    });
     expect(mocks.revalidate).not.toHaveBeenCalled();
   });
-
 });

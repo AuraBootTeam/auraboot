@@ -27,6 +27,7 @@ export interface ClientErrorReport {
   message: string;
   stack?: string;
   errorId?: string;
+  traceId?: string;
   kind?: string;
   status?: number;
   pageUrl: string;

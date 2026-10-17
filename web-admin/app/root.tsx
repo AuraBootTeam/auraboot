@@ -5,6 +5,7 @@ import {
   Scripts,
   ScrollRestoration,
   redirect,
+  data as routeData,
   Link,
   useRouteLoaderData,
   useLoaderData,
@@ -79,6 +80,13 @@ import {
 } from '~/error/root-error-view';
 import { reportClientError } from '~/shared/observability/clientErrorReporter';
 import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
+import { RootDependencyUnavailableError } from '~/shared/observability/rootReadErrors';
+import {
+  loadRootOnClient,
+  ROOT_DEPENDENCY_UNAVAILABLE,
+} from '~/shared/observability/backgroundRootRefresh';
+
+export const clientLoader = loadRootOnClient;
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -108,6 +116,7 @@ function getTimezoneFromRequest(request: Request): string {
 
 export async function resolveDeploymentBrandingFromBff(
   environment: Record<string, string | undefined>,
+  requestId?: string,
 ): Promise<BrandingConfig> {
   if (!isCommercialEdition(environment.EDITION)) {
     return resolveCommunityBranding();
@@ -120,9 +129,13 @@ export async function resolveDeploymentBrandingFromBff(
   // loopback BFF.
   const bffUrl = `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
   const response = await fetch(`${bffUrl}/api/runtime/branding`, {
+    headers: requestId ? { 'X-Request-Id': requestId } : undefined,
     signal: fetchTimeoutSignal(),
   });
   if (!response.ok) {
+    if ([502, 503, 504].includes(response.status)) {
+      throw new RootDependencyUnavailableError('branding', response.status);
+    }
     throw new Error(`Unable to resolve deployment branding from BFF (${response.status}).`);
   }
   const payload = (await response.json()) as { branding?: BrandingConfig };
@@ -133,10 +146,25 @@ export async function resolveDeploymentBrandingFromBff(
 }
 
 export async function loader(args: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
-  const { createLoaderDiagnostics } =
+  const { createLoaderDiagnostics, isRootDependencyUnavailable } =
     await import('~/server/observability/loaderDiagnostics.server');
   const diagnostics = createLoaderDiagnostics(args.request);
-  return diagnostics.stage('request', () => loadRoot(args, diagnostics));
+  try {
+    return await diagnostics.stage('request', () => loadRoot(args, diagnostics));
+  } catch (error) {
+    if (!args.request.signal.aborted && isRootDependencyUnavailable(error)) {
+      throw routeData(
+        {
+          code: ROOT_DEPENDENCY_UNAVAILABLE,
+          requestId: diagnostics.correlation.requestId,
+          traceId: diagnostics.correlation.traceId,
+          stage: diagnostics.failedStage,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 }
 
 async function loadRoot(
@@ -163,7 +191,9 @@ async function loadRoot(
   const buildIdentity = resolveBuildIdentity(process.env);
   // These reads are independent. Keep every request fresh without serial network waits.
   const [branding, bootstrapStatus, accessPolicy, token] = await Promise.all([
-    stage('branding', () => resolveDeploymentBrandingFromBff(process.env)),
+    stage('branding', () =>
+      resolveDeploymentBrandingFromBff(process.env, diagnostics.correlation.requestId),
+    ),
     stage('bootstrap', () => fetchBootstrapStatus()),
     stage('access-policy', () => fetchAccessPolicy()),
     stage('session', () => getTokenFromRequest(request)),
@@ -454,6 +484,7 @@ export default function App() {
             <AuthSessionRevalidator
               enabled={bootCoreRuntime && !data.impersonation}
               isAuthenticated={!!data.user}
+              snapshot={data}
             />
             <EntitlementProvider>
               <CorePluginBootstrap enabled={bootCoreRuntime} />

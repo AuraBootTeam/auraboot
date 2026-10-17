@@ -18,6 +18,7 @@ import { buildLoginFailureRedirect } from './login-failure';
 import { sessionStorage, commitUserSession, maybeRenewSession } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { resolveDeploymentBranding } from '~/config/branding.server';
+import { safeLoaderError } from './observability/loaderDiagnostics.server';
 import { resolveAuthAppearance } from '~/config/auth-appearance';
 import { enforceCsrfProtection, hasSameOrigin } from './middlewares/CsrfProtection';
 import { handleLegacySessionMigration } from './auth/legacy-session-migration';
@@ -363,7 +364,14 @@ app.get('/api/runtime/branding', async (_req, res, next) => {
     res.set('Cache-Control', 'no-store');
     res.json({ branding });
   } catch (error) {
-    next(error);
+    if (axios.isAxiosError(error) && (
+      [502, 503, 504].includes(error.response?.status || 0)
+      || (!error.response && ['ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error.code || ''))
+    )) {
+      const unavailable = new Error('Published authentication appearance is temporarily unavailable', { cause: error });
+      Object.assign(unavailable, { status: 503, code: 'root_dependency_unavailable' });
+      next(unavailable);
+    } else next(error);
   }
 });
 
@@ -495,7 +503,7 @@ app.use(errorLogger);
 // Error handling middleware
 app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const requestId = (req as any).requestId || 'unknown';
-  console.error(`[${requestId}] BFF Server Error:`, error);
+  console.error(`[${requestId}] BFF Server Error:`, safeLoaderError(error));
   // Express body-parser marks malformed JSON as a client error before proxying.
   if (error?.type === 'entity.parse.failed' && error?.status === 400) {
     res.status(400).json({
@@ -503,6 +511,10 @@ app.use((error: any, req: express.Request, res: express.Response, _next: express
       message: 'Invalid JSON request body',
       requestId,
     });
+    return;
+  }
+  if (error?.status === 503 && error?.code === 'root_dependency_unavailable') {
+    res.status(503).json({ error: 'Service Unavailable', code: error.code, requestId });
     return;
   }
   res.status(500).json({
