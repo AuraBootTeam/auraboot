@@ -487,6 +487,15 @@ if (process.env.NODE_ENV === 'development') {
 } else {
   app.all(
     '*',
+    (req, res, next) => {
+      // The React Router adapter appends Fetch response headers. Its data hook
+      // owns these headers; pre-setting them here would duplicate both IDs.
+      if (req.path.endsWith('.data')) {
+        res.removeHeader('X-Request-Id');
+        res.removeHeader('X-Trace-Id');
+      }
+      next();
+    },
     createRequestHandler({
       // @ts-expect-error - build output exists at runtime in the docker image
       // (web-admin/Dockerfile stage 1 runs `pnpm exec react-router build`),
