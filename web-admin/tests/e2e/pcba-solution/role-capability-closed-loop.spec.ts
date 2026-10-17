@@ -1431,6 +1431,8 @@ test('dashboard management capability governs customer 360 editing and revocatio
       await settings.locator('textarea').fill(value);
       await settings.getByRole('button', { name: '保存', exact: true }).click();
       await expect(settings).toHaveCount(0);
+      const historyRefreshing = member.waitForResponse(response => new URL(response.url()).origin === origin
+        && new URL(response.url()).pathname === versionsEndpoint && response.request().method() === 'GET');
       const saving = member.waitForResponse(response => new URL(response.url()).origin === origin
         && new URL(response.url()).pathname === endpoint && response.request().method() === 'PUT');
       await member.getByTestId('designer-toolbar-btn-save').click();
@@ -1438,6 +1440,9 @@ test('dashboard management capability governs customer 360 editing and revocatio
       expect(saved.status()).toBe(200);
       expect(saved.request().postDataJSON().description).toBe(value);
       expect(String((await saved.json()).code)).toBe('0');
+      const refreshed = await historyRefreshing;
+      expect(refreshed.status()).toBe(200);
+      expect(String((await refreshed.json()).code)).toBe('0');
       const readback = await member.request.get(endpoint);
       expect(readback.status()).toBe(200);
       const body = await readback.json();
@@ -1968,6 +1973,7 @@ for (const domain of ['catalog', 'board', 'rfq', 'dfm', 'margin', 'model'] as co
         const reorderHandle = member.getByRole('row').filter({ hasText: bindingFieldCode }).getByTestId('model-field-reorder');
         const initialPosition = await reorderHandle.boundingBox();
         expect(initialPosition).not.toBeNull();
+        await expect(reorderHandle).toHaveAttribute('aria-describedby', /\S+/);
         await reorderHandle.focus();
         await reorderHandle.press('Space');
         await expect(reorderHandle).toHaveAttribute('aria-pressed', 'true');

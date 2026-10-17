@@ -86,6 +86,8 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
   await expect(page.locator('canvas')).toHaveCount(4);
   for (let index = 0; index < expectedSeries.length; index++) {
     const chart = page.locator('[_echarts_instance_]').nth(index);
+    await expect(chart).toHaveAttribute('data-chart-ready', 'true');
+    await chart.scrollIntoViewIfNeeded();
     // Inspect the actual canvas: a populated option or display list alone can
     // pass while duplicate zrender Path classes silently suppress all ink.
     await expect.poll(async () => chart.evaluate((element) => {

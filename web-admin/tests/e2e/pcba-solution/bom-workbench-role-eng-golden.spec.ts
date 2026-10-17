@@ -284,7 +284,7 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       step = 'undo decision';
       await page.reload({ waitUntil: 'domcontentloaded' });
       await waitForDynamicPageLoad(page, 20_000);
-      await page.locator('tbody tr').filter({ hasText: '10K resistor canonical' }).first().click();
+      await page.locator('tbody tr').filter({ hasText: 'R1,R2' }).first().click();
       await expect(page.getByTestId('review-drawer')).toBeVisible({ timeout: 20_000 });
       await expect(page.getByTestId('review-drawer-candidate-action-undo_decision')).toBeEnabled({
         timeout: 20_000,
