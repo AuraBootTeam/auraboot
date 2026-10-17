@@ -194,7 +194,7 @@ public class AuraBotChatService {
                         chatToolResolver,
                         chatToolExecutor,
                         objectMapper,
-                        new ReadOnlyProfilePolicy()));
+                        new ReadOnlyProfilePolicy(), aiTraceService));
     }
 
     public AuraBotChatService(LlmProviderFactory llmProviderFactory,
@@ -575,7 +575,7 @@ public class AuraBotChatService {
                         ctx, providerCode, config, model, systemPrompt,
                         request.getHistory(), request.getMessage(), maxTokens, tools,
                         effectiveResolved, effectiveModelCode, request.getSessionId(), contextBundle, sink,
-                        userPermissionService, pendingToolStore, pendingToolSnapshotFactory, maxToolRounds);
+                        userPermissionService, pendingToolStore, pendingToolSnapshotFactory, maxToolRounds, trace);
             } else {
                 streamOutcome = streamProvider(providerCode, config, model, systemPrompt,
                         request.getHistory(), request.getMessage(), maxTokens, sink,

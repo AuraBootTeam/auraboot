@@ -65,7 +65,7 @@ function ExistingGraphViewport({ enabled }: { enabled: boolean }) {
   const width = useStore(state => state.width);
   const height = useStore(state => state.height);
   useEffect(() => {
-    if (enabled && initialized && width > 0 && height > 0) {
+    if (enabled && width > 0 && height > 0) {
       void fitView({ padding: 0.2, maxZoom: 1 });
     }
   }, [enabled, initialized, width, height, fitView]);
