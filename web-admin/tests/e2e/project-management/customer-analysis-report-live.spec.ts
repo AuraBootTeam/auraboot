@@ -157,10 +157,10 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   // The human reviewer keeps the live narrative but removes a duplicate Markdown table.
   // The governed report table above remains the authoritative, refreshable source of figures.
   const adoptedNarrative = detail.trace.output.split('\n')
-    .filter((line: string) => !/^\s*\|/.test(line)).join('\n').trim();
+    .filter((line: string) => !line.includes('|')).join('\n').trim();
   expect(adoptedNarrative.length).toBeGreaterThan(80);
-  expect(adoptedNarrative).not.toMatch(/^\s*\|/m);
-  const reviewedAnalysis = 'AI分析（人工核对后写入；数据见上表，建议不代替审批结论）\n' + adoptedNarrative;
+  expect(adoptedNarrative).not.toContain('|');
+  const reviewedAnalysis = 'AI分析（人工核对后写入；数据见上表，建议不代替审批结论）\n' + adoptedNarrative + '\n人工审阅补充：盈利判断还需核对实际收入与实际成本，不能仅凭预算与合同额的差额下结论。';
   // Full names and exact amounts are asserted below in persisted query rows and every export.
   // A concise narrative may legitimately omit a repeated customer prefix.
   expect(detail.trace.output).toContain(customer);
