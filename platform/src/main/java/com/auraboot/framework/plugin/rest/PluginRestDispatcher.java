@@ -6,6 +6,7 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.plugin.extension.AuthPolicy;
 import com.auraboot.framework.plugin.pf4j.RestEndpointRegistry;
 import com.auraboot.framework.saas.config.service.SystemModeService;
@@ -52,6 +53,7 @@ public class PluginRestDispatcher {
     private final ApiRateLimiter rateLimiter;
     private final SystemModeService systemModeService;
 
+    @AuthenticatedAccess("Dispatch delegates authorization to the registered route policy and permission guard")
     @RequestMapping("/{namespace}/**")
     public void dispatch(@PathVariable String namespace,
                          HttpServletRequest httpReq,
@@ -79,7 +81,7 @@ public class PluginRestDispatcher {
     private void dispatchAuthenticated(RestEndpointRegistry.Match m,
                                        HttpServletRequest httpReq,
                                        HttpServletResponse httpRes) throws Exception {
-        Long userId = MetaContext.getCurrentUserId();
+        Long userId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
         String permission = m.route().permissionCode();
         if (permission == null || permission.isBlank()
                 || userId == null
