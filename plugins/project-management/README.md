@@ -104,3 +104,12 @@ The acceptance detail uses ordinary DSL tabs: acceptance scope and materials are
 The verification tab is permission-gated by the optional verification plugin's `tdv.check.read`. Its read-only `tdv_check` sub-table is scoped by `tdv_ck_acceptance` to the current acceptance. Without that plugin/grant, the tab is absent and the child model is not queried. Child queries retain model permissions and tenant isolation; tab visibility does not grant access.
 
 `extension.showInlineApprovalPanel: false` disables the automatic below-content approval report only for this composed detail. The default for other pages remains enabled. The acceptance runtime tab opts into `audit-report` instead, retaining the governed report and download under a collapsed maintenance disclosure. System field-history tabs are hidden here; the same read-only field-history block is available under execution records. Completed and returned acceptances show their business result without an empty pending-task card.
+
+
+### Associated acceptance form
+
+The overview references `bpmPanel.formBinding.formRef: "tpm_acceptance_form"` and renders that form's sections through `useDslForm` / `DslFormRenderer` in read-only object-card mode. `excludeFields` suppresses facts already shown in the object header; `asideBlockIds` places delivery materials in the existing right column. These are presentation hints, not field permissions. Drafts and returned records use the current form via `currentWhen`; submitted and completed approvals use the instance snapshot. The approval/task area and existing tabs remain unchanged.
+
+At process start, BPM freezes the published page DTO and node field permissions in the protected `_formBindingsSnapshot`. Subsequent page publication affects new submissions only. This freezes structure and permissions, **not business values**: read-only detail displays the current governed business record. Historical values remain in field audit. Historical instances without a schema snapshot explicitly report an unconfirmed form version; they do not silently load the latest form.
+
+Both review nodes use the acceptance form with all business fields read-only and `variable_only` saving. Corrections require rejection and the normal edit/resubmit path. The decision/comment map to the existing workflow result variables. The backend rejects read-only, hidden and undeclared field writes, mapped-variable bypasses and save-strategy overrides before running a command.

@@ -528,3 +528,18 @@ describe('useDslForm', () => {
     });
   });
 });
+
+
+describe('submitted form snapshots', () => {
+  it('uses the frozen DTO and disables latest-page loading', () => {
+    setupSchemaLoaderWithSchema({ kind: 'form', blocks: [{ id: 'new', blockType: 'form-section' }] });
+    const snapshot = { pageKey: 'order_form', modelCode: 'order', kind: 'form', schemaVersion: 4,
+      blocks: [{ id: 'original', blockType: 'form-section', fields: [{ field: 'amount', readOnly: true }] }] };
+    const { result } = renderHook(() => useDslForm({ pageKey: 'order_form', schemaSnapshot: snapshot,
+      fieldPermissions: { amount: 'editable', secret: 'HIDDEN' as any } }));
+    expect(mockUseSchemaLoader).toHaveBeenLastCalledWith(expect.objectContaining({ pageKey: '__disabled__' }));
+    expect(result.current.schema.blocks[0].id).toBe('original');
+    expect(result.current.effectivePermissions).toEqual({ amount: 'readonly', secret: 'hidden' });
+    expect(snapshot.blocks[0].fields[0].readOnly).toBe(true);
+  });
+});

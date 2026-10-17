@@ -20,6 +20,7 @@
  */
 
 import React, { Suspense } from 'react';
+import { DslFormReadOnly, type DslFormReadOnlyOptions } from './DslFormReadOnly';
 import { profileRegistry, ProfileProvider } from '@auraboot/runtime-kernel';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { ErrorAlert } from '~/ui/ErrorAlert';
@@ -34,6 +35,8 @@ import '~/framework/meta/profiles/report';
 // ---------------------------------------------------------------------------
 
 export interface DslFormRendererProps {
+  /** Read-only business cards derived directly from form sections. */
+  readOnly?: DslFormReadOnlyOptions;
   /** Return value from useDslForm — contains schema, state, and rendererProps */
   form: UseDslFormReturn;
   /**
@@ -69,10 +72,11 @@ export interface DslFormRendererProps {
  */
 export function DslFormRenderer({
   form,
-  showButtons: _showButtons = true,
+  showButtons = true,
   compact: _compact = false,
   className,
   onCancel,
+  readOnly,
 }: DslFormRendererProps) {
   const { loading, error, schema, rendererProps } = form;
 
@@ -108,6 +112,8 @@ export function DslFormRenderer({
   if (!schema || !form.enabled) {
     return null;
   }
+
+  if (readOnly) return <DslFormReadOnly form={form} {...readOnly} />;
 
   // --- 4. Resolve profile ---
   let profile;
@@ -158,6 +164,7 @@ export function DslFormRenderer({
         <Suspense fallback={suspenseFallback}>
           <PageContent
             {...rendererProps}
+            schema={showButtons ? rendererProps.schema : { ...rendererProps.schema, blocks: rendererProps.schema.blocks?.filter((block: any) => block.blockType !== 'form-buttons') }}
             onCancelOverride={onCancel ?? rendererProps.onCancelOverride}
           />
         </Suspense>
