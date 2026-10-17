@@ -300,9 +300,7 @@ management:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
     propagation:
       type: w3c
-  otlp:
-    tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  # TraceExportDefaults enables OTLP only when a collector endpoint is configured.
 
 # MyBatis-Plus 配置
 mybatis-plus:
