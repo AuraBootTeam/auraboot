@@ -120,6 +120,7 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   const sent = page.waitForResponse(r => (new URL(r.url()).pathname.match(new RegExp(`/api/bpm/tasks/[^/]+/${action}$`))!==null || /\/api\/bpm\/forms\/task\/[^/]+\/submit$/.test(new URL(r.url()).pathname)) && r.request().method()==='POST');
   await page.getByTestId(`bpm-operations-${action}`).click();
   const comment = action==='approve'?'交付范围、完成标准和材料一致，批准验收。':'缺少培训签到记录，请补正后重新提交。';
+  await expect(page.getByTestId('bpm-task-drawer').or(page.getByTestId(`bpm-${action}-comment`))).toBeVisible();
   if (await page.getByTestId('bpm-task-drawer').count()) {
     await page.getByTestId('approval-comment-textarea').fill(comment);
     await page.getByTestId(`bpm-drawer-${action}-btn`).click();
@@ -422,8 +423,8 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   const taskForm = await data(await page.request.get(`/api/bpm/forms/task/${taskId}`));
   expect(taskForm.formBinding.schemaSnapshot).toEqual(frozen.schemaSnapshot);
   // Direct requests here are negative security probes, not a substitute for the UI approval below.
-  for (const forged of [{businessData:{tpm_ac_amount:1}}, {saveStrategy:'business_only'}]) {
-    const denied = await page.request.post(`/api/bpm/forms/task/${taskId}/submit`, {data:{...forged,variables:{decision:'approve'}}});
+  for (const forged of [{businessData:{tpm_ac_amount:1}}, {saveStrategy:'business_only'}, {variables:{decision:'approve',data:{tpm_ac_amount:1}}}]) {
+    const denied = await page.request.post(`/api/bpm/forms/task/${taskId}/submit`, {data:{variables:{decision:'approve'},...forged}});
     expect(denied.ok()).toBe(false);
     expect((await row(page,pid)).tpm_ac_status).toBe('submitted');
     expect((await row(page,pid)).tpm_ac_amount).toBe(68000);
@@ -467,6 +468,8 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
     expect(fresh.record).not.toHaveProperty('tpm_ac_scope');
     expect(fresh.fieldPermissions.tpm_ac_scope).toBe('hidden');
     const newTasks = await data(await page.request.get(`/api/bpm/tasks/by-process/${nextRecord.tpm_ac_process}`));
+    const hiddenTask = await data(await page.request.get(`/api/bpm/forms/task/${newTasks[0].instanceId}`));
+    expect(hiddenTask.processVariables).toEqual({});
     const hiddenDenied = await page.request.post(`/api/bpm/forms/task/${newTasks[0].instanceId}/submit`, {data:{businessData:{tpm_ac_scope:'forged hidden field'},variables:{decision:'approve'}}});
     expect(hiddenDenied.status()).toBe(403);
     expect((await row(page,nextPid)).tpm_ac_status).toBe('submitted');
