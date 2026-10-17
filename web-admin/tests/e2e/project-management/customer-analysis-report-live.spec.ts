@@ -100,7 +100,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await panel.getByTestId('aurabot-history-trigger').click();
   await panel.getByTestId('aurabot-new-session').click();
   await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
-  const question = `${customer}名下项目的预算各是多少？请先重新核对客户记录，再按所属客户关联查询并按项目名称列表，简短说明预算不是收入。`;
+  const question = `${customer}名下项目的预算各是多少？请先重新核对客户记录，再按所属客户关联查询并按项目名称列表，简短说明预算不是收入，并给两条交付建议。用纯文本短段落回答，不展示内部标识、候选客户清单或表格标记。`;
   const streamPromise = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/ai/aurabot/chat/stream' &&
@@ -221,6 +221,16 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.reload();
   const toolbar = page.getByTestId('report-designer-toolbar');
   await expect(toolbar).toBeVisible();
+  await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(`${customer} · 项目预算与交付建议`);
+  await page.getByTestId('drag-handle-analysis').locator('..').click();
+  const columns=payload.dsl.body.find((block:any)=>block.id==='analysis').columns;
+  const reviewedLabels:Record<string,string>={tpm_pj_name:'项目名称',tpm_pj_status:'项目状态',tpm_pj_budget:'项目预算（元）',tpm_pj_risk_summary:'交付风险',[budgetColumn]:'项目预算（元）'};
+  const tableProperties=page.getByTestId('block-property-panel');
+  for(let index=0;index<columns.length;index++){
+    const column=columns[index];
+    await expect(tableProperties.getByPlaceholder('字段名称',{exact:true}).nth(index)).toHaveValue(column.field);
+    if(reviewedLabels[column.field])await tableProperties.getByPlaceholder('显示名称',{exact:true}).nth(index).fill(reviewedLabels[column.field]);
+  }
   await page.getByTestId('drag-handle-analysis-summary').locator('..').click();
   await page.getByTestId('block-property-panel').getByPlaceholder('输入文本内容…').fill(reviewedAnalysis);
   const reviewedSave = page.waitForResponse(r => new URL(r.url()).pathname === `/api/report-definitions/${saved.pid}` && r.request().method() === 'PUT');
@@ -229,6 +239,11 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.reload();
   const reviewed = await (await page.request.get(`/api/report-definitions/${saved.pid}`)).json();
   expect(reviewed.data.dsl.body.find((block: any) => block.id === 'analysis-summary').content).toBe(reviewedAnalysis);
+  expect(reviewed.data.title).toBe(`${customer} · 项目预算与交付建议`);
+  expect(reviewed.data.dsl.dataSources.analysis.aggregateQuery).toEqual(query);
+  for(const column of reviewed.data.dsl.body.find((block:any)=>block.id==='analysis').columns){
+    if(reviewedLabels[column.field])expect(column.label).toBe(reviewedLabels[column.field]);
+  }
   await page.waitForFunction(() => {
     const toolbar = document.querySelector('[data-testid="report-designer-toolbar"]');
     const button =
@@ -301,6 +316,8 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
       } else {
         text = bytes.toString('utf8');
         expect(text).toMatch(/^# /);
+        // Rich-text paragraphs are literal text; decode CommonMark punctuation escapes for comparison.
+        text=text.replace(/\\([\\`*_{}\[\]()#+\-.!|>])/g,'$1');
       }
       expect(text).toContain(customer);
       expect(text.replace(/\s/g, '')).toContain(reviewedAnalysis.replace(/\s/g, ''));
