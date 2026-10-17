@@ -19,6 +19,7 @@ import { sessionStorage, commitUserSession, maybeRenewSession } from '~/shared/s
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { safeLoaderError } from './observability/loaderDiagnostics.server';
 import { createRuntimeBrandingHandler } from './routes/runtimeBranding';
+import { createSessionContextHandler } from './routes/sessionContext';
 import { enforceCsrfProtection, hasSameOrigin } from './middlewares/CsrfProtection';
 import { handleLegacySessionMigration } from './auth/legacy-session-migration';
 import { handleSocialSessionExchange } from './auth/social-session-exchange';
@@ -349,6 +350,7 @@ app.get('/metrics', async (_req, res) => {
 // verification and deployment file access behind this BFF-only boundary and
 // return only the public, serialized branding contract.
 app.get('/api/runtime/branding', createRuntimeBrandingHandler(SPRING_BOOT_URL));
+app.get('/api/runtime/session-context', createSessionContextHandler(SPRING_BOOT_URL));
 
 // Proxy timing middleware — measure BFF→backend latency
 app.use('/api', (req, res, next) => {

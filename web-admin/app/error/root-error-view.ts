@@ -20,6 +20,19 @@ export interface RootErrorView {
 const LOCALE_CODES: SupportedErrorLocale[] = ['zh-CN', 'en-US', 'ja-JP', 'ko-KR'];
 
 export const ROOT_ERROR_TEXTS = {
+  sessionAccessChangedTitle: {
+    'zh-CN': '访问权限已变更',
+    'en-US': 'Your access has changed',
+    'ja-JP': 'アクセス権限が変更されました',
+    'ko-KR': '접근 권한이 변경되었습니다',
+  },
+  sessionAccessChangedDetail: {
+    'zh-CN': '当前页面已停止展示受保护内容，请返回首页重新选择可访问的功能。',
+    'en-US':
+      'Protected content is no longer displayed. Return home to choose an available feature.',
+    'ja-JP': '保護された内容の表示を停止しました。ホームから利用できる機能を選択してください。',
+    'ko-KR': '보호된 콘텐츠 표시가 중단되었습니다. 홈에서 이용 가능한 기능을 선택하세요.',
+  },
   backgroundRefreshUnavailable: {
     'zh-CN': '后台连接暂时不可用，恢复后将自动更新。',
     'en-US': 'Background connection is unavailable. Updates will resume automatically.',

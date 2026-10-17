@@ -1,5 +1,6 @@
 import type { RuntimeProfile } from '@auraboot/runtime-kernel';
 import { useRouteLoaderData } from 'react-router';
+import { createContext, useContext } from 'react';
 import type { BrandingConfig, BuildIdentity } from '~/config/branding';
 import type { IcpComplianceConfig } from '~/config/icpCompliance';
 import type { BootstrapStatus } from '~/services/bootstrapStatus';
@@ -27,6 +28,9 @@ export interface RootLoaderData {
   impersonation: ImpersonationSessionInfo | null;
 }
 
+const RootLoaderDataContext = createContext<RootLoaderData | undefined>(undefined);
+export const RootLoaderDataProvider = RootLoaderDataContext.Provider;
 export function useRootLoaderData(): RootLoaderData | undefined {
-  return useRouteLoaderData<RootLoaderData>('root');
+  const initial = useRouteLoaderData<RootLoaderData>('root');
+  return useContext(RootLoaderDataContext) ?? initial;
 }

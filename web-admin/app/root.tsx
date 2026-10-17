@@ -40,7 +40,7 @@ import {
   resolveCommunityBranding,
   type BrandingConfig,
 } from '~/config/branding';
-import { useRootLoaderData, type RootLoaderData } from '~/root-data';
+import { RootLoaderDataProvider, useRootLoaderData, type RootLoaderData } from '~/root-data';
 
 import '~/app.css';
 import '~/styles/print.css';
@@ -69,7 +69,11 @@ import { fetchBootstrapStatus } from '~/services/bootstrapStatus';
 import { fetchAccessPolicy } from '~/services/accessPolicy';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
-import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
+import { SessionMaintenance } from '~/components/SessionMaintenance';
+import {
+  mergeSessionContext,
+  type SessionContextSnapshot,
+} from '~/shared/services/session-context';
 import {
   formatClientReportMessage,
   generateErrorId,
@@ -80,13 +84,10 @@ import {
 } from '~/error/root-error-view';
 import { reportClientError } from '~/shared/observability/clientErrorReporter';
 import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
-import { RootDependencyUnavailableError } from '~/shared/observability/rootReadErrors';
 import {
-  loadRootOnClient,
+  RootDependencyUnavailableError,
   ROOT_DEPENDENCY_UNAVAILABLE,
-} from '~/shared/observability/backgroundRootRefresh';
-
-export const clientLoader = loadRootOnClient;
+} from '~/shared/observability/rootReadErrors';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -440,8 +441,32 @@ function CorePluginBootstrap({ enabled }: { enabled: boolean }) {
   return null;
 }
 
+function SessionLoginRedirect() {
+  useEffect(() => {
+    window.location.replace(
+      `/login?redirectTo=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+    );
+  }, []);
+  return null;
+}
+
 export default function App() {
-  const data = useLoaderData<typeof loader>() as RootLoaderData;
+  const source = useLoaderData<typeof loader>() as RootLoaderData;
+  const [live, setLive] = useState<{
+    source: RootLoaderData;
+    data: RootLoaderData;
+    rejection?: 401 | 403;
+    error?: Error;
+  }>();
+  const current = live?.source === source ? live : undefined;
+  const data = current?.data ?? source;
+  const onRefresh = (snapshot: SessionContextSnapshot) =>
+    setLive((previous) => ({
+      source,
+      data: mergeSessionContext(previous?.source === source ? previous.data : source, snapshot),
+    }));
+  const onRejected = (rejection: 401 | 403) => setLive({ source, data, rejection });
+  const onError = (error: Error) => setLive({ source, data, error });
   const setFederationRuntimeProfile = useFederationStore((state) => state.setRuntimeProfile);
   const bootCoreRuntime = shouldBootCorePlugins(data.runtimeProfile);
 
@@ -456,6 +481,36 @@ export default function App() {
       ({ installClientErrorReporter }) => installClientErrorReporter(),
     );
   }, []);
+
+  if (current?.error) throw current.error;
+  if (current?.rejection === 401) {
+    return <SessionLoginRedirect />;
+  }
+  if (current?.rejection === 403) {
+    const locale = resolveErrorLocale(data.locale);
+    return (
+      <main
+        role="alert"
+        data-testid="session-access-denied"
+        className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-900"
+      >
+        <div className="max-w-md rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-800">
+          <h1 className="mb-3 text-xl font-semibold text-gray-900 dark:text-white">
+            {rootT('sessionAccessChangedTitle', locale)}
+          </h1>
+          <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+            {rootT('sessionAccessChangedDetail', locale)}
+          </p>
+          <Link
+            to="/home"
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-900 dark:bg-gray-700 dark:text-white"
+          >
+            {rootT('backHome', locale)}
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const appFrame = (
     <>
@@ -492,25 +547,30 @@ export default function App() {
   );
 
   return (
-    <QueryProvider>
-      <ThemeProvider>
-        {bootCoreRuntime ? (
-          <AuthProvider>
-            <AuthSessionRevalidator
-              enabled={bootCoreRuntime && !data.impersonation}
-              isAuthenticated={!!data.user}
-              snapshot={data}
-            />
-            <EntitlementProvider>
-              <CorePluginBootstrap enabled={bootCoreRuntime} />
-              <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
-            </EntitlementProvider>
-          </AuthProvider>
-        ) : (
-          sharedProviders
-        )}
-      </ThemeProvider>
-    </QueryProvider>
+    <RootLoaderDataProvider value={data}>
+      <QueryProvider>
+        <ThemeProvider>
+          {bootCoreRuntime ? (
+            <AuthProvider data={data}>
+              <SessionMaintenance
+                enabled={bootCoreRuntime && !data.impersonation}
+                source={source}
+                snapshot={data}
+                onRefresh={onRefresh}
+                onRejected={onRejected}
+                onError={onError}
+              />
+              <EntitlementProvider>
+                <CorePluginBootstrap enabled={bootCoreRuntime} />
+                <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
+              </EntitlementProvider>
+            </AuthProvider>
+          ) : (
+            sharedProviders
+          )}
+        </ThemeProvider>
+      </QueryProvider>
+    </RootLoaderDataProvider>
   );
 }
 
