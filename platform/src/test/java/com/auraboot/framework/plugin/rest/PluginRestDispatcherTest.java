@@ -6,6 +6,13 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.interceptor.PermissionInterceptor;
+import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.application.security.AdminRoleChecker;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.method.HandlerMethod;
 import com.auraboot.framework.plugin.extension.AuthPolicy;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
 import com.auraboot.framework.plugin.extension.RestEndpointExtension;
@@ -43,6 +50,16 @@ class PluginRestDispatcherTest {
     private final PluginRestDispatcher dispatcher =
             new PluginRestDispatcher(registry, perms, ctxFactory, pipeline, rateLimiter, systemModeService);
 
+    private void dispatchThroughAuthorization(String namespace, HttpServletRequest request,
+                                               HttpServletResponse response) throws Exception {
+        var interceptor = new PermissionInterceptor(perms, mock(MenuMapper.class),
+                mock(AdminRoleChecker.class), mock(PageSchemaMapper.class));
+        var method = PluginRestDispatcher.class.getMethod("dispatch", String.class,
+                HttpServletRequest.class, HttpServletResponse.class);
+        assertThat(interceptor.preHandle(request, response, new HandlerMethod(dispatcher, method))).isTrue();
+        dispatcher.dispatch(namespace, request, response);
+    }
+
     @AfterEach
     void clear() {
         MetaContext.clear();
@@ -76,7 +93,7 @@ class PluginRestDispatcherTest {
         MockHttpServletResponse res = new MockHttpServletResponse();
         when(registry.match("probe", "GET", "/nope")).thenReturn(Optional.empty());
 
-        dispatcher.dispatch("probe", req, res);
+        dispatchThroughAuthorization("probe", req, res);
 
         assertThat(res.getStatus()).isEqualTo(404);
     }
@@ -90,7 +107,7 @@ class PluginRestDispatcherTest {
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/whoami");
         MockHttpServletResponse res = new MockHttpServletResponse();
-        dispatcher.dispatch("probe", req, res);
+        dispatchThroughAuthorization("probe", req, res);
 
         verify(pipeline).execute(any(), any(), any());
         assertThat(res.getStatus()).isEqualTo(200);
@@ -106,8 +123,18 @@ class PluginRestDispatcherTest {
         when(perms.hasPermission(42L, "probe.probe.read")).thenReturn(false);
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/whoami");
-        assertThatThrownBy(() -> dispatcher.dispatch("probe", req, new MockHttpServletResponse()))
+        assertThatThrownBy(() -> dispatchThroughAuthorization("probe", req, new MockHttpServletResponse()))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void authenticatedRouteWithoutCallerNeverReachesPipeline() {
+        RestEndpointExtension ext = mock(RestEndpointExtension.class);
+        when(registry.match("probe", "GET", "/whoami")).thenReturn(Optional.of(whoamiMatch(ext)));
+        var request = new MockHttpServletRequest("GET", "/api/ext/probe/whoami");
+        assertThatThrownBy(() -> dispatchThroughAuthorization("probe", request, new MockHttpServletResponse()))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(pipeline, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -120,7 +147,7 @@ class PluginRestDispatcherTest {
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/whoami");
         MockHttpServletResponse res = new MockHttpServletResponse();
-        dispatcher.dispatch("probe", req, res);
+        dispatchThroughAuthorization("probe", req, res);
 
         assertThat(res.getStatus()).isEqualTo(400);
         assertThat(res.getContentAsString()).contains("text");
@@ -136,7 +163,7 @@ class PluginRestDispatcherTest {
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/whoami");
         MockHttpServletResponse res = new MockHttpServletResponse();
-        dispatcher.dispatch("probe", req, res);
+        dispatchThroughAuthorization("probe", req, res);
 
         assertThat(res.getStatus()).isEqualTo(409);
         assertThat(res.getContentAsString()).contains("different intent");
@@ -151,7 +178,7 @@ class PluginRestDispatcherTest {
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/whoami");
         MockHttpServletResponse res = new MockHttpServletResponse();
-        dispatcher.dispatch("probe", req, res);
+        dispatchThroughAuthorization("probe", req, res);
 
         assertThat(res.getStatus()).isEqualTo(500);
     }
@@ -169,7 +196,7 @@ class PluginRestDispatcherTest {
 
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/ext/probe/public/checkin");
         MockHttpServletResponse res = new MockHttpServletResponse();
-        dispatcher.dispatch("probe", req, res);
+        dispatchThroughAuthorization("probe", req, res);
 
         assertThat(res.getStatus()).isEqualTo(200);
         verify(pipeline).execute(any(), any(), any());
@@ -186,7 +213,7 @@ class PluginRestDispatcherTest {
 
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/ext/probe/public/checkin");
         MockHttpServletResponse res = new MockHttpServletResponse();
-        dispatcher.dispatch("probe", req, res);
+        dispatchThroughAuthorization("probe", req, res);
 
         assertThat(res.getStatus()).isEqualTo(429);
         verify(pipeline, never()).execute(any(), any(), any());

@@ -149,13 +149,19 @@ test.describe('QuoteOps bulk import + current sourcing golden', () => {
       // ── 3. seed historical cache evidence, then prove it is never adopted ──
       // qo_pe_valid_until is a DATE column — the platform rejects datetime values for it.
       const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const historicalQuote = await seedQuoteForCorrectedBomUpload(page);
+      created.rows.push(...historicalQuote.rows);
       for (const mpn of SYNTHETIC_MPNS) {
+        const historicalLineId = await dynamicCreate(page, 'qo_quote_line_common', {
+          qo_ql_quote_id: historicalQuote.quoteId, qo_ql_mpn: mpn, qo_ql_qty: 1,
+          qo_ql_item_type: 'component', qo_ql_description: `Historical fixture ${mpn}`,
+        }, created.rows);
         await dynamicCreate(
           page,
           'qo_price_evidence_common',
           {
-            // attached to a different (synthetic) line: this is the "priced on an earlier import" case
-            qo_pe_quote_line_id: `GOLDEN-CACHE-SRC-${mpn}`,
+            // A real, distinct prior line keeps the reference valid and the current import isolated.
+            qo_pe_quote_line_id: historicalLineId,
             qo_pe_part_no: mpn,
             qo_pe_source: 'yunhan',
             qo_pe_source_ref: HISTORICAL_SOURCE_REF,
