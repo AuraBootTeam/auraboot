@@ -3,6 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Header from '../Header';
 
+const presentation = vi.hoisted(() => ({ workspace: false }));
+vi.mock('~/shared/layout/PagePresentationContext', () => ({
+  usePagePresentation: () => presentation.workspace ? { mode: 'workspace', section: 'Delivery', title: 'Projects' } : null,
+  usePresentationNavigation: () => ({ sidebarWidth: 216 }),
+}));
+
 const rootLoaderData = vi.hoisted(() => ({
   value: {
     user: { username: 'cat', tenantName: 'AcmeCo' },
@@ -48,6 +54,7 @@ vi.mock('~/plugins/core-aurabot/components-shell/AuraBotProvider', () => ({
 
 // Stub fetch to keep useEffect for spaces quiet
 beforeEach(() => {
+  presentation.workspace = false;
   rootLoaderData.value = {
     user: { username: 'cat', tenantName: 'AcmeCo' },
     menus: [{ id: 'home', path: '/home' }],
@@ -187,4 +194,11 @@ describe('Header — polish', () => {
 
     expect(screen.queryByTestId('header-sidebar-toggle')).not.toBeInTheDocument();
   });
+});
+
+it('keeps the explicit AI action available in a business workspace', () => {
+  presentation.workspace = true;
+  render(<MemoryRouter><Header /></MemoryRouter>);
+  expect(screen.getByTestId('workspace-breadcrumb')).toBeInTheDocument();
+  expect(screen.getByTestId('ai-panel-toggle')).toBeVisible();
 });

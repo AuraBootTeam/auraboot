@@ -1,11 +1,5 @@
 /** Owner-reviewed showcase. API fixture/maintenance steps are recorded separately from UI actions. */
-import {
-  test,
-  expect,
-  type Page,
-  type APIResponse,
-  type Response,
-} from '@playwright/test';
+import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -18,9 +12,7 @@ if (
   !process.env.ADMIN_PASSWORD ||
   !process.env.AURA_ADMIN_TENANT_ID
 )
-  throw Error(
-    'Bind the registered runtime, evidence, administrator and exact business tenant.',
-  );
+  throw Error('Bind the registered runtime, evidence, administrator and exact business tenant.');
 async function data(response: APIResponse | Response) {
   const body = await response.json();
   expect(response.status(), JSON.stringify(body)).toBe(200);
@@ -29,10 +21,7 @@ async function data(response: APIResponse | Response) {
 }
 async function login(page: Page, email = process.env.ADMIN_EMAIL!) {
   await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute(
-    'data-hydrated',
-    'true',
-  );
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
   await page.locator('#identifier').fill(email);
   await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
   await page.getByRole('button', { name: '立即登录', exact: true }).click();
@@ -72,13 +61,9 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
   await login(page);
   // Setup uses public APIs. The actual failing/recovered execution and diagnosis are browser driven.
   const projects = (
-    await data(
-      await page.request.get('/api/dynamic/tpm_project/list?pageSize=100'),
-    )
+    await data(await page.request.get('/api/dynamic/tpm_project/list?pageSize=100'))
   ).records;
-  const project = projects.find(
-    (p: any) => p.tpm_pj_name === '华辰制造 · 供应链协同平台',
-  );
+  const project = projects.find((p: any) => p.tpm_pj_name === '华辰制造 · 供应链协同平台');
   expect(project).toBeTruthy();
   const suffix = randomUUID().replaceAll('-', '').slice(0, 10),
     taskName = `华辰制造 · 交付归档恢复 ${suffix}`;
@@ -99,8 +84,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
   );
   const taskPid = created.data.recordPid;
   expect(taskPid).toMatch(/^[0-9A-Z]{26}$/);
-  const task = async () =>
-    data(await page.request.get(`/api/dynamic/tpm_task/${taskPid}`));
+  const task = async () => data(await page.request.get(`/api/dynamic/tpm_task/${taskPid}`));
   expect((await task()).tpm_ts_description).toBe(original);
   const roleCode = `showcase_recovery_${suffix}`;
   const role = await data(
@@ -134,8 +118,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     'tpm.project.read',
     'model.tpm_project.read',
   ];
-  for (const code of [...grants, 'tpm.task.manage'])
-    expect(ids.has(code), code).toBe(true);
+  for (const code of [...grants, 'tpm.task.manage']) expect(ids.has(code), code).toBe(true);
   const setManage = async (granted: boolean) =>
     data(
       await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {
@@ -165,8 +148,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     await page.request.post('/api/automations', {
       data: {
         name: '华辰制造 · 交付归档与故障恢复 ' + suffix,
-        description:
-          '仅更新专属交付任务的归档说明。权限不足时保留失败，修正后通过设计器再次执行。',
+        description: '仅更新专属交付任务的归档说明。权限不足时保留失败，修正后通过设计器再次执行。',
         modelCode: 'tpm_task',
         triggerType: 'webhook',
         triggerConfig: { testRecordPid: taskPid },
@@ -194,20 +176,15 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     actor = await ctx.newPage();
   try {
     const identity = await login(actor, email);
-    expect(identity.permissions.roles.map((r: any) => r.code)).not.toContain(
-      'tenant_admin',
-    );
-    expect(identity.permissions.permissionCodes).not.toContain(
-      'tpm.task.manage',
-    );
+    expect(identity.permissions.roles.map((r: any) => r.code)).not.toContain('tenant_admin');
+    expect(identity.permissions.permissionCodes).not.toContain('tpm.task.manage');
     await menu(actor, '自动化');
     await actor.getByTestId(`btn-edit-${automation.pid}`).click();
     await expect(actor.getByTestId('btn-test-run')).toBeVisible();
     const run = async () => {
       const pending = actor.waitForResponse(
         (r) =>
-          new URL(r.url()).pathname ===
-            `/api/automations/${automation.pid}/trigger` &&
+          new URL(r.url()).pathname === `/api/automations/${automation.pid}/trigger` &&
           r.request().method() === 'POST',
       );
       await actor.getByTestId('btn-test-run').click();
@@ -230,18 +207,37 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
       ]),
     );
     expect((await task()).tpm_ts_description).toBe(original);
-    await expect(actor.getByTestId('automation-run-status')).toContainText(
-      /失败|Failed/i,
-    );
+    await expect(actor.getByTestId('automation-run-status')).toContainText(/失败|Failed/i);
     await expect(actor.getByTestId('automation-test-run-result')).toContainText(
       '缺少执行该业务动作所需的权限',
     );
+    await expect
+      .poll(async () => {
+        const canvas = actor.getByTestId('flow-canvas-shell');
+        const bounds = await canvas.boundingBox();
+        const nodes = await canvas.locator('.react-flow__node').evaluateAll((items) =>
+          items.map((item) => {
+            const r = item.getBoundingClientRect();
+            return { x: r.x, right: r.right, y: r.y, bottom: r.bottom };
+          }),
+        );
+        return (
+          !!bounds &&
+          nodes.length === 2 &&
+          nodes.every(
+            (node) =>
+              node.x >= bounds.x &&
+              node.right <= bounds.x + bounds.width &&
+              node.y >= bounds.y &&
+              node.bottom <= bounds.y + bounds.height,
+          )
+        );
+      })
+      .toBe(true);
     await shot(actor, 'SC12-failed');
     await actor.getByTestId('automation-runtime-trace-link').click();
     await expect(actor).toHaveURL(new RegExp(`logId=${failed.log.id}`));
-    await expect(actor.getByTestId('automation-run-status')).toContainText(
-      /失败|Failed/i,
-    );
+    await expect(actor.getByTestId('automation-run-status')).toContainText(/失败|Failed/i);
     await shot(actor, 'SC12-diagnosis');
     expect(failed.log.traceId).toBe(failed.traceId);
     expect(failed.traceId).toMatch(/^[a-f0-9]{32}$/);
@@ -251,9 +247,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
       `/ops/troubleshooting?traceId=${failed.traceId}`,
     );
     const correlatedResponse = actor.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname ===
-        `/api/observability/correlation/${failed.traceId}`,
+      (r) => new URL(r.url()).pathname === `/api/observability/correlation/${failed.traceId}`,
     );
     await traceLink.click();
     const correlated = await (await correlatedResponse).json();
@@ -262,14 +256,10 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
         (a: any) => a.commandCode === 'tpm:update_task' && a.success === false,
       ),
     ).toBe(true);
-    await expect(actor.getByTestId('troubleshooting-page')).toContainText(
-      'tpm:update_task',
-    );
+    await expect(actor.getByTestId('troubleshooting-page')).toContainText('tpm:update_task');
     await shot(actor, 'SC12-trace');
     await actor.goBack();
-    await expect(actor.getByTestId('automation-run-status')).toContainText(
-      /失败|Failed/i,
-    );
+    await expect(actor.getByTestId('automation-run-status')).toContainText(/失败|Failed/i);
 
     // The privileged maintenance change is explicit HTTP evidence, not a fabricated permission-editor UI action.
     await setManage(true);
@@ -280,21 +270,13 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     expect(successful.log.pid).not.toBe(failed.log.pid);
     expect(successful.log.triggerRecordPid).toBe(taskPid);
     expect((await task()).tpm_ts_description).toBe(recovered);
-    await expect(actor.getByTestId('automation-run-status')).toContainText(
-      /成功|Success/i,
-    );
+    await expect(actor.getByTestId('automation-run-status')).toContainText(/成功|Success/i);
     await shot(actor, 'SC12-recovered');
-    const logs = await data(
-      await page.request.get(`/api/automations/${automation.pid}/logs`),
-    );
+    const logs = await data(await page.request.get(`/api/automations/${automation.pid}/logs`));
     expect(
-      logs.filter((l: any) =>
-        [failed.log.pid, successful.log.pid].includes(l.pid),
-      ),
+      logs.filter((l: any) => [failed.log.pid, successful.log.pid].includes(l.pid)),
     ).toHaveLength(2);
-    expect(logs.find((l: any) => l.pid === failed.log.pid).status).toBe(
-      'failed',
-    );
+    expect(logs.find((l: any) => l.pid === failed.log.pid).status).toBe('failed');
     await menu(actor, '任务');
     const row = actor.getByRole('row').filter({ hasText: taskName });
     await row.getByRole('button', { name: /查看|详情/ }).click();
@@ -316,8 +298,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
           successful,
           businessBefore: original,
           businessAfter: recovered,
-          maintenanceDriver:
-            'public permission-matrix API; no owner/admin role changed',
+          maintenanceDriver: 'public permission-matrix API; no owner/admin role changed',
           recoveryDriver: 'browser Test Run creates new run',
           historicalFailureRetained: true,
         },

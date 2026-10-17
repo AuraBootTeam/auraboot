@@ -50,6 +50,11 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.getByRole('button', { name: '立即登录', exact: true }).click();
   await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
   await expect(page).toHaveURL(/\/p\/tpm_project$/);
+  const identity = await (await page.request.get('/api/auth/me')).json();
+  expect(String(identity.code)).toBe('0');
+  expect(String(identity.data.user.tenantId)).toBe(process.env.AURA_ADMIN_TENANT_ID);
+  expect(identity.data.user.email).toBe(DEFAULT_TEST_ACCOUNT.email);
+
   await expect(page.getByRole('table')).toContainText(customer);
 
   const customerResponse = await page.request.get('/api/dynamic/tpm_customer/list', {
@@ -87,10 +92,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
     expected.set(project.tpm_pj_name, (expected.get(project.tpm_pj_name) || 0) + budget);
   }
 
-  await page.waitForFunction(() => {
-    const toggle = document.querySelector('[data-testid="ai-panel-toggle"]');
-    return toggle && Object.keys(toggle).some((key) => key.startsWith('__reactProps$'));
-  });
+  await expect(page.getByTestId('ai-panel-toggle')).toBeVisible({ timeout: 15000 });
   await page.getByTestId('ai-panel-toggle').click();
   const panel = page.getByTestId('aurabot-panel');
   await expect(panel).toBeVisible();
