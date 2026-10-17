@@ -23,6 +23,8 @@ import {
   resolveVisibleDetailTabsFromBlocks,
   resolvePermissionHiddenDataSourceIds,
   resolveVisibleTopLevelDetailBlocks,
+  resolvePersistentDetailHeaderBlocks,
+  shouldRenderInlineDetailApproval,
   resolveDetailHeaderLayoutClasses,
   resolveDetailPdfFileName,
   shouldRenderDefaultDetailEditAction,
@@ -1131,4 +1133,25 @@ describe('resolvePermissionHiddenDataSourceIds with cross-surface refresh lists'
       new Set(['processFeeMetrics', 'processFeeRuleHits', 'outputReadiness']),
     );
   });
+});
+
+describe('persistent detail task blocks',()=>{
+  it('keeps specialized workflow headers above tabs without duplicating them in the body',()=>{
+    const task = {id:'task',blockType:'workflow-panel',detailPlacement:'header',permissionCode:'bpm.process.read'};
+    const history = {id:'history',blockType:'workflow-panel'};
+    const tabs = {id:'tabs',blockType:'tabs',detailPlacement:'header'};
+    const blocks = [task, history, tabs] as any;
+    expect(resolvePersistentDetailHeaderBlocks(blocks)).toEqual([task]);
+    expect(resolveVisibleTopLevelDetailBlocks(blocks,()=>true)).toEqual([history]);
+  });
+});
+
+it('does not reserve persistent header space for hidden or unauthorized task blocks',()=>{
+  const block={id:'task',blockType:'workflow-panel',detailPlacement:'header',permissionCode:'workflow.read',visibleWhen:'submitted'} as any;
+  expect(resolvePersistentDetailHeaderBlocks([block],()=>false,()=>true)).toEqual([]);
+  expect(resolvePersistentDetailHeaderBlocks([block],()=>true,()=>false)).toEqual([]);
+});
+it('lets an explicitly composed detail opt out of the automatic approval report',()=>{
+  expect(shouldRenderInlineDetailApproval({extension:{showInlineApprovalPanel:false}})).toBe(false);
+  expect(shouldRenderInlineDetailApproval({})).toBe(true);
 });
