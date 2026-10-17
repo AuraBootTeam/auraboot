@@ -80,7 +80,7 @@ function AdminLayoutContent() {
           <PageContent />
         </div>
 
-        <div className={aiPanelOpen ? 'contents' : 'hidden'}>
+        <div className={aiPanelOpen ? `flex min-h-0 shrink-0 ${workspace ? 'pt-14' : ''}` : 'hidden'} data-testid="ai-panel-dock">
           <AuraBotPanel />
         </div>
       </div>

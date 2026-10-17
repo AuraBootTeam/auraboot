@@ -101,6 +101,7 @@ test('SC06: live customer notes → reviewed draft → undo → manual correctio
   ).toBeTruthy();
   const name = `华辰制造${Date.now().toString(36)}有限公司`;
   const source = `今天客户会议纪要比较零散：先核对公司名称，正式客户名称是“${name}”。对接人为采购部张经理。请只整理明确的客户名称和客户联系人，不要推测其他资料。`;
+  page.setDefaultTimeout(20000);
   await page.goto('/login');
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
   await page.locator('#identifier').fill(DEFAULT_TEST_ACCOUNT.email);

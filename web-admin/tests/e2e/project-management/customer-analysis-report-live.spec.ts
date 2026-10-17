@@ -44,6 +44,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   execFileSync('pdftotext', ['-v'], { stdio: 'pipe' });
   const customer = process.env.PW_REPORT_CUSTOMER_NAME || '华辰制造';
 
+  page.setDefaultTimeout(20000);
   await page.goto('/login');
   await page.locator('input#identifier, input#email').fill(DEFAULT_TEST_ACCOUNT.email);
   await page.locator('input#password').fill(DEFAULT_TEST_ACCOUNT.password);
@@ -96,6 +97,8 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.getByTestId('ai-panel-toggle').click();
   const panel = page.getByTestId('aurabot-panel');
   await expect(panel).toBeVisible();
+  const historyBounds = await panel.getByTestId('aurabot-history-trigger').boundingBox();
+  expect(historyBounds?.y).toBeGreaterThanOrEqual(56);
   await panel.getByTestId('aurabot-history-trigger').click();
   await panel.getByTestId('aurabot-new-session').click();
   await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);

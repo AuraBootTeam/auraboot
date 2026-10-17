@@ -7,6 +7,7 @@ import {
   MiniMap,
   useReactFlow,
   useNodesInitialized,
+  useStore,
   type Connection,
   type NodeTypes,
   type EdgeTypes,
@@ -27,6 +28,7 @@ export interface FlowCanvasProps {
   showMinimap?: boolean;
   showControls?: boolean;
   className?: string;
+  fitExistingGraph?: boolean;
 }
 
 /**
@@ -57,20 +59,16 @@ function ScreenToFlowPositionCapture({
 }
 
 /** Refit existing graphs when adjacent result panels change the canvas width. */
-function ExistingGraphViewport({ enabled, container }: {
-  enabled: boolean;
-  container: React.RefObject<HTMLDivElement | null>;
-}) {
+function ExistingGraphViewport({ enabled }: { enabled: boolean }) {
   const { fitView } = useReactFlow();
   const initialized = useNodesInitialized();
+  const width = useStore(state => state.width);
+  const height = useStore(state => state.height);
   useEffect(() => {
-    if (!enabled || !initialized || !container.current) return;
-    const observer = new ResizeObserver(() => {
+    if (enabled && initialized && width > 0 && height > 0) {
       void fitView({ padding: 0.2, maxZoom: 1 });
-    });
-    observer.observe(container.current);
-    return () => observer.disconnect();
-  }, [enabled, initialized, container, fitView]);
+    }
+  }, [enabled, initialized, width, height, fitView]);
   return null;
 }
 
@@ -79,6 +77,7 @@ export function FlowCanvas({
   showMinimap = true,
   showControls = true,
   className,
+  fitExistingGraph,
 }: FlowCanvasProps) {
   const {
     nodes,
@@ -110,8 +109,7 @@ export function FlowCanvas({
     // node drop.
     hadInitialNodesRef.current = nodes.length > 0;
   }
-  const fitViewActive = hadInitialNodesRef.current;
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const fitViewActive = fitExistingGraph ?? hadInitialNodesRef.current;
 
   // Ref to hold the screenToFlowPosition function captured from inside the
   // ReactFlow context by ScreenToFlowPositionCapture below.
@@ -293,7 +291,7 @@ export function FlowCanvas({
   }, []);
 
   return (
-    <div ref={canvasRef} className={`min-h-0 flex-1 ${className || ''}`}>
+    <div className={`min-h-0 flex-1 ${className || ''}`}>
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -321,7 +319,7 @@ export function FlowCanvas({
             its context. It stores screenToFlowPosition in a ref so onDrop
             can convert viewport→flow coordinates at drop time. */}
         <ScreenToFlowPositionCapture onCapture={handleCapture} />
-        <ExistingGraphViewport enabled={fitViewActive} container={canvasRef} />
+        <ExistingGraphViewport enabled={fitViewActive} />
         <Background />
         {showControls && <Controls />}
         {showMinimap && <MiniMap />}
