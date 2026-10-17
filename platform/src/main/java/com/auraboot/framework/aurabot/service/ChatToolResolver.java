@@ -289,7 +289,7 @@ public class ChatToolResolver {
             LlmChatRequest.Tool.builder()
                     .name("aurabot_chat-bi")
                     .description("Analyze business data within AuraBot. First use action=catalog for governed metrics, "
-                            + "then action=query with a catalog semanticModelCode, metrics, dimensions and filters. "
+                            + "then action=query with a catalog semanticModelCode, metrics, dimensions and filters. CRITICAL: before any query about records belonging to a named customer/person/business entity, resolve that name with platform_resolve_reference(modelCode, fieldCode, displayValue), then filter the declared reference field EQ returned storedValue. Reference fields store IDs, not labels. Never use a project-name prefix or legacy text to decide customer membership. "
                             + "Ask the user to clarify ambiguous metrics. Preserve timeRange, orderBy and limit. "
                             + "Raw model aggregation is available for explicit ad-hoc exploration; do not substitute "
                             + "raw aggregates for unavailable governed KPIs.")

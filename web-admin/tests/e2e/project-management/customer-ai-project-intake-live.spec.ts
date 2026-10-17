@@ -1,5 +1,5 @@
 /** Live typed extraction through the generic DSL form, with reference and manual-value protection. */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { navigateToMenuByClick } from '../helpers';
@@ -33,7 +33,8 @@ test('SC03 live delivery notes → typed budget/date draft → preserved manual 
   const fields = new Map(request.formFill.fields.map((f:any)=>[f.code,f]));
   expect(fields.get('tpm_pj_budget')).toMatchObject({type:'number',locked:false});
   expect(fields.get('tpm_pj_end_date')).toMatchObject({format:'date',locked:false});
-  for(const code of ['tpm_pj_customer_id','tpm_pj_owner_user','tpm_pj_status'])expect(fields.get(code)).toMatchObject({locked:true});
+  // Locked/reference fields are excluded from the provider contract, not merely advisory locks.
+  for(const code of ['tpm_pj_customer_id','tpm_pj_owner_user','tpm_pj_status'])expect(fields.has(code)).toBe(false);
   expect(await stream.text()).toContain('"action":"form_fill"');
   await expect(page.getByTestId('ai-fill-dialog')).toBeHidden();
   await expect(page.locator('#tpm_pj_name')).toHaveValue(name);
