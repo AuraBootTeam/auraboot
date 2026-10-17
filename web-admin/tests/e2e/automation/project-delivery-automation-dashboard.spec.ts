@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 import {
@@ -28,10 +29,7 @@ const original = '[AuraBoot demo] Waiting for archival';
 const run = randomUUID().slice(0, 8);
 const automationName = `客户交付自动归档-${run}`;
 const dashboardTitle = `客户交付看板-${run}`;
-const fixtureRoot = path.resolve(
-  process.cwd(),
-  '../plugins/project-management/examples',
-);
+const fixtureRoot = fileURLToPath(new URL('../../../../plugins/project-management/examples', import.meta.url));
 
 async function record(page: Page, pid: string) {
   const response = await page.request.get(`/api/dynamic/tpm_task/${pid}`);
