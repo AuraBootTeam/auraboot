@@ -1,0 +1,334 @@
+{
+  "pageKey": "tpm_project_ai_intake",
+  "name:zh-CN": "AI整理交付需求",
+  "name:en": "AI delivery intake",
+  "modelCode": "tpm_project",
+  "kind": "form",
+  "schemaVersion": 4,
+  "title": {
+    "zh-CN": "AI整理交付需求",
+    "en": "AI delivery intake"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "delivery_intake_ai",
+      "blockType": "ai-fill-banner",
+      "placeholder": {
+        "zh-CN": "粘贴虚构客户纪要，整理项目名称、交付范围、预算、日期与风险。未确定的内容请留空。",
+        "en": "Paste fictional notes to extract project, scope, budget, dates and risks. Leave unknown facts blank."
+      },
+      "examples": [
+        "虚构纪要：华辰制造 · 供应商对账升级。范围为台账导入、对账联调和交付培训。预算128000.50元，交付日期2026-11-20，开始日期未定。风险：客户测试环境未开放。"
+      ]
+    },
+    {
+      "id": "outcome",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en": "Project information"
+      },
+      "fields": [
+        {
+          "field": "tpm_pj_name",
+          "colSpan": 12,
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：客户名称 · 项目名称",
+              "en": "e.g. Customer · Project name"
+            },
+            "helpText": {
+              "zh-CN": "使用客户名称和交付范围命名，便于检索与报告识别。",
+              "en": "Use the customer and delivery scope for searchable project names."
+            }
+          }
+        },
+        {
+          "field": "tpm_pj_customer_id",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "按名称搜索空间内客户",
+              "en": "Search customers in this space"
+            },
+            "helpText": {
+              "zh-CN": "关联当前空间的客户，客户联系人从客户资料读取。",
+              "en": "Link a customer in this space; contact details come from that record."
+            }
+          },
+          "required": true
+        },
+        {
+          "field": "tpm_pj_owner_user",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "按姓名搜索空间成员",
+              "en": "Search space members"
+            },
+            "helpText": {
+              "zh-CN": "选择对交付进展和下一步行动负责的空间成员。",
+              "en": "Select the space member responsible for delivery and next actions."
+            }
+          },
+          "required": true
+        },
+        {
+          "field": "tpm_pj_description",
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：完成会员迁移、积分联调与门店培训",
+              "en": "e.g. Migrate members, integrate points and train stores"
+            },
+            "helpText": {
+              "zh-CN": "写清本期交付范围和可验收的成果。",
+              "en": "Describe the delivery scope and verifiable outcomes."
+            }
+          },
+          "label": {
+            "zh-CN": "项目说明",
+            "en": "Project description"
+          }
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "交付计划",
+        "en": "Delivery plan"
+      },
+      "fields": [
+        {
+          "field": "tpm_pj_start_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_end_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_budget",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：128000",
+              "en": "e.g. 128000"
+            },
+            "helpText": {
+              "zh-CN": "人民币元（CNY）",
+              "en": "Chinese yuan (CNY)"
+            }
+          }
+        },
+        {
+          "field": "tpm_pj_status",
+          "colSpan": 6,
+          "readOnly": true,
+          "label": {
+            "zh-CN": "当前阶段",
+            "en": "Current stage"
+          },
+          "props": {
+            "helpText": {
+              "zh-CN": "新项目从需求确认开始，创建后通过项目动作推进阶段。",
+              "en": "New projects start in requirements; use project actions to advance their stage."
+            }
+          },
+          "defaultValue": "planning"
+        }
+      ],
+      "description": {
+        "zh-CN": "用于安排项目节奏，也方便团队识别即将到期的任务。",
+        "en": "Schedule delivery and identify upcoming deadlines."
+      }
+    },
+    {
+      "id": "delivery_actions",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "风险与下一步",
+        "en": "Risks and next steps"
+      },
+      "fields": [
+        {
+          "field": "tpm_pj_risk_summary",
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：客户测试环境尚未开放，可能影响联调",
+              "en": "Describe the delivery risk or the next owned action."
+            },
+            "helpText": {
+              "zh-CN": "说明会影响交付的问题；无阻塞时填写当前检查结论。",
+              "en": "Describe delivery risks or record that no blockers are open."
+            }
+          }
+        },
+        {
+          "field": "tpm_pj_next_action",
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：周三前由周宁确认测试环境和联调时间",
+              "en": "Describe the delivery risk or the next owned action."
+            },
+            "helpText": {
+              "zh-CN": "写清由谁在什么时间完成哪一项行动。",
+              "en": "State who will do what and by when."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tpm:create_project",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存项目",
+            "en": "Save project"
+          }
+        },
+        {
+          "code": "cancel",
+          "action": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          }
+        }
+      ],
+      "area": "footer"
+    }
+  ],
+  "extension": {
+    "formWidth": "comfortable",
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目协作",
+      "en": "Project collaboration"
+    },
+    "createTitle": {
+      "zh-CN": "AI整理交付需求",
+      "en": "AI delivery intake"
+    },
+    "editTitle": {
+      "zh-CN": "编辑项目",
+      "en": "Edit project"
+    },
+    "pageDescription": {
+      "zh-CN": "让AI整理金额、日期和范围；客户与负责人由你选择，核对后保存。",
+      "en": "Extract budget, dates and scope. Choose the customer and owner yourself, then review and save."
+    },
+    "footerNote": {
+      "zh-CN": "AI只填写草稿中的空值，保留人工输入。没有说明的日期不补造，客户与负责人不由AI猜测。",
+      "en": "AI fills empty draft fields and preserves manual input. Unknown dates stay blank; reference identities remain a human choice."
+    },
+    "formGuidance": {
+      "title": {
+        "zh-CN": "从客户纪要到交付草稿",
+        "en": "From notes to a delivery draft"
+      },
+      "description": {
+        "zh-CN": "先选择客户与负责人，再整理和核对，最后正常保存。",
+        "en": "Choose reference records, extract and review, then save normally."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh-CN": "粘贴纪要",
+            "en": "Paste notes"
+          },
+          "description": {
+            "zh-CN": "提供明确的预算、日期、范围和风险。",
+            "en": "Include explicit budget, dates, scope and risks."
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "核对依据与缺项",
+            "en": "Review evidence and gaps"
+          },
+          "description": {
+            "zh-CN": "已有人工内容保持不变，缺项由你补充。",
+            "en": "Manual values remain; fill missing facts yourself."
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "确认后保存",
+            "en": "Save after review"
+          },
+          "description": {
+            "zh-CN": "AI不会替你创建项目或推进阶段。",
+            "en": "AI does not create projects or change lifecycle state."
+          }
+        }
+      ]
+    },
+    "linkFileAttachments": true,
+    "attachmentFields": [
+      "tpm_pj_files"
+    ],
+    "editGuidance": {
+      "title": {
+        "zh-CN": "完善项目的下一步",
+        "en": "Next steps for this project"
+      },
+      "description": {
+        "zh-CN": "交付阶段通过项目动作推进，整体进度由负责人汇报。",
+        "en": "Use project actions to advance the stage; the owner reports overall progress."
+      },
+      "steps": [
+        {
+          "title": {
+            "zh-CN": "确认需求范围",
+            "en": "Confirm requirements"
+          },
+          "description": {
+            "zh-CN": "明确客户期望与交付边界",
+            "en": "Agree on customer expectations and delivery scope"
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "拆分交付里程碑",
+            "en": "Plan delivery milestones"
+          },
+          "description": {
+            "zh-CN": "为每个阶段安排内容和时间",
+            "en": "Define each deliverable and target date"
+          }
+        },
+        {
+          "title": {
+            "zh-CN": "跟进进度与验收",
+            "en": "Track progress and acceptance"
+          },
+          "description": {
+            "zh-CN": "保留变更记录，减少沟通遗漏",
+            "en": "Keep change history to prevent missed communication"
+          }
+        }
+      ],
+      "note": {
+        "zh-CN": "项目属于当前空间。具体查看与编辑范围由成员权限决定。",
+        "en": "The project belongs to this space. Member permissions govern access."
+      }
+    },
+    "afterSubmitRedirect": "/p/tpm_project",
+    "backTo": "/p/tpm_project"
+  }
+}

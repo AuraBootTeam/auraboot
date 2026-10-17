@@ -65,6 +65,19 @@
     "visible": true
   },
   {
+    "code": "tpm_project_ai_intake",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "AI整理交付需求",
+    "name:en": "AI delivery intake",
+    "path": "/p/c/tpm_project_ai_intake",
+    "component": null,
+    "icon": "sparkles",
+    "type": 1,
+    "permissionCode": "tpm.project.manage",
+    "orderNo": 4,
+    "visible": true
+  },
+  {
     "code": "tpm_acceptances",
     "parentCode": "tpm_root",
     "name:zh-CN": "交付验收",

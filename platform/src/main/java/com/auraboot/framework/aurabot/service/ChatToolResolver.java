@@ -302,11 +302,18 @@ public class ChatToolResolver {
      * tools remain the primary path and SQL cannot bypass their safer contracts.
      * chat-bi is always present (universal data-query primitive, never removed).
      */
+    private static final LlmChatRequest.Tool PLATFORM_REFERENCE_TOOL = LlmChatRequest.Tool.builder()
+            .name("platform_resolve_reference")
+            .description("Resolve a customer or other business reference label to its exact stored value using its DSL reference field. Use before filtering reference fields; do not guess IDs or infer relationships from names.")
+            .inputSchema(com.auraboot.framework.meta.service.ModelReferenceLookupService.inputSchema()).build();
+
     private void ensurePlatformTools(List<LlmChatRequest.Tool> tools) {
         Set<String> existing = tools.stream()
                 .map(LlmChatRequest.Tool::getName)
                 .collect(java.util.stream.Collectors.toSet());
 
+        if (!existing.contains(PLATFORM_REFERENCE_TOOL.getName())) tools.add(PLATFORM_REFERENCE_TOOL);
+        cacheSyntheticPlatformTool(PLATFORM_REFERENCE_TOOL, "platform.resolve_reference", true, "L0");
         if (!existing.contains(PLATFORM_FILL_FORM_TOOL.getName())) {
             tools.add(PLATFORM_FILL_FORM_TOOL);
         }

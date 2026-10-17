@@ -146,13 +146,31 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(detail.spans.filter((span: any) => span.type === 'generation').every((span: any) => span.inputTokens > 0 && span.outputTokens > 0)).toBe(true);
   expect(typeof detail.trace.output).toBe('string');
   expect(detail.trace.output.length).toBeGreaterThan(80);
+  expect(detail.spans.some((span:any) => span.toolCalls?.some((call:any) => call.name === 'platform_resolve_reference'))).toBe(true);
   const reviewedAnalysis = 'AI分析（人工核对后写入；建议不代替审批结论）\n' + detail.trace.output;
   for (const name of expected.keys()) expect(detail.trace.output).toContain(name);
 
-  const card = panel.locator('[data-testid="chatbi-result-card"][data-model-code="tpm_project"][data-dimensions="tpm_pj_name"]');
+  // The model may perform auxiliary reads. Select a result by its actual scoped query,
+  // never by DOM order or a requirement that a real LLM call exactly one tool.
+  const candidates = new Map<string, any>();
+  for (const line of streamBody.split('\n')) {
+    if (!line.startsWith('data:')) continue;
+    const event = JSON.parse(line.slice(5));
+    const result = event.data?.data || event.result?.data;
+    if (result?.analysisId && result.modelCode === 'tpm_project' &&
+        result.dataSource?.dimensions?.includes('tpm_pj_name') &&
+        result.dataSource?.metrics?.some((m:any) => m.field === 'tpm_pj_budget' && m.aggregation === 'sum') &&
+        result.dataSource?.filters?.some((f:any) => f.field === 'tpm_pj_customer_id' && f.operator === 'eq' && f.value === customerPid)) {
+      candidates.set(result.analysisId, result);
+    }
+  }
+  expect(candidates.size, 'AI must resolve the real customer relationship and produce a scoped budget query').toBeGreaterThan(0);
+  const selected = [...candidates.values()].at(-1)!;
+  expect(selected.records).toHaveLength(expected.size);
+  const card = panel.locator(`[data-testid="chatbi-result-card"][data-analysis-id="${selected.analysisId}"]`);
   await expect(card).toHaveCount(1);
   await expect(card).toHaveAttribute('data-row-count', String(expected.size));
-  for (const name of expected.keys()) await expect(card).toContainText(name);
+  await expect(card).toBeVisible();
   await page.screenshot({
     path: join(evidence!, 'SC06-report-01-real-analysis.png'),
     fullPage: true,
@@ -173,8 +191,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
     query.filters.some(
       (filter: { field: string; operator: string; value: unknown }) =>
         filter.operator === 'eq' &&
-        ((filter.field === 'tpm_pj_customer' && filter.value === customer) ||
-          (filter.field === 'tpm_pj_customer_id' && filter.value === customerPid)),
+        filter.field === 'tpm_pj_customer_id' && filter.value === customerPid,
     ),
   ).toBe(true);
   const metric = query.metrics.find(
