@@ -4,7 +4,7 @@ import { test, expect } from '../../fixtures';
 import { ensureSidebarExpanded, uniqueId } from '../helpers';
 import { makeQuoteRoleUser, ensureQuoteRoleUser, openQuoteRolePage,
   createCorrectedBomWorkbook, createQuoteFromReviewedBom, openQuoteDetailFromList,
-  executeCommand, readDynamicRecord, queryDynamicRecords, pollAsyncTaskResult, cleanupRows, type QuoteRoleUser, type CreatedRows,
+  executeCommand, readDynamicRecord, queryDynamicRecords, pollAsyncTaskResult, cleanupRows, cleanupImmutableQuoteArtifacts, type QuoteRoleUser, type CreatedRows,
 } from './quote-e2e-helpers';
 import { saveWorkbookDownload } from './workbook-download-evidence';
 
@@ -144,6 +144,12 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
         { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
       ]);
       expect(artifactHistory).toHaveLength(4);
+      const rejectedDelete = await admin.request.delete(`/api/dynamic/ab_document_artifact/${artifactHistory[0].pid}`);
+      expect(rejectedDelete.status()).toBe(400);
+      expect(String((await rejectedDelete.json()).context)).toContain('immutable');
+      expect(await queryDynamicRecords(admin, 'ab_document_artifact', [
+        { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
+      ])).toHaveLength(4);
       for (const row of artifactHistory.filter(row => Number(row.ab_da_document_version) === 2)) {
         created.rows.push({ model: 'ab_document_artifact', pid: String(row.pid) });
       }
@@ -184,8 +190,11 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       await info.attach('priced-document-failure-page', { body: JSON.stringify({ url: page.url(), text: await page.locator('body').innerText() }), contentType: 'application/json' });
       throw error;
     } finally {
-      await cleanupRows(admin, created);
-      await context.close();
+      try {
+        const cleanup = await cleanupImmutableQuoteArtifacts(created);
+        await info.attach('immutable-artifact-fixture-cleanup', { body: JSON.stringify(cleanup), contentType: 'application/json' });
+        await cleanupRows(admin, created);
+      } finally { await context.close(); }
     }
   });
 });

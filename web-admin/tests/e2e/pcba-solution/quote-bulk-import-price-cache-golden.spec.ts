@@ -154,6 +154,7 @@ test.describe('QuoteOps bulk import + current sourcing golden', () => {
       for (const mpn of SYNTHETIC_MPNS) {
         const historicalLineId = await dynamicCreate(page, 'qo_quote_line_common', {
           qo_ql_quote_id: historicalQuote.quoteId, qo_ql_mpn: mpn, qo_ql_qty: 1,
+          qo_ql_item_type: 'component', qo_ql_description: `Historical fixture ${mpn}`,
         }, created.rows);
         await dynamicCreate(
           page,

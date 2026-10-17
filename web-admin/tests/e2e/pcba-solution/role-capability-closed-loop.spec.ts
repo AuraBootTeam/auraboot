@@ -1462,7 +1462,7 @@ test('dashboard management capability governs customer 360 editing and revocatio
     const rollbackEndpoint = `${versionsEndpoint}/${firstVersion.pid}/rollback`;
     const historyLoading = member.waitForResponse(response => new URL(response.url()).origin === origin
       && new URL(response.url()).pathname === versionsEndpoint && response.request().method() === 'GET');
-    await member.getByTestId('designer-toolbar').getByRole('button', { name: /^History/ }).click();
+    await member.getByTestId('designer-toolbar').getByRole('button', { name: /^(?:History|版本历史)/ }).click();
     const historyResponse = await historyLoading;
     expect(historyResponse.status()).toBe(200);
     expect(String((await historyResponse.json()).code)).toBe('0');

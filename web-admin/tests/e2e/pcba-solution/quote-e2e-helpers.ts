@@ -4,7 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { utils as XLSXUtils, write } from 'xlsx';
 import { expect, test } from '../../fixtures';
-import { FixtureCleanupJournal, type FixtureRow } from './fixture-cleanup';
+import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, type FixtureRow } from './fixture-cleanup';
 import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   clickRowActionByLocator,
@@ -770,6 +770,27 @@ export async function queryNamedDataSourceRecords(
   ).toBe(true);
   expect(String((body as any).code), `${queryCode} datasource should return code=0`).toBe('0');
   return extractRecords(body);
+}
+
+/** Remove only this fixture's immutable outputs in its numbered nonproduction database. */
+export async function cleanupImmutableQuoteArtifacts(created: CreatedRows) {
+  const artifactIds = [...new Set(created.rows.filter(row => row.model === 'ab_document_artifact').map(row => row.pid))];
+  if (!artifactIds.length) return { artifactIds, deletedIds: [] as string[] };
+  const { client, database } = await openPgClient();
+  try {
+    const query = immutableQuoteArtifactCleanup(database, created.quoteId, artifactIds);
+    await client.query('BEGIN');
+    try {
+      const result = await client.query(query.text, query.values);
+      const deletedIds = result.rows.map(row => String(row.pid));
+      expect([...deletedIds].sort(), 'Only exact owned quote artifact fixtures may be purged').toEqual([...artifactIds].sort());
+      await client.query('COMMIT');
+      return { database, quoteId: created.quoteId, artifactIds, deletedIds };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
+  } finally { await client.end(); }
 }
 
 export async function cleanupRows(page: Page, created: CreatedRows): Promise<void> {
