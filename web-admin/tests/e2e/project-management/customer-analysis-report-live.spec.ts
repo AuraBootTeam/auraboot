@@ -100,7 +100,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await panel.getByTestId('aurabot-history-trigger').click();
   await panel.getByTestId('aurabot-new-session').click();
   await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
-  const question = `${customer}名下项目的预算各是多少？请按所属客户关联查询并按项目名称列表，简短说明预算不是收入。`;
+  const question = `${customer}名下项目的预算各是多少？请先重新核对客户记录，再按所属客户关联查询并按项目名称列表，简短说明预算不是收入。`;
   const streamPromise = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/ai/aurabot/chat/stream' &&

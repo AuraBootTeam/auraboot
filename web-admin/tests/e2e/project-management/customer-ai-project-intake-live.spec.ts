@@ -38,7 +38,7 @@ test('SC03 live delivery notes → typed budget/date draft → preserved manual 
   expect(await stream.text()).toContain('"action":"form_fill"');
   await expect(page.getByTestId('ai-fill-dialog')).toBeHidden();
   await expect(page.locator('#tpm_pj_name')).toHaveValue(name);
-  await expect(page.locator('#tpm_pj_budget')).toHaveValue('128000.5');
+  await expect(page.locator('#tpm_pj_budget')).toHaveAttribute('aria-valuenow','128000.5');
   await expect(page.locator('#tpm_pj_end_date')).toHaveValue('2026-11-20');
   await expect(page.locator('#tpm_pj_start_date')).toHaveValue('');
   await expect(page.locator('#tpm_pj_description')).toHaveValue(/对账联调/);
