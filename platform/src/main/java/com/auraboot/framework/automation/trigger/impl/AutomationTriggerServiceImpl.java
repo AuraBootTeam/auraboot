@@ -75,6 +75,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private TenantMemberService tenantMemberService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.micrometer.tracing.Tracer tracer;
+
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
     /** Max concurrent executions per automation rule (prevents thread pool exhaustion from batch events) */
@@ -607,10 +610,16 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     }
 
     private Map<String, Object> prepareExecutionTriggerPayload(Automation automation, Map<String, Object> payload) {
-        if (payload != null && payload.get("decision") instanceof Map<?, ?>) {
-            return payload;
+        Map<String, Object> enriched = payload != null && payload.get("decision") instanceof Map<?, ?>
+                ? payload : withDecision(automation, payload);
+        Map<String, Object> execution = new java.util.LinkedHashMap<>(enriched != null ? enriched : Map.of());
+        // Correlation is observation metadata, never a caller-supplied business variable.
+        execution.remove("runtimeTraceId");
+        String runtimeTraceId = com.auraboot.framework.observability.TraceCorrelation.traceId(tracer);
+        if (StringUtils.hasText(runtimeTraceId)) {
+            execution.put("runtimeTraceId", runtimeTraceId);
         }
-        return withDecision(automation, payload);
+        return execution;
     }
 
     /**

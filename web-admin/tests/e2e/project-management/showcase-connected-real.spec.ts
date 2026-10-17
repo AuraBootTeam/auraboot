@@ -234,7 +234,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
       /失败|Failed/i,
     );
     await expect(actor.getByTestId('automation-test-run-result')).toContainText(
-      'tpm.task.manage',
+      '缺少执行该业务动作所需的权限',
     );
     await shot(actor, 'SC12-failed');
     await actor.getByTestId('automation-runtime-trace-link').click();
@@ -243,6 +243,34 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
       /失败|Failed/i,
     );
     await shot(actor, 'SC12-diagnosis');
+    expect(failed.log.traceId).toBe(failed.traceId);
+    expect(failed.traceId).toMatch(/^[a-f0-9]{32}$/);
+    const traceLink = actor.getByTestId('automation-distributed-trace-link');
+    await expect(traceLink).toHaveAttribute(
+      'href',
+      `/ops/troubleshooting?traceId=${failed.traceId}`,
+    );
+    const correlatedResponse = actor.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname ===
+        `/api/observability/correlation/${failed.traceId}`,
+    );
+    await traceLink.click();
+    const correlated = await (await correlatedResponse).json();
+    expect(
+      correlated.commandAudits.some(
+        (a: any) => a.commandCode === 'tpm:update_task' && a.success === false,
+      ),
+    ).toBe(true);
+    await expect(actor.getByTestId('troubleshooting-page')).toContainText(
+      'tpm:update_task',
+    );
+    await shot(actor, 'SC12-trace');
+    await actor.goBack();
+    await expect(actor.getByTestId('automation-run-status')).toContainText(
+      /失败|Failed/i,
+    );
+
     // The privileged maintenance change is explicit HTTP evidence, not a fabricated permission-editor UI action.
     await setManage(true);
     const updated = await data(await actor.request.get('/api/auth/me'));
@@ -270,6 +298,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     await menu(actor, '任务');
     const row = actor.getByRole('row').filter({ hasText: taskName });
     await row.getByRole('button', { name: /查看|详情/ }).click();
+    await expect(actor).toHaveURL(new RegExp(`/p/tpm_task/view/${taskPid}$`));
     await actor.reload();
     await expect(actor.getByRole('main')).toContainText(recovered);
     await shot(actor, 'SC12-persisted');
@@ -296,31 +325,6 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
         2,
       ),
     );
-    // Correlation must be proven against the actual response, never filled with a made-up ID.
-    expect(
-      failed.traceId,
-      'the failed run must expose a real distributed trace ID',
-    ).toMatch(/^[a-f0-9]{32}$/);
-    await menu(page, '鹰眼排障台');
-    await page.getByTestId('trace-id-input').fill(failed.traceId!);
-    const query = page.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname ===
-        `/api/observability/correlation/${failed.traceId}`,
-    );
-    await page.getByTestId('trace-query-btn').click();
-    const correlation = await query;
-    expect(correlation.status()).toBe(200);
-    const correlated = await correlation.json();
-    expect(
-      correlated.commandAudits.some(
-        (a: any) => a.commandCode === 'tpm:update_task' && a.success === false,
-      ),
-    ).toBe(true);
-    await expect(page.getByTestId('troubleshooting-page')).toContainText(
-      'tpm:update_task',
-    );
-    await shot(page, 'SC12-trace');
   } finally {
     await ctx.close();
   }

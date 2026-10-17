@@ -31,6 +31,8 @@ public class AutomationLogDTO {
 
     private String triggerType;
     private String triggerRecordPid;
+    /** Observed request/worker trace retained with this specific run. */
+    private String traceId;
     private Map<String, Object> triggerPayload;
 
     private String status;
