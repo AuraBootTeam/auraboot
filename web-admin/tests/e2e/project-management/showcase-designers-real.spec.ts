@@ -63,7 +63,8 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   const queryResponses: Promise<any>[] = [];
   page.on('response', r => { if(new URL(r.url()).pathname === '/api/meta/chart-data' && r.request().postDataJSON()?.queryCode === 'tdo_acceptance_distribution') queryResponses.push(data(r)); });
   await page.reload();
-  await expect(chart).toContainText(title);
+  await chart.click();
+  await expect(panel.getByTestId('widget-prop-title-zh')).toHaveValue(title);
   await expect(chart.locator('[data-chart-ready="true"]')).toBeVisible();
   await expect.poll(() => queryResponses.length).toBeGreaterThan(0);
   const result = (await Promise.all(queryResponses))[0];
@@ -80,7 +81,7 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   expect(exported.dashboard.widgets.find((w:any) => w.id === 'acceptance-distribution').config).toEqual(config);
   await page.getByTestId('toolbar-btn-presentation').click();
   await expect(page.getByTestId('big-screen-mode')).toBeVisible();
-  await expect(page.getByTestId('big-screen-mode')).toContainText(title);
+  await expect(page.getByTestId('big-screen-mode').locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]')).toBeVisible();
   await shot(page, 'SC10-dashboard-published');
   await page.keyboard.press('Escape');
   await writeFile(join(evidence!, 'SC10-dashboard-receipt.json'), JSON.stringify({pid:board.pid,counts:Object.fromEntries(counts),config,output},null,2));

@@ -771,6 +771,14 @@ public class AuraBotChatService {
                 String col = f.getColumnName() != null ? f.getColumnName() : f.getCode();
                 schema.append(col).append(" (").append(f.getDataType());
                 if (f.getDisplayName() != null) schema.append(", ").append(f.getDisplayName());
+                if (f.getDescription() != null && !f.getDescription().isBlank()) {
+                    schema.append("; ").append(f.getDescription());
+                }
+                if (f.getRefTarget() != null) {
+                    schema.append("; reference target=").append(f.getRefTarget().getTargetEntity())
+                            .append("; stored value=").append(f.getRefTarget().getValueField())
+                            .append("; display field=").append(f.getRefTarget().getTargetField());
+                }
                 schema.append("), ");
             }
             return schema.length() > 2 ? schema.substring(0, schema.length() - 2) : "";

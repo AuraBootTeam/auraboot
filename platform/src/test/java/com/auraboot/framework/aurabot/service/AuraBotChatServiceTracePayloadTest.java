@@ -210,4 +210,24 @@ class AuraBotChatServiceTracePayloadTest {
     }
 
     private record CapturedEvent(String name, String payload) {}
+
+    @Test
+    void modelContextPreservesRelationshipAndLegacyFieldMeaning() {
+        var models = mock(MetaModelService.class);
+        var linked = com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                .code("customer_id").dataType("reference").displayName("Customer")
+                .description("Authoritative customer relationship")
+                .refTarget(com.auraboot.framework.meta.dto.FieldDefinition.RefTarget.builder()
+                        .targetEntity("customer").valueField("pid").targetField("name").build()).build();
+        var legacy = com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                .code("customer_text").dataType("string").displayName("Legacy customer text")
+                .description("Possibly stale; use customer_id for customer scope").build();
+        when(models.getModelDefinition("project")).thenReturn(java.util.Optional.of(
+                com.auraboot.framework.meta.dto.ModelDefinition.builder().fields(List.of(linked, legacy)).build()));
+        var service = new AuraBotChatService(null, null, null, null, new ObjectMapper(),
+                mock(AiTraceService.class), models, new ChatTurnRuntime(), (Executor) Runnable::run);
+        String schema = ReflectionTestUtils.invokeMethod(service, "buildModelSchemaText", "project");
+        assertThat(schema).contains("reference target=customer", "stored value=pid", "display field=name",
+                "Authoritative customer relationship", "Possibly stale; use customer_id for customer scope");
+    }
 }

@@ -79,7 +79,9 @@ public class ChatBiSkill implements AuraBotSkill {
             ]
           },
           "alias": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "description": "Optional technical result key using ASCII identifiers only; omit to use the default. Never use Chinese labels or spaces as aliases."
           }
         },
         "required": [

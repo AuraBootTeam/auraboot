@@ -55,6 +55,9 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(String(identity.code)).toBe('0');
   expect(String(identity.data.user.tenantId)).toBe(process.env.AURA_ADMIN_TENANT_ID);
   expect(identity.data.user.email).toBe(DEFAULT_TEST_ACCOUNT.email);
+  const imported = await page.request.post('/api/plugins/import/import-directory-sync', { data: { path: process.env.AURA_CORE_PROJECT_ROOT + '/plugins/project-management', conflictStrategy: 'OVERWRITE', deferReferenceValidation: true } });
+  expect(imported.ok()).toBe(true); expect((await imported.json()).success).toBe(true);
+  await page.reload();
 
   await expect(page.getByRole('table')).toContainText(customer);
 
@@ -75,7 +78,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
     params: {
       pageNum: '1',
       pageSize: '500',
-      filters: JSON.stringify([{ fieldName: 'tpm_pj_customer', operator: 'EQ', value: customer }]),
+      filters: JSON.stringify([{ fieldName: 'tpm_pj_customer_id', operator: 'EQ', value: customerPid }]),
     },
   });
   expect(sourceResponse.status()).toBe(200);
@@ -102,7 +105,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await panel.getByTestId('aurabot-history-trigger').click();
   await panel.getByTestId('aurabot-new-session').click();
   await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
-  const question = `请分析${customer}的项目预算：按项目名称列出预算合计，以表格展示，并给出客户交付管理的简短分析说明。必须查询系统内的真实项目数据，仅分析这家客户，不要猜测，不要执行任意 SQL。`;
+  const question = `请分析${customer}名下全部项目的预算：按“所属客户”的正式关联关系识别，先确认对应的客户记录，不能仅按历史客户名称文本筛选。按项目名称列出预算合计，以表格展示，只需给出简短预算分析。本次不分析状态或日期。最后用简短自然段说明事实与建议，说明预算不是收入，不必重复输出Markdown表格。必须使用系统查询工具读取真实数据，不要猜测，不要执行任意 SQL。`;
   const streamPromise = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/ai/aurabot/chat/stream' &&
@@ -145,8 +148,13 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(generationModels.length).toBeGreaterThan(0);
   expect(generationModels).toContain(model);
   expect(generationModels.join(' ')).not.toMatch(/stub|fake|mock/i);
+  expect(detail.spans.filter((span: any) => span.type === 'generation').every((span: any) => span.inputTokens > 0 && span.outputTokens > 0)).toBe(true);
+  expect(typeof detail.trace.output).toBe('string');
+  expect(detail.trace.output.length).toBeGreaterThan(80);
+  const reviewedAnalysis = 'AI分析（人工核对后写入；建议不代替审批结论）\n' + detail.trace.output;
+  for (const name of expected.keys()) expect(detail.trace.output).toContain(name);
 
-  const card = panel.getByTestId('chatbi-result-card');
+  const card = panel.locator('[data-testid="chatbi-result-card"][data-model-code="tpm_project"][data-dimensions="tpm_pj_name"]');
   await expect(card).toHaveCount(1);
   await expect(card).toHaveAttribute('data-row-count', String(expected.size));
   for (const name of expected.keys()) await expect(card).toContainText(name);
@@ -192,9 +200,18 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(typeof saved.pid).toBe('string');
   await card.getByTestId('chatbi-saved-report').click();
   await expect(page).toHaveURL(new RegExp(`/report-designer/${saved.pid}$`));
+  if (await panel.isVisible()) await page.getByTestId('ai-panel-toggle').click();
   await page.reload();
   const toolbar = page.getByTestId('report-designer-toolbar');
   await expect(toolbar).toBeVisible();
+  await page.getByTestId('drag-handle-analysis-summary').locator('..').click();
+  await page.getByTestId('block-property-panel').getByPlaceholder('输入文本内容…').fill(reviewedAnalysis);
+  const reviewedSave = page.waitForResponse(r => new URL(r.url()).pathname === `/api/report-definitions/${saved.pid}` && r.request().method() === 'PUT');
+  await page.getByTestId('report-designer-toolbar-btn-save').click();
+  expect((await reviewedSave).status()).toBe(200);
+  await page.reload();
+  const reviewed = await (await page.request.get(`/api/report-definitions/${saved.pid}`)).json();
+  expect(reviewed.data.dsl.body.find((block: any) => block.id === 'analysis-summary').content).toBe(reviewedAnalysis);
   await page.waitForFunction(() => {
     const toolbar = document.querySelector('[data-testid="report-designer-toolbar"]');
     const button =
@@ -269,6 +286,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
         expect(text).toMatch(/^# /);
       }
       expect(text).toContain(customer);
+      expect(text.replace(/\s/g, '')).toContain(reviewedAnalysis.replace(/\s/g, ''));
       for (const [name, budget] of expected) {
         expect(text.replace(/\s/g, '')).toContain(name.replace(/\s/g, ''));
         expect(text.replace(/[,\s]/g, '')).toContain(String(budget));

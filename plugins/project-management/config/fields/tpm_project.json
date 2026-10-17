@@ -110,8 +110,8 @@
   },
   {
     "code": "tpm_pj_customer",
-    "displayName:zh-CN": "客户",
-    "displayName:en": "Customer",
+    "displayName:zh-CN": "客户名称（历史文本）",
+    "displayName:en": "Customer name (legacy text)",
     "dataType": "string",
     "constraints": {
       "maxLength": 200
@@ -119,7 +119,7 @@
     "feature": {
       "searchable": true
     },
-    "description": "Customer business name; not a CRM relationship."
+    "description": "Legacy free-text customer name, possibly empty or stale. Never use it to select all projects of a customer. Resolve the customer record and filter the tpm_pj_customer_id reference instead."
   },
   {
     "code": "tpm_pj_budget",
@@ -177,7 +177,7 @@
     "feature": {
       "searchable": true
     },
-    "description": "Tenant-scoped customer reference.",
+    "description": "Authoritative tenant-scoped customer relationship. Stored value is tpm_customer.pid; display label is tpm_cu_name. Resolve the customer record before filtering all of its projects.",
     "constraints": {
       "required": true
     }
