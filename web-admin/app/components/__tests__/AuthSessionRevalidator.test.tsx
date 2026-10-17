@@ -75,6 +75,51 @@ describe('AuthSessionRevalidator', () => {
     ).toBe(false);
   });
 
+  it.each([401, 403])(
+    'never retains a dependency-outage snapshot after an authoritative %s auth probe',
+    async (status) => {
+      const snapshot = { user: { id: 'teacher' }, locale: 'zh-CN' } as RootLoaderData;
+      const outage = {
+        status: 503,
+        statusText: 'Service Unavailable',
+        internal: false,
+        data: {
+          code: 'root_dependency_unavailable',
+          requestId: 'auth-rejected',
+          stage: 'branding',
+        },
+      };
+      let returned: RootLoaderData | undefined;
+      let rejected: unknown;
+      mocks.fetch.mockResolvedValue({ status });
+      mocks.revalidate.mockImplementation(async () => {
+        try {
+          returned = await loadRootOnClient({
+            request: new Request(location.href),
+            serverLoader: vi.fn().mockRejectedValue(outage),
+          } as unknown as ClientLoaderFunctionArgs);
+        } catch (error) {
+          rejected = error;
+        }
+      });
+      render(
+        <AuthSessionRevalidator
+          enabled
+          isAuthenticated
+          snapshot={snapshot}
+          intervalMs={1000}
+          minIntervalMs={0}
+        />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(mocks.revalidate).toHaveBeenCalledTimes(1);
+      expect(rejected).toBe(outage);
+      expect(returned).toBeUndefined();
+    },
+  );
+
   it('keeps the background snapshot scope alive while the router becomes loading', async () => {
     let release!: () => void;
     const pending = new Promise<void>((resolve) => {

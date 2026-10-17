@@ -143,7 +143,8 @@ export function AuthSessionRevalidator({
             action: 'revalidate',
           });
           const data = current.current.snapshot;
-          if (data) {
+          // A rejected auth probe must never retain protected data after a later outage.
+          if (data && response.status >= 200 && response.status < 300) {
             await runBackgroundRootRefresh(
               {
                 url: window.location.href,
