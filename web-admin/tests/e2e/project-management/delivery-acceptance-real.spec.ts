@@ -387,13 +387,19 @@ test('acceptance detail tabs keep business facts primary and maintenance evidenc
 
 test('associated DSL form freezes structure, denies node writes and keeps the business layout @critical', async ({page}) => {
   const user = await login(page, process.env.ADMIN_EMAIL!, process.env.AURA_ADMIN_TENANT_ID);
+  const imported = await page.request.post('/api/plugins/import/import-directory-sync', {data:{
+    path:join(process.env.AURA_CORE_PROJECT_ROOT!, 'plugins/project-management'), conflictStrategy:'OVERWRITE',deferReferenceValidation:true
+  }});
+  expect(imported.ok()).toBe(true);
+  expect((await imported.json()).success).toBe(true);
   // Explicit fixture update affects new submissions only; existing instance snapshots stay untouched.
   const definitions = await data(await page.request.get('/api/bpm/process-definitions?size=1000'));
-  const process = definitions.records.find((row:any) => row.processKey === 'tpm_delivery_acceptance');
-  expect(process?.pid).toBeTruthy();
+  const definition = definitions.records.find((row:any) => row.processKey === 'tpm_delivery_acceptance');
+  expect(definition?.pid).toBeTruthy();
   const bundle = JSON.parse(await readFile(join(process.env.AURA_CORE_PROJECT_ROOT!, 'plugins/project-management/examples/acceptance-workflow.bpm-package.json'), 'utf8'));
-  await data(await page.request.put(`/api/bpm/process-definitions/${process.pid}/form-bindings`, {data:bundle.processDefinition.formBindings}));
-  const pid = await create(page, user, `华辰制造 · DSL关联验收 ${Date.now()}`, 68000, '高风险', true);
+  await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:bundle.processDefinition.formBindings}));
+  const before = await data(await page.request.get('/api/dynamic/tpm_acceptance/list'));
+  const pid = await create(page, user, `华辰制造 · 第${before.records.length+1}批交付验收`, 68000, '高风险', true);
   const bound = page.getByTestId('bpm-bound-form');
   await expect(bound).toHaveAttribute('data-version-source', 'current');
   await expect(bound.getByTestId('dsl-form-readonly')).toBeVisible();
