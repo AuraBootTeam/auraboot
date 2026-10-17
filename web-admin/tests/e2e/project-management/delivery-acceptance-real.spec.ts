@@ -400,7 +400,7 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   const bundle = JSON.parse(await readFile(join(process.env.AURA_CORE_PROJECT_ROOT!, 'plugins/project-management/examples/acceptance-workflow.bpm-package.json'), 'utf8'));
   await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:bundle.processDefinition.formBindings}));
   const before = await data(await page.request.get('/api/dynamic/tpm_acceptance/list'));
-  const name = `华辰制造 · 第${before.records.length+1}批交付验收`;
+  const name = `华辰制造 · 第${before.total+1}批交付验收`;
   const pid = await create(page, user, name, 68000, '高风险', true);
   const bound = page.getByTestId('bpm-bound-form');
   await expect(bound).toHaveAttribute('data-version-source', 'current');
@@ -457,7 +457,7 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
     const after = await data(await page.request.get(`/api/bpm/forms/instance/${instanceId}?formRef=tpm_acceptance_form`));
     expect(after.schemaSnapshot).toEqual(frozen.schemaSnapshot);
     await shot(page,'form-republished-old-instance');
-    const nextPid = await create(page, user, `华辰制造 · 第${before.records.length+2}批交付验收`, 68000, '高风险', true);
+    const nextPid = await create(page, user, `华辰制造 · 第${before.total+2}批交付验收`, 68000, '高风险', true);
     await submit(page, nextPid, 120, 'tpm_enhanced_review');
     await expect(bound).toHaveAttribute('data-version-source','frozen');
     await expect(bound).toContainText('新版风险与审批');
