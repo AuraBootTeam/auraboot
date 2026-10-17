@@ -41,7 +41,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('toolbar-btn-create').click();
   await page.getByTestId('model-type-physical').click();
   await page.getByTestId('model-code-input').fill(code);
-  await page.getByTestId('model-display-name-input').fill('客户跟进');
+  await page.getByTestId('model-display-name-input').fill('交付客户跟进');
   const create = page.waitForResponse(
     (r) => r.url().endsWith('/api/meta/models') && r.request().method() === 'POST',
   );
@@ -192,7 +192,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await expect(page.getByTestId('model-primary-page-preview')).toBeVisible();
   await page.getByTestId('model-primary-page-preview').click();
   await expect(page).toHaveURL(new RegExp(`/p/${code}(?:\\?.*)?$`));
-  await expect(page.getByRole('heading', { name: '客户跟进列表', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '交付客户跟进列表', exact: true })).toBeVisible();
   const customerHeader = page.getByRole('columnheader').filter({ has: page.getByText('客户名称', { exact: true }) });
   const amountHeader = page.getByRole('columnheader').filter({ has: page.getByText('商机金额', { exact: true }) });
   await expect(customerHeader).toHaveCount(1);
@@ -205,7 +205,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const listUrl = page.url();
   const customerField = `${code}_customer_name`;
   const amountField = `${code}_opportunity_amount`;
-  const customerName = '晨桥设备有限公司';
+  const customerName = '华辰制造';
   await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('toolbar-btn-create').click();
   await page.getByTestId(`form-field-${customerField}`).locator('input').fill(customerName);
@@ -291,7 +291,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const roleResponse = await page.request.post('/api/roles', {
     data: {
       code: roleCode,
-      name: '客户跟进只读验证',
+      name: '交付客户跟进只读验证',
       type: 'custom',
       status: 'active',
       scopeType: 'tenant',
@@ -321,7 +321,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   const userResponse = await page.request.post('/api/admin/users', {
     data: {
       email,
-      displayName: '客户跟进只读验证',
+      displayName: '交付客户跟进只读验证',
       initialPassword: password,
       roleCodes: [roleCode],
       sendInviteEmail: false,
@@ -459,7 +459,7 @@ test('SC05-PAGE: import, refine, export, save and reopen a page definition', asy
       {
         id: 'customer_section_imported',
         blockType: 'detail-section',
-        title: { 'zh-CN': '客户跟进信息', en: 'Customer follow-up information' },
+        title: { 'zh-CN': '交付客户跟进信息', en: 'Customer follow-up information' },
         columns: 12,
         fields: [],
       },

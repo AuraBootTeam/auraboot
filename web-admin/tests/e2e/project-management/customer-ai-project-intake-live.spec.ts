@@ -46,6 +46,7 @@ test('SC03 live delivery notes → typed budget/date draft → preserved manual 
   await expect(page.locator('#tpm_pj_next_action')).toHaveValue(manual);
   await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
   expect(writes).toHaveLength(0);
+  await page.screenshot({path:join(evidence,'SC03-delivery-applied-form.png'),fullPage:false});
   await page.getByTestId('form-ai-fill-receipt').locator('summary').click();
   await expect(page.getByTestId('form-ai-review-tpm_pj_budget')).toContainText('128000.50');
   await page.screenshot({path:join(evidence,'SC03-delivery-draft-review.png'),fullPage:false});
@@ -62,6 +63,7 @@ test('SC03 live delivery notes → typed budget/date draft → preserved manual 
   await expect(budget).toHaveAttribute('aria-valuenow','132000.5');
   await budget.press('Tab');
   await expect(budget).toHaveValue('132,000.50');
+  await page.screenshot({path:join(evidence,'SC03-delivery-reviewed-form.png'),fullPage:false});
   const savePromise=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/meta/commands/execute/tpm:create_project'&&r.request().method()==='POST');
   await page.getByTestId('form-btn-submit').click(); const saved=await savePromise;
   expect(saved.status()).toBe(200); const body=await saved.json(); expect(String(body.code)).toBe('0');
