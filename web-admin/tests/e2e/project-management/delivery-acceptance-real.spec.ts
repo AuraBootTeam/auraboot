@@ -121,7 +121,7 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   await page.getByTestId(`bpm-operations-${action}`).click();
   const comment = action==='approve'?'交付范围、完成标准和材料一致，批准验收。':'缺少培训签到记录，请补正后重新提交。';
   if (await page.getByTestId('bpm-task-drawer').count()) {
-    await page.getByTestId('bpm-task-drawer').locator('textarea').fill(comment);
+    await page.getByTestId('approval-comment-textarea').fill(comment);
     await page.getByTestId(`bpm-drawer-${action}-btn`).click();
   } else {
     await page.getByTestId(`bpm-${action}-comment`).fill(comment);
@@ -399,7 +399,8 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   const bundle = JSON.parse(await readFile(join(process.env.AURA_CORE_PROJECT_ROOT!, 'plugins/project-management/examples/acceptance-workflow.bpm-package.json'), 'utf8'));
   await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:bundle.processDefinition.formBindings}));
   const before = await data(await page.request.get('/api/dynamic/tpm_acceptance/list'));
-  const pid = await create(page, user, `华辰制造 · 第${before.records.length+1}批交付验收`, 68000, '高风险', true);
+  const name = `华辰制造 · 第${before.records.length+1}批交付验收`;
+  const pid = await create(page, user, name, 68000, '高风险', true);
   const bound = page.getByTestId('bpm-bound-form');
   await expect(bound).toHaveAttribute('data-version-source', 'current');
   await expect(bound.getByTestId('dsl-form-readonly')).toBeVisible();
@@ -432,22 +433,50 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   const current = await data(await page.request.get('/api/pages/key/tpm_acceptance_form'));
   const changedBlocks = structuredClone(current.blocks);
   changedBlocks.find((block:any) => block.id==='identity').title = {'zh-CN':'新版验收范围','en':'Updated acceptance scope'};
-  try {
-    await data(await page.request.put(`/api/pages/${current.pid}`, {data:{blocks:changedBlocks,rowVersion:current.rowVersion}}));
+  changedBlocks.find((block:any) => block.id==='risk').title = {'zh-CN':'新版风险与审批','en':'Updated risk and review'};
+  const publishBlocks = async (blocks:any[]) => {
+    let managed = await data(await page.request.get(`/api/pages/${current.pid}`));
+    if (String(managed.status).toLowerCase()==='published') {
+      await data(await page.request.post(`/api/pages/${current.pid}/unpublish`, {data:{}}));
+      managed = await data(await page.request.get(`/api/pages/${current.pid}`));
+    }
+    await data(await page.request.put(`/api/pages/${current.pid}`, {data:{blocks,rowVersion:managed.rowVersion}}));
     await data(await page.request.post(`/api/pages/${current.pid}/publish`, {data:{}}));
+  };
+  try {
+    await publishBlocks(changedBlocks);
+    const changedBinding = structuredClone(bundle.processDefinition.formBindings);
+    for (const binding of Object.values(changedBinding) as any[]) binding.fieldPermissions.tpm_ac_scope = 'hidden';
+    await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:changedBinding}));
     await page.reload();
     await expect(bound).toHaveAttribute('data-version-source','frozen');
     await expect(bound.getByTestId('object-section-identity')).toContainText('验收范围');
+    await expect(bound).toContainText('会员迁移、权限配置和培训交付完成');
     await expect(bound).not.toContainText('新版验收范围');
     const after = await data(await page.request.get(`/api/bpm/forms/instance/${instanceId}?formRef=tpm_acceptance_form`));
     expect(after.schemaSnapshot).toEqual(frozen.schemaSnapshot);
-    await writeFile(join(evidence!, 'associated-form-receipt.json'), JSON.stringify({pid,instanceId,taskId,frozen,after}, null,2));
     await shot(page,'form-republished-old-instance');
+    const nextPid = await create(page, user, `华辰制造 · 第${before.records.length+2}批交付验收`, 68000, '高风险', true);
+    await submit(page, nextPid, 120, 'tpm_enhanced_review');
+    await expect(bound).toHaveAttribute('data-version-source','frozen');
+    await expect(bound).toContainText('新版风险与审批');
+    await expect(bound).not.toContainText('会员迁移、权限配置和培训交付完成');
+    const nextRecord = await row(page, nextPid);
+    const fresh = await data(await page.request.get(`/api/bpm/forms/instance/${nextRecord.tpm_ac_process}?formRef=tpm_acceptance_form`));
+    expect(fresh.schemaSnapshot.blocks.find((block:any)=>block.id==='identity').title['zh-CN']).toBe('新版验收范围');
+    expect(fresh.record).not.toHaveProperty('tpm_ac_scope');
+    expect(fresh.fieldPermissions.tpm_ac_scope).toBe('hidden');
+    const newTasks = await data(await page.request.get(`/api/bpm/tasks/by-process/${nextRecord.tpm_ac_process}`));
+    const hiddenDenied = await page.request.post(`/api/bpm/forms/task/${newTasks[0].instanceId}/submit`, {data:{businessData:{tpm_ac_scope:'forged hidden field'},variables:{decision:'approve'}}});
+    expect(hiddenDenied.status()).toBe(403);
+    expect((await row(page,nextPid)).tpm_ac_status).toBe('submitted');
+    await shot(page,'form-new-submission-hidden');
+    await writeFile(join(evidence!, 'associated-form-receipt.json'), JSON.stringify({pid,instanceId,taskId,frozen,after,nextPid,fresh,hiddenDeniedStatus:hiddenDenied.status()}, null,2));
   } finally {
-    const latest = await data(await page.request.get('/api/pages/key/tpm_acceptance_form'));
-    await data(await page.request.put(`/api/pages/${current.pid}`, {data:{blocks:current.blocks,rowVersion:latest.rowVersion}}));
-    await data(await page.request.post(`/api/pages/${current.pid}/publish`, {data:{}}));
+    await publishBlocks(current.blocks);
+    await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:bundle.processDefinition.formBindings}));
   }
+  await openRecord(page,name);
   await decide(page,pid,'approve');
   await expect(page.getByTestId('bpm-bound-form')).toHaveAttribute('data-version-source','frozen');
   await page.reload();
