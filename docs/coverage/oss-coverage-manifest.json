@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "a7e7f33bf",
+    "commit": "9a7169402",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -4118,9 +4118,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-connected-real.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -4130,7 +4132,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/project-management/delivery-acceptance-real.spec.ts"
+            "web-admin/tests/e2e/project-management/delivery-acceptance-real.spec.ts",
+            "web-admin/tests/e2e/project-management/delivery-operations-real.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -4236,6 +4239,17 @@
           "note": "kind=list model=tpm_milestone"
         },
         {
+          "id": "page:tpm_project_ai_intake",
+          "action": "tpm_project_ai_intake",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tpm_project"
+        },
+        {
           "id": "page:tpm_project_detail",
           "action": "tpm_project_detail",
           "surface": "ui",
@@ -4275,7 +4289,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts"
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-connected-real.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -5883,7 +5898,8 @@
             "web-admin/tests/e2e/dashboard/dashboard-routes-pos-parity.spec.ts",
             "web-admin/tests/e2e/designer/dashboard-designer-deep.spec.ts",
             "web-admin/tests/e2e/designer-ux-improvements.spec.ts",
-            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -6203,6 +6219,8 @@
             "web-admin/tests/e2e/project-management/customer-analysis-report-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-formats-real.spec.ts",
             "web-admin/tests/e2e/project-management/delivery-brief-real.spec.ts",
+            "web-admin/tests/e2e/project-management/delivery-operations-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
             "web-admin/tests/e2e/report-designer-history-golden.spec.ts",
             "web-admin/tests/e2e/report-designer-readswitch-golden.spec.ts",
@@ -6714,9 +6732,11 @@
           "surface": "platform-page",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec navigates to this route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-connected-real.spec.ts"
+          ],
+          "assertion": "browser route reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "plugin=core-ops file=./plugins/core-ops/pages/troubleshooting/index.tsx"
         },
         {
@@ -7057,10 +7077,10 @@
   ],
   "stats": {
     "commands": 268,
-    "untested": 176,
-    "pages": 185,
-    "pagesUntested": 113,
+    "untested": 175,
+    "pages": 186,
+    "pagesUntested": 114,
     "platformPages": 95,
-    "platformPagesUntested": 37
+    "platformPagesUntested": 36
   }
 }

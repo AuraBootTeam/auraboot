@@ -146,6 +146,8 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(detail.spans.filter((span: any) => span.type === 'generation').every((span: any) => span.inputTokens > 0 && span.outputTokens > 0)).toBe(true);
   expect(typeof detail.trace.output).toBe('string');
   expect(detail.trace.output.length).toBeGreaterThan(80);
+  const firstGeneration=detail.spans.find((span:any)=>span.type==='generation');
+  expect(firstGeneration.toolDefinitions.map((tool:any)=>tool.name),'reference resolution must survive policy filtering into the real provider catalog').toContain('platform_resolve_reference');
   const calls=detail.spans.flatMap((span:any)=>span.toolCalls||[]);
   // Exact ownership may be established by the dedicated resolver or a governed customer query.
   // Do not force a specific tool name when the same authoritative lookup is actually performed.
