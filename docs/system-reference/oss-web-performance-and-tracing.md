@@ -21,25 +21,29 @@ flowchart LR
 
 The development path includes the Vite HTTP proxy. In the local production measurement mode, a loopback ingress forwards to the existing deployment BFF, which serves the compiled client and SSR handler; the document spans therefore use `auraboot-bff`, and the captured chain has three services. Server-side application reads can also reach Java directly through the existing HTTP client configuration; their parent context is propagated by Undici instrumentation. Service names are `auraboot-web`, `auraboot-ssr`, `auraboot-bff` and `auraboot-platform`.
 
-- `web-admin/instrumentation.server.mjs` loads before the server HTTP/fetch modules, using Node's `--import`. The SDK loads only when an OTLP trace endpoint is configured. `dev:web`, `dev:bff` and `start` include this preloader.
-- The root loader injects the active W3C `traceparent` into a document meta tag. The optional browser SDK uses it as the parent of `ui.page`. React Router `.data` fetches open a `ui.navigation` span; same-origin `/api/` and `.data` fetches inject trace headers. Third-party requests are left untouched.
+- `web-admin/instrumentation.server.mjs` loads before the server HTTP/fetch modules, using Node's `--import`. The SDK starts by default, with or without an OTLP endpoint. `dev`, `dev:test`, `dev:web`, `dev:bff`, `start` and the production Docker command include this preloader. Builtin HTTP hooks are activated before ESM entrypoints load, preserving incoming W3C context.
+- The root loader injects the active W3C `traceparent` into a document meta tag. The browser SDK starts by default and uses it as the parent of `ui.page`. React Router `.data` fetches open a `ui.navigation` span; same-origin `/api/` and `.data` fetches inject trace headers. Third-party requests are left untouched.
 - Java keeps the existing W3C propagation and response `X-Trace-Id` contract. `SqlObservationInterceptor` opens `mybatis.execution` within the active observation scope for MyBatis executor query/update calls.
 - `ui.page` ends at window load. It is **not** a business-data-ready metric. The home driver installs a browser-side MutationObserver before navigation and timestamps visible structure, empty inbox, shortcut rows and numeric statistics on an animation frame. Its readiness time is independent of when Playwright reads the mark. It separately checks successful critical API payloads. This controlled DOM-ready marker is not LCP, a paint timestamp, or readiness for every possible widget configuration.
 - MyBatis spans contain mapper identity, operation and database system. SQL text, bind values and raw driver exception messages are not recorded by this interceptor. Its fixed failure diagnostic does not replace the exception returned to application code. SQL observation is not JDBC-wide coverage.
 
-## Opt-in configuration
+## Default tracing and optional remote export
 
 | Variable | Purpose |
 | --- | --- |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Full OTLP HTTP trace URL, e.g. `http://127.0.0.1:4318/v1/traces`; enables Node SDK and configures Java exporter |
-| `MANAGEMENT_TRACING_ENABLED=true` | Enables Java tracing in dev; dev defaults to false |
-| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | Java root sampling, default `0.1`; use `1` only for controlled diagnosis |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Full OTLP HTTP trace URL, e.g. `http://127.0.0.1:4318/v1/traces`; adds Node remote export and configures the Java exporter |
+| `MANAGEMENT_TRACING_ENABLED=true` | Java tracing defaults to true in every runtime profile; false is an explicit override |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | Java root sampling, default `1`; explicitly lower it when accepting incomplete trace coverage |
 | `OTEL_TRACES_SAMPLER=parentbased_traceidratio` | Explicit Node root sampler; SDK honors incoming sampled parents |
 | `OTEL_TRACES_SAMPLER_ARG=0.1` | Node root ratio; **set this with the sampler** for bounded routine collection (Node SDK's own default is broader) |
 | `VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Browser exporter URL, exposed to the browser; must be browser-reachable and allow the exact Web origin with CORS |
-| `VITE_OTEL_TRACES_SAMPLE_RATE` | Browser root ratio, default `0.1`; server parent sampling is honored |
+| `VITE_OTEL_TRACES_SAMPLE_RATE` | Browser root ratio, default `1`; server parent sampling is honored |
 
-`VITE_*` variables are build-time settings for production. Node and Java settings are runtime settings. No endpoint means the optional browser/Node exporter is not installed; Java dev tracing remains opt-in. Do not put collector credentials into `VITE_*` variables. Protect and operate the collector as deployment infrastructure. No third-party collector SaaS is required.
+`VITE_*` variables are build-time settings for production. Node and Java settings are runtime settings. No browser endpoint means context propagation remains enabled, while browser span export is omitted. Node and Java retain local server spans without requiring a collector; an external collector is optional. Java automatically enables remote export when either the standard OTEL endpoint or Spring OTLP endpoint is configured; otherwise the remote exporter is disabled, preserving local tracing without connection-refused noise. An explicit `management.otlp.tracing.export.enabled` override takes precedence. Do not put collector credentials into `VITE_*` variables. Protect and operate the collector as deployment infrastructure. No third-party collector SaaS is required.
+
+Node and Java write a private JSONL trace index under `AURA_TRACE_LOG_DIR` (default `./logs/traces`), capped at five 10 MiB files per service. Only span identity, parentage, timing, status and whitelisted diagnostic attributes are retained; request bodies, headers, SQL text and automatic instrumentation exception messages are omitted. Pre-sanitized loader exceptions retain their type, message and stack in the local index as well as the original loader log. Local export failure is reported and does not fail a business request. `OTEL_SDK_DISABLED=true` explicitly disables the Node SDK.
+
+The shipped Compose templates enable Java tracing by default and retain backend traces in the existing backend data volume and frontend traces in a dedicated named volume. Replacing containers preserves those volumes; deleting volumes deletes retained evidence. Product-managed local runtimes place both services' trace files under their own evidence directory. Search `traceId` in the JSONL files and then use `request.id` and the loader logs for the original exception.
 
 For a complete sampled diagnostic run, set Java and browser ratios to `1` and Node `OTEL_TRACES_SAMPLER=always_on` before invoking the product launcher. All three settings must match the recorded measurement conditions. Resume state preserves the whitelisted telemetry variables and Redis host; changing a retained source or dependency still fails identity validation.
 
@@ -47,7 +51,7 @@ The SDK integrations follow the upstream [browser setup](https://opentelemetry.i
 
 ## Performance behavior
 
-- Root shell branding/bootstrap/access-policy/token reads start concurrently. Every request still resolves fresh server identity and permissions.
+- Root shell branding/bootstrap/access-policy/token reads start concurrently. Initial entry and route navigation still resolve fresh server identity and permissions.
 - Parent/child entry loaders share the `/api/auth/me` in-flight promise through the **per-request React Router context**, including cloned `Request` objects. Separate HTTP requests never share this memo; a failed promise is cleared. No global auth cache or new authorization TTL is introduced.
 - `/home` fetches the workbench configuration in its route loader and renders it from loader data. The initial browser mount no longer fetches the same configuration. Widget data still uses the existing real APIs; retry remains available on configuration failure.
 - Field permission evaluation resolves role codes only if model fields declare field permissions, and resolves role records in one batch. Restricted fields use the existing evaluator. Models without declarations retain the existing unrestricted policy.
@@ -126,3 +130,23 @@ The home driver requires an empty inbox, visible shortcut rows and pending/urgen
 | Reproducible workloads | `scripts/performance/` |
 | Real UI transitions | `web-admin/tests/e2e/showcase/oss-performance.spec.ts` |
 | Raw samples, linked trace and screenshots | [Production evidence](2026-10-15-oss-production-performance-results.md), [historical dev evidence](2026-10-15-oss-performance-results.md) |
+
+## Runtime branding dependency boundary
+
+`GET /api/runtime/branding` resolves deployment branding and license validation without a backend appearance read. Authentication pages (`/login`, `/admin-login`, `/signup`, `/forgot-password`, `/reset-password`) request `?include=auth-appearance` to fetch current published appearance; authenticated displays and other application routes omit it. The optional backend read has an eight-second timeout, within the root loader's ten-second deadline, and is cancelled when the caller disconnects. Invalid configuration and appearance contracts remain failures.
+
+The shared trace records `runtime.branding.request`, `deployment-config`, `appearance-fetch`, `appearance-validation` and `serialize` stages under the `runtime.branding` prefix. Match the root request ID and trace ID to distinguish local configuration resolution from backend response time and validation. Stage exceptions are sanitized before retention. Success spans are retained even when debug logging is disabled. User-info and space reads also have bounded waits so removing appearance does not leave an unbounded replacement dependency.
+
+## Platform session maintenance and recovery
+
+Authenticated core Web sessions use `SessionMaintenance` and `GET /api/runtime/session-context` independently of React Router revalidation. The endpoint reads fresh `/api/auth/me` and `/api/menu/user`, renews the signed session when due, and returns only user, permissions, preferences and menus. It does not resolve branding, bootstrap, spaces or business loaders. The overall server deadline is eight seconds and the browser deadline is ten seconds. JWTs remain in the HTTP-only signed cookie; responses use `Cache-Control: no-store`.
+
+Visible pages poll every 60 seconds. Focus and visibility changes respect a 15-second minimum; reconnect after an outage can retry immediately. Only one request runs at a time. Hidden tabs defer until visible. Anonymous and impersonated sessions do not use this channel. Unmount aborts the pending request, and responses from an older root-loader generation cannot modify the current session.
+
+A typed `session_context_unavailable` 503, recognized transport failure or offline event preserves the mounted route and unsaved inputs and shows a localized status notice. Recovery merges only the four session slices, preserving unchanged references. There is no whole-route snapshot fallback, background route revalidation, automatic document reload, command replay or draft submission. Unexpected server errors and malformed contracts remain visible errors rather than successful recovery.
+
+An authoritative 401 clears the cookie and immediately removes protected content before returning to login. A 403, removed permission/role, or changed user/tenant removes protected content and shows the localized access-changed gate. Permission gains and current menus update live shell consumers through `useRootLoaderData` and `AuthProvider`. Business APIs continue enforcing fresh server authorization; this channel does not grant access or introduce an authorization cache. Normal route navigation, business refresh and form submission retain their existing behavior.
+
+Local spans `session.context.request`, `identity`, `menus` and `renewal` correlate the browser request, BFF and backend. A transient response includes the failed stage and correlation IDs, and the browser records the first failure per outage. Default local trace retention applies in development and production without requiring a remote collector.
+
+The product diagnostic `scripts/verify-session-maintenance.mjs` validates workbench, DSL list, unsaved form and display through real login and menu entries. Each surface must cover owned backend outage/recovery, browser offline/reconnect, real wall-clock renewal beyond the short fixture JWT lifetime, session withdrawal and role withdrawal. Route/document request counters, mounted-node witnesses and business-write guards make accidental business revalidation falsifiable. Accelerated 24-hour scheduling tests supplement, and do not replace, recorded wall-clock runtime evidence.

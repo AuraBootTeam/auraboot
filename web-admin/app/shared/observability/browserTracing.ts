@@ -17,11 +17,13 @@ import { WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
 /** Trace only same-origin application traffic; never attach context to third-party URLs. */
-export function installBrowserTracing(endpoint: string, sampleRate = 0.1): void {
+export function installBrowserTracing(endpoint?: string, sampleRate = 1): void {
   const provider = new WebTracerProvider({
     resource: resourceFromAttributes({ 'service.name': 'auraboot-web' }),
     sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(sampleRate) }),
-    spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter({ url: endpoint }))],
+    spanProcessors: endpoint
+      ? [new BatchSpanProcessor(new OTLPTraceExporter({ url: endpoint }))]
+      : [],
   });
   provider.register({ propagator: new W3CTraceContextPropagator() });
   const tracer = provider.getTracer('auraboot-web');

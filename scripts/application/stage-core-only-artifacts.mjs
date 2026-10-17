@@ -201,6 +201,7 @@ function packWebShell(repoRoot, destination, version) {
       'public',
       'scripts',
       'react-router.config.ts',
+      'instrumentation.server.mjs',
       'tailwind.config.js',
       'tsconfig.json',
       'vite.config.ts',
