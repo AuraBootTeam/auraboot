@@ -324,7 +324,7 @@ describe('root loader authentication guard', () => {
         async (url: string) =>
           new Response(
             JSON.stringify(
-              String(url).endsWith('/api/runtime/branding')
+              String(url).includes('/api/runtime/branding')
                 ? {
                     branding: {
                       mode: 'commercial',
@@ -349,6 +349,38 @@ describe('root loader authentication guard', () => {
     expect(cached.branding.productName).toBe('Stale release');
     expect(mocks.getI18nData).not.toHaveBeenCalled();
   });
+
+  it.each(['/login', '/admin-login', '/signup', '/forgot-password', '/reset-password'])(
+    'requests published appearance only on authentication page %s',
+    async (pathname) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ branding: { mode: 'commercial' } })));
+      vi.stubGlobal('fetch', fetchMock);
+      const { resolveDeploymentBrandingFromBff } = await import('~/root');
+      await resolveDeploymentBrandingFromBff({ EDITION: 'standard' }, 'branding-route', pathname);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:3500/api/runtime/branding?include=auth-appearance',
+        expect.anything(),
+      );
+    },
+  );
+
+  it.each(['/xy/display', '/xy/display/class-123', '/home', '/login-other'])(
+    'does not request login appearance for application route %s',
+    async (pathname) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ branding: { mode: 'commercial' } })));
+      vi.stubGlobal('fetch', fetchMock);
+      const { resolveDeploymentBrandingFromBff } = await import('~/root');
+      await resolveDeploymentBrandingFromBff({ EDITION: 'standard' }, 'branding-route', pathname);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:3500/api/runtime/branding',
+        expect.anything(),
+      );
+    },
+  );
 
   it('always emits a stable product title when ICP mode is disabled', async () => {
     const { COMMUNITY_BRANDING } = await import('~/config/branding');

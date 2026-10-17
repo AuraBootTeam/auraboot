@@ -17,9 +17,8 @@ import { register, proxyDurationHistogram } from './metrics.server';
 import { buildLoginFailureRedirect } from './login-failure';
 import { sessionStorage, commitUserSession, maybeRenewSession } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
-import { resolveDeploymentBranding } from '~/config/branding.server';
 import { safeLoaderError } from './observability/loaderDiagnostics.server';
-import { resolveAuthAppearance } from '~/config/auth-appearance';
+import { createRuntimeBrandingHandler } from './routes/runtimeBranding';
 import { enforceCsrfProtection, hasSameOrigin } from './middlewares/CsrfProtection';
 import { handleLegacySessionMigration } from './auth/legacy-session-migration';
 import { handleSocialSessionExchange } from './auth/social-session-exchange';
@@ -349,31 +348,7 @@ app.get('/metrics', async (_req, res) => {
 // Root route modules are also compiled into the browser graph. Keep License
 // verification and deployment file access behind this BFF-only boundary and
 // return only the public, serialized branding contract.
-app.get('/api/runtime/branding', async (_req, res, next) => {
-  try {
-    const branding = await resolveDeploymentBranding(process.env);
-    if (branding.mode === 'commercial') {
-      const response = await axios.get(`${SPRING_BOOT_URL}/api/auth/appearance`);
-      if (String(response.data?.code) !== '0' || !response.data?.data) {
-        throw new Error('Unable to resolve published authentication appearance');
-      }
-      if (response.data.data.appearance !== null) {
-        branding.authAppearance = resolveAuthAppearance(response.data.data.appearance);
-      }
-    }
-    res.set('Cache-Control', 'no-store');
-    res.json({ branding });
-  } catch (error) {
-    if (axios.isAxiosError(error) && (
-      [502, 503, 504].includes(error.response?.status || 0)
-      || (!error.response && ['ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error.code || ''))
-    )) {
-      const unavailable = new Error('Published authentication appearance is temporarily unavailable', { cause: error });
-      Object.assign(unavailable, { status: 503, code: 'root_dependency_unavailable' });
-      next(unavailable);
-    } else next(error);
-  }
-});
+app.get('/api/runtime/branding', createRuntimeBrandingHandler(SPRING_BOOT_URL));
 
 // Proxy timing middleware — measure BFF→backend latency
 app.use('/api', (req, res, next) => {

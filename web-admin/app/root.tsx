@@ -117,6 +117,7 @@ function getTimezoneFromRequest(request: Request): string {
 export async function resolveDeploymentBrandingFromBff(
   environment: Record<string, string | undefined>,
   requestId?: string,
+  pathname = '/',
 ): Promise<BrandingConfig> {
   if (!isCommercialEdition(environment.EDITION)) {
     return resolveCommunityBranding();
@@ -128,10 +129,23 @@ export async function resolveDeploymentBrandingFromBff(
   // fetches, and hitting it yields a bare 401 from Spring. Always call the
   // loopback BFF.
   const bffUrl = `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
-  const response = await fetch(`${bffUrl}/api/runtime/branding`, {
-    headers: requestId ? { 'X-Request-Id': requestId } : undefined,
-    signal: fetchTimeoutSignal(),
-  });
+  // Authentication appearance is unrelated to authenticated application refreshes.
+  // Keep its database read out of long-lived display/session revalidation.
+  const appearanceRoutes = [
+    '/login',
+    '/admin-login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+  ];
+  const includeAppearance = appearanceRoutes.includes(pathname.replace(/\/$/, ''));
+  const response = await fetch(
+    `${bffUrl}/api/runtime/branding${includeAppearance ? '?include=auth-appearance' : ''}`,
+    {
+      headers: requestId ? { 'X-Request-Id': requestId } : undefined,
+      signal: fetchTimeoutSignal(),
+    },
+  );
   if (!response.ok) {
     if ([502, 503, 504].includes(response.status)) {
       throw new RootDependencyUnavailableError('branding', response.status);
@@ -192,7 +206,7 @@ async function loadRoot(
   // These reads are independent. Keep every request fresh without serial network waits.
   const [branding, bootstrapStatus, accessPolicy, token] = await Promise.all([
     stage('branding', () =>
-      resolveDeploymentBrandingFromBff(process.env, diagnostics.correlation.requestId),
+      resolveDeploymentBrandingFromBff(process.env, diagnostics.correlation.requestId, pathname),
     ),
     stage('bootstrap', () => fetchBootstrapStatus()),
     stage('access-policy', () => fetchAccessPolicy()),
@@ -255,6 +269,7 @@ async function loadRoot(
       const apiUrl = process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:6443';
       const resp = await fetch(`${apiUrl}/api/tenant-selection/my-spaces`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: fetchTimeoutSignal(),
       });
       if (!resp.ok) return [];
       const result = await resp.json();

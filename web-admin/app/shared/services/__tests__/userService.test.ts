@@ -191,6 +191,7 @@ describe('fetchUserInfo', () => {
       expect.stringContaining('/api/auth/me'),
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
+        signal: expect.any(AbortSignal),
       }),
     );
     expect(result!.user).toEqual({ id: 42, name: 'Alice' });

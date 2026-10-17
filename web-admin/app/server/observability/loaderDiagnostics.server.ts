@@ -64,7 +64,7 @@ export function safeLoaderError(error: unknown): Record<string, unknown> {
   return result;
 }
 
-export function createLoaderDiagnostics(request: Request) {
+export function createLoaderDiagnostics(request: Request, scope = 'root.loader') {
   const correlation = requestCorrelation(request);
   let failedStage: string | undefined;
   return {
@@ -76,14 +76,14 @@ export function createLoaderDiagnostics(request: Request) {
       const started = performance.now();
       return trace
         .getTracer('auraboot-ssr')
-        .startActiveSpan(`root.loader.${stage}`, async (span) => {
+        .startActiveSpan(`${scope}.${stage}`, async (span) => {
           span.setAttribute('request.id', correlation.requestId);
           span.setAttribute('url.path', correlation.path);
           try {
             const result = await operation();
             logger.debug(
               {
-                event: 'root-loader-stage',
+                event: scope === 'root.loader' ? 'root-loader-stage' : `${scope}-stage`,
                 ...correlation,
                 stage,
                 durationMs: Math.round(performance.now() - started),
@@ -97,7 +97,7 @@ export function createLoaderDiagnostics(request: Request) {
             const status = error instanceof Response ? error.status : undefined;
             const expectedResponse = status !== undefined && status < 500;
             const fields = {
-              event: 'root-loader-stage',
+              event: scope === 'root.loader' ? 'root-loader-stage' : `${scope}-stage`,
               ...correlation,
               stage,
               status,

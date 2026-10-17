@@ -130,3 +130,9 @@ The home driver requires an empty inbox, visible shortcut rows and pending/urgen
 | Reproducible workloads | `scripts/performance/` |
 | Real UI transitions | `web-admin/tests/e2e/showcase/oss-performance.spec.ts` |
 | Raw samples, linked trace and screenshots | [Production evidence](2026-10-15-oss-production-performance-results.md), [historical dev evidence](2026-10-15-oss-performance-results.md) |
+
+## Runtime branding dependency boundary
+
+`GET /api/runtime/branding` resolves deployment branding and license validation without a backend appearance read. Authentication pages (`/login`, `/admin-login`, `/signup`, `/forgot-password`, `/reset-password`) request `?include=auth-appearance` to fetch current published appearance; authenticated displays and other application routes omit it. The optional backend read has an eight-second timeout, within the root loader's ten-second deadline, and is cancelled when the caller disconnects. Invalid configuration and appearance contracts remain failures.
+
+The shared trace records `runtime.branding.request`, `deployment-config`, `appearance-fetch`, `appearance-validation` and `serialize` stages under the `runtime.branding` prefix. Match the root request ID and trace ID to distinguish local configuration resolution from backend response time and validation. Stage exceptions are sanitized before retention. Success spans are retained even when debug logging is disabled. User-info and space reads also have bounded waits so removing appearance does not leave an unbounded replacement dependency.
