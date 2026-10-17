@@ -34,7 +34,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
  const role=await data(await page.request.post('/api/roles',{data:{code:roleCode,name:'交付自动化运维 '+suffix,type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}}));
  const tree=await data(await page.request.get('/api/permissions/tree')),ids=new Map<string,number>();
  const collect=(nodes:any[])=>nodes.forEach(n=>{ids.set(n.code,n.id);collect(n.children||[]);});collect(tree);
- const grants=['automation.read','automation.update','automation.admin','model.tpm_task.read','tpm.task.read','tpm.project.read','model.tpm_project.read'];
+ const grants=['system_management','automation.automation.read','automation.read','automation.update','automation.admin','model.tpm_task.read','tpm.task.read','tpm.project.read','model.tpm_project.read'];
  for(const code of [...grants,'tpm.task.manage'])expect(ids.has(code),code).toBe(true);
  const setManage=async(granted:boolean)=>data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:[...grants.map(code=>({permissionId:ids.get(code),granted:true})),{permissionId:ids.get('tpm.task.manage'),granted}]}));
  await setManage(false);const email=roleCode+'@e2e.local';await data(await page.request.post('/api/admin/users',{data:{email,displayName:'交付自动化操作员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[roleCode],sendInviteEmail:false}}));
