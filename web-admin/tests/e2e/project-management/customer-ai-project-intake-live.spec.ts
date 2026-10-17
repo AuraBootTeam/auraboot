@@ -55,7 +55,13 @@ test('SC03 live delivery notes → typed budget/date draft → preserved manual 
   expect(detail.trace.metadata.provider_code).toBe(process.env.PW_EXPECT_LIVE_PROVIDER);
   expect(detail.trace.metadata.runtime_skill.code).toBe('form_draft_fill');
   expect(detail.spans.some((s:any)=>s.type==='generation'&&s.model===process.env.PW_EXPECT_LIVE_MODEL&&s.inputTokens>0)).toBe(true);
-  await page.locator('#tpm_pj_budget').fill('132000.5');
+  const budget=page.locator('#tpm_pj_budget');
+  await budget.click();
+  await expect(budget).toHaveValue('128000.50');
+  await budget.fill('132000.5');
+  await expect(budget).toHaveAttribute('aria-valuenow','132000.5');
+  await budget.press('Tab');
+  await expect(budget).toHaveValue('132,000.50');
   const savePromise=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/meta/commands/execute/tpm:create_project'&&r.request().method()==='POST');
   await page.getByTestId('form-btn-submit').click(); const saved=await savePromise;
   expect(saved.status()).toBe(200); const body=await saved.json(); expect(String(body.code)).toBe('0');

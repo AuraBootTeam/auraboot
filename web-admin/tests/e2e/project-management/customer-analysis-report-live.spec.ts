@@ -146,7 +146,12 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(detail.spans.filter((span: any) => span.type === 'generation').every((span: any) => span.inputTokens > 0 && span.outputTokens > 0)).toBe(true);
   expect(typeof detail.trace.output).toBe('string');
   expect(detail.trace.output.length).toBeGreaterThan(80);
-  expect(detail.spans.some((span:any) => span.toolCalls?.some((call:any) => call.name === 'platform_resolve_reference'))).toBe(true);
+  const calls=detail.spans.flatMap((span:any)=>span.toolCalls||[]);
+  // Exact ownership may be established by the dedicated resolver or a governed customer query.
+  // Do not force a specific tool name when the same authoritative lookup is actually performed.
+  const referenceLookup=calls.some((call:any)=>call.name==='platform_resolve_reference' && call.input?.modelCode==='tpm_project' && call.input?.fieldCode==='tpm_pj_customer_id' && call.input?.displayValue===customer);
+  const customerLookup=calls.some((call:any)=>call.input?.action==='query' && call.input?.modelCode==='tpm_customer' && call.input?.dimensions?.includes('pid') && call.input?.dimensions?.includes('tpm_cu_name') && call.input?.filters?.some((f:any)=>f.field==='tpm_cu_name' && ['eq','like'].includes(f.operator) && f.value===customer));
+  expect(referenceLookup||customerLookup,'this turn must actually look up the customer record; a name prefix or historical guess is insufficient').toBe(true);
   const reviewedAnalysis = 'AI分析（人工核对后写入；建议不代替审批结论）\n' + detail.trace.output;
   for (const name of expected.keys()) expect(detail.trace.output).toContain(name);
 
