@@ -481,6 +481,12 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   }
   await openRecord(page,name);
   await decide(page,pid,'approve');
+  await page.getByRole('tab',{name:'审批记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-history-container')).toContainText('审批通过');
+  await expect(page.getByTestId('bpm-history-container')).toContainText('交付范围、完成标准和材料一致，批准验收。');
+  await expect(page.getByTestId('bpm-history-container')).not.toContainText('task_complete');
+  await shot(page,'form-approved-history');
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
   await expect(page.getByTestId('bpm-bound-form')).toHaveAttribute('data-version-source','frozen');
   await page.reload();
   await expect(page.getByTestId('bpm-bound-form').getByTestId('dsl-form-readonly')).toBeVisible();

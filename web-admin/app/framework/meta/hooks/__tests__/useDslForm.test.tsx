@@ -543,3 +543,10 @@ describe('submitted form snapshots', () => {
     expect(snapshot.blocks[0].fields[0].readOnly).toBe(true);
   });
 });
+
+
+it('inherits readonly and hidden section constraints without allowing a caller to loosen them', () => {
+  setupSchemaLoaderWithSchema({kind:'form',blocks:[{readOnly:true,fields:[{field:'amount'}]},{hidden:true,fields:[{field:'secret'}]}]});
+  const { result } = renderHook(() => useDslForm({pageKey:'order_form',fieldPermissions:{amount:'editable',secret:'editable'}}));
+  expect(result.current.effectivePermissions).toEqual({amount:'readonly',secret:'hidden'});
+});

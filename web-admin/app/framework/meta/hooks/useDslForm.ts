@@ -233,15 +233,17 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
   const effectivePermissions = useMemo(() => {
     // Extract schema-level field permissions if available
     const schemaPerms: Record<string, FieldPermission> = {};
-    const visit = (value: any) => {
-      if (Array.isArray(value)) { value.forEach(visit); return; }
+    const visit = (value: any, parentReadonly = false, parentHidden = false) => {
+      if (Array.isArray(value)) { value.forEach(item => visit(item, parentReadonly, parentHidden)); return; }
       if (!value || typeof value !== 'object') return;
+      const readonly = parentReadonly || value.readOnly || value.readonly || value.feature?.readonly;
+      const hidden = parentHidden || value.hidden;
       const code = value.field || value.fieldCode || value.code;
       if (code) {
-        if (value.readOnly || value.readonly || value.feature?.readonly) schemaPerms[code] = 'readonly';
-        if (value.hidden) schemaPerms[code] = 'hidden';
+        if (readonly) schemaPerms[code] = 'readonly';
+        if (hidden) schemaPerms[code] = 'hidden';
       }
-      for (const key of ['fields', 'blocks', 'tabs', 'children']) visit(value[key]);
+      for (const key of ['fields', 'blocks', 'tabs', 'children']) visit(value[key], readonly, hidden);
     };
     visit(schema);
     const normalized = Object.fromEntries(Object.entries(callerPermissions).map(([key, value]) => {
