@@ -6,6 +6,18 @@ afterEach(() => {
   vi.resetModules();
 });
 describe('route request diagnostics', () => {
+  it('still sends route requests when randomUUID is unavailable on an insecure local origin', async () => {
+    vi.stubGlobal('crypto', undefined);
+    const fetch = vi.fn().mockResolvedValue(new Response('{}'));
+    vi.stubGlobal('fetch', fetch);
+    const { installRouteRequestDiagnostics } = await import('../routeRequestDiagnostics');
+    installRouteRequestDiagnostics();
+    await window.fetch('/xy/display.data');
+    expect(fetch).toHaveBeenCalledOnce();
+    expect((fetch.mock.calls[0][1].headers as Headers).get('X-Request-Id')).toMatch(
+      /^ui-[a-z0-9]+-[a-z0-9]+$/,
+    );
+  });
   it('persists the exact failed route request in the searchable browser error report', async () => {
     const fetch = vi
       .fn()

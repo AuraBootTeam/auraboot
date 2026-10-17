@@ -8,6 +8,8 @@ import {
   runBackgroundRootRefresh,
 } from '~/shared/observability/backgroundRootRefresh';
 import { useRevalidator } from 'react-router';
+import { createPortal } from 'react-dom';
+import { createClientRequestId } from '~/shared/observability/routeRequestDiagnostics';
 
 const DEFAULT_REVALIDATE_INTERVAL_MS = 60_000;
 const DEFAULT_MIN_REVALIDATE_INTERVAL_MS = 15_000;
@@ -50,6 +52,12 @@ interface AuthSessionRevalidatorProps {
 }
 
 const defaultNow = () => Date.now();
+const fullscreenElement = () =>
+  typeof document === 'undefined' ? null : document.fullscreenElement || null;
+const subscribeFullscreen = (notify: () => void) => {
+  document.addEventListener('fullscreenchange', notify);
+  return () => document.removeEventListener('fullscreenchange', notify);
+};
 
 /**
  * Keeps long-lived admin sessions aligned with backend permission changes.
@@ -64,6 +72,7 @@ export function AuthSessionRevalidator({
   now = defaultNow,
 }: AuthSessionRevalidatorProps) {
   const revalidator = useRevalidator();
+  const portalTarget = useSyncExternalStore(subscribeFullscreen, fullscreenElement, () => null);
   const lastRevalidatedAt = useRef(now());
   const current = useRef({ revalidator, snapshot });
   current.current = { revalidator, snapshot };
@@ -105,7 +114,7 @@ export function AuthSessionRevalidator({
       // Authoritative auth rejection still goes through normal loader handling.
       const probe = new AbortController();
       pendingProbe = probe;
-      const requestId = crypto.randomUUID();
+      const requestId = createClientRequestId();
       const started = performance.now();
       const logDeferred = (reason: string, status?: number) => {
         setBackgroundRefreshUnavailable(true);
@@ -194,14 +203,15 @@ export function AuthSessionRevalidator({
     };
   }, [enabled, isAuthenticated, intervalMs, minIntervalMs, now]);
 
-  if (!enabled || !isAuthenticated || !unavailable) return null;
-  return (
+  if (!enabled || !isAuthenticated || !unavailable || typeof document === 'undefined') return null;
+  return createPortal(
     <div
       role="status"
       data-testid="background-refresh-unavailable"
       className="pointer-events-none fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm"
     >
       {rootT('backgroundRefreshUnavailable', resolveErrorLocale(snapshot?.locale))}
-    </div>
+    </div>,
+    portalTarget || document.body,
   );
 }

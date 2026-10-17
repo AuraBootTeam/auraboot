@@ -115,6 +115,29 @@ describe('AuthSessionRevalidator', () => {
     expect(view.getByTestId('background-refresh-unavailable')).toBeTruthy();
   });
 
+  it('keeps the recovery status inside the active fullscreen element', async () => {
+    const target = document.createElement('main');
+    document.body.appendChild(target);
+    const previous = Object.getOwnPropertyDescriptor(document, 'fullscreenElement');
+    let active: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => active });
+    setBackgroundRefreshUnavailable(true);
+    const view = render(<AuthSessionRevalidator enabled isAuthenticated />);
+    try {
+      expect(document.body.contains(view.getByTestId('background-refresh-unavailable'))).toBe(true);
+      active = target;
+      await act(async () => {
+        document.dispatchEvent(new Event('fullscreenchange'));
+      });
+      expect(target.contains(view.getByTestId('background-refresh-unavailable'))).toBe(true);
+    } finally {
+      view.unmount();
+      target.remove();
+      if (previous) Object.defineProperty(document, 'fullscreenElement', previous);
+      else Reflect.deleteProperty(document, 'fullscreenElement');
+    }
+  });
+
   it('keeps polling through 24 hours of accelerated timer time', async () => {
     render(<AuthSessionRevalidator enabled isAuthenticated />);
     await act(async () => {

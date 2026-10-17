@@ -6,6 +6,13 @@ type RouteFailure = {
   path: string;
   at: number;
 };
+export function createClientRequestId(): string {
+  const randomUuid = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
+  return randomUuid
+    ? randomUuid()
+    : `ui-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+}
+
 let installed = false;
 const failures: RouteFailure[] = [];
 
@@ -26,7 +33,7 @@ export function installRouteRequestDiagnostics(): void {
     const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
     if (url.origin !== window.location.origin || !url.pathname.endsWith('.data'))
       return originalFetch(input, init);
-    const requestId = crypto.randomUUID();
+    const requestId = createClientRequestId();
     const headers = new Headers(
       init?.headers || (input instanceof Request ? input.headers : undefined),
     );
