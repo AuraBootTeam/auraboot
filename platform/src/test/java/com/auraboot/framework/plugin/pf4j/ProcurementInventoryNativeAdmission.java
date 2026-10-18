@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Test-only immutable admission for the four trusted receipt Native methods. */
 final class ProcurementInventoryNativeAdmission {
-    static final String MAIN_BASE="d60a9f0acdfce618d4817a7a74da24d61f8b2e5d";
+    static final String MAIN_BASE="39c92a8e2b15499f236f55f6aa0e804bfba67390";
     static final Set<String> PLUGINS=Set.of("com.auraboot.inventory","com.auraboot.procurement");
     static final List<String> SOURCES=List.of(
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementInventoryReceiptRealDbIT.java",
