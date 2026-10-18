@@ -58,5 +58,9 @@
   "remove": {
     "zh-CN": "移除",
     "en": "Remove"
+  },
+  "unnamedParameter": {
+    "zh-CN": "未命名参数（请补充操作元数据）",
+    "en": "Unnamed parameter (update operation metadata)"
   }
 }

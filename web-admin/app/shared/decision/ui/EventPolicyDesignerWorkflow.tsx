@@ -957,7 +957,7 @@ export function EventPolicyDesignerWorkflow({
                       id={`epd-action-type-${idx}`}
                       aria-label={`action-type-${idx}`}
                       value={action.type}
-                      onChange={(e) => updateAction(idx, { type: e.target.value })}
+                      onChange={(e) => updateAction(idx, { type: e.target.value, payloadJson: '{}', target: '' })}
                     >
                       {actionOptions.map((option) => (
                         <option key={option.actionType} value={option.actionType}>

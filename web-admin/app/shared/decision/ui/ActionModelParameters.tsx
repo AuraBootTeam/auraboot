@@ -44,6 +44,7 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
   const commandCode = typeof payload.commandCode === 'string' ? payload.commandCode : '';
   const [modelFields, setModelFields] = useState<ResourceOption[]>([]);
   const [parameterKeys, setParameterKeys] = useState<string[]>([]);
+  const [parameterSchema, setParameterSchema] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const values = object(isCommand ? payload.params : payload.fields);
@@ -55,6 +56,7 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
   useEffect(() => {
     let cancelled = false;
     setParameterKeys([]);
+    setParameterSchema({});
     setModelFields([]);
     setError('');
     if (!modelCode) return;
@@ -69,6 +71,7 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
       if (response?.data && response.data.modelCode !== modelCode) throw Error('Command model mismatch');
       setModelFields(loadedFields);
       setParameterKeys(response?.data ? commandParameterKeys(response.data) : []);
+      setParameterSchema(response?.data?.inputSchema ? object(JSON.parse(response.data.inputSchema)) : {});
     }).catch(reason => {
       if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
     }).finally(() => { if (!cancelled) setLoading(false); });
@@ -97,7 +100,7 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
       if (!readOnly) onChange({ ...payload, commandCode: value, params: {} });
     })}
     {isCommand && render({ key: 'targetRecordPid', label: text('target'), type: 'select',
-      options: [{label: text('currentRecord'), value: '${record.recordPid}'}, ...references.filter(reference => fields.some(field => `${field.scope}.${field.path}` === reference.value.slice(2,-1) && (field.reference || field.path.endsWith('Pid'))))], description: text('targetHint') }, payload.targetRecordPid ?? '', value => patch('targetRecordPid', value))}
+      options: [...(modelCode === currentModelCode ? [{label: text('currentRecord'), value: '${record.recordPid}'}] : []), ...references.filter(reference => fields.some(field => `${field.scope}.${field.path}` === reference.value.slice(2,-1) && field.reference?.targetEntity === modelCode))], description: text('targetHint') }, payload.targetRecordPid ?? '', value => patch('targetRecordPid', value))}
     {loading && <p role="status">{text('loading')}</p>}
     {error && <p role="alert" className="text-red-700">{text('loadError')} · {error}</p>}
     {!isCommand && modelCode && render({ key: 'field', label: text('field'), type: 'select',
@@ -108,21 +111,29 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
       })}
     {keys.map(key => {
       const metadata = modelFields.find(field => field.value === key);
-      const label = metadata?.label ?? key;
+      const declared = object(object(parameterSchema.properties)[key]);
+      const label = typeof declared.title === 'string' ? declared.title : metadata?.label ?? text('unnamedParameter');
       const value = values[key];
       const reference = typeof value === 'string' && value.startsWith('${');
-      const type = metadata?.description?.toLowerCase();
+      const type = typeof declared.type === 'string' ? declared.type : metadata?.description?.toLowerCase();
       const literalType = ['integer', 'decimal', 'number', 'long'].includes(type ?? '') ? 'number'
         : type === 'boolean' ? 'boolean' : 'text';
+      const compatibleReferences = references.filter(reference => fields.some(field => {
+        if (`${field.scope}.${field.path}` !== reference.value.slice(2,-1)) return false;
+        if (literalType === 'number') return ['integer','decimal'].includes(field.dataType);
+        if (literalType === 'boolean') return field.dataType === 'boolean';
+        return !['integer','decimal','boolean','collection','object'].includes(field.dataType);
+      }));
       return <div className="rule-action-assignment" key={key}>
         <div><strong>{label}</strong>{!isCommand && <button type="button" disabled={readOnly}
           onClick={() => { const next = { ...values }; delete next[key]; patch('fields', next); }}
           className="ml-2 text-xs text-slate-500">{text('remove')}</button>}</div>
         {render({ key: `${key}-source`, label: text('source'), type: 'select', options: [
           { label: text('fixed'), value: 'fixed' }, { label: text('reference'), value: 'reference' },
-        ] }, reference ? 'reference' : 'fixed', next => updateValue(key, next === 'reference' ? references[0]?.value ?? '' : ''))}
+        ] }, reference ? 'reference' : 'fixed', next => updateValue(key, next === 'reference' ? '${}' : ''))}
         {render({ key: `${key}-value`, label: text('value'), type: reference ? 'select' : literalType,
-          ...(reference ? { options: references } : {}) }, value ?? '', next => updateValue(key, next))}
+          required: Array.isArray(parameterSchema.required) && parameterSchema.required.includes(key),
+          ...(reference ? { options: [...(literalType === 'text' ? [{ label: text('currentRecord'), value: '${record.recordPid}' }] : []), ...compatibleReferences] } : {}) }, value ?? '', next => updateValue(key, next))}
       </div>;
     })}
     {isCommand && commandCode && !loading && !error && keys.length === 0 && <p>{text('noParams')}</p>}

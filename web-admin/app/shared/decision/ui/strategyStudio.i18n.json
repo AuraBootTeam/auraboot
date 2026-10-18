@@ -698,5 +698,9 @@
   "testTraceTitle": {
     "zh-CN": "执行标识",
     "en": "Execution reference"
+  },
+  "readOnlyNotice": {
+    "zh-CN": "只读查看：可查看判断逻辑与历史版本，修改和发布需相应权限。",
+    "en": "Read-only access. Editing and publishing require additional permissions."
   }
 }

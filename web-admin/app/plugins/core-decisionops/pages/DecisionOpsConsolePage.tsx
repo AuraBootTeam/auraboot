@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import {
   createDecisionApi,
   type HttpClient,
@@ -56,6 +56,7 @@ function createApi() {
 }
 
 export default function DecisionOpsConsolePage() {
+  const navigate = useNavigate()
   const api = useMemo(() => createApi(), [])
   const location = useLocation()
   const browserSearch = typeof window !== 'undefined' ? window.location.search : ''
@@ -65,6 +66,7 @@ export default function DecisionOpsConsolePage() {
       api={api}
       fields={DEFAULT_FIELDS}
       initialTab={tabFromSearch(searchParams.get('tab'))}
+      onTabChange={tab => navigate(`/decision-ops?tab=${tab}`, {replace: true})}
     />
   )
 }

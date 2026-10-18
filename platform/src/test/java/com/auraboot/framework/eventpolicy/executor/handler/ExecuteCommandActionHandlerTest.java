@@ -58,6 +58,14 @@ class ExecuteCommandActionHandlerTest {
         verifyNoInteractions(executor);
     }
 
+    @Test void tenantOnlyContextCannotBypassUserAuthorization() {
+        MetaContext.clear();
+        MetaContext.setCurrentTenantId(42L);
+        assertThatThrownBy(() -> handler.executeWithResult(plan(Map.of("modelCode", "project", "commandCode", "project:register")), context))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(commands, executor);
+    }
+
     @Test void missingTenantCannotDispatchCommands() {
         MetaContext.clear();
         assertThatThrownBy(() -> handler.executeWithResult(plan(Map.of("modelCode", "project", "commandCode", "project:register")), context))

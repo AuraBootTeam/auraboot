@@ -745,6 +745,17 @@
         "presentation": {
           "kind": "progress"
         }
+      },
+      {
+        "field": "tpm_pj_accepted_total",
+        "label": {
+          "zh-CN": "已验收金额",
+          "en": "Accepted delivery value"
+        },
+        "presentation": {
+          "kind": "currency",
+          "currencyCode": "CNY"
+        }
       }
     ],
     "hiddenSystemTabs": [

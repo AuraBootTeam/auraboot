@@ -1,6 +1,6 @@
 import { useAuth } from '~/contexts/AuthContext';
 import './decision-workbench.css';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DecisionDefinitionListPage, type DefinitionSummary } from './DecisionDefinitionListPage';
 import { DecisionTableEditor } from './DecisionTableEditor';
@@ -61,6 +61,7 @@ export interface DecisionOpsConsoleProps {
   permissionGrants?: RoleGrants[];
   dashboard?: { summary: DashboardSummary; exceptions: ExceptionItem[] };
   initialTab?: ConsoleTab;
+  onTabChange?: (tab: ConsoleTab) => void;
 }
 
 const TABS: { key: ConsoleTab; label: string; description: string }[] = [
@@ -138,6 +139,8 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
   const st = useSmartText();
   const [selectedDecisionCode, setSelectedDecisionCode] = useState('');
   const [tab, setTab] = useState<ConsoleTab>(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
+  const selectTab = (next: ConsoleTab) => { setTab(next); props.onTabChange?.(next); };
   const [selectedPolicy, setSelectedPolicy] = useState<EventPolicySummary | null>(null);
   const [tableDraft, setTableDraft] = useState<DecisionTable>(DEFAULT_TABLE);
   const [tableAnalysis, setTableAnalysis] = useState<DecisionTableAnalysis | null>(null);
@@ -351,7 +354,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
               aria-selected={tab === t.key}
               onClick={(event) => {
                 event.preventDefault();
-                setTab(t.key);
+                selectTab(t.key);
               }}
             >
               <span className="decisionops-nav-label">{t.label}</span>
@@ -361,7 +364,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           <details className="decisionops-professional-entry">
             <summary>{st('$i18n:decisionops.professional', '专业配置')}</summary>
             <div>{TABS.filter(item => !['definitions', 'policies', 'logs'].includes(item.key) && item.key !== tab).map(item => (
-              <button key={item.key} type="button" data-testid={`doc-tab-${item.key}`} onClick={() => setTab(item.key)}>{item.label}</button>
+              <button key={item.key} type="button" data-testid={`doc-tab-${item.key}`} onClick={() => selectTab(item.key)}>{item.label}</button>
             ))}</div>
           </details>
         </nav>
@@ -377,6 +380,9 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           <div className="doc-panel decisionops-content-card" data-testid={`doc-panel-${tab}`}>
             {tab === 'studio' && (
               <StrategyStudioWorkbench
+                readOnly={!hasPermission('decision.definition.manage')}
+                canPublish={hasPermission('decision.definition.publish')}
+                canRun={hasPermission('decision.runtime.evaluate')}
                 api={api}
                 initialDecisionCode={selectedDecisionCode}
                 fields={strategyFields}
@@ -408,16 +414,17 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
             )}
             {tab === 'policies' && (
               <EventPolicyListPage
+                readOnly={!hasPermission('decision.policy.manage')}
                 api={api}
                 onOpenDesigner={(policy) => {
                   setSelectedPolicy(policy);
-                  setTab('designer');
+                  selectTab('designer');
                 }}
-                onOpenLogs={() => setTab('logs')}
+                onOpenLogs={() => selectTab('logs')}
               />
             )}
             {tab === 'definitions' && <DecisionDefinitionListPage api={api} onOpen={definition => {
-              setSelectedDecisionCode(definition.decisionCode); setTab('studio');
+              setSelectedDecisionCode(definition.decisionCode); selectTab('studio');
             }} />}
             {tab === 'designer' && (
               <EventPolicyDesignerWorkflow

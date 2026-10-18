@@ -38,7 +38,7 @@ import {
 const zhText = (key: StrategyStudioTextKey) => strategyStudioText(key, 'zh-CN')
 
 type StrategyScenarioKey = 'SLA' | 'BPM' | 'AUTOMATION' | 'PERMISSION' | 'EVENT_POLICY'
-type StrategyWorkspacePanelKey = 'rule' | 'facts' | 'dmn' | 'review'
+type StrategyWorkspacePanelKey = 'rule' | 'facts' | 'dmn' | 'test' | 'review'
 
 interface StrategyScenario {
   key: StrategyScenarioKey
@@ -112,6 +112,9 @@ const LEAVE_APPLICANT_REFERENCE_FIELD: FieldOption = {
 };
 
 export interface StrategyStudioWorkbenchProps {
+  readOnly?: boolean
+  canPublish?: boolean
+  canRun?: boolean
   initialDecisionCode?: string
   fields: FieldOption[]
   decisions?: DecisionOption[]
@@ -250,6 +253,7 @@ const WORKSPACE_PANELS: Array<{ key: StrategyWorkspacePanelKey }> = [
   { key: 'rule' },
   { key: 'facts' },
   { key: 'dmn' },
+  { key: 'test' },
   { key: 'review' },
 ]
 
@@ -261,6 +265,7 @@ const WORKSPACE_PANEL_TEXT: Record<
   rule: { label: 'panelRuleLabel', summary: 'panelRuleSummary' },
   facts: { label: 'panelFactsLabel', summary: 'panelFactsSummary' },
   dmn: { label: 'panelDmnLabel', summary: 'panelDmnSummary' },
+  test: { label: 'testPanelTitle', summary: 'testPanelHint' },
   review: { label: 'panelReviewLabel', summary: 'panelReviewSummary' },
 }
 
@@ -1003,6 +1008,9 @@ function sampleContext() {
 }
 
 export function StrategyStudioWorkbench({
+  readOnly = false,
+  canPublish = true,
+  canRun = true,
   initialDecisionCode = '',
   fields,
   decisions = [],
@@ -1300,6 +1308,7 @@ export function StrategyStudioWorkbench({
   }
 
   const checkReadiness = async () => {
+    if (readOnly) return;
     const code = activeScenario.decisionCode
     const fingerprint = draftFingerprint
     setCheckingReadiness(true)
@@ -1334,12 +1343,13 @@ export function StrategyStudioWorkbench({
       if (!parts.length || parts.some((part) => !part || ['__proto__', 'constructor', 'prototype'].includes(part))) continue
       let target: Record<string, unknown> = context[scope] ??= {}
       for (const part of parts.slice(0, -1)) target = (target[part] ??= {}) as Record<string, unknown>
-      target[parts[parts.length - 1]] = ['integer', 'decimal', 'number'].includes(input.dataType ?? '') ? Number(value) : value
+      target[parts[parts.length - 1]] = ['integer', 'decimal', 'number'].includes(input.dataType ?? '') ? Number(value) : input.dataType === 'boolean' ? value === 'true' : value
     }
     return context
   }
 
   const runTest = async () => {
+    if (!canRun) return;
     setTestTrace(null)
     setOperationStatus(text('testRunning'))
     setTestOutputs(null)
@@ -1593,6 +1603,7 @@ export function StrategyStudioWorkbench({
   const saveDraft = async (
     target: StrategyScenario = activeScenario,
   ): Promise<{ decisionPid: string | null; conditionFragmentPid: string | null } | null> => {
+    if (readOnly) return null;
     setOperationStatus(text('draftSaving'))
     try {
       const conditionFragmentPid = await saveConditionFragmentDraft(target)
@@ -1608,6 +1619,7 @@ export function StrategyStudioWorkbench({
   }
 
   const publish = async () => {
+    if (readOnly || !canPublish) return;
     if (!publishReady) {
       setOperationStatus(publishStatus, 'error')
       return
@@ -1682,6 +1694,7 @@ export function StrategyStudioWorkbench({
 
           <button
             type="button"
+            disabled={readOnly}
             data-testid="strategy-save-draft"
             onClick={() => void saveDraft()}
           >
@@ -1690,7 +1703,7 @@ export function StrategyStudioWorkbench({
           <button
             type="button"
             data-testid="strategy-publish"
-            disabled={!publishReady || checkingReadiness}
+            disabled={readOnly || !canPublish || !publishReady || checkingReadiness}
             className="strategy-studio-primary"
             onClick={() => void publish()}
           >
@@ -1698,6 +1711,7 @@ export function StrategyStudioWorkbench({
           </button>
         </div>
       </header>
+      {readOnly && <p role="status" className="text-sm text-slate-500">{text('readOnlyNotice')}</p>}
       <div className="strategy-workspace-tabs" aria-label={text('workspaceGroupLabel')}>
         {WORKSPACE_PANELS.map((panel) => (
           <button
@@ -1714,7 +1728,7 @@ export function StrategyStudioWorkbench({
       </div>
 
       <div className="strategy-studio-body">
-      <div className="strategy-studio-grid">
+      <fieldset disabled={readOnly} className="strategy-studio-grid border-0 p-0 m-0 min-w-0">
         <aside
           className="strategy-studio-panel strategy-workspace-panel"
           data-testid="strategy-fact-catalog"
@@ -1888,20 +1902,21 @@ export function StrategyStudioWorkbench({
 
 
         </aside>
-      </div>
-      <aside className="strategy-test-panel" data-testid="strategy-test-panel">
+      </fieldset>
+      <aside className="strategy-test-panel strategy-workspace-panel" data-active={activeWorkspacePanel === 'test' ? 'true' : 'false'} data-testid="strategy-test-panel">
         <header><h4>{text('testPanelTitle')}</h4><p>{text('testPanelHint')}</p></header>
-      {selectedDecisionCode && <div className="strategy-studio-metrics" data-testid="strategy-test-inputs">{scenarioTable.inputs.map((input) => <label key={input.id}>{input.label || input.id}<input aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => { setStatus(null); setTestOutputs(null); setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value })) }} /></label>)}</div>}
+      {selectedDecisionCode && <div className="strategy-studio-metrics" data-testid="strategy-test-inputs">{scenarioTable.inputs.map((input) => <label key={input.id}>{input.label || input.id}{input.dataType === 'boolean' || input.allowedValues?.length ? <select aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => { setStatus(null); setTestOutputs(null); setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value })) }}><option value="">{text('anyValue')}</option>{(input.allowedValues ?? ['true', 'false']).map(value => <option key={String(value)} value={String(value)}>{input.valueLabels?.[String(value)] ?? String(value)}</option>)}</select> : <input type={['integer', 'number', 'decimal'].includes(input.dataType) ? 'number' : 'text'} aria-label={input.label || input.id} value={businessTestValues[`${activeScenario.decisionCode}:${input.id}`] ?? ''} onChange={(event) => { setStatus(null); setTestOutputs(null); setBusinessTestValues((current) => ({ ...current, [`${activeScenario.decisionCode}:${input.id}`]: event.target.value })) }} />}</label>)}</div>}
       {operationStatus && (
         <div className="strategy-operation-status" data-testid="strategy-operation-status" data-tone={operationTone} role={operationTone === 'error' ? 'alert' : 'status'}>
           {operationStatus}
         </div>
       )}
 
-      {testOutputs && <dl className="strategy-test-outputs" data-testid="strategy-test-outputs">{Object.entries(testOutputs).map(([key, value]) => <div key={key}><dt>{scenarioTable.outputs.find((output) => output.id === key)?.label || key}</dt><dd>{typeof value === 'object' ? text('structuredOutput') : String(value)}</dd></div>)}</dl>}
+      {testOutputs && <dl className="strategy-test-outputs" data-testid="strategy-test-outputs">{Object.entries(testOutputs).map(([key, value]) => <div key={key}><dt>{scenarioTable.outputs.find((output) => output.id === key)?.label || key}</dt><dd>{typeof value === 'object' ? text('structuredOutput') : scenarioTable.outputs.find(output => output.id === key)?.valueLabels?.[String(value)] ?? String(value)}</dd></div>)}</dl>}
       {testOutputs && testTrace && <details className="strategy-test-trace"><summary>{text('testTraceTitle')}</summary><code>{testTrace}</code></details>}
           <button
             type="button"
+            disabled={!canRun}
             data-testid="strategy-run-test"
             onClick={() => void runTest()}
           >
@@ -1913,7 +1928,7 @@ export function StrategyStudioWorkbench({
                 {publishStatus}
               </span>
             </div>
-            <button type="button" data-testid="strategy-check-readiness" disabled={checkingReadiness} onClick={() => void checkReadiness()}>{text(checkingReadiness ? 'checkingReadiness' : 'checkReadiness')}</button>
+            <button type="button" data-testid="strategy-check-readiness" disabled={readOnly || checkingReadiness} onClick={() => void checkReadiness()}>{text(checkingReadiness ? 'checkingReadiness' : 'checkReadiness')}</button>
             <div className="strategy-check-list">
               <span data-state={draftValid ? 'ok' : 'pending'}>{text(draftValid ? 'checkFieldsResolvable' : 'draftCheckPending')}</span>
               <span data-state={fragmentReady ? 'neutral' : 'warn'}>{text(!selectedFragment ? 'fragmentNotUsed' : fragmentReady ? 'checkFragmentVersionAvailable' : 'fragmentUnpublished')}</span>

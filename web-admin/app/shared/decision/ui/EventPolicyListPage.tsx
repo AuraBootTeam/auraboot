@@ -14,6 +14,7 @@ import { useEventPolicyFormText } from './eventPolicyFormText';
  */
 
 export interface EventPolicyListPageProps {
+  readOnly?: boolean;
   api: DecisionApi;
   onOpenDesigner?: (policy: EventPolicySummary) => void;
   onOpenLogs?: (policy: EventPolicySummary) => void;
@@ -121,7 +122,7 @@ function statusTone(statusValue: unknown): string {
   return 'is-neutral';
 }
 
-export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPolicyListPageProps) {
+export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs, readOnly = false }: EventPolicyListPageProps) {
   const queryClient = useQueryClient();
   const { text } = useEventPolicyFormText();
   const [query, setQuery] = useState('');
@@ -273,6 +274,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
         <button
           className="decisionops-primary-button"
           type="button"
+          disabled={readOnly}
           data-testid="epl-new-policy"
           onClick={startCreate}
         >
@@ -379,7 +381,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
                       type="button"
                       aria-pressed={policy.enabled !== false}
                       data-testid={`epl-toggle-enabled-${policy.policyCode}`}
-                      disabled={enabledMutation.isPending}
+                      disabled={readOnly || enabledMutation.isPending}
                       onClick={() =>
                         enabledMutation.mutate({
                           policyCode: policy.policyCode,
@@ -401,6 +403,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
                       </button>
                       <button
                         type="button"
+                        disabled={readOnly}
                         data-testid={`epl-copy-${policy.policyCode}`}
                         onClick={() => startCopy(policy)}
                       >

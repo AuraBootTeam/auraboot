@@ -35,6 +35,10 @@ public class ExecuteCommandActionHandler implements ActionHandler {
         if (!MetaContext.exists() || MetaContext.getCurrentTenantId() == null) {
             throw new IllegalStateException("A tenant execution identity is required");
         }
+        if (!com.auraboot.framework.application.tenant.MetaContext.exists()
+                || com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId() == null) {
+            throw new IllegalStateException("A named execution actor is required for business writes");
+        }
         Map<String, Object> payload = plan.payload();
         String model = required(payload, "modelCode");
         String code = required(payload, "commandCode");

@@ -1,0 +1,54 @@
+{
+  "businessRule": {
+    "zh-CN": "业务规则",
+    "en": "Business rule"
+  },
+  "purpose": {
+    "zh-CN": "解决什么问题",
+    "en": "Business purpose"
+  },
+  "consumer": {
+    "zh-CN": "应用位置",
+    "en": "Used by"
+  },
+  "details": {
+    "zh-CN": "更多信息",
+    "en": "More information"
+  },
+  "identifiers": {
+    "zh-CN": "标识与来源",
+    "en": "Identifiers and source"
+  },
+  "unnamed": {
+    "zh-CN": "未命名规则",
+    "en": "Unnamed rule"
+  },
+  "purposeMissing": {
+    "zh-CN": "尚未填写业务说明",
+    "en": "Business description not provided"
+  },
+  "approval": {
+    "zh-CN": "审批流程",
+    "en": "Approval workflow"
+  },
+  "deadline": {
+    "zh-CN": "处理时限",
+    "en": "Service deadline"
+  },
+  "model": {
+    "zh-CN": "业务模型",
+    "en": "Business model"
+  },
+  "operation": {
+    "zh-CN": "业务操作",
+    "en": "Business operation"
+  },
+  "shared": {
+    "zh-CN": "共享规则",
+    "en": "Shared rule"
+  },
+  "professional": {
+    "zh-CN": "专业配置",
+    "en": "Professional settings"
+  }
+}

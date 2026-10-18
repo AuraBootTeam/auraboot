@@ -83,3 +83,16 @@
 
 .epd-edit-scope { border: 0; padding: 0; margin: 0; min-width: 0; }
 .epd-edit-scope:disabled { opacity: .8; }
+
+.decisionops-rule-purpose { max-width: 420px; color: #64748b; line-height: 1.6; }
+.decisionops-rule-identifiers { font-size: 12px; color: #64748b; }
+.decisionops-rule-identifiers summary { cursor: pointer; }
+.decisionops-rule-identifiers div { margin-top: 5px; overflow-wrap: anywhere; }
+
+/* Keep editing and trial evaluation separate so the decision table has room. */
+.decisionops-shell .strategy-studio-body { grid-template-columns:minmax(0,1fr); }
+.decisionops-shell .strategy-test-panel { position:static; max-width:100%; }
+.decisionops-shell .strategy-test-panel [data-testid=strategy-test-inputs] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.decisionops-shell .strategy-test-panel select { min-height:38px; padding:7px 10px; border:1px solid var(--color-border); border-radius:6px; background:var(--color-panel); }
+.decisionops-shell .strategy-studio-grid:has(~ .strategy-test-panel[data-active=true]) { display:none; }
+@media(max-width:800px){ .decisionops-shell .strategy-test-panel [data-testid=strategy-test-inputs]{grid-template-columns:1fr;} }

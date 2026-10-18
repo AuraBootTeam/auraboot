@@ -34,6 +34,8 @@ public class OutboxServiceImpl implements OutboxService {
     private final DrtOutboxMapper outboxMapper;
     private final EventPolicyRuntimeService runtimeService;
     private final ObjectMapper objectMapper;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+    private final com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper tenantMembers;
 
     @Transactional
     @Override
@@ -62,16 +64,19 @@ public class OutboxServiceImpl implements OutboxService {
         List<DrtOutboxEntity> pending = outboxMapper.findPending(tid, limit);
         // The exact-event method is also the after-commit dispatch entry. Runtime action
         // transactions and durable outcomes are independent of a worker's ambient transaction.
-        for (DrtOutboxEntity row : pending) processRow(row);
+        for (DrtOutboxEntity row : pending) processEvent(row.getEventId());
         return pending.size();
     }
 
     @Override
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void processEvent(String eventId) {
-        DrtOutboxEntity row = outboxMapper.findByEventIdForUpdate(requireTenant(), eventId);
-        if (row == null || !"PENDING".equals(row.getStatus())) return;
-        processRow(row);
+        Long tenantId = requireTenant();
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transaction.executeWithoutResult(status -> {
+            DrtOutboxEntity row = outboxMapper.findByEventIdForUpdate(tenantId, eventId);
+            if (row != null && "PENDING".equals(row.getStatus())) processRow(row);
+        });
     }
 
     private void processRow(DrtOutboxEntity row) {
@@ -81,10 +86,16 @@ public class OutboxServiceImpl implements OutboxService {
                             new TypeReference<Map<String, Map<String, Object>>>() {});
             var actor = ctx.getOrDefault("actor", Map.of());
             Long actorId = actor.get("userId") instanceof Number number ? number.longValue() : null;
+            var member = actorId == null ? null : tenantMembers.findByTenantIdAndUserId(row.getTenantId(), actorId);
+            if (actorId != null && (member == null || !row.getTenantId().equals(member.getTenantId())
+                    || !actorId.equals(member.getUserId()) || Boolean.TRUE.equals(member.getDeletedFlag())
+                    || !"active".equalsIgnoreCase(member.getStatus()))) {
+                throw new IllegalStateException("The event actor is not an active member of this space");
+            }
             MetaContext.Snapshot identity = new MetaContext.Snapshot(row.getTenantId(), actorId,
                     actor.get("userPid") instanceof String pid ? pid : null,
                     actor.get("username") instanceof String name ? name : null,
-                    java.util.Set.of(), null, null, null, null);
+                    java.util.Set.of(), member == null ? null : member.getId(), null, null, null);
             var previousPrincipal = com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current().orElse(null);
             var previousEnvelope = com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current().orElse(null);
             com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear();

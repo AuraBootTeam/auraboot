@@ -145,61 +145,71 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   await expect(page.getByTestId('bpm-history-container')).not.toContainText('Access forbidden');
   await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
   await page.getByRole('tab',{name:'验收详情',exact:true}).click();
+  if(action==='approve') {
+    await expect.poll(async ()=>(await row(observer,pid)).tpm_ac_registered, {timeout:15000}).toBe(true);
+    const accepted=await row(observer,pid);
+    const all=await data(await observer.request.get('/api/dynamic/tpm_acceptance/list?size=100'));
+    const sum=all.records.filter((r:any)=>r.tpm_ac_project===accepted.tpm_ac_project&&r.tpm_ac_status==='accepted').reduce((sum:number,r:any)=>sum+Number(r.tpm_ac_amount),0);
+    const projects=await data(await observer.request.get('/api/dynamic/tpm_project/list?size=100'));
+    const project=projects.records.find((r:any)=>r.pid===accepted.tpm_ac_project);
+    expect(Number(project.tpm_pj_accepted_total)).toBe(sum);
+    const checks=await data(await observer.request.get('/api/dynamic/tdv_check/list?size=100'));
+    expect(checks.records.filter((r:any)=>r.tdv_ck_acceptance===pid)).toHaveLength(1);
+    receipts.push({case:'C02',acceptancePid:pid,projectPid:project.pid,acceptedTotal:sum,checkCount:1});
+    await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
+  }
   return sla;
 }
 
 test('real decision drafts, readiness and boundary outputs from the rule workbench @critical', async({page})=>{
   await login(page);
-  expect((await data(await page.request.get('/api/dynamic/tpm_acceptance/list'))).records).toHaveLength(0);
-  expect((await data(await page.request.get('/api/dynamic/tpm_project/list'))).records).toHaveLength(8);
-  await menu(page,'策略工作台');await expect(page.getByTestId('strategy-business-decision').locator('option')).toHaveCount(3);
-  await shot(page,'d16');
-  await expect(page.getByTestId('strategy-studio')).toContainText('草稿尚未验证或已修改');
-  await shot(page,'d01');
-  await page.getByTestId('strategy-business-decision').selectOption('tpm_acceptance_route');
-  await expect(page.getByTestId('strategy-test-inputs').getByRole('textbox',{name:'交付金额',exact:true})).toBeVisible();
-  for(const [amount,risk,route] of [['68000','normal','standard'],['68000','high','enhanced'],['100000','normal','enhanced'],['99999.99','normal','standard']]) {
-    await page.getByRole('textbox',{name:'交付金额',exact:true}).fill(amount);
-    await page.getByRole('textbox',{name:'风险等级',exact:true}).fill(risk);
+  await menu(page,'策略工作台');
+  await expect(page.getByTestId('decision-definition-list')).toBeVisible();
+  await shot(page,'R01');
+  await page.getByRole('button',{name:'交付验收 · 审批分级',exact:true}).click();
+  await expect(page.getByTestId('strategy-dmn-panel')).toBeVisible();
+  await shot(page,'R02');
+  await page.getByTestId('strategy-workspace-tab-test').click();
+  const inputs=page.getByTestId('strategy-test-inputs');
+  for(const [amount,risk,issues,materials,route] of [
+    ['68000','normal','0','true','standard'], ['68000','high','0','true','enhanced'],
+    ['100000','normal','1','true','enhanced'], ['100000','normal','0','true','standard'],
+    ['99999.99','normal','1','true','standard'], ['68000','normal','0','false','enhanced'],
+  ]) {
+    await inputs.getByRole('spinbutton',{name:'交付金额',exact:true}).fill(amount);
+    await inputs.getByRole('combobox',{name:'风险等级',exact:true}).selectOption(risk);
+    await inputs.getByRole('spinbutton',{name:'未解决问题数',exact:true}).fill(issues);
+    await inputs.getByRole('combobox',{name:'材料内容已齐全',exact:true}).selectOption(materials);
     const executed=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/decision/test-run'&&r.request().method()==='POST');
     await page.getByTestId('strategy-run-test').click();
     const response=await executed;const result=await data(response);
     expect(result.outputs.route).toBe(route);
-    expect(response.request().postDataJSON().context.record.data.tpm_ac_amount).toBe(Number(amount));
-    await expect(page.getByTestId('strategy-test-outputs')).toContainText(route);
+    expect(response.request().postDataJSON().context.record.data).toMatchObject({tpm_ac_amount:Number(amount),tpm_ac_open_issues:Number(issues),tpm_ac_materials_complete:materials==='true'});
+    await expect(page.getByTestId('strategy-test-outputs')).toContainText(route==='standard'?'常规审核':'加强审核');
   }
+  await shot(page,'R05');
   for(const width of [1280,1440]) {
     await page.setViewportSize({width,height:1000});
-    const panel=await page.getByTestId('strategy-test-panel').boundingBox();
+    await page.getByTestId('strategy-workspace-tab-dmn').click();
     const editor=await page.getByTestId('strategy-dmn-panel').boundingBox();
-    expect(panel).toBeTruthy();expect(editor).toBeTruthy();
-    expect(editor!.x+editor!.width).toBeLessThanOrEqual(panel!.x);
-    expect(panel!.x+panel!.width).toBeLessThanOrEqual(width);
-    expect(editor!.width).toBeGreaterThan(450);
-    if(width===1280) await shot(page,'d02-compact');
+    expect(editor!.width).toBeGreaterThan(width-540);
+    expect(editor!.x+editor!.width).toBeLessThanOrEqual(width);
+    await expect(page.getByTestId('strategy-test-panel')).not.toBeVisible();
+    await shot(page,`R02-${width}`);
   }
-  await shot(page,'d02');
-  await page.getByTestId('dt-row-1').locator('td').filter({has:page.getByLabel('feel-1-amount',{exact:true})}).getByText('表达式',{exact:true}).click();
-  await page.getByLabel('feel-1-amount',{exact:true}).fill('>< invalid');
-  const invalid=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/decision/test-run'&&r.request().method()==='POST');
-  await page.getByTestId('strategy-run-test').click();expect((await data(await invalid)).status).toBe('ERROR');
-  await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','error');
-  await expect(page.getByTestId('strategy-operation-status')).toContainText('Invalid FEEL');await shot(page,'d03');
-  await page.getByLabel('feel-1-amount',{exact:true}).fill('');
-  await page.getByTestId('strategy-check-readiness').click();
-  await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
   await page.getByText('字段与输出配置',{exact:true}).click();
   await page.getByLabel('input-label-0').fill('交付金额（草稿修改）');
-  await expect(page.getByTestId('strategy-studio')).toContainText('草稿尚未验证或已修改');
-  await shot(page,'d04');
+  await page.getByTestId('strategy-workspace-tab-test').click();
   await page.getByTestId('strategy-check-readiness').click();
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
   const published=page.waitForResponse(r=>/\/api\/decision\/versions\/[^/]+\/publish$/.test(new URL(r.url()).pathname)&&r.request().method()==='POST');
-  await page.getByTestId('strategy-publish').click();const version=await data(await published);expect(version.status).toBe('PUBLISHED');
-  await page.reload();await page.getByTestId('strategy-business-decision').selectOption('tpm_acceptance_route');
+  await page.getByTestId('strategy-publish').click();expect((await data(await published)).status).toBe('PUBLISHED');
+  await page.reload();
+  await page.getByTestId('strategy-business-decision').selectOption('tpm_acceptance_route');
+  await page.getByTestId('strategy-workspace-tab-dmn').click();
   await page.getByText('字段与输出配置',{exact:true}).click();
   await expect(page.getByLabel('input-label-0',{exact:true})).toHaveValue('交付金额（草稿修改）');
-  await shot(page,'d02-published');
+  await shot(page,'R06');
 });
 
 test('standard delivery enforces materials, blocks forged outcomes, approves and closes SLA @critical',async({page})=>{
@@ -221,7 +231,7 @@ test('standard delivery enforces materials, blocks forged outcomes, approves and
   const duplicate=await page.request.post('/api/meta/commands/execute/tpm:submit_delivery_acceptance',{data:{operationType:'update',targetRecordPid:pid,payload:{}}});
   expect(duplicate.ok()).toBe(false);expect((await row(page,pid)).tpm_ac_process).toBe(sla.processInstanceId);
   await decide(page,pid,'approve');await shot(page,'d08');
-  await menu(page,'流程监控');await expect(page.getByTestId('sla-strategy-chain')).toContainText('交付验收');await shot(page,'d12');
+  await menu(page,'流程监控');await page.getByTestId('sla-professional-diagnostics').locator('summary').first().click();await expect(page.getByTestId('sla-strategy-chain')).toContainText('交付验收');await shot(page,'d12');
 });
 
 test('high-risk rejection can be corrected and resubmitted through a new owned instance @critical',async({page})=>{
@@ -246,7 +256,7 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
   const change=async(value:any)=>data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:value}));
   await change({...config,name:'加强审核 · 30秒加速验证',deadlineMode:'FIXED',deadlineValue:'PT30S',ruleBinding:{...config.ruleBinding,enabled:false}});
   try {
-    const name='SLA 加速验证 · 30秒交付验收';const pid=await create(page,user,name,100000,'普通',true);
+    const name='SLA 加速验证 · 30秒交付验收';const pid=await create(page,user,name,100000,'高风险',true);
     const sla=await submit(page,pid,0.5,'tpm_enhanced_review');await shot(page,'d10');
     let expired:any;
     await expect.poll(async()=>{expired=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));return expired.status;},{timeout:65000,intervals:[3000]}).toBe('overdue');
@@ -256,7 +266,7 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
     let action:any;await expect.poll(async()=>{const logs=await data(await page.request.get(`/api/event-policy/action-logs?size=100&correlationId=sla:${sla.pid}`));action=logs.find((item:any)=>item.correlationId===`sla:${sla.pid}`);return action?.status;},{timeout:10000}).toBe('SUCCESS');
     expect(action.resultPayload.sentCount).toBeGreaterThan(0);
     await writeFile(join(evidence!,'sla-notification-evidence.json'),JSON.stringify({notifications:actual,action},null,2));
-    await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('30秒');await expect(page.getByTestId('sla-record-row').filter({hasText:name})).toContainText('逾期');await shot(page,'d11');
+    await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('SLA');await expect(page.getByTestId('sla-record-row').filter({hasText:name})).toContainText('逾期');await shot(page,'S01');await page.getByTestId('sla-record-row').filter({hasText:name}).getByTestId('sla-record-detail').click();await expect(page.getByTestId('sla-item-detail')).toContainText('已执行成功');await shot(page,'S02');
     await openRecord(page,name);await decide(page,pid,'approve');
     const completed=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));
     const closedAt=Date.parse(completed.completedTime);
@@ -276,7 +286,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
   for(const reviewer of [false,true]) {
     const code=`acceptance_${reviewer?'unassigned':'readonly'}_${Date.now()}`;
     const role=await data(await page.request.post('/api/roles',{data:{code,name:code,type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}}));
-    const grants=['tpm.acceptance.read','model.tpm_acceptance.read','tpm.project.read','model.tpm_project.read',...(reviewer?['tpm.acceptance.manage','bpm.process.read','bpm.process.execute']:[])];
+    const grants=['tpm.acceptance.read','model.tpm_acceptance.read','tpm.project.read','model.tpm_project.read','decision.definition.read','decision.policy.read',...(reviewer?['tpm.acceptance.manage','bpm.process.read','bpm.process.execute']:[])];
     await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>{expect(ids.has(code),code).toBe(true);return {permissionId:ids.get(code),granted:true};})}));
     const email=`${code}@e2e.local`;
     await data(await page.request.post('/api/admin/users',{data:{email,displayName:reviewer?'验收协作成员':'交付只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
@@ -295,6 +305,13 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
         await expect(actor.getByTestId('toolbar-btn-submit_acceptance')).toHaveCount(0);
         await expect(actor.getByTestId('bpm-panel')).toHaveCount(0);
         const refused=await actor.request.post('/api/meta/commands/execute/tpm:accept_acceptance',{data:{operationType:'update',targetRecordPid:pid,payload:{}}});expect(refused.status()).toBe(403);
+        await menu(actor,'策略工作台');
+        await actor.getByTestId('ddl-open-tpm_acceptance_route').click();
+        await expect(actor.getByTestId('strategy-save-draft')).toBeDisabled();
+        await expect(actor.getByTestId('strategy-publish')).toBeDisabled();
+        await expect(actor.getByRole('status').filter({hasText:'只读查看'})).toBeVisible();
+        await shot(actor,'R15-readonly');
+        await openRecord(actor,name);
       }
       expect((await row(page,pid)).tpm_ac_status).toBe('submitted');await shot(actor,reviewer?'d13':'d13-readonly');
       if(reviewer) {

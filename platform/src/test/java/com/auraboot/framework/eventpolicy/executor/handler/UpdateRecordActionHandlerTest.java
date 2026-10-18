@@ -9,6 +9,8 @@ import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import com.auraboot.framework.application.tenant.MetaContext;
 import static org.mockito.ArgumentMatchers.any;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +34,9 @@ class UpdateRecordActionHandlerTest {
     private final CommandService commandService = mock(CommandService.class);
     private final CommandExecutor commandExecutor = mock(CommandExecutor.class);
     private final UpdateRecordActionHandler handler = new UpdateRecordActionHandler(commandService, commandExecutor);
+    @AfterEach void clearActor() { MetaContext.clear(); }
     @BeforeEach void command() {
+        MetaContext.setContext(42L, 7L, "user-pid", "operator");
         when(commandService.resolveCrudCommands("complaint")).thenReturn(Map.of("update", "complaint:update"));
     }
 

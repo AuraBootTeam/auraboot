@@ -61,6 +61,10 @@ public class UpdateRecordActionHandler implements ActionHandler {
                             .build(),
                     null);
         }
+        if (!com.auraboot.framework.application.tenant.MetaContext.exists()
+                || com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId() == null) {
+            throw new IllegalStateException("A named execution actor is required for business writes");
+        }
         Map<String, Object> payload = plan.payload() != null ? plan.payload() : Map.of();
         Object fieldsObj = payload.get("fields");
         if (!(fieldsObj instanceof Map<?, ?> fields) || fields.isEmpty()) {
