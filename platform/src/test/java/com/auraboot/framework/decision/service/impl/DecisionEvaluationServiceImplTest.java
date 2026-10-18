@@ -3,6 +3,10 @@ package com.auraboot.framework.decision.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.decision.ast.DecisionContext;
+import com.auraboot.framework.decision.dto.DecisionFactCatalogDTO;
+import com.auraboot.framework.decision.dto.DecisionFactDTO;
+import com.auraboot.framework.decision.dto.DecisionFactEntityDTO;
+import com.auraboot.framework.decision.dto.DecisionFactOptionDTO;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
 import com.auraboot.framework.decision.dto.DrtLogDTO;
 import com.auraboot.framework.decision.dto.DrtTestRunRequest;
@@ -553,6 +557,110 @@ class DecisionEvaluationServiceImplTest {
                     Map.of("modelCode", "crm_customer", "recordId", "rec-1")))));
 
             assertThat(capturedTraceSnapshot()).contains("ERROR").contains("db down");
+        }
+    }
+
+    @Nested
+    @DisplayName("追踪快照与事实元数据")
+    class TraceSnapshots {
+
+        private DrtVersionEntity versionWithOutputs() {
+            DrtVersionEntity entity = version(2, VersionStatus.PUBLISHED.name());
+            Map<String, Object> valueLabels = Map.of("true", "通过");
+            Map<String, Object> output = new java.util.LinkedHashMap<>();
+            output.put("id", "approve");
+            output.put("label", "是否通过");
+            output.put("dataType", "BOOLEAN");
+            output.put("allowedValues", List.of(Map.of("value", "true", "label", "通过")));
+            output.put("valueLabels", valueLabels);
+            entity.setContentJson(objectMapper.valueToTree(Map.of(
+                    "rules", List.of(),
+                    "outputs", List.of(output))));
+            return entity;
+        }
+
+        private DecisionResult resultWithOutputs(List<String> unknownReasons) {
+            DecisionResult.Builder builder = DecisionResult.builder("sla_auto_approve")
+                    .traceId("tr-snap")
+                    .status(DecisionStatus.MATCHED)
+                    .matched(true)
+                    .outputs(Map.of("approve", true));
+            if (unknownReasons != null) {
+                builder.unknownReasons(unknownReasons);
+            }
+            return builder.build();
+        }
+
+        private DrtLogEntity evaluateAndCapture(DrtVersionEntity versionEntity, DecisionResult runtimeResult) {
+            when(versionMapper.findAllByCode(42L, "sla_auto_approve")).thenReturn(List.of(versionEntity));
+            when(decisionRuntime.evaluate(any(), any(), any())).thenReturn(runtimeResult);
+            service.evaluate(request());
+            ArgumentCaptor<DrtLogEntity> captor = ArgumentCaptor.forClass(DrtLogEntity.class);
+            verify(logMapper).insert(captor.capture());
+            return captor.getValue();
+        }
+
+        @Test
+        @DisplayName("contentJson 的 outputs 定义进 outputMetadata 快照")
+        void outputMetadataSnapshot() {
+            DrtLogEntity logEntry = evaluateAndCapture(
+                    versionWithOutputs(), resultWithOutputs(null));
+            String snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).contains("outputMetadata").contains("approve").contains("是否通过");
+        }
+
+        @Test
+        @DisplayName("unknownReasons 进入追踪快照")
+        void unknownReasonsLandInSnapshot() {
+            DrtLogEntity logEntry = evaluateAndCapture(
+                    versionWithOutputs(), resultWithOutputs(List.of("amount is missing")));
+            assertThat(String.valueOf(logEntry.getTraceSnapshot())).contains("unknownReasons").contains("amount is missing");
+        }
+
+        @Test
+        @DisplayName("事实目录命中：fact 元数据（含掩码/值标签）进快照")
+        void factMetadataMatchedFromCatalog() {
+            DecisionFactOptionDTO option = new DecisionFactOptionDTO();
+            option.setValue("true");
+            option.setLabel("通过");
+            DecisionFactDTO fact = new DecisionFactDTO();
+            fact.setFactKey("approve");
+            fact.setScope("record");
+            fact.setPath("data.approve");
+            fact.setLabel("审批结果");
+            fact.setDataType("BOOLEAN");
+            fact.setMasked(true);
+            fact.setAllowedValues(List.of(option));
+            DecisionFactEntityDTO entity = new DecisionFactEntityDTO();
+            entity.setModelCode("crm_customer");
+            entity.setSourceRef("crm.customer");
+            entity.setFacts(List.of(fact));
+            DecisionFactCatalogDTO catalog = new DecisionFactCatalogDTO();
+            catalog.setEntities(List.of(entity));
+            when(decisionModelFieldService.getFactCatalog(org.mockito.ArgumentMatchers.nullable(String.class)))
+                    .thenReturn(catalog);
+
+            DrtLogEntity logEntry = evaluateAndCapture(
+                    versionWithOutputs(), resultWithOutputs(null));
+
+            String snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).contains("factMetadata");
+            assertThat(snapshot).contains("审批结果");
+            assertThat(snapshot).contains("\"masked\":true");
+        }
+
+        @Test
+        @DisplayName("事实目录查询异常优雅跳过")
+        void catalogFailureSkippedGracefully() {
+            when(decisionModelFieldService.getFactCatalog(org.mockito.ArgumentMatchers.nullable(String.class)))
+                    .thenThrow(new IllegalStateException("catalog down"));
+
+            DrtLogEntity logEntry = evaluateAndCapture(
+                    versionWithOutputs(), resultWithOutputs(null));
+
+            String snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).contains("outputMetadata");
+            assertThat(snapshot).doesNotContain("factMetadata");
         }
     }
 }
