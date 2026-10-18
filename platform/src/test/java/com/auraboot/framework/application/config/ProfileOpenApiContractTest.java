@@ -49,6 +49,15 @@ class ProfileOpenApiContractTest {
         }
     }
 
+    @Test
+    void memberSearchSchemaIncludesTheEmailOnlyUsernameNull() {
+        var schemas = new ModelConverters(true).readAll(
+                com.auraboot.framework.tenant.dto.MemberSearchOption.class);
+        var identity = Json31.mapper().valueToTree(schemas.get("UserIdentity"));
+        assertThat(identity.at("/properties/username/type").toString()).contains("null");
+        assertThat(identity.at("/properties/pid/type").toString()).doesNotContain("null");
+    }
+
     static class Parameters {
         void read(@CurrentUserId Long caller, @CurrentMemberId Long member, @RequestParam Long userId) {}
     }

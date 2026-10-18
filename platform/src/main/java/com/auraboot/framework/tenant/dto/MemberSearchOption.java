@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record MemberSearchOption(String pid, String status, @Schema(nullable = true) UserIdentity user) {
 
     public record UserIdentity(
-            String pid, String username, @Schema(nullable = true) String email,
+            String pid, @Schema(nullable = true) String username, @Schema(nullable = true) String email,
             @Schema(nullable = true) String realName, @Schema(nullable = true) String avatar) {
     }
 }
