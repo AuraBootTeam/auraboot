@@ -22,6 +22,18 @@ test('generates deterministic required, enum and nullable types that reject inva
     // @ts-expect-error schema enum
     const wrong:Create={title:'Example',state:'published'};
   `;
+  assertConsumerCompiles(generated, consumer);
+});
+
+test('rejects unsupported query encodings including referenced parameters', async () => {
+  const changed = structuredClone(document);
+  changed.components.parameters = { filter: { name: 'values', in: 'query', style: 'pipeDelimited',
+    explode: false, schema: { type: 'array', items: { type: 'string' } } } };
+  changed.paths['/api/example'].post.parameters = [{ $ref: '#/components/parameters/filter' }];
+  await assert.rejects(generateTypes(changed), /serializer does not support/);
+});
+
+function assertConsumerCompiles(generated, consumer) {
   const files = new Map([['/consumer.ts', consumer], ['/generated.ts', generated]]);
   const options = { strict: true, noEmit: true, target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
@@ -33,12 +45,25 @@ test('generates deterministic required, enum and nullable types that reject inva
   const program = ts.createProgram(['/consumer.ts', '/generated.ts'], options, host);
   const errors = ts.getPreEmitDiagnostics(program).filter(d => d.category === ts.DiagnosticCategory.Error);
   assert.deepEqual(errors.map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n')), []);
-});
+}
 
-test('rejects unsupported query encodings including referenced parameters', async () => {
-  const changed = structuredClone(document);
-  changed.components.parameters = { filter: { name: 'values', in: 'query', style: 'pipeDelimited',
-    explode: false, schema: { type: 'array', items: { type: 'string' } } } };
-  changed.paths['/api/example'].post.parameters = [{ $ref: '#/components/parameters/filter' }];
-  await assert.rejects(generateTypes(changed), /serializer does not support/);
+test('generates binary multipart fields as Blob while preserving nullable parts', async () => {
+  const multipart = structuredClone(document);
+  multipart.paths['/api/upload'] = { post: { operationId: 'upload', requestBody: { required: true, content: {
+    'multipart/form-data': { schema: { type: 'object', required: ['file'], properties: {
+      file: { type: 'string', format: 'binary' }, optional: { type: ['string', 'null'], format: 'binary' },
+    } } },
+  } }, responses: { 200: { description: 'OK' } } } };
+  const generated = await generateTypes(multipart);
+  assertConsumerCompiles(generated, `import type {paths} from './generated';
+    type Body=paths['/api/upload']['post']['requestBody']['content']['multipart/form-data'];
+    const valid:Body={file:new Blob(['image']),optional:null};
+    const optionalFile:Body={file:new Blob([]),optional:new Blob([])};
+    // @ts-expect-error file is required
+    const missing:Body={};
+    // @ts-expect-error binary parts are not JSON strings
+    const wrong:Body={file:'file-content'};
+    // @ts-expect-error nullable binary parts still refuse JSON strings
+    const wrongOptional:Body={file:new Blob([]),optional:'file-content'};
+  `);
 });

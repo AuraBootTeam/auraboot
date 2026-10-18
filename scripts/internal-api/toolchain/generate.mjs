@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
+import ts from 'typescript';
 import { canonicalJson, normalizeDocument, operations, requireCondition, resolvePointer, sha256 } from '../contract.mjs';
 
 export async function generateTypes(document) {
@@ -18,6 +19,11 @@ export async function generateTypes(document) {
   }
   const nodes = await openapiTS(normalized, {
     alphabetize: true,
+    transform(schema) {
+      if (schema.type === 'string' && schema.format === 'binary') {
+        return ts.factory.createTypeReferenceNode('Blob');
+      }
+    },
     // A bare object must not silently become an unrestricted record.
     additionalProperties: false,
   });

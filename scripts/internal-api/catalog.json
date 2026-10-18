@@ -41,7 +41,8 @@
         "captured drift never creates success evidence for an empty or changed producer document",
         "response shape validates nested references required fields nullability arrays and scalar types",
         "response shape refuses undeclared operations statuses media and validates error response references",
-        "response shape detects stale nullable metadata without claiming format or business acceptance"
+        "response shape detects stale nullable metadata without claiming format or business acceptance",
+        "generates binary multipart fields as Blob while preserving nullable parts"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },

@@ -40477,7 +40477,7 @@ export interface operations {
             content: {
                 "multipart/form-data": {
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -42820,7 +42820,7 @@ export interface operations {
                     /** Format: int64 */
                     currentUserId?: number;
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -42847,7 +42847,7 @@ export interface operations {
             content: {
                 "multipart/form-data": {
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -45133,7 +45133,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -46592,7 +46592,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string;
+                    "*/*": Blob;
                 };
             };
         };
@@ -50607,9 +50607,9 @@ export interface operations {
             content: {
                 "multipart/form-data": {
                     /** Format: binary */
-                    catalog?: string;
+                    catalog?: Blob;
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -55105,7 +55105,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string;
+                    "*/*": Blob;
                 };
             };
         };
@@ -55218,7 +55218,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -55237,7 +55237,7 @@ export interface operations {
     uploadFiles: {
         parameters: {
             query: {
-                files: string[];
+                files: Blob[];
                 userId: number;
             };
             header?: never;
@@ -70637,7 +70637,7 @@ export interface operations {
             content: {
                 "multipart/form-data": {
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -71113,7 +71113,7 @@ export interface operations {
                      * Format: binary
                      * @description Plugin package file (JSON or ZIP)
                      */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -71479,7 +71479,7 @@ export interface operations {
                      * Format: binary
                      * @description Plugin package file
                      */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -71611,7 +71611,7 @@ export interface operations {
                      * Format: binary
                      * @description Plugin package file (ZIP or JSON)
                      */
-                    file: string;
+                    file: Blob;
                 };
             };
         };
@@ -76328,7 +76328,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Format: binary */
-                    file: string;
+                    file: Blob;
                 };
             };
         };

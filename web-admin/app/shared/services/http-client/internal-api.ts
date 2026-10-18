@@ -44,6 +44,22 @@ type Body<O> = O extends { requestBody: infer B }
   : O extends { requestBody?: infer B }
     ? JsonMediaValue<NonNullable<B>>
     : never;
+type MultipartBody<O> = O extends { requestBody: infer B }
+  ? B extends { content: { 'multipart/form-data': infer F } }
+    ? F
+    : never
+  : never;
+type MultipartPart = string | number | boolean | Blob | undefined;
+type SupportedMultipart<T> = T extends object
+  ? { [K in keyof T]: T[K] extends MultipartPart | readonly MultipartPart[] ? T[K] : never }
+  : never;
+export type InternalFormPath<M extends Method> = {
+  [P in InternalPath<M>]: [MultipartBody<Operation<M, P>>] extends [never] ? never : P;
+}[InternalPath<M>];
+export type InternalFormInput<M extends Method, P extends InternalPath<M>> = Omit<
+  InternalRequestInput<M, P>,
+  'body'
+> & { body: SupportedMultipart<MultipartBody<Operation<M, P>>> };
 type SuccessBody<O> = O extends { responses: infer R }
   ? {
       [S in keyof R]: `${S & (string | number)}` extends `2${string}` ? MediaValue<R[S]> : never;
@@ -66,7 +82,7 @@ export type InternalRequestInput<M extends Method, P extends InternalPath<M>> = 
   Slot<'query', Parameters<Operation<M, P>, 'query'>> &
   Slot<'headers', Parameters<Operation<M, P>, 'header'>> &
   BodySlot<Operation<M, P>> & {
-    options?: Omit<FetchOptions, 'method' | 'params' | 'body' | 'headers'>;
+    options?: Omit<FetchOptions, 'method' | 'params' | 'body' | 'formData' | 'headers'>;
     request?: Request;
   };
 
@@ -79,7 +95,7 @@ interface TransportInput {
   query?: Record<string, unknown>;
   headers?: Record<string, unknown>;
   body?: unknown;
-  options?: Omit<FetchOptions, 'method' | 'params' | 'body' | 'headers'>;
+  options?: Omit<FetchOptions, 'method' | 'params' | 'body' | 'formData' | 'headers'>;
   request?: Request;
 }
 
@@ -114,6 +130,15 @@ export async function internalRequest(
   path: string,
   input: TransportInput = {},
 ): Promise<Result<unknown>> {
+  const { url, headers } = requestTarget(path, input);
+  return fetchResult(
+    url,
+    { ...input.options, method, headers, params: undefined, formData: undefined, body: input.body },
+    input.request,
+  );
+}
+
+function requestTarget(path: string, input: TransportInput) {
   const remaining = new Set(Object.keys(input.path ?? {}));
   let url = path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
     const value = input.path?.[name];
@@ -131,5 +156,50 @@ export async function internalRequest(
       .filter(([, value]) => value != null)
       .map(([name, value]) => [name, String(value)]),
   );
-  return fetchResult(url, { ...input.options, method, headers, body: input.body }, input.request);
+  return { url, headers };
+}
+
+/** Default form/explode multipart parts; structured JSON parts require a dedicated adapter. */
+export function serializeInternalFormData(body: unknown): FormData {
+  if (!body || typeof body !== 'object' || Object.getPrototypeOf(body) !== Object.prototype)
+    throw new Error('Multipart body must be a plain field object');
+  const form = new FormData();
+  const append = (name: string, value: unknown) => {
+    if (value === undefined) return;
+    if (value instanceof Blob) form.append(name, value);
+    else if (
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))
+    )
+      form.append(name, String(value));
+    else
+      throw new Error(
+        `Unsupported multipart part requires an explicit serialization contract: ${name}`,
+      );
+  };
+  for (const [name, value] of Object.entries(body)) {
+    if (Array.isArray(value)) value.forEach((part) => append(name, part));
+    else append(name, value);
+  }
+  return form;
+}
+
+/** Multipart operations share session, BFF, authoring protection and cancellation with JSON. */
+export function internalFormRequest<
+  M extends Method,
+  P extends InternalPath<M> & InternalFormPath<M>,
+>(method: M, path: P, input: InternalFormInput<M, P>): Promise<Result<InternalResponseData<M, P>>>;
+export async function internalFormRequest(
+  method: Method,
+  path: string,
+  input: TransportInput,
+): Promise<Result<unknown>> {
+  const { url, headers } = requestTarget(path, input);
+  const formData = serializeInternalFormData(input.body);
+  return fetchResult(
+    url,
+    { ...input.options, method, headers, params: undefined, body: undefined, formData },
+    input.request,
+  );
 }

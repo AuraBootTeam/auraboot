@@ -1,5 +1,8 @@
 package com.auraboot.framework.application.config;
 
+import com.auraboot.framework.application.annotation.CurrentUserId;
+import com.auraboot.framework.application.annotation.CurrentMemberId;
+import org.springdoc.core.utils.SpringDocUtils;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
@@ -22,6 +25,11 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class OpenApiConfig {
+
+    public OpenApiConfig() {
+        SpringDocUtils.getConfig().addAnnotationsToIgnore(CurrentUserId.class, CurrentMemberId.class);
+    }
+
 
     @Bean
     public OpenAPI auraBootOpenApi() {

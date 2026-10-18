@@ -53,6 +53,9 @@ export interface FetchOptions {
   /** Explicit JSON body. Unlike legacy params, preserves empty objects and scalar/null bodies. */
   body?: unknown;
 
+  /** Explicit multipart body; fetch owns its Content-Type boundary. Exclusive with JSON body. */
+  formData?: FormData;
+
   /**
    * HTTP method
    * @default 'get'

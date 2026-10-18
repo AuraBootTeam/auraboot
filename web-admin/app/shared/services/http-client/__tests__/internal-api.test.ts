@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { internalRequest, serializeInternalQuery } from '../internal-api';
+import {
+  internalRequest,
+  serializeInternalQuery,
+  serializeInternalFormData,
+} from '../internal-api';
 import { fetchResult } from '../HttpClient';
 import {
   activateAuthoringPreviewGuard,
@@ -13,6 +17,30 @@ vi.mock('~/shared/services/session', () => ({
 }));
 
 describe('generated internal operation transport', () => {
+  it('serializes repeated scalar and binary parts without losing false, zero or empty values', () => {
+    const file = new File(['bytes'], 'owned.png', { type: 'image/png' });
+    const form = serializeInternalFormData({
+      file,
+      flags: [false, true],
+      offset: 0,
+      empty: '',
+      absent: undefined,
+    });
+    expect(form.get('file')).toBe(file);
+    expect(form.getAll('flags')).toEqual(['false', 'true']);
+    expect(form.get('offset')).toBe('0');
+    expect(form.get('empty')).toBe('');
+    expect(form.has('absent')).toBe(false);
+    for (const invalid of [
+      null,
+      [],
+      { nested: {} },
+      { nested: [[]] },
+      { value: null },
+      { value: NaN },
+    ])
+      expect(() => serializeInternalFormData(invalid)).toThrow();
+  });
   const originalFetch = globalThis.fetch;
   beforeEach(() => {
     globalThis.fetch = vi.fn(
