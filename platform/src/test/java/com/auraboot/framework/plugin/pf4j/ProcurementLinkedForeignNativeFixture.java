@@ -652,7 +652,13 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
             "pr_purchase_order","pr_purchase_order_line","qo_procurement_membership_common","qo_procurement_quote_line_common","qo_procurement_history_common",
             "qo_procurement_allocation_common","qo_procurement_execution_common","qo_procurement_address_common","qo_procurement_shipment_common",
             "qo_procurement_shipment_line_common","qo_procurement_receipt_common","qo_procurement_reminder_common","qo_procurement_submission_common",
-            "qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common");
+            "qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common",
+            "qo_procurement_inquiry_request_common");
+    static List<String> foreignSnapshotModels() { return FOREIGN_MODELS; }
+    static Map<String,Object> foreignSnapshotMetadata(Map<String,Object> actualModel,String table) {
+        assertTrue(actualModel.get("pid") instanceof String && !actualModel.get("pid").toString().isBlank(),"Actual published model PID is required");
+        return Map.of("pid",actualModel.get("pid"),"tableName",table);
+    }
     private Map<String,Object> foreignSnapshots(ProcurementLinkedForeignNativeFixture foreign) {
         var snapshot=new LinkedHashMap<String,Object>();
         for(String model:FOREIGN_MODELS) {
@@ -660,10 +666,10 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
             var tenants=new LinkedHashMap<String,Object>();
             for(var current:List.of(this,foreign)) {
                 current.context();var definition=current.actualMetadata.getModelDefinitionFromDb(model).orElseThrow();assertEquals(table,definition.getTableName());
-                var actualModel=new JdbcTemplate(postgres).queryForMap("SELECT id,tenant_id,status FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE",current.tenant,model);
+                var actualModel=new JdbcTemplate(postgres).queryForMap("SELECT id,pid,tenant_id,status FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE",current.tenant,model);
                 assertEquals(current.tenant,actualModel.get("tenant_id"));assertEquals(definition.getId(),actualModel.get("id"));assertEquals("published",actualModel.get("status"));
                 assertEquals(table,new JdbcTemplate(postgres).queryForObject("SELECT to_regclass(?)::text",String.class,table));
-                tenants.put(current.tenant.toString(),Map.of("metadata",List.of(Map.of("tableName",table)),"rows",current.rows(model)));
+                tenants.put(current.tenant.toString(),Map.of("metadata",List.of(foreignSnapshotMetadata(actualModel,table)),"rows",current.rows(model)));
             }
             snapshot.put(model,Map.of("physicalTable",table,"tableExists",true,"tenants",tenants));
         }

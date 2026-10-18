@@ -97,7 +97,7 @@ class ProcurementControlledOrderNativeIT extends ProcurementPublicSourceNativeFi
         var binding=json.readTree(Path.of(required("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT")).toFile());
         Path app=Path.of(binding.path("applicationCoreRoot").asText()).toRealPath();
         assertEquals(binding.path("applicationCoreCommit").asText(),gitRead(app,"rev-parse","HEAD").strip());assertEquals("",gitRead(app,"status","--porcelain").strip());
-        assertEquals("",gitRead(app,"diff","69493861397abec3205edb8fd62ba54001ff5013","HEAD","--","platform/src/main").strip());
+        assertEquals("",gitRead(app,"diff","d60a9f0acdfce618d4817a7a74da24d61f8b2e5d","HEAD","--","platform/src/main").strip());
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(),Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath());
         assertEquals(binding.path("nativeHostTestSha256").asText(),sha(app.resolve("platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementControlledOrderNativeIT.java")));
         super.prepareEvidence(test);
@@ -261,7 +261,7 @@ class ProcurementControlledOrderNativeIT extends ProcurementPublicSourceNativeFi
         String actualHead = gitRead(app, "rev-parse", "HEAD").strip();
         assertEquals(binding.path("applicationCoreCommit").asText(), actualHead);
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        String mainBase = "69493861397abec3205edb8fd62ba54001ff5013";
+        String mainBase = "d60a9f0acdfce618d4817a7a74da24d61f8b2e5d";
         assertEquals("", gitRead(app, "diff", mainBase, "HEAD", "--", "platform/src/main").strip());
         Path test = app.resolve("platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementControlledOrderNativeIT.java").toRealPath();
         Path shared = test.resolveSibling("ProcurementPublicSourceNativeFixture.java");

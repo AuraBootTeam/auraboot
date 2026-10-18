@@ -14,6 +14,52 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Hermetic fixture-authority counterexamples; not PG, PF4J or browser acceptance. */
 class ProcurementLinkedForeignNativeContractTest {
+    @Test void foreignSnapshotRosterRetainsEveryOriginalModelAndAddsPermanentInquiryLedger() {
+        var models=ProcurementLinkedForeignNativeFixture.foreignSnapshotModels();
+        var expected=Set.of("pr_supplier_common","pr_supplier_pcba_contact","s2p_sourcing_event","pr_purchase_request","s2p_bid",
+                "pr_purchase_order","pr_purchase_order_line","qo_procurement_membership_common","qo_procurement_quote_line_common","qo_procurement_history_common",
+                "qo_procurement_allocation_common","qo_procurement_execution_common","qo_procurement_address_common","qo_procurement_shipment_common",
+                "qo_procurement_shipment_line_common","qo_procurement_receipt_common","qo_procurement_reminder_common","qo_procurement_submission_common",
+                "qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common",
+                "qo_procurement_inquiry_request_common");
+        assertEquals(22,models.size());assertEquals(expected,Set.copyOf(models));
+        assertThrows(UnsupportedOperationException.class,()->models.add("unexpected_model"));
+    }
+
+    @Test void foreignSnapshotMetadataMatchesActualDualTenantReaderPidAndTableShape() {
+        var actual=Map.<String,Object>of("id",17L,"pid","actual-model-pid","tenant_id",29L,"status","published");
+        assertEquals(Map.of("pid","actual-model-pid","tableName","mt_actual_table"),
+                ProcurementLinkedForeignNativeFixture.foreignSnapshotMetadata(actual,"mt_actual_table"));
+        for(var invalid:List.of(Map.<String,Object>of(),Map.<String,Object>of("pid",""),Map.<String,Object>of("pid",17L)))
+            assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeFixture.foreignSnapshotMetadata(invalid,"mt_actual_table"));
+    }
+
+    @Test void inquiryLedgerSnapshotPreservesCompleteCanonicalRowAndTypedJsonbFacts() {
+        var mapper=new ObjectMapper();
+        String raw="""
+                {"pid":"request-pid","tenant_id":17,"row_version":2,"qo_pr_inquiry_request_managed":true,
+                 "qo_pr_inquiry_request_state":"accepted","qo_pr_inquiry_request_key":"123",
+                 "qo_pr_inquiry_request_request_json":{"requestId":"001","title":"true","selected":[{"requisitionId":"123","entryId":"7"}]},
+                 "qo_pr_inquiry_request_result_json":{"items":[],"exactQuantity":0.12345678901234567890123456789},
+                 "updated_at":null,"unrelated_preserved_column":"null"}
+                """;
+        var row=ProcurementLinkedForeignNativeFixture.canonicalSnapshotRow(mapper,raw);
+        assertEquals(10,row.size());assertEquals("request-pid",row.get("pid"));
+        assertEquals(17L,row.get("tenant_id"));assertEquals(2L,row.get("row_version"));
+        assertEquals(Boolean.TRUE,row.get("qo_pr_inquiry_request_managed"));
+        assertEquals("accepted",row.get("qo_pr_inquiry_request_state"));assertEquals("123",row.get("qo_pr_inquiry_request_key"));
+        var request=(Map<?,?>)row.get("qo_pr_inquiry_request_request_json");
+        assertEquals("001",request.get("requestId"));assertEquals("true",request.get("title"));
+        assertEquals(List.of(Map.of("requisitionId","123","entryId","7")),request.get("selected"));
+        var result=(Map<?,?>)row.get("qo_pr_inquiry_request_result_json");
+        assertEquals(List.of(),result.get("items"));
+        assertEquals(new java.math.BigDecimal("0.12345678901234567890123456789"),result.get("exactQuantity"));
+        assertTrue(row.containsKey("updated_at"));assertNull(row.get("updated_at"));
+        assertEquals("null",row.get("unrelated_preserved_column"));
+        var changed=new LinkedHashMap<>(row);changed.put("row_version",3L);assertNotEquals(row,changed);
+        var missing=new LinkedHashMap<>(row);missing.remove("qo_pr_inquiry_request_request_json");assertNotEquals(row,missing);
+    }
+
     @Test void modernPrivateCryptoAdmissionUsesExplicitV2InsteadOfRebrandingLegacyInput() {
         var json=new ObjectMapper();
         var value=json.createObjectNode().put("kind","procurement-linked-foreign-native-admission-v2")
@@ -28,7 +74,7 @@ class ProcurementLinkedForeignNativeContractTest {
         assertEquals("50924063538e4181cb601300f0c26c6bbfcce2f0",ProcurementLinkedForeignNativeAdmission.mainBase(legacy));
         assertEquals(ProcurementLinkedForeignNativeAdmission.SOURCES,ProcurementLinkedForeignNativeAdmission.sources(legacy));
         var modern=legacy.deepCopy().put("kind","procurement-linked-foreign-native-admission-v2").put("schemaVersion",2);
-        assertEquals("69493861397abec3205edb8fd62ba54001ff5013",ProcurementLinkedForeignNativeAdmission.mainBase(modern));
+        assertEquals("d60a9f0acdfce618d4817a7a74da24d61f8b2e5d",ProcurementLinkedForeignNativeAdmission.mainBase(modern));
         assertEquals(10,ProcurementLinkedForeignNativeAdmission.sources(modern).size());
         assertTrue(ProcurementLinkedForeignNativeAdmission.sources(modern).contains(ProcurementLinkedForeignNativeAdmission.CRYPTO_SOURCE));
         for(var invalid:List.of(modern.deepCopy().put("kind","procurement-linked-foreign-native-admission-v1"),

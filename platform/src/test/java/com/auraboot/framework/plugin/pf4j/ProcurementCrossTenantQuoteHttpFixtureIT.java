@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @Import(ProcurementPublicSourceNativeFixture.IsolatedScheduling.class)
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_CROSS_TENANT_QUOTE_IT",matches="true")
 class ProcurementCrossTenantQuoteHttpFixtureIT extends ProcurementPublicSourceNativeFixture {
-    static final String MAIN="69493861397abec3205edb8fd62ba54001ff5013";
+    static final String MAIN="d60a9f0acdfce618d4817a7a74da24d61f8b2e5d";
     static final String DIRECTORY="qo_procurement_task_common:sync_directory";
     static final List<String> MODELS=List.of("s2p_sourcing_event","pr_purchase_request","s2p_bid",
             "qo_procurement_quote_line_common","qo_procurement_history_common","qo_procurement_submission_common",

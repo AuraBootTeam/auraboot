@@ -25,7 +25,7 @@ final class ProcurementLinkedForeignNativeAdmission {
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementSourceUiFixtureProducerIT.java",
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java",
         "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/ProductQuoteNativeInitialization.java");
-    static final String MAIN_BASE_V2="69493861397abec3205edb8fd62ba54001ff5013";
+    static final String MAIN_BASE_V2="d60a9f0acdfce618d4817a7a74da24d61f8b2e5d";
     static final String CRYPTO_SOURCE="platform/src/test/java/com/auraboot/framework/notification/sourcebinding/S06NativeEncryptionAdmission.java";
     static String mainBase(JsonNode input) {
         assertTrue(input.path("schemaVersion").isInt());
