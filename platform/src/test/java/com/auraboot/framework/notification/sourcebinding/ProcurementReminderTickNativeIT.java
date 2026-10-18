@@ -428,7 +428,7 @@ class ProcurementReminderTickNativeIT {
         receipt.put("matchingEncryptionAdmission", S06NativeEncryptionAdmission.admit(System.getenv(), json,
                 context.getBean(FieldEncryptionService.class), getClass(), context.getEnvironment().getActiveProfiles()));
         var protectedTables = physicalTables(Long.parseLong(required("TEST_TENANT_ID")));
-        var protectedBefore = snapshot(protectedTables, -1L, false);
+        var protectedBefore = automaticSnapshot(protectedTables, -1L, false);
         ProductQuoteReminderNativeFacet.AutomaticFixture fixture = null;
         Map<String, Object> metadataBefore = null;
         Map<String, Object> ownedBusinessBefore = null;
@@ -441,8 +441,8 @@ class ProcurementReminderTickNativeIT {
             var q = fixture.quote();
             var tables = new LinkedHashMap<>(physicalTables(q.tenantId()));
             tables.put("qo_procurement_reminder_common", q.tables().get("qo_procurement_reminder_common"));
-            metadataBefore = metadata(q.tenantId(), true);
-            ownedBusinessBefore = snapshot(tables, q.tenantId(), true);
+            metadataBefore = automaticMetadata(q.tenantId(), true);
+            ownedBusinessBefore = automaticSnapshot(tables, q.tenantId(), true);
             assertThat(count("ab_outbox", q.tenantId())).isZero();
             assertThat(count("ab_notification", q.tenantId())).isZero();
             assertThat(count("ab_integration_receipt", q.tenantId())).isZero();
@@ -536,18 +536,18 @@ class ProcurementReminderTickNativeIT {
                         .isEqualTo(events.stream().map(IntegrationEventEnvelope::eventId).collect(java.util.stream.Collectors.toSet()));
                 // The unchanged teardown snapshot uses ORDER BY id, not event hash or JSON lexical order.
                 phase.put("ownedOutboxRows", actualOwnedOutboxRows(outbox));
-                var after = new LinkedHashMap<>(snapshot(tables, q.tenantId(), true));
+                var after = new LinkedHashMap<>(automaticSnapshot(tables, q.tenantId(), true));
                 var before = new LinkedHashMap<>(ownedBusinessBefore);
                 after.remove("qo_procurement_reminder_common"); before.remove("qo_procurement_reminder_common");
                 assertThat(after).isEqualTo(before);
-                assertThat(metadata(q.tenantId(), true)).isEqualTo(metadataBefore);
-                assertThat(snapshot(protectedTables, q.tenantId(), false)).isEqualTo(protectedBefore);
+                assertThat(automaticMetadata(q.tenantId(), true)).isEqualTo(metadataBefore);
+                assertThat(automaticSnapshot(protectedTables, q.tenantId(), false)).isEqualTo(protectedBefore);
                 // The unchanged teardown helper requires ALL of this new tenant's outbox to equal this exact two-event scope.
                 // Seal real delivery/replay evidence first, then remove only this phase's pending intents before the next phase.
                 phase.put("deliveryAndReplayVerified", true);
                 phase.put("inboxBeforeTeardown", inbox);
                 phase.put("integrationReceiptsBeforeTeardown", deliveryReceipts);
-                phase.put("businessBeforeTeardown", snapshot(tables, q.tenantId(), true));
+                phase.put("businessBeforeTeardown", automaticSnapshot(tables, q.tenantId(), true));
                 Path phaseTrace = evidence.resolve("automatic-" + kind + "-phase-trace.json");
                 Files.writeString(phaseTrace, json.writerWithDefaultPrettyPrinter().writeValueAsString(phase), StandardOpenOption.CREATE_NEW);
                 @SuppressWarnings("unchecked") var phaseRows = (List<JsonNode>) phase.get("ownedOutboxRows");
@@ -559,7 +559,7 @@ class ProcurementReminderTickNativeIT {
                 assertThat(rows("ab_outbox", q.tenantId())).isEmpty();
                 assertThat(rows("ab_notification", q.tenantId())).isEqualTo(inbox);
                 assertThat(rows("ab_integration_receipt", q.tenantId())).isEqualTo(deliveryReceipts);
-                assertThat(snapshot(tables, q.tenantId(), true)).isEqualTo(phase.get("businessBeforeTeardown"));
+                assertThat(automaticSnapshot(tables, q.tenantId(), true)).isEqualTo(phase.get("businessBeforeTeardown"));
                 phase.put("phaseTrace", Map.of("path", phaseTrace.toString(), "sha256", hash(phaseTrace)));
                 phase.put("intentTeardown", Map.of("path", teardown.toString(), "sha256", hash(teardown)));
                 phase.put("outboxAfterIntentTeardown", List.of());
@@ -585,7 +585,7 @@ class ProcurementReminderTickNativeIT {
             if (fixture != null) {
                 receipt.put("tenantId", Long.toString(fixture.quote().tenantId()));
                 receipt.put("fixtureSetupPath", fixture.setupEvidence().toString()); receipt.put("fixtureSetupSha256", fixture.setupSha256());
-                receipt.put("protectedAfter", snapshot(protectedTables, fixture.quote().tenantId(), false));
+                receipt.put("protectedAfter", automaticSnapshot(protectedTables, fixture.quote().tenantId(), false));
             }
             Path sealed = evidence.resolve("pf4j-automatic-reminder-trace.json");
             Files.writeString(sealed, json.writerWithDefaultPrettyPrinter().writeValueAsString(receipt), StandardOpenOption.CREATE_NEW);
@@ -595,9 +595,9 @@ class ProcurementReminderTickNativeIT {
                 assertThat(count("ab_notification", q.tenantId())).isEqualTo(4);
                 assertThat(count("ab_integration_receipt", q.tenantId())).isEqualTo(4);
                 assertThat(count("ab_outbox", q.tenantId())).isZero();
-                assertThat(snapshot(protectedTables, q.tenantId(), false)).isEqualTo(protectedBefore);
-                assertThat(metadata(q.tenantId(), true)).isEqualTo(metadataBefore);
-                var afterTeardown = new LinkedHashMap<>(snapshot(physicalTables(q.tenantId()), q.tenantId(), true));
+                assertThat(automaticSnapshot(protectedTables, q.tenantId(), false)).isEqualTo(protectedBefore);
+                assertThat(automaticMetadata(q.tenantId(), true)).isEqualTo(metadataBefore);
+                var afterTeardown = new LinkedHashMap<>(automaticSnapshot(physicalTables(q.tenantId()), q.tenantId(), true));
                 var beforeTeardown = new LinkedHashMap<>(ownedBusinessBefore);
                 beforeTeardown.remove("qo_procurement_reminder_common");
                 assertThat(afterTeardown).isEqualTo(beforeTeardown);
@@ -789,5 +789,100 @@ class ProcurementReminderTickNativeIT {
             throw new SecurityException("Automatic operation boundary rejected");
         }
     }
+    private Map<String, Object> automaticSnapshot(Map<String, String> tables, long tenant, boolean onlyTenant) {
+        return automaticReadonly(() -> {
+            Map<String, Object> result = new LinkedHashMap<>();
+            tables.forEach((model, table) -> result.put(model, automaticSummary(table, tenant, onlyTenant)));
+            if (!onlyTenant) result.put("metadataAndDelivery", automaticMetadata(tenant, false));
+            return result;
+        });
+    }
+
+    private Map<String, Object> automaticMetadata(long tenant, boolean onlyTenant) {
+        return automaticReadonly(() -> {
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (String table : List.of("ab_meta_model", "ab_meta_field", "ab_meta_model_field_binding", "ab_plugin", "ab_plugin_resource",
+                    "ab_command_definition", "ab_notification_rule", "ab_notification_template")) {
+                result.put(table, automaticSummary(table, tenant, onlyTenant));
+            }
+            if (!onlyTenant) {
+                for (String table : List.of("ab_notification", "ab_integration_receipt", "ab_outbox"))
+                    result.put(table, automaticSummary(table, tenant, false));
+            }
+            return result;
+        });
+    }
+
+    private Map<String, Object> automaticReadonly(java.util.function.Supplier<Map<String, Object>> action) {
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(
+                context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        // PG JDBC uses a server cursor only inside an active transaction with positive fetchSize.
+        transaction.setReadOnly(true);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        Map<String, Object> result = transaction.execute(status -> action.get());
+        if (result == null) throw new IllegalStateException("AUTOMATIC_SNAPSHOT_MISSING");
+        return result;
+    }
+
+    private Map<String, Object> automaticSummary(String table, long tenant, boolean onlyTenant) {
+        identifier(table);
+        String sql = "SELECT row_to_json(t)::text FROM \"" + table + "\" t WHERE tenant_id "
+                + (onlyTenant ? "=" : "IS DISTINCT FROM") + " ? ORDER BY row_to_json(t)::text";
+        AutomaticDigest result = jdbc.query(connection -> {
+            if (connection.getAutoCommit() || !connection.isReadOnly()) throw new java.sql.SQLException("AUTOMATIC_SNAPSHOT_CURSOR_REQUIRES_READONLY_TRANSACTION");
+            var statement = connection.prepareStatement(sql);
+            statement.setLong(1, tenant);
+            statement.setFetchSize(16);
+            return statement;
+        }, (org.springframework.jdbc.core.ResultSetExtractor<AutomaticDigest>) rows -> {
+            try (var digest = new AutomaticRowDigest()) {
+                while (rows.next()) {
+                    try (java.io.Reader row = rows.getCharacterStream(1)) { digest.append(row); }
+                }
+                return digest.finish();
+            } catch (java.io.IOException invalid) {
+                throw new IllegalStateException("AUTOMATIC_SNAPSHOT_STREAM_FAILED", invalid);
+            }
+        });
+        if (result == null) throw new IllegalStateException("AUTOMATIC_SNAPSHOT_MISSING");
+        return Map.of("count", result.count(), "sha256", result.sha256());
+    }
+
+    record AutomaticDigest(long count, String sha256) {}
+
+    /** Same canonical array-of-strings bytes, without a List, JSON tree or whole-array String. */
+    static final class AutomaticRowDigest implements AutoCloseable {
+        private final java.security.MessageDigest digest;
+        private final com.fasterxml.jackson.core.JsonGenerator generator;
+        private long count;
+        private boolean finished;
+        private boolean failed;
+        AutomaticRowDigest() throws java.io.IOException {
+            try { digest = java.security.MessageDigest.getInstance("SHA-256"); }
+            catch (java.security.NoSuchAlgorithmException unavailable) { throw new IllegalStateException(unavailable); }
+            // Writer encoding matches SourceBindingCanonical.json(...).getBytes(UTF_8), including supplementary Unicode.
+            var output = new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), digest);
+            generator = new com.fasterxml.jackson.core.JsonFactory().createGenerator(
+                    new java.io.OutputStreamWriter(output, java.nio.charset.StandardCharsets.UTF_8));
+            generator.writeStartArray();
+        }
+        void append(java.io.Reader row) throws java.io.IOException {
+            if (finished || failed || row == null) throw new IllegalStateException("AUTOMATIC_SNAPSHOT_STREAM_INVALID");
+            try {
+                generator.writeString(row, -1);
+                count = Math.incrementExact(count);
+            } catch (java.io.IOException | RuntimeException invalid) {
+                failed = true; throw invalid;
+            }
+        }
+        AutomaticDigest finish() throws java.io.IOException {
+            if (finished) throw new IllegalStateException("AUTOMATIC_SNAPSHOT_STREAM_ALREADY_FINISHED");
+            if (failed) throw new IllegalStateException("AUTOMATIC_SNAPSHOT_STREAM_INVALID");
+            generator.writeEndArray(); generator.close(); finished = true;
+            return new AutomaticDigest(count, java.util.HexFormat.of().formatHex(digest.digest()));
+        }
+        @Override public void close() throws java.io.IOException { generator.close(); }
+    }
+
     // END additive PF4J automatic Native.
 }

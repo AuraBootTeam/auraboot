@@ -315,5 +315,62 @@ class ProcurementReminderTickContractTest {
             assertThat(root.getBeansOfType(org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         }
     }
+    private ProcurementReminderTickNativeIT.AutomaticDigest streamedRows(List<String> rows) throws Exception {
+        try (var digest = new ProcurementReminderTickNativeIT.AutomaticRowDigest()) {
+            for (String row : rows) try (var reader = new java.io.StringReader(row)) { digest.append(reader); }
+            return digest.finish();
+        }
+    }
+    @Test
+    void automaticStreamingDigestIsByteIdenticalToCanonicalRawStringArrayIncludingEmptyUnicodeEscapesAndLargeRows() throws Exception {
+        for (List<String> rows : List.of(List.<String>of(), List.of(""), List.of("null", "true", "123", "{\"a\":1}"),
+                List.of("中文🚀é", "\"quoted\"\\path\n\r\t\b\f\u0000"),
+                List.of("{\"large\":\"" + "大\\\"\n".repeat(150_000) + "\"}", "last"))) {
+            var actual = streamedRows(rows);
+            assertThat(actual.count()).isEqualTo(rows.size());
+            assertThat(actual.sha256()).isEqualTo(SourceBindingCanonical.hash(rows));
+        }
+    }
+    @Test
+    void automaticStreamingDigestPreservesEveryRowAndCallerOrderAndNeverParsesJsonFacts() throws Exception {
+        List<String> rows = List.of("{\"z\":1,\"a\":2}", "{\"z\":1,\"a\":2}", "null", "中文");
+        var before = streamedRows(rows);
+        assertThat(before.sha256()).isEqualTo(SourceBindingCanonical.hash(rows));
+        for (List<String> changed : List.of(List.of(rows.get(0), rows.get(2), rows.get(3)),
+                List.of(rows.get(3), rows.get(2), rows.get(1), rows.get(0)),
+                List.of("{\"a\":2,\"z\":1}", rows.get(1), rows.get(2), rows.get(3)),
+                List.of(rows.get(0) + " ", rows.get(1), rows.get(2), rows.get(3)))) {
+            assertThat(streamedRows(changed).sha256()).isNotEqualTo(before.sha256());
+            assertThat(streamedRows(changed).sha256()).isEqualTo(SourceBindingCanonical.hash(changed));
+        }
+    }
+    @Test
+    void automaticStreamingConsumesLargeReadersInBoundedChunksAndFailsClosedOnReaderOrLifecycleErrors() throws Exception {
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var maxRequest = new java.util.concurrent.atomic.AtomicInteger();
+        try (var digest = new ProcurementReminderTickNativeIT.AutomaticRowDigest()) {
+            var reader = new java.io.Reader() {
+                int left = 8_000_000;
+                @Override public int read(char[] target, int offset, int length) {
+                    calls.incrementAndGet(); maxRequest.accumulateAndGet(length, Math::max);
+                    if (left == 0) return -1;
+                    int amount = Math.min(left, length); java.util.Arrays.fill(target, offset, offset + amount, 'x'); left -= amount; return amount;
+                }
+                @Override public void close() {}
+            };
+            digest.append(reader); var result = digest.finish();
+            assertThat(result.count()).isEqualTo(1); assertThat(result.sha256()).hasSize(64);
+            assertThat(calls.get()).isGreaterThan(1); assertThat(maxRequest.get()).isLessThanOrEqualTo(16_384);
+            assertThatThrownBy(digest::finish).hasMessage("AUTOMATIC_SNAPSHOT_STREAM_ALREADY_FINISHED");
+            assertThatThrownBy(() -> digest.append(new java.io.StringReader("late"))).hasMessage("AUTOMATIC_SNAPSHOT_STREAM_INVALID");
+        }
+        try (var digest = new ProcurementReminderTickNativeIT.AutomaticRowDigest()) {
+            assertThatThrownBy(() -> digest.append(new java.io.Reader() {
+                @Override public int read(char[] chars, int offset, int length) throws java.io.IOException { throw new java.io.IOException("controlled read failure"); }
+                @Override public void close() {}
+            })).isInstanceOf(java.io.IOException.class);
+            assertThatThrownBy(digest::finish).hasMessage("AUTOMATIC_SNAPSHOT_STREAM_INVALID");
+        }
+    }
     // END additive automatic-registry contracts.
 }
