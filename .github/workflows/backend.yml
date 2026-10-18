@@ -17,6 +17,8 @@ jobs:
   build:
     name: Build, Lint & Compile (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
+    env:
+      AURA_MAVEN_CENTRAL_FIRST: "true"
     timeout-minutes: 30
 
     strategy:

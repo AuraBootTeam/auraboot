@@ -365,6 +365,7 @@ export function EventPolicyDesignerWorkflow({
   );
   const [selectedRuleCode, setSelectedRuleCode] = useState('R-1');
   const [draftPid, setDraftPid] = useState(selectedPolicy?.latestVersionPid ?? '');
+  const [operationVersion, setOperationVersion] = useState<number | undefined>(selectedPolicy?.version);
   const [publishStatus, setPublishStatus] = useState(selectedPolicy?.status ?? 'UNSAVED');
   const [error, setError] = useState('');
   const [versionLoading, setVersionLoading] = useState(false);
@@ -525,6 +526,7 @@ export function EventPolicyDesignerWorkflow({
     setRulesValue(restoredRules);
     setSelectedRuleCode(restoredRules.rules[0]?.ruleCode ?? '');
     setDraftPid(selectedPolicy?.latestVersionPid ?? '');
+    setOperationVersion(selectedPolicy?.version);
     setPublishStatus(selectedPolicy?.status ?? 'UNSAVED');
     setError('');
     setVersionError('');
@@ -546,6 +548,7 @@ export function EventPolicyDesignerWorkflow({
         const version = latestVersion(versions, selectedPolicy?.latestVersionPid);
         if (!version) return;
         setDraftPid(version.pid);
+        setOperationVersion(version.version);
         setPublishStatus(version.status ?? selectedPolicy?.status ?? 'UNSAVED');
         if (archivedDraft) return;
         const hydratedRules = hydrateRules(
@@ -643,6 +646,7 @@ export function EventPolicyDesignerWorkflow({
         rulesJson: buildRulesJson(rulesValue),
       });
       setDraftPid(result.pid);
+      setOperationVersion(result.version);
       setPublishStatus(result.status ?? 'DRAFT');
       // The draft now lives in a backend version — the session archive for this
       // policy served its purpose and must not resurrect older edits later.
@@ -1236,11 +1240,11 @@ export function EventPolicyDesignerWorkflow({
           <div className="epd-summary-grid">
             <div className="epd-summary-card">
               <span>{copy('current_status')}</span>
-              <strong>{policyStatusLabel(selectedPolicy?.status)}</strong>
+              <strong>{policyStatusLabel(publishStatus)}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('current_version')}</span>
-              <strong>v{selectedPolicy?.version ?? '-'}</strong>
+              <strong>v{operationVersion ?? '-'}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('draft_status')}</span>

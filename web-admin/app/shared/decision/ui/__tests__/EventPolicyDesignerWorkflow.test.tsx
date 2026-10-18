@@ -1199,3 +1199,18 @@ describe('EventPolicy operation failures and recovery', () => {
     await waitFor(() => expect(method).toHaveBeenCalledTimes(2));
   });
 });
+
+
+it('keeps history on the persisted operation version after publication without requiring a parent reload', async () => {
+  const service = api();
+  render(<EventPolicyDesignerWorkflow api={service} fields={FIELDS} selectedPolicy={POLICY} />);
+  fireEvent.click(screen.getByTestId('epd-step-publish'));
+  fireEvent.click(screen.getByTestId('epd-save-draft'));
+  await waitFor(() => expect(service.createPolicyDraftVersion).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByTestId('epd-validate-version')).toBeEnabled());
+  fireEvent.click(screen.getByTestId('epd-publish-version'));
+  await waitFor(() => expect(screen.getByTestId('epd-publish-status')).toHaveTextContent('已发布'));
+  fireEvent.click(screen.getByTestId('epd-step-history'));
+  expect(screen.getByTestId('epd-history-panel')).toHaveTextContent('已发布');
+  expect(screen.getByTestId('epd-history-panel')).toHaveTextContent('v2');
+});

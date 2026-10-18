@@ -25,6 +25,8 @@ jobs:
   quickstart:
     name: docker compose --profile full + smoke
     runs-on: ubuntu-latest
+    env:
+      AURA_MAVEN_CENTRAL_FIRST: "true"
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7

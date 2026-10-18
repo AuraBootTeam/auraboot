@@ -210,6 +210,7 @@ test('professional event policy publish, execution failure and recovery preserve
   await shot(page, 'R11');
   await page.getByTestId('epd-step-actions').click();
   await page.getByTestId('epd-add-action').click();
+  await page.getByLabel('action-type-0',{exact:true}).selectOption('NOTIFY');
   await page.getByLabel('action-target-0', {exact:true}).fill(`USER:${user.pid}`);
   await page.getByLabel('action-field-0-payload.title', {exact:true}).fill('专业试算通知');
   await page.getByLabel('action-field-0-payload.content', {exact:true}).fill(`本轮真实通知 ${policy}`);
@@ -238,7 +239,7 @@ test('professional event policy publish, execution failure and recovery preserve
     expect((await data(await response)).status).toBe('PUBLISHED');
   }
   await publishVersion(draft.pid);
-  await page.getByTestId('epd-step-history').click();await shot(page, 'R07');
+  await page.getByTestId('epd-step-history').click();await expect(page.getByTestId('epd-history-panel')).toContainText('已发布');await expect(page.getByTestId('epd-history-panel')).toContainText(`v${draft.version}`);await shot(page, 'R07');
   await page.getByTestId('epd-step-test').click();
   async function run() {
     const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/event-policy/run-and-execute' && r.request().method() === 'POST');
@@ -291,7 +292,7 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   await page.getByRole('combobox',{name:'entity-filter',exact:true}).selectOption('tpm_acceptance');
   await expect(page.getByTestId('data-model-viewer')).toContainText('tpm_ac_amount');await shot(page,'A03');
   await professionalTab(page,'permissions');
-  const permissions=page.getByTestId('permission-matrix');await expect(permissions).toBeVisible();
+  const permissions=page.getByTestId('permission-matrix');await expect(permissions).toBeVisible();expect(await permissions.getByRole('button').count()).toBeGreaterThan(0);
   for(const button of await permissions.getByRole('button').all()) await expect(button).toBeDisabled();await shot(page,'A04');
   await professionalTab(page,'connectors');await page.getByRole('textbox',{name:'connector-search',exact:true}).fill('本轮不存在的连接器');
   await expect(page.getByTestId('cl-empty')).toBeVisible();await shot(page,'A05');
@@ -369,7 +370,7 @@ test('professional rollout compares exact versions and audits activation pause a
   }
   await transition('activate','ACTIVE');await transition('pause','PAUSED');await transition('activate','ACTIVE');await transition('rollback','ROLLED_BACK');
   await expect(page.getByTestId('rollout-audit-panel')).toContainText('本轮专属版本核验');await shot(page,'R06');
-  await page.reload();await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('ROLLED_BACK');
+  await page.reload();await page.getByLabel('rollout-decision-code',{exact:true}).fill(code);await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('ROLLED_BACK');
   const actual=await data(await page.request.get(`/api/decision/definitions/${code}/rollouts`));
   expect(actual.find((r:any)=>r.pid===rollout.pid).status).toBe('ROLLED_BACK');
   await writeFile(join(evidence!,'professional-rollout-receipt.json'),JSON.stringify({versions,actual},null,2));

@@ -22,6 +22,8 @@ ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine
 FROM ${BUILD_JDK_IMAGE} AS builder
 
 WORKDIR /app
+ARG AURA_MAVEN_CENTRAL_FIRST=false
+ENV AURA_MAVEN_CENTRAL_FIRST=${AURA_MAVEN_CENTRAL_FIRST}
 
 # Copy Gradle wrapper and config (cache dependencies layer)
 COPY platform/gradlew gradlew
