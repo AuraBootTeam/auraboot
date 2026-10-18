@@ -20,6 +20,34 @@ describe('FormDialog choice fields', () => {
     vi.unstubAllGlobals();
   });
 
+  it('keeps focus and numeric drafts in the field the user chooses immediately after opening', () => {
+    vi.useFakeTimers();
+    try {
+      const onSubmit = vi.fn();
+      renderDialog({
+        fields: [
+          { field: 'quantity', label: 'Quantity', type: 'number' },
+          { field: 'multiplier', label: 'Multiplier', type: 'number' },
+        ],
+        defaults: { quantity: 2 },
+        onSubmit,
+      });
+      const quantity = screen.getByTestId('form-dialog-field-quantity');
+      const multiplier = screen.getByTestId('form-dialog-field-multiplier');
+      multiplier.focus();
+      act(() => vi.advanceTimersByTime(50));
+
+      expect(multiplier).toHaveFocus();
+      fireEvent.change(multiplier, { target: { value: '105' } });
+      expect(quantity).toHaveValue(2);
+      expect(multiplier).toHaveValue(105);
+      fireEvent.click(screen.getByTestId('form-dialog-submit'));
+      expect(onSubmit).toHaveBeenCalledWith({ quantity: 2, multiplier: 105 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('renders a MemberPicker command input and submits the selected user pid', async () => {
     const onSubmit = vi.fn();
     vi.stubGlobal(

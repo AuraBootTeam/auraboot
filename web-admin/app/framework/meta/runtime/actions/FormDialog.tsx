@@ -11,7 +11,7 @@
  * - On cancel, calls onCancel() which rejects the action promise
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
@@ -175,13 +175,10 @@ export default function FormDialog() {
   }, []);
 
   // Focus first input when dialog opens
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (state.open) {
-      // Delay to allow DOM to render
-      const timer = setTimeout(() => {
-        firstInputRef.current?.focus();
-      }, 50);
-      return () => clearTimeout(timer);
+      // Refs are ready at commit; focus before paint so later input cannot be interrupted.
+      firstInputRef.current?.focus();
     }
   }, [state.open]);
 
