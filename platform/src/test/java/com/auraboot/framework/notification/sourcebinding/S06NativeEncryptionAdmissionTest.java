@@ -79,6 +79,199 @@ class S06NativeEncryptionAdmissionTest {
                 .hasMessage("S06_ACTUAL_BEAN_MODE_MISMATCH");
     }
 
+    @Test
+    void privateAdditionalPropertiesModeUsesEffectiveKeyWithoutInventingEnvironmentSet() {
+        ObjectNode proof = privateProof();
+        assertThat(S06NativeEncryptionAdmission.mode(proof, key())).isEqualTo("encrypted");
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.mode(proof, ""))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void privateProofMissingFieldsOrConflictingEnvironmentCannotAuthorizeMode() {
+        for (String field : java.util.List.of("privateSourceEvidencePath", "privateSourceEvidenceSha256", "effectiveKeyState", "backendPid")) {
+            ObjectNode proof = privateProof();
+            proof.remove(field);
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.mode(proof, key()))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        ObjectNode conflicting = privateProof();
+        conflicting.put("environmentKeyState", "SET");
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.mode(conflicting, key())).isInstanceOf(IllegalStateException.class);
+        ObjectNode proof = privateProof();
+        proof.put("privateSourceEvidenceSha256", "wrong");
+        ObjectNode malformed = proof;
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.mode(malformed, key())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void fixedOwnedPrivatePropertiesMustMatchNativeKeyAndRecordedBytes(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        java.nio.file.Path target = temp.toRealPath().resolve("field-encryption.properties");
+        writePrivate(target, "security.field-encryption.key=" + key() + "\n");
+        ObjectNode proof = privateProof();
+        ObjectNode source = source(proof, target);
+        S06NativeEncryptionAdmission.privateSource(proof, source, target, key());
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, source, target,
+                Base64.getEncoder().encodeToString(new byte[32]) + "different"))
+                .isInstanceOf(IllegalStateException.class);
+        writePrivate(target, "security.field-encryption.key=" + Base64.getEncoder().encodeToString(new byte[16]) + "\n");
+        ObjectNode changed = source(proof, target);
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, changed, target, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_KEY_MISMATCH");
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, source, target, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_FILE_DRIFT");
+    }
+
+    @Test
+    void duplicateUnknownOrMissingPropertyCannotSelectAKey(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        java.nio.file.Path target = temp.toRealPath().resolve("field-encryption.properties");
+        ObjectNode proof = privateProof();
+        for (String contents : java.util.List.of("", "unrelated=value\n",
+                "security.field-encryption.key=" + key() + "\nsecurity.field-encryption.key=" + key() + "\n",
+                "security.field-encryption.key=" + key() + "\nunrelated=value\n",
+                "security.field-encryption.key=" + key() + "\nsecurity.field-encryption.\u006bey=" + key() + "\n")) {
+            writePrivate(target, contents);
+            ObjectNode source = source(proof, target);
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, source, target, key()))
+                    .hasMessage("S06_PRIVATE_SOURCE_PROPERTY_INVALID");
+        }
+    }
+
+    @Test
+    void privateEvidenceMustMatchActualPidUniqueLocationAndRealBooleanOverrides(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        java.nio.file.Path target = temp.toRealPath().resolve("field-encryption.properties");
+        writePrivate(target, "security.field-encryption.key=" + key() + "\n");
+        ObjectNode proof = privateProof();
+        for (String name : java.util.List.of("backendPid", "additionalLocation", "additionalLocationCount", "propertiesPath", "propertiesSha256", "overridesAbsent")) {
+            ObjectNode invalid = source(proof, target); invalid.remove(name);
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, invalid, target, key()))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        for (Object value : java.util.List.of("true", false)) {
+            ObjectNode invalid = source(proof, target);
+            if (value instanceof String text) ((ObjectNode) invalid.get("overridesAbsent")).put("jvmFieldEncryptionKey", text);
+            else ((ObjectNode) invalid.get("overridesAbsent")).put("jvmFieldEncryptionKey", false);
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, invalid, target, key()))
+                    .hasMessage("S06_PRIVATE_SOURCE_OVERRIDE_CONFLICT");
+        }
+        ObjectNode wrongPid = source(proof, target).put("backendPid", 9999);
+        ObjectNode duplicateLocation = source(proof, target).put("additionalLocationCount", 2);
+        ObjectNode wrongLocation = source(proof, target).put("additionalLocation", "file:" + target + ",file:/untrusted");
+        ObjectNode extraOverride = source(proof, target);
+        ((ObjectNode) extraOverride.get("overridesAbsent")).put("unknown", true);
+        ObjectNode unknown = source(proof, target).put("undeclared", true);
+        for (ObjectNode invalid : java.util.List.of(wrongPid,duplicateLocation,wrongLocation,extraOverride,unknown))
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, invalid, target, key()))
+                    .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void privateSourceCannotReadDifferentPathSymlinkOrBroadPermissions(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        java.nio.file.Path target = temp.toRealPath().resolve("field-encryption.properties");
+        writePrivate(target, "security.field-encryption.key=" + key() + "\n");
+        ObjectNode proof = privateProof();
+        java.nio.file.Path other = temp.resolve("other.properties").toAbsolutePath();
+        writePrivate(other, "security.field-encryption.key=" + key() + "\n");
+        ObjectNode wrongPath = source(proof, other);
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, wrongPath, target, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_EVIDENCE_INVALID");
+        java.nio.file.Path link = temp.resolve("linked.properties").toAbsolutePath();
+        java.nio.file.Files.createSymbolicLink(link, target);
+        ObjectNode linked = source(proof, link);
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, linked, link, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_PATH_INVALID");
+        ObjectNode source = source(proof, target);
+        java.nio.file.Files.setPosixFilePermissions(target, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, source, target, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_FILE_INVALID");
+    }
+
+    @Test
+    void privateReferentMustBeOwnedHashedPrivateAndDuplicateFree(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        java.nio.file.Path owned = java.nio.file.Files.createDirectory(temp.toRealPath().resolve("evidence"));
+        java.nio.file.Path file = owned.resolve("private-source.json");
+        writePrivate(file, "{\"safe\":true}");
+        ObjectNode proof = privateProof().put("privateSourceEvidencePath",file.toString());
+        proof.put("privateSourceEvidenceSha256",fileHash(file));
+        assertThat(S06NativeEncryptionAdmission.privateSourceEvidence(proof,owned,new ObjectMapper()).path("safe").booleanValue()).isTrue();
+        proof.put("privateSourceEvidenceSha256","0".repeat(64));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSourceEvidence(proof,owned,new ObjectMapper()))
+                .hasMessage("S06_ENCRYPTION_REFERENT_DRIFT");
+        java.nio.file.Path outside = temp.toRealPath().resolve("outside.json");writePrivate(outside,"{}");
+        proof.put("privateSourceEvidencePath",outside.toString()).put("privateSourceEvidenceSha256",fileHash(outside));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSourceEvidence(proof,owned,new ObjectMapper()))
+                .hasMessage("S06_PRIVATE_SOURCE_REFERENT_INVALID");
+        java.nio.file.Path link = owned.resolve("link.json");java.nio.file.Files.createSymbolicLink(link,file);
+        proof.put("privateSourceEvidencePath",link.toString()).put("privateSourceEvidenceSha256",fileHash(file));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSourceEvidence(proof,owned,new ObjectMapper()))
+                .hasMessage("S06_PRIVATE_SOURCE_REFERENT_INVALID");
+        proof.put("privateSourceEvidencePath",file.toString());
+        java.nio.file.Files.setPosixFilePermissions(file,java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSourceEvidence(proof,owned,new ObjectMapper()))
+                .hasMessage("S06_PRIVATE_SOURCE_FILE_INVALID");
+        writePrivate(file,"{\"overridesAbsent\":{\"jvmFieldEncryptionKey\":true,\"jvmFieldEncryptionKey\":true}}");
+        proof.put("privateSourceEvidenceSha256",fileHash(file));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSourceEvidence(proof,owned,new ObjectMapper()))
+                .isInstanceOf(com.fasterxml.jackson.core.JsonProcessingException.class);
+    }
+
+    @Test
+    void privateSourceBackendMustBeTheActualRuntimeAndAllDeclaredReferentPids() {
+        ObjectMapper json = new ObjectMapper();
+        ObjectNode proof = privateProof();
+        ObjectNode runtime = json.createObjectNode();
+        runtime.putObject("backend").putObject("expected").put("pid",1234);
+        ObjectNode env = json.createObjectNode().put("backendPid",1234);
+        ObjectNode profiles = json.createObjectNode().put("backendPid",1234);
+        S06NativeEncryptionAdmission.privateBackend(proof,runtime,env,profiles);
+        for (ObjectNode invalid : java.util.List.of(json.createObjectNode(), json.createObjectNode().put("backendPid","1234"))) {
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(invalid,runtime,env,profiles))
+                    .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        }
+        ObjectNode missing = runtime.deepCopy(); ((ObjectNode)missing.path("backend").path("expected")).remove("pid");
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,missing,env,profiles))
+                .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        for (ObjectNode invalid : java.util.List.of(json.createObjectNode().put("backendPid",9999),json.createObjectNode().put("backendPid","1234"))) {
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,runtime,invalid,profiles))
+                    .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,runtime,env,invalid))
+                    .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        }
+        ObjectNode other = runtime.deepCopy(); ((ObjectNode)other.path("backend").path("expected")).put("pid",9999);
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,other,env,profiles))
+                .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+    }
+
+    private static String fileHash(java.nio.file.Path file) throws Exception {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(file)));
+    }
+
+    private static void writePrivate(java.nio.file.Path path, String contents) throws Exception {
+        java.nio.file.Files.writeString(path, contents);
+        java.nio.file.Files.setPosixFilePermissions(path, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+    }
+
+    private static ObjectNode source(ObjectNode proof, java.nio.file.Path target) throws Exception {
+        ObjectNode result = new ObjectMapper().createObjectNode().put("schemaVersion",1)
+                .put("kind","procurement-private-additional-properties-evidence-v1")
+                .put("runtime","procurement-web-stack-20261010").put("backendPid",proof.path("backendPid").intValue())
+                .put("environmentKeyState","UNSET").put("effectiveKeyState","SET")
+                .put("additionalLocationCount",1).put("additionalLocation","file:" + target)
+                .put("propertiesPath",target.toString()).put("propertiesSha256",java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(target))));
+        ObjectNode absent = result.putObject("overridesAbsent");
+        for (String name : java.util.List.of("jvmFieldEncryptionKey","commandLineFieldEncryptionKey","springApplicationJson",
+                "profileSpecificFieldEncryptionKey","environmentConfigLocation")) absent.put(name,true);
+        return result;
+    }
+
+    private static ObjectNode privateProof() {
+        return proof("encrypted").put("keySource", "private-additional-properties")
+                .put("environmentKeyState", "UNSET").put("effectiveKeyState", "SET").put("backendPid", 1234)
+                .put("privateSourceEvidencePath", "/owned/evidence/private-source.json")
+                .put("privateSourceEvidenceSha256", "a".repeat(64));
+    }
+
     private static FieldEncryptionService bean(String key) {
         FieldEncryptionService result = new FieldEncryptionService();
         ReflectionTestUtils.setField(result, "base64Key", key);

@@ -3,7 +3,13 @@ package com.auraboot.framework.notification.sourcebinding;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Properties;
+import java.util.Set;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.Base64;
@@ -15,6 +21,13 @@ import java.util.Map;
 /** Test-only admission. Runtime profiles are evidence, not the Native application's profile identity. */
 final class S06NativeEncryptionAdmission {
     static final String KEY = "S06_NATIVE_FIELD_ENCRYPTION_KEY";
+    private static final Path PRIVATE_PROPERTIES = Path.of("/Users/ghj/work/auraboot/.workspace/private/"
+            + "procurement-web-stack-20261010/field-encryption.properties");
+    private static final Set<String> OVERRIDES = Set.of("jvmFieldEncryptionKey", "commandLineFieldEncryptionKey",
+            "springApplicationJson", "profileSpecificFieldEncryptionKey", "environmentConfigLocation");
+    private static final Set<String> PRIVATE_SOURCE_FIELDS = Set.of("schemaVersion", "kind", "runtime", "backendPid",
+            "environmentKeyState", "effectiveKeyState", "additionalLocationCount", "additionalLocation",
+            "propertiesPath", "propertiesSha256", "overridesAbsent");
     private static final String RUNTIME = "procurement-web-stack-20261010";
 
     private S06NativeEncryptionAdmission() {}
@@ -35,7 +48,8 @@ final class S06NativeEncryptionAdmission {
         require(proofPath.startsWith(evidence), "S06_ENCRYPTION_PROOF_NOT_OWNED");
         String proofHash = hash(proofPath);
         require(proofHash.equals(required(environment, "S06_NATIVE_ENCRYPTION_PROOF_SHA256")), "S06_ENCRYPTION_PROOF_DRIFT");
-        JsonNode proof = json.readTree(proofPath.toFile());
+        JsonNode proof = json.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+                .readTree(Files.readString(proofPath));
         String mode = mode(proof, key);
         require(hash(app.resolve("platform/src/main/java/com/auraboot/framework/common/crypto/FieldEncryptionService.java"))
                 .equals(proof.path("fieldEncryptionServiceSha256").asText()), "S06_ENCRYPTION_SERVICE_SOURCE_DRIFT");
@@ -57,6 +71,11 @@ final class S06NativeEncryptionAdmission {
         JsonNode profiles = referent(proof, "runtimeProfileEvidence", evidence, json);
         require(profiles.path("runtime").asText().equals(RUNTIME) && profiles.path("actualSpringProfiles").asText()
                 .equals(proof.path("actualSpringProfiles").asText()), "S06_ENCRYPTION_RUNTIME_PROFILES_MISMATCH");
+        if (proof.path("keySource").asText().equals("private-additional-properties")) {
+            privateBackend(proof, runtime, envProof, profiles);
+            JsonNode source = privateSourceEvidence(proof, evidence, json);
+            privateSource(proof, source, PRIVATE_PROPERTIES, key);
+        }
         probe(mode, bean);
         return Map.of("mode", mode, "proofPath", proofPath.toString(), "proofSha256", proofHash,
                 "runtimeActualSpringProfiles", proof.path("actualSpringProfiles").asText(),
@@ -70,22 +89,114 @@ final class S06NativeEncryptionAdmission {
                 && proof.path("runtime").asText().equals(RUNTIME)
                 && proof.path("configProperty").asText().equals("${FIELD_ENCRYPTION_KEY:}")
                 && proof.path("actualSpringProfiles").isTextual(), "S06_ENCRYPTION_PROOF_SCHEMA_INVALID");
+        boolean privateSource = proof.path("keySource").asText().equals("private-additional-properties");
+        if (privateSource) {
+            require(proof.path("environmentKeyState").asText().equals("UNSET")
+                    && proof.path("effectiveKeyState").asText().equals("SET")
+                    && proof.path("backendPid").isIntegralNumber() && proof.path("backendPid").canConvertToLong()
+                    && proof.path("backendPid").longValue() > 0
+                    && proof.path("privateSourceEvidencePath").isTextual()
+                    && !proof.path("privateSourceEvidencePath").textValue().isBlank()
+                    && Path.of(proof.path("privateSourceEvidencePath").textValue()).isAbsolute()
+                    && proof.path("privateSourceEvidenceSha256").isTextual()
+                    && proof.path("privateSourceEvidenceSha256").textValue().matches("[a-f0-9]{64}"),
+                    "S06_PRIVATE_SOURCE_PROOF_INVALID");
+        } else {
+            require(!proof.has("keySource") && !proof.has("privateSourceEvidencePath") && !proof.has("privateSourceEvidenceSha256"),
+                    "S06_PRIVATE_SOURCE_PROOF_INVALID");
+        }
         String mode = proof.path("mode").asText();
         String profiles = proof.path("actualSpringProfiles").asText().toLowerCase(Locale.ROOT);
         String state = proof.path("environmentKeyState").asText();
         if (mode.equals("dev-passthrough")) {
             require(List.of("development", "verification").contains(proof.path("runtimeMode").asText())
-                    && List.of("UNSET", "EMPTY").contains(state) && key.isBlank() && !profiles.contains("prod")
+                    && !privateSource && List.of("UNSET", "EMPTY").contains(state) && key.isBlank() && !profiles.contains("prod")
                     && (profiles.isBlank() || profiles.contains("dev") || profiles.contains("local") || profiles.contains("test")),
                     "S06_PASSTHROUGH_NOT_MATCHING_RUNTIME");
         } else {
-            require(mode.equals("encrypted") && state.equals("SET") && !key.isBlank(), "S06_ENCRYPTION_MODE_INVALID");
+            require(mode.equals("encrypted") && (privateSource || state.equals("SET")) && !key.isBlank(), "S06_ENCRYPTION_MODE_INVALID");
             byte[] bytes;
             try { bytes = Base64.getDecoder().decode(key); }
             catch (IllegalArgumentException invalid) { throw new IllegalStateException("S06_MANAGED_KEY_ENCODING_INVALID"); }
             require(bytes.length == 32, "S06_MANAGED_KEY_LENGTH_INVALID");
         }
         return mode;
+    }
+
+    static void privateBackend(JsonNode proof, JsonNode runtime, JsonNode environment, JsonNode profiles) {
+        JsonNode pid = proof.path("backendPid");
+        JsonNode actual = runtime.path("backend").path("expected").path("pid");
+        require(pid.isIntegralNumber() && pid.canConvertToLong() && pid.longValue() > 0
+                && actual.isIntegralNumber() && actual.canConvertToLong() && pid.longValue() == actual.longValue(),
+                "S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        for (JsonNode referent : List.of(environment, profiles)) {
+            if (referent.has("backendPid")) require(referent.path("backendPid").isIntegralNumber()
+                    && referent.path("backendPid").canConvertToLong()
+                    && referent.path("backendPid").longValue() == pid.longValue(), "S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        }
+    }
+
+    static JsonNode privateSourceEvidence(JsonNode proof, Path evidence, ObjectMapper json) throws Exception {
+        Path declared = Path.of(proof.path("privateSourceEvidencePath").textValue());
+        require(!Files.isSymbolicLink(declared), "S06_PRIVATE_SOURCE_REFERENT_INVALID");
+        Path sourcePath = declared.toRealPath();
+        require(sourcePath.startsWith(evidence.toRealPath()), "S06_PRIVATE_SOURCE_REFERENT_INVALID");
+        ownedPrivateFile(sourcePath);
+        return referent(proof, "privateSourceEvidence", evidence.toRealPath(), json);
+    }
+
+    /** Only admit() supplies the literal Native target; tests supply their own fixed temporary target. */
+    static void privateSource(JsonNode proof, JsonNode source, Path fixedTarget, String key) throws Exception {
+        require(mode(proof, key).equals("encrypted")
+                && proof.path("keySource").asText().equals("private-additional-properties"), "S06_PRIVATE_SOURCE_PROOF_INVALID");
+        var sourceFields = new java.util.HashSet<String>();
+        source.fieldNames().forEachRemaining(sourceFields::add);
+        require(source.isObject() && sourceFields.equals(PRIVATE_SOURCE_FIELDS) && source.path("schemaVersion").isInt() && source.path("schemaVersion").intValue() == 1
+                && source.path("kind").asText().equals("procurement-private-additional-properties-evidence-v1")
+                && source.path("runtime").asText().equals(RUNTIME)
+                && source.path("backendPid").isIntegralNumber() && source.path("backendPid").equals(proof.path("backendPid"))
+                && source.path("environmentKeyState").asText().equals("UNSET")
+                && source.path("effectiveKeyState").asText().equals("SET")
+                && source.path("additionalLocationCount").isInt() && source.path("additionalLocationCount").intValue() == 1
+                && source.path("propertiesPath").isTextual()
+                && source.path("propertiesPath").textValue().equals(fixedTarget.toString())
+                && source.path("additionalLocation").isTextual()
+                && source.path("additionalLocation").textValue().equals("file:" + fixedTarget)
+                && source.path("propertiesSha256").isTextual()
+                && source.path("propertiesSha256").textValue().matches("[a-f0-9]{64}"), "S06_PRIVATE_SOURCE_EVIDENCE_INVALID");
+        JsonNode overrides = source.path("overridesAbsent");
+        var fields = new java.util.HashSet<String>();
+        overrides.fieldNames().forEachRemaining(fields::add);
+        require(overrides.isObject() && fields.equals(OVERRIDES)
+                && OVERRIDES.stream().allMatch(name -> overrides.path(name).isBoolean() && overrides.path(name).booleanValue()),
+                "S06_PRIVATE_SOURCE_OVERRIDE_CONFLICT");
+        require(fixedTarget.isAbsolute() && fixedTarget.normalize().equals(fixedTarget)
+                && fixedTarget.toRealPath().equals(fixedTarget), "S06_PRIVATE_SOURCE_PATH_INVALID");
+        ownedPrivateFile(fixedTarget);
+        require(Files.size(fixedTarget) <= 65536, "S06_PRIVATE_SOURCE_FILE_INVALID");
+        byte[] bytes = Files.readAllBytes(fixedTarget);
+        require(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
+                .equals(source.path("propertiesSha256").textValue()), "S06_PRIVATE_SOURCE_FILE_DRIFT");
+        Properties properties = new Properties() {
+            @Override public synchronized Object put(Object name, Object value) {
+                require(!containsKey(name), "S06_PRIVATE_SOURCE_PROPERTY_INVALID");
+                return super.put(name, value);
+            }
+        };
+        try { properties.load(new StringReader(new String(bytes, StandardCharsets.UTF_8))); }
+        catch (IllegalArgumentException invalid) { throw new IllegalStateException("S06_PRIVATE_SOURCE_PROPERTY_INVALID"); }
+        require(properties.size() == 1 && properties.containsKey("security.field-encryption.key"),
+                "S06_PRIVATE_SOURCE_PROPERTY_INVALID");
+        require(MessageDigest.isEqual(key.getBytes(StandardCharsets.UTF_8),
+                properties.getProperty("security.field-encryption.key").getBytes(StandardCharsets.UTF_8)),
+                "S06_PRIVATE_SOURCE_KEY_MISMATCH");
+    }
+
+    private static void ownedPrivateFile(Path path) throws Exception {
+        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(path)
+                && Files.getPosixFilePermissions(path).equals(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE))
+                && Files.getOwner(path).equals(path.getFileSystem().getUserPrincipalLookupService()
+                    .lookupPrincipalByName(System.getProperty("user.name"))), "S06_PRIVATE_SOURCE_FILE_INVALID");
     }
 
     static void probe(String mode, FieldEncryptionService bean) {
@@ -101,7 +212,7 @@ final class S06NativeEncryptionAdmission {
         Path path = Path.of(proof.path(prefix + "Path").asText()).toRealPath();
         require(path.startsWith(evidence) && hash(path).equals(proof.path(prefix + "Sha256").asText()),
                 "S06_ENCRYPTION_REFERENT_DRIFT");
-        return json.readTree(path.toFile());
+        return json.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readTree(Files.readString(path));
     }
 
     private static String required(Map<String, String> environment, String name) {
