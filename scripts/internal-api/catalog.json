@@ -348,7 +348,8 @@
       "purpose": "Owned team member UI journey through the registered DSL menu; not all organization or authorization coverage",
       "spec": "web-admin/tests/e2e/model/internal-api-team.spec.ts",
       "tests": [
-        "generated team memberships preserve the menu add reload and remove journey"
+        "generated team memberships preserve the menu add reload and remove journey",
+        "team viewer reads the real menu while viewer and unassigned writes are forbidden"
       ]
     },
     "dslRendererGate": {
@@ -854,6 +855,19 @@
       "expected": "Actual remove operation targets the team-membership row PID and reload remains empty",
       "test": "generated team memberships preserve the menu add reload and remove journey",
       "screenshot": "TEAM-04-remove-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-05",
+      "feature": "teams",
+      "action": "read-only-menu-refresh",
+      "branch": "sad",
+      "expected": "Viewer menu and refresh retain the persisted member without write controls; separate direct API probes refuse viewer/unassigned mutations",
+      "test": "team viewer reads the real menu while viewer and unassigned writes are forbidden",
+      "screenshot": "TEAM-05-read-only.png",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",

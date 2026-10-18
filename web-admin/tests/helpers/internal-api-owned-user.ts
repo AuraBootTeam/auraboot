@@ -14,7 +14,11 @@ export async function loginInternalApiUser(page: Page, username: string, passwor
 }
 
 /** Provision only a uniquely owned no-email account; no shared administrator mutations. */
-export async function provisionInternalApiUser(browser: Browser, baseURL: string) {
+export async function provisionInternalApiUser(
+  browser: Browser,
+  baseURL: string,
+  role: 'tenant_admin' | 'viewer' | null = 'tenant_admin',
+) {
   expect(PG_CONN.database).toMatch(/^auraboot_\d+$/);
   const origin = new URL(baseURL).origin;
   const username = `ic_views_${randomUUID().replaceAll('-', '').slice(0, 16)}`;
@@ -31,7 +35,49 @@ export async function provisionInternalApiUser(browser: Browser, baseURL: string
     viewport: { width: 1440, height: 1000 },
   });
   let userPid: string | undefined;
+  const sessionCleanup: Array<{
+    context: string;
+    beforeStatus: number;
+    afterStatus: number;
+    revoked: boolean;
+  }> = [];
   async function dispose() {
+    const errors: unknown[] = [];
+    // Each context logged in independently. Revoke only its current server-issued
+    // session, while the cookie is still present, and prove that token is rejected.
+    for (const [label, client] of [
+      ['owned-user', context],
+      ['provisioner', admin],
+    ] as const) {
+      try {
+        const before = await client.request.get('/api/auth/me');
+        if (before.status() === 401) {
+          sessionCleanup.push({
+            context: label,
+            beforeStatus: 401,
+            afterStatus: 401,
+            revoked: false,
+          });
+          continue;
+        }
+        expect(before.status()).toBe(200);
+        const revoked = await client.request.delete('/api/user/sessions/current', {
+          headers: { Origin: origin },
+        });
+        expect(revoked.status()).toBe(200);
+        expect((await revoked.json()).code).toBe('0');
+        const after = await client.request.get('/api/auth/me');
+        sessionCleanup.push({
+          context: label,
+          beforeStatus: before.status(),
+          afterStatus: after.status(),
+          revoked: true,
+        });
+        expect(after.status()).toBe(401);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
     try {
       if (userPid) {
         const db = new pg.Client(PG_CONN);
@@ -54,11 +100,20 @@ export async function provisionInternalApiUser(browser: Browser, baseURL: string
           await db.end();
         }
       }
-    } finally {
-      await context.close();
-      await admin.close();
+    } catch (error) {
+      errors.push(error);
     }
+    for (const client of [context, admin]) {
+      try {
+        await client.close();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length)
+      throw new AggregateError(errors, 'Owned user or exact-session cleanup failed');
   }
+
   try {
     const adminPage = await admin.newPage();
     await loginInternalApiUser(
@@ -72,7 +127,8 @@ export async function provisionInternalApiUser(browser: Browser, baseURL: string
         userName: username,
         displayName: username,
         initialPassword: password,
-        roleCodes: ['tenant_admin'],
+        roleCodes: role ? [role] : [],
+        roleAssignmentMode: role ? 'EXPLICIT' : 'NONE',
         sendInviteEmail: false,
       },
     });
@@ -82,12 +138,12 @@ export async function provisionInternalApiUser(browser: Browser, baseURL: string
     expect(response.status()).toBe(200);
     expect(payload.code).toBe('0');
     expect(userPid).toBeTruthy();
-    expect(payload.data.assignedRoles).toContain('tenant_admin');
+    expect(payload.data.assignedRoles).toEqual(role ? [role] : []);
     await context.addCookies([{ name: 'locale', value: 'en-US', url: origin }]);
     await context.addInitScript(() => localStorage.setItem('locale', 'en-US'));
     const page = await context.newPage();
     await loginInternalApiUser(page, username, password);
-    return { context, page, userPid: userPid!, username, origin, dispose };
+    return { context, page, userPid: userPid!, username, role, origin, sessionCleanup, dispose };
   } catch (error) {
     try {
       await dispose();
