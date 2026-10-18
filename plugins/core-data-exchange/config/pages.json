@@ -69,7 +69,7 @@
             "label": { "zh-CN": "状态", "en": "Status" },
             "dictCode": "exchange_job_status",
             "renderType": "status",
-            "width": 100
+            "width": 120
           },
           {
             "field": "progress",

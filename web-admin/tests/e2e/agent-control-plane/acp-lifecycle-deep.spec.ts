@@ -32,7 +32,7 @@
  */
 
 import { test, expect, type Page, type Locator } from '@playwright/test';
-import { uniqueId, executeCommandViaApi, findRowInPaginatedList, queryFilteredList } from '../helpers/index';
+import { uniqueId, executeCommandViaApi, findRowInPaginatedList, queryFilteredList, acceptConfirmDialog } from '../helpers/index';
 import { gotoAcpUiPage } from './route-helpers';
 import { readFileSync } from 'node:fs';
 
@@ -984,7 +984,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
   // -------------------------------------------------------------------------
   // LIFE-19: Dispatch task → new Run appears in run list
   // -------------------------------------------------------------------------
-  test('LIFE-19: Dispatch task → new Run appears in run list', async ({ page }) => {
+  test('LIFE-19: Dispatch task → new Run appears in run list', async ({ page }, info) => {
     await navigateToAcpPage(page, '/dynamic/agent-task');
 
     const row = await findRow(page, taskDispTitle);
@@ -994,8 +994,10 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
     expect(before).toEqual([]);
     const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/agent/dispatch' && r.request().method() === 'POST');
     await clickRowActionBtn(page, row, BTN.dispatchTask);
-    const confirm = page.getByTestId('confirm-ok');
-    if (await confirm.isVisible()) await confirm.click();
+    const dialog = page.getByTestId('confirm-dialog');
+    await expect(dialog).toContainText('确认将此任务派发给指定的 AI 同事？');
+    await page.screenshot({ path: info.outputPath('life-19-confirm-zh-CN.png'), fullPage: true });
+    await acceptConfirmDialog(page);
     const result = await response;
     expect(result.request().postDataJSON()).toEqual({ taskPid: dispatchTaskPid, agentCode });
     const body = await result.json();
@@ -1007,6 +1009,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
     expect(runs[0].agent_id).toBe(agentCode);
     await navigateToAcpPage(page, '/dynamic/agent-run');
     await expect(page.locator('tbody tr').filter({ hasText: taskDispTitle })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('life-19-dispatched-zh-CN.png'), fullPage: true });
   });
 
   // =========================================================================

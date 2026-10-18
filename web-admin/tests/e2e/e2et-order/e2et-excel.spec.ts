@@ -275,6 +275,7 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
           response.url().includes('/api/exchange/jobs') && response.status() === 200),
         refresh.click(),
       ]);
+      await expect(refresh).toBeEnabled();
       await page.screenshot({
         path: testInfo.outputPath('job-center-desktop-completed.png'),
         fullPage: true,
