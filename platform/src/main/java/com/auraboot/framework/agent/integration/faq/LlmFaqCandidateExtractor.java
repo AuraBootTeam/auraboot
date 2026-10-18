@@ -95,8 +95,6 @@ public class LlmFaqCandidateExtractor implements FaqCandidateExtractor {
                 .build();
 
         LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
-        log.info("[faq-extract] tenant={} transcriptChars={} (in={} out={} tokens)",
-                tenantId, transcript.length(), response.getInputTokens(), response.getOutputTokens());
         Map<String, Object> args = firstToolInput(response, TOOL_NAME);
         if (args == null) {
             log.warn("[faq-extract] tenant={} model did not call {} — treating as no FAQs found",
@@ -104,6 +102,8 @@ public class LlmFaqCandidateExtractor implements FaqCandidateExtractor {
             return List.of();
         }
 
+        log.info("[faq-extract] tenant={} transcriptChars={} (in={} out={} tokens)",
+                tenantId, transcript.length(), response.getInputTokens(), response.getOutputTokens());
         return mapList(args.get("faqs"));
     }
 
