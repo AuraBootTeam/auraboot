@@ -323,6 +323,19 @@ poll_http_up() {  # poll_http_up <url> <timeout-s>
 
 spawn_detached() {  # spawn_detached <pid-file> <work-dir> <log-file> <cmd> [args...]
   local pid_file="$1" work_dir="$2" log_file="$3"; shift 3
+  if [ "${pid_file##*/}" = frontend.pid ]; then
+    [ "${1:-}" = env ] || die "frontend launch requires explicit runtime environment"
+    shift
+    local frontend_env=() frontend_name="" assignment
+    while [ $# -gt 0 ] && [[ "$1" = *=* ]]; do
+      assignment="$1"; shift
+      frontend_env+=("$assignment")
+      case "$assignment" in AURA_RUNTIME_NAME=*) frontend_name="${assignment#*=}";; esac
+    done
+    [ -n "$frontend_name" ] && [ $# -gt 0 ] || die "frontend launch identity missing"
+    set -- env "${frontend_env[@]}" node "$SCRIPT_DIR/lib/golden-frontend-supervisor.mjs" \
+      "$frontend_name" "$REPO_ROOT" "$DEV" -- "$@"
+  fi
   local py; py="$(command -v python3 2>/dev/null || true)"
   if [ -n "$py" ]; then
     "$py" - "$pid_file" "$work_dir" "$log_file" "$@" <<'PY'

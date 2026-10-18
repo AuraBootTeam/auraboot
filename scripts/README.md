@@ -84,6 +84,8 @@
 | `gates/fixtures/workspace-control.mjs` | 0 | 2026-10-05 | Hermetic workspace-control fixture for gate tests. |
 | `lib/golden-new-database.sh` | 0 | 2026-10-05 | Create an absent owned golden database without replacement. |
 | `lib/golden-process-stop.mjs` | 0 | 2026-10-05 | Stop only identity-attested owned golden processes. |
+| `lib/golden-frontend-supervisor.mjs` | 1 | 2026-10-18 | Keep a stable owned frontend parent across automatic listener restarts. |
+| `lib/golden-frontend-registration.mjs` | 1 | 2026-10-18 | Register each authenticated Web/BFF generation before its entrypoint can listen. |
 | `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |
 | `lib/golden-resume-state.mjs` | 0 | 2026-10-05 | Validate saved golden state before resume. |
 | `lib/golden-runtime-identity.sh` | 0 | 2026-10-05 | Register declared golden source roots in workspace control. |
