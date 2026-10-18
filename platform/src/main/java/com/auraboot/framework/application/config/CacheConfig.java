@@ -3,10 +3,12 @@ package com.auraboot.framework.application.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.auraboot.framework.application.cache.BroadcastableCaffeineCacheManager;
+import com.auraboot.framework.application.cache.CacheEvictPublisher;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -35,16 +37,18 @@ public class CacheConfig {
 
     /**
      * 配置缓存管理器
-     * 
-     * 使用 ConcurrentMapCacheManager 作为默认实现，适用于单机部署。
-     * 在生产环境中，可以考虑替换为 Redis 等分布式缓存解决方案。
-     * 
+     *
+     * Caffeine 本地缓存；多实例部署时（Redis 已配置）本地失效事件经
+     * {@link CacheEvictPublisher} 广播到其它实例，避免最长 30 分钟的跨实例
+     * 陈旧窗口。单实例（无 Redis）时 broadcaster 为 null，行为与原实现一致。
+     *
      * @return CacheManager 缓存管理器实例
      */
     @Bean
     @Primary
-    public CacheManager cacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+    public BroadcastableCaffeineCacheManager cacheManager(ObjectProvider<CacheEvictPublisher> cacheEvictPublisher) {
+        BroadcastableCaffeineCacheManager cacheManager =
+            new BroadcastableCaffeineCacheManager(cacheEvictPublisher.getIfAvailable());
         cacheManager.setCaffeine(Caffeine.newBuilder()
             .maximumSize(10_000)
             .expireAfterWrite(Duration.ofMinutes(30))
@@ -124,8 +128,10 @@ public class CacheConfig {
      * </ul>
      */
     @Bean
-    public CacheManager permissionCacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+    public BroadcastableCaffeineCacheManager permissionCacheManager(
+            ObjectProvider<CacheEvictPublisher> cacheEvictPublisher) {
+        BroadcastableCaffeineCacheManager cacheManager =
+            new BroadcastableCaffeineCacheManager(cacheEvictPublisher.getIfAvailable());
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(5_000)
                 .expireAfterWrite(Duration.ofMinutes(5))
