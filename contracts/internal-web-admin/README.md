@@ -90,3 +90,20 @@ and custom patterns retain their own contract. A local datetime does not itself
 identify a timezone. UTC metadata fields converted by the platform's UTC mapper
 must be displayed through the shared timezone formatter rather than interpreted as
 browser-local wall time.
+
+## CI and release checks
+
+Frontend CI runs `foundation.mjs --evidence <fresh-directory>` after installing the
+locked toolchain. It requires the exact registered unit test set, canonical snapshot,
+current generated types, and standalone declaration compilation; empty, missing,
+skipped, repeated or unexpected test evidence fails. Its receipt claims offline
+consistency only. It does not certify domain migration or browser acceptance.
+
+Docker Quickstart compares the actual built backend's group against the snapshot.
+The existing Open Platform release-image runner additionally checks this same internal
+contract from its retained release container and includes both drift and foundation
+receipts in its release receipt. `--archive-source <SHA>` is restricted to git-free
+archives: the caller owns the frozen archive and image provenance, while the runner
+checks its scoped input bytes remain unchanged. This update does not independently
+qualify a release; the complete existing image gate must execute successfully on the
+admitted Linux CI host.

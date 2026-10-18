@@ -22,7 +22,7 @@ RELEASE_MUTATION="${AURA_OPEN_PLATFORM_RELEASE_MUTATION:-}"
   || fatal "exact frozen source-set digest is required"
 [[ "$(uname -s)" == "Linux" ]] || fatal "release images must be verified on the admitted Linux CI host"
 [[ "$(uname -m)" == "x86_64" ]] || fatal "release image builder must be x86_64"
-for command_name in docker git openssl python3 timeout bash curl jq; do need "$command_name"; done
+for command_name in docker git node npm openssl python3 timeout bash curl jq; do need "$command_name"; done
 RUNNER_UID="$(id -u)"
 RUNNER_GID="$(id -g)"
 [[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all)" ]] || fatal "CI checkout is dirty"
@@ -334,6 +334,21 @@ python3 "$STAGE/scripts/ci/open_platform_quick_ui.py" verify --archive "$OPEN_PL
   --root "$STAGE" --expected-ref "$REF_SHA" > "$ARTIFACTS/quick-ui-receipt.json" \
   2> "$ARTIFACTS/logs/quick-ui.log" || fail "quick-access UI evidence incomplete or from another candidate"
 
+info "verifying the internal Web Admin contract from this release container"
+INTERNAL_API_ARTIFACTS="$ARTIFACTS/internal-api"
+mkdir "$INTERNAL_API_ARTIFACTS"
+docker exec "$APP" wget -q -O - http://localhost:6443/v3/api-docs/internal-web-admin \
+  > "$INTERNAL_API_ARTIFACTS/openapi.json" || fail "internal API release-container export failed"
+node "$STAGE/scripts/internal-api/drift.mjs" "$INTERNAL_API_ARTIFACTS/openapi.json" \
+  "$INTERNAL_API_ARTIFACTS/drift-receipt.json" \
+  > "$ARTIFACTS/logs/internal-api-drift.log" 2>&1 || fail "internal API release-container contract drift"
+npm_config_cache="$WORK_ROOT/internal-api-npm-cache" timeout 300 npm ci \
+  --prefix "$STAGE/scripts/internal-api/toolchain" --ignore-scripts --no-audit --no-fund \
+  > "$ARTIFACTS/logs/internal-api-toolchain.log" 2>&1 || fail "locked internal API toolchain unavailable"
+node "$STAGE/scripts/internal-api/foundation.mjs" --evidence "$INTERNAL_API_ARTIFACTS/foundation" \
+  --archive-source "$REF_SHA" \
+  > "$ARTIFACTS/logs/internal-api-foundation.log" 2>&1 || fail "internal API offline consistency gate failed"
+
 info "running two-domain HTTP protocol probe"
 # Create the secret handoff as the unprivileged host runner before the rootful helper container
 # writes it. Opening an existing file preserves host ownership; the EXIT trap removes it on every
@@ -462,6 +477,9 @@ json.dump({
   "quickAccessUi": json.load(open("$ARTIFACTS/quick-ui-receipt.json")),
   "officeGuide": json.load(open("$ARTIFACTS/office-guide/result.json")),
   "controllerEndpoints": json.load(open("$ARTIFACTS/controller-endpoints/result.json")),
+  "internalApiContract": {
+    "drift": json.load(open("$ARTIFACTS/internal-api/drift-receipt.json")),
+    "foundation": json.load(open("$ARTIFACTS/internal-api/foundation/foundation-receipt.json"))},
   "endpointOpenapi": json.load(open("$ARTIFACTS/endpoint-openapi-receipt.json")),
   "openapi": json.load(open("$ARTIFACTS/openapi-receipt.json")), "openapiTypes": "strict-positive-negative-ok",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",

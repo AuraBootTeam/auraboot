@@ -345,3 +345,6 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `internal-api/discover.mjs` | contract | Reconcile frontend network-call candidates with a captured runtime catalog; retain unresolved and unmigrated entries. |
 | `internal-api/export.mjs` | contract | Export or compare the internal OpenAPI group and create a fresh source-bound export receipt. |
 | `internal-api/toolchain/generate.mjs` | codegen | Generate or check TypeScript declarations using the isolated, locked OpenAPI toolchain. |
+
+| `internal-api/foundation.mjs` | contract | Verify canonical spec, generated declarations and the exact registered offline unit denominator; emit a fresh source-bound consistency receipt. |
+| `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |

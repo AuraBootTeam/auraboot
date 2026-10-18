@@ -14,9 +14,31 @@
         "codegen.test.mjs",
         "contract.test.mjs",
         "discover.test.mjs",
-        "export.test.mjs"
+        "export.test.mjs",
+        "foundation.test.mjs",
+        "drift.test.mjs"
       ],
-      "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json"
+      "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json",
+      "unitTests": [
+        "generates deterministic required, enum and nullable types that reject invalid consumers",
+        "rejects unsupported query encodings including referenced parameters",
+        "normalizes only ordering and runtime origins without changing schema semantics",
+        "rejects empty, duplicate, dangling and missing-path-parameter contracts",
+        "does not normalize away field, required, enum, nullability, security or operation drift",
+        "explicit selection preserves recursive schemas and denies missing or repeated operations",
+        "external references fail closed instead of reading arbitrary remote contracts",
+        "resolves imported aliases, local constants, class base URLs and encoded templates",
+        "matches fixed routes preferentially and does not guess fixed paths from client variables",
+        "retains missing, external and indirect calls rather than silently excluding them",
+        "counts generated operations without mistaking request headers or request caches for HTTP calls",
+        "fails closed on unexpected endpoints, HTTP failures, invalid JSON and empty catalogs",
+        "requires a fresh receipt and never writes success when the live catalog drifts",
+        "foundation audit rejects empty missing repeated skipped failed and unexpected test evidence",
+        "foundation audit accepts each registered passing test exactly once",
+        "captured drift compares semantic contracts and refuses receipt reuse",
+        "captured drift never creates success evidence for an empty or changed producer document"
+      ],
+      "runner": "scripts/internal-api/foundation.mjs"
     },
     "dictionary": {
       "purpose": "Dictionary JSON operation browser regression; not full migration acceptance",
