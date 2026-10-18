@@ -31171,7 +31171,7 @@
           },
           "jdbcUrl": {
             "minLength": 1,
-            "pattern": "^jdbc:(mysql|postgresql)://.+$",
+            "pattern": "^jdbc:postgresql://.+$",
             "type": "string"
           },
           "maxPoolSize": {
@@ -38513,7 +38513,10 @@
       "PaginationResultCommandAuditLogDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38543,7 +38546,10 @@
       "PaginationResultDataChangeLog": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38573,7 +38579,10 @@
       "PaginationResultEmployeeProvisionOption": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38603,7 +38612,10 @@
       "PaginationResultMapStringObject": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38634,7 +38646,10 @@
       "PaginationResultMemberSearchOption": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38664,7 +38679,10 @@
       "PaginationResultNamedQueryDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38694,7 +38712,10 @@
       "PaginationResultNotificationDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38724,7 +38745,10 @@
       "PaginationResultOrgEmployeeDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38754,7 +38778,10 @@
       "PaginationResultPageSchemaListDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38784,7 +38811,10 @@
       "PaginationResultReconciliationItemDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38814,7 +38844,10 @@
       "PaginationResultReconciliationRunDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38844,7 +38877,10 @@
       "PaginationResultRoleMemberDTO": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38874,7 +38910,10 @@
       "PaginationResultScheduledTaskLog": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38904,7 +38943,10 @@
       "PaginationResultSourceChoice": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",
@@ -38934,7 +38976,10 @@
       "PaginationResultWebClientError": {
         "properties": {
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "format": "int32",

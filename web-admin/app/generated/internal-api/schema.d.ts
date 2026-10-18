@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: cfe21ec1a8f1d9fcb401d73d1961894bcf8313f25d2efea99fcaaad6f6f7e4c5
+ * Contract SHA-256: 319b1ae2adcb10206668a65d1cab458b589630aa40cd0af537f5600663996076
  */
 export interface paths {
     "/api/activities": {
@@ -35560,7 +35560,7 @@ export interface components {
             pageSize?: number;
         };
         PaginationResultCommandAuditLogDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35572,7 +35572,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultDataChangeLog: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35584,7 +35584,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultEmployeeProvisionOption: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35596,7 +35596,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultMapStringObject: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35610,7 +35610,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultMemberSearchOption: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35622,7 +35622,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultNamedQueryDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35634,7 +35634,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultNotificationDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35646,7 +35646,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultOrgEmployeeDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35658,7 +35658,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultPageSchemaListDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35670,7 +35670,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultReconciliationItemDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35682,7 +35682,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultReconciliationRunDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35694,7 +35694,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultRoleMemberDTO: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35706,7 +35706,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultScheduledTaskLog: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35718,7 +35718,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultSourceChoice: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -35730,7 +35730,7 @@ export interface components {
             totalPages?: number;
         };
         PaginationResultWebClientError: {
-            nextCursor?: string;
+            nextCursor?: string | null;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
