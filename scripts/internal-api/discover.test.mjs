@@ -64,4 +64,31 @@ test('counts generated operations without mistaking request headers or request c
   assert.equal(result.calls[1].matches[0].operationId, 'upload');
   assert.equal(result.calls[1].method, 'post');
   assert.equal(result.calls[1].migration, 'generated-operation');
+  const candidates = discoverCalls([{ file: 'web-admin/app/cache.ts', text: `
+    import {fetchResult} from '~/shared/services/http-client';
+    const apiResolvedCache = new Map<string, object>();
+    const apiAlias = apiResolvedCache;
+    apiResolvedCache.get(key);
+    apiAlias.delete(key);
+    fetchResult(endpoint, {method:'get'});
+    function uncertain(apiClient: unknown) { apiClient.get(endpoint); }
+  ` }], document);
+  assert.equal(candidates.calls.length, 4, 'Local collections remain explicit candidates');
+  for (const row of candidates.calls.slice(0, 2)) {
+    assert.equal(row.classification, 'excluded-local-collection');
+    assert.equal(row.migration, 'not-applicable');
+    assert.equal(row.evidence[0].constructor, 'Map');
+    assert.equal(row.evidence[0].binding, 'apiResolvedCache');
+    assert.equal(row.evidence[0].declarationLine, 3);
+    assert.deepEqual(row.matches, []);
+  }
+  assert.equal(candidates.calls[2].migration, 'not-migrated');
+  assert.equal(candidates.calls[3].migration, 'not-migrated');
+  const shadowed = discoverCalls([{ file: 'web-admin/app/shadow.ts', text: `
+    import {Map} from './network-client';
+    const apiClient = new Map();
+    apiClient.get('/api/views/accessible');
+  ` }], document);
+  assert.equal(shadowed.calls[0].classification, 'source-linked');
+  assert.equal(shadowed.calls[0].matches[0].operationId, 'accessible');
 });

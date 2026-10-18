@@ -83,6 +83,24 @@ export function discoverCalls(sources, document) {
       if (ts.isCallExpression(n) && n.arguments[0]) return placeholder(n.arguments[0]);
       return n.getText(sf).replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 100) || 'value';
     }
+    function localCollection(receiver, visited = new Set()) {
+      if (!receiver) return undefined;
+      if (ts.isParenthesizedExpression(receiver) || ts.isAsExpression(receiver) || ts.isNonNullExpression(receiver))
+        return localCollection(receiver.expression, visited);
+      const symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(receiver) ? receiver.name : receiver);
+      if (!symbol || visited.has(symbol)) return undefined;
+      const declaration = symbol.valueDeclaration;
+      const initializer = declaration?.initializer;
+      if (!initializer) return undefined;
+      if (ts.isNewExpression(initializer) && ts.isIdentifier(initializer.expression)
+        && ['Map', 'Set', 'WeakMap', 'WeakSet'].includes(initializer.expression.text)
+        // A locally imported or declared constructor may be a network client.
+        && !checker.getSymbolAtLocation(initializer.expression)?.declarations?.length) {
+        return { kind: 'local-collection', binding: symbol.name, constructor: initializer.expression.text,
+          file: source.file, declarationLine: sf.getLineAndCharacterOfPosition(declaration.getStart(sf)).line + 1 };
+      }
+      return localCollection(initializer, new Set([...visited, symbol]));
+    }
     function visit(n) {
       const line = () => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
       if (ts.isInterfaceDeclaration(n) || ts.isTypeAliasDeclaration(n)) declarations.push({
@@ -109,7 +127,8 @@ export function discoverCalls(sources, document) {
           const route = evaluate(targetNode);
           const target = targetNode?.getText(sf) ?? '';
           const plumbing = /\/http-client\/|\/ApiService\.ts$|\/server\/services\/BffProxyService\.ts$/.test(source.file);
-          let classification = plumbing ? 'transport-plumbing' : !route ? 'unresolved-route'
+          const exclusion = ts.isPropertyAccessExpression(n.expression) ? localCollection(n.expression.expression) : undefined;
+          let classification = exclusion ? 'excluded-local-collection' : plumbing ? 'transport-plumbing' : !route ? 'unresolved-route'
             : /^https?:\/\//.test(route) ? 'absolute-origin-needs-review'
             : !route.startsWith('/api/') ? 'non-api-or-unresolved-base' : 'internal';
           const matches = classification === 'internal' ? matchOperation(route, method, document) : [];
@@ -118,7 +137,8 @@ export function discoverCalls(sources, document) {
           calls.push({ id: sha256(`${source.file}:${n.getStart(sf)}:${callee}:${target}`).slice(0, 20),
             file: source.file, line: line(), callee, method, target, route: route ?? null,
             typeArguments: (n.typeArguments ?? []).map(t => t.getText(sf)), classification, matches,
-            migration: generated ? 'generated-operation' : 'not-migrated', evidence: [] });
+            migration: exclusion ? 'not-applicable' : generated ? 'generated-operation' : 'not-migrated',
+            evidence: exclusion ? [exclusion] : [] });
         }
       }
       ts.forEachChild(n, visit);
