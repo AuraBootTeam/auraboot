@@ -130,9 +130,6 @@ export const EXPLICIT_SPRING_BOOT_URL = process.env.SPRING_BOOT_URL;
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;
 
-/** Explicit URL for tests that require an owned runtime rather than host defaults. */
-export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
-
 /** Vite-served base — what `page.goto` and `page.request` use by default. */
 export const BASE_URL =
   EXPLICIT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
