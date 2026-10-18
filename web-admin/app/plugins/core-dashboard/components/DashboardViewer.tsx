@@ -22,6 +22,7 @@ import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { buildDrillDownTarget, type DrillDownPayload } from '../utils/drillDownNavigation';
 
+import { createDashboardUsageId } from '../utils/dashboardUsageId';
 import { DashboardQueryContext } from '~/framework/smart/hooks/DashboardQueryContext';
 
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
@@ -56,7 +57,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
 }) => {
   const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
-  const usageId = useMemo(() => crypto.randomUUID(), [dashboardPid]);
+  const usageId = useMemo(() => createDashboardUsageId(), [dashboardPid]);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [linkageFilters, setLinkageFilters] = useState<LinkageFiltersMap>({});
 

@@ -1,6 +1,8 @@
 import { useContext, type ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+
+afterEach(() => vi.unstubAllGlobals());
 import { DashboardQueryContext } from '~/framework/smart/hooks/DashboardQueryContext';
 import type { Widget } from '../../types';
 import { DashboardViewer } from '../DashboardViewer';
@@ -36,7 +38,10 @@ const widgets: Widget[] = [
     config: { title: 'Orders' },
   },
 ];
-it('keeps one visit while rendering and starts a new visit on each dashboard switch', () => {
+it.each(['native UUID', 'HTTP origin without randomUUID'])('keeps valid UUID visits stable across renders and distinct across dashboard switches (%s)', (environment) => {
+  if (environment === 'HTTP origin without randomUUID') {
+    vi.stubGlobal('crypto', { getRandomValues: crypto.getRandomValues.bind(crypto) });
+  }
   const view = (dashboardPid: string) => (
     <DashboardViewer
       dashboardPid={dashboardPid}
@@ -46,7 +51,7 @@ it('keeps one visit while rendering and starts a new visit on each dashboard swi
   );
   const { rerender } = render(view('first'));
   const original = screen.getByTestId('usage').getAttribute('data-visit');
-  expect(original).toMatch(/^[0-9a-f-]{36}$/);
+  expect(original).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   rerender(view('first'));
   expect(screen.getByTestId('usage')).toHaveAttribute('data-visit', original!);
   rerender(view('second'));
