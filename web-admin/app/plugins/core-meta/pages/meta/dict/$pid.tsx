@@ -12,17 +12,12 @@ import {
   useLocation,
   type LoaderFunctionArgs,
 } from 'react-router';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import tz from 'dayjs/plugin/timezone';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 import { dictService } from '~/shared/services/dictService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import type { DictDTO, DictItemData, DictTreeNode } from '~/types/dict';
-
-dayjs.extend(utc);
-dayjs.extend(tz);
 
 type TabType = 'basic' | 'items' | 'versions';
 type EditableItem = DictItemData & { _id: string };
@@ -60,13 +55,6 @@ const parseTabFromHash = (hash: string): TabType => {
   return VALID_TABS.includes(tab as TabType) ? (tab as TabType) : 'basic';
 };
 
-function formatDisplayDateTime(value: string | null | undefined, userTimezone: string): string {
-  if (!value) return '-';
-  const d = dayjs(value);
-  if (!d.isValid()) return '-';
-  const effectiveTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return d.tz(effectiveTz).format('YYYY-MM-DD HH:mm:ss');
-}
 
 const flattenTreeNodes = (root: DictTreeNode | undefined): DictItemData[] => {
   if (!root) return [];
@@ -140,7 +128,7 @@ export default function DictDetailPage() {
     data: initialData,
   } = useLoaderData<typeof loader>();
   const { showSuccessToast, showErrorToast } = useToastContext();
-  const { timezone: userTimezone } = useTimezone();
+  const { timezone: userTimezone, formats } = useTimezone();
 
   const [activeTab, setActiveTab] = useState<TabType>(() => parseTabFromHash(location.hash));
   const [dict, setDict] = useState<DictDTO>(initialDict);
@@ -600,15 +588,15 @@ export default function DictDetailPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">创建时间</label>
-                  <div className="text-sm text-gray-900">
-                    {formatDisplayDateTime(dict.createdAt, userTimezone)}
-                  </div>
+                  <time dateTime={dict.createdAt} data-testid="dict-created-at" className="text-sm text-gray-900">
+                    {formatInTimezone(dict.createdAt, formats.datetime, userTimezone)}
+                  </time>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">更新时间</label>
-                  <div className="text-sm text-gray-900">
-                    {formatDisplayDateTime(dict.updatedAt, userTimezone)}
-                  </div>
+                  <time dateTime={dict.updatedAt} data-testid="dict-updated-at" className="text-sm text-gray-900">
+                    {formatInTimezone(dict.updatedAt, formats.datetime, userTimezone)}
+                  </time>
                 </div>
               </div>
             </div>
@@ -797,7 +785,7 @@ export default function DictDetailPage() {
                             {getStatusBadge(version.status)}
                           </div>
                           <p className="mt-1 text-xs text-gray-400">
-                            {formatDisplayDateTime(version.createdAt, userTimezone)}
+                            {formatInTimezone(version.createdAt, formats.datetime, userTimezone)}
                           </p>
                         </div>
                       </div>
