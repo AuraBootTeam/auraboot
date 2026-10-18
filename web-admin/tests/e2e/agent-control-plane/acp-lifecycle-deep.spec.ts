@@ -300,6 +300,7 @@ let acpInstalled = true;
 
 test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
   test.describe.configure({ mode: 'serial' });
+  test.use({ locale: 'zh-CN', viewport: { width: 1280, height: 720 } });
   test.setTimeout(90_000);
 
   const uid = uniqueId('life');
@@ -313,7 +314,8 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
   const taskIpTitle   = `Task_IP_${uid}`;    // in_progress seed
   const taskIpTitle2  = `Task_IP2_${uid}`;   // second in_progress for cancel
   const taskIpTitle3  = `Task_IP3_${uid}`;   // third in_progress for complete
-  const taskDispTitle = `Task_Disp_${uid}`;  // for dispatch test
+  const taskDispTitle = `Task_Disp_${uid}`;
+  const runTaskTitle = `Running_Task_${uid}`;  // for dispatch test
   let agentCode = '';
   let agentPid  = '';
   let missionPidForTask = '';
@@ -519,7 +521,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
       expect(rejectedTaskPid).toBeTruthy();
       expect(rejectedRunPid).toBeTruthy();
       const runningTask = await executeCommandViaApi(page, CMDS.createTask, {
-        title: `Running_Task_${uid}`, task_status: 'in_progress', task_priority: 'medium',
+        title: runTaskTitle, task_status: 'in_progress', task_priority: 'medium',
         assignee_type: 'agent', assignee_id: agentCode, mission_id: missionPidForTask,
       }, undefined, 'create');
       runTaskPid = runningTask.recordId;
@@ -933,7 +935,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
   // -------------------------------------------------------------------------
   // LIFE-17: Run running — Cancel button visible
   // -------------------------------------------------------------------------
-  test('LIFE-17: Run running — Cancel button visible', async ({ page }) => {
+  test('LIFE-17: Run running — Cancel button visible', async ({ page }, info) => {
     await navigateToAcpPage(page, '/dynamic/agent-run');
 
     // Verify the run list shows data
@@ -944,28 +946,33 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
     expect(records.length, 'Run record should exist').toBeGreaterThan(0);
     expect(records[0].run_status).toBe('running');
 
-    // Find row by agent_id (visible as AGENT column) — pid is not shown in the table
-    const row = await findRow(page, agentCode);
+    const row = page.locator('tbody tr').filter({ hasText: runTaskTitle });
     await expect(row).toBeVisible({ timeout: 8_000 });
 
     // Cancel button visible for running run
+    await expect(row).toContainText(`LifeAgent_${uid}`);
+    await expect(row).not.toContainText('关联记录不存在或无权访问');
     await assertBtnVisible(row, BTN.cancelRun);
+    await page.screenshot({ path: info.outputPath('life-17-reference-zh-CN.png'), fullPage: true });
   });
 
   // -------------------------------------------------------------------------
   // LIFE-18: Run — Click Cancel → cancelled
   // -------------------------------------------------------------------------
-  test('LIFE-18: Run — Click Cancel → cancelled', async ({ page }) => {
+  test('LIFE-18: Run — Click Cancel → cancelled', async ({ page }, info) => {
     await navigateToAcpPage(page, '/dynamic/agent-run');
 
-    let row = await findRow(page, agentCode);
-    row = await clickActionAndWaitForTransition(page, row, BTN.cancelRun, agentCode);
+    let row = page.locator('tbody tr').filter({ hasText: runTaskTitle });
+    await expect(row).toBeVisible();
+    row = await clickActionAndWaitForTransition(page, row, BTN.cancelRun, runTaskTitle);
 
     await assertRowStatus(row, 'cancelled', 'acp_run_status');
 
     // Verify via API
     const record = await fetchRecordByPid(page, 'agent-run', runPid);
     expect(record?.run_status).toBe('cancelled');
+    expect((await fetchRecordByPid(page, 'agent-task', runTaskPid))?.task_status).toBe('cancelled');
+    await page.screenshot({ path: info.outputPath('life-18-cancelled-zh-CN.png'), fullPage: true });
 
     // Cancel button hidden (terminal state)
     await assertBtnHidden(row, BTN.cancelRun);
@@ -1000,7 +1007,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
     expect(runs[0].pid).not.toBe(runPid);
     expect(runs[0].agent_id).toBe(agentCode);
     await navigateToAcpPage(page, '/dynamic/agent-run');
-    await expect(await findRow(page, agentCode)).toBeVisible();
+    await expect(page.locator('tbody tr').filter({ hasText: taskDispTitle })).toBeVisible();
   });
 
   // =========================================================================

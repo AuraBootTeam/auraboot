@@ -398,6 +398,7 @@
     "displayName:zh-CN": "关联任务",
     "displayName:en": "Task",
     "dataType": "string",
+    "refTarget": { "targetEntity": "agent_task", "displayField": "title", "valueField": "pid" },
     "constraints": {
       "required": false,
       "maxLength": 64
@@ -408,6 +409,7 @@
     "displayName:zh-CN": "Agent",
     "displayName:en": "Agent",
     "dataType": "string",
+    "refTarget": { "targetEntity": "agent_definition", "displayField": "name", "valueField": "agent_code" },
     "constraints": {
       "required": true,
       "maxLength": 64
