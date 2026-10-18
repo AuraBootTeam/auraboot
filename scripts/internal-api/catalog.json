@@ -350,6 +350,18 @@
       "tests": [
         "generated team memberships preserve the menu add reload and remove journey"
       ]
+    },
+    "dslRendererGate": {
+      "purpose": "Fixed static renderer gate fixtures; not API or UI behavior acceptance",
+      "unitFile": "scripts/check-dsl-render-types.test.mjs",
+      "unitTests": [
+        "reads actual registry calls instead of comments or string lookalikes",
+        "allows implemented status pills only on direct table columns",
+        "removing a real table renderer branch makes its page fail",
+        "unknown renderers still fail in table blocks and nested pages",
+        "comments strings and non-rendering conditions cannot declare table capabilities",
+        "empty and malformed page inputs fail without producing a green gate"
+      ]
     }
   },
   "scenarios": [

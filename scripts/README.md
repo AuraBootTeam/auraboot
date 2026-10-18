@@ -57,7 +57,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `check-docs.sh` | 2 | 2026-07-02 | Documentation quality gate. |
 | `check-dsl-actions.mjs` | 3 | 2026-07-15 | check-dsl-actions.mjs — a workbench button may only ask for an action the runtime runs. |
 | `check-dsl-command-convention.mjs` | 0 | 2026-06-19 | check-dsl-command-convention.mjs — regression gate for convention CRUD routing. |
-| `check-dsl-render-types.mjs` | 1 | 2026-07-17 | check-dsl-render-types.mjs — a DSL page may only ask for a renderer that exists. |
+| `check-dsl-render-types.mjs` | 1 | 2026-10-19 | Parse registry and table-column renderer capabilities using the pinned internal-api toolchain; `--self-test` verifies fixed fixtures. |
 | `check-dsl-status-colors.mjs` | 1 | 2026-07-13 | check-dsl-status-colors.mjs — DSL dict status color semantics gate. |
 | `check-e2e-assertions.mjs` | 1 | 2026-07-14 | check-e2e-assertions — an assertion that something is ABSENT must be able to fail. |
 | `check-e2e-spec-registration.mjs` | 3 | 2026-07-23 | Gate: no E2E spec may exist without being selectable by some project. |
