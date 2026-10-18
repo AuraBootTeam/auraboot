@@ -14,14 +14,14 @@ export interface TeamOption {
 
 export type Team = InternalResponseData<'get', '/api/org/teams/{pid}'>;
 type TeamMemberWire = InternalResponseData<'post', '/api/org/teams/{teamPid}/members'>;
-/** Legacy numeric identity is used only for matching existing picker selections. */
-export type TeamMember = Omit<TeamMemberWire, 'userId'> & { userId: string };
+/** Public PIDs identify rows and selections; legacy int64 userId can exceed JS precision. */
+export type TeamMember = Omit<TeamMemberWire, 'userId'>;
 export type TeamCreateRequest = InternalRequestInput<'post', '/api/org/teams'>['body'];
 export type TeamUpdateRequest = InternalRequestInput<'put', '/api/org/teams/{pid}'>['body'];
-export type TeamMemberAddRequest = InternalRequestInput<
-  'post',
-  '/api/org/teams/{teamPid}/members'
->['body'];
+export type TeamMemberAddRequest = Omit<
+  InternalRequestInput<'post', '/api/org/teams/{teamPid}/members'>['body'],
+  'userId'
+>;
 
 function data<T>(result: Result<T>, message: string): T {
   if (!ResultHelper.isSuccess(result)) throw new Error(result.desc || message);
@@ -34,15 +34,10 @@ function success(result: Result<unknown>, message: string): void {
 }
 
 function memberForView(value: TeamMemberWire): TeamMember {
-  if (
-    typeof value.pid !== 'string' ||
-    !value.pid ||
-    !Number.isSafeInteger(value.userId) ||
-    value.userId <= 0
-  ) {
+  if (typeof value.pid !== 'string' || !value.pid)
     throw new Error('Invalid team membership identity');
-  }
-  return { ...value, userId: String(value.userId) };
+  const { userId: _legacyUserId, ...member } = value;
+  return member;
 }
 
 export async function fetchTeams(request?: Request): Promise<Team[]> {
@@ -96,6 +91,8 @@ export async function addTeamMember(
   body: TeamMemberAddRequest,
   request?: Request,
 ): Promise<TeamMember> {
+  if ('userId' in body || (!body.memberPid && !body.userPid))
+    throw new Error('A public user or tenant-member PID is required');
   return memberForView(
     data(
       await internalRequest('post', '/api/org/teams/{teamPid}/members', {

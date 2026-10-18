@@ -35,7 +35,7 @@ const member = {
   role: 'member',
   joinedAt: '2026-10-18T00:00:00Z',
 } satisfies InternalResponseData<'post', '/api/org/teams/{teamPid}/members'>;
-const memberView = { ...member, userId: '42' };
+const { userId: _legacyUserId, ...memberView } = member;
 const create = { code: 'SALES', name: 'Sales' },
   update = { name: 'Updated' },
   add = { memberPid: 'tenant-member-pid', role: 'member' };
@@ -154,22 +154,23 @@ describe('generated team operations', () => {
       userEmail: null,
     });
   });
-  it.each(['42', Number.MAX_SAFE_INTEGER + 1, 0, null])(
-    'refuses invalid or imprecise legacy numeric identity (%s)',
-    async (userId) => {
-      call.mockResolvedValue({ code: '0', data: [{ ...member, userId }] });
-      await expect(fetchTeamMembers('team-pid')).rejects.toThrow(
-        'Invalid team membership identity',
-      );
-    },
-  );
-  it('keeps the legacy add-user field numeric on the wire', async () => {
-    call.mockResolvedValue({ code: '0', data: member });
-    await addTeamMember('team-pid', { userId: 42 });
-    expect(call).toHaveBeenCalledWith('post', '/api/org/teams/{teamPid}/members', {
-      path: { teamPid: 'team-pid' },
-      body: { userId: 42 },
-      request: undefined,
+  it('discards legacy int64 identity without rounding it into a UI key', async () => {
+    call.mockResolvedValue({
+      code: '0',
+      data: [{ ...member, userId: Number.MAX_SAFE_INTEGER + 1 }],
     });
+    expect(await fetchTeamMembers('team-pid')).toEqual([memberView]);
+    expect((await fetchTeamMembers('team-pid'))[0]).not.toHaveProperty('userId');
+  });
+  it.each(['', null])('refuses an absent public membership PID (%s)', async (pid) => {
+    call.mockResolvedValue({ code: '0', data: [{ ...member, pid }] });
+    await expect(fetchTeamMembers('team-pid')).rejects.toThrow('Invalid team membership identity');
+  });
+  it('rejects legacy numeric add-user input at the service boundary', async () => {
+    // @ts-expect-error UI callers must use public PIDs instead of an unsafe int64.
+    await expect(addTeamMember('team-pid', { userId: 42 })).rejects.toThrow(
+      'A public user or tenant-member PID is required',
+    );
+    expect(call).not.toHaveBeenCalled();
   });
 });

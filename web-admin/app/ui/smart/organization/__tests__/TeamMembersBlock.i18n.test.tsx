@@ -34,7 +34,7 @@ vi.mock('~/shared/services/http-client', () => ({ post: f.post }));
 const member = {
   pid: 'row-1',
   memberPid: 'member-1',
-  userId: 'user-1',
+  userPid: 'user-1',
   userName: 'Aaron',
   userEmail: 'aaron@example.test',
   role: 'leader',

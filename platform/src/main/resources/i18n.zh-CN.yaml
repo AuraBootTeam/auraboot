@@ -2882,3 +2882,6 @@ list_sample:
 "cloudConfig.save.retryReadback": "重试读取"
 "admin.permission.editor.impactStateDetailsV2": "查看关联能力状态、菜单及动作明细"
 "admin.permission.editor.previewStateCountsV2": "关联能力保存后状态：完整授权 {full} 项 · 部分动作 {partial} 项 · 未授权 {none} 项"
+
+report:
+  generate: "报告"

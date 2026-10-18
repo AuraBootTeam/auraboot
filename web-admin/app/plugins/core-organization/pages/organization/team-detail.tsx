@@ -181,7 +181,7 @@ export default function TeamDetailPage() {
                       onClick={() => handleRemoveMember(member)}
                       className="text-text-3 hover:text-status-red rounded p-1.5 transition-colors"
                       title="移除成员"
-                      data-testid={`remove-member-${member.userId}`}
+                      data-testid={`remove-member-${member.pid}`}
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -198,7 +198,7 @@ export default function TeamDetailPage() {
           onClose={() => setShowAddModal(false)}
           onAdd={handleAddMember}
           existingMemberUserIds={members.flatMap((m) =>
-            [m.userId, m.userPid, m.memberPid].filter((value): value is string => Boolean(value)),
+            [m.userPid, m.memberPid].filter((value): value is string => Boolean(value)),
           )}
         />
       )}
@@ -215,6 +215,7 @@ function AddMemberModal({
   onAdd: (memberPid: string, role: string) => void;
   existingMemberUserIds: string[];
 }) {
+  const { locale } = useI18n();
   const [tenantMembers, setTenantMembers] = useState<TenantMemberOption[]>([]);
   const [selectedMemberPid, setSelectedMemberPid] = useState('');
   const [loading, setLoading] = useState(true);
@@ -237,9 +238,8 @@ function AddMemberModal({
           const existing = new Set(existingMemberUserIds.map(String));
           const options: TenantMemberOption[] = items
             .filter((m: any) => {
-              const userId = m.userId ?? m.user?.id;
               const userPid = m.userPid ?? m.user?.pid;
-              return !existing.has(String(userId)) && !existing.has(String(userPid));
+              return !existing.has(String(m.pid)) && !existing.has(String(userPid));
             })
             .map((m: any) => ({
               memberPid: String(m.pid || ''),
@@ -249,7 +249,7 @@ function AddMemberModal({
                 m.user?.realName ||
                 m.user?.username ||
                 m.user?.email ||
-                String(m.userId || m.user?.pid || ''),
+                getLocalizedText(TEAM_TEXT.member, locale),
               userEmail: m.email || m.user?.email || '',
             }))
             .filter((m) => m.memberPid);
@@ -262,7 +262,7 @@ function AddMemberModal({
       }
     };
     loadMembers();
-  }, [existingMemberUserIds]);
+  }, [existingMemberUserIds, locale]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

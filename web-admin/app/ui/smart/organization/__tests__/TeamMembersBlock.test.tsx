@@ -53,7 +53,7 @@ describe('TeamMembersBlock', () => {
       {
         pid: 'row-pid-1',
         memberPid: 'member-pid-1',
-        userId: '1001',
+        userPid: 'user-pid-1',
         userName: '张三',
         userEmail: 'zhang@example.com',
         role: 'leader',
@@ -147,4 +147,20 @@ describe('TeamMembersBlock', () => {
       expect(teamService.removeTeamMember).toHaveBeenCalledWith('team-pid-1', 'row-pid-1'),
     );
   });
+  it('does not expose a legacy numeric ID or public PID as an unnamed candidate label', async () => {
+    httpClient.post.mockResolvedValue({ code: '0', data: { records: [{
+      pid: 'unnamed-member-pid', userPid: 'unnamed-user-pid', userId: Number.MAX_SAFE_INTEGER + 1,
+    }] } });
+    renderBlock();
+    await screen.findByText('张三');
+    fireEvent.click(screen.getByTestId('team-members-add'));
+    const option = await screen.findByRole('option', { name: '成员 (无邮箱)' });
+    expect(option).not.toHaveTextContent('unnamed-member-pid');
+    expect(option).not.toHaveTextContent('unnamed-user-pid');
+    expect(option).not.toHaveTextContent(String(Number.MAX_SAFE_INTEGER + 1));
+    fireEvent.change(screen.getByTestId('team-members-select'), { target: { value: 'unnamed-member-pid' } });
+    fireEvent.click(screen.getByTestId('team-members-confirm'));
+    await waitFor(() => expect(teamService.addTeamMember).toHaveBeenCalledWith('team-pid-1', { memberPid: 'unnamed-member-pid', role: 'member' }));
+  });
+
 });

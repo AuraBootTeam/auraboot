@@ -2691,3 +2691,6 @@ list_sample:
 "cloudConfig.save.retryReadback": "Retry loading"
 "admin.permission.editor.impactStateDetailsV2": "Review related capability states, menus and action details"
 "admin.permission.editor.previewStateCountsV2": "Related capabilities after saving: {full} fully granted · {partial} with partial actions · {none} not granted"
+
+report:
+  generate: "Report"

@@ -95,7 +95,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   const existingMemberKeys = useMemo(
     () =>
       members.flatMap((member) =>
-        [member.userId, member.userPid, member.memberPid].filter((value): value is string =>
+        [member.userPid, member.memberPid].filter((value): value is string =>
           Boolean(value),
         ),
       ),
@@ -287,11 +287,9 @@ function AddMemberModal({
         const existing = new Set(existingMemberKeys.map(String));
         const options = items
           .filter((member: any) => {
-            const userId = member.userId ?? member.user?.id;
             const userPid = member.userPid ?? member.user?.pid;
             const memberPid = member.pid;
             return (
-              !existing.has(String(userId)) &&
               !existing.has(String(userPid)) &&
               !existing.has(String(memberPid))
             );
@@ -304,7 +302,7 @@ function AddMemberModal({
               member.user?.realName ||
               member.user?.username ||
               member.user?.email ||
-              String(member.userId || member.user?.pid || ''),
+              text('member'),
             userEmail: member.email || member.user?.email || '',
           }))
           .filter((member) => member.memberPid);
@@ -320,7 +318,7 @@ function AddMemberModal({
     return () => {
       cancelled = true;
     };
-  }, [existingMemberKeys, retryAttempt]);
+  }, [existingMemberKeys, retryAttempt, text]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();

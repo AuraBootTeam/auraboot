@@ -88,6 +88,7 @@ test('generated team memberships preserve the menu add reload and remove journey
     await row.getByTestId('row-action-members').click();
     await expect(page).toHaveURL(new RegExp(`/organization/teams/${teamPid}$`));
     await expect(page.getByText('No team members', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('report-generate-button')).toHaveText('Report');
     await capture('TEAM-01', page, info);
     await page.getByTestId('team-members-add').click();
     const select = page.getByTestId('team-members-select');
