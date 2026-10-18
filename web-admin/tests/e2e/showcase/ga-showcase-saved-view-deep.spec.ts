@@ -509,7 +509,14 @@ test.describe('GA showcase SavedView deep persistence', () => {
       /^(显示按钮|Show button)$/,
       { timeout: 5_000 },
     );
-    await toolbarUpdate;
+    await page.getByTestId('action-config-close').click();
+    await expect(page.getByTestId('action-config-panel')).toBeHidden();
+    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+    await page.getByTestId('personal-view-save-current').click();
+    const savedToolbar = await toolbarUpdate;
+    expect(savedToolbar.ok()).toBe(true);
+    expect((await savedToolbar.json()).code).toBe('0');
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
 
     await expect
       .poll(
@@ -538,8 +545,6 @@ test.describe('GA showcase SavedView deep persistence', () => {
         exportCsvPinned: false,
       });
 
-    await page.getByTestId('action-config-close').click();
-    await expect(page.getByTestId('action-config-panel')).toBeHidden({ timeout: 5_000 });
     await expect(page.getByTestId('toolbar-btn-create')).toHaveCount(0, { timeout: 5_000 });
     await page.getByTestId('toolbar-more-menu').click();
     await expect(page.getByTestId('more-menu-action-create')).toBeVisible({ timeout: 5_000 });
@@ -588,9 +593,9 @@ test.describe('GA showcase SavedView deep persistence', () => {
         return filters.includes('sc_name') && filters.includes(seed.scName);
       },
       { timeout: 5_000 },
-    ).catch(() => null);
+    );
     await page.getByTestId('filter-search').click();
-    await filteredList;
+    expect((await filteredList).ok()).toBe(true);
     await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toContainText(
       seed.scName,
       { timeout: 10_000 },
@@ -602,9 +607,14 @@ test.describe('GA showcase SavedView deep persistence', () => {
         new URL(response.url()).pathname === `/api/views/${pid}` &&
         response.status() === 200,
       { timeout: 5_000 },
-    ).catch(() => null);
-    await page.getByTestId('filter-save').evaluate((el: HTMLElement) => el.click());
-    await filterUpdate;
+    );
+    await page.getByTestId('filter-save').click();
+    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+    await page.getByTestId('personal-view-save-current').click();
+    const savedFilters = await filterUpdate;
+    expect(savedFilters.ok()).toBe(true);
+    expect((await savedFilters.json()).code).toBe('0');
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
 
     await expect
       .poll(
