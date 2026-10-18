@@ -43,4 +43,34 @@ class ProcurementControlledOrderNativeContractTest {
         assertEquals("success",ProcurementControlledOrderNativeIT.responseMode("partialCreation",0));assertEquals("failed",ProcurementControlledOrderNativeIT.responseMode("partialCreation",1));
         assertThrows(IllegalArgumentException.class,()->ProcurementControlledOrderNativeIT.initialState("invented",0));
     }
+
+    @Test void storedJsonDecodesTheActualNestedFrozenPaymentTextNode() throws Exception {
+        var json=ProcurementQuoteLifecycleErp.JSON;
+        var terms=json.readTree("{\"kind\":\"KINGDEE_PAYMENT_CONDITION\",\"condition\":{\"Number\":\"000012\",\"PayRecCondtionEntry\":[{\"Rate\":40.00000000000000000000000000001},{\"Rate\":59.99999999999999999999999999999}]}}");
+        var outer=json.createObjectNode().put("qo_pr_quote_payment_terms_snapshot",json.writeValueAsString(terms));
+        var header=ProcurementControlledOrderNativeIT.storedJson(json.writeValueAsString(outer));
+        assertTrue(header.path("qo_pr_quote_payment_terms_snapshot").isTextual(),"The real frozen header stores the snapshot as JSON text");
+        var actual=ProcurementControlledOrderNativeIT.storedJson(header.get("qo_pr_quote_payment_terms_snapshot"));
+        assertEquals("KINGDEE_PAYMENT_CONDITION",actual.path("kind").asText());
+        assertEquals(2,actual.path("condition").path("PayRecCondtionEntry").size());
+        assertEquals("000012",actual.path("condition").path("Number").textValue());
+        assertEquals(0,new java.math.BigDecimal("59.99999999999999999999999999999").compareTo(actual.path("condition").path("PayRecCondtionEntry").get(1).path("Rate").decimalValue()));
+    }
+    @Test void storedJsonPreservesStringMapObjectNodeAndExactDecimalShapes() throws Exception {
+        var json=ProcurementQuoteLifecycleErp.JSON;
+        var facts=new LinkedHashMap<String,Object>();facts.put("kind","KINGDEE_PAYMENT_CONDITION");facts.put("amount",new java.math.BigDecimal("12345678901234567890.000000000001"));facts.put("code","000012");facts.put("flag",false);facts.put("embeddedText","{\"notRecursivelyParsed\":true}");
+        var object=json.valueToTree(facts);
+        for(Object raw:List.of(json.writeValueAsString(facts),facts,object)) {
+            var actual=ProcurementControlledOrderNativeIT.storedJson(raw);
+            assertTrue(actual.isObject());assertEquals("KINGDEE_PAYMENT_CONDITION",actual.path("kind").asText());
+            assertEquals(0,new java.math.BigDecimal("12345678901234567890.000000000001").compareTo(actual.path("amount").decimalValue()));
+            assertEquals("000012",actual.path("code").textValue());assertTrue(actual.path("flag").isBoolean());assertFalse(actual.path("flag").booleanValue());
+            assertTrue(actual.path("embeddedText").isTextual());assertEquals("{\"notRecursivelyParsed\":true}",actual.path("embeddedText").textValue());
+        }
+    }
+    @Test void storedJsonMalformedTextAndNullAreNotSilentlyTreatedAsObjects() {
+        assertThrows(Exception.class,()->ProcurementControlledOrderNativeIT.storedJson(com.fasterxml.jackson.databind.node.TextNode.valueOf("{broken")));
+        assertThrows(Exception.class,()->ProcurementControlledOrderNativeIT.storedJson("{broken"));
+        assertThrows(AssertionError.class,()->ProcurementControlledOrderNativeIT.storedJson(null));
+    }
 }

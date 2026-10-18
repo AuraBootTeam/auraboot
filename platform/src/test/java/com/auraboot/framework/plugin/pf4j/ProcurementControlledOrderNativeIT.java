@@ -889,8 +889,11 @@ class ProcurementControlledOrderNativeIT extends ProcurementPublicSourceNativeFi
         assertEquals(1,changed);json.writeValue(file.toFile(),array);importDirectory(copy);procurementDirectory=copy.toString();
         writeArtifact("current-master-policy.json",array);
     }
-    private JsonNode storedJson(Object raw) throws Exception {
-        assertNotNull(raw);return raw instanceof String text?ProcurementQuoteLifecycleErp.JSON.readTree(text):ProcurementQuoteLifecycleErp.JSON.valueToTree(raw);
+    static JsonNode storedJson(Object raw) throws Exception {
+        assertNotNull(raw);
+        if(raw instanceof String text)return ProcurementQuoteLifecycleErp.JSON.readTree(text);
+        if(raw instanceof JsonNode node && node.isTextual())return ProcurementQuoteLifecycleErp.JSON.readTree(node.textValue());
+        return ProcurementQuoteLifecycleErp.JSON.valueToTree(raw);
     }
     private static Object canonicalPayment(JsonNode node) {
         if(node.isObject()){var sorted=new java.util.TreeMap<String,Object>();node.properties().forEach(e->sorted.put(e.getKey(),canonicalPayment(e.getValue())));return sorted;}
