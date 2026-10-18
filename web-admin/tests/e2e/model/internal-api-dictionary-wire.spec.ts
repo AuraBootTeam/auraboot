@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import { LoginPage } from '../../pages/LoginPage';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { revokeInternalApiCurrentSession } from '../../helpers/internal-api-owned-user';
 import { uniqueId } from '../helpers';
 import { createResponseShapeValidator } from '../../../../scripts/internal-api/response-shape.mjs';
 
@@ -19,6 +20,17 @@ const catalog = JSON.parse(
 );
 
 test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN' });
+
+test.afterEach(async ({ page }, info) => {
+  const baseURL = info.project.use.baseURL;
+  if (!baseURL) throw new Error('Managed test base URL is required for session cleanup');
+  const proof = await revokeInternalApiCurrentSession(
+    page.request, new URL(baseURL).origin, 'test-fixture-page',
+  );
+  await info.attach('current-session-cleanup', {
+    body: JSON.stringify(proof), contentType: 'application/json',
+  });
+});
 
 test('all registered dictionary operations satisfy their real JSON response structures', async ({
   page,

@@ -1,4 +1,4 @@
-import { expect, type Browser, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { PG_CONN } from './environments';
@@ -11,6 +11,33 @@ export async function loginInternalApiUser(page: Page, username: string, passwor
   await login.waitForFormReady();
   await login.login(username, password);
   await login.expectLoggedIn();
+}
+
+export type InternalApiSessionCleanup = {
+  context: string;
+  beforeStatus: number;
+  afterStatus: number;
+  revoked: boolean;
+};
+
+/** The caller owns this fresh context; never revoke all sessions of a shared account. */
+export async function revokeInternalApiCurrentSession(
+  request: APIRequestContext,
+  origin: string,
+  context: string,
+): Promise<InternalApiSessionCleanup> {
+  const before = await request.get('/api/auth/me');
+  if (before.status() === 401)
+    return { context, beforeStatus: 401, afterStatus: 401, revoked: false };
+  expect(before.status()).toBe(200);
+  const revoked = await request.delete('/api/user/sessions/current', {
+    headers: { Origin: origin },
+  });
+  expect(revoked.status()).toBe(200);
+  expect((await revoked.json()).code).toBe('0');
+  const after = await request.get('/api/auth/me');
+  expect(after.status()).toBe(401);
+  return { context, beforeStatus: 200, afterStatus: 401, revoked: true };
 }
 
 /** Provision unique no-email accounts; revoke only sessions issued to these fresh contexts. */
@@ -50,12 +77,7 @@ export async function provisionInternalApiUser(
     return owned;
   }
   let userPid: string | undefined;
-  const sessionCleanup: Array<{
-    context: string;
-    beforeStatus: number;
-    afterStatus: number;
-    revoked: boolean;
-  }> = [];
+  const sessionCleanup: InternalApiSessionCleanup[] = [];
   async function dispose() {
     const errors: unknown[] = [];
     // Each context logged in independently. Revoke only its current server-issued
@@ -68,30 +90,9 @@ export async function provisionInternalApiUser(
       ),
     ] as const) {
       try {
-        const before = await client.request.get('/api/auth/me');
-        if (before.status() === 401) {
-          sessionCleanup.push({
-            context: label,
-            beforeStatus: 401,
-            afterStatus: 401,
-            revoked: false,
-          });
-          continue;
-        }
-        expect(before.status()).toBe(200);
-        const revoked = await client.request.delete('/api/user/sessions/current', {
-          headers: { Origin: origin },
-        });
-        expect(revoked.status()).toBe(200);
-        expect((await revoked.json()).code).toBe('0');
-        const after = await client.request.get('/api/auth/me');
-        sessionCleanup.push({
-          context: label,
-          beforeStatus: before.status(),
-          afterStatus: after.status(),
-          revoked: true,
-        });
-        expect(after.status()).toBe(401);
+        sessionCleanup.push(
+          await revokeInternalApiCurrentSession(client.request, origin, label),
+        );
       } catch (error) {
         errors.push(error);
       }

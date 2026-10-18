@@ -2,6 +2,7 @@ import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import fs from 'node:fs/promises';
 import { LoginPage } from '../../pages/LoginPage';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { revokeInternalApiCurrentSession } from '../../helpers/internal-api-owned-user';
 import { uniqueId } from '../helpers';
 
 const catalog = JSON.parse(
@@ -31,6 +32,17 @@ async function capture(id: string, page: Page, info: TestInfo) {
   await info.attach(id, { path: file, contentType: 'image/png' });
   info.annotations.push({ type: 'internal-api-scenario', description: id });
 }
+
+test.afterEach(async ({ page }, info) => {
+  const baseURL = info.project.use.baseURL;
+  if (!baseURL) throw new Error('Managed test base URL is required for session cleanup');
+  const proof = await revokeInternalApiCurrentSession(
+    page.request, new URL(baseURL).origin, 'test-fixture-page',
+  );
+  await info.attach('current-session-cleanup', {
+    body: JSON.stringify(proof), contentType: 'application/json',
+  });
+});
 
 test('generated dictionary operations preserve the UI journey', async ({ page }, info) => {
   test.setTimeout(90_000);

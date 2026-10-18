@@ -5,6 +5,7 @@ import pg from 'pg';
 import { PG_CONN } from '../../helpers/environments';
 import { LoginPage } from '../../pages/LoginPage';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { revokeInternalApiCurrentSession, type InternalApiSessionCleanup } from '../../helpers/internal-api-owned-user';
 import { createResponseShapeValidator } from '../../../../scripts/internal-api/response-shape.mjs';
 
 const document = JSON.parse(
@@ -49,6 +50,17 @@ async function capture(id: string, page: Page, info: TestInfo) {
   info.annotations.push({ type: 'internal-api-scenario', description: id });
 }
 
+test.afterEach(async ({ page }, info) => {
+  const baseURL = info.project.use.baseURL;
+  if (!baseURL) throw new Error('Managed test base URL is required for session cleanup');
+  const proof = await revokeInternalApiCurrentSession(
+    page.request, new URL(baseURL).origin, 'test-fixture-page',
+  );
+  await info.attach('current-session-cleanup', {
+    body: JSON.stringify(proof), contentType: 'application/json',
+  });
+});
+
 test('generated profile operations persist an owned avatar and no-email profile', async ({
   page,
   browser,
@@ -64,6 +76,7 @@ test('generated profile operations persist an owned avatar and no-email profile'
     observed = new Set<string>(),
     files = new Set<string>();
   const cleanupErrors: unknown[] = [];
+  const sessionCleanup: InternalApiSessionCleanup[] = [];
   let userPid: string | undefined, ownedPage: Page | undefined, journeyError: unknown;
   const baseURL = info.project.use.baseURL;
   if (!baseURL) throw new Error('A managed profile test requires a base URL');
@@ -307,6 +320,11 @@ test('generated profile operations persist an owned avatar and no-email profile'
         cleanupErrors.push(error);
       }
     }
+    try {
+      sessionCleanup.push(await revokeInternalApiCurrentSession(
+        ownedContext.request, headers.Origin, 'owned-profile',
+      ));
+    } catch (error) { cleanupErrors.push(error); }
     if (ownedId) {
       try {
         const user = await db.query(
@@ -339,6 +357,7 @@ test('generated profile operations persist an owned avatar and no-email profile'
           journeyError: journeyError ? String(journeyError) : null,
           cleanupErrors: cleanupErrors.map(String),
           imageSha256: hash(imageBytes),
+          sessionCleanup,
         },
         null,
         2,
@@ -370,6 +389,7 @@ test('generated profile operations preserve an email-only account without a user
   const password = `Aa7!${randomUUID()}`;
   const context = await browser.newContext({ baseURL: origin, storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
   const rows: object[] = [], cleanupErrors: unknown[] = [];
+  const sessionCleanup: InternalApiSessionCleanup[] = [];
   let userPid: string | undefined, journeyError: unknown;
   async function record(response: APIResponse, method: string) {
     const payload = await response.json();
@@ -413,6 +433,11 @@ test('generated profile operations preserve an email-only account without a user
     await capture('PROFILE-06', owned, info);
   } catch (error) { journeyError = error; }
   finally {
+    try {
+      sessionCleanup.push(await revokeInternalApiCurrentSession(
+        context.request, origin, 'owned-email-profile',
+      ));
+    } catch (error) { cleanupErrors.push(error); }
     const db = new pg.Client(PG_CONN);
     try {
       await db.connect();
@@ -428,7 +453,7 @@ test('generated profile operations preserve an email-only account without a user
       }
     } catch (error) { cleanupErrors.push(error); }
     finally { await db.end(); await context.close(); }
-    await info.attach('profile-email-only-observations', { body: JSON.stringify({ claim: 'owned-email-only-profile-browser-journey', userPid, rows, journeyError: journeyError ? String(journeyError) : null, cleanupErrors: cleanupErrors.map(String) }), contentType: 'application/json' });
+    await info.attach('profile-email-only-observations', { body: JSON.stringify({ claim: 'owned-email-only-profile-browser-journey', userPid, rows, sessionCleanup, journeyError: journeyError ? String(journeyError) : null, cleanupErrors: cleanupErrors.map(String) }), contentType: 'application/json' });
   }
   if (journeyError || cleanupErrors.length) throw new AggregateError([...(journeyError ? [journeyError] : []), ...cleanupErrors], 'Email-only profile journey or cleanup failed');
 });
