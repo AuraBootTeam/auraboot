@@ -94,6 +94,7 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     @Autowired ReceiptTargetVersionObservation receiptTargetVersionObservation;
     private ReceiptOutcome lastReceiptOutcome;
     @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualReceiptEncryption;
+    @Autowired org.springframework.core.env.Environment actualReceiptEnvironment;
     private final Map<Long,com.auraboot.framework.application.tenant.MetaContext.Snapshot> formalImportPrincipals=new LinkedHashMap<>();
     private int formalImportSequence;
     private String prerequisiteActor;
@@ -102,11 +103,13 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     private boolean integrationOwnerInstalled;
     @Override protected void prepareEvidence(org.junit.jupiter.api.TestInfo test) throws Exception {
         restoreProductionDirectory();
+        if (test.getTestMethod().orElseThrow().getName().equals("registeredReceiptCommandsPersistLineageAndCounterExactlyOnce"))
+            receiptReadBuyerPassword(System.getenv());
         super.prepareEvidence(test);
         var input=json.readTree(java.nio.file.Files.readAllBytes(Path.of(required("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"))));
         ProcurementInventoryNativeAdmission.validate(input, Path.of(required("PROCUREMENT_PUBLIC_SOURCE_EVIDENCE_DIR")),
                 Path.of(input.path("applicationCoreRoot").asText()), actualReceiptEncryption,
-                requiredAllowEmpty("PROCUREMENT_RECEIPT_FIELD_ENCRYPTION_KEY"), plugins, json);
+                requiredAllowEmpty("PROCUREMENT_RECEIPT_FIELD_ENCRYPTION_KEY"), plugins, json,actualReceiptEnvironment.getActiveProfiles());
         writeArtifact("receipt-artifact-crypto-admission.json",Map.of("actualProofValidated",true,
                 "actualEncryptionServiceProbed",true,"nativeFixtureOnly",true,"sourceSet",input.path("sourceSet")));
     }
@@ -376,6 +379,70 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         writeArtifact("trusted-receipt-result.json",Map.of("tenantId",tenant.toString(),"orderPid",poPid,"orderLinePid",linePid,
             "prReceiptPid",prReceipt,"inventoryReceiptPid",invReceipt,"requestEventId",requestEvent,"postedEventId",postedEvent,
             "receivedQtyPerLine",receiptQuantity,"nativeExecuted",true,"externalErpSynthetic",true));
+        if(scenario==Scenario.HAPPY)retainHappyBuyerReadFacts(order,poPid,linePid,prReceipt,invReceipt);
+    }
+
+
+    /** Separate retained P14 reader only; receiving/request/prerequisite role authorities never change. */
+    static List<String> receiptReadBuyerPermissions() {
+        return List.of("qo.procurement.manage","meta.command.execute","page.page.read",
+                "model.s2p_sourcing_event.read","model.qo_procurement_execution_common.read",
+                "model.pr_supplier_common.read","model.pr_purchase_order.read","model.pr_purchase_order_line.read",
+                "model.qo_procurement_shipment_common.read","model.qo_procurement_shipment_line_common.read",
+                "model.pr_purchase_request.read","model.pr_spend_category.read");
+    }
+    static String receiptReadBuyerPassword(Map<String,String> environment) {
+        String password=environment.get("PROCUREMENT_INVENTORY_BUYER_PASSWORD");
+        assertTrue(password!=null && password.length()>=12 && password.length()<=128,
+                "Explicit synthetic inventory buyer credential must be supplied before fixture writes");
+        return password;
+    }
+    private void retainHappyBuyerReadFacts(PreparedOrder prepared,String poPid,String linePid,
+                                          String prReceipt,String invReceipt) throws Exception {
+        var line=record("pr_purchase_order_line",linePid);var po=record("pr_purchase_order",poPid);
+        assertEquals(poPid,line.get("pr_pol_order_id"));assertEquals(prepared.supplier(),po.get("pr_po_supplier"));
+        assertDecimal("300.000001",line.get("pr_pol_qty"));assertDecimal("0",line.get("qo_pr_order_line_submitted_qty"));
+        assertDecimal("250",line.get("pr_pol_received_qty"));assertEquals("open",po.get("qo_pr_order_state"));
+        assertEquals(0,records(domainModel("shipment"),Map.of("qo_pr_shipment_order_pid",poPid)).size());
+        var material=new LinkedHashMap<String,Object>();
+        for(String field:List.of("material_code","material_name","specification","unit")) {
+            Object value=line.get("qo_pr_order_line_"+field);assertTrue(value instanceof String && !value.toString().isBlank(),
+                    "Retained order material facts must be actual nonempty native snapshot values");material.put(field,value);
+        }
+        context();var caller=com.auraboot.framework.application.tenant.MetaContext.snapshot();
+        try {
+            String username=provider+"-buyer-read",email=username+"@example.invalid";
+            String password=receiptReadBuyerPassword(System.getenv());
+            var user=users.signUp(email,password,"Receipt read-only buyer",username);
+            var member=members.addMember(user.getId(),tenant,"active");
+            String bearer=actorToken(user.getId(),user.getPid(),member.getId(),email,receiptReadBuyerPermissions(),password);
+            assertTrue(bearer!=null && !bearer.isBlank(),"Real fixture authentication must issue a token");
+            var assigned=userRoles.findByMemberIdAndTenantId(member.getId(),tenant);assertEquals(1,assigned.size());
+            var role=roles.getRoleById(assigned.getFirst().getRoleId());assertNotNull(role);
+            assertFalse(userPermissions.hasPermission(tenant,user.getId(),member.getId(),"qo.procurement.integrate"));
+            assertFalse(userPermissions.hasPermission(tenant,user.getId(),member.getId(),"pr.purchase.manage"));
+            assertFalse(userPermissions.hasPermission(tenant,user.getId(),member.getId(),"inv.warehouse.manage"));
+            var buyer=new LinkedHashMap<String,Object>(retainedActors.getLast());
+            buyer.put("tenantId",tenant.toString());buyer.put("userId",user.getId().toString());buyer.put("memberPid",member.getPid());
+            buyer.put("rolePid",role.getPid());buyer.put("credentialEnvironment","PROCUREMENT_INVENTORY_BUYER_PASSWORD");
+            assertEquals(receiptReadBuyerPermissions(),buyer.get("permissionCodes"));
+            var facts=new LinkedHashMap<String,Object>();facts.put("kind","inventory-happy-buyer-read-prerequisites-v1");facts.put("schemaVersion",1);
+            facts.put("method","registeredReceiptCommandsPersistLineageAndCounterExactlyOnce");facts.put("tenantId",tenant.toString());
+            facts.put("namespace",provider);facts.put("connectionPid",connection);facts.put("accountId",provider);
+            facts.put("executionPid",prepared.execution());facts.put("taskPid",task);facts.put("sourcePid",prepared.quote().source());
+            facts.put("supplierPid",prepared.supplier());facts.put("orderPid",poPid);facts.put("orderLinePid",linePid);
+            facts.put("erpOrderId",po.get("qo_pr_order_erp_id"));facts.put("erpBillNo",po.get("pr_po_code"));
+            facts.put("orderedQty","300.000001");facts.put("submittedQty","0");facts.put("receivedQty","250");facts.put("remainingQty","300.000001");
+            facts.put("orderState","open");facts.put("orderLineMaterialFacts",material);
+            facts.put("orderLineMaterialFactsOrigin","Synthetic loopback source read persisted by native domain lifecycle; copied into formal order-line snapshot, not customer ERP006/007 evidence");
+            facts.put("buyerActor",buyer);facts.put("expectedShipmentHistory",List.of());
+            facts.put("prReceiptPid",prReceipt);facts.put("inventoryReceiptPid",invReceipt);
+            Path receipt=caseEvidence.resolve("trusted-receipt-result.json").toRealPath();
+            facts.put("trustedReceiptResultPath",receipt.toString());facts.put("trustedReceiptResultSha256",sha(receipt));
+            facts.put("receiptWriterVerified",true);facts.put("externalERPOutcomeSynthetic",true);
+            facts.put("httpBuyerProjectionExecuted",false);facts.put("browserExecuted",0);facts.put("releaseApproved",false);
+            writeArtifact("receipt-happy-buyer-read-prerequisites.json",facts);
+        } finally {com.auraboot.framework.application.tenant.MetaContext.restore(caller);}
     }
 
     @Override protected List<List<Object>> orderReadRows() {

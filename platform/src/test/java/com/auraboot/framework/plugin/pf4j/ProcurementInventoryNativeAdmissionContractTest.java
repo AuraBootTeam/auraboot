@@ -14,6 +14,20 @@ import static org.mockito.Mockito.*;
 
 /** Hermetic prerequisite guards and real AOP invocation, not a Native receipt verdict. */
 class ProcurementInventoryNativeAdmissionContractTest {
+    @Test void retainedHappyBuyerHasOnlyTheOriginalP14ReadRoleAndExplicitCredential() {
+        var codes=ProcurementInventoryReceiptRealDbIT.receiptReadBuyerPermissions();
+        assertEquals(12,codes.size());assertEquals(12,Set.copyOf(codes).size());
+        assertEquals(Set.of("qo.procurement.manage","meta.command.execute","page.page.read",
+                "model.s2p_sourcing_event.read","model.qo_procurement_execution_common.read",
+                "model.pr_supplier_common.read","model.pr_purchase_order.read","model.pr_purchase_order_line.read",
+                "model.qo_procurement_shipment_common.read","model.qo_procurement_shipment_line_common.read",
+                "model.pr_purchase_request.read","model.pr_spend_category.read"),Set.copyOf(codes));
+        assertThrows(AssertionError.class,()->ProcurementInventoryReceiptRealDbIT.receiptReadBuyerPassword(Map.of()));
+        assertThrows(AssertionError.class,()->ProcurementInventoryReceiptRealDbIT.receiptReadBuyerPassword(
+                Map.of("PROCUREMENT_INVENTORY_BUYER_PASSWORD","short")));
+        assertDoesNotThrow(()->ProcurementInventoryReceiptRealDbIT.receiptReadBuyerPassword(
+                Map.of("PROCUREMENT_INVENTORY_BUYER_PASSWORD","Synthetic-only-contract-value-123!")));
+    }
     @Test void counterAuditRequiresSystemZeroAndRetainsEveryBusinessField() {
         var before=new java.util.LinkedHashMap<String,Object>(Map.of(
                 "pid","line", "pr_pol_order_id","order", "pr_pol_qty","300.000001", "pr_pol_received_qty","0",
@@ -350,11 +364,11 @@ class ProcurementInventoryNativeAdmissionContractTest {
         var directory=java.nio.file.Files.createTempDirectory("inventory-six-family-");
         try {
             for(String source:ProcurementInventoryNativeAdmission.SOURCES){var file=directory.resolve(source.replace("platform/src/test/java/","").replace(".java",".class"));java.nio.file.Files.createDirectories(file.getParent());java.nio.file.Files.writeString(file,"fixture bytes");}
-            var first=ProcurementInventoryNativeAdmission.classInventory(directory);assertEquals(6,first.size());
+            var first=ProcurementInventoryNativeAdmission.classInventory(directory);assertEquals(7,first.size());
             Path dependency=directory.resolve("com/auraboot/framework/plugin/pf4j/ProcurementSourceUiFixtureProducerIT.class");
             java.nio.file.Files.writeString(dependency,"changed dependency");assertNotEquals(first,ProcurementInventoryNativeAdmission.classInventory(directory));
             var inner=dependency.resolveSibling("ProcurementSourceUiFixtureProducerIT$Inner.class");java.nio.file.Files.writeString(inner,"inner");
-            assertEquals(7,ProcurementInventoryNativeAdmission.classInventory(directory).size());
+            assertEquals(8,ProcurementInventoryNativeAdmission.classInventory(directory).size());
             java.nio.file.Files.delete(dependency);assertThrows(AssertionError.class,()->ProcurementInventoryNativeAdmission.classInventory(directory));
         } finally {try(var files=java.nio.file.Files.walk(directory)){for(var file:files.sorted(java.util.Comparator.reverseOrder()).toList())java.nio.file.Files.delete(file);}}
     }

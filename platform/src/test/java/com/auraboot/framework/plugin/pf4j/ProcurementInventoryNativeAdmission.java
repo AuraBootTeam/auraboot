@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Test-only immutable admission for the four trusted receipt Native methods. */
 final class ProcurementInventoryNativeAdmission {
-    static final String MAIN_BASE="50924063538e4181cb601300f0c26c6bbfcce2f0";
+    static final String MAIN_BASE="69493861397abec3205edb8fd62ba54001ff5013";
     static final Set<String> PLUGINS=Set.of("com.auraboot.inventory","com.auraboot.procurement");
     static final List<String> SOURCES=List.of(
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementInventoryReceiptRealDbIT.java",
@@ -21,9 +21,10 @@ final class ProcurementInventoryNativeAdmission {
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementPublicSourceNativeFixture.java",
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java",
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementSourceUiFixtureProducerIT.java",
-        "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/ProductQuoteNativeInitialization.java");
+        "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/ProductQuoteNativeInitialization.java",
+        "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/S06NativeEncryptionAdmission.java");
     static void validate(JsonNode input,Path attempt,Path app,FieldEncryptionService encryption,String matchingKey,
-                         AuraPluginManager plugins,ObjectMapper json) throws Exception {
+                         AuraPluginManager plugins,ObjectMapper json,String[] actualNativeProfiles) throws Exception {
         app=app.toRealPath();attempt=attempt.toRealPath();
         assertEquals("procurement-inventory-native-admission-v1",input.path("kind").asText());
         assertEquals(1,input.path("schemaVersion").asInt(-1));
@@ -39,7 +40,8 @@ final class ProcurementInventoryNativeAdmission {
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(),loaded);
         for(Class<?> dependency:List.of(ProcurementInventoryNativeAdmission.class,ProcurementPublicSourceNativeFixture.class,
                 ProcurementOrderUiFixtureProducerIT.class,ProcurementSourceUiFixtureProducerIT.class,
-                com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.class))
+                com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization.class,
+                com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission.class))
             assertEquals(loaded,Path.of(dependency.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath());
         String resource="com/auraboot/framework/common/crypto/FieldEncryptionService.class";
         var resources=java.util.Collections.list(FieldEncryptionService.class.getClassLoader().getResources(resource));
@@ -62,7 +64,14 @@ final class ProcurementInventoryNativeAdmission {
         assertEquals(input.path("sourceSet").path("oss").asText(),proof.path("sourceCommit").asText());
         assertEquals(sha(app.resolve("platform/src/main/java/com/auraboot/framework/common/crypto/FieldEncryptionService.java")),proof.path("fieldEncryptionServiceSha256").asText());
         assertEquals(sha(app.resolve("platform/src/main/resources/application.yml")),proof.path("applicationYmlSha256").asText());
-        String mode=ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof,matchingKey);
+        String admittedKey=com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission.requiredKey(System.getenv());
+        assertTrue(java.security.MessageDigest.isEqual(matchingKey.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                admittedKey.getBytes(java.nio.charset.StandardCharsets.UTF_8)), "Receipt crypto aliases must match the same admitted runtime value");
+        var matching=com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission.admit(
+                System.getenv(),json,encryption,ProcurementInventoryReceiptRealDbIT.class,actualNativeProfiles);
+        assertEquals(proofPath.toString(),matching.get("proofPath"));
+        assertEquals(input.path("encryptionConfigProofSha256").asText(),matching.get("proofSha256"));
+        String mode=matching.get("mode").toString();
         assertEquals(input.path("encryptionMode").asText(),mode);
         for(String stem:List.of("runtimeAdmission","runtimeEnvironmentEvidence","runtimeProfileEvidence")){
             Path file=Path.of(proof.path(stem+"Path").asText()).toRealPath();assertTrue(file.startsWith(evidenceRoot));
