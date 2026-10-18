@@ -9,6 +9,22 @@ plugins {
     id 'io.qameta.allure' version '2.12.0'
 }
 
+// ========== Dependency locking (supply chain) ==========
+// Pin the resolved version of every external dependency per configuration
+// (gradle.lockfile next to each build.gradle, root + subprojects). Front-end is
+// already pinned via pnpm-lock.yaml; this closes the Gradle side. Project
+// dependencies (project(':platform-plugin-api')) are not locked by design.
+// MUST stay ahead of any eager configuration resolution in this script (the
+// Test -javaagent setup resolves :mockitoAgent during evaluation) — applying
+// locking to an already-resolved configuration fails the build.
+// After changing dependencies in build.gradle, regenerate:
+//   ./gradlew dependencies --write-locks
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+}
+
 // Publish plain jar (not fat boot jar) for downstream modules
 jar {
     enabled = true

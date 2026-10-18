@@ -60,6 +60,19 @@ cd web-admin && NO_PROXY=localhost npx playwright test
 
 `./gradlew test` covers the main backend suite, but AI runtime packages are intentionally isolated behind `./gradlew testAi` because they require a heavier Spring context and additional fixtures. If your change touches AuraBot, agents, RAG, intent routing, or shared AI infrastructure, run both commands before opening a PR.
 
+### Dependency Locking
+
+Gradle dependency versions are pinned by `gradle.lockfile` files (one per project under `platform/`, the same way `pnpm-lock.yaml` pins front-end dependencies). If you add, remove, or bump a dependency in `platform/build.gradle`, regenerate the affected lockfiles and commit them together with your change:
+
+```bash
+cd platform && ./gradlew dependencies --write-locks
+```
+
+Include every project whose dependencies you touched, e.g.
+`./gradlew dependencies :platform-storage-minio:dependencies --write-locks`.
+Builds fail when a lockfile does not match the declared dependencies — that is
+the point: resolved versions cannot drift silently between environments.
+
 ---
 
 ## Code Style
