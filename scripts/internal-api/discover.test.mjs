@@ -123,3 +123,36 @@ test('enumerates finite route branches and retains every missing external or unb
   assert.equal(result.calls[5].branches[0].route, null);
   assert.equal(result.calls[6].classification, 'unresolved-route', 'Overflow cannot become a guessed path placeholder');
 });
+
+
+test('retains aliased bound and injected network transports without marking shadowed generated calls migrated', () => {
+  const result = discoverCalls([{ file: 'web-admin/app/transports.ts', text: `
+    import {internalRequest as call, get} from './http-client/internal-api';
+    const read = get;
+    read('/api/views/accessible');
+    const native = globalThis.fetch.bind(globalThis);
+    native('/api/views/accessible');
+    function injected(fetchImpl: typeof fetch) { fetchImpl('/api/views/accessible'); }
+    const fallback = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
+    fallback('/api/views/accessible');
+    (dependencies.fetchImpl ?? fetch)('/api/views/accessible');
+    const operation = call;
+    operation('get', '/api/views/{pid}', {path:{pid}});
+    function shadow(call: Function) { call('get', '/api/views/{pid}'); }
+    function shadowNamedFetch(fetch: Function) { fetch('/api/views/accessible'); }
+  ` }], document);
+  assert.equal(result.calls.length, 7);
+  for (const row of result.calls.slice(0, 5)) {
+    assert.equal(row.classification, 'source-linked');
+    assert.equal(row.migration, 'not-migrated');
+  }
+  assert.equal(result.calls[0].transportResolution, 'get');
+  assert.equal(result.calls[1].transportResolution, 'fetch');
+  assert.equal(result.calls[2].transportResolution, 'fetch');
+  assert.equal(result.calls[3].transportResolution, 'candidate');
+  assert.equal(result.calls[4].transportResolution, 'candidate');
+  assert.equal(result.calls[5].migration, 'generated-operation');
+  assert.equal(result.calls[5].matches[0].operationId, 'read');
+  assert.equal(result.calls[6].migration, 'not-migrated');
+  assert.equal(result.calls[6].transportResolution, 'name-heuristic-candidate');
+});

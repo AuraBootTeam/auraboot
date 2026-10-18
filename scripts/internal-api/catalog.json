@@ -48,7 +48,8 @@
         "source graph keeps missing imports dynamic modules and indirect route files unresolved",
         "source graph respects package export boundaries and rejects ambiguous source identities",
         "core release projection permits product additions but rejects core schema parameter and security drift",
-        "enumerates finite route branches and retains every missing external or unbounded alternative"
+        "enumerates finite route branches and retains every missing external or unbounded alternative",
+        "retains aliased bound and injected network transports without marking shadowed generated calls migrated"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },

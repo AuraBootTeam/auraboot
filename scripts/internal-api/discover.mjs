@@ -54,8 +54,39 @@ export function discoverCalls(sources, document) {
       const binding = n.importClause?.namedBindings;
       if (binding && ts.isNamedImports(binding)) for (const e of binding.elements) {
         const original = (e.propertyName ?? e.name).text;
-        if (HTTP_NAMES.has(original)) imports.set(e.name.text, original);
+        if (HTTP_NAMES.has(original)) imports.set(checker.getSymbolAtLocation(e.name), original);
       }
+    }
+    function transport(n, visited = new Set()) {
+      if (!n) return undefined;
+      if (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isNonNullExpression(n))
+        return transport(n.expression, visited);
+      const symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(n) ? n.name : n);
+      if (imports.has(symbol)) return imports.get(symbol);
+      if (ts.isIdentifier(n) && n.text === 'fetch' && !symbol?.declarations?.length) return 'fetch';
+      if (ts.isPropertyAccessExpression(n) && n.name.text === 'fetch'
+        && ts.isIdentifier(n.expression) && ['globalThis', 'window'].includes(n.expression.text)
+        && !checker.getSymbolAtLocation(n.expression)?.declarations?.length) return 'fetch';
+      if (symbol && !visited.has(symbol)) {
+        const next = new Set(visited); next.add(symbol);
+        const declaration = symbol.valueDeclaration;
+        // A typed injected fetch remains a network candidate even without a default.
+        if (declaration?.type && ts.isTypeQueryNode(declaration.type)
+          && declaration.type.exprName.getText(sf) === 'fetch') return 'fetch';
+        if (declaration?.initializer) return transport(declaration.initializer, next);
+      }
+      if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)
+        && n.expression.name.text === 'bind') {
+        const kind = transport(n.expression.expression, visited);
+        return kind && n.arguments.length <= 1 ? kind : kind ? 'candidate' : undefined;
+      }
+      if (ts.isConditionalExpression(n) || ts.isBinaryExpression(n)
+        && [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(n.operatorToken.kind)) {
+        const left = transport(ts.isConditionalExpression(n) ? n.whenTrue : n.left, visited);
+        const right = transport(ts.isConditionalExpression(n) ? n.whenFalse : n.right, visited);
+        return left && left === right ? left : left || right ? 'candidate' : undefined;
+      }
+      return undefined;
     }
     function evaluate(n, visited = new Set()) {
       if (!n) return undefined;
@@ -147,8 +178,9 @@ export function discoverCalls(sources, document) {
       if (ts.isCallExpression(n)) {
         const callee = n.expression.getText(sf);
         const property = ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : undefined;
-        const imported = imports.get(callee);
-        const isFetch = callee === 'fetch' || callee === 'globalThis.fetch';
+        const resolvedTransport = transport(n.expression);
+        const imported = resolvedTransport && HTTP_NAMES.has(resolvedTransport) ? resolvedTransport : undefined;
+        const isFetch = resolvedTransport === 'fetch' || resolvedTransport === 'candidate' || callee === 'fetch' || callee === 'globalThis.fetch';
         const isClient = property && (HTTP_NAMES.has(property) || property === 'fetch') && /api|http|client|axios|service/i.test(callee);
         if (imported || isFetch || isClient) {
           const generated = imported === 'internalRequest' || imported === 'internalFormRequest';
@@ -181,6 +213,7 @@ export function discoverCalls(sources, document) {
             .map(match => [`${match.method} ${match.path}`, match])).values()];
           calls.push({ id: sha256(`${source.file}:${n.getStart(sf)}:${callee}:${target}`).slice(0, 20),
             file: source.file, line: line(), callee, method, target, route: route ?? null,
+            transportResolution: resolvedTransport ?? 'name-heuristic-candidate',
             typeArguments: (n.typeArguments ?? []).map(t => t.getText(sf)), classification, matches, branches,
             migration: exclusion ? 'not-applicable' : generated ? 'generated-operation' : 'not-migrated',
             evidence: exclusion ? [exclusion] : [] });
