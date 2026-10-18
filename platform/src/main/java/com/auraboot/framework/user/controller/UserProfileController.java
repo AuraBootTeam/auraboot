@@ -103,7 +103,7 @@ public class UserProfileController {
      * 上传用户头像
      */
     @PostMapping(value = "/avatar/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "上传头像")
+    @Operation(summary = "上传头像", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true))
     public ApiResponse<FileUploadResponseDTO> uploadAvatar(
             @RequestParam("file") MultipartFile file,
             @CurrentUserId Long userId) {

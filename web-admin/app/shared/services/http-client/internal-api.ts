@@ -44,8 +44,8 @@ type Body<O> = O extends { requestBody: infer B }
   : O extends { requestBody?: infer B }
     ? JsonMediaValue<NonNullable<B>>
     : never;
-type MultipartBody<O> = O extends { requestBody: infer B }
-  ? B extends { content: { 'multipart/form-data': infer F } }
+type MultipartBody<O> = O extends { requestBody?: infer B }
+  ? NonNullable<B> extends { content: { 'multipart/form-data': infer F } }
     ? F
     : never
   : never;

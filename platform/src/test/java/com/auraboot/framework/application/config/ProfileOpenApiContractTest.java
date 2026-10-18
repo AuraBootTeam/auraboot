@@ -7,6 +7,7 @@ import com.auraboot.framework.user.controller.UserProfileController;
 import com.auraboot.framework.user.dto.UserProfileResponse;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.core.util.Json31;
+import io.swagger.v3.oas.annotations.Operation;
 import org.junit.jupiter.api.Test;
 import org.springdoc.core.utils.SpringDocAnnotationsUtils;
 import org.springframework.core.MethodParameter;
@@ -32,6 +33,7 @@ class ProfileOpenApiContractTest {
         var method = UserProfileController.class.getMethod("uploadAvatar", MultipartFile.class, Long.class);
         assertThat(method.getAnnotation(PostMapping.class).consumes())
                 .containsExactly(MediaType.MULTIPART_FORM_DATA_VALUE);
+        assertThat(method.getAnnotation(Operation.class).requestBody().required()).isTrue();
     }
 
     @Test
