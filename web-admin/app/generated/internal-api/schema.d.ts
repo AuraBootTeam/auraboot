@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 09854fb3d9db3355baff655eeacfa698c23e32c3fe4bf658d0884abebfb25c72
+ * Contract SHA-256: cfe21ec1a8f1d9fcb401d73d1961894bcf8313f25d2efea99fcaaad6f6f7e4c5
  */
 export interface paths {
     "/api/activities": {
@@ -4370,22 +4370,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["resetPassword"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/verify-code/dev/latest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getLatestCode"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -23374,7 +23358,7 @@ export interface components {
         ApiResponse: {
             code?: string;
             context?: unknown;
-            data?: unknown;
+            data?: null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23382,7 +23366,7 @@ export interface components {
         ApiResponseAbSemanticPreagg: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AbSemanticPreagg"];
+            data?: components["schemas"]["AbSemanticPreagg"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23390,7 +23374,7 @@ export interface components {
         ApiResponseAccessPolicyResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AccessPolicyResponse"];
+            data?: components["schemas"]["AccessPolicyResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23398,7 +23382,7 @@ export interface components {
         ApiResponseAccountSecurityPolicyResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AccountSecurityPolicyResponse"];
+            data?: components["schemas"]["AccountSecurityPolicyResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23406,7 +23390,7 @@ export interface components {
         ApiResponseActivity: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Activity"];
+            data?: components["schemas"]["Activity"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23414,7 +23398,7 @@ export interface components {
         ApiResponseActorSwitchResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ActorSwitchResponse"];
+            data?: components["schemas"]["ActorSwitchResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23422,7 +23406,7 @@ export interface components {
         ApiResponseAddFieldResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AddFieldResult"];
+            data?: components["schemas"]["AddFieldResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23430,7 +23414,7 @@ export interface components {
         ApiResponseAgentRunDetail: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AgentRunDetail"];
+            data?: components["schemas"]["AgentRunDetail"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23438,7 +23422,7 @@ export interface components {
         ApiResponseAgentRunPage: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AgentRunPage"];
+            data?: components["schemas"]["AgentRunPage"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23446,7 +23430,7 @@ export interface components {
         ApiResponseAgentRuntimeAuditTrail: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AgentRuntimeAuditTrail"];
+            data?: components["schemas"]["AgentRuntimeAuditTrail"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23454,7 +23438,7 @@ export interface components {
         ApiResponseAggregateQueryResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AggregateQueryResponse"];
+            data?: components["schemas"]["AggregateQueryResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23462,7 +23446,7 @@ export interface components {
         ApiResponseAiFillResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AiFillResponse"];
+            data?: components["schemas"]["AiFillResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23470,7 +23454,7 @@ export interface components {
         ApiResponseAiGenerationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AiGenerationResult"];
+            data?: components["schemas"]["AiGenerationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23478,7 +23462,7 @@ export interface components {
         ApiResponseAiPatchProposalView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AiPatchProposalView"];
+            data?: components["schemas"]["AiPatchProposalView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23486,7 +23470,7 @@ export interface components {
         ApiResponseAiSearchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AiSearchResult"];
+            data?: components["schemas"]["AiSearchResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23494,7 +23478,7 @@ export interface components {
         ApiResponseAiTranslationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AiTranslationResult"];
+            data?: components["schemas"]["AiTranslationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23502,7 +23486,7 @@ export interface components {
         ApiResponseAnalyticsExecution: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AnalyticsExecution"];
+            data?: components["schemas"]["AnalyticsExecution"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23510,7 +23494,7 @@ export interface components {
         ApiResponseAnalyticsFunnel: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AnalyticsFunnel"];
+            data?: components["schemas"]["AnalyticsFunnel"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23518,7 +23502,7 @@ export interface components {
         ApiResponseAnalyticsRetention: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AnalyticsRetention"];
+            data?: components["schemas"]["AnalyticsRetention"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23526,7 +23510,7 @@ export interface components {
         ApiResponseAnnouncementDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AnnouncementDTO"];
+            data?: components["schemas"]["AnnouncementDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23534,7 +23518,7 @@ export interface components {
         ApiResponseApiConnector: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ApiConnector"];
+            data?: components["schemas"]["ApiConnector"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23542,7 +23526,7 @@ export interface components {
         ApiResponseApplication: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Application"];
+            data?: components["schemas"]["Application"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23550,7 +23534,7 @@ export interface components {
         ApiResponseApplicationMemberView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ApplicationMemberView"];
+            data?: components["schemas"]["ApplicationMemberView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23558,7 +23542,7 @@ export interface components {
         ApiResponseApplicationView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ApplicationView"];
+            data?: components["schemas"]["ApplicationView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23566,7 +23550,7 @@ export interface components {
         ApiResponseApplyAiPatchProposalResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ApplyAiPatchProposalResult"];
+            data?: components["schemas"]["ApplyAiPatchProposalResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23574,7 +23558,7 @@ export interface components {
         ApiResponseAsset: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Asset"];
+            data?: components["schemas"]["Asset"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23582,7 +23566,7 @@ export interface components {
         ApiResponseAsyncTaskDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AsyncTaskDTO"];
+            data?: components["schemas"]["AsyncTaskDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23590,7 +23574,7 @@ export interface components {
         ApiResponseAuditChainVerificationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AuditChainVerificationResult"];
+            data?: components["schemas"]["AuditChainVerificationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23598,7 +23582,7 @@ export interface components {
         ApiResponseAuditComplianceReport: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AuditComplianceReport"];
+            data?: components["schemas"]["AuditComplianceReport"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23606,7 +23590,7 @@ export interface components {
         ApiResponseAuraBotConversationItem: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AuraBotConversationItem"];
+            data?: components["schemas"]["AuraBotConversationItem"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23614,7 +23598,7 @@ export interface components {
         ApiResponseAuthenticationResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AuthenticationResponse"];
+            data?: components["schemas"]["AuthenticationResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23622,7 +23606,7 @@ export interface components {
         ApiResponseAutomationDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AutomationDTO"];
+            data?: components["schemas"]["AutomationDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23630,7 +23614,7 @@ export interface components {
         ApiResponseAutomationLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AutomationLogDTO"];
+            data?: components["schemas"]["AutomationLogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23638,7 +23622,7 @@ export interface components {
         ApiResponseBehaviorAnalyticsRecordsBehaviorEventCount: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BehaviorAnalyticsRecordsBehaviorEventCount"];
+            data?: components["schemas"]["BehaviorAnalyticsRecordsBehaviorEventCount"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23646,7 +23630,7 @@ export interface components {
         ApiResponseBehaviorAnalyticsRecordsBehaviorOverview: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BehaviorAnalyticsRecordsBehaviorOverview"];
+            data?: components["schemas"]["BehaviorAnalyticsRecordsBehaviorOverview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23654,7 +23638,7 @@ export interface components {
         ApiResponseBehaviorQuarantineReplayBatchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BehaviorQuarantineReplayBatchResult"];
+            data?: components["schemas"]["BehaviorQuarantineReplayBatchResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23662,7 +23646,7 @@ export interface components {
         ApiResponseBehaviorQuarantineReplayResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BehaviorQuarantineReplayResult"];
+            data?: components["schemas"]["BehaviorQuarantineReplayResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23670,7 +23654,7 @@ export interface components {
         ApiResponseBinding: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Binding"];
+            data?: components["schemas"]["Binding"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23678,7 +23662,7 @@ export interface components {
         ApiResponseBindingConfiguration: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BindingConfiguration"];
+            data?: components["schemas"]["BindingConfiguration"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23686,7 +23670,7 @@ export interface components {
         ApiResponseBindingRuleDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BindingRuleDTO"];
+            data?: components["schemas"]["BindingRuleDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23694,7 +23678,7 @@ export interface components {
         ApiResponseBoolean: {
             code?: string;
             context?: unknown;
-            data?: boolean;
+            data?: boolean | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23702,7 +23686,7 @@ export interface components {
         ApiResponseBootstrapProgressResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BootstrapProgressResponse"];
+            data?: components["schemas"]["BootstrapProgressResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23710,7 +23694,7 @@ export interface components {
         ApiResponseBootstrapStatusResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BootstrapStatusResponse"];
+            data?: components["schemas"]["BootstrapStatusResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23718,7 +23702,7 @@ export interface components {
         ApiResponseCapabilityCatalog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CapabilityCatalog"];
+            data?: components["schemas"]["CapabilityCatalog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23726,7 +23710,7 @@ export interface components {
         ApiResponseCapabilityRegistryView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CapabilityRegistryView"];
+            data?: components["schemas"]["CapabilityRegistryView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23734,7 +23718,7 @@ export interface components {
         ApiResponseCapabilitySelectionPreview: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CapabilitySelectionPreview"];
+            data?: components["schemas"]["CapabilitySelectionPreview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23742,7 +23726,7 @@ export interface components {
         ApiResponseCapabilityView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CapabilityView"];
+            data?: components["schemas"]["CapabilityView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23750,7 +23734,7 @@ export interface components {
         ApiResponseCascadeDictResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CascadeDictResult"];
+            data?: components["schemas"]["CascadeDictResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23758,7 +23742,7 @@ export interface components {
         ApiResponseCategory: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Category"];
+            data?: components["schemas"]["Category"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23766,7 +23750,7 @@ export interface components {
         ApiResponseChangeRequestResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ChangeRequestResponse"];
+            data?: components["schemas"]["ChangeRequestResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23774,7 +23758,7 @@ export interface components {
         ApiResponseChangeSetView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ChangeSetView"];
+            data?: components["schemas"]["ChangeSetView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23782,7 +23766,7 @@ export interface components {
         ApiResponseChannelTarget: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ChannelTarget"];
+            data?: components["schemas"]["ChannelTarget"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23790,7 +23774,7 @@ export interface components {
         ApiResponseCheckoutResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CheckoutResponse"];
+            data?: components["schemas"]["CheckoutResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23798,7 +23782,7 @@ export interface components {
         ApiResponseCloudConfigResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CloudConfigResponse"];
+            data?: components["schemas"]["CloudConfigResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23806,7 +23790,7 @@ export interface components {
         ApiResponseCommandAuditLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CommandAuditLogDTO"];
+            data?: components["schemas"]["CommandAuditLogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23814,7 +23798,7 @@ export interface components {
         ApiResponseCommandDefinitionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CommandDefinitionDTO"];
+            data?: components["schemas"]["CommandDefinitionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23822,7 +23806,7 @@ export interface components {
         ApiResponseCommandExecuteResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CommandExecuteResult"];
+            data?: components["schemas"]["CommandExecuteResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23830,7 +23814,7 @@ export interface components {
         ApiResponseCompiledPlan: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CompiledPlan"];
+            data?: components["schemas"]["CompiledPlan"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23838,7 +23822,7 @@ export interface components {
         ApiResponseCompileResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CompileResult"];
+            data?: components["schemas"]["CompileResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23846,7 +23830,7 @@ export interface components {
         ApiResponseComponentSchemaDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ComponentSchemaDTO"];
+            data?: components["schemas"]["ComponentSchemaDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23854,7 +23838,7 @@ export interface components {
         ApiResponseConditionFragmentDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConditionFragmentDTO"];
+            data?: components["schemas"]["ConditionFragmentDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23862,7 +23846,7 @@ export interface components {
         ApiResponseConditionFragmentEvaluationDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConditionFragmentEvaluationDTO"];
+            data?: components["schemas"]["ConditionFragmentEvaluationDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23870,7 +23854,7 @@ export interface components {
         ApiResponseConditionFragmentImpactDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConditionFragmentImpactDTO"];
+            data?: components["schemas"]["ConditionFragmentImpactDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23878,7 +23862,7 @@ export interface components {
         ApiResponseConversationListItem: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConversationListItem"];
+            data?: components["schemas"]["ConversationListItem"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23886,7 +23870,7 @@ export interface components {
         ApiResponseConversionResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConversionResult"];
+            data?: components["schemas"]["ConversionResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23894,7 +23878,7 @@ export interface components {
         ApiResponseCreatePartyResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CreatePartyResponse"];
+            data?: components["schemas"]["CreatePartyResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23902,7 +23886,7 @@ export interface components {
         ApiResponseCredentialSecret: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CredentialSecret"];
+            data?: components["schemas"]["CredentialSecret"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23910,7 +23894,7 @@ export interface components {
         ApiResponseCriticalPathResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CriticalPathResult"];
+            data?: components["schemas"]["CriticalPathResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23918,7 +23902,7 @@ export interface components {
         ApiResponseDashboardDataResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DashboardDataResponse"];
+            data?: components["schemas"]["DashboardDataResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23926,7 +23910,7 @@ export interface components {
         ApiResponseDashboardDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DashboardDTO"];
+            data?: components["schemas"]["DashboardDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23934,7 +23918,7 @@ export interface components {
         ApiResponseDashboardModuleDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DashboardModuleDTO"];
+            data?: components["schemas"]["DashboardModuleDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23942,7 +23926,7 @@ export interface components {
         ApiResponseDataChangeLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DataChangeLog"];
+            data?: components["schemas"]["DataChangeLog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23950,7 +23934,7 @@ export interface components {
         ApiResponseDataDomain: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DataDomain"];
+            data?: components["schemas"]["DataDomain"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23958,7 +23942,7 @@ export interface components {
         ApiResponseDataPermissionPolicy: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DataPermissionPolicy"];
+            data?: components["schemas"]["DataPermissionPolicy"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23966,7 +23950,7 @@ export interface components {
         ApiResponseDDLPreviewResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DDLPreviewResult"];
+            data?: components["schemas"]["DDLPreviewResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23974,7 +23958,7 @@ export interface components {
         ApiResponseDeactivationResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DeactivationResponse"];
+            data?: components["schemas"]["DeactivationResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23982,7 +23966,7 @@ export interface components {
         ApiResponseDeadLetterDetail: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DeadLetterDetail"];
+            data?: components["schemas"]["DeadLetterDetail"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23990,7 +23974,7 @@ export interface components {
         ApiResponseDebugSessionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DebugSessionDTO"];
+            data?: components["schemas"]["DebugSessionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -23998,7 +23982,7 @@ export interface components {
         ApiResponseDecisionActionCatalogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionActionCatalogDTO"];
+            data?: components["schemas"]["DecisionActionCatalogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24006,7 +23990,7 @@ export interface components {
         ApiResponseDecisionDashboardDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionDashboardDTO"];
+            data?: components["schemas"]["DecisionDashboardDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24014,7 +23998,7 @@ export interface components {
         ApiResponseDecisionDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionDefinition"];
+            data?: components["schemas"]["DecisionDefinition"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24022,7 +24006,7 @@ export interface components {
         ApiResponseDecisionFactCatalogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionFactCatalogDTO"];
+            data?: components["schemas"]["DecisionFactCatalogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24030,7 +24014,7 @@ export interface components {
         ApiResponseDecisionFieldImpactDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionFieldImpactDTO"];
+            data?: components["schemas"]["DecisionFieldImpactDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24038,7 +24022,7 @@ export interface components {
         ApiResponseDecisionFieldPreflightDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionFieldPreflightDTO"];
+            data?: components["schemas"]["DecisionFieldPreflightDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24046,7 +24030,7 @@ export interface components {
         ApiResponseDecisionImpactDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionImpactDTO"];
+            data?: components["schemas"]["DecisionImpactDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24054,7 +24038,7 @@ export interface components {
         ApiResponseDecisionIntegrationImpactDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionIntegrationImpactDTO"];
+            data?: components["schemas"]["DecisionIntegrationImpactDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24062,7 +24046,7 @@ export interface components {
         ApiResponseDecisionPermissionMatrixDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionPermissionMatrixDTO"];
+            data?: components["schemas"]["DecisionPermissionMatrixDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24070,7 +24054,7 @@ export interface components {
         ApiResponseDecisionRecord: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionRecord"];
+            data?: components["schemas"]["DecisionRecord"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24078,7 +24062,7 @@ export interface components {
         ApiResponseDecisionResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionResult"];
+            data?: components["schemas"]["DecisionResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24086,7 +24070,7 @@ export interface components {
         ApiResponseDecisionRolloutDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionRolloutDTO"];
+            data?: components["schemas"]["DecisionRolloutDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24094,7 +24078,7 @@ export interface components {
         ApiResponseDecisionRolloutMetricsDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionRolloutMetricsDTO"];
+            data?: components["schemas"]["DecisionRolloutMetricsDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24102,7 +24086,7 @@ export interface components {
         ApiResponseDecisionTableAnalysisDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionTableAnalysisDTO"];
+            data?: components["schemas"]["DecisionTableAnalysisDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24110,7 +24094,7 @@ export interface components {
         ApiResponseDecisionTableDmnXmlDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionTableDmnXmlDTO"];
+            data?: components["schemas"]["DecisionTableDmnXmlDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24118,7 +24102,7 @@ export interface components {
         ApiResponseDecisionUsageIndexRebuildDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionUsageIndexRebuildDTO"];
+            data?: components["schemas"]["DecisionUsageIndexRebuildDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24126,7 +24110,7 @@ export interface components {
         ApiResponseDecisionValidateResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionValidateResult"];
+            data?: components["schemas"]["DecisionValidateResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24134,7 +24118,7 @@ export interface components {
         ApiResponseDeleteCheckResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DeleteCheckResponse"];
+            data?: components["schemas"]["DeleteCheckResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24142,7 +24126,7 @@ export interface components {
         ApiResponseDeploymentPolicy: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DeploymentPolicy"];
+            data?: components["schemas"]["DeploymentPolicy"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24150,7 +24134,7 @@ export interface components {
         ApiResponseDescription: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Description"];
+            data?: components["schemas"]["Description"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24158,7 +24142,7 @@ export interface components {
         ApiResponseDesignVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DesignVersionDTO"];
+            data?: components["schemas"]["DesignVersionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24166,7 +24150,7 @@ export interface components {
         ApiResponseDictDataResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictDataResult"];
+            data?: components["schemas"]["DictDataResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24174,7 +24158,7 @@ export interface components {
         ApiResponseDictDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictDTO"];
+            data?: components["schemas"]["DictDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24182,7 +24166,7 @@ export interface components {
         ApiResponseDictExportResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictExportResult"];
+            data?: components["schemas"]["DictExportResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24190,7 +24174,7 @@ export interface components {
         ApiResponseDictImportResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictImportResult"];
+            data?: components["schemas"]["DictImportResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24198,7 +24182,7 @@ export interface components {
         ApiResponseDictStatistics: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictStatistics"];
+            data?: components["schemas"]["DictStatistics"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24206,7 +24190,7 @@ export interface components {
         ApiResponseDictTreeNode: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictTreeNode"];
+            data?: components["schemas"]["DictTreeNode"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24214,7 +24198,7 @@ export interface components {
         ApiResponseDictValidationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictValidationResult"];
+            data?: components["schemas"]["DictValidationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24223,7 +24207,7 @@ export interface components {
             code?: string;
             context?: unknown;
             /** Format: double */
-            data?: number;
+            data?: number | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24231,7 +24215,7 @@ export interface components {
         ApiResponseDrtDefinitionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtDefinitionDTO"];
+            data?: components["schemas"]["DrtDefinitionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24239,7 +24223,7 @@ export interface components {
         ApiResponseDrtLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtLogDTO"];
+            data?: components["schemas"]["DrtLogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24247,7 +24231,7 @@ export interface components {
         ApiResponseDrtPolicyDefinitionEntity: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtPolicyDefinitionEntity"];
+            data?: components["schemas"]["DrtPolicyDefinitionEntity"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24255,7 +24239,7 @@ export interface components {
         ApiResponseDrtPolicyVersionEntity: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtPolicyVersionEntity"];
+            data?: components["schemas"]["DrtPolicyVersionEntity"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24263,7 +24247,7 @@ export interface components {
         ApiResponseDrtVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtVersionDTO"];
+            data?: components["schemas"]["DrtVersionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24271,7 +24255,7 @@ export interface components {
         ApiResponseDryRunResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DryRunResult"];
+            data?: components["schemas"]["DryRunResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24279,7 +24263,7 @@ export interface components {
         ApiResponseDslIntrospectionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DslIntrospectionResponse"];
+            data?: components["schemas"]["DslIntrospectionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24287,7 +24271,7 @@ export interface components {
         ApiResponseDynamicBatchResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DynamicBatchResponse"];
+            data?: components["schemas"]["DynamicBatchResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24295,7 +24279,7 @@ export interface components {
         ApiResponseEdiMessageType: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EdiMessageType"];
+            data?: components["schemas"]["EdiMessageType"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24303,7 +24287,7 @@ export interface components {
         ApiResponseEdiPartner: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EdiPartner"];
+            data?: components["schemas"]["EdiPartner"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24311,7 +24295,7 @@ export interface components {
         ApiResponseEdiTransaction: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EdiTransaction"];
+            data?: components["schemas"]["EdiTransaction"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24319,7 +24303,7 @@ export interface components {
         ApiResponseEmailAccountMember: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailAccountMember"];
+            data?: components["schemas"]["EmailAccountMember"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24327,7 +24311,7 @@ export interface components {
         ApiResponseEmailLinkStatusResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailLinkStatusResponse"];
+            data?: components["schemas"]["EmailLinkStatusResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24335,7 +24319,7 @@ export interface components {
         ApiResponseEmailMessage: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailMessage"];
+            data?: components["schemas"]["EmailMessage"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24343,7 +24327,7 @@ export interface components {
         ApiResponseEmailRecordLink: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailRecordLink"];
+            data?: components["schemas"]["EmailRecordLink"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24351,7 +24335,7 @@ export interface components {
         ApiResponseEmailSequence: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailSequence"];
+            data?: components["schemas"]["EmailSequence"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24359,7 +24343,7 @@ export interface components {
         ApiResponseEmailSequenceStep: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailSequenceStep"];
+            data?: components["schemas"]["EmailSequenceStep"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24367,7 +24351,7 @@ export interface components {
         ApiResponseEmployeeAccountImportPreviewResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmployeeAccountImportPreviewResponse"];
+            data?: components["schemas"]["EmployeeAccountImportPreviewResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24375,7 +24359,7 @@ export interface components {
         ApiResponseEmployeeAccountProvisionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmployeeAccountProvisionResponse"];
+            data?: components["schemas"]["EmployeeAccountProvisionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24383,7 +24367,7 @@ export interface components {
         ApiResponseEnvironmentDiffResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EnvironmentDiffResponse"];
+            data?: components["schemas"]["EnvironmentDiffResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24391,7 +24375,7 @@ export interface components {
         ApiResponseEnvironmentExportData: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EnvironmentExportData"];
+            data?: components["schemas"]["EnvironmentExportData"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24399,7 +24383,7 @@ export interface components {
         ApiResponseEnvironmentResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EnvironmentResponse"];
+            data?: components["schemas"]["EnvironmentResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24407,7 +24391,7 @@ export interface components {
         ApiResponseEventPolicyActionLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EventPolicyActionLogDTO"];
+            data?: components["schemas"]["EventPolicyActionLogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24415,7 +24399,7 @@ export interface components {
         ApiResponseEventPolicyExecutionResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EventPolicyExecutionResult"];
+            data?: components["schemas"]["EventPolicyExecutionResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24423,7 +24407,7 @@ export interface components {
         ApiResponseEventPolicyResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EventPolicyResult"];
+            data?: components["schemas"]["EventPolicyResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24431,7 +24415,7 @@ export interface components {
         ApiResponseEventStreamDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EventStreamDTO"];
+            data?: components["schemas"]["EventStreamDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24439,7 +24423,7 @@ export interface components {
         ApiResponseEvidenceRecord: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EvidenceRecord"];
+            data?: components["schemas"]["EvidenceRecord"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24447,7 +24431,7 @@ export interface components {
         ApiResponseExchangeRateResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ExchangeRateResponse"];
+            data?: components["schemas"]["ExchangeRateResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24455,7 +24439,7 @@ export interface components {
         ApiResponseExportTaskDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ExportTaskDTO"];
+            data?: components["schemas"]["ExportTaskDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24463,7 +24447,7 @@ export interface components {
         ApiResponseFieldAuditConfig: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldAuditConfig"];
+            data?: components["schemas"]["FieldAuditConfig"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24471,7 +24455,7 @@ export interface components {
         ApiResponseFieldMaskConfig: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldMaskConfig"];
+            data?: components["schemas"]["FieldMaskConfig"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24479,7 +24463,7 @@ export interface components {
         ApiResponseFieldUsageInfo: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldUsageInfo"];
+            data?: components["schemas"]["FieldUsageInfo"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24487,7 +24471,7 @@ export interface components {
         ApiResponseFieldUsageReport: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldUsageReport"];
+            data?: components["schemas"]["FieldUsageReport"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24495,7 +24479,7 @@ export interface components {
         ApiResponseFieldUsageStatistics: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldUsageStatistics"];
+            data?: components["schemas"]["FieldUsageStatistics"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24503,7 +24487,7 @@ export interface components {
         ApiResponseFileUploadResponseDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FileUploadResponseDTO"];
+            data?: components["schemas"]["FileUploadResponseDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24511,7 +24495,7 @@ export interface components {
         ApiResponseGenerationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["GenerationResult"];
+            data?: components["schemas"]["GenerationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24519,7 +24503,7 @@ export interface components {
         ApiResponseGlobalSearchCandidates: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["GlobalSearchCandidates"];
+            data?: components["schemas"]["GlobalSearchCandidates"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24527,7 +24511,7 @@ export interface components {
         ApiResponseGlobalSearchPreference: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["GlobalSearchPreference"];
+            data?: components["schemas"]["GlobalSearchPreference"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24535,7 +24519,7 @@ export interface components {
         ApiResponseGlobalSearchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["GlobalSearchResult"];
+            data?: components["schemas"]["GlobalSearchResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24543,7 +24527,7 @@ export interface components {
         ApiResponseGovernanceStatsResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["GovernanceStatsResponse"];
+            data?: components["schemas"]["GovernanceStatsResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24551,7 +24535,7 @@ export interface components {
         ApiResponseHandoffContextView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["HandoffContextView"];
+            data?: components["schemas"]["HandoffContextView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24559,7 +24543,7 @@ export interface components {
         ApiResponseHandoffCreatedView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["HandoffCreatedView"];
+            data?: components["schemas"]["HandoffCreatedView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24567,7 +24551,7 @@ export interface components {
         ApiResponseHealth: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Health"];
+            data?: components["schemas"]["Health"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24575,7 +24559,7 @@ export interface components {
         ApiResponseI18nCoverageResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["I18nCoverageResponse"];
+            data?: components["schemas"]["I18nCoverageResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24583,7 +24567,7 @@ export interface components {
         ApiResponseI18nResource: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["I18nResource"];
+            data?: components["schemas"]["I18nResource"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24591,7 +24575,7 @@ export interface components {
         ApiResponseIdentityProviderSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IdentityProviderSummary"];
+            data?: components["schemas"]["IdentityProviderSummary"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24599,7 +24583,7 @@ export interface components {
         ApiResponseIdentitySimulationView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IdentitySimulationView"];
+            data?: components["schemas"]["IdentitySimulationView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24607,7 +24591,7 @@ export interface components {
         ApiResponseImMessageResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImMessageResponse"];
+            data?: components["schemas"]["ImMessageResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24615,7 +24599,7 @@ export interface components {
         ApiResponseImNotificationPreference: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImNotificationPreference"];
+            data?: components["schemas"]["ImNotificationPreference"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24623,7 +24607,7 @@ export interface components {
         ApiResponseImpersonationSessionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImpersonationSessionResponse"];
+            data?: components["schemas"]["ImpersonationSessionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24631,7 +24615,7 @@ export interface components {
         ApiResponseImportExecuteResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImportExecuteResult"];
+            data?: components["schemas"]["ImportExecuteResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24639,7 +24623,7 @@ export interface components {
         ApiResponseImportResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImportResult"];
+            data?: components["schemas"]["ImportResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24647,7 +24631,7 @@ export interface components {
         ApiResponseInboxItemResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["InboxItemResponse"];
+            data?: components["schemas"]["InboxItemResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24655,7 +24639,7 @@ export interface components {
         ApiResponseInstallationView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["InstallationView"];
+            data?: components["schemas"]["InstallationView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24664,7 +24648,7 @@ export interface components {
             code?: string;
             context?: unknown;
             /** Format: int32 */
-            data?: number;
+            data?: number | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24672,7 +24656,7 @@ export interface components {
         ApiResponseIntentAnalysisResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IntentAnalysisResult"];
+            data?: components["schemas"]["IntentAnalysisResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24680,7 +24664,7 @@ export interface components {
         ApiResponseInvariantDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["InvariantDefinition"];
+            data?: components["schemas"]["InvariantDefinition"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24688,7 +24672,7 @@ export interface components {
         ApiResponseIPageAsyncTaskDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IPageAsyncTaskDTO"];
+            data?: components["schemas"]["IPageAsyncTaskDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24696,7 +24680,7 @@ export interface components {
         ApiResponseIPageEmailMessage: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IPageEmailMessage"];
+            data?: components["schemas"]["IPageEmailMessage"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24704,7 +24688,7 @@ export interface components {
         ApiResponseIPageI18nResource: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IPageI18nResource"];
+            data?: components["schemas"]["IPageI18nResource"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24712,7 +24696,7 @@ export interface components {
         ApiResponseIPageInboxItemResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IPageInboxItemResponse"];
+            data?: components["schemas"]["IPageInboxItemResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24720,7 +24704,7 @@ export interface components {
         ApiResponseIssueInstallTokenResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IssueInstallTokenResponse"];
+            data?: components["schemas"]["IssueInstallTokenResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24728,7 +24712,7 @@ export interface components {
         ApiResponseJdbcConnector: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["JdbcConnector"];
+            data?: components["schemas"]["JdbcConnector"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24736,7 +24720,7 @@ export interface components {
         ApiResponseJdbcConnectorEndpoint: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["JdbcConnectorEndpoint"];
+            data?: components["schemas"]["JdbcConnectorEndpoint"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24744,7 +24728,7 @@ export interface components {
         ApiResponseJointSubTableSaveResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["JointSubTableSaveResponse"];
+            data?: components["schemas"]["JointSubTableSaveResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24752,7 +24736,7 @@ export interface components {
         ApiResponseKbDocumentDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["KbDocumentDTO"];
+            data?: components["schemas"]["KbDocumentDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24760,7 +24744,7 @@ export interface components {
         ApiResponseKnowledgeBaseDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["KnowledgeBaseDTO"];
+            data?: components["schemas"]["KnowledgeBaseDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24768,7 +24752,7 @@ export interface components {
         ApiResponseLangResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["LangResult"];
+            data?: components["schemas"]["LangResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24776,7 +24760,7 @@ export interface components {
         ApiResponseListAbSemanticPreagg: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AbSemanticPreagg"][];
+            data?: components["schemas"]["AbSemanticPreagg"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24784,7 +24768,7 @@ export interface components {
         ApiResponseListActiveTurnDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ActiveTurnDTO"][];
+            data?: components["schemas"]["ActiveTurnDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24792,7 +24776,7 @@ export interface components {
         ApiResponseListActivity: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Activity"][];
+            data?: components["schemas"]["Activity"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24800,7 +24784,7 @@ export interface components {
         ApiResponseListAffectedModel: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AffectedModel"][];
+            data?: components["schemas"]["AffectedModel"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24808,7 +24792,7 @@ export interface components {
         ApiResponseListAgentDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AgentDefinition"][];
+            data?: components["schemas"]["AgentDefinition"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24816,7 +24800,7 @@ export interface components {
         ApiResponseListAgentToolDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AgentToolDefinition"][];
+            data?: components["schemas"]["AgentToolDefinition"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24824,7 +24808,7 @@ export interface components {
         ApiResponseListAnnouncementDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AnnouncementDTO"][];
+            data?: components["schemas"]["AnnouncementDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24832,7 +24816,7 @@ export interface components {
         ApiResponseListApiConnector: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ApiConnector"][];
+            data?: components["schemas"]["ApiConnector"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24840,7 +24824,7 @@ export interface components {
         ApiResponseListApplicationView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ApplicationView"][];
+            data?: components["schemas"]["ApplicationView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24848,7 +24832,7 @@ export interface components {
         ApiResponseListAuditTrailPublicDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AuditTrailPublicDTO"][];
+            data?: components["schemas"]["AuditTrailPublicDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24856,7 +24840,7 @@ export interface components {
         ApiResponseListAuraBotConversationItem: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AuraBotConversationItem"][];
+            data?: components["schemas"]["AuraBotConversationItem"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24864,7 +24848,7 @@ export interface components {
         ApiResponseListAuraBotConversationMessage: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AuraBotConversationMessage"][];
+            data?: components["schemas"]["AuraBotConversationMessage"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24872,7 +24856,7 @@ export interface components {
         ApiResponseListAutomationDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AutomationDTO"][];
+            data?: components["schemas"]["AutomationDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24880,7 +24864,7 @@ export interface components {
         ApiResponseListAutomationLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AutomationLogDTO"][];
+            data?: components["schemas"]["AutomationLogDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24888,7 +24872,7 @@ export interface components {
         ApiResponseListAutomationNodeExecutionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["AutomationNodeExecutionDTO"][];
+            data?: components["schemas"]["AutomationNodeExecutionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24896,7 +24880,7 @@ export interface components {
         ApiResponseListBatchPasswordResetItem: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BatchPasswordResetItem"][];
+            data?: components["schemas"]["BatchPasswordResetItem"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24904,7 +24888,7 @@ export interface components {
         ApiResponseListBindingConfiguration: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BindingConfiguration"][];
+            data?: components["schemas"]["BindingConfiguration"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24912,7 +24896,7 @@ export interface components {
         ApiResponseListBindingRuleDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["BindingRuleDTO"][];
+            data?: components["schemas"]["BindingRuleDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24920,7 +24904,7 @@ export interface components {
         ApiResponseListCallAuditView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CallAuditView"][];
+            data?: components["schemas"]["CallAuditView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24928,7 +24912,7 @@ export interface components {
         ApiResponseListCandidate: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Candidate"][];
+            data?: components["schemas"]["Candidate"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24936,7 +24920,7 @@ export interface components {
         ApiResponseListCapability: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Capability"][];
+            data?: components["schemas"]["Capability"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24944,7 +24928,7 @@ export interface components {
         ApiResponseListCapabilityEvalCase: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CapabilityEvalCase"][];
+            data?: components["schemas"]["CapabilityEvalCase"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24952,7 +24936,7 @@ export interface components {
         ApiResponseListCapabilityGroup: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CapabilityGroup"][];
+            data?: components["schemas"]["CapabilityGroup"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24960,7 +24944,7 @@ export interface components {
         ApiResponseListCapabilityView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CapabilityView"][];
+            data?: components["schemas"]["CapabilityView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24968,7 +24952,7 @@ export interface components {
         ApiResponseListCascadeOption: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CascadeOption"][];
+            data?: components["schemas"]["CascadeOption"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24976,7 +24960,7 @@ export interface components {
         ApiResponseListCategory: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Category"][];
+            data?: components["schemas"]["Category"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24984,7 +24968,7 @@ export interface components {
         ApiResponseListChangeItemView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ChangeItemView"][];
+            data?: components["schemas"]["ChangeItemView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24992,7 +24976,7 @@ export interface components {
         ApiResponseListChipPinDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ChipPinDTO"][];
+            data?: components["schemas"]["ChipPinDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25000,7 +24984,7 @@ export interface components {
         ApiResponseListCloudConfigResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CloudConfigResponse"][];
+            data?: components["schemas"]["CloudConfigResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25008,7 +24992,7 @@ export interface components {
         ApiResponseListCommandDefinitionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CommandDefinitionDTO"][];
+            data?: components["schemas"]["CommandDefinitionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25016,7 +25000,7 @@ export interface components {
         ApiResponseListConditionFragmentDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConditionFragmentDTO"][];
+            data?: components["schemas"]["ConditionFragmentDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25024,7 +25008,7 @@ export interface components {
         ApiResponseListConversationListItem: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConversationListItem"][];
+            data?: components["schemas"]["ConversationListItem"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25032,7 +25016,7 @@ export interface components {
         ApiResponseListConversationMemberInfo: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ConversationMemberInfo"][];
+            data?: components["schemas"]["ConversationMemberInfo"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25040,7 +25024,7 @@ export interface components {
         ApiResponseListCredentialView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["CredentialView"][];
+            data?: components["schemas"]["CredentialView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25048,7 +25032,7 @@ export interface components {
         ApiResponseListDashboardDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DashboardDTO"][];
+            data?: components["schemas"]["DashboardDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25056,7 +25040,7 @@ export interface components {
         ApiResponseListDashboardModuleDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DashboardModuleDTO"][];
+            data?: components["schemas"]["DashboardModuleDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25064,7 +25048,7 @@ export interface components {
         ApiResponseListDataChangeLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DataChangeLog"][];
+            data?: components["schemas"]["DataChangeLog"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25072,7 +25056,7 @@ export interface components {
         ApiResponseListDataDomain: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DataDomain"][];
+            data?: components["schemas"]["DataDomain"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25080,7 +25064,7 @@ export interface components {
         ApiResponseListDataPermissionPolicy: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DataPermissionPolicy"][];
+            data?: components["schemas"]["DataPermissionPolicy"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25088,7 +25072,7 @@ export interface components {
         ApiResponseListDataPermissionRoleBinding: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DataPermissionRoleBinding"][];
+            data?: components["schemas"]["DataPermissionRoleBinding"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25096,7 +25080,7 @@ export interface components {
         ApiResponseListDecisionAlarm: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionAlarm"][];
+            data?: components["schemas"]["DecisionAlarm"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25104,7 +25088,7 @@ export interface components {
         ApiResponseListDecisionDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionDefinition"][];
+            data?: components["schemas"]["DecisionDefinition"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25112,7 +25096,7 @@ export interface components {
         ApiResponseListDecisionModelFieldDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionModelFieldDTO"][];
+            data?: components["schemas"]["DecisionModelFieldDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25120,7 +25104,7 @@ export interface components {
         ApiResponseListDecisionRecord: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionRecord"][];
+            data?: components["schemas"]["DecisionRecord"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25128,7 +25112,7 @@ export interface components {
         ApiResponseListDecisionResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionResult"][];
+            data?: components["schemas"]["DecisionResult"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25136,7 +25120,7 @@ export interface components {
         ApiResponseListDecisionRolloutDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DecisionRolloutDTO"][];
+            data?: components["schemas"]["DecisionRolloutDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25144,7 +25128,7 @@ export interface components {
         ApiResponseListDepartmentTreeNode: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DepartmentTreeNode"][];
+            data?: components["schemas"]["DepartmentTreeNode"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25152,7 +25136,7 @@ export interface components {
         ApiResponseListDesignVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DesignVersionDTO"][];
+            data?: components["schemas"]["DesignVersionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25160,7 +25144,7 @@ export interface components {
         ApiResponseListDictDataResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictDataResult"][];
+            data?: components["schemas"]["DictDataResult"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25168,7 +25152,7 @@ export interface components {
         ApiResponseListDictDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictDTO"][];
+            data?: components["schemas"]["DictDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25176,7 +25160,7 @@ export interface components {
         ApiResponseListDictItemData: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DictItemData"][];
+            data?: components["schemas"]["DictItemData"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25184,7 +25168,7 @@ export interface components {
         ApiResponseListDrtLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtLogDTO"][];
+            data?: components["schemas"]["DrtLogDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25192,7 +25176,7 @@ export interface components {
         ApiResponseListDrtPolicyVersionEntity: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtPolicyVersionEntity"][];
+            data?: components["schemas"]["DrtPolicyVersionEntity"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25200,7 +25184,7 @@ export interface components {
         ApiResponseListDrtVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["DrtVersionDTO"][];
+            data?: components["schemas"]["DrtVersionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25208,7 +25192,7 @@ export interface components {
         ApiResponseListEdiMessageType: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EdiMessageType"][];
+            data?: components["schemas"]["EdiMessageType"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25216,7 +25200,7 @@ export interface components {
         ApiResponseListEdiPartner: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EdiPartner"][];
+            data?: components["schemas"]["EdiPartner"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25224,7 +25208,7 @@ export interface components {
         ApiResponseListEdiTransaction: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EdiTransaction"][];
+            data?: components["schemas"]["EdiTransaction"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25232,7 +25216,7 @@ export interface components {
         ApiResponseListEmailAccount: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailAccount"][];
+            data?: components["schemas"]["EmailAccount"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25240,7 +25224,7 @@ export interface components {
         ApiResponseListEmailAccountMember: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailAccountMember"][];
+            data?: components["schemas"]["EmailAccountMember"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25248,7 +25232,7 @@ export interface components {
         ApiResponseListEmailMessage: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailMessage"][];
+            data?: components["schemas"]["EmailMessage"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25256,7 +25240,7 @@ export interface components {
         ApiResponseListEmailSequence: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailSequence"][];
+            data?: components["schemas"]["EmailSequence"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25264,7 +25248,7 @@ export interface components {
         ApiResponseListEmailSequenceEnrollment: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmailSequenceEnrollment"][];
+            data?: components["schemas"]["EmailSequenceEnrollment"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25272,7 +25256,7 @@ export interface components {
         ApiResponseListEmbeddingProfile: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EmbeddingProfile"][];
+            data?: components["schemas"]["EmbeddingProfile"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25280,7 +25264,7 @@ export interface components {
         ApiResponseListEnvironmentResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EnvironmentResponse"][];
+            data?: components["schemas"]["EnvironmentResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25288,7 +25272,7 @@ export interface components {
         ApiResponseListEventDescriptor: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EventDescriptor"][];
+            data?: components["schemas"]["EventDescriptor"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25296,7 +25280,7 @@ export interface components {
         ApiResponseListEventPolicyActionLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EventPolicyActionLogDTO"][];
+            data?: components["schemas"]["EventPolicyActionLogDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25304,7 +25288,7 @@ export interface components {
         ApiResponseListEventPolicyDefinitionSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EventPolicyDefinitionSummary"][];
+            data?: components["schemas"]["EventPolicyDefinitionSummary"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25312,7 +25296,7 @@ export interface components {
         ApiResponseListEvidenceRecord: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["EvidenceRecord"][];
+            data?: components["schemas"]["EvidenceRecord"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25320,7 +25304,7 @@ export interface components {
         ApiResponseListExchangeRateResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ExchangeRateResponse"][];
+            data?: components["schemas"]["ExchangeRateResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25328,7 +25312,7 @@ export interface components {
         ApiResponseListFieldAuditConfig: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldAuditConfig"][];
+            data?: components["schemas"]["FieldAuditConfig"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25336,7 +25320,7 @@ export interface components {
         ApiResponseListFieldChangeLogResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldChangeLogResponse"][];
+            data?: components["schemas"]["FieldChangeLogResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25344,7 +25328,7 @@ export interface components {
         ApiResponseListFieldForkHistory: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldForkHistory"][];
+            data?: components["schemas"]["FieldForkHistory"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25352,7 +25336,7 @@ export interface components {
         ApiResponseListFieldMaskConfig: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldMaskConfig"][];
+            data?: components["schemas"]["FieldMaskConfig"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25360,7 +25344,7 @@ export interface components {
         ApiResponseListFieldRecommendation: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FieldRecommendation"][];
+            data?: components["schemas"]["FieldRecommendation"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25368,7 +25352,7 @@ export interface components {
         ApiResponseListFileUploadResponseDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FileUploadResponseDTO"][];
+            data?: components["schemas"]["FileUploadResponseDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25376,7 +25360,7 @@ export interface components {
         ApiResponseListFunctionInfo: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["FunctionInfo"][];
+            data?: components["schemas"]["FunctionInfo"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25384,7 +25368,7 @@ export interface components {
         ApiResponseListGrantView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["GrantView"][];
+            data?: components["schemas"]["GrantView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25392,7 +25376,7 @@ export interface components {
         ApiResponseListI18nResource: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["I18nResource"][];
+            data?: components["schemas"]["I18nResource"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25400,7 +25384,7 @@ export interface components {
         ApiResponseListIdentityProviderSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IdentityProviderSummary"][];
+            data?: components["schemas"]["IdentityProviderSummary"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25408,7 +25392,7 @@ export interface components {
         ApiResponseListIdentitySimulationView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["IdentitySimulationView"][];
+            data?: components["schemas"]["IdentitySimulationView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25416,7 +25400,7 @@ export interface components {
         ApiResponseListImMessageResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImMessageResponse"][];
+            data?: components["schemas"]["ImMessageResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25424,7 +25408,7 @@ export interface components {
         ApiResponseListImNotificationPreference: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImNotificationPreference"][];
+            data?: components["schemas"]["ImNotificationPreference"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25432,7 +25416,7 @@ export interface components {
         ApiResponseListImpersonationAuditRecordResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ImpersonationAuditRecordResponse"][];
+            data?: components["schemas"]["ImpersonationAuditRecordResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25440,7 +25424,7 @@ export interface components {
         ApiResponseListInstallationGrantView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["InstallationGrantView"][];
+            data?: components["schemas"]["InstallationGrantView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25448,7 +25432,7 @@ export interface components {
         ApiResponseListInvariantDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["InvariantDefinition"][];
+            data?: components["schemas"]["InvariantDefinition"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25456,7 +25440,7 @@ export interface components {
         ApiResponseListInvariantEvaluationLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["InvariantEvaluationLog"][];
+            data?: components["schemas"]["InvariantEvaluationLog"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25464,7 +25448,7 @@ export interface components {
         ApiResponseListJdbcConnector: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["JdbcConnector"][];
+            data?: components["schemas"]["JdbcConnector"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25472,7 +25456,7 @@ export interface components {
         ApiResponseListJdbcConnectorEndpoint: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["JdbcConnectorEndpoint"][];
+            data?: components["schemas"]["JdbcConnectorEndpoint"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25480,7 +25464,7 @@ export interface components {
         ApiResponseListKbChunk: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["KbChunk"][];
+            data?: components["schemas"]["KbChunk"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25488,7 +25472,7 @@ export interface components {
         ApiResponseListKbDocumentDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["KbDocumentDTO"][];
+            data?: components["schemas"]["KbDocumentDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25496,7 +25480,7 @@ export interface components {
         ApiResponseListKnowledgeBaseDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["KnowledgeBaseDTO"][];
+            data?: components["schemas"]["KnowledgeBaseDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25504,7 +25488,7 @@ export interface components {
         ApiResponseListLoginChannelOption: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["LoginChannelOption"][];
+            data?: components["schemas"]["LoginChannelOption"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25512,7 +25496,7 @@ export interface components {
         ApiResponseListLong: {
             code?: string;
             context?: unknown;
-            data?: number[];
+            data?: number[] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25522,7 +25506,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: unknown;
-            }[];
+            }[] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25532,7 +25516,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: string;
-            }[];
+            }[] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25540,7 +25524,7 @@ export interface components {
         ApiResponseListMarketplaceCategory: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MarketplaceCategory"][];
+            data?: components["schemas"]["MarketplaceCategory"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25548,7 +25532,7 @@ export interface components {
         ApiResponseListMarketplacePluginDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MarketplacePluginDTO"][];
+            data?: components["schemas"]["MarketplacePluginDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25556,7 +25540,7 @@ export interface components {
         ApiResponseListMarketplaceVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MarketplaceVersionDTO"][];
+            data?: components["schemas"]["MarketplaceVersionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25564,7 +25548,7 @@ export interface components {
         ApiResponseListMenu: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Menu"][];
+            data?: components["schemas"]["Menu"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25572,7 +25556,7 @@ export interface components {
         ApiResponseListMessage: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Message"][];
+            data?: components["schemas"]["Message"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25580,7 +25564,7 @@ export interface components {
         ApiResponseListMessageSearchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MessageSearchResult"][];
+            data?: components["schemas"]["MessageSearchResult"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25588,7 +25572,7 @@ export interface components {
         ApiResponseListMetaFieldDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MetaFieldDTO"][];
+            data?: components["schemas"]["MetaFieldDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25596,7 +25580,7 @@ export interface components {
         ApiResponseListMetaModelDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MetaModelDTO"][];
+            data?: components["schemas"]["MetaModelDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25604,7 +25588,7 @@ export interface components {
         ApiResponseListMetaModelFieldBindingDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MetaModelFieldBindingDTO"][];
+            data?: components["schemas"]["MetaModelFieldBindingDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25612,7 +25596,7 @@ export interface components {
         ApiResponseListModelReference: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ModelReference"][];
+            data?: components["schemas"]["ModelReference"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25620,7 +25604,7 @@ export interface components {
         ApiResponseListNamedQueryDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryDTO"][];
+            data?: components["schemas"]["NamedQueryDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25628,7 +25612,7 @@ export interface components {
         ApiResponseListNamedQueryFieldDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryFieldDTO"][];
+            data?: components["schemas"]["NamedQueryFieldDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25636,7 +25620,7 @@ export interface components {
         ApiResponseListNamedQueryVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryVersionDTO"][];
+            data?: components["schemas"]["NamedQueryVersionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25644,7 +25628,7 @@ export interface components {
         ApiResponseListNbaSuggestion: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NbaSuggestion"][];
+            data?: components["schemas"]["NbaSuggestion"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25652,7 +25636,7 @@ export interface components {
         ApiResponseListNotificationPreferenceDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NotificationPreferenceDTO"][];
+            data?: components["schemas"]["NotificationPreferenceDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25660,7 +25644,7 @@ export interface components {
         ApiResponseListNotificationRuleDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NotificationRuleDTO"][];
+            data?: components["schemas"]["NotificationRuleDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25668,7 +25652,7 @@ export interface components {
         ApiResponseListNotificationTemplate: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NotificationTemplate"][];
+            data?: components["schemas"]["NotificationTemplate"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25676,7 +25660,7 @@ export interface components {
         ApiResponseListOtDataLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OtDataLog"][];
+            data?: components["schemas"]["OtDataLog"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25684,7 +25668,7 @@ export interface components {
         ApiResponseListOtDevice: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OtDevice"][];
+            data?: components["schemas"]["OtDevice"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25692,7 +25676,7 @@ export interface components {
         ApiResponseListPageSchemaDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageSchemaDTO"][];
+            data?: components["schemas"]["PageSchemaDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25700,7 +25684,7 @@ export interface components {
         ApiResponseListPageSchemaSyncVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageSchemaSyncVersionDTO"][];
+            data?: components["schemas"]["PageSchemaSyncVersionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25708,7 +25692,7 @@ export interface components {
         ApiResponseListPageSchemaVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageSchemaVersionDTO"][];
+            data?: components["schemas"]["PageSchemaVersionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25716,7 +25700,7 @@ export interface components {
         ApiResponseListPartyActorOption: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PartyActorOption"][];
+            data?: components["schemas"]["PartyActorOption"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25724,7 +25708,7 @@ export interface components {
         ApiResponseListPermissionAuditLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PermissionAuditLogDTO"][];
+            data?: components["schemas"]["PermissionAuditLogDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25732,7 +25716,7 @@ export interface components {
         ApiResponseListPermissionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PermissionDTO"][];
+            data?: components["schemas"]["PermissionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25740,7 +25724,7 @@ export interface components {
         ApiResponseListPermissionReferenceDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PermissionReferenceDTO"][];
+            data?: components["schemas"]["PermissionReferenceDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25748,7 +25732,7 @@ export interface components {
         ApiResponseListPermissionTreeNodeDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PermissionTreeNodeDTO"][];
+            data?: components["schemas"]["PermissionTreeNodeDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25756,7 +25740,7 @@ export interface components {
         ApiResponseListPluginDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PluginDTO"][];
+            data?: components["schemas"]["PluginDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25764,7 +25748,7 @@ export interface components {
         ApiResponseListPluginImportResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PluginImportResult"][];
+            data?: components["schemas"]["PluginImportResult"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25772,7 +25756,7 @@ export interface components {
         ApiResponseListPolicyResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PolicyResponse"][];
+            data?: components["schemas"]["PolicyResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25780,7 +25764,7 @@ export interface components {
         ApiResponseListPromotionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PromotionResponse"][];
+            data?: components["schemas"]["PromotionResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25788,7 +25772,7 @@ export interface components {
         ApiResponseListPublicationView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PublicationView"][];
+            data?: components["schemas"]["PublicationView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25796,7 +25780,7 @@ export interface components {
         ApiResponseListQuotaBucketBalanceDto: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["QuotaBucketBalanceDto"][];
+            data?: components["schemas"]["QuotaBucketBalanceDto"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25804,7 +25788,7 @@ export interface components {
         ApiResponseListReconciliationProfileDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReconciliationProfileDTO"][];
+            data?: components["schemas"]["ReconciliationProfileDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25812,7 +25796,7 @@ export interface components {
         ApiResponseListRecordShareResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RecordShareResponse"][];
+            data?: components["schemas"]["RecordShareResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25820,7 +25804,7 @@ export interface components {
         ApiResponseListReportDefinitionSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReportDefinitionSummary"][];
+            data?: components["schemas"]["ReportDefinitionSummary"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25828,7 +25812,7 @@ export interface components {
         ApiResponseListReportScheduleResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReportScheduleResponse"][];
+            data?: components["schemas"]["ReportScheduleResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25836,7 +25820,7 @@ export interface components {
         ApiResponseListResolvedFieldDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ResolvedFieldDTO"][];
+            data?: components["schemas"]["ResolvedFieldDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25844,7 +25828,7 @@ export interface components {
         ApiResponseListResourceCatalog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ResourceCatalog"][];
+            data?: components["schemas"]["ResourceCatalog"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25852,7 +25836,7 @@ export interface components {
         ApiResponseListResourceReference: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ResourceReference"][];
+            data?: components["schemas"]["ResourceReference"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25860,7 +25844,7 @@ export interface components {
         ApiResponseListReviewResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReviewResponse"][];
+            data?: components["schemas"]["ReviewResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25868,7 +25852,7 @@ export interface components {
         ApiResponseListRoleMemberDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RoleMemberDTO"][];
+            data?: components["schemas"]["RoleMemberDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25876,7 +25860,7 @@ export interface components {
         ApiResponseListRolePreviewTargetView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RolePreviewTargetView"][];
+            data?: components["schemas"]["RolePreviewTargetView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25884,7 +25868,7 @@ export interface components {
         ApiResponseListRoleResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RoleResponse"][];
+            data?: components["schemas"]["RoleResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25892,7 +25876,7 @@ export interface components {
         ApiResponseListSavedViewAuditEventDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SavedViewAuditEventDTO"][];
+            data?: components["schemas"]["SavedViewAuditEventDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25900,7 +25884,7 @@ export interface components {
         ApiResponseListSavedViewDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SavedViewDTO"][];
+            data?: components["schemas"]["SavedViewDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25908,7 +25892,7 @@ export interface components {
         ApiResponseListSavedViewTeamMembershipDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SavedViewTeamMembershipDTO"][];
+            data?: components["schemas"]["SavedViewTeamMembershipDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25916,7 +25900,7 @@ export interface components {
         ApiResponseListScheduledTask: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ScheduledTask"][];
+            data?: components["schemas"]["ScheduledTask"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25924,7 +25908,7 @@ export interface components {
         ApiResponseListScheduledTaskLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ScheduledTaskLog"][];
+            data?: components["schemas"]["ScheduledTaskLog"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25932,7 +25916,7 @@ export interface components {
         ApiResponseListSemanticMetricAlertDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SemanticMetricAlertDTO"][];
+            data?: components["schemas"]["SemanticMetricAlertDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25940,7 +25924,7 @@ export interface components {
         ApiResponseListShadowRunAggregation: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ShadowRunAggregation"][];
+            data?: components["schemas"]["ShadowRunAggregation"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25948,7 +25932,7 @@ export interface components {
         ApiResponseListShadowRunListItem: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ShadowRunListItem"][];
+            data?: components["schemas"]["ShadowRunListItem"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25956,7 +25940,7 @@ export interface components {
         ApiResponseListShareRoleOption: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ShareRoleOption"][];
+            data?: components["schemas"]["ShareRoleOption"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25964,7 +25948,7 @@ export interface components {
         ApiResponseListSkillMeta: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SkillMeta"][];
+            data?: components["schemas"]["SkillMeta"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25972,7 +25956,7 @@ export interface components {
         ApiResponseListSodRule: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SodRule"][];
+            data?: components["schemas"]["SodRule"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25980,7 +25964,7 @@ export interface components {
         ApiResponseListSodViolationLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SodViolationLog"][];
+            data?: components["schemas"]["SodViolationLog"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25988,7 +25972,7 @@ export interface components {
         ApiResponseListSolutionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SolutionDTO"][];
+            data?: components["schemas"]["SolutionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25996,7 +25980,7 @@ export interface components {
         ApiResponseListSourceView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SourceView"][];
+            data?: components["schemas"]["SourceView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26004,7 +25988,7 @@ export interface components {
         ApiResponseListStateGraphDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["StateGraphDefinition"][];
+            data?: components["schemas"]["StateGraphDefinition"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26012,7 +25996,7 @@ export interface components {
         ApiResponseListStateTransitionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["StateTransitionDTO"][];
+            data?: components["schemas"]["StateTransitionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26020,7 +26004,7 @@ export interface components {
         ApiResponseListString: {
             code?: string;
             context?: unknown;
-            data?: string[];
+            data?: string[] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26028,7 +26012,7 @@ export interface components {
         ApiResponseListSubjectPermissionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SubjectPermissionDTO"][];
+            data?: components["schemas"]["SubjectPermissionDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26036,7 +26020,7 @@ export interface components {
         ApiResponseListTeamMemberResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TeamMemberResponse"][];
+            data?: components["schemas"]["TeamMemberResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26044,7 +26028,7 @@ export interface components {
         ApiResponseListTeamResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TeamResponse"][];
+            data?: components["schemas"]["TeamResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26052,7 +26036,7 @@ export interface components {
         ApiResponseListTemplateDef: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TemplateDef"][];
+            data?: components["schemas"]["TemplateDef"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26060,7 +26044,7 @@ export interface components {
         ApiResponseListTenantLoginChannel: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TenantLoginChannel"][];
+            data?: components["schemas"]["TenantLoginChannel"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26068,7 +26052,7 @@ export interface components {
         ApiResponseListTenantMemberOffboardingCandidate: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TenantMemberOffboardingCandidate"][];
+            data?: components["schemas"]["TenantMemberOffboardingCandidate"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26076,7 +26060,7 @@ export interface components {
         ApiResponseListTimezoneInfo: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TimezoneInfo"][];
+            data?: components["schemas"]["TimezoneInfo"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26084,7 +26068,7 @@ export interface components {
         ApiResponseListUsageEvent: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UsageEvent"][];
+            data?: components["schemas"]["UsageEvent"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26092,7 +26076,7 @@ export interface components {
         ApiResponseListUserEngagementDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserEngagementDTO"][];
+            data?: components["schemas"]["UserEngagementDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26100,7 +26084,7 @@ export interface components {
         ApiResponseListUserProjectBinding: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserProjectBinding"][];
+            data?: components["schemas"]["UserProjectBinding"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26108,7 +26092,7 @@ export interface components {
         ApiResponseListUserRoleResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserRoleResponse"][];
+            data?: components["schemas"]["UserRoleResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26116,7 +26100,7 @@ export interface components {
         ApiResponseListUserSearchDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserSearchDTO"][];
+            data?: components["schemas"]["UserSearchDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26124,7 +26108,7 @@ export interface components {
         ApiResponseListUserSpaceDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserSpaceDTO"][];
+            data?: components["schemas"]["UserSpaceDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26132,7 +26116,7 @@ export interface components {
         ApiResponseListVersionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["VersionResponse"][];
+            data?: components["schemas"]["VersionResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26140,7 +26124,7 @@ export interface components {
         ApiResponseListView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["View"][];
+            data?: components["schemas"]["View"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26148,7 +26132,7 @@ export interface components {
         ApiResponseListWebhookDeliveryLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["WebhookDeliveryLog"][];
+            data?: components["schemas"]["WebhookDeliveryLog"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26156,7 +26140,7 @@ export interface components {
         ApiResponseListWebhookDeliveryView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["WebhookDeliveryView"][];
+            data?: components["schemas"]["WebhookDeliveryView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26164,7 +26148,7 @@ export interface components {
         ApiResponseListWebhookSubscription: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["WebhookSubscription"][];
+            data?: components["schemas"]["WebhookSubscription"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26172,7 +26156,7 @@ export interface components {
         ApiResponseListWebhookSubscriptionHealthView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["WebhookSubscriptionHealthView"][];
+            data?: components["schemas"]["WebhookSubscriptionHealthView"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26181,7 +26165,7 @@ export interface components {
             code?: string;
             context?: unknown;
             /** Format: int64 */
-            data?: number;
+            data?: number | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26191,7 +26175,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: boolean;
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26201,7 +26185,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: components["schemas"]["AiGenerationResult"];
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26211,7 +26195,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: boolean;
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26221,7 +26205,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: number;
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26231,7 +26215,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: components["schemas"]["JsonNode"];
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26243,7 +26227,7 @@ export interface components {
                 [key: string]: {
                     [key: string]: unknown;
                 }[];
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26253,7 +26237,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: components["schemas"]["MetaFieldDTO"][];
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26263,7 +26247,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: number;
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26273,7 +26257,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: unknown;
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26283,7 +26267,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: components["schemas"]["PerformanceStats"];
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26293,7 +26277,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: components["schemas"]["ResourceOwnerDTO"];
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26303,7 +26287,7 @@ export interface components {
             context?: unknown;
             data?: {
                 [key: string]: string;
-            };
+            } | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26311,7 +26295,7 @@ export interface components {
         ApiResponseMarketplacePluginDetailDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MarketplacePluginDetailDTO"];
+            data?: components["schemas"]["MarketplacePluginDetailDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26319,7 +26303,7 @@ export interface components {
         ApiResponseMemberResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MemberResponse"];
+            data?: components["schemas"]["MemberResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26327,7 +26311,7 @@ export interface components {
         ApiResponseMenu: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Menu"];
+            data?: components["schemas"]["Menu"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26335,7 +26319,7 @@ export interface components {
         ApiResponseMetaFieldDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MetaFieldDTO"];
+            data?: components["schemas"]["MetaFieldDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26343,7 +26327,7 @@ export interface components {
         ApiResponseMetaFieldValidationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MetaFieldValidationResult"];
+            data?: components["schemas"]["MetaFieldValidationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26351,7 +26335,7 @@ export interface components {
         ApiResponseMetaModelDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MetaModelDTO"];
+            data?: components["schemas"]["MetaModelDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26359,7 +26343,7 @@ export interface components {
         ApiResponseMetaModelFieldBindingDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["MetaModelFieldBindingDTO"];
+            data?: components["schemas"]["MetaModelFieldBindingDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26367,7 +26351,7 @@ export interface components {
         ApiResponseModelCapabilities: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ModelCapabilities"];
+            data?: components["schemas"]["ModelCapabilities"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26375,7 +26359,7 @@ export interface components {
         ApiResponseModelIntrospection: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ModelIntrospection"];
+            data?: components["schemas"]["ModelIntrospection"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26383,7 +26367,7 @@ export interface components {
         ApiResponseModelPublishReplayReportDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ModelPublishReplayReportDTO"];
+            data?: components["schemas"]["ModelPublishReplayReportDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26391,7 +26375,7 @@ export interface components {
         ApiResponseModelSuggestion: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ModelSuggestion"];
+            data?: components["schemas"]["ModelSuggestion"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26399,7 +26383,7 @@ export interface components {
         ApiResponseModificationImpact: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ModificationImpact"];
+            data?: components["schemas"]["ModificationImpact"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26407,7 +26391,7 @@ export interface components {
         ApiResponseNamedQueryBatchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryBatchResult"];
+            data?: components["schemas"]["NamedQueryBatchResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26415,7 +26399,7 @@ export interface components {
         ApiResponseNamedQueryDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryDTO"];
+            data?: components["schemas"]["NamedQueryDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26423,7 +26407,7 @@ export interface components {
         ApiResponseNamedQueryFieldBatchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryFieldBatchResult"];
+            data?: components["schemas"]["NamedQueryFieldBatchResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26431,7 +26415,7 @@ export interface components {
         ApiResponseNamedQueryFieldDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryFieldDTO"];
+            data?: components["schemas"]["NamedQueryFieldDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26439,7 +26423,7 @@ export interface components {
         ApiResponseNamedQueryTestResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryTestResult"];
+            data?: components["schemas"]["NamedQueryTestResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26447,7 +26431,7 @@ export interface components {
         ApiResponseNamedQueryValidationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryValidationResult"];
+            data?: components["schemas"]["NamedQueryValidationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26455,7 +26439,7 @@ export interface components {
         ApiResponseNamedQueryVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NamedQueryVersionDTO"];
+            data?: components["schemas"]["NamedQueryVersionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26463,7 +26447,7 @@ export interface components {
         ApiResponseNewPageWorkspaceOptions: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NewPageWorkspaceOptions"];
+            data?: components["schemas"]["NewPageWorkspaceOptions"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26471,7 +26455,7 @@ export interface components {
         ApiResponseNotificationRuleDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NotificationRuleDTO"];
+            data?: components["schemas"]["NotificationRuleDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26479,7 +26463,7 @@ export interface components {
         ApiResponseNotificationRuleTestResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NotificationRuleTestResult"];
+            data?: components["schemas"]["NotificationRuleTestResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26487,7 +26471,7 @@ export interface components {
         ApiResponseNotificationTemplate: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["NotificationTemplate"];
+            data?: components["schemas"]["NotificationTemplate"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26495,7 +26479,7 @@ export interface components {
         ApiResponseObject: {
             code?: string;
             context?: unknown;
-            data?: unknown;
+            data?: null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26503,7 +26487,7 @@ export interface components {
         ApiResponseOnlineEvalSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OnlineEvalSummary"];
+            data?: components["schemas"]["OnlineEvalSummary"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26511,7 +26495,7 @@ export interface components {
         ApiResponseOpenPlatformAccessView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OpenPlatformAccessView"];
+            data?: components["schemas"]["OpenPlatformAccessView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26519,7 +26503,7 @@ export interface components {
         ApiResponseOperationsOverview: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OperationsOverview"];
+            data?: components["schemas"]["OperationsOverview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26527,7 +26511,7 @@ export interface components {
         ApiResponseOrgEmployeeDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OrgEmployeeDTO"];
+            data?: components["schemas"]["OrgEmployeeDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26535,7 +26519,7 @@ export interface components {
         ApiResponseOrgPlacement: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OrgPlacement"];
+            data?: components["schemas"]["OrgPlacement"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26543,7 +26527,7 @@ export interface components {
         ApiResponseOtDataLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OtDataLog"];
+            data?: components["schemas"]["OtDataLog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26551,7 +26535,7 @@ export interface components {
         ApiResponseOtDevice: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["OtDevice"];
+            data?: components["schemas"]["OtDevice"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26559,7 +26543,7 @@ export interface components {
         ApiResponsePage: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Page"];
+            data?: components["schemas"]["Page"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26567,7 +26551,7 @@ export interface components {
         ApiResponsePageCategory: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageCategory"];
+            data?: components["schemas"]["PageCategory"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26575,7 +26559,7 @@ export interface components {
         ApiResponsePageChangeRequestResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageChangeRequestResponse"];
+            data?: components["schemas"]["PageChangeRequestResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26583,7 +26567,7 @@ export interface components {
         ApiResponsePageMetaResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageMetaResponse"];
+            data?: components["schemas"]["PageMetaResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26591,7 +26575,7 @@ export interface components {
         ApiResponsePageResultAutomationDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultAutomationDTO"];
+            data?: components["schemas"]["PageResultAutomationDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26599,7 +26583,7 @@ export interface components {
         ApiResponsePageResultBehaviorQuarantine: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultBehaviorQuarantine"];
+            data?: components["schemas"]["PageResultBehaviorQuarantine"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26607,7 +26591,7 @@ export interface components {
         ApiResponsePageResultConditionFragmentDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultConditionFragmentDTO"];
+            data?: components["schemas"]["PageResultConditionFragmentDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26615,7 +26599,7 @@ export interface components {
         ApiResponsePageResultDashboardDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultDashboardDTO"];
+            data?: components["schemas"]["PageResultDashboardDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26623,7 +26607,7 @@ export interface components {
         ApiResponsePageResultDeadLetterSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultDeadLetterSummary"];
+            data?: components["schemas"]["PageResultDeadLetterSummary"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26631,7 +26615,7 @@ export interface components {
         ApiResponsePageResultDecisionRolloutDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultDecisionRolloutDTO"];
+            data?: components["schemas"]["PageResultDecisionRolloutDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26639,7 +26623,7 @@ export interface components {
         ApiResponsePageResultDictDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultDictDTO"];
+            data?: components["schemas"]["PageResultDictDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26647,7 +26631,7 @@ export interface components {
         ApiResponsePageResultDrtDefinitionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultDrtDefinitionDTO"];
+            data?: components["schemas"]["PageResultDrtDefinitionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26655,7 +26639,7 @@ export interface components {
         ApiResponsePageResultDrtLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultDrtLogDTO"];
+            data?: components["schemas"]["PageResultDrtLogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26663,7 +26647,7 @@ export interface components {
         ApiResponsePageResultMetaFieldDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultMetaFieldDTO"];
+            data?: components["schemas"]["PageResultMetaFieldDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26671,7 +26655,7 @@ export interface components {
         ApiResponsePageResultMetaModelDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageResultMetaModelDTO"];
+            data?: components["schemas"]["PageResultMetaModelDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26679,7 +26663,7 @@ export interface components {
         ApiResponsePageRoleResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageRoleResponse"];
+            data?: components["schemas"]["PageRoleResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26687,7 +26671,7 @@ export interface components {
         ApiResponsePageSchemaDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageSchemaDTO"];
+            data?: components["schemas"]["PageSchemaDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26695,7 +26679,7 @@ export interface components {
         ApiResponsePageSchemaVersionComparisonDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageSchemaVersionComparisonDTO"];
+            data?: components["schemas"]["PageSchemaVersionComparisonDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26703,7 +26687,7 @@ export interface components {
         ApiResponsePageSchemaVersionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageSchemaVersionDTO"];
+            data?: components["schemas"]["PageSchemaVersionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26711,7 +26695,7 @@ export interface components {
         ApiResponsePageUserRoleResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PageUserRoleResponse"];
+            data?: components["schemas"]["PageUserRoleResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26719,7 +26703,7 @@ export interface components {
         ApiResponsePaginationResultCommandAuditLogDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultCommandAuditLogDTO"];
+            data?: components["schemas"]["PaginationResultCommandAuditLogDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26727,7 +26711,7 @@ export interface components {
         ApiResponsePaginationResultDataChangeLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultDataChangeLog"];
+            data?: components["schemas"]["PaginationResultDataChangeLog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26735,7 +26719,7 @@ export interface components {
         ApiResponsePaginationResultEmployeeProvisionOption: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultEmployeeProvisionOption"];
+            data?: components["schemas"]["PaginationResultEmployeeProvisionOption"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26743,7 +26727,7 @@ export interface components {
         ApiResponsePaginationResultMapStringObject: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultMapStringObject"];
+            data?: components["schemas"]["PaginationResultMapStringObject"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26751,7 +26735,7 @@ export interface components {
         ApiResponsePaginationResultMemberSearchOption: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultMemberSearchOption"];
+            data?: components["schemas"]["PaginationResultMemberSearchOption"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26759,7 +26743,7 @@ export interface components {
         ApiResponsePaginationResultNamedQueryDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultNamedQueryDTO"];
+            data?: components["schemas"]["PaginationResultNamedQueryDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26767,7 +26751,7 @@ export interface components {
         ApiResponsePaginationResultNotificationDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultNotificationDTO"];
+            data?: components["schemas"]["PaginationResultNotificationDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26775,7 +26759,7 @@ export interface components {
         ApiResponsePaginationResultOrgEmployeeDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultOrgEmployeeDTO"];
+            data?: components["schemas"]["PaginationResultOrgEmployeeDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26783,7 +26767,7 @@ export interface components {
         ApiResponsePaginationResultPageSchemaListDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultPageSchemaListDTO"];
+            data?: components["schemas"]["PaginationResultPageSchemaListDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26791,7 +26775,7 @@ export interface components {
         ApiResponsePaginationResultReconciliationItemDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultReconciliationItemDTO"];
+            data?: components["schemas"]["PaginationResultReconciliationItemDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26799,7 +26783,7 @@ export interface components {
         ApiResponsePaginationResultReconciliationRunDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultReconciliationRunDTO"];
+            data?: components["schemas"]["PaginationResultReconciliationRunDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26807,7 +26791,7 @@ export interface components {
         ApiResponsePaginationResultRoleMemberDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultRoleMemberDTO"];
+            data?: components["schemas"]["PaginationResultRoleMemberDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26815,7 +26799,7 @@ export interface components {
         ApiResponsePaginationResultScheduledTaskLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultScheduledTaskLog"];
+            data?: components["schemas"]["PaginationResultScheduledTaskLog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26823,7 +26807,7 @@ export interface components {
         ApiResponsePaginationResultSourceChoice: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultSourceChoice"];
+            data?: components["schemas"]["PaginationResultSourceChoice"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26831,7 +26815,7 @@ export interface components {
         ApiResponsePaginationResultWebClientError: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaginationResultWebClientError"];
+            data?: components["schemas"]["PaginationResultWebClientError"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26839,7 +26823,7 @@ export interface components {
         ApiResponsePatchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PatchResult"];
+            data?: components["schemas"]["PatchResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26847,7 +26831,7 @@ export interface components {
         ApiResponsePaymentEventResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PaymentEventResponse"];
+            data?: components["schemas"]["PaymentEventResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26855,7 +26839,7 @@ export interface components {
         ApiResponsePerformanceSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PerformanceSummary"];
+            data?: components["schemas"]["PerformanceSummary"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26863,7 +26847,7 @@ export interface components {
         ApiResponsePermissionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PermissionDTO"];
+            data?: components["schemas"]["PermissionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26871,7 +26855,7 @@ export interface components {
         ApiResponsePermissionExplanation: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PermissionExplanation"];
+            data?: components["schemas"]["PermissionExplanation"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26879,7 +26863,7 @@ export interface components {
         ApiResponsePermissionMatrixDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PermissionMatrixDTO"];
+            data?: components["schemas"]["PermissionMatrixDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26887,7 +26871,7 @@ export interface components {
         ApiResponsePipelineImportPreview: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PipelineImportPreview"];
+            data?: components["schemas"]["PipelineImportPreview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26895,7 +26879,7 @@ export interface components {
         ApiResponsePipelineImportResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PipelineImportResult"];
+            data?: components["schemas"]["PipelineImportResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26903,7 +26887,7 @@ export interface components {
         ApiResponsePivotQueryResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PivotQueryResponse"];
+            data?: components["schemas"]["PivotQueryResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26911,7 +26895,7 @@ export interface components {
         ApiResponsePlatformAiScoreResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PlatformAiScoreResult"];
+            data?: components["schemas"]["PlatformAiScoreResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26919,7 +26903,7 @@ export interface components {
         ApiResponsePluginDeployResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PluginDeployResult"];
+            data?: components["schemas"]["PluginDeployResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26927,7 +26911,7 @@ export interface components {
         ApiResponsePluginDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PluginDTO"];
+            data?: components["schemas"]["PluginDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26935,7 +26919,7 @@ export interface components {
         ApiResponsePluginGenerateResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PluginGenerateResult"];
+            data?: components["schemas"]["PluginGenerateResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26943,7 +26927,7 @@ export interface components {
         ApiResponsePluginImportResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PluginImportResult"];
+            data?: components["schemas"]["PluginImportResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26951,7 +26935,7 @@ export interface components {
         ApiResponsePolicyResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PolicyResponse"];
+            data?: components["schemas"]["PolicyResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26959,7 +26943,7 @@ export interface components {
         ApiResponsePromotionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PromotionResponse"];
+            data?: components["schemas"]["PromotionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26967,7 +26951,7 @@ export interface components {
         ApiResponsePublication: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Publication"];
+            data?: components["schemas"]["Publication"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26975,7 +26959,7 @@ export interface components {
         ApiResponsePublicationView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PublicationView"];
+            data?: components["schemas"]["PublicationView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26983,7 +26967,7 @@ export interface components {
         ApiResponsePublicSharedViewResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PublicSharedViewResponse"];
+            data?: components["schemas"]["PublicSharedViewResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26991,7 +26975,7 @@ export interface components {
         ApiResponsePublished: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Published"];
+            data?: components["schemas"]["Published"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26999,7 +26983,7 @@ export interface components {
         ApiResponsePublishedRelease: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["PublishedRelease"];
+            data?: components["schemas"]["PublishedRelease"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27007,7 +26991,7 @@ export interface components {
         ApiResponseReadReceiptSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReadReceiptSummary"];
+            data?: components["schemas"]["ReadReceiptSummary"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27015,7 +26999,7 @@ export interface components {
         ApiResponseRebuildResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RebuildResult"];
+            data?: components["schemas"]["RebuildResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27023,7 +27007,7 @@ export interface components {
         ApiResponseReconciliationItemDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReconciliationItemDTO"];
+            data?: components["schemas"]["ReconciliationItemDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27031,7 +27015,7 @@ export interface components {
         ApiResponseReconciliationProfileDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReconciliationProfileDTO"];
+            data?: components["schemas"]["ReconciliationProfileDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27039,7 +27023,7 @@ export interface components {
         ApiResponseReconciliationReportDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReconciliationReportDTO"];
+            data?: components["schemas"]["ReconciliationReportDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27047,7 +27031,7 @@ export interface components {
         ApiResponseReconciliationRunDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReconciliationRunDTO"];
+            data?: components["schemas"]["ReconciliationRunDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27055,7 +27039,7 @@ export interface components {
         ApiResponseRecordCapabilities: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RecordCapabilities"];
+            data?: components["schemas"]["RecordCapabilities"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27063,7 +27047,7 @@ export interface components {
         ApiResponseRecordShareAccessResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RecordShareAccessResponse"];
+            data?: components["schemas"]["RecordShareAccessResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27071,7 +27055,7 @@ export interface components {
         ApiResponseRecordShareCapabilityResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RecordShareCapabilityResponse"];
+            data?: components["schemas"]["RecordShareCapabilityResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27079,7 +27063,7 @@ export interface components {
         ApiResponseRedeemInstallTokenResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RedeemInstallTokenResponse"];
+            data?: components["schemas"]["RedeemInstallTokenResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27087,7 +27071,7 @@ export interface components {
         ApiResponseRegistration: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Registration"];
+            data?: components["schemas"]["Registration"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27095,7 +27079,7 @@ export interface components {
         ApiResponseReleaseHistoryView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReleaseHistoryView"];
+            data?: components["schemas"]["ReleaseHistoryView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27103,7 +27087,7 @@ export interface components {
         ApiResponseReleaseView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReleaseView"];
+            data?: components["schemas"]["ReleaseView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27111,7 +27095,7 @@ export interface components {
         ApiResponseReplayResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReplayResult"];
+            data?: components["schemas"]["ReplayResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27119,7 +27103,7 @@ export interface components {
         ApiResponseReport: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Report"];
+            data?: components["schemas"]["Report"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27127,7 +27111,7 @@ export interface components {
         ApiResponseReportDefinitionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReportDefinitionResponse"];
+            data?: components["schemas"]["ReportDefinitionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27135,7 +27119,7 @@ export interface components {
         ApiResponseReportScheduleResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReportScheduleResponse"];
+            data?: components["schemas"]["ReportScheduleResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27143,7 +27127,7 @@ export interface components {
         ApiResponseResourceOwnerDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ResourceOwnerDTO"];
+            data?: components["schemas"]["ResourceOwnerDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27151,7 +27135,7 @@ export interface components {
         ApiResponseRetrievalOutcome: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RetrievalOutcome"];
+            data?: components["schemas"]["RetrievalOutcome"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27159,7 +27143,7 @@ export interface components {
         ApiResponseReviewResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReviewResponse"];
+            data?: components["schemas"]["ReviewResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27167,7 +27151,7 @@ export interface components {
         ApiResponseReviewSummaryResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReviewSummaryResponse"];
+            data?: components["schemas"]["ReviewSummaryResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27175,7 +27159,7 @@ export interface components {
         ApiResponseReviewWorkspaceView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ReviewWorkspaceView"];
+            data?: components["schemas"]["ReviewWorkspaceView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27183,7 +27167,7 @@ export interface components {
         ApiResponseRevokePurchaseResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RevokePurchaseResponse"];
+            data?: components["schemas"]["RevokePurchaseResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27191,7 +27175,7 @@ export interface components {
         ApiResponseRoleMemberTreeResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RoleMemberTreeResponse"];
+            data?: components["schemas"]["RoleMemberTreeResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27199,7 +27183,7 @@ export interface components {
         ApiResponseRoleResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RoleResponse"];
+            data?: components["schemas"]["RoleResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27207,7 +27191,7 @@ export interface components {
         ApiResponseRoleStructurePreviewView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RoleStructurePreviewView"];
+            data?: components["schemas"]["RoleStructurePreviewView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27215,7 +27199,7 @@ export interface components {
         ApiResponseRotatedCredentialSecret: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["RotatedCredentialSecret"];
+            data?: components["schemas"]["RotatedCredentialSecret"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27223,7 +27207,7 @@ export interface components {
         ApiResponseRotation: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Rotation"];
+            data?: components["schemas"]["Rotation"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27231,7 +27215,7 @@ export interface components {
         ApiResponseSavedViewCapabilityCheckResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SavedViewCapabilityCheckResponse"];
+            data?: components["schemas"]["SavedViewCapabilityCheckResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27239,7 +27223,7 @@ export interface components {
         ApiResponseSavedViewDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SavedViewDTO"];
+            data?: components["schemas"]["SavedViewDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27247,7 +27231,7 @@ export interface components {
         ApiResponseScheduledTask: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ScheduledTask"];
+            data?: components["schemas"]["ScheduledTask"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27255,7 +27239,7 @@ export interface components {
         ApiResponseSchemaOperationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SchemaOperationResult"];
+            data?: components["schemas"]["SchemaOperationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27263,7 +27247,7 @@ export interface components {
         ApiResponseSecret: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Secret"];
+            data?: components["schemas"]["Secret"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27271,7 +27255,7 @@ export interface components {
         ApiResponseSemanticLineageResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SemanticLineageResponse"];
+            data?: components["schemas"]["SemanticLineageResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27279,7 +27263,7 @@ export interface components {
         ApiResponseSemanticMetaResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SemanticMetaResponse"];
+            data?: components["schemas"]["SemanticMetaResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27287,7 +27271,7 @@ export interface components {
         ApiResponseSemanticMetricAlertDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SemanticMetricAlertDTO"];
+            data?: components["schemas"]["SemanticMetricAlertDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27295,7 +27279,7 @@ export interface components {
         ApiResponseSemanticQueryResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SemanticQueryResponse"];
+            data?: components["schemas"]["SemanticQueryResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27303,7 +27287,7 @@ export interface components {
         ApiResponseSemanticUsageSummaryDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SemanticUsageSummaryDTO"];
+            data?: components["schemas"]["SemanticUsageSummaryDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27311,7 +27295,7 @@ export interface components {
         ApiResponseSessionView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SessionView"];
+            data?: components["schemas"]["SessionView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27319,7 +27303,7 @@ export interface components {
         ApiResponseShadowRunListItem: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ShadowRunListItem"];
+            data?: components["schemas"]["ShadowRunListItem"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27327,7 +27311,7 @@ export interface components {
         ApiResponseSkillResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SkillResult"];
+            data?: components["schemas"]["SkillResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27335,7 +27319,7 @@ export interface components {
         ApiResponseSodCheckResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SodCheckResult"];
+            data?: components["schemas"]["SodCheckResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27343,7 +27327,7 @@ export interface components {
         ApiResponseSodRule: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SodRule"];
+            data?: components["schemas"]["SodRule"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27351,7 +27335,7 @@ export interface components {
         ApiResponseSodViolationLog: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SodViolationLog"];
+            data?: components["schemas"]["SodViolationLog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27359,7 +27343,7 @@ export interface components {
         ApiResponseSolutionDetailDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SolutionDetailDTO"];
+            data?: components["schemas"]["SolutionDetailDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27367,7 +27351,7 @@ export interface components {
         ApiResponseSolutionInstallResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SolutionInstallResult"];
+            data?: components["schemas"]["SolutionInstallResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27375,7 +27359,7 @@ export interface components {
         ApiResponseSourceView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SourceView"];
+            data?: components["schemas"]["SourceView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27383,7 +27367,7 @@ export interface components {
         ApiResponseSplitChangeSetView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SplitChangeSetView"];
+            data?: components["schemas"]["SplitChangeSetView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27391,7 +27375,7 @@ export interface components {
         ApiResponseStateGraphDefinition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["StateGraphDefinition"];
+            data?: components["schemas"]["StateGraphDefinition"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27399,7 +27383,7 @@ export interface components {
         ApiResponseString: {
             code?: string;
             context?: unknown;
-            data?: string;
+            data?: string | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27407,7 +27391,7 @@ export interface components {
         ApiResponseStudioBatchResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["StudioBatchResult"];
+            data?: components["schemas"]["StudioBatchResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27415,7 +27399,7 @@ export interface components {
         ApiResponseSubjectPermissionDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SubjectPermissionDTO"];
+            data?: components["schemas"]["SubjectPermissionDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27423,7 +27407,7 @@ export interface components {
         ApiResponseSyncResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SyncResult"];
+            data?: components["schemas"]["SyncResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27431,7 +27415,7 @@ export interface components {
         ApiResponseSyntheticPreviewView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SyntheticPreviewView"];
+            data?: components["schemas"]["SyntheticPreviewView"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27439,7 +27423,7 @@ export interface components {
         ApiResponseSystemPreferencesResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["SystemPreferencesResponse"];
+            data?: components["schemas"]["SystemPreferencesResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27447,7 +27431,7 @@ export interface components {
         ApiResponseTeamMemberResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TeamMemberResponse"];
+            data?: components["schemas"]["TeamMemberResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27455,7 +27439,7 @@ export interface components {
         ApiResponseTeamResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TeamResponse"];
+            data?: components["schemas"]["TeamResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27463,7 +27447,7 @@ export interface components {
         ApiResponseTemplateGenerationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TemplateGenerationResult"];
+            data?: components["schemas"]["TemplateGenerationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27471,7 +27455,7 @@ export interface components {
         ApiResponseTenantMemberOffboardingImpactResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TenantMemberOffboardingImpactResponse"];
+            data?: components["schemas"]["TenantMemberOffboardingImpactResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27479,7 +27463,7 @@ export interface components {
         ApiResponseTenantResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TenantResponse"];
+            data?: components["schemas"]["TenantResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27487,7 +27471,7 @@ export interface components {
         ApiResponseTenantSelectionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TenantSelectionResponse"];
+            data?: components["schemas"]["TenantSelectionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27495,7 +27479,7 @@ export interface components {
         ApiResponseTimezoneInfo: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TimezoneInfo"];
+            data?: components["schemas"]["TimezoneInfo"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27503,7 +27487,7 @@ export interface components {
         ApiResponseTokenRenewResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["TokenRenewResponse"];
+            data?: components["schemas"]["TokenRenewResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27511,7 +27495,7 @@ export interface components {
         ApiResponseTransition: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["Transition"];
+            data?: components["schemas"]["Transition"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27519,7 +27503,7 @@ export interface components {
         ApiResponseUnreadSummary: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UnreadSummary"];
+            data?: components["schemas"]["UnreadSummary"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27527,7 +27511,7 @@ export interface components {
         ApiResponseUpgradeTenantBindingResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UpgradeTenantBindingResponse"];
+            data?: components["schemas"]["UpgradeTenantBindingResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27535,7 +27519,7 @@ export interface components {
         ApiResponseUsageEvent: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UsageEvent"];
+            data?: components["schemas"]["UsageEvent"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27543,7 +27527,7 @@ export interface components {
         ApiResponseUserDataDomain: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserDataDomain"];
+            data?: components["schemas"]["UserDataDomain"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27551,7 +27535,7 @@ export interface components {
         ApiResponseUserEngagementDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserEngagementDTO"];
+            data?: components["schemas"]["UserEngagementDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27559,7 +27543,7 @@ export interface components {
         ApiResponseUserInfoResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserInfoResponse"];
+            data?: components["schemas"]["UserInfoResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27567,7 +27551,7 @@ export interface components {
         ApiResponseUserNoteDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserNoteDTO"];
+            data?: components["schemas"]["UserNoteDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27575,7 +27559,7 @@ export interface components {
         ApiResponseUserProfileResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserProfileResponse"];
+            data?: components["schemas"]["UserProfileResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27583,7 +27567,7 @@ export interface components {
         ApiResponseUserProvisionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserProvisionResponse"];
+            data?: components["schemas"]["UserProvisionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27591,7 +27575,7 @@ export interface components {
         ApiResponseUserSearchDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["UserSearchDTO"];
+            data?: components["schemas"]["UserSearchDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27599,7 +27583,7 @@ export interface components {
         ApiResponseValidationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ValidationResult"];
+            data?: components["schemas"]["ValidationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27607,7 +27591,7 @@ export interface components {
         ApiResponseVatCalculationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["VatCalculationResult"];
+            data?: components["schemas"]["VatCalculationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27615,7 +27599,7 @@ export interface components {
         ApiResponseVersionCheckResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["VersionCheckResult"];
+            data?: components["schemas"]["VersionCheckResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27623,7 +27607,7 @@ export interface components {
         ApiResponseVersionDiffResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["VersionDiffResponse"];
+            data?: components["schemas"]["VersionDiffResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27631,7 +27615,7 @@ export interface components {
         ApiResponseVersionResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["VersionResponse"];
+            data?: components["schemas"]["VersionResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27639,7 +27623,7 @@ export interface components {
         ApiResponseView: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["View"];
+            data?: components["schemas"]["View"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27647,7 +27631,7 @@ export interface components {
         ApiResponseViewModelSummaryDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ViewModelSummaryDTO"];
+            data?: components["schemas"]["ViewModelSummaryDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27655,7 +27639,7 @@ export interface components {
         ApiResponseViewModelValidationResult: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ViewModelValidationResult"];
+            data?: components["schemas"]["ViewModelValidationResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27663,7 +27647,7 @@ export interface components {
         ApiResponseViewShareResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ViewShareResponse"];
+            data?: components["schemas"]["ViewShareResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27671,7 +27655,7 @@ export interface components {
         ApiResponseViewShareStatusResponse: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["ViewShareStatusResponse"];
+            data?: components["schemas"]["ViewShareStatusResponse"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27679,7 +27663,7 @@ export interface components {
         ApiResponseVoid: {
             code?: string;
             context?: unknown;
-            data?: unknown;
+            data?: null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27687,7 +27671,7 @@ export interface components {
         ApiResponseWebhookSubscription: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["WebhookSubscription"];
+            data?: components["schemas"]["WebhookSubscription"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27695,7 +27679,7 @@ export interface components {
         ApiResponseWorkbenchStatsDTO: {
             code?: string;
             context?: unknown;
-            data?: components["schemas"]["WorkbenchStatsDTO"];
+            data?: components["schemas"]["WorkbenchStatsDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -47089,28 +47073,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
-                };
-            };
-        };
-    };
-    getLatestCode: {
-        parameters: {
-            query: {
-                target: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
                 };
             };
         };
