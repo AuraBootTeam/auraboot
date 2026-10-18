@@ -195,6 +195,9 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
   const code = `ic_role_${randomUUID().replaceAll('-', '').slice(0, 16)}`;
   const name = `Contract access ${code.slice(-8)}`;
   let journeyError: unknown;
+  let rolePid: string | undefined;
+  const roleCode = `${code}_reader`;
+  const readPermissions = ['org.team.read', 'org_management', 'org_teams', 'model.ab_team.read'];
   async function denied(actor: InternalApiOwnedUser, method: string, path: string, body?: object) {
     let createdCode: string | undefined;
     if (method === 'post' && path === '/api/org/teams') {
@@ -217,7 +220,46 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
     expect(response.status(), `${actor.role ?? 'unassigned'} ${method} ${path}`).toBe(403);
   }
   try {
-    viewer = await provisionInternalApiUser(browser, baseURL, 'viewer');
+    const roleResponse = await owner.context.request.post('/api/roles', {
+      headers: { Origin: owner.origin },
+      data: {
+        code: roleCode,
+        name: roleCode,
+        type: 'custom',
+        scopeType: 'tenant',
+        defaultDataScopeType: 'all',
+      },
+    });
+    const rolePayload = await roleResponse.json();
+    if (typeof rolePayload.data?.pid === 'string') rolePid = rolePayload.data.pid;
+    expect(roleResponse.status()).toBe(200);
+    expect(rolePayload.code).toBe('0');
+    expect(rolePid).toBeTruthy();
+    const treeResponse = await owner.context.request.get('/api/permissions/tree');
+    expect(treeResponse.status()).toBe(200);
+    const treePayload = await treeResponse.json();
+    expect(treePayload.code).toBe('0');
+    const permissionPids = new Map<string, string>();
+    type PermissionNode = { code: string; pid: string; children?: PermissionNode[] };
+    function collect(nodes: PermissionNode[]) {
+      for (const node of nodes) {
+        permissionPids.set(node.code, node.pid);
+        collect(node.children ?? []);
+      }
+    }
+    collect(treePayload.data);
+    const grants = readPermissions.map((permission) => {
+      const pid = permissionPids.get(permission);
+      expect(pid, `Required permission ${permission}`).toBeTruthy();
+      return pid!;
+    });
+    const granted = await owner.context.request.post(`/api/roles/${rolePid}/permissions`, {
+      headers: { Origin: owner.origin },
+      data: grants,
+    });
+    expect(granted.status()).toBe(200);
+    expect((await granted.json()).code).toBe('0');
+    viewer = await provisionInternalApiUser(browser, baseURL, roleCode);
     unassigned = await provisionInternalApiUser(browser, baseURL, null);
     const createdResponse = await owner.context.request.post('/api/org/teams', {
       headers: { Origin: owner.origin },
@@ -247,12 +289,12 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
       const permissions: string[] = identity.data.permissions.permissionCodes;
       expect(permissions.includes('*')).toBe(false);
       expect(permissions.includes('org.team.manage')).toBe(false);
-      expect(permissions.includes('org.team.read')).toBe(actor.role === 'viewer');
+      expect(permissions.includes('org.team.read')).toBe(actor.role === roleCode);
       if (!actor.role) {
         await denied(actor, 'get', `/api/org/teams/${teamPid}`);
         await denied(actor, 'get', `/api/org/teams/${teamPid}/members`);
       }
-      const suffix = actor.role ?? 'unassigned';
+      const suffix = actor.role ? 'reader' : 'unassigned';
       await denied(actor, 'post', '/api/org/teams', {
         code: `${code}_${suffix}`,
         name: 'Forbidden creation',
@@ -336,6 +378,36 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
     } finally {
       await db.end();
     }
+    if (rolePid) {
+      try {
+        if (viewer) {
+          expect(viewer.memberPid).toBeTruthy();
+          const removed = await owner.context.request.delete('/api/user-roles/remove-by-pid', {
+            headers: { Origin: owner.origin },
+            data: { memberPid: viewer.memberPid, rolePids: [rolePid] },
+          });
+          expect(removed.status()).toBe(200);
+          expect((await removed.json()).code).toBe('0');
+        }
+        const found = await owner.context.request.get(`/api/roles/${rolePid}`);
+        expect(found.status()).toBe(200);
+        expect((await found.json()).data.code).toBe(roleCode);
+        const removed = await owner.context.request.delete(`/api/roles/${rolePid}`, {
+          headers: { Origin: owner.origin },
+        });
+        expect(removed.status()).toBe(200);
+        expect((await removed.json()).data).toBe(true);
+        const verify = await owner.context.request.get('/api/roles/all');
+        expect(verify.status()).toBe(200);
+        expect(
+          (await verify.json()).data.some(
+            (role: { pid: string; code: string }) => role.pid === rolePid || role.code === roleCode,
+          ),
+        ).toBe(false);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
     for (const actor of [viewer, unassigned, owner]) {
       if (!actor) continue;
       try {
@@ -348,6 +420,8 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
       body: JSON.stringify({
         claim:
           'viewer browser read-only journey and API-driven write denial for viewer/unassigned; not cross-tenant or leader-rule acceptance',
+        roleCode,
+        readPermissions,
         reads,
         denials,
         sessionCleanup: [viewer, unassigned, owner]

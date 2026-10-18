@@ -17,7 +17,7 @@ export async function loginInternalApiUser(page: Page, username: string, passwor
 export async function provisionInternalApiUser(
   browser: Browser,
   baseURL: string,
-  role: 'tenant_admin' | 'viewer' | null = 'tenant_admin',
+  role: string | null = 'tenant_admin',
 ) {
   expect(PG_CONN.database).toMatch(/^auraboot_\d+$/);
   const origin = new URL(baseURL).origin;
@@ -143,7 +143,17 @@ export async function provisionInternalApiUser(
     await context.addInitScript(() => localStorage.setItem('locale', 'en-US'));
     const page = await context.newPage();
     await loginInternalApiUser(page, username, password);
-    return { context, page, userPid: userPid!, username, role, origin, sessionCleanup, dispose };
+    return {
+      context,
+      page,
+      userPid: userPid!,
+      username,
+      memberPid: payload.data.memberPid as string,
+      role,
+      origin,
+      sessionCleanup,
+      dispose,
+    };
   } catch (error) {
     try {
       await dispose();
