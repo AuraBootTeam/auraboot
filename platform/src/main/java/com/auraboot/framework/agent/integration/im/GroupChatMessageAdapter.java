@@ -1,4 +1,4 @@
-package com.auraboot.framework.im.integration;
+package com.auraboot.framework.agent.integration.im;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;

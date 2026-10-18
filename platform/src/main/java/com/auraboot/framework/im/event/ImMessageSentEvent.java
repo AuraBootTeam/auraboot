@@ -1,4 +1,4 @@
-package com.auraboot.framework.agentchat.event;
+package com.auraboot.framework.im.event;
 
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;

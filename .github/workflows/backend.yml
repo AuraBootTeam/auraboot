@@ -17,8 +17,6 @@ jobs:
   build:
     name: Build, Lint & Compile (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
-    env:
-      AURA_MAVEN_CENTRAL_FIRST: "true"
     timeout-minutes: 30
 
     strategy:
@@ -83,6 +81,22 @@ jobs:
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: ./gradlew --no-daemon compileJava compileTestJava
+
+      - name: Verify core agent implementation boundary
+        if: steps.changes.outputs.run == 'true'
+        working-directory: platform
+        run: >-
+          ./gradlew --no-daemon :test
+          --tests com.auraboot.framework.architecture.CoreAgentBoundaryTest
+          --max-workers=2 -PauraTestMaxHeap=2g -PauraTestMinHeap=256m
+
+      - name: Upload core agent boundary results
+        if: always() && steps.changes.outputs.run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-agent-boundary-java-${{ matrix.java }}-${{ github.run_attempt }}
+          path: platform/build/test-results/test/TEST-com.auraboot.framework.architecture.CoreAgentBoundaryTest.xml
+          if-no-files-found: warn
 
       # Phase 2.1 IT scaffolding: compile-only gate ensures IT sources stay
       # green even though we don't run the suite in CI yet (running requires

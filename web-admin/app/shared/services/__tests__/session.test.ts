@@ -120,10 +120,10 @@ describe('session recovery', () => {
       'http://127.0.0.1:6443/api/user/sessions/current',
       {
         method: 'DELETE',
+        signal: expect.any(AbortSignal),
         headers: {
           Authorization: 'Bearer header.payload.signature',
         },
-        signal: expect.any(AbortSignal),
       },
     );
     expect(validSession.unset).toHaveBeenCalledWith('jwtToken');

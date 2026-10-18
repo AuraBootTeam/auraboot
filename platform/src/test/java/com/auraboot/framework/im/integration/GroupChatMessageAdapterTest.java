@@ -1,5 +1,6 @@
 package com.auraboot.framework.im.integration;
 
+import com.auraboot.framework.agent.integration.im.GroupChatMessageAdapter;
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;

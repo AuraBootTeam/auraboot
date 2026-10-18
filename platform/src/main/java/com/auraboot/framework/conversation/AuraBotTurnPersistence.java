@@ -173,7 +173,7 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
                 : AuraBotAgentResolver.DEFAULT_AGENT_CODE;
         long agentId = agentResolver.resolve(ctx.tenantId(), resolveCode);
         String persistedPayload = cardPayload;
-        var analyticsReferences = com.auraboot.framework.behavior.service.AnalyticsResultHistory.references(artifacts.resultContracts());
+        var analyticsReferences = com.auraboot.framework.agent.integration.behavior.AnalyticsResultHistory.references(artifacts.resultContracts());
         if (!analyticsReferences.isEmpty() || !artifacts.retrievalEvidence().isEmpty()) {
             try {
                 java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();

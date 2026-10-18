@@ -204,20 +204,13 @@ tasks.register('verifyMultiWorktreeGuard') {
 
 repositories {
     mavenLocal()
-    // Hosted runners use the official repository first; local China builds retain mirrors.
-    def centralFirst = System.getenv('AURA_MAVEN_CENTRAL_FIRST') == 'true'
-    if (centralFirst) {
-        mavenCentral()
-    }
     maven {
         url = 'https://maven.aliyun.com/repository/public'
     }
     maven {
         url = 'https://maven.aliyun.com/repository/spring'
     }
-    if (!centralFirst) {
-        mavenCentral()
-    }
+    mavenCentral()
     // Apache repository for snapshots and releases
     maven {
         url = 'https://repository.apache.org/content/repositories/releases/'

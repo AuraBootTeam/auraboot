@@ -1,12 +1,9 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import static com.auraboot.framework.plugin.service.PluginResourceRecords.createResourceRecord;
+
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
-import com.auraboot.framework.agent.entity.AgentDefinition;
-import com.auraboot.framework.agent.entity.AgentEvalCase;
-import com.auraboot.framework.agent.eval.EvalCaseStructureValidator;
-import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
-import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.menu.entity.Menu;
@@ -170,8 +167,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final PageSchemaMapper pageSchemaMapper;
     private final DictMapper dictMapper;
     private final NamedQueryMapper namedQueryMapper;
-    private final AgentDefinitionMapper agentDefinitionMapper;
-    private final AgentEvalCaseMapper agentEvalCaseMapper;
+    private final com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources;
     // Provider-plugin resolution for fail-closed role permission errors (model owner naming).
     private final PluginRecordMapper pluginRecordMapper;
 
@@ -277,7 +273,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     @Override
     public boolean checkAgentDefinitionExists(Long tenantId, String agentCode) {
-        return findActiveAgentDefinition(tenantId, agentCode) != null;
+        return agentDefinitionResources.exists(tenantId, agentCode);
     }
 
     // ==================== OVERWRITE_SAFE Helper ====================
@@ -2430,188 +2426,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     @Override
     public PluginResource importAgentDefinition(AgentDefinitionDTO dto, String pluginPid, String importId,
                                                 Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        AgentDefinition existing = findActiveAgentDefinition(tenantId, dto.getAgentCode());
-        boolean exists = existing != null;
-
-        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
-            throw new PluginException("Agent definition already exists: " + dto.getAgentCode());
-        }
-
-        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                    null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
-        }
-
-        if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.AGENT_DEFINITION, dto.getAgentCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.AGENT_DEFINITION, logSafe(dto.getAgentCode()));
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                    null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
-        }
-
-        Map<String, Object> currentState = buildAgentDefinitionState(dto);
-        Instant now = Instant.now();
-
-        if (exists) {
-            applyAgentDefinition(existing, dto);
-            existing.setUpdatedAt(now);
-            existing.setDeletedFlag(false);
-            agentDefinitionMapper.updateById(existing);
-
-            replaceEvalCases(tenantId, dto, pluginPid);
-
-            AgentDefinition updated = findActiveAgentDefinition(tenantId, dto.getAgentCode());
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                    updated.getPid(), updated.getId(), dto.getAgentCode(), dto.getEffectiveName(),
-                    ResourceAction.UPDATE, null, currentState);
-        }
-
-        AgentDefinition created = new AgentDefinition();
-        created.setPid(UlidGenerator.generate());
-        created.setTenantId(tenantId);
-        applyAgentDefinition(created, dto);
-        created.setCreatedAt(now);
-        created.setUpdatedAt(now);
-        created.setDeletedFlag(false);
-        agentDefinitionMapper.insert(created);
-
-        replaceEvalCases(tenantId, dto, pluginPid);
-
-        return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                created.getPid(), created.getId(), dto.getAgentCode(), dto.getEffectiveName(),
-                ResourceAction.CREATE, null, currentState);
-    }
-
-    private AgentDefinition findActiveAgentDefinition(Long tenantId, String agentCode) {
-        if (tenantId == null || agentCode == null || agentCode.isBlank()) {
-            return null;
-        }
-        return agentDefinitionMapper.selectOne(new QueryWrapper<AgentDefinition>()
-                .eq("tenant_id", tenantId)
-                .eq("agent_code", agentCode)
-                .apply("(deleted_flag = FALSE OR deleted_flag IS NULL)")
-                .last("LIMIT 1"));
-    }
-
-    private void applyAgentDefinition(AgentDefinition target, AgentDefinitionDTO dto) {
-        target.setAgentCode(dto.getAgentCode());
-        target.setName(dto.getEffectiveName());
-        target.setDescription(dto.getDescription());
-        target.setAvatarUrl(dto.getAvatarUrl());
-        target.setAgentType(defaultString(dto.getAgentType(), "reactive"));
-        target.setModel(dto.getModel());
-        target.setSystemPrompt(dto.getSystemPrompt());
-        target.setTools(toJsonText(dto.getTools()));
-        target.setSkills(toJsonText(dto.getSkills()));
-        target.setGuardrails(toJsonText(dto.getGuardrails()));
-        target.setSoulProfile(dto.getSoulProfile());
-        target.setPersonality(dto.getPersonality());
-        target.setExpertise(dto.getExpertise());
-        target.setCommunicationStyle(dto.getCommunicationStyle());
-        target.setBoundaries(dto.getBoundaries());
-        target.setSoulGoals(dto.getSoulGoals());
-        target.setAllowedModels(dto.getAllowedModels());
-        target.setAllowedOperations(dto.getAllowedOperations() != null
-                ? dto.getAllowedOperations()
-                : List.of("query", "create", "update", "delete", "transition"));
-        target.setKnowledgeBaseIds(dto.getKnowledgeBaseIds() != null
-                ? dto.getKnowledgeBaseIds()
-                : List.of());
-        target.setMaxTools(dto.getMaxTools() != null ? dto.getMaxTools() : 20);
-        target.setMaxConcurrentRuns(dto.getMaxConcurrentRuns() != null ? dto.getMaxConcurrentRuns() : 3);
-        target.setExecutionTimeoutSeconds(dto.getExecutionTimeoutSeconds() != null
-                ? dto.getExecutionTimeoutSeconds()
-                : 300);
-        target.setEventTriggers(dto.getEventTriggers());
-        target.setAutoReplyMode(defaultString(dto.getAutoReplyMode(), "mention"));
-        target.setStatus(defaultString(dto.getStatus(), "active"));
-        target.setStats(dto.getStats());
-        target.setVisibility(defaultString(dto.getVisibility(), "private"));
-    }
-
-    private Map<String, Object> buildAgentDefinitionState(AgentDefinitionDTO dto) {
-        Map<String, Object> state = new HashMap<>();
-        state.put("agentCode", dto.getAgentCode());
-        state.put("name", dto.getEffectiveName());
-        state.put("description", dto.getDescription());
-        state.put("agentType", defaultString(dto.getAgentType(), "reactive"));
-        state.put("model", dto.getModel());
-        state.put("systemPrompt", dto.getSystemPrompt());
-        state.put("tools", dto.getTools());
-        state.put("skills", dto.getSkills());
-        state.put("guardrails", dto.getGuardrails());
-        state.put("soulProfile", dto.getSoulProfile());
-        state.put("allowedModels", dto.getAllowedModels());
-        state.put("allowedOperations", dto.getAllowedOperations());
-        state.put("knowledgeBaseIds", dto.getKnowledgeBaseIds());
-        state.put("maxTools", dto.getMaxTools());
-        state.put("maxConcurrentRuns", dto.getMaxConcurrentRuns());
-        state.put("executionTimeoutSeconds", dto.getExecutionTimeoutSeconds());
-        state.put("eventTriggers", dto.getEventTriggers());
-        state.put("autoReplyMode", defaultString(dto.getAutoReplyMode(), "mention"));
-        state.put("status", defaultString(dto.getStatus(), "active"));
-        state.put("visibility", defaultString(dto.getVisibility(), "private"));
-        return state;
-    }
-
-    /**
-     * Replace all eval cases for {@code (tenantId, dto.agentCode)} with the cases
-     * declared in the DTO (physical DELETE + INSERT). This is an overwrite-on-import
-     * sub-resource: the caller's transaction absorbs the DELETE+INSERT atomically with
-     * the agent row write that precedes this call.
-     *
-     * <p>Validates case structure before touching the DB; throws {@link PluginException}
-     * (import fails, {@code success:false}) if any violation is found.
-     */
-    private void replaceEvalCases(Long tenantId, AgentDefinitionDTO dto, String pluginPid) {
-        List<CapabilityEvalCase> cases =
-                dto.getEvalCases() == null ? List.of() : dto.getEvalCases();
-        List<String> violations = EvalCaseStructureValidator.validate(cases);
-        if (!violations.isEmpty()) {
-            throw new PluginException(
-                    "Invalid eval cases for agent " + dto.getAgentCode() + ": " + violations);
-        }
-        // Clean slate for this agent — cases are an overwrite-on-import sub-resource.
-        jdbcTemplate.update(
-                "DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?",
-                tenantId, dto.getAgentCode());
-        Instant now = Instant.now();
-        for (CapabilityEvalCase c : cases) {
-            AgentEvalCase row = new AgentEvalCase();
-            row.setPid(UlidGenerator.generate());
-            row.setTenantId(tenantId);
-            row.setAgentCode(dto.getAgentCode());
-            row.setCaseId(c.getCaseId());
-            row.setCategory(c.getCategory());
-            row.setTaskDescription(c.getTaskDescription());
-            row.setExpectedToolCodes(c.getExpectedToolCodes());
-            row.setForbiddenToolCodes(c.getForbiddenToolCodes());
-            row.setExpectedInputKeys(c.getExpectedInputKeys());
-            row.setExpectedRiskLevel(c.getExpectedRiskLevel());
-            row.setExpectsConfirmation(c.isExpectsConfirmation());
-            row.setPluginSource(pluginPid);
-            row.setDeletedFlag(false);
-            row.setCreatedAt(now);
-            row.setUpdatedAt(now);
-            agentEvalCaseMapper.insert(row);
-        }
-    }
-
-    private String toJsonText(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof String text) {
-            return text;
-        }
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new PluginException("Failed to serialize agent definition field: " + e.getMessage(), e);
-        }
-    }
-
-    private String defaultString(String value, String fallback) {
-        return value != null && !value.isBlank() ? value : fallback;
+        return agentDefinitionResources.importAgentDefinition(dto, pluginPid, importId, tenantId, conflictStrategy);
     }
 
     // ==================== Rollback Operations ====================
@@ -2732,20 +2547,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     }
                 }
             }
-            case AGENT_DEFINITION -> {
-                if (resource.getResourcePid() != null) {
-                    jdbcTemplate.update("""
-                            UPDATE ab_agent_definition
-                            SET deleted_flag = TRUE, updated_at = NOW()
-                            WHERE pid = ?
-                            """, resource.getResourcePid());
-                }
-                jdbcTemplate.update("""
-                        UPDATE ab_agent_eval_case
-                        SET deleted_flag = TRUE, updated_at = NOW()
-                        WHERE tenant_id = ? AND agent_code = ?
-                        """, resource.getTenantId(), resource.getResourceCode());
-            }
+            case AGENT_DEFINITION -> agentDefinitionResources.rollback(resource);
             default -> log.warn("Rollback not implemented for resource type: {}", type);
         }
     }
@@ -2759,18 +2561,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             return;
         }
         if (type == ResourceType.AGENT_DEFINITION) {
-            if (resource.getResourcePid() != null) {
-                jdbcTemplate.update("""
-                        UPDATE ab_agent_definition
-                        SET deleted_flag = FALSE, updated_at = NOW()
-                        WHERE pid = ?
-                        """, resource.getResourcePid());
-            }
-            jdbcTemplate.update("""
-                    UPDATE ab_agent_eval_case
-                    SET deleted_flag = FALSE, updated_at = NOW()
-                    WHERE tenant_id = ? AND agent_code = ?
-                    """, resource.getTenantId(), resource.getResourceCode());
+            agentDefinitionResources.restore(resource);
             return;
         }
         if (resource.getPreviousState() == null) {
@@ -2901,47 +2692,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     // ==================== Helper Methods ====================
-
-    private PluginResource createResourceRecord(String pluginPid, String importId, Long tenantId,
-                                                ResourceType type, String resourcePid, Long resourceId,
-                                                String code, String name, ResourceAction action,
-                                                Map<String, Object> previousState, Map<String, Object> currentState) {
-        return createResourceRecord(pluginPid, importId, tenantId, type, resourcePid, resourceId,
-                code, name, action, previousState, currentState, null);
-    }
-
-    private PluginResource createResourceRecord(String pluginPid, String importId, Long tenantId,
-                                                ResourceType type, String resourcePid, Long resourceId,
-                                                String code, String name, ResourceAction action,
-                                                Map<String, Object> previousState, Map<String, Object> currentState,
-                                                String pluginVersion) {
-        OwnershipType ownership = type.getDefaultOwnership();
-        if (action == ResourceAction.SKIP) {
-            ownership = null;
-        }
-
-        return PluginResource.builder()
-                .pid(UlidGenerator.generate())
-                .tenantId(tenantId)
-                .pluginPid(pluginPid)
-                .importId(importId)
-                .resourceType(type.code())
-                .resourcePid(resourcePid)
-                .resourceId(resourceId)
-                .resourceCode(code)
-                .resourceName(name)
-                .action(action.code())
-                .previousState(previousState)
-                .currentState(currentState)
-                .ownershipType(ownership != null ? ownership.code() : OwnershipType.SHARED.code())
-                .importSnapshot(currentState)
-                .userModified(false)
-                .lastSyncVersion(pluginVersion)
-                .sequence(type.getImportOrder())
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
-    }
 
     private String toJson(Object obj) {
         try {

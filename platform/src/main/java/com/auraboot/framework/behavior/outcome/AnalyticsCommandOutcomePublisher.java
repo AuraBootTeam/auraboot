@@ -1,6 +1,6 @@
 package com.auraboot.framework.behavior.outcome;
 
-import com.auraboot.framework.agent.service.StepContext;
+import com.auraboot.framework.behavior.service.AnalyticsExecutionContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,23 +25,16 @@ public class AnalyticsCommandOutcomePublisher {
     private final ObjectMapper json;
     private final BehaviorOutcomePublisher outcomes;
     private final RecordSnapshotReader snapshots;
+    private final AnalyticsExecutionContext executionContext;
+    private final AnalyticsCommandOriginLookup origins;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(CommandPipelineContext ctx) {
-        String runPid = StepContext.getRunPid();
+        String runPid = executionContext.runPid();
         if (runPid == null || ctx.getRequest().isDryRun()) return;
         Object operation = ctx.getExecConfig().get("type");
         if (!Set.of("create", "update", "delete").contains(operation == null ? "" : operation)) return;
-        var rows = jdbc.queryForList("""
-                SELECT r.actor_user_id, r.principal_type, r.run_status, a.binding,
-                       started.event_id AS started_event_id, started.payload AS started_payload
-                FROM ab_agent_run r
-                JOIN ab_analytics_task_execution a ON a.tenant_id=r.tenant_id AND a.task_pid=r.task_id
-                LEFT JOIN ab_behavior_outcome_outbox started ON started.tenant_id=r.tenant_id
-                  AND started.run_id=r.pid AND started.event_name='agent_execution_started'
-                WHERE r.tenant_id=? AND r.pid=?
-                FOR SHARE OF r
-                """, ctx.getTenantId(), runPid);
+        var rows = origins.find(ctx.getTenantId(), runPid);
         if (rows.isEmpty()) return;
         if (rows.size() != 1) throw new IllegalStateException("Ambiguous analytics command origin");
         var origin = rows.get(0);

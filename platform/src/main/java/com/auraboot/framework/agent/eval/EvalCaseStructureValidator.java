@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent.eval;
 
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.auraboot.framework.automation.executor.impl;
+package com.auraboot.framework.agent.integration.automation;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
@@ -89,7 +89,7 @@ public class LlmCallExecutor implements ActionExecutor {
     /**
      * Optional fan-out for live LLM chunk observability (E.1 Phase 1). Wired
      * by the Spring container; left null in mock-driven unit tests where
-     * {@link com.auraboot.framework.automation.executor.impl.LlmCallExecutorTest}
+     * {@link com.auraboot.framework.agent.integration.automation.LlmCallExecutorTest}
      * uses {@code @InjectMocks} without configuring a publisher. Null-safe
      * call sites below.
      */
@@ -294,7 +294,8 @@ public class LlmCallExecutor implements ActionExecutor {
                 .doOnNext(chunk -> {
                     if (streamPublisher != null && runPid != null) {
                         streamPublisher.publish(new AutomationLlmChunkEvent(
-                                runPid, nodeId, chunk, chunk.seq()));
+                                runPid, nodeId, new com.auraboot.framework.automation.event.AutomationStreamChunk(
+                                        chunk.seq(), chunk.delta(), chunk.thinkingDelta(), chunk.done()), chunk.seq()));
                     }
                     if (chunk.done() && chunk.aggregateResponse() != null) {
                         aggregateHolder[0] = chunk.aggregateResponse();

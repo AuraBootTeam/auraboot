@@ -17,15 +17,15 @@ class AcpDurableWorkflowEngineTest {
     @Test
     void aReusedTaskStillReachesAtomicRunAdmission() {
         var runs = mock(AgentRunService.class);
-        var tasks = mock(com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.class);
+        var tasks = mock(com.auraboot.framework.agent.integration.behavior.AnalyticsConversationTaskStore.class);
         var context = mock(TurnContext.class);
         when(context.tenantId()).thenReturn(7L);
-        var reference = new com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Request("adopt", "request");
+        var reference = new com.auraboot.framework.agent.integration.behavior.AnalyticsConversationTaskStore.Request("adopt", "request");
         var request = new com.auraboot.framework.agent.dto.ChatRequest();
         request.setMessage("Execute adopted goal");
         request.setAnalyticsExecution(reference);
         when(tasks.create(eq(context), eq(reference), anyMap(), anyMap()))
-                .thenReturn(new com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Stored("task", false));
+                .thenReturn(new com.auraboot.framework.agent.integration.behavior.AnalyticsConversationTaskStore.Stored("task", false));
         when(runs.executeInitialAnalyticsTaskSync(7L, "task", "aurabot"))
                 .thenThrow(new com.auraboot.framework.agent.service.AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted());
         var engine = new AcpDurableWorkflowEngine(runs, mock(DynamicDataMapper.class), new ObjectMapper());

@@ -1,4 +1,4 @@
-import { BASE_URL } from '../../helpers/environments';
+import { requireRuntimeUrl } from '../../helpers/environments';
 import {test,expect} from '@playwright/test';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -131,7 +131,7 @@ test('a rejected report save retains the draft and can recover after the fixture
  const email=`${roleCode}@e2e.local`;const password='Test2026x';
  const user=await page.request.post('/api/admin/users',{data:{email,displayName:roleCode,initialPassword:password,roleCodes:[roleCode],sendInviteEmail:false}});
  expect(user.status()).toBe(200);
- const context=await browser.newContext({baseURL:BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+ const context=await browser.newContext({baseURL:requireRuntimeUrl('base'),storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
  const actor=await context.newPage();const title=`保存失败恢复验证 ${suffix}`;const description='权限恢复前保留当前交付草稿，恢复后保存并核对。';
  try{
   await actor.goto('/login');await expect(actor.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');

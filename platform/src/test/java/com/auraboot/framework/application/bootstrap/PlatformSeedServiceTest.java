@@ -3,7 +3,6 @@ package com.auraboot.framework.application.bootstrap;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 
-import com.auraboot.framework.application.bootstrap.seeder.AgentTemplateSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.CloudConfigSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.I18nBaseSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.MarketplaceCategorySeeder;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -30,14 +28,17 @@ class PlatformSeedServiceTest {
     @Mock private I18nBaseSeeder i18nBaseSeeder;
     @Mock private CloudConfigSeeder cloudConfigSeeder;
     @Mock private MarketplaceCategorySeeder marketplaceCategorySeeder;
-    @Mock private AgentTemplateSeeder agentTemplateSeeder;
+    @Mock private PlatformSeedContributor agentTemplateSeeder;
     @Mock private SolutionSeeder solutionSeeder;
     @Mock private I18nOverrideAuditor i18nOverrideAuditor;
 
-    @InjectMocks private PlatformSeedService service;
+    private PlatformSeedService service;
 
     @BeforeEach
     void stubAudits() {
+        service = new PlatformSeedService(authAppearanceSeeder, systemFieldSeeder, queryOperatorSeeder,
+                i18nBaseSeeder, cloudConfigSeeder, marketplaceCategorySeeder,
+                List.of(agentTemplateSeeder), solutionSeeder, i18nOverrideAuditor);
         for (String locale : List.of("zh-CN", "en-US")) {
             when(i18nOverrideAuditor.audit(locale))
                     .thenReturn(new I18nOverrideAuditor.OverrideAuditReport(locale, 0, 0, 0, List.of()));

@@ -1,4 +1,6 @@
-package com.auraboot.framework.behavior.service;
+package com.auraboot.framework.agent.integration.behavior;
+
+import com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.TurnContext;

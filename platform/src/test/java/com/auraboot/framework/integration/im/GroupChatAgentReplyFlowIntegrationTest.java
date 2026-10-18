@@ -4,7 +4,7 @@ import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.agent.port.AgentTurnOverrides;
-import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
+import com.auraboot.framework.im.event.ImMessageSentEvent;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;

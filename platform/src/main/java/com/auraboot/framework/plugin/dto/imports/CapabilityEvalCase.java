@@ -1,4 +1,4 @@
-package com.auraboot.framework.agent.dto;
+package com.auraboot.framework.plugin.dto.imports;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

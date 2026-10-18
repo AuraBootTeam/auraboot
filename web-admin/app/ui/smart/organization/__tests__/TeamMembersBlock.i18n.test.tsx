@@ -7,6 +7,8 @@ import teamPage from '../../../../../../plugins/org-management/config/pages/ab_t
 const f = vi.hoisted(() => ({ locale: 'en-US', fetch: vi.fn(), add: vi.fn(), remove: vi.fn(), post: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (code: string) => code === 'org.team.manage' }) }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: f.locale, t: (key: string) => key }) }));
+// Locale fixtures exercise the authorized manager; denial is covered by the access suite.
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (permission: string) => permission === 'org.team.manage' }) }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showSuccessToast: f.success, showErrorToast: f.error }) }));
 vi.mock('~/shared/services/teamService', () => ({ fetchTeamMembers: f.fetch, addTeamMember: f.add, removeTeamMember: f.remove }));
 vi.mock('~/shared/services/http-client', () => ({ post: f.post }));

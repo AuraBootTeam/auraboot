@@ -1,6 +1,5 @@
 package com.auraboot.framework.observability;
 
-import com.auraboot.framework.agent.trace.GenAiUsageRecorder;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -79,11 +78,11 @@ public class ObservabilityController {
         business.put("llmRequests", sumCounter("auraboot_llm_requests_total"));
         business.put("llmTokensTotal", sumCounter("auraboot_llm_token_usage_total"));
         business.put("llmLedgerWriteFailures",
-                sumCounter(GenAiUsageRecorder.METRIC_WRITE_FAILURE));
+                sumCounter(LlmUsageMetrics.METRIC_WRITE_FAILURE));
         business.put("llmUnpricedCalls",
-                sumCounter(GenAiUsageRecorder.METRIC_UNPRICED));
+                sumCounter(LlmUsageMetrics.METRIC_UNPRICED));
         business.put("llmCacheUnpricedCalls",
-                sumCounter(GenAiUsageRecorder.METRIC_CACHE_UNPRICED));
+                sumCounter(LlmUsageMetrics.METRIC_CACHE_UNPRICED));
         snapshot.put("business", business);
 
         // Prometheus endpoint info
