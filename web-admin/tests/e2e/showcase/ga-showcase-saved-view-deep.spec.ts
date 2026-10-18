@@ -364,7 +364,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     );
     await page.getByTestId('table-header-sort-sc_code').click();
     await expect(
-      page.getByTestId('table-header-sc_code').locator('svg path[fill="#2563eb"]').first(),
+      page.getByTestId('table-header-sc_code').locator('svg path[fill="var(--color-accent)"]').first(),
     ).toBeVisible({ timeout: 5_000 });
     await sortUpdate;
 
@@ -387,7 +387,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
       timeout: 10_000,
     });
     await expect(
-      page.getByTestId('table-header-sc_code').locator('svg path[fill="#2563eb"]').first(),
+      page.getByTestId('table-header-sc_code').locator('svg path[fill="var(--color-accent)"]').first(),
     ).toBeVisible({ timeout: 5_000 });
   });
 

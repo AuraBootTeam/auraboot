@@ -106,12 +106,12 @@ export function AuthProvider({
       // Prefer permissionCodes (string array)
       const permissionCodes = data.permissions.permissionCodes;
       if (Array.isArray(permissionCodes)) {
-        return permissionCodes.includes(permissionCode);
+        return permissionCodes.includes('*') || permissionCodes.includes(permissionCode);
       }
       // Support legacy format: permissions object array
       const permissions = data.permissions.permissions;
       if (Array.isArray(permissions)) {
-        return permissions.some((p) => p.code === permissionCode);
+        return permissions.some((p) => p.code === '*' || p.code === permissionCode);
       }
       return false;
     };
