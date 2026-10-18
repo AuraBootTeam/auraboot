@@ -129,6 +129,14 @@ Binary, multipart, streaming and configured dynamic transports need their own
 operation-specific boundary and runtime evidence. Type generation does not
 replace serialization, permission, persistence or browser journey tests.
 
+Role membership consumers use generated list/candidate/assignment/removal
+operations through `roleMemberService`. The UI projection discards legacy numeric
+`memberId` and retains `memberPid` for selection, row identity and writes. Nullable
+personal, organization and assignment fields remain null. List responses use the
+actual `page` field; query input uses `pageNum`. Invalid successful data is rejected
+and the existing member surfaces show a retryable read error instead of an empty
+success. This adapter does not certify the other role/permission operations.
+
 ## Datetime formats
 
 `date-time` identifies offset-bearing timestamps such as `Instant`. Default Jackson

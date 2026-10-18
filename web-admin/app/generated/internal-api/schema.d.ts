@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 2f5963dd8857f3dee2758c907aa50acbf7a3f503034a817224c4589043c351e6
+ * Contract SHA-256: a2f07645b379c350b220fd4214827bf904e1507bb26e6113cce7b0bd1e2db9ee
  */
 export interface paths {
     "/api/activities": {
@@ -22657,9 +22657,9 @@ export interface components {
         };
         AddRoleMembersRequest: {
             /** Format: date */
-            effectiveDate?: string;
+            effectiveDate?: string | null;
             /** Format: date */
-            expiryDate?: string;
+            expiryDate?: string | null;
             memberPids?: string[];
         };
         AdminActionView: {
@@ -37830,18 +37830,21 @@ export interface components {
         };
         RoleMemberDTO: {
             /** Format: date-time */
-            assignedAt?: string;
-            departmentName?: string;
+            assignedAt: string | null;
+            departmentName: string | null;
             /** Format: date */
-            effectiveDate?: string;
-            email?: string;
+            effectiveDate: string | null;
+            email: string | null;
             /** Format: date */
-            expiryDate?: string;
-            /** Format: int64 */
-            memberId?: number;
-            memberPid?: string;
-            positionName?: string;
-            userName?: string;
+            expiryDate: string | null;
+            /**
+             * Format: int64
+             * @description Legacy numeric member identifier; browser consumers use memberPid
+             */
+            memberId: number;
+            memberPid: string;
+            positionName: string | null;
+            userName: string | null;
         };
         RoleMemberTreeResponse: {
             departments?: components["schemas"]["DeptUserTreeNode"][];

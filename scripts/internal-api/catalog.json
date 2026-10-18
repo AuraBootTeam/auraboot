@@ -431,6 +431,31 @@
           "path": "/api/org/departments/permitted-tree"
         }
       ]
+    },
+    "roleMemberBrowser": {
+      "purpose": "Four role membership operations through the actual role menu with owned public-PID selection and persistence; not complete role, cross-tenant or time-window acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-role-members.spec.ts",
+      "tests": [
+        "generated role memberships preserve public PID selection assignment reload and removal"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/roles/{rolePid}/members"
+        },
+        {
+          "method": "get",
+          "path": "/api/roles/{rolePid}/members/candidates"
+        },
+        {
+          "method": "post",
+          "path": "/api/roles/{rolePid}/members/assign"
+        },
+        {
+          "method": "post",
+          "path": "/api/roles/{rolePid}/members/remove"
+        }
+      ]
     }
   },
   "scenarios": [
@@ -940,6 +965,42 @@
       "dependencies": "real-stack",
       "authority": "regression",
       "driver": "browser"
+    },
+    {
+      "id": "ROLEMEM-01",
+      "feature": "role-members",
+      "action": "menu-empty",
+      "branch": "happy",
+      "expected": "An owned empty role shows the member entry through the actual Roles menu",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-01-menu-empty.png"
+    },
+    {
+      "id": "ROLEMEM-02",
+      "feature": "role-members",
+      "action": "candidate-selection",
+      "branch": "happy",
+      "expected": "Nullable enrichment remains blank and selection uses the public member PID",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-02-candidate-selection.png"
+    },
+    {
+      "id": "ROLEMEM-03",
+      "feature": "role-members",
+      "action": "assignment-reload",
+      "branch": "happy",
+      "expected": "The assigned member remains after reload with the same public identity",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-03-assignment-reload.png"
+    },
+    {
+      "id": "ROLEMEM-04",
+      "feature": "role-members",
+      "action": "removal-reload",
+      "branch": "happy",
+      "expected": "Removal submits the public member PID array and reload shows an empty role",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-04-removal-reload.png"
     }
   ]
 }

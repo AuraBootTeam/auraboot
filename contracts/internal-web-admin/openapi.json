@@ -611,11 +611,17 @@
         "properties": {
           "effectiveDate": {
             "format": "date",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "expiryDate": {
             "format": "date",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "memberPids": {
             "items": {
@@ -44839,23 +44845,39 @@
         "properties": {
           "assignedAt": {
             "format": "date-time",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "departmentName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "effectiveDate": {
             "format": "date",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "email": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "expiryDate": {
             "format": "date",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "memberId": {
+            "description": "Legacy numeric member identifier; browser consumers use memberPid",
             "format": "int64",
             "type": "integer"
           },
@@ -44863,12 +44885,29 @@
             "type": "string"
           },
           "positionName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "userName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
+        "required": [
+          "assignedAt",
+          "departmentName",
+          "effectiveDate",
+          "email",
+          "expiryDate",
+          "memberId",
+          "memberPid",
+          "positionName",
+          "userName"
+        ],
         "type": "object"
       },
       "RoleMemberTreeResponse": {

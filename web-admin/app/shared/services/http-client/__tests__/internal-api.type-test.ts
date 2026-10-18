@@ -36,6 +36,15 @@ function consumer() {
   // @ts-expect-error response schema fields cannot be substituted for the request DTO
   internalRequest('post', '/api/meta/dict', { body: { pid: 'wrong-input' } });
   internalRequest('get', '/api/user/profile');
+  internalRequest('get', '/api/roles/{rolePid}/members', {path:{rolePid:'role-pid'},query:{pageNum:1,pageSize:20}});
+  internalRequest('post', '/api/roles/{rolePid}/members/remove', {path:{rolePid:'role-pid'},body:['member-pid']});
+  internalRequest('post', '/api/roles/{rolePid}/members/assign', {path:{rolePid:'role-pid'},body:{memberPids:['member-pid'],expiryDate:null}});
+  // @ts-expect-error role membership writes use member PID strings
+  internalRequest('post', '/api/roles/{rolePid}/members/remove', {path:{rolePid:'role-pid'},body:[123]});
+  // @ts-expect-error the backend list query accepts pageNum rather than page
+  internalRequest('get', '/api/roles/{rolePid}/members', {path:{rolePid:'role-pid'},query:{page:1}});
+  // @ts-expect-error role PID cannot be substituted by a legacy numeric role ID
+  internalRequest('get', '/api/roles/{rolePid}/members', {path:{rolePid:123}});
   internalRequest('put', '/api/user/profile', { body: { imgId: 'file-owned' } });
   internalFormRequest('post', '/api/user/avatar/upload', { body: { file: new Blob(['image']) } });
   // @ts-expect-error the authenticated identity is injected by the server

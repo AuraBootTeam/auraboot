@@ -26,9 +26,22 @@ function fixture() {
 }
 function withFixture(run) { const f = fixture(); try { run(f); } finally { fs.rmSync(f.root, { recursive: true, force: true }); } }
 function rebindReport(f) { f.reportBytes = Buffer.from(JSON.stringify(f.report)); f.after.reportSha256 = sha256(f.reportBytes); f.review.reportSha256 = f.after.reportSha256; }
+function roleMemberObservation(f, denials) {
+  const name='role-member-browser-observations';
+  f.registry.tests[0].requiredEvidence[0].name=name;
+  f.expected.registrySha256=sha256(canonicalJson(f.registry));
+  f.before.identity.registrySha256=f.after.identity.registrySha256=f.expected.registrySha256;
+  const attachment=f.report.suites[0].specs[0].tests[0].results[0].attachments[0];
+  const payload=JSON.parse(Buffer.from(attachment.body,'base64'));
+  payload.denials=denials;attachment.name=name;attachment.body=Buffer.from(JSON.stringify(payload)).toString('base64');
+  rebindReport(f);
+}
+const roleMemberDenials=['anonymous','no-role'].flatMap(actor=>[['get',''],['get','/candidates'],['post','/assign'],['post','/remove']]
+  .map(([method,suffix])=>({actor,method,suffix,status:actor==='anonymous'?401:403})));
 
 test('browser evidence separates functional execution from exact original review and source runtime identity', () => withFixture(f => {
   const accepted = auditBrowserEvidence(f); assert.equal(accepted.counts.passed, 1); assert.equal(accepted.responses, 1); assert.equal(accepted.visualVerdict, 'pass');
+  roleMemberObservation(f,roleMemberDenials);assert.equal(auditBrowserEvidence(f).responses,1);
   // Distinct journeys may legitimately land on the same login/settings screen.
   const second = path.join(f.root, 'SAMPLE-02.png'); fs.copyFileSync(f.originals[0].path, second);
   f.originals.push({ id: 'SAMPLE-02', path: second });
@@ -46,6 +59,9 @@ test('browser evidence separates functional execution from exact original review
 test('browser evidence rejects stale failed skipped retried missing mismatched or unreviewed attempts', () => {
   const mutations = [
     f => { f.after.nonce = 'different'; }, f => { f.before.identity.sourceCommit = 'f'.repeat(40); },
+    f => { roleMemberObservation(f,roleMemberDenials.slice(1)); },
+    f => { roleMemberObservation(f,roleMemberDenials.map(row=>({...row,status:200}))); },
+    f => { roleMemberObservation(f,[roleMemberDenials[1],...roleMemberDenials.slice(1)]); },
     f => { f.after.identity.runtimeManifestSha256 = 'f'.repeat(64); }, f => { f.after.sourceUnchanged = false; },
     f => { f.before.runtimeVerified = false; }, f => { f.after.exitCode = 1; },
     f => { f.after.reportSha256 = 'f'.repeat(64); }, f => { f.before.startedAt = '2026-10-19T00:00:02Z'; },

@@ -31,7 +31,7 @@ function auditObservation(name, value) {
   if (value.sessionCleanup) sessionTree(value.sessionCleanup);
   const sessionRequired = ['profile-wire-observations','profile-email-only-observations','saved-view-wire-observations',
     'saved-view-browser-observations','team-wire-observations','team-browser-observations','team-role-observations',
-    'session-operation-observations','tenant-member-search-observations','session-compatibility-evidence','department-tree-observations'];
+    'session-operation-observations','tenant-member-search-observations','session-compatibility-evidence','department-tree-observations','role-member-browser-observations'];
   if (sessionRequired.includes(name)) requireCondition(Array.isArray(value.sessionCleanup) && value.sessionCleanup.length > 0, `Missing owned session cleanup: ${name}`);
   const rows = value.rows ?? value.reads ?? value.checks;
   requireCondition(Array.isArray(rows) && rows.length > 0, `Empty operation observations: ${name}`);
@@ -45,6 +45,13 @@ function auditObservation(name, value) {
     && row.shape.errors.length === 0 && Number.isInteger(row.status), `Invalid response structure observation: ${name}`);
   if (name === 'team-role-observations') requireCondition(Array.isArray(value.denials)
     && value.denials.length === 12 && value.denials.every(row => row.status === 403), 'Missing team role refusal probes');
+  if (name === 'role-member-browser-observations') {
+    const expected = ['anonymous','no-role'].flatMap(actor=>['get ','get /candidates','post /assign','post /remove'].map(op=>`${actor} ${op}`)).sort();
+    requireCondition(Array.isArray(value.denials) && value.denials.length===8
+      && value.denials.every(row=>row.status===(row.actor==='anonymous'?401:403))
+      && isDeepStrictEqual(value.denials.map(row=>`${row.actor} ${row.method} ${row.suffix}`).sort(),expected),
+    'Missing role member refusal probes');
+  }
   return rows.length;
 }
 
