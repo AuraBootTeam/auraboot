@@ -4,10 +4,11 @@
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Required env vars (set in .env or export):
-#   REGISTRY     — e.g. ghcr.io/aurabootteam
-#   TAG          — e.g. latest, v1.0.0, main, or a commit sha
-#   DB_PASSWORD  — PostgreSQL password (override default)
+# Required env vars (set in .env or export; the two secrets fail fast if unset):
+#   REGISTRY          — e.g. ghcr.io/aurabootteam
+#   TAG               — e.g. latest, v1.0.0, main, or a commit sha
+#   POSTGRES_PASSWORD — PostgreSQL password (no default in prod)
+#   JWT_SECRET        — JWT signing secret, min 32 chars (openssl rand -hex 32)
 
 services:
   backend:
@@ -19,9 +20,13 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aura_boot}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-auraboot}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production deployments}
+      # Boot 3 binds spring.data.redis.* — SPRING_REDIS_* is silently ignored.
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # Required: without it the stack inherits the local-eval default, which the
+      # app-side guard does not recognize, so a weak secret would boot in prod.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for production deployments (min 32 chars, openssl rand -hex 32)}
       JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC"
             # Default-deny authorization knob (PermissionInterceptor un-annotated surface,
       # shipped deny since the authz flip); ops can override to shadow/allow per
