@@ -366,7 +366,12 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(
       page.getByTestId('table-header-sc_code').locator('svg path[fill="var(--color-accent)"]').first(),
     ).toBeVisible({ timeout: 5_000 });
-    await sortUpdate;
+    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+    await page.getByTestId('personal-view-save-current').click();
+    const savedSort = await sortUpdate;
+    expect(savedSort.ok()).toBe(true);
+    expect((await savedSort.json()).code).toBe('0');
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
 
     await expect
       .poll(
@@ -425,8 +430,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await page.getByTestId('column-settings-width-sc_name').fill('260');
     await expect(priceVisibleToggle).not.toBeChecked();
     await page.getByTestId('column-settings-save').click();
-    await columnUpdate;
     await expect(panel).toBeHidden({ timeout: 5_000 });
+    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+    await page.getByTestId('personal-view-save-current').click();
+    const savedColumns = await columnUpdate;
+    expect(savedColumns.ok()).toBe(true);
+    expect((await savedColumns.json()).code).toBe('0');
+    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
 
     await expect
       .poll(
