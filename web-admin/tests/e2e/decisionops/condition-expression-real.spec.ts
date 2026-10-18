@@ -443,6 +443,7 @@ test('E10 a real reader can inspect nested conditions but cannot edit, publish o
       expect(permissions).not.toContain(code);
     await navigateToMenuByClick(reader, ['条件片段库']);
     await reader.getByPlaceholder('搜索片段编码、名称').fill(key);
+    await reader.getByTestId('cfl-refresh').click();
     await reader.getByTestId(`cfl-row-${key}`).click();
     const view = reader.getByTestId('cfl-readonly-condition');
     await expect(view).toBeVisible();
@@ -510,6 +511,7 @@ test('E10 a real reader can inspect nested conditions but cannot edit, publish o
     await expect(reader.getByTestId('cfl-readonly-condition')).toBeVisible();
     await expect(reader.getByTestId('cfl-open-create')).toBeDisabled();
     await reader.getByPlaceholder('搜索片段编码、名称').fill(key);
+    await reader.getByTestId('cfl-refresh').click();
     await expect(reader.getByTestId('cfl-count')).toHaveText('1');
     await shot(reader, 'E10-readonly');
     await reader.getByLabel('group-not-2', {exact:true}).scrollIntoViewIfNeeded();
