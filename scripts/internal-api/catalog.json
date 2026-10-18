@@ -140,6 +140,32 @@
       "tests": [
         "all registered dictionary operations satisfy their real JSON response structures"
       ]
+    },
+    "profile": {
+      "purpose": "Owned username-only profile and avatar journey with existing password policy; not all authorization or tenant coverage",
+      "spec": "web-admin/tests/e2e/model/internal-api-profile.spec.ts",
+      "tests": [
+        "generated profile operations persist an owned avatar and no-email profile",
+        "anonymous profile access is refused"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/user/profile"
+        },
+        {
+          "method": "put",
+          "path": "/api/user/profile"
+        },
+        {
+          "method": "post",
+          "path": "/api/user/avatar/upload"
+        },
+        {
+          "method": "put",
+          "path": "/api/user/password"
+        }
+      ]
     }
   },
   "scenarios": [
@@ -333,6 +359,71 @@
       "expected": "A real empty tree accepts a root through its item editor, sends the declared PUT payload and retains the root after reload and cascade API read",
       "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
       "screenshot": "DICT-15-tree-root-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-01",
+      "feature": "profile",
+      "action": "view-no-email",
+      "branch": "empty",
+      "expected": "A username-only owned account opens the real profile page with null email and a correctly converted fixture timestamp",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-01-view-no-email.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-02",
+      "feature": "profile",
+      "action": "edit-no-email",
+      "branch": "happy",
+      "expected": "The profile form allows no-email accounts and keeps credential fields read-only",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-02-edit-no-email.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-03",
+      "feature": "profile",
+      "action": "upload-avatar",
+      "branch": "state-transition",
+      "expected": "The browser sends a real multipart file and previews the returned file URL",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-03-upload-avatar.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-04",
+      "feature": "profile",
+      "action": "save-reload-avatar",
+      "branch": "state-transition",
+      "expected": "Saving submits imgId, and both avatar bytes and profile changes survive a full reload",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-04-save-reload-avatar.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-05",
+      "feature": "profile",
+      "action": "anonymous",
+      "branch": "permission",
+      "expected": "Anonymous profile navigation redirects to login and internal reads are refused",
+      "test": "anonymous profile access is refused",
+      "screenshot": "PROFILE-05-anonymous.png",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",

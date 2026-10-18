@@ -1,4 +1,4 @@
-import { internalRequest } from '../internal-api';
+import { internalRequest, internalFormRequest } from '../internal-api';
 import type { InternalRequestInput } from '../internal-api';
 
 // Type-only conformance examples; this function is never executed by a runner.
@@ -35,6 +35,22 @@ function consumer() {
   const missing: InternalRequestInput<'post', '/api/meta/dict'> = { body: {} };
   // @ts-expect-error response schema fields cannot be substituted for the request DTO
   internalRequest('post', '/api/meta/dict', { body: { pid: 'wrong-input' } });
+  internalRequest('get', '/api/user/profile');
+  internalRequest('put', '/api/user/profile', { body: { imgId: 'file-owned' } });
+  internalFormRequest('post', '/api/user/avatar/upload', { body: { file: new Blob(['image']) } });
+  // @ts-expect-error the authenticated identity is injected by the server
+  internalRequest('get', '/api/user/profile', { query: { userId: 'other-user' } });
+  // @ts-expect-error avatar bytes cannot be supplied through the JSON operation
+  internalRequest('post', '/api/user/avatar/upload', { body: { file: new Blob([]) } });
+  // @ts-expect-error multipart file is required
+  internalFormRequest('post', '/api/user/avatar/upload', { body: {} });
+  // @ts-expect-error binary multipart parts are Blob/File values, not strings
+  internalFormRequest('post', '/api/user/avatar/upload', { body: { file: 'file-string' } });
+  internalFormRequest('post', '/api/user/avatar/upload', {
+    body: { file: new Blob([]) },
+    // @ts-expect-error JSON options cannot override the generated multipart body
+    options: { body: {} },
+  });
   return missing;
 }
 export type InternalConsumerFixture = typeof consumer;

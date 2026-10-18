@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   internalRequest,
+  internalFormRequest,
   serializeInternalQuery,
   serializeInternalFormData,
 } from '../internal-api';
@@ -95,6 +96,28 @@ describe('generated internal operation transport', () => {
     expect(String(url)).toMatch(/\/api\/meta\/dict$/);
     expect(JSON.parse(String(init?.body))).toEqual(body);
     expect(init?.signal).toBe(controller.signal);
+  });
+
+  it('sends generated multipart parts through the same request stack with a fetch-owned boundary', async () => {
+    const file = new File(['actual bytes'], 'owned.png', { type: 'image/png' });
+    const controller = new AbortController();
+    await internalFormRequest('post', '/api/user/avatar/upload', {
+      body: { file },
+      options: { signal: controller.signal },
+    });
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/user\/avatar\/upload$/);
+    expect(init?.body).toBeInstanceOf(FormData);
+    expect((init?.body as FormData).get('file')).toBe(file);
+    expect(new Headers(init?.headers).has('Content-Type')).toBe(false);
+    expect(init?.credentials).toBe('include');
+    expect(init?.signal).toBe(controller.signal);
+    activateAuthoringPreviewGuard('session-pid');
+    const blocked = await internalFormRequest('post', '/api/user/avatar/upload', {
+      body: { file },
+    });
+    expect(blocked.code).toBe('authoring_preview_write_blocked');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('retains the authoring preview write guard on generated operations', async () => {

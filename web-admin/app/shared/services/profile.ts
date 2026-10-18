@@ -1,90 +1,81 @@
-import { fetchResult } from '~/shared/services/http-client';
+import { internalFormRequest, internalRequest } from '~/shared/services/http-client/internal-api';
 import { ResultHelper } from '~/utils/type';
-import type { UserProfile, UpdateUserProfileRequest } from '~/types/profile';
+import type {
+  UserProfile,
+  UserProfileWire,
+  UpdateUserProfileRequest,
+  FileUploadResponse,
+  FileUploadResponseWire,
+} from '~/types/profile';
 
-/**
- * 获取当前用户的个人资料
- */
-export async function getUserProfile(request: Request): Promise<UserProfile | null> {
-  const result = await fetchResult<UserProfile>(
-    '/api/user/profile',
-    {
-      method: 'get',
-    },
-    request,
-  );
-
-  if (!ResultHelper.isSuccess(result) || !result.data) {
-    console.error('获取用户资料失败:', result.desc || result.message);
-    throw new Error(result.desc || result.message || '获取用户资料失败');
+function profileForView(data: UserProfileWire | null | undefined): UserProfile {
+  if (
+    !data ||
+    Array.isArray(data) ||
+    typeof data.pid !== 'string' ||
+    !data.pid ||
+    typeof data.userName !== 'string' ||
+    !data.userName
+  ) {
+    throw new Error('Profile response is missing its identity');
   }
-
-  return result.data;
+  return { ...data, pid: data.pid, userName: data.userName };
 }
 
-/**
- * 更新用户个人资料
- */
+function uploadForView(data: FileUploadResponseWire | null | undefined): FileUploadResponse {
+  if (
+    !data ||
+    Array.isArray(data) ||
+    typeof data.fileId !== 'string' ||
+    !data.fileId ||
+    typeof data.url !== 'string' ||
+    !data.url
+  ) {
+    throw new Error('Avatar upload response is missing its file identity or URL');
+  }
+  return { ...data, fileId: data.fileId, url: data.url };
+}
+
+export async function getUserProfile(request: Request): Promise<UserProfile> {
+  const result = await internalRequest('get', '/api/user/profile', { request });
+  if (!ResultHelper.isSuccess(result))
+    throw new Error(result.desc || result.message || 'Failed to load profile');
+  return profileForView(result.data);
+}
+
 export async function updateUserProfile(
   request: Request,
   profileData: UpdateUserProfileRequest,
-): Promise<UserProfile | null> {
-  const result = await fetchResult<UserProfile>(
-    '/api/user/profile',
-    {
-      method: 'put',
-      params: profileData,
-    },
-    request,
-  );
-
-  if (!ResultHelper.isSuccess(result)) {
-    console.error('更新用户资料失败:', result.desc);
-    throw new Error(result.desc || '更新失败');
-  }
-
-  return result.data;
+): Promise<UserProfile> {
+  const result = await internalRequest('put', '/api/user/profile', { body: profileData, request });
+  if (!ResultHelper.isSuccess(result))
+    throw new Error(result.desc || result.message || 'Failed to update profile');
+  return profileForView(result.data);
 }
 
-/**
- * 上传用户头像
- */
-export async function uploadAvatar(file: File, request?: Request): Promise<string | null> {
-  let token: string | null | undefined;
-  if (request) {
-    // Dynamic import to avoid pulling server-only session module into client bundle
-    const { getTokenFromRequest } = await import('~/shared/services/session');
-    token = await getTokenFromRequest(request);
-  }
-  const formData = new FormData();
-  formData.append('file', file);
+export async function uploadAvatar(file: File, request?: Request): Promise<FileUploadResponse> {
+  const result = await internalFormRequest('post', '/api/user/avatar/upload', {
+    body: { file },
+    request,
+  });
+  if (!ResultHelper.isSuccess(result))
+    throw new Error(result.desc || result.message || 'Failed to upload avatar');
+  return uploadForView(result.data);
+}
 
-  const headers: HeadersInit = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  try {
-    const response = await fetch('/api/user/avatar/upload', {
-      method: 'post',
-      headers,
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP错误: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (!ResultHelper.isSuccess(result)) {
-      console.error('上传头像失败:', result.desc);
-      throw new Error(result.desc || '上传失败');
-    }
-
-    return result.data;
-  } catch (error) {
-    console.error('上传头像失败:', error);
-    throw error;
-  }
+/** Only mutable profile fields enter the JSON operation; credentials use verified flows. */
+export function profileUpdateFromFormData(form: FormData): UpdateUserProfileRequest {
+  const text = (name: string) => {
+    const value = form.get(name);
+    if (value !== null && typeof value !== 'string')
+      throw new Error(`Invalid profile field: ${name}`);
+    return value || undefined;
+  };
+  return {
+    nickName: text('nickName'),
+    mobile: text('mobile'),
+    area: text('area'),
+    signature: text('signature'),
+    imgId: text('imgId'),
+  };
 }

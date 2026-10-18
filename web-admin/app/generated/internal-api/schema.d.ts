@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: f25ffcf1a8a98840b2c7db7741291532def070f3df1b39aa32d59e9f3af355f9
+ * Contract SHA-256: 154f2d26998f525f1857c251d40568ddc10a6ccd8b4ed0594379bb004ee36807
  */
 export interface paths {
     "/api/activities": {
@@ -31963,14 +31963,14 @@ export interface components {
             fileIds?: string[];
         };
         FileUploadResponseDTO: {
-            cloudPath?: string;
+            cloudPath?: string | null;
             /** Format: int64 */
-            createdBy?: number;
+            createdBy?: number | null;
             fileId?: string;
-            fileName?: string;
+            fileName?: string | null;
             /** Format: int64 */
             fileSize?: number;
-            mimeType?: string;
+            mimeType?: string | null;
             originalName?: string;
             status?: string;
             /** @enum {string} */
@@ -39450,19 +39450,19 @@ export interface components {
             content?: string;
         };
         UserProfileResponse: {
-            area?: string;
-            avatarUrl?: string;
+            area?: string | null;
+            avatarUrl?: string | null;
             /** Format: local-date-time */
-            createdAt?: string;
-            email?: string;
+            createdAt?: string | null;
+            email?: string | null;
             emailVerified?: boolean;
-            imgId?: string;
+            imgId?: string | null;
             /** Format: local-date-time */
-            lastSignInAt?: string;
-            mobile?: string;
-            nickName?: string;
+            lastSignInAt?: string | null;
+            mobile?: string | null;
+            nickName?: string | null;
             pid?: string;
-            signature?: string;
+            signature?: string | null;
             userName?: string;
         };
         UserProjectBinding: {
@@ -41107,9 +41107,7 @@ export interface operations {
     };
     saveRate: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -42686,9 +42684,7 @@ export interface operations {
     };
     provisionUser: {
         parameters: {
-            query: {
-                currentUserId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -42780,9 +42776,7 @@ export interface operations {
     };
     provisionEmployeeAccounts: {
         parameters: {
-            query: {
-                currentUserId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -42817,8 +42811,6 @@ export interface operations {
         requestBody?: {
             content: {
                 "multipart/form-data": {
-                    /** Format: int64 */
-                    currentUserId?: number;
                     /** Format: binary */
                     file: Blob;
                 };
@@ -49050,9 +49042,7 @@ export interface operations {
     };
     createCategory: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -49098,9 +49088,7 @@ export interface operations {
     };
     updateCategory: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 pid: string;
@@ -54988,9 +54976,7 @@ export interface operations {
     };
     getFile: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 fileId: string;
@@ -55012,9 +54998,7 @@ export interface operations {
     };
     deleteFile: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 fileId: string;
@@ -55036,9 +55020,7 @@ export interface operations {
     };
     deleteFiles: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -55062,9 +55044,7 @@ export interface operations {
     };
     create_19: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -55088,9 +55068,7 @@ export interface operations {
     };
     downloadFile: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 fileId: string;
@@ -55112,9 +55090,7 @@ export interface operations {
     };
     getUserFiles: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -55134,9 +55110,7 @@ export interface operations {
     };
     createFileRelation: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -55207,9 +55181,7 @@ export interface operations {
     };
     uploadFile: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -55238,7 +55210,6 @@ export interface operations {
         parameters: {
             query: {
                 files: Blob[];
-                userId: number;
             };
             header?: never;
             path?: never;
@@ -58352,9 +58323,7 @@ export interface operations {
     };
     getUserButtonPermissions: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -58376,7 +58345,6 @@ export interface operations {
         parameters: {
             query: {
                 path: string;
-                userId: number;
             };
             header?: never;
             path?: never;
@@ -58397,9 +58365,7 @@ export interface operations {
     };
     createMenu: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -58445,7 +58411,6 @@ export interface operations {
         parameters: {
             query: {
                 permissionCode: string;
-                userId: number;
             };
             header?: never;
             path?: never;
@@ -58510,9 +58475,7 @@ export interface operations {
     };
     updateMenu: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -58536,9 +58499,7 @@ export interface operations {
     };
     getUserMenus: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -68477,9 +68438,7 @@ export interface operations {
     };
     createTeam: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -68525,9 +68484,7 @@ export interface operations {
     };
     updateTeam: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 pid: string;
@@ -68597,9 +68554,7 @@ export interface operations {
     };
     addMember_1: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 teamPid: string;
@@ -68648,9 +68603,7 @@ export interface operations {
     };
     getCurrentUserTeams_1: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -71814,9 +71767,7 @@ export interface operations {
     };
     getProjectMembers: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 projectPid: string;
@@ -71838,9 +71789,7 @@ export interface operations {
     };
     addMember: {
         parameters: {
-            query: {
-                operatorId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 projectPid: string;
@@ -71868,9 +71817,7 @@ export interface operations {
     };
     removeMember_3: {
         parameters: {
-            query: {
-                operatorId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 projectPid: string;
@@ -71893,9 +71840,7 @@ export interface operations {
     };
     getMyProjects: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -73316,9 +73261,7 @@ export interface operations {
     };
     createRole: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -73364,9 +73307,7 @@ export interface operations {
     };
     updateRole: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 pid: string;
@@ -75143,9 +75084,7 @@ export interface operations {
     };
     getMySpaces: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -75165,9 +75104,7 @@ export interface operations {
     };
     processTenantSelection: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -75191,9 +75128,7 @@ export interface operations {
     };
     getTenant: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 tenantPid: string;
@@ -75215,9 +75150,7 @@ export interface operations {
     };
     updateTenant: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 tenantPid: string;
@@ -75269,9 +75202,7 @@ export interface operations {
     };
     getCurrentTenantInfo: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -75317,9 +75248,7 @@ export interface operations {
     };
     getCurrentInviteCode: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -75342,7 +75271,6 @@ export interface operations {
             query: {
                 expiryDays: number;
                 roleCodes?: string;
-                userId: number;
             };
             header?: never;
             path?: never;
@@ -75365,7 +75293,6 @@ export interface operations {
         parameters: {
             query: {
                 code: string;
-                userId: number;
             };
             header?: never;
             path?: never;
@@ -75388,7 +75315,6 @@ export interface operations {
         parameters: {
             query: {
                 code: string;
-                userId: number;
             };
             header?: never;
             path?: never;
@@ -75431,9 +75357,7 @@ export interface operations {
     };
     getMember: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 memberPid: string;
@@ -75455,9 +75379,8 @@ export interface operations {
     };
     removeMember_2: {
         parameters: {
-            query: {
+            query?: {
                 targetMemberPid?: string;
-                userId: number;
             };
             header?: never;
             path: {
@@ -75480,9 +75403,7 @@ export interface operations {
     };
     approveMember: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 memberPid: string;
@@ -75508,9 +75429,8 @@ export interface operations {
     };
     listOffboardingCandidates: {
         parameters: {
-            query: {
+            query?: {
                 action?: string;
-                userId: number;
             };
             header?: never;
             path: {
@@ -75533,10 +75453,9 @@ export interface operations {
     };
     inspectOffboardingImpact: {
         parameters: {
-            query: {
+            query?: {
                 action?: string;
                 targetMemberPid?: string;
-                userId: number;
             };
             header?: never;
             path: {
@@ -75559,9 +75478,7 @@ export interface operations {
     };
     updateMemberStatus: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 memberPid: string;
@@ -75609,9 +75526,7 @@ export interface operations {
     };
     batchRemoveMembers: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -75635,9 +75550,7 @@ export interface operations {
     };
     batchUpdateMemberStatus: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -75681,9 +75594,7 @@ export interface operations {
     };
     searchMembers: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -75968,7 +75879,6 @@ export interface operations {
         parameters: {
             query: {
                 memberId: number;
-                operatorId: number;
             };
             header?: never;
             path?: never;
@@ -75993,9 +75903,7 @@ export interface operations {
     };
     assignRolesToMemberByCode: {
         parameters: {
-            query: {
-                operatorId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76019,9 +75927,7 @@ export interface operations {
     };
     assignRolesToMemberByPid: {
         parameters: {
-            query: {
-                operatorId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76045,9 +75951,7 @@ export interface operations {
     };
     batchAssignRoles: {
         parameters: {
-            query: {
-                operatorId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76071,9 +75975,7 @@ export interface operations {
     };
     batchAssignRolesByPid: {
         parameters: {
-            query: {
-                operatorId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76266,7 +76168,6 @@ export interface operations {
         parameters: {
             query: {
                 memberId: number;
-                operatorId: number;
             };
             header?: never;
             path?: never;
@@ -76291,9 +76192,7 @@ export interface operations {
     };
     syncMemberRolesByPid: {
         parameters: {
-            query: {
-                operatorId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76317,16 +76216,14 @@ export interface operations {
     };
     uploadAvatar: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
-                "application/json": {
+                "multipart/form-data": {
                     /** Format: binary */
                     file: Blob;
                 };
@@ -76342,13 +76239,92 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseFileUploadResponseDTO"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Permission denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Unsupported request media */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Invalid business request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
         };
     };
     status: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76368,9 +76344,7 @@ export interface operations {
     };
     confirm: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76394,9 +76368,7 @@ export interface operations {
     };
     sendCode: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76420,9 +76392,7 @@ export interface operations {
     };
     changePassword: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76442,13 +76412,92 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Permission denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Unsupported request media */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Invalid business request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
         };
     };
     getUserProfile: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76464,13 +76513,92 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseUserProfileResponse"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Permission denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Unsupported request media */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Invalid business request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
         };
     };
     updateUserProfile: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76490,13 +76618,92 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseUserProfileResponse"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Permission denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Unsupported request media */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Invalid business request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"];
+                };
+            };
         };
     };
     getActiveSessions: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76516,9 +76723,7 @@ export interface operations {
     };
     revokeAllSessions: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -76538,9 +76743,7 @@ export interface operations {
     };
     revokeSession: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 sessionPid: string;

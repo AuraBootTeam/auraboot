@@ -25401,24 +25401,36 @@
       "FileUploadResponseDTO": {
         "properties": {
           "cloudPath": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "createdBy": {
             "format": "int64",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "fileId": {
             "type": "string"
           },
           "fileName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "fileSize": {
             "format": "int64",
             "type": "integer"
           },
           "mimeType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "originalName": {
             "type": "string"
@@ -46199,39 +46211,66 @@
       "UserProfileResponse": {
         "properties": {
           "area": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "avatarUrl": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "createdAt": {
             "format": "local-date-time",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "email": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "emailVerified": {
             "type": "boolean"
           },
           "imgId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "lastSignInAt": {
             "format": "local-date-time",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "mobile": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "nickName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pid": {
             "type": "string"
           },
           "signature": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "userName": {
             "type": "string"
@@ -49341,17 +49380,6 @@
       },
       "post": {
         "operationId": "saveRate",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -51518,17 +51546,6 @@
     "/api/admin/users": {
       "post": {
         "operationId": "provisionUser",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "currentUserId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -51591,17 +51608,6 @@
     "/api/admin/users/employee-accounts": {
       "post": {
         "operationId": "provisionEmployeeAccounts",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "currentUserId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -51657,10 +51663,6 @@
             "multipart/form-data": {
               "schema": {
                 "properties": {
-                  "currentUserId": {
-                    "format": "int64",
-                    "type": "integer"
-                  },
                   "file": {
                     "format": "binary",
                     "type": "string"
@@ -60740,17 +60742,6 @@
       },
       "post": {
         "operationId": "createCategory",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -60944,15 +60935,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -69740,17 +69722,6 @@
     "/api/file/batch": {
       "delete": {
         "operationId": "deleteFiles",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -69784,17 +69755,6 @@
     "/api/file/create": {
       "post": {
         "operationId": "create_19",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -69833,15 +69793,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -69865,17 +69816,6 @@
     "/api/file/list": {
       "get": {
         "operationId": "getUserFiles",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -69896,17 +69836,6 @@
     "/api/file/relation": {
       "post": {
         "operationId": "createFileRelation",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -70021,17 +69950,6 @@
     "/api/file/upload": {
       "post": {
         "operationId": "uploadFile",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -70082,15 +70000,6 @@
               },
               "type": "array"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -70121,15 +70030,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -70157,15 +70057,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -74532,17 +74423,6 @@
     "/api/menu/buttons": {
       "get": {
         "operationId": "getUserButtonPermissions",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -74564,15 +74444,6 @@
       "get": {
         "operationId": "getMenuByPath",
         "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          },
           {
             "in": "query",
             "name": "path",
@@ -74602,17 +74473,6 @@
     "/api/menu/create": {
       "post": {
         "operationId": "createMenu",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -74664,15 +74524,6 @@
       "get": {
         "operationId": "checkMenuPermission",
         "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          },
           {
             "in": "query",
             "name": "permissionCode",
@@ -74764,17 +74615,6 @@
     "/api/menu/update": {
       "put": {
         "operationId": "updateMenu",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -74806,17 +74646,6 @@
       "get": {
         "description": "Returns the sidebar menu tree for the current authenticated user based on their roles and permissions.",
         "operationId": "getUserMenus",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -88889,17 +88718,6 @@
       },
       "post": {
         "operationId": "createTeam",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -88930,17 +88748,6 @@
     "/api/org/teams/current-user": {
       "get": {
         "operationId": "getCurrentUserTeams_1",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -89025,15 +88832,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "requestBody": {
@@ -89101,15 +88899,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -94026,17 +93815,6 @@
     "/api/projects/me/projects": {
       "get": {
         "operationId": "getMyProjects",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -94065,15 +93843,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -94101,15 +93870,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -94156,15 +93916,6 @@
           {
             "in": "path",
             "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "operatorId",
             "required": true,
             "schema": {
               "format": "int64",
@@ -96348,17 +96099,6 @@
       },
       "post": {
         "operationId": "createRole",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -96472,15 +96212,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -99015,17 +98746,6 @@
     "/api/tenant-selection/my-spaces": {
       "get": {
         "operationId": "getMySpaces",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -99046,17 +98766,6 @@
     "/api/tenant-selection/process": {
       "post": {
         "operationId": "processTenantSelection",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -99128,17 +98837,6 @@
     "/api/tenant/info": {
       "get": {
         "operationId": "getCurrentTenantInfo",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -99200,17 +98898,6 @@
     "/api/tenant/invite-code/current": {
       "get": {
         "operationId": "getCurrentInviteCode",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -99232,15 +98919,6 @@
       "post": {
         "operationId": "generateInviteCode",
         "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          },
           {
             "in": "query",
             "name": "expiryDays",
@@ -99287,15 +98965,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -99325,15 +98994,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -99387,17 +99047,6 @@
     "/api/tenant/members/batch-delete": {
       "post": {
         "operationId": "batchRemoveMembers",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -99431,17 +99080,6 @@
     "/api/tenant/members/batch-status": {
       "post": {
         "operationId": "batchUpdateMemberStatus",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -99492,17 +99130,6 @@
     "/api/tenant/members/search": {
       "post": {
         "operationId": "searchMembers",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -99549,15 +99176,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -99585,15 +99203,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -99624,15 +99233,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -99683,15 +99283,6 @@
               "default": "remove",
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -99739,15 +99330,6 @@
               "default": "remove",
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -99777,15 +99359,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -99857,15 +99430,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -99893,15 +99457,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
             }
           }
         ],
@@ -100279,15 +99834,6 @@
               "format": "int64",
               "type": "integer"
             }
-          },
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "requestBody": {
@@ -100325,17 +99871,6 @@
     "/api/user-roles/assign-by-code": {
       "post": {
         "operationId": "assignRolesToMemberByCode",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -100366,17 +99901,6 @@
     "/api/user-roles/assign-by-pid": {
       "post": {
         "operationId": "assignRolesToMemberByPid",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -100408,17 +99932,6 @@
       "post": {
         "deprecated": true,
         "operationId": "batchAssignRoles",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -100453,17 +99966,6 @@
     "/api/user-roles/batch-assign-by-pid": {
       "post": {
         "operationId": "batchAssignRolesByPid",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -100769,15 +100271,6 @@
               "format": "int64",
               "type": "integer"
             }
-          },
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
           }
         ],
         "requestBody": {
@@ -100815,17 +100308,6 @@
     "/api/user-roles/sync-by-pid": {
       "put": {
         "operationId": "syncMemberRolesByPid",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "operatorId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -100916,20 +100398,9 @@
     "/api/user/avatar/upload": {
       "post": {
         "operationId": "uploadAvatar",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
                 "properties": {
                   "file": {
@@ -100943,7 +100414,8 @@
                 "type": "object"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -100955,6 +100427,96 @@
               }
             },
             "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Permission denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Upload too large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Unsupported request media"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid business request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Internal error"
           }
         },
         "summary": "上传头像",
@@ -100966,17 +100528,6 @@
     "/api/user/email-link": {
       "get": {
         "operationId": "status",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -100997,17 +100548,6 @@
     "/api/user/email-link/confirm": {
       "post": {
         "operationId": "confirm",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -101038,17 +100578,6 @@
     "/api/user/email-link/send-code": {
       "post": {
         "operationId": "sendCode",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -101079,17 +100608,6 @@
     "/api/user/password": {
       "put": {
         "operationId": "changePassword",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -101110,6 +100628,96 @@
               }
             },
             "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Permission denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Upload too large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Unsupported request media"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid business request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Internal error"
           }
         },
         "summary": "修改密码",
@@ -101121,17 +100729,6 @@
     "/api/user/profile": {
       "get": {
         "operationId": "getUserProfile",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -101142,6 +100739,96 @@
               }
             },
             "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Permission denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Upload too large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Unsupported request media"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid business request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Internal error"
           }
         },
         "summary": "获取个人资料",
@@ -101151,17 +100838,6 @@
       },
       "put": {
         "operationId": "updateUserProfile",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -101182,6 +100858,96 @@
               }
             },
             "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Permission denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Upload too large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Unsupported request media"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Invalid business request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            },
+            "description": "Internal error"
           }
         },
         "summary": "更新个人资料",
@@ -101193,17 +100959,6 @@
     "/api/user/sessions": {
       "delete": {
         "operationId": "revokeAllSessions",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -101223,17 +100978,6 @@
       },
       "get": {
         "operationId": "getActiveSessions",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -101277,15 +101021,6 @@
       "delete": {
         "operationId": "revokeSession",
         "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          },
           {
             "in": "path",
             "name": "sessionPid",
