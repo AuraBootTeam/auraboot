@@ -11,6 +11,15 @@ async function data(response: APIResponse | Response) {
   expect(String(body.code)).toBe('0');
   return body.data;
 }
+function canonicalInputMappings(mappings: any[]) {
+  return mappings.map(mapping => {
+    const source = {...mapping.source};
+    // FIELD sources do not consume literal values. DTO serialization includes
+    // a null value while the structured editor omits that unused property.
+    if (source.kind === 'FIELD' && source.value == null) delete source.value;
+    return {...mapping, source};
+  });
+}
 async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant?: string) {
   await page.goto('/login');
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
@@ -271,9 +280,12 @@ test('professional event policy publish, execution failure and recovery preserve
   expect(logs.filter((l:any)=>l.status==='SUCCESS')).toHaveLength(1);
   expect(logs.filter((l:any)=>l.status==='FAILED')).toHaveLength(1);
   await writeFile(join(evidence!, 'professional-policy-receipt.json'), JSON.stringify({policy,success,failed,logs},null,2));
-  await data(await page.request.post('/api/decision/evaluate',{data:{decisionCode:'tpm_acceptance_route',context:{record:{recordPid:`trace-${policy}`,data:{tpm_ac_amount:68000,tpm_ac_risk:'normal',tpm_ac_open_issues:0,tpm_ac_materials_complete:true}}}}}));
+  const trace=await data(await page.request.post('/api/decision/evaluate',{data:{decisionCode:'tpm_acceptance_route',context:{record:{recordPid:`trace-${policy}`,data:{tpm_ac_amount:68000,tpm_ac_risk:'normal',tpm_ac_open_issues:0,tpm_ac_materials_complete:true}}}}}));
+  expect(trace.traceId).toBeTruthy();
+  const traceLogs=await data(await page.request.get(`/api/decision/logs?traceId=${encodeURIComponent(trace.traceId)}`));
+  const ownedLogs=traceLogs.filter((log:any)=>log.decisionCode==='tpm_acceptance_route');expect(ownedLogs).toHaveLength(1);
   await menu(page,'执行日志');await expect(page.getByTestId('elta-business-results')).toBeVisible();
-  await page.getByTestId('elta-business-results').getByRole('button',{name:'查看依据',exact:true}).first().click();
+  await page.getByTestId(`elta-open-trace-${ownedLogs[0].pid ?? ownedLogs[0].traceId}`).click();
   await expect(page.getByTestId('elta-trace-drawer')).toBeVisible();
   await expect(page.getByTestId('elta-trace-chain')).toBeVisible();await shot(page, 'R17');
 });
@@ -295,7 +307,9 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','error');
   await expect(page.getByTestId('strategy-test-outputs')).toHaveCount(0);await shot(page,'R05');
   await professionalTab(page,'model');
-  await page.getByRole('combobox',{name:'entity-filter',exact:true}).selectOption('tpm_acceptance');
+  await page.getByRole('combobox',{name:'entity-filter',exact:true}).selectOption('record');
+  await page.getByRole('textbox',{name:'field-search',exact:true}).fill('tpm_ac_amount');
+  await expect(page.getByTestId('dmv-count')).toHaveText('1');
   await expect(page.getByTestId('data-model-viewer')).toContainText('tpm_ac_amount');await shot(page,'A03');
   await professionalTab(page,'permissions');
   const permissions=page.getByTestId('permission-matrix');await expect(permissions).toBeVisible();expect(await permissions.getByRole('button').count()).toBeGreaterThan(0);
@@ -310,6 +324,10 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   await menu(page,'策略工作台');await expect(page.getByTestId('ddl-error')).toBeVisible({timeout:20000});await shot(page,'A02');
   await page.unroute(definitionPath);await page.reload();
   await expect(page.getByTestId('ddl-row-tpm_acceptance_route')).toBeVisible();await expect(page.getByTestId('ddl-error')).toHaveCount(0);await shot(page,'A02-recovered');
+  await page.getByTestId('ddl-open-tpm_acceptance_deadline').click();
+  await expect(page.getByTestId('strategy-business-decision')).toHaveValue('tpm_acceptance_deadline');
+  await page.getByTestId('strategy-workspace-tab-dmn').click();
+  await expect(page.getByTestId('strategy-studio')).toContainText('截止分钟');await shot(page,'R08');
 });
 
 test('SLA paused completed and failed-action detail states use actual lifecycle records @critical', async ({page}) => {
@@ -317,7 +335,7 @@ test('SLA paused completed and failed-action detail states use actual lifecycle 
   const pid=await create(page,user,name,68000,'普通',true);const sla=await submit(page,pid,480,'tpm_standard_review');
   async function processAction(action:'suspend'|'resume') {
     await menu(page,'任务中心');await page.getByRole('button',{name:'我发起的',exact:true}).click();
-    const process=page.getByRole('row').filter({hasText:name});await expect(process).toHaveCount(1);
+    const process=page.getByRole('row').filter({hasText:pid});await expect(process).toHaveCount(1);
     await process.getByRole('button').click();
     const response=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith(`/${sla.processInstanceId}/${action}`)&&r.request().method()==='POST');
     await page.getByRole('button',{name:action==='suspend'?'暂停流程':'恢复流程',exact:true}).click();await data(await response);
@@ -367,11 +385,15 @@ test('professional rollout compares exact versions and audits activation pause a
   await page.getByTestId('rollout-create').click();const rollout=await data(await created);
   expect(rollout.baselineVersion).toBe(versions[0].version);expect(rollout.candidateVersion).toBe(versions[1].version);
   async function transition(action:string, expected:string) {
-    await page.getByTestId(`rollout-${action}-${rollout.pid}`).click();
-    await expect(page.getByTestId('rollout-confirm-panel')).toBeVisible();await page.getByLabel('rollout-action-note',{exact:true}).fill(`本轮专属版本核验：${action}`);
-    await shot(page,`R06-confirm-${action}`);
     const response=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/decision/rollouts/${rollout.pid}/${action}`&&r.request().method()==='POST');
-    await page.getByTestId('rollout-confirm-action').click();expect((await data(await response)).status).toBe(expected);
+    await page.getByTestId(`rollout-${action}-${rollout.pid}`).click();
+    if (action === 'rollback') {
+      await expect(page.getByTestId('rollout-confirm-panel')).toBeVisible();
+      await page.getByLabel('rollout-action-note',{exact:true}).fill(`本轮专属版本核验：${action}`);
+      await shot(page,`R06-confirm-${action}`);
+      await page.getByTestId('rollout-confirm-action').click();
+    }
+    expect((await data(await response)).status).toBe(expected);
     await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText(expected);
   }
   await transition('activate','ACTIVE');await transition('pause','PAUSED');await transition('activate','ACTIVE');await transition('rollback','ROLLED_BACK');
@@ -413,8 +435,8 @@ test('SLA policies use business summaries and save fixed durations through the e
     await page.getByLabel('时长单位',{exact:true}).selectOption('minutes');await page.getByLabel('时长数值',{exact:true}).fill('15');await shot(page,'S10');
     const saved=page.waitForResponse(response=>response.url().includes('/execute/admin:update_sla_config')&&response.request().method()==='POST');
     await page.getByRole('button',{name:'保存',exact:true}).click();const response=await saved;await data(response);
-    const payload=response.request().postDataJSON().payload;expect(payload).toMatchObject({deadline_mode:'FIXED',deadline_value:'PT900S'});const binding=typeof payload.rule_binding==='string'?JSON.parse(payload.rule_binding):payload.rule_binding;expect(binding).toMatchObject({enabled:false,decisionBinding:{enabled:false}});expect(Object.keys(binding)).not.toContain('0');expect(binding.decisionBinding.inputMappings).toEqual(config.ruleBinding.decisionBinding.inputMappings);
-    const actual=await data(await page.request.get(`/api/bpm/sla-configs/${config.pid}`));expect(actual.deadlineMode).toBe('FIXED');expect(actual.deadlineValue).toBe('PT900S');expect(actual.ruleBinding.enabled).toBe(false);
+    const payload=response.request().postDataJSON().payload;expect(payload).toMatchObject({deadline_mode:'FIXED',deadline_value:'PT900S'});const binding=typeof payload.rule_binding==='string'?JSON.parse(payload.rule_binding):payload.rule_binding;expect(binding).toMatchObject({enabled:false,decisionBinding:{enabled:false}});expect(Object.keys(binding)).not.toContain('0');expect(canonicalInputMappings(binding.decisionBinding.inputMappings)).toEqual(canonicalInputMappings(config.ruleBinding.decisionBinding.inputMappings));
+    const actual=await data(await page.request.get(`/api/bpm/sla-configs/${config.pid}`));expect(actual.deadlineMode).toBe('FIXED');expect(actual.deadlineValue).toBe('PT900S');expect(actual.ruleBinding.enabled).toBe(false);expect(canonicalInputMappings(actual.ruleBinding.decisionBinding.inputMappings)).toEqual(canonicalInputMappings(config.ruleBinding.decisionBinding.inputMappings));
     await menu(page,'SLA 配置');await expect(page.getByTestId('sla-policy-row').filter({hasText:config.name})).toContainText('15 分钟');await shot(page,'S11');
     await page.getByTestId('sla-policy-row').filter({hasText:config.name}).getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByLabel('时长数值',{exact:true})).toHaveValue('15');await expect(page.getByLabel('时长单位',{exact:true})).toHaveValue('minutes');
     const refused=await page.request.post('/api/meta/commands/execute/admin:update_sla_config',{data:{targetRecordPid:config.pid,payload:{deadline_mode:'FIXED',deadline_value:'invalid',business_calendar:false,rule_binding:{enabled:false}},clientRequestId:`invalid-duration:${config.pid}`}});
@@ -832,6 +854,6 @@ test('rule center primary and professional views remain reachable through their 
     await expect(page.getByTestId(`doc-panel-${tab}`)).not.toContainText('Failed to load');
     if(error)await expect(page.getByTestId(error)).toHaveCount(0);
     if(tab==='logs'){await expect(page.getByTestId('elta-business-results')).toBeVisible();await expect(page.getByTestId('elta-filters')).toHaveCount(0);}
-    await shot(page,image);
+    await shot(page,['R01','A03','A04','A05','R06'].includes(image)?`${image}-navigation`:image);
   }
 });
