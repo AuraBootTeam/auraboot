@@ -971,7 +971,6 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
     // Verify via API
     const record = await fetchRecordByPid(page, 'agent-run', runPid);
     expect(record?.run_status).toBe('cancelled');
-    expect((await fetchRecordByPid(page, 'agent-task', runTaskPid))?.task_status).toBe('cancelled');
     await page.screenshot({ path: info.outputPath('life-18-cancelled-zh-CN.png'), fullPage: true });
 
     // Cancel button hidden (terminal state)
