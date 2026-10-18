@@ -116,9 +116,10 @@ public class EnvironmentServiceImpl implements EnvironmentService {
     @Transactional
     public void delete(String pid, Long tenantId) {
         Environment env = findByPidOrThrow(pid, tenantId);
-        env.setDeletedFlag(true);
-        env.setUpdatedAt(new Date());
-        environmentMapper.updateById(env);
+        // Ordinary entity updates exclude the configured logical-delete field.
+        if (environmentMapper.deleteById(env.getId()) != 1) {
+            throw new IllegalStateException("Environment deletion did not affect the selected record");
+        }
         log.info("Deleted environment: pid={}, code={}", pid, env.getCode());
     }
 

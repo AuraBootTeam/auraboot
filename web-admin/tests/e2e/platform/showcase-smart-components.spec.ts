@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 /**
  * Showcase Smart Components — E2E Test
  *
@@ -92,6 +93,7 @@ async function openCreateForm(page: Page): Promise<void> {
     .waitForURL(/showcase.all.fields.*form|\/new|\/create/, { timeout: 15_000 })
     .catch(() => null);
   await waitForFormReady(page, 15_000);
+  await expandFormSections(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,6 +396,7 @@ test.describe('Showcase Smart Components', () => {
       waitUntil: 'domcontentloaded',
     });
     await waitForFormReady(page, 15_000);
+  await expandFormSections(page);
 
     // Edit budget
     const budgetInput = field(page, 'sc_budget').locator('input').first();

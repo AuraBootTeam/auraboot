@@ -20,11 +20,14 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 
 const UNIQUE = `e2e${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Colleague ${UNIQUE}`;
 /** Screenshots are the evidence a person can actually check; assertions alone cannot show layout. */
-const SHOTS = 'test-results/digital-employee';
+const SHOTS = path.join(process.env.AURA_EVIDENCE_ROOT ?? 'test-results', 'digital-employee');
+test.beforeEach(async () => { await mkdir(SHOTS, { recursive: true }); });
 
 /**
  * The wizard opens on a template picker; every path to the form goes through it.

@@ -61,6 +61,7 @@ async function navigateToNewOrderForm(page: import('@playwright/test').Page) {
 
 test.describe('Block Renderer — Block Type Tests', () => {
   let orderPid: string;
+  const itemName = `Block Test Widget ${uniqueId()}`;
 
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
@@ -69,7 +70,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     orderPid = await order.createViaApi({ e2et_order_title: `BlockTest ${uniqueId()}` });
     // Create an item for sub-table tests
     await order.child('item').createForParent(orderPid, {
-      e2et_item_name: 'Block Test Widget',
+      e2et_item_name: itemName,
       e2et_item_qty: 5,
       e2et_item_price: 20.0,
     });
@@ -259,19 +260,9 @@ test.describe('Block Renderer — Block Type Tests', () => {
       })
       .first();
 
-    if (await itemsTab.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const tabLoadPromise = page
-        .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
-        .catch(() => null);
-
-      await itemsTab.click();
-      await tabLoadPromise;
-
-      await page.locator('main table').first().waitFor({ state: 'visible', timeout: 10000 });
-      const tableRows = page.locator('main table tbody tr');
-      const rowCount = await tableRows.count();
-      expect(rowCount).toBeGreaterThanOrEqual(1);
-    }
+    await expect(itemsTab).toBeVisible();
+    await itemsTab.click();
+    await expect(page.locator('main table tbody tr').filter({ hasText: itemName })).toBeVisible();
   });
 
   // -------------------------------------------------------------------------

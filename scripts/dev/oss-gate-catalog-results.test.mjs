@@ -33,6 +33,25 @@ test('preserves a phase infrastructure error despite passing tests', () => {
   assert.equal(mergeCatalogReports(catalog, [report(['pristine']), phase]).valid, false);
 });
 
+test('distinguishes a serial block from an explicit skip without losing either identity', () => {
+  const blocked = report(['remaining'], 'skipped');
+  Object.assign(blocked.suites[0].specs[0].tests[0].results[0], {
+    workerIndex: -1, parallelIndex: -1, duration: 0,
+  });
+  const result = mergeCatalogReports(catalog, [report(['pristine']), blocked]);
+  assert.equal(result.valid, false);
+  assert.equal(result.counts.didNotRun, 1);
+  assert.equal(result.counts.skipped, 0);
+  assert.equal(result.report.stats.unexpected, 1);
+  assert.deepEqual(result.report.catalogAudit.mismatches, []);
+
+  blocked.suites[0].specs[0].tests[0].expectedStatus = 'skipped';
+  const explicit = mergeCatalogReports(catalog, [report(['pristine']), blocked]);
+  assert.equal(explicit.counts.didNotRun, 0);
+  assert.equal(explicit.counts.skipped, 1);
+  assert.equal(explicit.valid, false);
+});
+
 test('merged phase statistics preserve the strict final execution contract', () => {
   const merged = mergeCatalogReports(catalog, [report(['pristine']), report(['remaining'])]).report;
   assert.deepEqual({expected: merged.stats.expected, unexpected: merged.stats.unexpected, skipped: merged.stats.skipped, flaky: merged.stats.flaky},

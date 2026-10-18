@@ -331,35 +331,29 @@ test.describe('Data Tools Deep — Template Download', () => {
   /**
    * DT-010: Excel template download API for e2et_order
    */
-  test('DT-010: Excel template download API', async ({ page }) => {
-    const resp = await page.request.get('/api/meta/excel/template/e2et_order');
-
-    if (resp.status() === 404) {
-      throw new Error(String('Excel template API not available'));
-      return;
-    }
-
-    expect(resp.ok()).toBe(true);
-
-    const contentType = resp.headers()['content-type'] || '';
-    const isExcel =
-      contentType.includes('spreadsheet') ||
-      contentType.includes('octet-stream') ||
-      contentType.includes('xlsx');
-
-    if (isExcel) {
-      const buffer = await resp.body();
-      expect(buffer.length).toBeGreaterThan(0);
-      expect(Array.from(buffer.subarray(0, 2))).toEqual([0x50, 0x4b]);
-      const entries = new Set(new AdmZip(buffer).getEntries().map((entry) => entry.entryName));
-      expect(entries).toContain('xl/workbook.xml');
-      expect(entries).toContain('xl/worksheets/sheet1.xml');
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
-      expect(workbook.SheetNames.length).toBeGreaterThan(0);
-    } else {
-      const body = await resp.json().catch(() => null);
-      expect(body).toBeTruthy();
-    }
+  test('DT-010: Excel template download API', async ({ page }, info) => {
+    const resp = await page.request.get('/api/meta/excel/document-template/e2et_order');
+    expect(resp.status()).toBe(200);
+    expect(resp.headers()['content-type']).toContain('spreadsheetml.sheet');
+    expect(resp.headers()['content-disposition']).toContain('e2et_order-document-import-template.xlsx');
+    const buffer = await resp.body();
+    await info.attach('e2et_order-document-import-template.xlsx', {
+      body: buffer, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    expect(buffer.length).toBeGreaterThan(0);
+    expect(Array.from(buffer.subarray(0, 2))).toEqual([0x50, 0x4b]);
+    const entries = new Set(new AdmZip(buffer).getEntries().map((entry) => entry.entryName));
+    expect(entries).toContain('xl/workbook.xml');
+    expect(entries).toContain('xl/worksheets/sheet1.xml');
+    expect(entries).toContain('xl/worksheets/sheet2.xml');
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    expect(workbook.SheetNames).toEqual(['Orders', 'Lines']);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets.Orders, { header: 1 })).toEqual([
+      ['e2et_order_title', 'e2et_order_desc'],
+    ]);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets.Lines, { header: 1 })).toEqual([
+      ['e2et_item_spec', 'e2et_item_name', 'e2et_item_qty', 'e2et_item_price'],
+    ]);
   });
 
   /**

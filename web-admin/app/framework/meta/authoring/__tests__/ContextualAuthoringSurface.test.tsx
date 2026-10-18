@@ -675,6 +675,7 @@ describe('ContextualAuthoringSurface', () => {
   });
 
   it('fails closed with the exact dirty edit when permission changes during save reconciliation', async () => {
+    const focusListeners = vi.spyOn(window, 'addEventListener');
     vi.mocked(applyAuthoringPatch).mockRejectedValueOnce(new Error('Failed to fetch'));
     vi.mocked(loadAuthoringSession).mockRejectedValueOnce(new Error('403 Forbidden'));
     vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValueOnce({
@@ -683,8 +684,9 @@ describe('ContextualAuthoringSurface', () => {
       canAdministerDesigner: false,
     });
     renderSurface(vi.fn(), vi.fn());
-    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await act(async () => { fireEvent.click(screen.getByTestId('contextual-authoring-enter')); });
     await screen.findByTestId('contextual-authoring-surface');
+    const initialFocusListeners = focusListeners.mock.calls.filter(([event]) => event === 'focus').length;
     fireEvent.click(screen.getByTestId('runtime-write'));
     fireEvent.change(screen.getByLabelText(/标题/), {
       target: { value: '权限切换期间的订单标题' },
@@ -709,6 +711,8 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByText('保存')).toBeDisabled();
     expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
 
+    await waitFor(() => expect(focusListeners.mock.calls.filter(([event]) => event === 'focus')).toHaveLength(initialFocusListeners + 1));
+
     vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValue({
       canReadDesigner: true,
       canManageDesigner: true,
@@ -719,7 +723,7 @@ describe('ContextualAuthoringSurface', () => {
       await Promise.resolve();
     });
 
-    expect(loadAuthoringPermissionSnapshot).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(loadAuthoringPermissionSnapshot).toHaveBeenCalledTimes(2));
     expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
       'data-read-only',
       'false',
@@ -825,8 +829,10 @@ describe('ContextualAuthoringSurface', () => {
         publishState: 'DRAFT',
       }),
     );
-    vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
-      createAuthoringSession({
+    let finishRefresh!: (session: AuthoringSession) => void;
+    const refreshedSession = new Promise<AuthoringSession>((resolve) => { finishRefresh = resolve; });
+    vi.mocked(loadAuthoringSession).mockReturnValueOnce(refreshedSession);
+    const editableSession = createAuthoringSession({
         revision: 8,
         changeSetStatus: 'DRAFT',
         state: 'ACTIVE',
@@ -834,8 +840,7 @@ describe('ContextualAuthoringSurface', () => {
         impactState: 'UNKNOWN',
         approvalState: 'STALE',
         publishState: 'DRAFT',
-      }),
-    );
+      });
     renderSurface(vi.fn(), vi.fn());
     fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
 
@@ -855,7 +860,11 @@ describe('ContextualAuthoringSurface', () => {
         '补充评审要求的异常场景',
       ),
     );
-    expect(screen.queryByTestId('authoring-governance-notice')).not.toBeInTheDocument();
+    await waitFor(() => expect(loadAuthoringSession).toHaveBeenCalled());
+    expect(screen.getByTestId('authoring-governance-notice')).toHaveTextContent('revision r7 已冻结');
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute('data-read-only', 'true');
+    await act(async () => { finishRefresh(editableSession); });
+    await waitFor(() => expect(screen.queryByTestId('authoring-governance-notice')).not.toBeInTheDocument());
     expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
       'data-read-only',
       'false',

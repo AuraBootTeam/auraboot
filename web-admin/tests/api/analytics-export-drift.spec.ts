@@ -2,7 +2,7 @@
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { PG_CONN } from '../helpers/environments';
+import { BACKEND_URL, PG_CONN } from '../helpers/environments';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
@@ -71,7 +71,7 @@ test('department drift invalidates stored exports and complex SQL respects the s
     );
     expect(identity.rows).toHaveLength(1);
     const ctx = await requestFactory.newContext({
-      baseURL: process.env.BACKEND_URL,
+      baseURL: BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${(await login.json()).data.jwt}` },
     });
     return { ctx, email, userId: String(identity.rows[0].user_id), memberPid: String(identity.rows[0].member_pid) };

@@ -143,11 +143,11 @@ export function hasPermission(
     return false;
   }
 
-  if (permissions.permissionCodes?.includes(permissionCode)) {
+  if (permissions.permissionCodes?.includes('*') || permissions.permissionCodes?.includes(permissionCode)) {
     return true;
   }
 
-  return permissions.permissions?.some((p) => p.code === permissionCode) ?? false;
+  return permissions.permissions?.some((p) => p.code === '*' || p.code === permissionCode) ?? false;
 }
 
 /**

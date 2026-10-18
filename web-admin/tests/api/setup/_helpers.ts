@@ -13,7 +13,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 /**
  * Log in as the default admin user against the running backend (via vite
  * proxy / BFF / backend chain — `request` fixture's baseURL is
- * PLAYWRIGHT_BASE_URL). Returns the JWT.
+ * PLAYWRIGHT_BASE_URL). Returns the explicitly selected business-space JWT.
  *
  * Throws if the backend is not yet bootstrapped — call 00-bootstrap.spec.ts
  * before any spec that uses this helper.
@@ -36,7 +36,30 @@ export async function loginAdmin(request: APIRequestContext): Promise<string> {
       `[setup] admin login returned no JWT: ${JSON.stringify(body)}`,
     );
   }
-  return body.data.jwt as string;
+  const initialJwt = body.data.jwt as string;
+  const spacesResponse = await request.get('/api/tenant-selection/my-spaces', {
+    headers: authHeaders(initialJwt),
+  });
+  const spacesBody = await spacesResponse.json();
+  if (!spacesResponse.ok() || spacesBody.code !== '0' || !Array.isArray(spacesBody.data)) {
+    throw new Error(`[setup] admin spaces unavailable (HTTP ${spacesResponse.status()})`);
+  }
+  const companyName = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
+  const spaces = spacesBody.data.filter((space: { spaceType?: string; tenantName?: string }) =>
+    space.spaceType === 'business' && space.tenantName === companyName);
+  if (spaces.length !== 1 || !spaces[0].tenantId) {
+    throw new Error(`[setup] expected exactly one business space named ${companyName}`);
+  }
+  const selectedResponse = await request.post('/api/tenant-selection/process', {
+    headers: authHeaders(initialJwt),
+    data: { action: 'select', tenantId: spaces[0].tenantId },
+  });
+  const selected = await selectedResponse.json();
+  if (!selectedResponse.ok() || selected.code !== '0' || !selected.data?.jwt
+      || String(selected.data.tenantId) !== String(spaces[0].tenantId)) {
+    throw new Error(`[setup] business-space selection failed (HTTP ${selectedResponse.status()})`);
+  }
+  return selected.data.jwt as string;
 }
 
 /**

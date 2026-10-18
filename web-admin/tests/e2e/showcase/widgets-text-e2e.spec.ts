@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 /**
  * Task B1 — Text-bucket widget full coverage.
  *
@@ -125,9 +126,7 @@ async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: strin
   }
   await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 8_000 });
 
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 
   // Narrow the list to our row with a keyword search.
   const search = page
@@ -153,9 +152,7 @@ async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: strin
   const row = page.locator(`tr:has-text("${pageKey}")`).first();
   await expect(row).toBeVisible({ timeout: 5_000 });
 
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 
   const rowLink = row.locator(`a[href*="/page-designer/${pid}"]`).first();
   if (await rowLink.isVisible({ timeout: 1_500 }).catch(() => false)) {
@@ -571,10 +568,10 @@ async function navigateToShowcaseRuntimeForm(page: Page): Promise<void> {
   await createBtn.click({ trial: true }).catch(() => null);
   await createBtn.click();
   await expect(page).toHaveURL(SHOWCASE_FORM_NEW_URL_RE, { timeout: 10_000 });
+  await expect(page.locator('.form-section').first()).toBeVisible();
+  await expandFormSections(page);
 
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 }
 
 // ---------------------------------------------------------------------------

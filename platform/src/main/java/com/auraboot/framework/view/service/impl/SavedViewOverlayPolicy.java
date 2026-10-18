@@ -50,6 +50,9 @@ public class SavedViewOverlayPolicy {
     static final String REASON_MANDATORY_RESTORED = "MANDATORY_ELEMENT_RESTORED";
 
     private static final int MAX_STALE_PATHS = 100;
+    // List toolbar actions supplied by the platform rather than the page DSL.
+    private static final Set<String> LIST_BUILTIN_ACTION_CODES = Set.of(
+            "_import", "_export_excel", "_export_csv", "_print");
 
     private final PageSchemaService pageSchemaService;
     private final MetaModelService metaModelService;
@@ -443,6 +446,9 @@ public class SavedViewOverlayPolicy {
         Set<String> mandatoryActions = new TreeSet<>();
         collect(objectMapper.valueToTree(page.getBlocks()), null,
                 fields, actions, mandatoryFields, mandatoryActions);
+        if ("list".equalsIgnoreCase(page.getKind())) {
+            actions.addAll(LIST_BUILTIN_ACTION_CODES);
+        }
         // The runtime table renders every model-declared column plus the
         // structural audit columns, so a saved view's column overlay may
         // reference them even though the page DSL block does not declare
