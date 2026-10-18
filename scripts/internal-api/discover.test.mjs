@@ -105,8 +105,9 @@ test('enumerates finite route branches and retains every missing external or unb
     get(enabled ? '/api/views/accessible' : computeRoute());
     const bit = enabled ? 'a' : 'b';
     get('/api/' + bit + bit + bit + bit + bit + bit);
+    get(\`/api/views/\${bit + bit + bit + bit + bit + bit}\`);
   ` }], document);
-  assert.equal(result.calls.length, 6);
+  assert.equal(result.calls.length, 7);
   assert.equal(result.calls[0].classification, 'source-linked');
   assert.deepEqual(result.calls[0].branches.map(b => b.route), ['/api/views/accessible?q=one', '/api/views/accessible']);
   assert.equal(result.calls[0].matches.length, 1);
@@ -120,4 +121,5 @@ test('enumerates finite route branches and retains every missing external or unb
   assert.equal(result.calls[4].branches[1].classification, 'unresolved-route');
   assert.equal(result.calls[5].classification, 'unresolved-route');
   assert.equal(result.calls[5].branches[0].route, null);
+  assert.equal(result.calls[6].classification, 'unresolved-route', 'Overflow cannot become a guessed path placeholder');
 });

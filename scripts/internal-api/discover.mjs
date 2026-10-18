@@ -82,23 +82,25 @@ export function discoverCalls(sources, document) {
     }
     // Enumerate syntactic finite alternatives without selecting a runtime branch.
     // A cap preserves pathological expressions as unresolved rather than truncating.
+    const routeOverflow = Symbol('route-alternative-overflow');
     function routeAlternatives(n, visited = new Set()) {
       if (!n) return [undefined];
       const unique = values => [...new Set(values)];
       const product = (left, right) => {
-        if (left.length * right.length > 32) return [undefined];
+        if (left.includes(routeOverflow) || right.includes(routeOverflow) || left.length * right.length > 32) return [routeOverflow];
         return unique(left.flatMap(a => right.map(b => a === undefined || b === undefined ? undefined : a + b)));
       };
       if (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isNonNullExpression(n))
         return routeAlternatives(n.expression, visited);
       if (ts.isConditionalExpression(n)) {
         const values = unique([...routeAlternatives(n.whenTrue, visited), ...routeAlternatives(n.whenFalse, visited)]);
-        return values.length > 32 ? [undefined] : values;
+        return values.length > 32 ? [routeOverflow] : values;
       }
       if (ts.isTemplateExpression(n)) {
         let values = [n.head.text];
         for (const span of n.templateSpans) {
-          values = product(values, routeAlternatives(span.expression, visited));
+          values = product(values, routeAlternatives(span.expression, visited)
+            .map(value => value === undefined ? `{${placeholder(span.expression)}}` : value));
           values = product(values, [span.literal.text]);
         }
         return values;
@@ -159,7 +161,7 @@ export function discoverCalls(sources, document) {
             else if (!generated && !httpMethod(imported ?? property) && config.properties.some(p => ts.isSpreadAssignment(p))) method = 'unresolved';
           } else if (!generated && !httpMethod(imported ?? property) && config) method = 'unresolved';
           if (!method || !httpMethod(method)) method = 'unresolved';
-          const routes = routeAlternatives(targetNode);
+          const routes = routeAlternatives(targetNode).map(value => value === routeOverflow ? undefined : value);
           const route = routes.length === 1 ? routes[0] : undefined;
           const target = targetNode?.getText(sf) ?? '';
           const plumbing = /\/http-client\/|\/ApiService\.ts$|\/server\/services\/BffProxyService\.ts$/.test(source.file);
