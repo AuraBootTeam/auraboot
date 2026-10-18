@@ -65,7 +65,7 @@ jobs:
           python3 scripts/prepare-quickstart-env.test.py
           python3 scripts/prepare-quickstart-env.py --file .env
           FIELD_ENCRYPTION_KEY=quickstart-fallback-fixture OPEN_PLATFORM_PROTOCOL_SIGNING_KEY= \
-            docker compose config --format json | python3 -c 'import json,sys; value=json.load(sys.stdin)["services"]["backend"]["environment"]["OPEN_PLATFORM_PROTOCOL_SIGNING_KEY"]; assert value == "quickstart-fallback-fixture", "Protocol signing fallback changed"'
+            docker compose --profile full config --format json | python3 -c 'import json,sys; value=json.load(sys.stdin)["services"]["backend"]["environment"]["OPEN_PLATFORM_PROTOCOL_SIGNING_KEY"]; assert value == "quickstart-fallback-fixture", "Protocol signing fallback changed"'
 
       - name: Build & start full stack
         if: steps.changes.outputs.run == 'true'
