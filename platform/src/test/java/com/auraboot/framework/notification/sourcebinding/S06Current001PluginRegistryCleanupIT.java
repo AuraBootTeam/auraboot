@@ -100,7 +100,7 @@ class S06Current001PluginRegistryCleanupIT {
                     String sql = "SELECT row_to_json(p)::text FROM ab_plugin p WHERE p.plugin_id IN ("
                             + placeholders(ids.size()) + ") AND p.deleted_flag=FALSE ORDER BY p.tenant_id,p.pid FOR UPDATE";
                     List<String> locked = jdbc.queryForList(sql, String.class, ids.toArray());
-                    require(locked.size() == 14, "CLEANUP_ACTUAL_PLUGIN_ROSTER_CHANGED");
+                    require(locked.size() == admission.plugins().size(), "CLEANUP_ACTUAL_PLUGIN_ROSTER_CHANGED");
                     Map<String, JsonNode> actual = new LinkedHashMap<>();
                     for (String raw : locked) {
                         JsonNode row = json.readTree(raw);
@@ -124,7 +124,7 @@ class S06Current001PluginRegistryCleanupIT {
                                     "tenantId", Long.toString(target.tenant()), "pluginPid", target.pid(),
                                     "pluginId", target.pluginId(), "namespace", target.namespace(), "version", target.version(),
                                     "status", target.status(), "rowSha256", target.rowSha256(), "manifestSha256", target.manifestSha256())).toList(), "preservedBefore", summary(before), "crypto", crypto,
-                            "sessionTimezone", sessionTimezone, "executed", false, "sourceClassificationSha256", S06Current001PluginCleanupAdmission.CLASSIFICATION_SHA));
+                            "sessionTimezone", sessionTimezone, "executed", false, "sourceClassificationSha256", admission.classificationSha256()));
                     List<Map<String, Object>> results = new ArrayList<>();
                     for (var target : admission.plugins()) {
                         MetaContext.setContext(target.tenant(), 0L, "SYSTEM", "s06-current001-owned-lifecycle-cleanup");
@@ -153,7 +153,7 @@ class S06Current001PluginRegistryCleanupIT {
                     return result;
                 } catch (Exception | AssertionError failure) {
                     status.setRollbackOnly();
-                    throw new IllegalStateException("CLEANUP_ALL_FOURTEEN_ROLLED_BACK", failure);
+                    throw new IllegalStateException(admission.schemaVersion() == 1 ? "CLEANUP_ALL_FOURTEEN_ROLLED_BACK" : "CLEANUP_EXACT_ROSTER_ROLLED_BACK", failure);
                 }
             });
         } finally {
@@ -170,11 +170,11 @@ class S06Current001PluginRegistryCleanupIT {
         require(summary(persisted).equals(completed.get("preservedAfter")), "CLEANUP_COMMIT_READBACK_CHANGED");
         completed.put("persistedAfter", summary(persisted));
         completed.put("inputSha256", admission.inputSha256());
-        completed.put("sourceClassificationSha256", S06Current001PluginCleanupAdmission.CLASSIFICATION_SHA);
-        completed.put("softDeletedPluginRegistrations", 14);
+        completed.put("sourceClassificationSha256", admission.classificationSha256());
+        completed.put("softDeletedPluginRegistrations", admission.plugins().size());
         completed.put("sessionTimezone", sessionTimezone);
         completed.put("businessDeliverySuccessClaimed", false);
-        completed.put("stage", "current001-plugin-registration-cleanup-completed");
+        completed.put("stage", admission.schemaVersion() == 1 ? "current001-plugin-registration-cleanup-completed" : "sealed-native-plugin-registration-cleanup-completed");
         write(admission.output().resolve("cleanup-receipt.json"), completed);
     }
 
@@ -271,7 +271,7 @@ class S06Current001PluginRegistryCleanupIT {
     }
 
     private static String placeholders(int count) {
-        require(count > 0 && count <= 14, "CLEANUP_QUERY_SCOPE_INVALID");
+        require(count > 0 && count <= S06Current001PluginCleanupAdmission.METHODS.size() * 2, "CLEANUP_QUERY_SCOPE_INVALID");
         return String.join(",", java.util.Collections.nCopies(count, "?"));
     }
 
