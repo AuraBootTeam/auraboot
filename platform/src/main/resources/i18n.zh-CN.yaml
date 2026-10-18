@@ -518,6 +518,7 @@ record_share:
   notification_permission_collaborate: 可协作
 
 member_picker:
+  member: 成员
   select: 选择成员…
   add: 添加
   search_placeholder: 搜索成员…

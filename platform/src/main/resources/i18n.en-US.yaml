@@ -1249,6 +1249,7 @@ record_share:
   notification_permission_collaborate: collaboration
 
 member_picker:
+  member: Member
   select: Select member…
   add: Add
   search_placeholder: Search members…
