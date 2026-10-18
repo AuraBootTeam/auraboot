@@ -236,6 +236,17 @@ test.describe('Named Query Deep', () => {
     await nq.gotoList();
     await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     await page.locator('select').first().selectOption('archived');
+    await page.getByPlaceholder('输入编码或标题搜索', { exact: true }).fill(base.code);
+    const filteredResponse = page.waitForResponse(r => {
+      const url = new URL(r.url());
+      return url.pathname === '/api/meta/named-queries' && r.request().method() === 'GET'
+        && url.searchParams.get('status') === 'archived' && url.searchParams.get('keyword') === base.code;
+    });
+    await page.getByRole('button', { name: '搜索', exact: true }).click();
+    const filtered = await success(await filteredResponse);
+    expect(filtered.total).toBe(1);
+    expect(filtered.records).toEqual([expect.objectContaining({ pid: base.pid, code: base.code, status: 'archived' })]);
+    await expect(nq.queryTable.locator('tbody tr')).toHaveCount(1);
     const row = nq.queryTable.locator('tbody tr').filter({ hasText: base.code });
     await expect(row).toBeVisible();
     await expect(row).toContainText('已归档');
