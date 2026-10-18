@@ -1,4 +1,3 @@
-import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
  *
@@ -10,6 +9,9 @@ import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useListCellRenderer } from './list/useListCellRenderer';
+import { useListTableColumns, useListColumnLabel, useListFieldOptions } from './list/listColumnModel';
+import type { DictItem, DynamicEntity } from './list/listPageTypes';
 import {
   createSearchParams,
   useSearchParams,
@@ -33,8 +35,6 @@ import type {
   TableConfig,
 } from '~/framework/meta/schemas/types';
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
-import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
-import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import {
   resolveCommandErrorMessage,
   useActionHandler,
@@ -53,7 +53,6 @@ import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
 import { useTransientFlag } from '~/hooks/useTransientFlag';
-import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { useAutoSaveView } from '~/framework/smart/hooks/useAutoSaveView';
 import {
   DEFAULT_ROW_HEIGHT,
@@ -114,7 +113,6 @@ import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
 import { SavedViewOverlayStatusBanner } from './list/SavedViewOverlayStatusBanner';
 import {
-  resolveAuditUserCellValue,
   resolveAuditUserDisplayFields,
 } from './list/auditUserDisplayFields';
 import {
@@ -158,15 +156,7 @@ import {
 import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
 
 import {
-  getListFieldValueWithAlias,
   resolveFieldMetaDisplayName,
-  resolveFieldMetaDataType,
-  resolveFieldMetaRenderComponent,
-  renderComponentToValueType,
-  resolveColumnCapabilityDataType,
-  buildListFilterFieldMetadata,
-  buildViewManageFieldOptions,
-  buildListColumnSettingsDefinitions,
   getSystemFieldI18nKey,
   translateOrFallback,
 } from './list/listFieldMetadata';
@@ -201,7 +191,6 @@ import {
 import {
   buildBulkFieldCommandPayload,
   resolveInitialListTabKey,
-  resolveTableBlockRowActions,
   buildToolbarConditionContext,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
@@ -261,19 +250,6 @@ export {
   type ListMiscBlocksPosition,
   resolveListMiscBlocksPosition,
 } from './list/listSchemaPolicy';
-
-// Dict data item type
-interface DictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, any>;
-}
-
-interface DynamicEntity {
-  [key: string]: any;
-  id?: string;
-  pid?: string;
-}
 
 interface ListLoadDataParams {
   page?: number;
@@ -2671,147 +2647,10 @@ function ListPageContentInner(props: PageContentProps) {
     [filters, pageContext],
   );
 
-  const inferValueType = useCallback(
-    (column: ColumnConfig, value: any, record?: DynamicEntity): ColumnConfig['valueType'] => {
-      if (column.valueType) {
-        return column.valueType;
-      }
-      const field = column.field || '';
-      // renderComponent-driven visual type (colorpicker/progress/rating/money): the field's
-      // control comes from extension.renderComponent, not its dataType, so the name-suffix
-      // heuristics below miss it. Also honor the DSL column `renderType` key as a fallback.
-      const byRenderComponent =
-        renderComponentToValueType(resolveFieldMetaRenderComponent(field, modelFieldMap)) ??
-        renderComponentToValueType(
-          typeof (column as any).renderType === 'string'
-            ? (column as any).renderType.toLowerCase()
-            : undefined,
-        );
-      if (byRenderComponent) {
-        return byRenderComponent;
-      }
-      const declaredTemporalType = resolveTemporalType(undefined, modelFieldMap.get(field)?.dataType, undefined);
-      if (declaredTemporalType) return declaredTemporalType;
-      // REFERENCE field: either ends with _id, or has a {field}_display sibling in the record
-      if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) {
-        return 'reference';
-      }
-      const declaredDataType = modelFieldMap.get(field)?.dataType;
-      const temporalType = resolveTemporalType(field, declaredDataType, value);
-      if (temporalType) return temporalType;
-      // Detect boolean values (native boolean or string "true"/"false")
-      if (typeof value === 'boolean' || value === 'true' || value === 'false') {
-        return 'boolean' as any;
-      }
-      return undefined;
-    },
-    [modelFieldMap],
-  );
-
-  // Render cell content using CellRendererRegistry
-  const renderCellContent = useCallback(
-    (column: ColumnConfig, record: DynamicEntity, rowIndex: number) => {
-      const rawValue = getListFieldValueWithAlias(record, column.field);
-      const value = resolveAuditUserCellValue(record, column.field, rawValue);
-      const recordWithAliasedField = Object.prototype.hasOwnProperty.call(record, column.field)
-        ? record
-        : { ...record, [column.field]: value };
-      const referenceConfig = collectListReferenceDisplayConfigs([column], modelFieldMap)[0];
-      const cacheKey = referenceConfig
-        ? buildListReferenceDisplayCacheKey(referenceConfig)
-        : undefined;
-      const referenceDisplayValue =
-        referenceConfig && value !== null && value !== undefined
-          ? recordWithAliasedField[referenceConfig.displayKey] ||
-            referenceDisplayCache[cacheKey || '']?.[String(value)]
-          : undefined;
-      const recordForRenderer = referenceDisplayValue
-        ? { ...recordWithAliasedField, [referenceConfig!.displayKey]: referenceDisplayValue }
-        : recordWithAliasedField;
-      const effectiveValueType = referenceConfig
-        ? 'reference'
-        : inferValueType(column, value, recordForRenderer);
-
-      // Null/undefined handling
-      if (
-        !((column as any).allowNullRenderer === true) &&
-        (value === null || value === undefined)
-      ) {
-        return <span className="text-text-3">-</span>;
-      }
-
-      // If dictCode exists, try to translate value to label
-      if (column.dictCode) {
-        const dictItems = dictDataCache.current.get(column.dictCode);
-        if (dictItems) {
-          const item = dictItems.find((i) => String(i.value) === String(value));
-          if (item) {
-            // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
-            // A dict item may carry `extension.icon` (category dims like lead source)
-            // to render a leading icon instead of the semantic color dot.
-            return (
-              <StatusDot
-                tone={resolveStatusTone(item.extension?.color)}
-                label={item.label}
-                icon={(item.extension as any)?.icon}
-              />
-            );
-          }
-        }
-        // Dict not loaded or no match — show raw value
-        return String(value);
-      }
-
-      // Handle custom render expressions first (if runtime is available)
-      if (typeof column.render === 'string' && runtime) {
-        try {
-          const context = runtime.getContext();
-          const evaluator = runtime.getEvaluator();
-          const rendered = evaluator.evaluateTemplate(column.render, {
-            ...context,
-            row: recordForRenderer,
-          });
-          return <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(rendered) }} />;
-        } catch (err) {
-          console.error('Render expression failed:', err);
-        }
-      }
-
-      // Use CellRendererRegistry for valueType-based rendering
-      const rendererType = column.presentation ? 'workspace' : (column as any).cellRenderer || effectiveValueType;
-      return cellRendererRegistry.render(rendererType, {
-        value,
-        record: recordForRenderer,
-        column: {
-          field: column.field,
-          label: typeof column.label === 'string' ? column.label : undefined,
-          valueType: effectiveValueType,
-          cellRenderer: (column as any).cellRenderer,
-          format: column.format,
-          dateTimeFormats,
-          timezone: effectiveTimezone,
-          render: column.render,
-          tagMap: (column as any).tagMap,
-          presentation: column.presentation,
-        },
-        expressionContext: pageContext,
-        locale,
-        t,
-        rowIndex,
-      });
-    },
-    [
-      runtime,
-      pageContext,
-      locale,
-      t,
-      inferValueType,
-      dateTimeFormats,
-      effectiveTimezone,
-      modelFieldMap,
-      referenceDisplayCache,
-    ],
-  );
+  const renderCellContent = useListCellRenderer({
+    runtime, pageContext, locale, t, modelFieldMap, referenceDisplayCache,
+    dictDataCache, dateTimeFormats, effectiveTimezone,
+  });
 
   // Inline edit: save a single field value via dynamic data PUT API
   const handleInlineSave = useCallback(
@@ -2996,130 +2835,9 @@ function ListPageContentInner(props: PageContentProps) {
     return { ...found, buttons: [...buttons, ...actions] };
   }, [allBlocks]);
 
-  // System fields on every dynamic entity — not in DSL but available in API response
-  const SYSTEM_FIELD_DEFS: ColumnConfig[] = useMemo(
-    () => [
-      {
-        field: 'created_at',
-        label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
-        valueType: 'datetime' as any,
-      },
-      {
-        field: 'updated_at',
-        label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
-        valueType: 'datetime' as any,
-      },
-      {
-        field: 'created_by',
-        label: t('common.creator') || 'Created By',
-      },
-      {
-        field: 'updated_by',
-        label: t('common.modifier') || 'Updated By',
-      },
-    ],
-    [t],
-  );
-
-  // Get columns: prefer table.columns, fallback to block-level columns
-  // Then apply SavedView column visibility/order overrides
-  const tableColumns: ColumnConfig[] = useMemo(() => {
-    if (!tableBlock) return [];
-    const cols = (tableBlock as BlockConfig).table?.columns || tableBlock.columns;
-    if (!Array.isArray(cols)) return [];
-
-    // If the block has rowActions defined either at block level or under table,
-    // synthesize an action column. Backend PageSchemaDTO commonly keeps actions
-    // inside `table.rowActions`; dropping that path makes API-backed DSL pages
-    // render only generated defaults.
-    const rowActions = resolveTableBlockRowActions(tableBlock);
-    let baseCols = cols as ColumnConfig[];
-    if (rowActions && rowActions.length > 0) {
-      const hasActionCol = cols.some((c: any) => c.isActionColumn);
-      if (!hasActionCol) {
-        baseCols = [
-          ...cols,
-          { field: '_actions', isActionColumn: true, buttons: rowActions },
-        ] as ColumnConfig[];
-      } else {
-        // An action column already exists (e.g. default view/edit/delete injected
-        // for existing models). Merge in the block-level custom rowActions (dedup
-        // by code) so page-defined commands surface alongside the defaults — without
-        // this, custom rowActions on existing models are silently dropped.
-        baseCols = cols.map((c: any) => {
-          if (!c.isActionColumn) return c;
-          const existing = Array.isArray(c.buttons) ? c.buttons : [];
-          const existingCodes = new Set(existing.map((b: any) => b.code));
-          const merged = [
-            ...existing,
-            ...rowActions.filter((ra: any) => !existingCodes.has(ra.code)),
-          ];
-          return { ...c, buttons: merged };
-        }) as ColumnConfig[];
-      }
-    }
-
-    // Apply SavedView column config (visibility + order + width)
-    const viewColumns = effectiveViewConfig?.columns;
-    if (!viewColumns || viewColumns.length === 0) return baseCols;
-
-    const viewColMap = new Map(viewColumns.map((vc) => [vc.fieldCode, vc]));
-    // Filter visible columns and apply order
-    // Include model and system fields that are explicitly enabled in viewConfig.
-    // This lets SavedView promote a valid model field that the DSL table does
-    // not show by default, while the page schema remains the default layout.
-    const baseFields = new Set(baseCols.map((c) => c.field));
-    const modelCols: ColumnConfig[] = [];
-    for (const vc of viewColumns) {
-      if (vc.visible === false || baseFields.has(vc.fieldCode)) continue;
-      const meta = modelFieldMap.get(vc.fieldCode);
-      if (!meta) continue;
-      const renderComponent = resolveFieldMetaRenderComponent(vc.fieldCode, modelFieldMap);
-      const dataType = resolveFieldMetaDataType(vc.fieldCode, modelFieldMap);
-      modelCols.push({
-        field: vc.fieldCode,
-        label: resolveFieldMetaDisplayName(vc.fieldCode, modelFieldMap) ?? vc.fieldCode,
-        valueType: renderComponentToValueType(renderComponent),
-        sorter: dataType,
-        sortable: true,
-        dictCode: meta.dictCode || meta.extension?.dictCode || undefined,
-        refTarget: meta.refTarget || meta.extension?.refTarget || undefined,
-      } as ColumnConfig);
-      baseFields.add(vc.fieldCode);
-    }
-    const sysCols = SYSTEM_FIELD_DEFS.filter((sf) => {
-      const vc = viewColMap.get(sf.field);
-      return vc && vc.visible !== false && !baseFields.has(sf.field);
-    });
-    const allCols = [...baseCols, ...modelCols, ...sysCols];
-    const visibleCols = allCols
-      .map((col) => {
-        const vc = viewColMap.get(col.field);
-        if (vc && vc.visible === false) return null;
-        return {
-          ...col,
-          ...(vc?.width ? { width: vc.width } : {}),
-          ...(vc?.frozen && vc.frozenPosition
-            ? { fixed: vc.frozenPosition }
-            : vc?.frozen === false
-              ? { fixed: undefined }
-              : {}),
-        };
-      })
-      .filter((col): col is ColumnConfig => col !== null);
-
-    // Sort by SavedView order if specified
-    const hasOrder = viewColumns.some((vc) => vc.order !== undefined && vc.order !== null);
-    if (hasOrder) {
-      visibleCols.sort((a, b) => {
-        const orderA = viewColMap.get(a.field)?.order ?? 999;
-        const orderB = viewColMap.get(b.field)?.order ?? 999;
-        return orderA - orderB;
-      });
-    }
-
-    return visibleCols;
-  }, [tableBlock, effectiveViewConfig, modelFieldMap, SYSTEM_FIELD_DEFS]);
+  const { SYSTEM_FIELD_DEFS, tableColumns } = useListTableColumns({
+    tableBlock, effectiveViewConfig, modelFieldMap, t,
+  });
 
   const referenceDisplayConfigs = useMemo(
     () =>
@@ -3253,46 +2971,7 @@ function ListPageContentInner(props: PageContentProps) {
     setColumnOrder(tableColumns.filter((c) => !c.isActionColumn).map((c) => c.field));
   }, [effectiveViewConfig?.columns, tableColumns]);
 
-  // Resolve column label via i18n
-  const resolveColumnLabel = useCallback(
-    (column: ColumnConfig): string => {
-      if (column.label) {
-        return getLocalizedText(column.label, locale, t);
-      }
-      if (column.isActionColumn) {
-        return t('table.actions');
-      }
-      const systemKey = getSystemFieldI18nKey(column.field);
-      if (systemKey) {
-        const systemLabel = t(systemKey);
-        if (systemLabel !== systemKey) return systemLabel;
-      }
-      const mc = schema?.modelCode || tableName;
-      const modelKey = `model.${mc}.${column.field}.label`;
-      const modelLabel = t(modelKey);
-      if (modelLabel !== modelKey) return modelLabel;
-      const modelFieldKey = `field.${mc}.${column.field}.label`;
-      const modelFieldLabel = t(modelFieldKey);
-      if (modelFieldLabel !== modelFieldKey) return modelFieldLabel;
-      const fieldKey = `field.${column.field}.label`;
-      const fieldLabel = t(fieldKey);
-      if (fieldLabel !== fieldKey) return fieldLabel;
-      // Probe `common.field.<code>` namespaced under `common.field.*` (legacy slot)
-      const commonFieldKey = `common.field.${column.field}`;
-      const commonFieldLabel = t(commonFieldKey);
-      if (commonFieldLabel !== commonFieldKey) return commonFieldLabel;
-      // Probe top-level `common.<code>` — covers system audit fields like
-      // created_at / updated_at / created_by / updated_by which live directly
-      // under the `common:` namespace in i18n yaml resources.
-      const commonKey = `common.${column.field}`;
-      const commonLabel = t(commonKey);
-      if (commonLabel !== commonKey) return commonLabel;
-      // Last resort before leaking the raw field code: the model field
-      // metadata carries the imported displayName (zh-CN first).
-      return resolveFieldMetaDisplayName(column.field, modelFieldMap) ?? column.field;
-    },
-    [locale, t, schema?.modelCode, tableName, modelFieldMap],
-  );
+  const resolveColumnLabel = useListColumnLabel({ locale, t, schema, tableName, modelFieldMap });
 
   // Column widths map from SavedView
   const columnWidths = useMemo(() => {
@@ -3373,51 +3052,9 @@ function ListPageContentInner(props: PageContentProps) {
     ],
   );
 
-  // All model-backed column definitions for ColumnSettingsPanel. DSL columns
-  // define the default visible subset; other readable model fields begin hidden.
-  const allColumnDefs = useMemo(() => {
-    if (!tableBlock) return [];
-    const cols = (tableBlock as BlockConfig).table?.columns || tableBlock.columns;
-    if (!Array.isArray(cols)) return [];
-    return buildListColumnSettingsDefinitions(
-      cols as ColumnConfig[],
-      modelFieldMap,
-      SYSTEM_FIELD_DEFS,
-      resolveColumnLabel,
-    );
-  }, [tableBlock, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
-
-  const viewManageFields = useMemo(() => {
-    const fieldMap = new Map(
-      buildViewManageFieldOptions(tableColumns, modelFieldMap).map((field) => [field.code, field]),
-    );
-
-    for (const column of tableColumns) {
-      if (!column.field || column.isActionColumn) continue;
-      fieldMap.set(column.field, {
-        code: column.field,
-        name: resolveColumnLabel(column),
-        dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
-      });
-    }
-
-    return Array.from(fieldMap.values());
-  }, [tableColumns, modelFieldMap, resolveColumnLabel]);
-
-  const filterFieldMetadata = useMemo(() => {
-    const businessFields = buildListFilterFieldMetadata(
-      tableColumns,
-      modelFieldMap,
-      resolveColumnLabel,
-    );
-    const known = new Set(businessFields.map((field) => field.fieldCode));
-    const systemFields = buildListFilterFieldMetadata(
-      SYSTEM_FIELD_DEFS.filter((column) => !known.has(column.field)),
-      modelFieldMap,
-      resolveColumnLabel,
-    );
-    return [...businessFields, ...systemFields];
-  }, [tableColumns, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
+  const { allColumnDefs, viewManageFields, filterFieldMetadata } = useListFieldOptions({
+    tableBlock, tableColumns, modelFieldMap, SYSTEM_FIELD_DEFS, resolveColumnLabel,
+  });
 
   const handleAnalysisDrillDown = useCallback(
     (drillFilters: import('~/framework/smart/types/chart').FilterConfig[]) => {
