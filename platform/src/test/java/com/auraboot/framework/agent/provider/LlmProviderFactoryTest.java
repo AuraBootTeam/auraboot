@@ -82,11 +82,32 @@ class LlmProviderFactoryTest {
             assertThat(info.getSource()).isEqualTo("stub_mode");
             assertThat(info.isConfigured()).isTrue();
         });
-        assertThat(factory.listAllProviders()).singleElement()
-                .extracting(LlmProviderFactory.ProviderInfo::getProviderCode).isEqualTo("stub");
         assertThat(factory.resolveDefaultProviderCode(7L)).isEqualTo("stub");
         assertThat(factory.resolveProvider(7L, "stub").getProvider()).isSameAs(stub);
         org.mockito.Mockito.verifyNoInteractions(configs);
+        assertThat(factory.listAllProviders()).singleElement()
+                .extracting(LlmProviderFactory.ProviderInfo::getProviderCode).isEqualTo("stub");
+
+    }
+
+    @Test
+    @DisplayName("stub execution mode retains configured vendor entries in the management catalog")
+    void stubModeRetainsConfiguredVendorCatalog() {
+        CloudConfigService configs = mock(CloudConfigService.class);
+        var vendor = new com.auraboot.framework.cloudconfig.entity.CloudConfig();
+        vendor.setProviderCode("anthropic");
+        vendor.setConfig("{\"displayName\":\"Configured vendor\",\"apiKey\":\"fixture-key\",\"apiFormat\":\"messages\"}");
+        when(configs.getAllByServiceType("llm")).thenReturn(List.of(vendor));
+        LlmProvider stub = mock(LlmProvider.class);
+        when(stub.getProviderCode()).thenReturn(StubLlmProvider.PROVIDER_CODE);
+        LlmProviderFactory factory = factoryWithConfigs(configs, stub);
+        ReflectionTestUtils.setField(factory, "stubMode", true);
+
+        assertThat(factory.listAllProviders()).extracting(LlmProviderFactory.ProviderInfo::getProviderCode)
+                .containsExactlyInAnyOrder("stub", "anthropic");
+        assertThat(factory.listConfiguredProviders(7L)).singleElement()
+                .extracting(LlmProviderFactory.ProviderInfo::getProviderCode).isEqualTo("stub");
+        assertThat(factory.resolveProvider(7L, "anthropic").getProvider()).isSameAs(stub);
     }
 
     @Test

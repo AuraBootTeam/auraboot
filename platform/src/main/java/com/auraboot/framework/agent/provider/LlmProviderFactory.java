@@ -451,16 +451,16 @@ public class LlmProviderFactory {
      */
     @SuppressWarnings("unchecked")
     public List<ProviderInfo> listAllProviders() {
-        // Discovery must report the same explicit operator mode used by execution.
+        List<ProviderInfo> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        // The management catalog still includes configured vendors while execution uses the stub.
         if (stubMode) {
-            return List.of(ProviderInfo.builder()
+            result.add(ProviderInfo.builder()
                     .providerCode(StubLlmProvider.PROVIDER_CODE).displayName("Stub (explicit test mode)")
                     .apiFormat("stub").source("stub_mode").configured(true)
                     .build());
+            seen.add(StubLlmProvider.PROVIDER_CODE);
         }
-
-        List<ProviderInfo> result = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
 
         try {
             List<CloudConfig> configs = cloudConfigService.getAllByServiceType("llm");
