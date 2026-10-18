@@ -49,7 +49,8 @@
         "source graph respects package export boundaries and rejects ambiguous source identities",
         "core release projection permits product additions but rejects core schema parameter and security drift",
         "enumerates finite route branches and retains every missing external or unbounded alternative",
-        "retains aliased bound and injected network transports without marking shadowed generated calls migrated"
+        "retains aliased bound and injected network transports without marking shadowed generated calls migrated",
+        "keeps replaceable route defaults and mutable bases outside proven source links"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },

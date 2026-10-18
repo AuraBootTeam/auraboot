@@ -164,3 +164,29 @@ test('retains aliased bound and injected network transports without marking shad
     assert.equal(row.transportResolution, 'candidate');
   }
 });
+
+
+test('keeps replaceable route defaults and mutable bases outside proven source links', () => {
+  const result = discoverCalls([{ file: 'web-admin/app/defaults.ts', text: `
+    import {get} from './http-client';
+    function configured(base = '/api/views') { get(base + '/accessible'); }
+    let base = '/api/views';
+    get(base + '/accessible');
+    class Mutable { base = '/api/views'; load() { get(this.base + '/accessible'); } }
+    class Fixed { readonly base = '/api/views'; load() { get(this.base + '/accessible'); } }
+    const fixed = '/api/views';
+    get(fixed + '/accessible');
+  ` }], document);
+  assert.equal(result.calls.length, 5);
+  for (const row of result.calls.slice(0, 4)) {
+    assert.equal(row.classification, 'route-input-needs-review');
+    assert.equal(row.matches[0].operationId, 'accessible', 'Default match remains candidate evidence');
+    assert.equal(row.routeInputEvidence.length, 1);
+  }
+  assert.equal(result.calls[0].routeInputEvidence[0].kind, 'replaceable-parameter-default');
+  assert.equal(result.calls[1].routeInputEvidence[0].kind, 'mutable-route-value');
+  for (const row of result.calls.slice(4)) {
+    assert.equal(row.classification, 'source-linked');
+    assert.deepEqual(row.routeInputEvidence, []);
+  }
+});

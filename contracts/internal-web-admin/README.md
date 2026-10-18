@@ -77,7 +77,9 @@ classified as linked; enumeration overflow stays unresolved. Calls through local
 aliases, bound fetch functions and typed injected fetch parameters remain in the
 inventory. Mutable aliases and replaceable injected operation defaults do not
 prove generated-operation migration. These static facts do not establish wire
-type propagation or runtime branch coverage.
+type propagation or runtime branch coverage. Replaceable route defaults, mutable
+values and instance base fields retain candidate matches with declaration evidence;
+they require explicit reconciliation before being counted as proven source links.
 
 ## Typed JSON operations
 

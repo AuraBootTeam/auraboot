@@ -153,6 +153,30 @@ export function discoverCalls(sources, document) {
       }
       return [evaluate(n, visited)];
     }
+    function routeInputs(n, visited = new Set(), inputs = new Map()) {
+      if (!n) return [...inputs.values()];
+      const symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(n) ? n.name : n);
+      if (symbol && !visited.has(symbol)) {
+        visited.add(symbol);
+        const declaration = symbol.valueDeclaration;
+        if (declaration?.initializer) {
+          const configurable = ts.isParameter(declaration);
+          const mutableVariable = ts.isVariableDeclaration(declaration)
+            && ts.isVariableDeclarationList(declaration.parent)
+            && !(declaration.parent.flags & ts.NodeFlags.Const);
+          // Even readonly instance fields can be replaced by constructor input.
+          const instanceProperty = ts.isPropertyDeclaration(declaration);
+          if (configurable || mutableVariable || instanceProperty) {
+            const line = sf.getLineAndCharacterOfPosition(declaration.getStart(sf)).line + 1;
+            inputs.set(`${line}:${symbol.name}`, { kind: configurable ? 'replaceable-parameter-default' : instanceProperty ? 'instance-route-property' : 'mutable-route-value',
+              binding: symbol.name, declarationLine: line });
+          }
+          routeInputs(declaration.initializer, visited, inputs);
+        }
+      }
+      ts.forEachChild(n, child => { routeInputs(child, visited, inputs); });
+      return [...inputs.values()];
+    }
     function placeholder(n) {
       if (ts.isCallExpression(n) && n.arguments[0]) return placeholder(n.arguments[0]);
       return n.getText(sf).replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 100) || 'value';
@@ -202,6 +226,7 @@ export function discoverCalls(sources, document) {
           const routes = routeAlternatives(targetNode).map(value => value === routeOverflow ? undefined : value);
           const route = routes.length === 1 ? routes[0] : undefined;
           const target = targetNode?.getText(sf) ?? '';
+          const routeInputEvidence = routeInputs(targetNode);
           const plumbing = /\/http-client\/|\/ApiService\.ts$|\/server\/services\/BffProxyService\.ts$/.test(source.file);
           const exclusion = ts.isPropertyAccessExpression(n.expression) ? localCollection(n.expression.expression) : undefined;
           const branches = routes.map(route => {
@@ -214,12 +239,13 @@ export function discoverCalls(sources, document) {
             return { route: route ?? null, classification, matches };
           });
           const classifications = new Set(branches.map(branch => branch.classification));
-          const classification = classifications.size === 1 ? branches[0].classification : 'unresolved-route-branches';
+          let classification = classifications.size === 1 ? branches[0].classification : 'unresolved-route-branches';
+          if (classification === 'source-linked' && routeInputEvidence.length) classification = 'route-input-needs-review';
           const matches = [...new Map(branches.flatMap(branch => branch.matches)
             .map(match => [`${match.method} ${match.path}`, match])).values()];
           calls.push({ id: sha256(`${source.file}:${n.getStart(sf)}:${callee}:${target}`).slice(0, 20),
             file: source.file, line: line(), callee, method, target, route: route ?? null,
-            transportResolution: resolvedTransport ?? 'name-heuristic-candidate',
+            transportResolution: resolvedTransport ?? 'name-heuristic-candidate', routeInputEvidence,
             typeArguments: (n.typeArguments ?? []).map(t => t.getText(sf)), classification, matches, branches,
             migration: exclusion ? 'not-applicable' : generated ? 'generated-operation' : 'not-migrated',
             evidence: exclusion ? [exclusion] : [] });
