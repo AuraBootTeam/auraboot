@@ -36,7 +36,15 @@ export type DecisionStatus =
   | 'ERROR'
   | 'SKIPPED';
 
+export interface ConditionTrace {
+  result: 'TRUE' | 'FALSE' | 'UNKNOWN';
+  steps: { expr: string; left: unknown; right: unknown; result: 'TRUE' | 'FALSE' | 'UNKNOWN' }[];
+  unknownReasons: string[];
+  nodeResults: Record<string, 'TRUE' | 'FALSE' | 'UNKNOWN'>;
+}
+
 export interface DecisionResult {
+  conditionTrace?: ConditionTrace;
   traceId?: string;
   decisionCode?: string;
   status: DecisionStatus;
@@ -786,6 +794,7 @@ export function createDecisionApi(http: HttpClient) {
       runtimeAdapter: string;
       contentJson: unknown;
       context: ScopedContext;
+      explain?: boolean;
     }) => http.post<DecisionResult>(`${D}/test-run`, req).then(unwrap),
 
     evaluate: (req: EvaluateRequest) =>
@@ -801,8 +810,7 @@ export function createDecisionApi(http: HttpClient) {
       ownerModule?: string;
     }) => http.post<unknown>(`${D}/definitions`, req).then(unwrap),
 
-    getDefinition: (code: string) =>
-      http.get<unknown>(`${D}/definitions/${code}`).then(unwrap),
+    getDefinition: (code: string) => http.get<unknown>(`${D}/definitions/${code}`).then(unwrap),
     listDefinitions: (filters: DecisionDefinitionListFilters = {}) =>
       http.get<unknown>(`${D}/definitions`, compactParams(filters)).then(unwrap),
 
@@ -817,10 +825,7 @@ export function createDecisionApi(http: HttpClient) {
         outputSchemaJson?: unknown;
         contextSchemaJson?: unknown;
       },
-    ) =>
-      http
-        .post<DecisionVersionSummary>(`${D}/definitions/${code}/versions`, req)
-        .then(unwrap),
+    ) => http.post<DecisionVersionSummary>(`${D}/definitions/${code}/versions`, req).then(unwrap),
 
     listVersions: (code: string) =>
       http.get<DecisionVersionSummary[]>(`${D}/definitions/${code}/versions`).then(unwrap),
@@ -857,12 +862,9 @@ export function createDecisionApi(http: HttpClient) {
         .then(unwrap),
     replayEventPolicyActionLog: (pid: string) =>
       http
-        .post<EventPolicyActionLogRecord>(
-          `${P}/action-logs/${encodeURIComponent(pid)}/replay`,
-        )
+        .post<EventPolicyActionLogRecord>(`${P}/action-logs/${encodeURIComponent(pid)}/replay`)
         .then(unwrap),
-    getDashboard: () =>
-      http.get<DecisionDashboardResponse>(`${D}/dashboard/summary`).then(unwrap),
+    getDashboard: () => http.get<DecisionDashboardResponse>(`${D}/dashboard/summary`).then(unwrap),
     getModelFields: () => http.get<DecisionModelField[]>(`${D}/model/fields`).then(unwrap),
     getFactCatalog: (modelCode?: string) => {
       const params = compactParams({ modelCode });
@@ -911,19 +913,17 @@ export function createDecisionApi(http: HttpClient) {
       http.post<DecisionFieldPreflight>(`${D}/fields/preflight`, req).then(unwrap),
     listConditionFragments: (filters: ConditionFragmentListFilters = {}) =>
       http
-        .get<DecisionPageResult<ConditionFragment>>(
-          `${D}/condition-fragments`,
-          compactParams(filters),
-        )
+        .get<
+          DecisionPageResult<ConditionFragment>
+        >(`${D}/condition-fragments`, compactParams(filters))
         .then(unwrap),
-    createConditionFragment: (req: ConditionFragmentUpsertRequest & {
-      fragmentCode: string;
-      fragmentName: string;
-    }) => http.post<ConditionFragment>(`${D}/condition-fragments`, req).then(unwrap),
-    createConditionFragmentVersion: (
-      code: string,
-      req: ConditionFragmentUpsertRequest,
-    ) =>
+    createConditionFragment: (
+      req: ConditionFragmentUpsertRequest & {
+        fragmentCode: string;
+        fragmentName: string;
+      },
+    ) => http.post<ConditionFragment>(`${D}/condition-fragments`, req).then(unwrap),
+    createConditionFragmentVersion: (code: string, req: ConditionFragmentUpsertRequest) =>
       http
         .post<ConditionFragment>(
           `${D}/condition-fragments/${encodeURIComponent(code)}/versions`,
@@ -939,9 +939,7 @@ export function createDecisionApi(http: HttpClient) {
         .then(unwrap),
     listConditionFragmentVersions: (code: string) =>
       http
-        .get<ConditionFragment[]>(
-          `${D}/condition-fragments/${encodeURIComponent(code)}/versions`,
-        )
+        .get<ConditionFragment[]>(`${D}/condition-fragments/${encodeURIComponent(code)}/versions`)
         .then(unwrap),
     evaluateConditionFragment: (code: string, context?: ScopedContext) =>
       http
@@ -952,9 +950,7 @@ export function createDecisionApi(http: HttpClient) {
         .then(unwrap),
     getConditionFragmentImpact: (code: string) =>
       http
-        .get<ConditionFragmentImpact>(
-          `${D}/condition-fragments/${encodeURIComponent(code)}/impact`,
-        )
+        .get<ConditionFragmentImpact>(`${D}/condition-fragments/${encodeURIComponent(code)}/impact`)
         .then(unwrap),
     validateConditionFragmentVersion: (pid: string) =>
       http
@@ -982,9 +978,7 @@ export function createDecisionApi(http: HttpClient) {
         })
         .then(unwrap),
     importTableDmn: (dmnXml: string) =>
-      http
-        .post<DecisionTableDmnXmlResult>(`${D}/tables/import-dmn`, { dmnXml })
-        .then(unwrap),
+      http.post<DecisionTableDmnXmlResult>(`${D}/tables/import-dmn`, { dmnXml }).then(unwrap),
     roundTripTableDmn: (
       model: DecisionTable,
       decisionName = 'decision_table',
@@ -1023,9 +1017,7 @@ export function createDecisionApi(http: HttpClient) {
       http.post<EventPolicySummary>(`${P}/definitions`, req).then(unwrap),
 
     setPolicyEnabled: (code: string, enabled: boolean) =>
-      http
-        .post<EventPolicySummary>(`${P}/definitions/${code}/enabled`, { enabled })
-        .then(unwrap),
+      http.post<EventPolicySummary>(`${P}/definitions/${code}/enabled`, { enabled }).then(unwrap),
 
     copyPolicyDefinition: (code: string, req: EventPolicyCopyRequest) =>
       http.post<EventPolicySummary>(`${P}/definitions/${code}/copy`, req).then(unwrap),
@@ -1045,14 +1037,10 @@ export function createDecisionApi(http: HttpClient) {
     }) => http.post<unknown>(`${P}/run-and-execute`, req).then(unwrap),
 
     createPolicyDraftVersion: (code: string, req: EventPolicyDraftVersionRequest) =>
-      http
-        .post<EventPolicyVersionSummary>(`${P}/definitions/${code}/versions`, req)
-        .then(unwrap),
+      http.post<EventPolicyVersionSummary>(`${P}/definitions/${code}/versions`, req).then(unwrap),
 
     listPolicyVersions: (code: string) =>
-      http
-        .get<EventPolicyVersionSummary[]>(`${P}/definitions/${code}/versions`)
-        .then(unwrap),
+      http.get<EventPolicyVersionSummary[]>(`${P}/definitions/${code}/versions`).then(unwrap),
 
     validatePolicyVersion: (pid: string) =>
       http.post<EventPolicyVersionSummary>(`${P}/versions/${pid}/validate`).then(unwrap),

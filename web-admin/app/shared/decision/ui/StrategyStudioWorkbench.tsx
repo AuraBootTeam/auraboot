@@ -1101,10 +1101,9 @@ export function StrategyStudioWorkbench({
   )
   const scenarioFields = useMemo(() => {
     const fragmentFields = fieldsFromFragment(selectedFragment)
-    const catalogBackedFields = mergeFields(
-      selectedDecisionCode ? [] : activeScenario.fields,
-      selectedDecisionCode ? fields : filterScenarioFields(activeScenario, fragmentFields, fields),
-    )
+    // The editor uses the real catalog, including related models; scenario samples
+    // must never replace metadata types, dictionary labels, or permission flags.
+    const catalogBackedFields = fields
     return mergeFields(catalogBackedFields, fragmentFields)
   }, [activeScenario, fields, selectedFragment, selectedDecisionCode])
   const scenarioTable = tableDrafts[studioTableKey(activeScenario)] ?? buildScenarioTable(activeScenario)

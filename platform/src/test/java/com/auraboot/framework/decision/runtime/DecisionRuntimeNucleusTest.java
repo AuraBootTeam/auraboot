@@ -85,6 +85,9 @@ class DecisionRuntimeNucleusTest {
         ResolvedDecision draft = ResolvedDecision.simpleCondition("big_amount", null, VersionStatus.DRAFT, ast());
         DecisionResult r = runtime.testRun(draft, ctx(20000), DecisionEvaluateOptions.explaining());
         assertThat(r.status()).isEqualTo(DecisionStatus.MATCHED);
+        assertThat(r.conditionTrace()).isNotNull();
+        assertThat(r.conditionTrace().result()).isEqualTo(com.auraboot.framework.decision.ast.Truth.TRUE);
+        assertThat(runtime.testRun(draft, ctx(20000), DecisionEvaluateOptions.defaults()).conditionTrace()).isNull();
     }
 
     @Test

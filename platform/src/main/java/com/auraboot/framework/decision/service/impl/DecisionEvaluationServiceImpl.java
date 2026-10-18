@@ -168,10 +168,18 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
                 "__test__", 0, null, VersionStatus.DRAFT,
                 kind, adapter, request.getContentJson());
 
+        DecisionValidateResult validation = decisionRuntime.validate(resolved);
+        if (!validation.valid()) {
+            return DecisionResult.builder("__test__")
+                    .status(DecisionStatus.ERROR)
+                    .errors(validation.errors().stream().map(DecisionValidateResult.Issue::message).toList())
+                    .build();
+        }
         DecisionContext ctx = buildContext(request.getContext());
 
         log.info("Decision test-run: kind={}, adapter={}", request.getKind(), request.getRuntimeAdapter());
-        return decisionRuntime.testRun(resolved, ctx, DecisionEvaluateOptions.defaults());
+        return decisionRuntime.testRun(resolved, ctx, request.isExplain()
+                ? DecisionEvaluateOptions.explaining() : DecisionEvaluateOptions.defaults());
     }
 
     @Override

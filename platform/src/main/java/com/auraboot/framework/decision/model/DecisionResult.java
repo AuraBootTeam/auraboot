@@ -23,7 +23,8 @@ public record DecisionResult(
         List<MatchedRule> matchedRules,
         List<String> errors,
         List<String> unknownReasons,
-        DecisionMetrics metrics
+        DecisionMetrics metrics,
+        com.auraboot.framework.decision.ast.EvalTrace conditionTrace
 ) {
 
     /** A single field-level violation (docs/1.md §16.3 CrossField). */
@@ -63,6 +64,7 @@ public record DecisionResult(
         private List<String> errors = List.of();
         private List<String> unknownReasons = List.of();
         private DecisionMetrics metrics = DecisionMetrics.of(0, 0);
+        private com.auraboot.framework.decision.ast.EvalTrace conditionTrace;
 
         private Builder(String decisionCode) {
             this.decisionCode = decisionCode;
@@ -81,12 +83,13 @@ public record DecisionResult(
         public Builder matchedRules(List<MatchedRule> v) { this.matchedRules = v == null ? List.of() : v; return this; }
         public Builder errors(List<String> v) { this.errors = v == null ? List.of() : v; return this; }
         public Builder unknownReasons(List<String> v) { this.unknownReasons = v == null ? List.of() : v; return this; }
+        public Builder conditionTrace(com.auraboot.framework.decision.ast.EvalTrace v) { this.conditionTrace = v; return this; }
         public Builder metrics(DecisionMetrics v) { this.metrics = v; return this; }
 
         public DecisionResult build() {
             return new DecisionResult(traceId, decisionCode, decisionVersion, kind, engineType,
                     resultType, status, matched, outputs, violations, actionPlans, matchedRules,
-                    errors, unknownReasons, metrics);
+                    errors, unknownReasons, metrics, conditionTrace);
         }
     }
 }

@@ -4,6 +4,12 @@ import { StrategyStudioWorkbench } from '../StrategyStudioWorkbench';
 import { STUDIO_DRAFT_KEY_PREFIX, STUDIO_WORKBENCH_DRAFT_SCOPE } from '../designerDraftStorage';
 import type { DecisionApi } from '../../api/decisionApi';
 
+const metadataFields: import('../ConditionBuilder').FieldOption[] = [
+  {scope:'record',path:'data.targetKey',label:'SLA 节点',dataType:'string'},
+  {scope:'record',path:'data.wd_req_applicant',label:'申请人',dataType:'user'},
+  {scope:'sla',path:'deadlineMinutes',label:'截止分钟',dataType:'integer'},
+];
+
 const language = vi.hoisted(() => ({ locale: 'zh-CN' }));
 // Flip to true to reproduce the legacy behavior: the studio keeps its mapping
 // drafts purely in memory, so a locale switch — which reloads the page and
@@ -84,7 +90,7 @@ function api(): DecisionApi {
 }
 
 function mountWorkbench(fakeApi: DecisionApi = api()) {
-  return render(<StrategyStudioWorkbench api={fakeApi} fields={[]} />);
+  return render(<StrategyStudioWorkbench api={fakeApi} fields={metadataFields} />);
 }
 
 function openDecisionMappingEditor() {

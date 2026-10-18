@@ -2005,6 +2005,7 @@ export function DecisionRuleBindingBlock({
             </div>
             <ConditionBuilder
               value={condition}
+              readOnly={readOnly}
               fields={ruleInputFields}
               onChange={updateCondition}
             />

@@ -148,6 +148,7 @@ describe('ConditionFragmentLibraryBlock', () => {
                 modelCode: 'wd_leave_request',
                 label: '请假申请',
                 facts: [
+                  {scope:'record',path:'record.data.wd_req_days',label:'请假天数',dataType:'decimal'},
                   {
                     factKey: 'wd_leave_request.wd_req_type',
                     scope: 'record',
@@ -279,6 +280,7 @@ describe('ConditionFragmentLibraryBlock', () => {
       '请假审批分派',
     );
     fireEvent.click(screen.getByTestId('cb-add'));
+    fireEvent.change(screen.getByLabelText('model-0'), {target:{value:'record:wd_leave_request'}});
     fireEvent.change(screen.getByLabelText('field-0'), {
       target: { value: 'record:data.wd_req_days' },
     });
@@ -311,7 +313,7 @@ describe('ConditionFragmentLibraryBlock', () => {
                 expect.objectContaining({
                   operator: 'GTE',
                   left: expect.objectContaining({ scope: 'record', path: 'data.wd_req_days' }),
-                  right: expect.objectContaining({ value: '3' }),
+                  right: expect.objectContaining({ value: 3 }),
                 }),
               ],
             }),

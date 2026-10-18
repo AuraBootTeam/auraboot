@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getApiService } from '~/shared/services/ApiService';
+import { conditionConfigurationValid } from '~/shared/decision/ui/ConditionServerTrial';
+import { useDecisionConditionText } from '~/shared/decision/ui/decisionConditionText';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   group,
@@ -27,7 +29,7 @@ import {
   type ScopedContext,
 } from '~/shared/decision/api/decisionApi';
 
-type EditorMode = 'create' | 'version' | null;
+type EditorMode = 'create' | 'version' | 'edit' | null;
 
 interface LoadFragmentsOptions {
   silentError?: boolean;
@@ -524,14 +526,7 @@ function editorFieldsFor(
   fieldCatalog: FieldOption[],
   selectedFragment: ConditionFragment | null,
 ): FieldOption[] {
-  return mergeFieldOptions(
-    scopeDefaults(draft.scopeType),
-    filterCatalogFields(draft.scopeType, fieldCatalog),
-    fieldsFromConditionNode(draft.conditionRoot),
-    (selectedFragment?.fieldRefs ?? [])
-      .map(fieldFromRef)
-      .filter((field): field is FieldOption => Boolean(field)),
-  );
+  return fieldCatalog.filter(field => field.visible !== false && !field.masked);
 }
 
 function draftFromFragment(fragment: ConditionFragment): FragmentDraft {
@@ -609,6 +604,7 @@ function contributedImpactSourceUrl(ref: DecisionImpactRef): string | null {
 
 export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibraryBlockProps) {
   const { t } = useI18n();
+  const { text: conditionText } = useDecisionConditionText();
   const api = useMemo(() => createApi(), []);
   const defaultScopeType = block?.props?.defaultScopeType;
   const sampleContextJson = block?.props?.sampleContextJson ?? DEFAULT_SAMPLE_CONTEXT;
@@ -880,6 +876,15 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
     setError('');
   };
 
+  const openDraft = () => {
+    if (!selectedFragment?.pid || !['DRAFT', 'VALIDATED'].includes(String(selectedFragment.status)))
+      return;
+    setEditorMode('edit');
+    setDraft(draftFromFragment(selectedFragment));
+    setMessage('');
+    setError('');
+  };
+
   const closeEditor = () => {
     setEditorMode(null);
     setDraft(emptyDraft(defaultScopeType));
@@ -889,9 +894,24 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
     setError('');
     setMessage('');
     try {
+      if (!conditionConfigurationValid(draft.conditionRoot, editorFields)) {
+        throw new Error(conditionText('invalidCondition'));
+      }
       const conditionSpec = conditionSpecFromDraft(draft);
       let savedFragment: ConditionFragment;
-      if (editorMode === 'version') {
+      if (editorMode === 'edit') {
+        if (!selectedFragment?.pid) throw new Error(conditionText('invalidCondition'));
+        savedFragment = await api.updateConditionFragmentDraft(selectedFragment.pid, {
+          fragmentName: draft.fragmentName,
+          description: draft.description,
+          scopeType: draft.scopeType,
+          scopeRef: draft.scopeRef,
+          ownerModule: draft.ownerModule,
+          enabled: true,
+          conditionSpec,
+        });
+        setMessage(conditionText('draftSaved'));
+      } else if (editorMode === 'version') {
         savedFragment = await api.createConditionFragmentVersion(draft.fragmentCode, {
           fragmentName: draft.fragmentName,
           description: draft.description,
@@ -1033,7 +1053,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
             data-testid="fragment-code"
             placeholder={t('decision.fragments.codePlaceholder', undefined, '片段编码')}
             value={draft.fragmentCode}
-            disabled={editorMode === 'version'}
+            disabled={editorMode !== 'create'}
             onChange={(e) => updateDraft('fragmentCode', e.target.value)}
           />
           <input
@@ -1242,6 +1262,11 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                 </span>
               </div>
               <div className="cfl-actions">
+                {['DRAFT', 'VALIDATED'].includes(String(selectedFragment.status)) && (
+                  <button type="button" onClick={openDraft} data-testid="cfl-open-edit">
+                    {conditionText('editDraft')}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={openVersion}

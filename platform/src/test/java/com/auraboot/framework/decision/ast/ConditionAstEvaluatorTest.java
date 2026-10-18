@@ -37,6 +37,37 @@ class ConditionAstEvaluatorTest {
         return DecisionContext.builder().record(recordData).build();
     }
 
+    @Test
+    void missingRightFieldRemainsUnknownUnderEqualityAndNegation() {
+        var equality = cmp(recPath("amount", DataType.DECIMAL), Operator.EQ,
+                recPath("budget", DataType.DECIMAL));
+        var trace = evaluator.evaluate(new NotNode(equality), ctxOf(Map.of("amount", 128000)));
+        assertThat(trace.result()).isEqualTo(Truth.UNKNOWN);
+        assertThat(trace.nodeResults()).containsEntry("root", Truth.UNKNOWN)
+                .containsEntry("root.0", Truth.UNKNOWN);
+        assertThat(trace.unknownReasons()).anyMatch(reason -> reason.contains("right operand"));
+    }
+
+    @Test
+    void explainsEveryNestedGroupAndFieldComparisonFromTheSameEvaluation() {
+        var root = new GroupNode(BoolOp.AND, List.of(
+                cmp(recPath("amount", DataType.DECIMAL), Operator.GTE, lit(100000, DataType.DECIMAL)),
+                new GroupNode(BoolOp.OR, List.of(
+                        cmp(recPath("risk", DataType.ENUM), Operator.EQ, lit("high", DataType.ENUM)),
+                        cmp(recPath("amount", DataType.DECIMAL), Operator.GT, recPath("budget", DataType.DECIMAL)))),
+                new NotNode(cmp(recPath("status", DataType.ENUM), Operator.IN,
+                        lit(List.of("accepted", "cancelled"), DataType.ENUM)))));
+        var trace = evaluator.evaluate(root, ctxOf(Map.of("amount",128000,"budget",100000,
+                "risk","normal","status","pending")));
+        assertThat(trace.result()).isEqualTo(Truth.TRUE);
+        assertThat(trace.nodeResults()).containsEntry("root.1.0",Truth.FALSE)
+                .containsEntry("root.1.1",Truth.TRUE).containsEntry("root.1",Truth.TRUE)
+                .containsEntry("root.2.0",Truth.FALSE).containsEntry("root.2",Truth.TRUE)
+                .containsEntry("root",Truth.TRUE);
+        assertThat(trace.steps()).hasSize(4);
+        assertThat(trace.steps().get(2).right()).isEqualTo(100000);
+    }
+
     // ── happy ──────────────────────────────────────────────────────────────
 
     @Test

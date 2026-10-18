@@ -290,7 +290,9 @@ function evalCompare(node: CompareNode, ctx: ScopedContext): Truth {
   }
   if (!left.present) return 'UNKNOWN';                 // missing field
   if (left.value === null || left.value === undefined) return 'UNKNOWN'; // null vs value
-  const rv = resolveOperand(node.right, ctx).value;
+  const right = resolveOperand(node.right, ctx);
+  if (!right.present || right.value === null || right.value === undefined) return 'UNKNOWN';
+  const rv = right.value;
   const dt = (node.left as PathOperand).dataType ?? (node.left as LiteralOperand).dataType;
   const bool = (b: boolean): Truth => (b ? 'TRUE' : 'FALSE');
   switch (op) {
