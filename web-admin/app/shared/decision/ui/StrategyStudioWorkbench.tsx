@@ -875,9 +875,9 @@ function buildScenarioTable(scenario: StrategyScenario): DecisionTable {
 function studioTableKey(scenario: StrategyScenario): string { return `${scenario.key}:${scenario.decisionCode}` }
 
 function initialScenarioTables(): Record<string, DecisionTable> {
-  return Object.fromEntries(
-    SCENARIOS.map((scenario) => [studioTableKey(scenario), buildScenarioTable(scenario)]),
-  ) as Record<string, DecisionTable>
+  // Scenario templates are render-time defaults, not evidence of a server load.
+  // A populated cache here prevents listVersions from restoring persisted rules.
+  return {}
 }
 
 function isDecisionTable(value: unknown): value is DecisionTable {
@@ -1688,6 +1688,7 @@ export function StrategyStudioWorkbench({
           <button
             type="button"
             data-testid="strategy-publish"
+            disabled={!publishReady || checkingReadiness}
             className="strategy-studio-primary"
             onClick={() => void publish()}
           >

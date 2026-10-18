@@ -2,6 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConditionFragmentLibraryBlock } from '../ConditionFragmentLibraryBlock';
 
+const auth = vi.hoisted(() => ({
+  permissions: new Set([
+    'decision.definition.manage',
+    'decision.definition.publish',
+    'decision.runtime.evaluate',
+  ]),
+}));
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: (code: string) => auth.permissions.has(code) }),
+}));
 const get = vi.fn();
 const post = vi.fn();
 const resolveUsageLink = vi.fn();
@@ -55,6 +65,11 @@ const baseFragment = {
 
 describe('ConditionFragmentLibraryBlock', () => {
   beforeEach(() => {
+    auth.permissions = new Set([
+      'decision.definition.manage',
+      'decision.definition.publish',
+      'decision.runtime.evaluate',
+    ]);
     get.mockReset();
     post.mockReset();
     resolveUsageLink.mockReset();
@@ -148,7 +163,12 @@ describe('ConditionFragmentLibraryBlock', () => {
                 modelCode: 'wd_leave_request',
                 label: '请假申请',
                 facts: [
-                  {scope:'record',path:'record.data.wd_req_days',label:'请假天数',dataType:'decimal'},
+                  {
+                    scope: 'record',
+                    path: 'record.data.wd_req_days',
+                    label: '请假天数',
+                    dataType: 'decimal',
+                  },
                   {
                     factKey: 'wd_leave_request.wd_req_type',
                     scope: 'record',
@@ -280,7 +300,9 @@ describe('ConditionFragmentLibraryBlock', () => {
       '请假审批分派',
     );
     fireEvent.click(screen.getByTestId('cb-add'));
-    fireEvent.change(screen.getByLabelText('model-0'), {target:{value:'record:wd_leave_request'}});
+    fireEvent.change(screen.getByLabelText('model-0'), {
+      target: { value: 'record:wd_leave_request' },
+    });
     fireEvent.change(screen.getByLabelText('field-0'), {
       target: { value: 'record:data.wd_req_days' },
     });
@@ -534,5 +556,30 @@ describe('ConditionFragmentLibraryBlock', () => {
     await waitFor(() => expect(screen.getByTestId('cfl-versions')).toHaveTextContent('v2已发布'));
     expect(screen.queryByTestId('cfl-impact-ack')).not.toBeInTheDocument();
     expect(screen.getByTestId('cfl-publish-selected')).toBeDisabled();
+  });
+  it('shows the shared condition read-only and blocks every mutation without management permission', async () => {
+    auth.permissions = new Set(['decision.definition.read']);
+    render(<ConditionFragmentLibraryBlock />);
+    const condition = await screen.findByTestId('cfl-readonly-condition');
+    await waitFor(() => expect(condition).toHaveTextContent('只读'));
+    expect(screen.getByTestId('cfl-open-create')).toBeDisabled();
+    expect(screen.queryByTestId('cfl-open-edit')).not.toBeInTheDocument();
+    for (const id of [
+      'cfl-open-version',
+      'cfl-validate-selected',
+      'cfl-publish-selected',
+      'cfl-run-evaluate',
+    ]) {
+      expect(screen.getByTestId(id)).toBeDisabled();
+      fireEvent.click(screen.getByTestId(id));
+    }
+    for (const input of condition.querySelectorAll(
+      'fieldset input, fieldset select, fieldset button',
+    )) {
+      expect(input).toBeDisabled();
+    }
+    fireEvent.click(screen.getByTestId('cfl-open-create'));
+    expect(screen.queryByTestId('cfl-editor')).not.toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
   });
 });

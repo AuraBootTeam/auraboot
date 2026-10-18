@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getApiService } from '~/shared/services/ApiService';
 import { conditionConfigurationValid } from '~/shared/decision/ui/ConditionServerTrial';
 import { useDecisionConditionText } from '~/shared/decision/ui/decisionConditionText';
+import { useAuth } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   group,
@@ -526,7 +527,7 @@ function editorFieldsFor(
   fieldCatalog: FieldOption[],
   selectedFragment: ConditionFragment | null,
 ): FieldOption[] {
-  return fieldCatalog.filter(field => field.visible !== false && !field.masked);
+  return fieldCatalog.filter((field) => field.visible !== false && !field.masked);
 }
 
 function draftFromFragment(fragment: ConditionFragment): FragmentDraft {
@@ -604,6 +605,10 @@ function contributedImpactSourceUrl(ref: DecisionImpactRef): string | null {
 
 export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibraryBlockProps) {
   const { t } = useI18n();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('decision.definition.manage');
+  const canPublish = hasPermission('decision.definition.publish');
+  const canEvaluate = hasPermission('decision.runtime.evaluate');
   const { text: conditionText } = useDecisionConditionText();
   const api = useMemo(() => createApi(), []);
   const defaultScopeType = block?.props?.defaultScopeType;
@@ -858,6 +863,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const openCreate = () => {
+    if (!canManage) return;
     setEditorMode('create');
     setDraft(emptyDraft(defaultScopeType));
     setMessage('');
@@ -865,6 +871,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const openVersion = () => {
+    if (!canManage) return;
     if (!selectedFragment) return;
     if (!canCreateNewVersion(selectedFragment)) {
       setError('只有已发布、已废弃或已停用版本可以编辑为新版本');
@@ -877,6 +884,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const openDraft = () => {
+    if (!canManage) return;
     if (!selectedFragment?.pid || !['DRAFT', 'VALIDATED'].includes(String(selectedFragment.status)))
       return;
     setEditorMode('edit');
@@ -891,6 +899,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const saveFragment = async () => {
+    if (!canManage) return;
     setError('');
     setMessage('');
     try {
@@ -948,6 +957,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const validateSelected = async () => {
+    if (!canManage) return;
     if (!selectedFragment?.pid) return;
     if (!canValidateVersion(selectedFragment)) {
       setError('不可校验已发布、已废弃或已停用版本');
@@ -968,6 +978,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const publishSelected = async () => {
+    if (!canPublish) return;
     if (!selectedFragment?.pid) return;
     if (!canPublishVersion(selectedFragment)) {
       setError('只有已校验版本可以发布');
@@ -994,6 +1005,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const evaluateSelected = async () => {
+    if (!canEvaluate) return;
     if (!selectedFragment?.fragmentCode) return;
     setError('');
     setMessage('');
@@ -1037,6 +1049,8 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
           type="button"
           className="decisionops-primary-button"
           onClick={openCreate}
+          disabled={!canManage}
+          title={!canManage ? conditionText('readOnlyCondition') : undefined}
           data-testid="cfl-open-create"
         >
           新建片段
@@ -1262,7 +1276,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                 </span>
               </div>
               <div className="cfl-actions">
-                {['DRAFT', 'VALIDATED'].includes(String(selectedFragment.status)) && (
+                {canManage && ['DRAFT', 'VALIDATED'].includes(String(selectedFragment.status)) && (
                   <button type="button" onClick={openDraft} data-testid="cfl-open-edit">
                     {conditionText('editDraft')}
                   </button>
@@ -1270,7 +1284,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                 <button
                   type="button"
                   onClick={openVersion}
-                  disabled={!canCreateNewVersion(selectedFragment)}
+                  disabled={!canManage || !canCreateNewVersion(selectedFragment)}
                   title={newVersionDisabledReason || '编辑为新版本'}
                   data-testid="cfl-open-version"
                 >
@@ -1279,7 +1293,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                 <button
                   type="button"
                   onClick={validateSelected}
-                  disabled={!canValidateVersion(selectedFragment)}
+                  disabled={!canManage || !canValidateVersion(selectedFragment)}
                   title={validateDisabledReason || '校验当前版本'}
                   data-testid="cfl-validate-selected"
                 >
@@ -1288,16 +1302,33 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                 <button
                   type="button"
                   onClick={publishSelected}
-                  disabled={Boolean(publishDisabledReason)}
+                  disabled={!canPublish || Boolean(publishDisabledReason)}
                   title={publishDisabledReason || '发布当前版本'}
                   data-testid="cfl-publish-selected"
                 >
                   发布
                 </button>
-                <button type="button" onClick={evaluateSelected} data-testid="cfl-run-evaluate">
+                <button
+                  type="button"
+                  onClick={evaluateSelected}
+                  disabled={!canEvaluate}
+                  data-testid="cfl-run-evaluate"
+                >
                   测试运行
                 </button>
               </div>
+              {!canManage && (
+                <div className="cfl-condition-editor" data-testid="cfl-readonly-condition">
+                  <ConditionBuilder
+                    value={draftFromFragment(selectedFragment).conditionRoot}
+                    fields={fieldCatalog.filter(
+                      (field) => field.visible !== false && !field.masked,
+                    )}
+                    readOnly
+                    onChange={() => {}}
+                  />
+                </div>
+              )}
               <dl className="cfl-facts">
                 <div>
                   <dt>消费场景</dt>

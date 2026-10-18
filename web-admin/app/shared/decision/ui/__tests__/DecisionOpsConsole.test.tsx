@@ -264,6 +264,12 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
       matched: true,
       outputs: {},
     })),
+    testRun: vi.fn(async () => ({
+      traceId: 'trace-default',
+      status: 'MATCHED',
+      matched: true,
+      outputs: {},
+    })),
     createDefinition: vi.fn(async () => ({ decisionCode: 'approval_routing' })),
     getDefinition: vi.fn(async () => ({ decisionCode: 'approval_routing' })),
     createDraftVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'DRAFT' })),
@@ -811,6 +817,23 @@ describe('DecisionOpsConsole', () => {
   it('keeps compact Strategy Studio work focused on one workspace panel at a time', () => {
     renderConsole();
 
+    expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
+    expect(screen.getByTestId('strategy-workspace-panel-review')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
+
+    fireEvent.click(screen.getByTestId('strategy-workspace-tab-rule'));
+
     expect(screen.getByTestId('strategy-workspace-tab-rule')).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -819,24 +842,7 @@ describe('DecisionOpsConsole', () => {
       'data-active',
       'true',
     );
-    expect(screen.getByTestId('strategy-fact-catalog')).toHaveAttribute('data-active', 'false');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'false');
-    expect(screen.getByTestId('strategy-workspace-panel-review')).toHaveAttribute(
-      'data-active',
-      'false',
-    );
-
-    fireEvent.click(screen.getByTestId('strategy-workspace-tab-dmn'));
-
-    expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute(
-      'data-active',
-      'false',
-    );
-    expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'true');
 
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
 
@@ -1025,7 +1031,7 @@ describe('DecisionOpsConsole', () => {
       outgoing: [],
       risk: { blocking: false, summary: '1 个消费方引用' },
     }));
-    const evaluate = vi.fn(async () => ({
+    const testRun = vi.fn(async () => ({
       traceId: 'trace-studio',
       decisionCode: 'complaint_sla_deadline',
       status: 'MATCHED',
@@ -1061,7 +1067,7 @@ describe('DecisionOpsConsole', () => {
 
     renderConsole(undefined, {
       getDecisionImpact,
-      evaluate,
+      testRun,
       getDefinition,
       createDefinition,
       createDraftVersion,
@@ -1080,12 +1086,12 @@ describe('DecisionOpsConsole', () => {
     );
 
     fireEvent.click(screen.getByTestId('strategy-run-test'));
-    await waitFor(() => expect(evaluate).toHaveBeenCalledOnce());
-    expect(evaluate).toHaveBeenCalledWith(
+    await waitFor(() => expect(testRun).toHaveBeenCalledOnce());
+    expect(testRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        decisionCode: 'complaint_sla_deadline',
-        callerType: 'SLA',
-        callerRef: 'wd_manager_approve_sla',
+        kind: 'DECISION_TABLE',
+        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+        contentJson: expect.objectContaining({ hitPolicy: 'FIRST' }),
         context: expect.objectContaining({
           record: expect.objectContaining({
             data: expect.objectContaining({
@@ -1096,7 +1102,7 @@ describe('DecisionOpsConsole', () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('trace-studio'),
+      expect(screen.getByTestId('strategy-test-panel')).toHaveTextContent('trace-studio'),
     );
 
     fireEvent.click(screen.getByTestId('strategy-save-draft'));
@@ -1149,6 +1155,8 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('草稿已保存');
 
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+    fireEvent.click(screen.getByTestId('strategy-check-readiness'));
+    await waitFor(() => expect(screen.getByTestId('strategy-publish')).toBeEnabled());
     fireEvent.click(screen.getByTestId('strategy-publish'));
 
     await waitFor(() => expect(publishVersion).toHaveBeenCalled());
@@ -1481,7 +1489,7 @@ describe('DecisionOpsConsole', () => {
     fireEvent.change(screen.getByLabelText('input-field-search-0'), {
       target: { value: 'wd_req_type' },
     });
-    fireEvent.click(screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type'));
+    fireEvent.click(await screen.findByTestId('dt-input-field-option-0-record-data_wd_req_type'));
 
     await waitFor(() =>
       expect(screen.getByTestId('dt-in-record_data_wd_req_type')).toHaveTextContent('请假类型'),
@@ -1616,6 +1624,8 @@ describe('DecisionOpsConsole', () => {
     } as unknown as Partial<DecisionApi>);
 
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+    fireEvent.click(screen.getByTestId('strategy-check-readiness'));
+    await waitFor(() => expect(screen.getByTestId('strategy-publish')).toBeEnabled());
     fireEvent.click(screen.getByTestId('strategy-publish'));
 
     await waitFor(() => expect(validateVersion).toHaveBeenCalledWith('draft-default'));
@@ -1679,6 +1689,8 @@ describe('DecisionOpsConsole', () => {
         '请假 SLA 节点匹配',
       ),
     );
+    fireEvent.click(screen.getByTestId('strategy-check-readiness'));
+    await waitFor(() => expect(screen.getByTestId('strategy-publish')).toBeEnabled());
     fireEvent.click(screen.getByTestId('strategy-publish'));
     await waitFor(() =>
       expect(publishConditionFragmentVersion).toHaveBeenCalledWith(
@@ -1829,6 +1841,8 @@ describe('DecisionOpsConsole', () => {
         '请假 SLA 节点匹配',
       ),
     );
+    fireEvent.click(screen.getByTestId('strategy-check-readiness'));
+    await waitFor(() => expect(screen.getByTestId('strategy-publish')).toBeEnabled());
     fireEvent.click(screen.getByTestId('strategy-publish'));
     await waitFor(() =>
       expect(publishConditionFragmentVersion).toHaveBeenCalledWith(
@@ -1855,10 +1869,10 @@ describe('DecisionOpsConsole', () => {
   });
 
   it('shows a stable Strategy Studio test-run failure when the runtime returns no result body', async () => {
-    const evaluate = vi.fn(async () => null);
+    const testRun = vi.fn(async () => null);
 
     renderConsole(undefined, {
-      evaluate,
+      testRun,
     } as unknown as Partial<DecisionApi>);
 
     fireEvent.click(screen.getByTestId('strategy-run-test'));
@@ -2021,6 +2035,8 @@ describe('DecisionOpsConsole', () => {
       expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过'),
     );
 
+    fireEvent.click(screen.getByTestId('strategy-check-readiness'));
+    await waitFor(() => expect(screen.getByTestId('strategy-publish')).toBeEnabled());
     fireEvent.click(screen.getByTestId('strategy-publish'));
     await waitFor(() =>
       expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布成功'),
