@@ -1,4 +1,6 @@
 [
+  { "key": "message.action.dispatch.confirm.title", "zh-CN": "派发任务", "en-US": "Dispatch task", "source": "import", "refType": "message" },
+  { "key": "message.action.dispatch.confirm.content", "zh-CN": "确认将此任务派发给指定的 AI 同事？", "en-US": "Dispatch this task to the assigned AI colleague?", "source": "import", "refType": "message" },
   { "key": "model.agent_definition._meta.label", "zh-CN": "Agent 定义", "en-US": "Agent Definition", "source": "import", "refType": "model" },
   { "key": "model.agent_definition.agent_code.label", "zh-CN": "Agent 编码", "en-US": "Agent Code", "source": "import", "refType": "field" },
   { "key": "model.agent_definition.name.label", "zh-CN": "名称", "en-US": "Name", "source": "import", "refType": "field" },

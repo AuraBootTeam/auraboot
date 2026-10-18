@@ -25,9 +25,9 @@ const EVIDENCE_ROOT = process.env.AURA_EVIDENCE_ROOT
       'par25-dashboard-crud',
     );
 
-function shot(page: Page, name: string): void {
+async function shot(page: Page, name: string): Promise<void> {
   fs.mkdirSync(EVIDENCE_ROOT, { recursive: true });
-  void page.screenshot({ path: path.join(EVIDENCE_ROOT, `${name}.png`), fullPage: false });
+  await page.screenshot({ path: path.join(EVIDENCE_ROOT, `${name}.png`), fullPage: false });
 }
 
 async function getToken(page: Page): Promise<string> {

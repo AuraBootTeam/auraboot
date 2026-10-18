@@ -38,8 +38,8 @@ const widgets: Widget[] = [
     config: { title: 'Orders' },
   },
 ];
-it.each(['native UUID', 'HTTP origin without randomUUID'])('keeps valid UUID visits stable across renders and distinct across dashboard switches (%s)', (environment) => {
-  if (environment === 'HTTP origin without randomUUID') {
+it.each(['secure', 'http'])('keeps visits stable and rotates them on dashboard switches over %s', (origin) => {
+  if (origin === 'http') {
     vi.stubGlobal('crypto', { getRandomValues: crypto.getRandomValues.bind(crypto) });
   }
   const view = (dashboardPid: string) => (

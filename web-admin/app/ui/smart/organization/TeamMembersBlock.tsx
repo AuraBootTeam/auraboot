@@ -50,7 +50,6 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { hasPermission } = useAuth();
   const canManage = hasPermission('org.team.manage');
-  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -116,7 +115,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
 
   const handleRemoveMember = async (member: TeamMember) => {
     if (!teamPid || !canManage) return;
-    const name = member.userName || member.userEmail || l('该成员', 'this member');
+    const name = member.userName || member.userEmail || text('memberFallback');
     if (!window.confirm(text('confirmRemove').replace('{name}', name))) return;
     try {
       await removeTeamMember(teamPid, member.pid);
@@ -146,21 +145,21 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
             </h3>
             <p className="text-text-3 mt-0.5 text-xs">
               {canManage
-                ? l('维护团队成员与团队角色', 'Manage team members and roles')
-                : l('查看团队成员与团队角色', 'View team members and roles')}
+                ? text('subtitle')
+                : text('viewSubtitle')}
             </p>
           </div>
         </div>
         {canManage && (
           <button
             type="button"
-            onClick={() => setShowAddModal(true)}
-            className="bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
             disabled={loading || loadFailed}
+            onClick={() => setShowAddModal(true)}
+            className="disabled:cursor-not-allowed disabled:opacity-50 bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
             data-testid="team-members-add"
           >
             <PlusIcon className="h-4 w-4" />
-            {l('添加成员', 'Add member')}
+            {text('addMember')}
           </button>
         )}
       </div>
@@ -179,8 +178,8 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
           <p className="text-text-2 text-sm font-medium">{text('empty')}</p>
           <p className="text-text-3 mt-1 text-sm">
             {canManage
-              ? l('添加成员后，他们会出现在这里。', 'Added members will appear here.')
-              : l('此团队尚未添加成员。', 'This team has no members yet.')}
+              ? text('emptyHint')
+              : text('viewEmptyHint')}
           </p>
         </div>
       ) : (
@@ -192,7 +191,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
                 <HeaderCell>{text('email')}</HeaderCell>
                 <HeaderCell>{text('role')}</HeaderCell>
                 <HeaderCell>{text('joined')}</HeaderCell>
-                {canManage && <HeaderCell align="right">{l('操作', 'Actions')}</HeaderCell>}
+                {canManage && <HeaderCell align="right">{text('actions')}</HeaderCell>}
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -212,7 +211,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
                         type="button"
                         onClick={() => void handleRemoveMember(member)}
                         className="text-text-3 hover:text-status-red focus-visible:shadow-focus rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors focus:outline-none"
-                        title={l('移除成员', 'Remove member')}
+                        title={text('removeMember')}
                         data-testid={`team-members-remove-${member.pid}`}
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -406,7 +405,7 @@ function HeaderCell({
 
 function RoleBadge({ role }: { role?: string }) {
   const text = useTeamText();
-  const leader = role === 'leader';
+  const leader = role?.toLowerCase() === 'leader';
   return (
     <span
       className={`rounded-pill inline-flex px-2.5 py-1 text-xs font-medium whitespace-nowrap ${

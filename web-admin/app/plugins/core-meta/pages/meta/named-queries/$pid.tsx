@@ -73,8 +73,8 @@ export default function NamedQueryEditPage() {
   /**
    * Get initial tab from URL hash
    */
-  const getInitialTab = (): TabType => {
-    const hash = location.hash.replace('#', '');
+  const getInitialTab = (rawHash = location.hash): TabType => {
+    const hash = rawHash.replace('#', '');
     const validTabs: TabType[] = ['basic', 'fields', 'test', 'policy', 'versions'];
     return validTabs.includes(hash as TabType) ? (hash as TabType) : 'basic';
   };
@@ -134,7 +134,8 @@ export default function NamedQueryEditPage() {
    */
   useEffect(() => {
     const handleHashChange = () => {
-      const newTab = getInitialTab();
+      // Native hash navigation can precede the router location snapshot.
+      const newTab = getInitialTab(window.location.hash);
       setActiveTab(newTab);
     };
 

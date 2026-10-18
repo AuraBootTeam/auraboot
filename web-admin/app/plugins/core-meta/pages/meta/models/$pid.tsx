@@ -1058,7 +1058,7 @@ export default function ModelDetailPage() {
                   data-testid="model-more-actions"
                   className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
                 >
-                  更多
+                  {text('moreActions')}
                 </summary>
                 <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
                   {model.status === 'draft' && (
@@ -1068,7 +1068,7 @@ export default function ModelDetailPage() {
                       className="block w-full rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50"
                       disabled={loading || publishLoading}
                     >
-                      {publishLoading ? '加载中...' : '发布模型'}
+                      {publishLoading ? text('loading') : text('actionPublishModel')}
                     </button>
                   )}
                   {model.status === 'published' && (
@@ -1077,7 +1077,7 @@ export default function ModelDetailPage() {
                       className="block w-full rounded-lg px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
                       disabled={loading}
                     >
-                      取消发布
+                      {text('actionUnpublish')}
                     </button>
                   )}
                   <button
@@ -1085,7 +1085,7 @@ export default function ModelDetailPage() {
                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                     disabled={loading}
                   >
-                    刷新缓存
+                    {text('actionRefreshCache')}
                   </button>
                   {isVirtualModel(model) && (
                     <button
@@ -1093,7 +1093,7 @@ export default function ModelDetailPage() {
                       onClick={() => triggerRedetection(model.pid)}
                       data-testid="redetect-btn"
                     >
-                      重新检测
+                      {text('actionRedetect')}
                     </button>
                   )}
                   <button

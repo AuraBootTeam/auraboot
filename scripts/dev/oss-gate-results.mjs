@@ -17,6 +17,8 @@ export function auditResults(report) {
     if (results.length === 1 && results[0].retry !== 0) counts.retried++;
     const result = results.at(-1);
     if (!result) counts.didNotRun++;
+    else if (result.status === 'skipped' && test.expectedStatus !== 'skipped'
+      && result.workerIndex === -1) counts.didNotRun++;
     else if (result.status === 'skipped') counts.skipped++;
     else {
       counts.executed++;

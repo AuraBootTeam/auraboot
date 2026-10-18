@@ -52,7 +52,9 @@ const role = {
   status: 'active',
 };
 function showPage() {
-  render(<RouterProvider router={createMemoryRouter([{ path: '/', element: <PermissionManagement /> }])} />);
+  render(
+    <RouterProvider router={createMemoryRouter([{ path: '*', element: <PermissionManagement /> }], { initialEntries: ['/permissions'] })} />,
+  );
 }
 afterEach(cleanup);
 beforeEach(() => {

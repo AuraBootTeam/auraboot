@@ -208,6 +208,7 @@ Copy `.env.example` to `.env` and configure:
 | `POSTGRES_USER` | `auraboot` | No | Database user |
 | `POSTGRES_PASSWORD` | `auraboot_dev` | **Yes (prod)** | Database password |
 | `JWT_SECRET` | (weak default) | **Yes (prod)** | JWT signing secret (min 32 chars) |
+| `OPEN_PLATFORM_PROTOCOL_SIGNING_KEY` | — | **Yes (community/prod)** | Persistent Open Platform protocol signing secret; share across replicas and restarts |
 | `REDIS_HOST` | (empty) | No | Set to `redis` to enable Redis |
 | `ANTHROPIC_API_KEY` | — | No | Enable AI/AuraBot features |
 | `OPENAI_API_KEY` | — | No | OpenAI provider (alternative LLM) |

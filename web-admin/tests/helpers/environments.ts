@@ -135,9 +135,12 @@ export function requireRuntimeUrl(target: 'base' | 'backend'): string {
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;
 
+/** Explicit URL for tests that require an owned runtime rather than host defaults. */
+export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
+
 /** Vite-served base — what `page.goto` and `page.request` use by default. */
 export const BASE_URL =
-  process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
+  EXPLICIT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
 
 /** Remix BFF base — for specs that need to drive `/login` or BFF-specific endpoints directly. */
 export const BFF_URL =

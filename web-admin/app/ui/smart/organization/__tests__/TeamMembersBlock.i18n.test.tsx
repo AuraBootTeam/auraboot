@@ -5,6 +5,7 @@ import { TeamMembersBlock } from '../TeamMembersBlock';
 import teamPage from '../../../../../../plugins/org-management/config/pages/ab_team_detail.json';
 
 const f = vi.hoisted(() => ({ locale: 'en-US', fetch: vi.fn(), add: vi.fn(), remove: vi.fn(), post: vi.fn(), success: vi.fn(), error: vi.fn() }));
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (code: string) => code === 'org.team.manage' }) }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: f.locale, t: (key: string) => key }) }));
 // Locale fixtures exercise the authorized manager; denial is covered by the access suite.
 vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (permission: string) => permission === 'org.team.manage' }) }));
@@ -25,7 +26,8 @@ beforeEach(() => { vi.resetAllMocks(); f.locale = 'en-US'; f.fetch.mockResolvedV
 describe('team-member DSL title, localized states and API payloads', () => {
   for (const locale of ['en-US', 'zh-CN']) {
     const english = locale === 'en-US';
-    it(`${locale} resolves the imported DSL title, table labels and unchanged record/member identity`, async () => {
+    it.each(['leader', 'LEADER'])(`${locale} resolves the imported DSL title, table labels and unchanged record/member identity (%s)`, async (role) => {
+      f.fetch.mockResolvedValue([{ ...member, role }]);
       f.locale = locale; view(true); await screen.findByText('Aaron');
       expect(screen.getByRole('heading')).toHaveTextContent(english ? 'Team members (1)' : '\u56e2\u961f\u6210\u5458 (1)');
       expect(screen.getByRole('button', { name: english ? 'Add member' : '\u6dfb\u52a0\u6210\u5458' })).toBeEnabled();

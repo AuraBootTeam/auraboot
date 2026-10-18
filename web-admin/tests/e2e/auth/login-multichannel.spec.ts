@@ -97,6 +97,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   async function getAvailableChannels(page: import('@playwright/test').Page): Promise<string[]> {
     // Navigate to login page first
     await page.goto(LOGIN_URL);
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     await page.waitForLoadState('domcontentloaded');
 
     // Channels are loaded via server-side BFF loader, not client-side fetch.
@@ -139,6 +140,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
   test('LM-001: default login page shows account/password form', async ({ page }) => {
     await page.goto(LOGIN_URL);
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     await page.waitForLoadState('domcontentloaded');
 
     // Account identifier and password inputs visible
@@ -210,6 +212,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
     // beforeAll enables EMAIL_PASSWORD + SMS + EMAIL_CODE — all 3 tabs should be visible
     await page.goto(LOGIN_URL);
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     await page.waitForLoadState('domcontentloaded');
     await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
@@ -243,6 +246,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
     // beforeAll enables SMS channel — navigate and switch to SMS tab
     await page.goto(LOGIN_URL);
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     await page.waitForLoadState('domcontentloaded');
     await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
@@ -271,6 +275,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
     // beforeAll enables EMAIL_CODE channel — navigate and switch to EMAIL_CODE tab
     await page.goto(LOGIN_URL);
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     await page.waitForLoadState('domcontentloaded');
     await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
@@ -292,6 +297,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
   test('LM-006: empty form submission shows validation', async ({ page }) => {
     await page.goto(LOGIN_URL);
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     await page.waitForLoadState('domcontentloaded');
     await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 
@@ -317,6 +323,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
 
   test('LM-007: remember-me checkbox', async ({ page }) => {
     await page.goto(LOGIN_URL);
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     await page.waitForLoadState('domcontentloaded');
     await accountInput(page).waitFor({ state: 'visible', timeout: 5000 });
 

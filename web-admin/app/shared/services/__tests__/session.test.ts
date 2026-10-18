@@ -124,6 +124,7 @@ describe('session recovery', () => {
         headers: {
           Authorization: 'Bearer header.payload.signature',
         },
+        signal: expect.any(AbortSignal),
       },
     );
     expect(validSession.unset).toHaveBeenCalledWith('jwtToken');

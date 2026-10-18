@@ -284,7 +284,7 @@ export PW_ARTIFACT_DIR="$AURA_EVIDENCE_ROOT/playwright/artifacts"
 export PW_REPORT_DIR="$AURA_EVIDENCE_ROOT/playwright/report"
 export PW_RESULTS_JSON="$AURA_EVIDENCE_ROOT/results.json"
 export PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json"
-mkdir -p "$AURA_EVIDENCE_ROOT/logs"
+mkdir -p "$AURA_EVIDENCE_ROOT/logs" "$PW_REPORT_DIR"
 LOG="$AURA_EVIDENCE_ROOT/logs/oss-e2e-gate-$(date +%Y%m%d-%H%M%S).log"
 log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE)"
 

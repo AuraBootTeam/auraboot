@@ -183,7 +183,9 @@ async function newPublicPage(browser: Browser): Promise<Page> {
   const context = await browser.newContext({
     storageState: { cookies: [], origins: [] },
     baseURL: BASE_URL,
+    locale: 'en-US',
   });
+  await context.addCookies([{ name: 'locale', value: 'en-US', url: BASE_URL }]);
   return context.newPage();
 }
 

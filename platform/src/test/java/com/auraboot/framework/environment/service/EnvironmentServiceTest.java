@@ -176,13 +176,23 @@ class EnvironmentServiceTest {
         Environment existing = buildEnvironment("dev", "Dev", TENANT_ID);
         existing.setPid("pid_del");
         when(environmentMapper.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(existing);
-        when(environmentMapper.updateById(any(Environment.class))).thenReturn(1);
+        when(environmentMapper.deleteById(existing.getId())).thenReturn(1);
 
         environmentService.delete("pid_del", TENANT_ID);
 
-        ArgumentCaptor<Environment> captor = ArgumentCaptor.forClass(Environment.class);
-        verify(environmentMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getDeletedFlag()).isTrue();
+        verify(environmentMapper).deleteById(existing.getId());
+    }
+
+    @Test
+    void delete_noAffectedRecord_failsClosed() {
+        Environment existing = buildEnvironment("dev", "Dev", TENANT_ID);
+        existing.setPid("pid_concurrent_delete");
+        when(environmentMapper.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+                .thenReturn(existing);
+
+        assertThatThrownBy(() -> environmentService.delete(existing.getPid(), TENANT_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("deletion");
     }
 
     // ---- Export ----

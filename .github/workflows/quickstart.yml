@@ -159,8 +159,7 @@ jobs:
           response=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
             -H "Content-Type: application/json" \
             -d '{"email":"admin@auraboot.com","password":"Test2026x"}')
-          echo "$response" | head -c 200
-          echo
+          echo "Login response received; token contents are not logged."
           echo "$response" | grep -q '"jwt"' || {
             echo "login did not return a JWT"
             docker compose logs --tail 100 backend
