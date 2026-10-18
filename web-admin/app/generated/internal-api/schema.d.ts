@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 03e0fc6fecf7c56f30da11e1b8e2b3765fc89bca26843a3cd308805e9f7d4cd5
+ * Contract SHA-256: 78edca777abbaf20edf6ddb80efc6c34fe5feaf99b3c229ab8c6691854b84043
  */
 export interface paths {
     "/api/activities": {
@@ -27761,11 +27761,11 @@ export interface components {
             rolePids?: string[];
         };
         AsyncTaskDTO: {
-            /** Format: date-time */
+            /** Format: local-date-time */
             cancelledAt?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             completedAt?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             errorMessage?: string;
             inputParams?: components["schemas"]["JsonNode"];
@@ -27779,7 +27779,7 @@ export interface components {
             resultData?: components["schemas"]["JsonNode"];
             /** Format: int32 */
             retryCount?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             startedAt?: string;
             status?: string;
             taskCode?: string;
@@ -28300,7 +28300,7 @@ export interface components {
             aliasCode?: string;
             /** Format: int64 */
             bindingId?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             defaultValue?: string;
             dictOverrideCode?: string;
@@ -28317,7 +28317,7 @@ export interface components {
             remarks?: string;
             required?: boolean;
             uiHint?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             validationOverride?: string;
             validationRules?: string;
@@ -28327,7 +28327,7 @@ export interface components {
             /** Format: int64 */
             commandId?: number;
             config?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             enabled?: boolean;
             eventType?: string;
@@ -28342,7 +28342,7 @@ export interface components {
             sourceField?: string;
             targetField?: string;
             targetModel?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
         };
         BootstrapProgressResponse: {
@@ -28924,7 +28924,7 @@ export interface components {
             bindingRules?: components["schemas"]["BindingRuleDTO"][];
             cmdRiskLevel?: string;
             code?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             description?: string;
             displayName?: string;
@@ -28947,7 +28947,7 @@ export interface components {
             /** Format: int64 */
             tenantId?: number;
             type?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             /** Format: int32 */
             version?: number;
@@ -30381,7 +30381,7 @@ export interface components {
             cacheConfig?: components["schemas"]["JsonNode"];
             cascadeConfig?: components["schemas"]["JsonNode"];
             code?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             createdBy?: string;
             deletedFlag?: boolean;
@@ -30399,7 +30399,7 @@ export interface components {
             name?: string;
             pid?: string;
             pinnedVersion?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             publishedAt?: string;
             remark?: string;
             /** Format: int32 */
@@ -30412,7 +30412,7 @@ export interface components {
             tags?: string;
             /** Format: int64 */
             tenantId?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             updatedBy?: string;
             /** Format: int32 */
@@ -31485,13 +31485,13 @@ export interface components {
             toolId?: string;
         };
         ExportTaskDTO: {
-            /** Format: date-time */
+            /** Format: local-date-time */
             completedAt?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             downloadUrl?: string;
             errorMessage?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             expiresAt?: string;
             /** Format: int64 */
             fileSize?: number;
@@ -31861,7 +31861,7 @@ export interface components {
             fieldCode?: string;
             /** Format: int64 */
             fieldId?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             operationTime?: string;
             reason?: string;
         };
@@ -31945,7 +31945,7 @@ export interface components {
             mimeType?: string;
             originalName: string;
             storageType: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             uploadTime?: string;
         };
         FileRelationRequestDTO: {
@@ -31967,7 +31967,7 @@ export interface components {
             status?: string;
             /** @enum {string} */
             storageType?: "local" | "minio" | "oss" | "cos" | "s3";
-            /** Format: date-time */
+            /** Format: local-date-time */
             uploadTime?: string;
             url?: string;
         };
@@ -33422,7 +33422,7 @@ export interface components {
         };
         MetaFieldDTO: {
             code?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             createdBy?: string;
             /** Format: int64 */
@@ -33468,7 +33468,7 @@ export interface components {
                 [key: string]: unknown;
             };
             unique?: boolean;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             updatedBy?: string;
             /** Format: int32 */
@@ -33541,7 +33541,7 @@ export interface components {
         MetaModelDTO: {
             archived?: boolean;
             code?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             createdBy?: string;
             description?: string;
@@ -33560,7 +33560,7 @@ export interface components {
             modelType?: string;
             pid?: string;
             published?: boolean;
-            /** Format: date-time */
+            /** Format: local-date-time */
             publishedAt?: string;
             publishedBy?: string;
             sourceRef?: string;
@@ -33569,7 +33569,7 @@ export interface components {
             tableName?: string;
             /** Format: int64 */
             tenantId?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             updatedBy?: string;
             /** Format: int32 */
@@ -33581,7 +33581,7 @@ export interface components {
             code?: string;
             compatibilityStatus?: string;
             compatible?: boolean;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             extension?: unknown;
             /** Format: int64 */
@@ -33600,7 +33600,7 @@ export interface components {
             required?: boolean;
             /** Format: int64 */
             tenantId?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             valid?: boolean;
             visible?: boolean;
@@ -33876,7 +33876,7 @@ export interface components {
             allSuccess?: boolean;
             /** Format: int64 */
             durationMs?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             endTime?: string;
             errorMessages?: {
                 [key: string]: string;
@@ -33898,7 +33898,7 @@ export interface components {
             /** Format: int32 */
             skippedCount?: number;
             skippedPids?: string[];
-            /** Format: date-time */
+            /** Format: local-date-time */
             startTime?: string;
             success?: boolean;
             /** Format: int32 */
@@ -33994,13 +33994,13 @@ export interface components {
             code?: string;
             connectorEndpointCode?: string;
             connectorPid?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             createdBy?: string;
             /** Format: int32 */
             currentVersion?: number;
             defaultOrder?: components["schemas"]["JsonNode"];
-            /** Format: date-time */
+            /** Format: local-date-time */
             deprecatedAt?: string;
             description?: string;
             displayName?: string;
@@ -34020,12 +34020,12 @@ export interface components {
             /** Format: int64 */
             id?: number;
             isComplexQuery?: boolean;
-            /** Format: date-time */
+            /** Format: local-date-time */
             lastExecutedAt?: string;
             metadata?: components["schemas"]["JsonNode"];
             pid?: string;
             policy?: components["schemas"]["NamedQueryPolicy"];
-            /** Format: date-time */
+            /** Format: local-date-time */
             publishedAt?: string;
             /** Format: int64 */
             publishedBy?: number;
@@ -34037,7 +34037,7 @@ export interface components {
             /** Format: int64 */
             tenantId?: number;
             title?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             updatedBy?: string;
             /** Format: int64 */
@@ -34057,7 +34057,7 @@ export interface components {
             completed?: boolean;
             /** Format: int64 */
             durationMs?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             endTime?: string;
             /** Format: int32 */
             failureCount?: number;
@@ -34066,7 +34066,7 @@ export interface components {
             skipped?: components["schemas"]["FieldOperationDetail"][];
             /** Format: int32 */
             skippedCount?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             startTime?: string;
             /** Format: int32 */
             successCount?: number;
@@ -34077,7 +34077,7 @@ export interface components {
         };
         NamedQueryFieldDTO: {
             columnExpr?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             dataType?: string;
             defaultOperators?: string[];
@@ -34111,7 +34111,7 @@ export interface components {
             tenantId?: number;
             uiComponent?: string;
             uiConfig?: components["schemas"]["JsonNode"];
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             validationRules?: string;
             /** Format: int32 */
@@ -34159,7 +34159,7 @@ export interface components {
             beforeStatus?: string;
             /** Format: int64 */
             durationMs?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             endTime?: string;
             errorMessage?: string;
             failure?: boolean;
@@ -34170,7 +34170,7 @@ export interface components {
             queryTitle?: string;
             result?: string;
             skipped?: boolean;
-            /** Format: date-time */
+            /** Format: local-date-time */
             startTime?: string;
             status?: string;
             success?: boolean;
@@ -34201,9 +34201,9 @@ export interface components {
         };
         NamedQueryQueryRequest: {
             code?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAtEnd?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAtStart?: string;
             createdBy?: string;
             description?: string;
@@ -34219,9 +34219,9 @@ export interface components {
             status?: string;
             tags?: string;
             title?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAtEnd?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAtStart?: string;
             updatedBy?: string;
         };
@@ -34253,7 +34253,7 @@ export interface components {
             whereConditions?: components["schemas"]["JsonNode"];
         };
         NamedQueryTestResult: {
-            /** Format: date-time */
+            /** Format: local-date-time */
             endTime?: string;
             errorMessage?: string;
             executedSql?: string;
@@ -34269,7 +34269,7 @@ export interface components {
             sampleData?: {
                 [key: string]: unknown;
             }[];
-            /** Format: date-time */
+            /** Format: local-date-time */
             startTime?: string;
             success?: boolean;
             syntaxErrors?: string[];
@@ -34330,7 +34330,7 @@ export interface components {
             dependencyValidation?: components["schemas"]["NamedQueryDependencyValidation"];
             /** Format: int64 */
             durationMs?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             endTime?: string;
             /** Format: int32 */
             errorCount?: number;
@@ -34339,7 +34339,7 @@ export interface components {
             firstErrorMessage?: string;
             permissionValidation?: components["schemas"]["NamedQueryPermissionValidation"];
             sqlValidation?: components["schemas"]["NamedQuerySqlValidation"];
-            /** Format: date-time */
+            /** Format: local-date-time */
             startTime?: string;
             suggestions?: string[];
             summary?: string;
@@ -34367,7 +34367,7 @@ export interface components {
         };
         NamedQueryVersionDTO: {
             baseWhere?: components["schemas"]["JsonNode"];
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             defaultOrder?: components["schemas"]["JsonNode"];
             description?: string;
@@ -34375,7 +34375,7 @@ export interface components {
             fromSql?: string;
             pid?: string;
             policy?: components["schemas"]["NamedQueryPolicy"];
-            /** Format: date-time */
+            /** Format: local-date-time */
             publishedAt?: string;
             /** Format: int64 */
             publishedBy?: number;
@@ -35304,7 +35304,7 @@ export interface components {
             commands?: {
                 [key: string]: string;
             };
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             dataSources?: {
                 [key: string]: unknown;
@@ -35336,7 +35336,7 @@ export interface components {
             pageKey?: string;
             pid?: string;
             profile?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             publishedAt?: string;
             recordSource?: {
                 [key: string]: unknown;
@@ -35360,13 +35360,13 @@ export interface components {
             title?: {
                 [key: string]: unknown;
             };
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             /** Format: int32 */
             version?: number;
         };
         PageSchemaListDTO: {
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             deletedFlag?: boolean;
             description?: string;
@@ -35383,7 +35383,7 @@ export interface components {
             name?: string;
             pageKey?: string;
             pid?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             publishedAt?: string;
             /** Format: int32 */
             rowVersion?: number;
@@ -35399,7 +35399,7 @@ export interface components {
             /** Format: int64 */
             tenantId?: number;
             title?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             /** Format: int32 */
             version?: number;
@@ -35487,7 +35487,7 @@ export interface components {
             id?: number;
             isCurrent?: boolean;
             operation?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             operationTime?: string;
             operatorPid?: string;
             pagePid?: string;
@@ -35937,10 +35937,10 @@ export interface components {
         };
         PermissionDTO: {
             action?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             archivedAt?: string;
             code?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             /** Format: int64 */
             createdBy?: number;
@@ -35948,7 +35948,7 @@ export interface components {
                 [key: string]: unknown;
             };
             dataScopeType?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             deprecatedAt?: string;
             description?: string;
             extension?: {
@@ -35972,7 +35972,7 @@ export interface components {
             tags?: string[];
             /** Format: int64 */
             tenantId?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             /** Format: int64 */
             updatedBy?: number;
@@ -36024,7 +36024,7 @@ export interface components {
             resourceName?: string;
         };
         PermissionReferenceDTO: {
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             /** Format: int64 */
             createdBy?: number;
@@ -38150,7 +38150,7 @@ export interface components {
             executedDDL?: string[];
             message?: string;
             modelCode?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             operationTime?: string;
             /** @enum {string} */
             operationType?: "CREATE_TABLE" | "UPDATE_TABLE" | "DROP_TABLE" | "ADD_FIELD" | "REMOVE_FIELD" | "UPDATE_FIELD" | "CREATE_INDEX" | "DROP_INDEX" | "SYNC_SCHEMA";
@@ -38831,7 +38831,7 @@ export interface components {
             subjectType: string;
         };
         SubjectPermissionDTO: {
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             /** Format: int64 */
             createdBy?: number;
@@ -38856,7 +38856,7 @@ export interface components {
             subjectType?: string;
             /** Format: int64 */
             tenantId?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             /** Format: int64 */
             updatedBy?: number;
@@ -39084,7 +39084,7 @@ export interface components {
         TenantResponse: {
             contactEmail?: string;
             contactPhone?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             /** Format: int64 */
             createdBy?: number;
@@ -39101,7 +39101,7 @@ export interface components {
             status?: string;
             /** Format: int64 */
             storeCount?: number;
-            /** Format: date-time */
+            /** Format: local-date-time */
             updatedAt?: string;
             /** Format: int64 */
             updatedBy?: number;
@@ -39444,12 +39444,12 @@ export interface components {
         UserProfileResponse: {
             area?: string;
             avatarUrl?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             createdAt?: string;
             email?: string;
             emailVerified?: boolean;
             imgId?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             lastSignInAt?: string;
             mobile?: string;
             nickName?: string;
@@ -39636,7 +39636,7 @@ export interface components {
             /** Format: int64 */
             historyId?: number;
             operation?: string;
-            /** Format: date-time */
+            /** Format: local-date-time */
             operationTime?: string;
             operatorPid?: string;
             pagePid?: string;

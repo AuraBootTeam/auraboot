@@ -13450,15 +13450,15 @@
       "AsyncTaskDTO": {
         "properties": {
           "cancelledAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "completedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "errorMessage": {
@@ -13490,7 +13490,7 @@
             "type": "integer"
           },
           "startedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "status": {
@@ -14887,7 +14887,7 @@
             "type": "integer"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "defaultValue": {
@@ -14934,7 +14934,7 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "validationOverride": {
@@ -14959,7 +14959,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "enabled": {
@@ -14998,7 +14998,7 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           }
         },
@@ -16659,7 +16659,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "description": {
@@ -16716,7 +16716,7 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "version": {
@@ -20912,7 +20912,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -20965,7 +20965,7 @@
             "type": "string"
           },
           "publishedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "remark": {
@@ -20996,7 +20996,7 @@
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -24093,11 +24093,11 @@
       "ExportTaskDTO": {
         "properties": {
           "completedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "downloadUrl": {
@@ -24107,7 +24107,7 @@
             "type": "string"
           },
           "expiresAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "fileSize": {
@@ -25045,7 +25045,7 @@
             "type": "integer"
           },
           "operationTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "reason": {
@@ -25267,7 +25267,7 @@
             "type": "string"
           },
           "uploadTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           }
         },
@@ -25338,7 +25338,7 @@
             "type": "string"
           },
           "uploadTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "url": {
@@ -29292,7 +29292,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -29383,7 +29383,7 @@
             "type": "boolean"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -29566,7 +29566,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -29615,7 +29615,7 @@
             "type": "boolean"
           },
           "publishedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "publishedBy": {
@@ -29638,7 +29638,7 @@
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -29669,7 +29669,7 @@
             "type": "boolean"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "extension": {},
@@ -29712,7 +29712,7 @@
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "valid": {
@@ -30499,7 +30499,7 @@
             "type": "integer"
           },
           "endTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "errorMessages": {
@@ -30558,7 +30558,7 @@
             "type": "array"
           },
           "startTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "success": {
@@ -30741,7 +30741,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -30755,7 +30755,7 @@
             "$ref": "#/components/schemas/JsonNode"
           },
           "deprecatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "description": {
@@ -30810,7 +30810,7 @@
             "type": "boolean"
           },
           "lastExecutedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "metadata": {
@@ -30823,7 +30823,7 @@
             "$ref": "#/components/schemas/NamedQueryPolicy"
           },
           "publishedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "publishedBy": {
@@ -30856,7 +30856,7 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -31052,7 +31052,7 @@
             "type": "integer"
           },
           "endTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "failureCount": {
@@ -31079,7 +31079,7 @@
             "type": "integer"
           },
           "startTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "successCount": {
@@ -31109,7 +31109,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "dataType": {
@@ -31215,7 +31215,7 @@
             "$ref": "#/components/schemas/JsonNode"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "validationRules": {
@@ -31390,7 +31390,7 @@
             "type": "integer"
           },
           "endTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "errorMessage": {
@@ -31421,7 +31421,7 @@
             "type": "boolean"
           },
           "startTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "status": {
@@ -31505,11 +31505,11 @@
             "type": "string"
           },
           "createdAtEnd": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdAtStart": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -31560,11 +31560,11 @@
             "type": "string"
           },
           "updatedAtEnd": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedAtStart": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -31655,7 +31655,7 @@
       "NamedQueryTestResult": {
         "properties": {
           "endTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "errorMessage": {
@@ -31693,7 +31693,7 @@
             "type": "array"
           },
           "startTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "success": {
@@ -31902,7 +31902,7 @@
             "type": "integer"
           },
           "endTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "errorCount": {
@@ -31931,7 +31931,7 @@
             "$ref": "#/components/schemas/NamedQuerySqlValidation"
           },
           "startTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "suggestions": {
@@ -32006,7 +32006,7 @@
             "$ref": "#/components/schemas/JsonNode"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "defaultOrder": {
@@ -32028,7 +32028,7 @@
             "$ref": "#/components/schemas/NamedQueryPolicy"
           },
           "publishedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "publishedBy": {
@@ -34595,7 +34595,7 @@
             "type": "object"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "dataSources": {
@@ -34663,7 +34663,7 @@
             "type": "string"
           },
           "publishedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "recordSource": {
@@ -34710,7 +34710,7 @@
             "type": "object"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "version": {
@@ -34723,7 +34723,7 @@
       "PageSchemaListDTO": {
         "properties": {
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "deletedFlag": {
@@ -34765,7 +34765,7 @@
             "type": "string"
           },
           "publishedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "rowVersion": {
@@ -34800,7 +34800,7 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "version": {
@@ -35018,7 +35018,7 @@
             "type": "string"
           },
           "operationTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "operatorPid": {
@@ -36106,14 +36106,14 @@
             "type": "string"
           },
           "archivedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "code": {
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -36128,7 +36128,7 @@
             "type": "string"
           },
           "deprecatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "description": {
@@ -36186,7 +36186,7 @@
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -36417,7 +36417,7 @@
       "PermissionReferenceDTO": {
         "properties": {
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -42377,7 +42377,7 @@
             "type": "string"
           },
           "operationTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "operationType": {
@@ -44460,7 +44460,7 @@
       "SubjectPermissionDTO": {
         "properties": {
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -44519,7 +44519,7 @@
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -45115,7 +45115,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "createdBy": {
@@ -45156,7 +45156,7 @@
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "updatedBy": {
@@ -46094,7 +46094,7 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "email": {
@@ -46107,7 +46107,7 @@
             "type": "string"
           },
           "lastSignInAt": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "mobile": {
@@ -46629,7 +46629,7 @@
             "type": "string"
           },
           "operationTime": {
-            "format": "date-time",
+            "format": "local-date-time",
             "type": "string"
           },
           "operatorPid": {

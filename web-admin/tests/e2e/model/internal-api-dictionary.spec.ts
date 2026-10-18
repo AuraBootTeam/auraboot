@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import fs from 'node:fs/promises';
-import { performLogin } from '../../workflows/login.workflow';
+import { LoginPage } from '../../pages/LoginPage';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { uniqueId } from '../helpers';
 
 const catalog = JSON.parse(
@@ -33,7 +34,11 @@ async function capture(id: string, page: Page, info: TestInfo) {
 
 test('generated dictionary operations preserve the UI journey', async ({ page }, info) => {
   test.setTimeout(90_000);
-  await performLogin(page);
+  const login = new LoginPage(page);
+  await login.gotoRoot();
+  await login.waitForFormReady();
+  await login.login(DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await login.expectLoggedIn();
   await page.locator('nav a[href="/meta/dict"]').click();
   await expect(page.getByTestId('dictionary-list')).toBeVisible();
   await expect(page.locator('tbody')).toContainText('org_team_status');
