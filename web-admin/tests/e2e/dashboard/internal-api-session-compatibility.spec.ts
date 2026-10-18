@@ -21,8 +21,24 @@ test('dashboard usage and account logout survive missing randomUUID', async ({ b
   const actor = await provisionInternalApiUser(browser, baseURL);
   const { context, page, origin } = actor;
   const pageErrors: string[] = [], cleanupErrors: unknown[] = [], checks: object[] = [];
+  const widgetResults: Array<{ path: string; status: number; code: unknown; error?: string }> = [];
+  const widgetPending: Promise<void>[] = [];
+  const reloadedRequests = new WeakSet<object>();
+  let reloaded = false;
   let journeyError: unknown;
   page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('framenavigated', frame => { if (frame === page.mainFrame()) reloaded = true; });
+  page.on('request', request => { if (reloaded) reloadedRequests.add(request); });
+  page.on('response', response => {
+    if (!reloadedRequests.has(response.request())) return;
+    const path = new URL(response.url()).pathname;
+    if (!['/api/inbox', '/api/workbench/stats'].includes(path)) return;
+    widgetPending.push(response.json().then(payload => {
+      widgetResults.push({ path, status: response.status(), code: payload.code });
+    }).catch(error => {
+      widgetResults.push({ path, status: response.status(), code: null, error: String(error) });
+    }));
+  });
   try {
     await expect(page).toHaveURL(/\/home(?:[?#].*)?$/);
     await context.addCookies([{ name: 'locale', value: 'zh-CN', url: origin }]);
@@ -36,6 +52,12 @@ test('dashboard usage and account logout survive missing randomUUID', async ({ b
     expect(await page.evaluate(() => typeof crypto.getRandomValues)).toBe('function');
     await expect(page.getByTestId('ab:dashboard:workbench:container')).toBeVisible();
     await expect(page.locator('header[data-hydrated="true"]')).toBeAttached();
+    await expect(page.getByText('暂无待办事项', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('shortcuts-customize-button')).toBeVisible();
+    await expect(page.getByTestId('stat-card-inbox_pending').getByText('0', { exact: true })).toBeVisible();
+    await Promise.all(widgetPending);
+    expect([...new Set(widgetResults.map(row => row.path))].sort()).toEqual(['/api/inbox', '/api/workbench/stats']);
+    expect(widgetResults.every(row => row.status === 200 && row.code === '0' && !row.error)).toBe(true);
     await expect(page.getByRole('heading', { name: '出错了！', exact: true })).toHaveCount(0);
     await capture('SESSION-01', page, info);
 
@@ -68,7 +90,7 @@ test('dashboard usage and account logout survive missing randomUUID', async ({ b
     try { await actor.dispose(); } catch (error) { cleanupErrors.push(error); }
     await info.attach('session-compatibility-evidence', { body: JSON.stringify({
       claim: 'owned-browser-capability-and-session-journey; no response-schema acceptance',
-      userPid: actor.userPid, checks, pageErrors,
+      userPid: actor.userPid, checks, widgetResults, pageErrors,
       journeyError: journeyError ? String(journeyError) : null, cleanupErrors: cleanupErrors.map(String),
     }), contentType: 'application/json' });
   }

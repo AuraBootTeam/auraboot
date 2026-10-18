@@ -62,6 +62,15 @@ configured runtime endpoints and absolute origins require explicit reconciliatio
 Do not exclude them merely to obtain a green report. A generated-operation marker
 records source migration, not executed test evidence.
 
+The inventory includes JavaScript/TypeScript in the application and workspace
+packages. Its source graph follows the shell, router, SSR/CSR and BFF entries,
+configured source aliases, router resource files and package exports. Type-only
+imports remain type candidates. Dynamic imports, virtual contributions, JSON/DSL
+resources and unknown export conditions remain explicit boundaries. A file not
+statically linked to an entry is not automatically excluded. Local collections
+such as a `Map` cache retain candidate rows with declaration evidence instead of
+being mistaken for HTTP calls or silently removed.
+
 ## Typed JSON operations
 
 `internalRequest(method, template, input)` binds method, path, query, headers,
@@ -107,6 +116,22 @@ archives: the caller owns the frozen archive and image provenance, while the run
 checks its scoped input bytes remain unchanged. This update does not independently
 qualify a release; the complete existing image gate must execute successfully on the
 admitted Linux CI host.
+
+The shared product release-image gate uses `drift.mjs --core-operations` after
+the product's own initialization, publication and artifact identity checks. It
+compares every snapshot operation and its full referenced component/security
+closure, allowing unrelated product operations and components. Core path,
+parameter, DTO, nullability and security changes still fail. This mode certifies
+Core compatibility; it does not certify the additional product API contract.
+OSS Quickstart and the standalone Core image gate retain full-document comparison.
+
+`scripts/ci/capture-internal-document.py` authenticates only to the admitted
+loopback image using explicit environment credentials. It captures documentation,
+revokes its issued session and requires a subsequent identity request to return
+401 before writing a success receipt. It never initializes an existing product
+database, follows login redirects, or persists credentials. The image receipt
+binds the capture/comparison hashes to the Core commit and loaded image identity.
+Host capture checks and hermetic tests do not substitute for Linux image execution.
 
 ## JSON response structure evidence
 
