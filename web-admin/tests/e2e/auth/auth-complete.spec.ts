@@ -56,7 +56,9 @@ const SIGNUP_PASSWORD = 'TestPass2026!';
 // ---------------------------------------------------------------------------
 
 async function loginViaUI(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  // The dev server serves the login module graph after DOMContentLoaded. Wait
+  // for that document's scripts before checking React hydration.
+  await page.goto('/login', { waitUntil: 'load' });
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
     timeout: 5000,
   });
@@ -396,7 +398,8 @@ test.describe('Registration Policy — Self-registration disabled', () => {
   test('REG-DISABLED-002: login page hides signup link and direct /signup returns to login', async ({
     page,
   }) => {
-    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    await page.goto('/login', { waitUntil: 'load' });
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
     const signupLink = page.locator('a[href*="signup"]').first();
     const hasSignupLink = await signupLink.isVisible({ timeout: 2000 }).catch(() => false);
     test.skip(hasSignupLink, 'Self-registration is enabled in this environment');

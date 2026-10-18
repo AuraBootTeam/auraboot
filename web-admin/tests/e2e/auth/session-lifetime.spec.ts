@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { HeaderPage } from '../../pages';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
-// Browser-driven login/logout plus real-backend renewal. Time travel belongs to
+// Browser-driven login/logout plus API-driven BFF and backend renewal. Time travel belongs to
 // JwtSessionLifetimeTest; this test never changes production clocks or signs JWTs.
 test.use({ storageState: { cookies: [], origins: [] } });
 test('seven-day login, active renewal endpoint and shared-session revocation', async ({ page, context, request }) => {
@@ -12,12 +12,18 @@ test('seven-day login, active renewal endpoint and shared-session revocation', a
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
   await page.locator('input#identifier, input#email').first().fill(DEFAULT_TEST_ACCOUNT.email);
   await page.locator('input#password').fill(DEFAULT_TEST_ACCOUNT.password);
-  const activityCheck = page.waitForResponse(r => r.url().endsWith('/api/auth/session-renew') && r.request().method() === 'POST');
   await page.locator('form button[type="submit"]').first().click();
   await page.waitForURL(url => !url.pathname.includes('/login'));
-  const activityResponse = await activityCheck;
+  // The current browser maintains sessions through /api/runtime/session-context.
+  // Exercise this separate cookie boundary explicitly rather than expecting the
+  // retired automatic POST loop to issue a request. page.request shares cookies.
+  const activityResponse = await page.request.post('/api/auth/session-renew', {
+    headers: { Origin: new URL(page.url()).origin },
+  });
   expect(activityResponse.status()).toBe(200);
   expect(activityResponse.headers()['cache-control']).toBe('no-store');
+  // A fresh login is outside the renewal window; no replacement token is needed.
+  expect(await activityResponse.json()).toEqual({ renewed: false });
   const cookie = (await context.cookies()).find(c => c.name === '__session');
   expect(cookie?.httpOnly).toBe(true);
   const session = JSON.parse(Buffer.from(decodeURIComponent(cookie!.value).split('.')[0], 'base64').toString());
