@@ -110,6 +110,13 @@ test('generated capabilities preserve menu preview apply reload and revoke with 
       'data-role-pid',
       rolePid!,
     );
+    await expect(page.getByTestId('data-scope-default')).toHaveText('Not configured');
+    await expect(page.getByTestId('capability-preset-viewer')).toHaveText('Viewer');
+    await expect(page.getByTestId('capability-group-组织管理').locator('legend')).toContainText(
+      'Organization',
+    );
+    await page.getByTestId('capability-search').fill('View Organization');
+    await expect(page.getByTestId('capability-checkbox-org.cap.hr_view')).toBeVisible();
     return capability;
   }
   async function storage(phase: string, expected: string[]) {
@@ -141,6 +148,8 @@ test('generated capabilities preserve menu preview apply reload and revoke with 
     expect(plan.revokedCodes.slice().sort()).toEqual(expectedRevoke);
     expect(plan.preservedCodes).toEqual([]);
     await expect(page.getByTestId('capability-preview-summary')).toBeVisible();
+    await expect(page.getByTestId('capability-preview-summary')).toContainText('View Organization');
+    await expect(page.getByTestId('capability-preview-summary')).not.toContainText('查看组织架构');
     return async () => {
       const applied = responseFor('PUT');
       await page.getByTestId('confirm-ok').click();

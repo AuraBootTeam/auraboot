@@ -88,6 +88,25 @@ class I18nServiceTest {
     }
 
     @Test
+    void capabilityPresetAndCoreGroupNamesAreBundledWithoutTenantImports() {
+        when(i18nResourceService.getResourceMapByLang(anyString())).thenReturn(Map.of());
+        Map<String, String> english = Map.of(
+                "permission.capability.preset.label", "Presets",
+                "permission.capability.preset.viewer", "Viewer",
+                "permission.capability.preset.editor", "Editor",
+                "permission.capability.preset.admin", "Administrator",
+                "permission.module.组织管理", "Organization",
+                "permission.module.系统管理", "System Management");
+        for (var entry : english.entrySet()) {
+            assertEquals(entry.getValue(), service.getI18nData("en-US").get(entry.getKey()));
+            for (String locale : new String[]{"zh-CN", "ja-JP", "ko-KR"}) {
+                assertThat(service.loadBundledBase(locale).get(entry.getKey()))
+                        .isInstanceOf(String.class).isNotEqualTo(entry.getValue());
+            }
+        }
+    }
+
+    @Test
     void getI18nData_emptyOrNullLocale_usesDefaultLocale() {
         Map<String, String> dbData = Map.of("k", "v");
         when(i18nResourceService.getResourceMapByLang("zh-CN")).thenReturn(dbData);

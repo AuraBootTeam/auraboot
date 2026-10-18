@@ -6,6 +6,7 @@ import type { PermissionMatrixDTO } from '../../types';
 
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
+    locale: 'en-US',
     t: (key: string, _vars?: unknown, fallback?: string) => {
       // Existing database translations override resource changes on upgraded environments.
       if (key === 'admin.permission.editor.impactDetailsV2')
@@ -73,6 +74,36 @@ function mockData(g: CapabilityGroup[] = groups, m: PermissionMatrixDTO = emptyM
 }
 
 describe('CapabilityRoleEditor', () => {
+  it('searches the displayed English declaration and retains that name in preview and impact', async () => {
+    const capability = {
+      ...cap('org.cap.read', '查看组织架构', false),
+      localizedLabels: { en: 'View Organization' },
+      includes: ['org.hr.read'],
+    };
+    mockData([{ group: 'Organization', capabilities: [capability] }]);
+    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
+      grantedCodes: ['org.hr.read'],
+      revokedCodes: [],
+      preservedCodes: [],
+      relatedMenus: [],
+      resultingCapabilities: [
+        { ...capability, granted: true, authorizationState: 'full', missingCodes: [] },
+      ],
+    });
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await screen.findByTestId('capability-role-editor');
+    fireEvent.change(screen.getByTestId('capability-search'), {
+      target: { value: 'View Organization' },
+    });
+    fireEvent.click(screen.getByTestId('capability-checkbox-org.cap.read'));
+    fireEvent.click(screen.getByTestId('capability-save'));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Grant: View Organization');
+    expect(screen.getByTestId('capability-preview-impact-org.cap.read')).toHaveTextContent(
+      'View Organization',
+    );
+    expect(dialog).not.toHaveTextContent('查看组织架构');
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(capabilityService.previewSelection).mockResolvedValue({

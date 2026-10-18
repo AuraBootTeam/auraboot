@@ -2719,3 +2719,61 @@ session_security:
   created: "Created"
 
 "permission.capability.ungrouped": "Other capabilities"
+
+"permission.module.系统管理": "System Management"
+
+"permission.module.决策与事件策略管理": "Decisions & Event Policies"
+
+"permission.module.报表定义管理": "Report Definitions"
+
+"permission.module.元数据与页面配置": "Metadata & Pages"
+
+"permission.module.页面配置治理": "Page Governance"
+
+"permission.module.审计与留痕": "Audit & History"
+
+"permission.module.报表与输出": "Reports & Output"
+
+"permission.module.文件与附件": "Files & Attachments"
+
+"permission.module.AI运行与治理": "AI Operations & Governance"
+
+"permission.module.知识库": "Knowledge Bases"
+
+"permission.module.自动化规则": "Automation Rules"
+
+"permission.module.计费信息": "Billing"
+
+"permission.module.公告与通知": "Announcements & Notifications"
+
+"permission.module.数据交换与设备": "Data Exchange & Devices"
+
+"permission.module.元数据工具": "Metadata Tools"
+
+"permission.module.客服配置与接待": "Customer Support"
+
+"permission.module.业务裁定": "Business Adjudication"
+
+"permission.module.制造计划与指标": "Manufacturing Plans & Metrics"
+
+"permission.module.二维码管理": "QR Codes"
+
+"permission.module.语义指标": "Semantic Metrics"
+
+"permission.module.业务参与方": "Business Parties"
+
+"permission.module.列表视图": "List Views"
+
+"permission.module.主数据治理": "Master Data Governance"
+
+"permission.module.组织与权限管理": "Organization & Permissions"
+
+"permission.module.组织管理": "Organization"
+
+"permission.capability.preset.label": "Presets"
+
+"permission.capability.preset.viewer": "Viewer"
+
+"permission.capability.preset.editor": "Editor"
+
+"permission.capability.preset.admin": "Administrator"

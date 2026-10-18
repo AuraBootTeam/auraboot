@@ -1,3 +1,4 @@
+import { getLocalizedText } from '~/utils/i18n';
 import { useMemo, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import type { CapabilityGroup } from './types';
@@ -12,7 +13,7 @@ export default function CapabilityDiagnostics({
   matrix: PermissionMatrixDTO | null;
   groups: CapabilityGroup[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
   const capabilities = groups
@@ -122,7 +123,12 @@ export default function CapabilityDiagnostics({
                       </td>
                       <td className="p-2">
                         {related.length
-                          ? related.map((cap) => cap.label).join(' / ')
+                          ? related
+                              .map(
+                                (cap) =>
+                                  getLocalizedText(cap.localizedLabels, locale, t) || cap.label,
+                              )
+                              .join(' / ')
                           : t(
                               'admin.permission.diagnostics.unmappedV2',
                               undefined,

@@ -2910,3 +2910,61 @@ session_security:
   created: "创建时间"
 
 "permission.capability.ungrouped": "其他能力"
+
+"permission.module.系统管理": "系统管理"
+
+"permission.module.决策与事件策略管理": "决策与事件策略管理"
+
+"permission.module.报表定义管理": "报表定义管理"
+
+"permission.module.元数据与页面配置": "元数据与页面配置"
+
+"permission.module.页面配置治理": "页面配置治理"
+
+"permission.module.审计与留痕": "审计与留痕"
+
+"permission.module.报表与输出": "报表与输出"
+
+"permission.module.文件与附件": "文件与附件"
+
+"permission.module.AI运行与治理": "AI运行与治理"
+
+"permission.module.知识库": "知识库"
+
+"permission.module.自动化规则": "自动化规则"
+
+"permission.module.计费信息": "计费信息"
+
+"permission.module.公告与通知": "公告与通知"
+
+"permission.module.数据交换与设备": "数据交换与设备"
+
+"permission.module.元数据工具": "元数据工具"
+
+"permission.module.客服配置与接待": "客服配置与接待"
+
+"permission.module.业务裁定": "业务裁定"
+
+"permission.module.制造计划与指标": "制造计划与指标"
+
+"permission.module.二维码管理": "二维码管理"
+
+"permission.module.语义指标": "语义指标"
+
+"permission.module.业务参与方": "业务参与方"
+
+"permission.module.列表视图": "列表视图"
+
+"permission.module.主数据治理": "主数据治理"
+
+"permission.module.组织与权限管理": "组织与权限管理"
+
+"permission.module.组织管理": "组织管理"
+
+"permission.capability.preset.label": "预设"
+
+"permission.capability.preset.viewer": "查看者"
+
+"permission.capability.preset.editor": "编辑者"
+
+"permission.capability.preset.admin": "管理员"
