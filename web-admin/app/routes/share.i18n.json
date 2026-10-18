@@ -60,8 +60,8 @@
     "en-US": "Shared view settings"
   },
   "configurationHelp": {
-    "zh-CN": "此链接分享视图设置。业务数据需要登录后按权限访问。",
-    "en-US": "This link shares view settings. Sign in to access business data according to your permissions."
+    "zh-CN": "此链接分享视图设置（包括已保存的筛选条件）。业务记录需要登录后按权限访问。",
+    "en-US": "This link shares view settings, including saved filters. Sign in to access business records according to your permissions."
   },
   "columns": {
     "zh-CN": "列设置",

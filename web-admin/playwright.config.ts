@@ -436,6 +436,14 @@ export default defineConfig({
               storageState: adminStorageState,
             },
           },
+          {
+            name: 'internal-api-wire',
+            testDir: './tests/api/internal-api',
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: { cookies: [], origins: [] },
+            },
+          },
         ]
       : []),
     ...(runProfile === 'enterprise-smoke'

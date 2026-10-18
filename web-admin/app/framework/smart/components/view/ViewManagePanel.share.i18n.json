@@ -1,0 +1,58 @@
+{
+  "common.saved_view_share_title": {
+    "zh-CN": "公开分享链接",
+    "en-US": "Public share link"
+  },
+  "common.saved_view_share_loading": {
+    "zh-CN": "加载中…",
+    "en-US": "Loading…"
+  },
+  "common.saved_view_share_status_failed": {
+    "zh-CN": "获取分享状态失败",
+    "en-US": "Unable to load sharing status"
+  },
+  "common.saved_view_share_create_failed": {
+    "zh-CN": "生成分享链接失败",
+    "en-US": "Unable to create a share link"
+  },
+  "common.saved_view_share_revoke_failed": {
+    "zh-CN": "撤销分享链接失败",
+    "en-US": "Unable to revoke the share link"
+  },
+  "common.saved_view_share_copy_failed": {
+    "zh-CN": "复制失败，请手动复制链接",
+    "en-US": "Copy failed. Copy the link manually."
+  },
+  "common.saved_view_share_revoke_confirm": {
+    "zh-CN": "确定撤销该视图的公开链接吗？撤销后，现有链接将立即失效。",
+    "en-US": "Revoke this public link? The current link will stop working immediately."
+  },
+  "common.saved_view_share_active": {
+    "zh-CN": "链接已开启，可查看视图设置（包括已保存的筛选条件）。业务记录仍需登录并按权限访问。",
+    "en-US": "The link shares view settings, including saved filters. Business records still require sign-in and access permissions."
+  },
+  "common.saved_view_share_inactive": {
+    "zh-CN": "生成公开链接后，任何拿到链接的人都可查看视图设置（包括已保存的筛选条件）。业务记录仍需登录并按权限访问。",
+    "en-US": "Anyone with the generated link can view the settings, including saved filters. Business records still require sign-in and access permissions."
+  },
+  "common.saved_view_share_copied": {
+    "zh-CN": "已复制",
+    "en-US": "Copied"
+  },
+  "common.saved_view_share_copy": {
+    "zh-CN": "复制",
+    "en-US": "Copy"
+  },
+  "common.saved_view_share_expires_at": {
+    "zh-CN": "过期时间：{time}",
+    "en-US": "Expires: {time}"
+  },
+  "common.saved_view_share_revoke": {
+    "zh-CN": "撤销链接",
+    "en-US": "Revoke link"
+  },
+  "common.saved_view_share_generate": {
+    "zh-CN": "生成分享链接",
+    "en-US": "Generate share link"
+  }
+}

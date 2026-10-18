@@ -61,7 +61,8 @@ public class OpenApiConfig {
                 .addOpenApiCustomizer(new NullableReferenceOpenApiCustomizer())
                 .packagesToScan("com.auraboot.framework", "com.auraboot.module")
                 .pathsToMatch("/api/**")
-                .pathsToExclude("/api/open/v1/**", "/api/test/**", "/api/mobile/**")
+                .pathsToExclude("/api/open/v1/**", "/api/test/**", "/api/mobile/**",
+                        "/api/auth/verify-code/dev/**")
                 .addOpenApiCustomizer(api -> {
                     api.setServers(java.util.List.of(new Server().url("/")));
                     api.setInfo(new Info().title("AuraBoot Internal Web Admin API")

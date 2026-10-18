@@ -76,7 +76,8 @@ const ZH = {
     saved_view_field_timelineTitleField: '标题字段',
     saved_view_select_field: '选择字段',
     saved_view_reason_missing_date_field: '缺少日期字段，暂不能保存该视图。',
-    saved_view_reason_kanban_drag_command_missing: '当前数据可生成看板，但未配置状态更新命令，拖拽将保持禁用。',
+    saved_view_reason_kanban_drag_command_missing:
+      '当前数据可生成看板，但未配置状态更新命令，拖拽将保持禁用。',
     saved_view_action_set_default: '设为默认',
     saved_view_action_default: '默认视图',
     saved_view_action_edit: '重命名视图',
@@ -111,21 +112,25 @@ function makeView(overrides: Partial<SavedView> = {}): SavedView {
 
 function renderPanel(
   overrides: Partial<React.ComponentProps<typeof ViewManagePanel>> = {},
+  locale = 'zh-CN',
 ): React.ComponentProps<typeof ViewManagePanel> {
   const props: React.ComponentProps<typeof ViewManagePanel> = {
     open: true,
     onClose: vi.fn(),
     views: [],
     currentView: null,
-    onCreateView: vi.fn(async (request) => ({
-      pid: 'new-view',
-      name: request.name,
-      modelCode: request.modelCode,
-      pageKey: request.pageKey,
-      scope: request.scope ?? 'personal',
-      viewType: request.viewType,
-      viewConfig: request.viewConfig ?? {},
-    }) as SavedView),
+    onCreateView: vi.fn(
+      async (request) =>
+        ({
+          pid: 'new-view',
+          name: request.name,
+          modelCode: request.modelCode,
+          pageKey: request.pageKey,
+          scope: request.scope ?? 'personal',
+          viewType: request.viewType,
+          viewConfig: request.viewConfig ?? {},
+        }) as SavedView,
+    ),
     onDeleteView: vi.fn(),
     onDuplicateView: vi.fn(),
     onEditView: vi.fn(),
@@ -138,7 +143,7 @@ function renderPanel(
   };
 
   render(
-    <I18nProvider initialData={ZH} initialLocale="zh-CN">
+    <I18nProvider initialData={locale === 'zh-CN' ? ZH : {}} initialLocale={locale}>
       <ViewManagePanel {...props} />
     </I18nProvider>,
   );
@@ -148,9 +153,7 @@ function renderPanel(
 describe('ViewManagePanel personal-only release', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(savedViewService.getMyTeams).mockResolvedValue([
-      { pid: 'team-a', name: 'Team A' },
-    ]);
+    vi.mocked(savedViewService.getMyTeams).mockResolvedValue([{ pid: 'team-a', name: 'Team A' }]);
     vi.mocked(confirmDialog).mockResolvedValue(true);
   });
 
@@ -374,7 +377,39 @@ describe('ViewManagePanel public share link', () => {
   });
 
   const shareableView = () =>
-    makeView({ pid: 'team-view', name: '团队工作视图', scope: 'team', teamId: 'team-a', actions: ['view', 'manage', 'share'] });
+    makeView({
+      pid: 'team-view',
+      name: '团队工作视图',
+      scope: 'team',
+      teamId: 'team-a',
+      actions: ['view', 'manage', 'share'],
+    });
+
+  it('explains the real sharing scope in English through generate and revoke', async () => {
+    renderPanel({ views: [shareableView()] }, 'en-US');
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
+    const generate = await screen.findByTestId('saved-view-share-generate-team-view');
+    expect(generate).toHaveTextContent('Generate share link');
+    expect(screen.getByTestId('saved-view-share-state-team-view')).toHaveTextContent(
+      'Anyone with the generated link can view the settings, including saved filters.',
+    );
+    fireEvent.click(generate);
+    await screen.findByTestId('saved-view-share-link-team-view');
+    expect(screen.getByTestId('saved-view-share-state-team-view')).toHaveTextContent(
+      'Business records still require sign-in and access permissions.',
+    );
+    expect(screen.getByTestId('saved-view-share-copy-team-view')).toHaveTextContent('Copy');
+    fireEvent.click(screen.getByTestId('saved-view-share-revoke-team-view'));
+    await waitFor(() =>
+      expect(confirmDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: 'Revoke this public link? The current link will stop working immediately.',
+        }),
+      ),
+    );
+    await screen.findByTestId('saved-view-share-generate-team-view');
+    expect(savedViewService.revokeShare).toHaveBeenCalledWith('team-view');
+  });
 
   it('exposes a share affordance on a authorized team view', () => {
     renderPanel({ views: [shareableView()] });
@@ -430,7 +465,9 @@ describe('ViewManagePanel public share link', () => {
 
   it('exposes authorized global and team links independently of team pin privileges', () => {
     renderPanel({
-      views: [makeView({ pid: 'global-share', scope: 'global', actions: ['view', 'manage', 'share'] })],
+      views: [
+        makeView({ pid: 'global-share', scope: 'global', actions: ['view', 'manage', 'share'] }),
+      ],
       teamViews: [shareableView()],
       canManageTeamPins: false,
     });
@@ -441,11 +478,22 @@ describe('ViewManagePanel public share link', () => {
   });
 
   it('drops a displayed token when refreshed server actions revoke sharing', async () => {
-    vi.mocked(savedViewService.getShareStatus).mockResolvedValue({ shared: true, token: 'before-revoke' });
+    vi.mocked(savedViewService.getShareStatus).mockResolvedValue({
+      shared: true,
+      token: 'before-revoke',
+    });
     const props: React.ComponentProps<typeof ViewManagePanel> = {
-      open: true, onClose: vi.fn(), views: [shareableView()], currentView: null,
-      onCreateView: vi.fn(), onDeleteView: vi.fn(), onDuplicateView: vi.fn(),
-      onSetDefaultView: vi.fn(), onSelectView: vi.fn(), modelCode: 'order', pageKey: 'order_list',
+      open: true,
+      onClose: vi.fn(),
+      views: [shareableView()],
+      currentView: null,
+      onCreateView: vi.fn(),
+      onDeleteView: vi.fn(),
+      onDuplicateView: vi.fn(),
+      onSetDefaultView: vi.fn(),
+      onSelectView: vi.fn(),
+      modelCode: 'order',
+      pageKey: 'order_list',
     };
     const content = (views: SavedView[]) => (
       <I18nProvider initialData={ZH} initialLocale="zh-CN">
@@ -468,9 +516,7 @@ describe('ViewManagePanel public share link', () => {
 
     fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
 
-    await waitFor(() =>
-      expect(savedViewService.getShareStatus).toHaveBeenCalledWith('team-view'),
-    );
+    await waitFor(() => expect(savedViewService.getShareStatus).toHaveBeenCalledWith('team-view'));
     await waitFor(() =>
       expect(screen.getByTestId('saved-view-share-generate-team-view')).toBeInTheDocument(),
     );

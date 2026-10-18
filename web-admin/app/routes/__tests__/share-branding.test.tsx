@@ -43,7 +43,7 @@ describe('SharedViewPage actual producer contract', () => {
     expect(screen.getByText('Powered by AuraBoot')).toBeVisible();
     expect(
       screen.getByText(
-        'This link shares view settings. Sign in to access business data according to your permissions.',
+        'This link shares view settings, including saved filters. Sign in to access business records according to your permissions.',
       ),
     ).toBeVisible();
     expect(screen.queryByRole('table')).toBeNull();

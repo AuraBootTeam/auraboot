@@ -27,6 +27,8 @@ WORKDIR /app
 COPY platform/gradlew gradlew
 COPY platform/gradle gradle
 COPY platform/build.gradle platform/settings.gradle platform/gradle.properties ./
+# Lombok controls constructor binding and copied injection qualifiers, hence the HTTP contract.
+COPY platform/lombok.config ./
 # platform/build.gradle intentionally reads ../VERSION so the platform and repository release
 # stay on one canonical version. WORKDIR is /app in this stage, therefore that file is /VERSION.
 COPY VERSION /VERSION

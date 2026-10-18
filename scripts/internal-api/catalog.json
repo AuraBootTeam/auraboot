@@ -166,6 +166,122 @@
           "path": "/api/user/password"
         }
       ]
+    },
+    "savedViewWire": {
+      "purpose": "Real owned-account SavedView operation responses and listed persistence/negative invariants; API driver, not UI or complete tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/saved-view.spec.ts",
+      "tests": [
+        "generated SavedView operations preserve owned configuration and public sharing boundaries"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/views/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/accessible"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/personal"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/global"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/team"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/chip-pins"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{viewPid}/pin"
+        },
+        {
+          "method": "delete",
+          "path": "/api/views/{viewPid}/pin"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/my-teams"
+        },
+        {
+          "method": "post",
+          "path": "/api/tenant/members/search"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/default"
+        },
+        {
+          "method": "post",
+          "path": "/api/views"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/auto-save"
+        },
+        {
+          "method": "put",
+          "path": "/api/views/{pid}"
+        },
+        {
+          "method": "delete",
+          "path": "/api/views/{pid}"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{pid}/set-default"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{pid}/duplicate"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{pid}/copy-to-personal"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/{pid}/audit-events"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/capability-check"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{viewPid}/share"
+        },
+        {
+          "method": "delete",
+          "path": "/api/views/{viewPid}/share"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/{viewPid}/share/status"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/check-name"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/shared/{shareToken}"
+        }
+      ]
+    },
+    "savedView": {
+      "purpose": "Owned global-view sharing through the real management panel and anonymous configuration/password/error UI; not all SavedView CRUD or tenant acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-saved-view.spec.ts",
+      "tests": [
+        "generated SavedView sharing preserves the owner and anonymous browser journeys"
+      ]
     }
   },
   "scenarios": [
@@ -424,6 +540,123 @@
       "expected": "Anonymous profile navigation redirects to login and internal reads are refused",
       "test": "anonymous profile access is refused",
       "screenshot": "PROFILE-05-anonymous.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-01",
+      "feature": "savedView",
+      "action": "inactive",
+      "branch": "empty",
+      "expected": "Owner opens the actual team list from its menu and sees the owned view sharing scope before generating a link",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-01-inactive.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-02",
+      "feature": "savedView",
+      "action": "active",
+      "branch": "state-transition",
+      "expected": "Owner generates a public link through the panel and the returned link persists after reopening",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-02-active.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-03",
+      "feature": "savedView",
+      "action": "public-configuration",
+      "branch": "happy",
+      "expected": "Anonymous recipient sees the actual view name and settings counts without business records or a login redirect",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-03-public-configuration.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-04",
+      "feature": "savedView",
+      "action": "revoke-confirm",
+      "branch": "confirmation",
+      "expected": "Revocation confirmation is visible before the owner confirms it",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-04-revoke-confirm.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-05",
+      "feature": "savedView",
+      "action": "revoked",
+      "branch": "sad",
+      "expected": "The revoked public link shows unavailable and does not retain previous settings",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-05-revoked.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-06",
+      "feature": "savedView",
+      "action": "password-required",
+      "branch": "permission",
+      "expected": "Anonymous recipient must enter the password for an owned protected link",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-06-password-required.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-07",
+      "feature": "savedView",
+      "action": "password-invalid",
+      "branch": "sad",
+      "expected": "An incorrect password displays inline error and allows retry",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-07-password-invalid.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-08",
+      "feature": "savedView",
+      "action": "password-success",
+      "branch": "state-transition",
+      "expected": "The correct password opens configuration without business records",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-08-password-success.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-09",
+      "feature": "savedView",
+      "action": "expired",
+      "branch": "sad",
+      "expected": "An expired link shows the actual expiration error with a retry action",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-09-expired.png",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",
