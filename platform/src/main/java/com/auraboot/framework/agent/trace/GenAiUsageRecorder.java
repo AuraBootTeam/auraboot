@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.trace;
 
+import com.auraboot.framework.observability.LlmUsageMetrics;
+
 import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
 import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -26,9 +28,9 @@ import java.util.Map;
 @Service
 public class GenAiUsageRecorder {
 
-    public static final String METRIC_WRITE_FAILURE = "auraboot_genai_ledger_write_failure_total";
-    public static final String METRIC_UNPRICED = "auraboot_genai_unpriced_total";
-    public static final String METRIC_CACHE_UNPRICED = "auraboot_genai_cache_unpriced_total";
+    public static final String METRIC_WRITE_FAILURE = LlmUsageMetrics.METRIC_WRITE_FAILURE;
+    public static final String METRIC_UNPRICED = LlmUsageMetrics.METRIC_UNPRICED;
+    public static final String METRIC_CACHE_UNPRICED = LlmUsageMetrics.METRIC_CACHE_UNPRICED;
 
     private final GenAiUsageMapper genAiUsageMapper;
     private final ObjectProvider<GenAiPricingProperties> pricingProperties;

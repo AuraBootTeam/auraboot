@@ -68,7 +68,8 @@ class StepLoopParallelToolTest {
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(50);
         executor.setThreadNamePrefix("test-async-");
-        executor.setTaskDecorator(new TenantAwareTaskDecorator());
+        executor.setTaskDecorator(new TenantAwareTaskDecorator(new com.auraboot.framework.event.context.ThreadContextScopes(
+                java.util.List.of(new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor()))));
         executor.initialize();
         meterRegistry = new SimpleMeterRegistry();
         parallelToolMetrics = new ParallelToolMetrics(meterRegistry);

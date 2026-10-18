@@ -1,4 +1,6 @@
-package com.auraboot.framework.application.bootstrap.seeder;
+package com.auraboot.framework.agent.integration.bootstrap;
+
+import com.auraboot.framework.application.bootstrap.PlatformSeedContributor;
 
 import com.auraboot.framework.agent.service.SystemAgentUserProvisioner;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -35,7 +37,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AgentTemplateSeeder {
+public class AgentTemplateSeeder implements PlatformSeedContributor {
 
     private static final long SYSTEM_TENANT_ID = SystemTenantContextExecutor.SYSTEM_TENANT_ID;
 

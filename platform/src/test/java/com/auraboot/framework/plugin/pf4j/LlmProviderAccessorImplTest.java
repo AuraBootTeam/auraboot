@@ -44,7 +44,8 @@ class LlmProviderAccessorImplTest {
                         .outputTokens(8)
                         .build());
 
-        LlmProviderAccessorImpl accessor = new LlmProviderAccessorImpl(factory, new ObjectMapper(), 7L);
+        var accessor = new com.auraboot.framework.agent.integration.plugin.LlmProviderAccessorFactory(
+                factory, new ObjectMapper()).create(7L);
         AiProviderAccessor.ChatResponse response = accessor.chat(new AiProviderAccessor.ChatRequest(
                 "bom_conversion",
                 "acme-bom-normalizer-prod",
