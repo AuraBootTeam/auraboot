@@ -27,24 +27,9 @@ fi
 
 pattern="$(IFS='|'; echo "${BLOCKLIST[*]}")"
 hits="$(git grep -InE "$pattern" -- "${build_files[@]}" 2>/dev/null || true)"
-
-# Test-scope exception: a coordinate on a `testRuntimeOnly` line never reaches
-# the distribution artifacts (test runtime classpath is not packaged into the
-# bootJar), which is what the 2026-09-27 removal actually guarded. Anything
-# else — implementation/runtimeOnly/compileOnly — stays a violation. Follow-up:
-# replacing the test-scope MySQL driver with the MariaDB-compatible path
-# properly needs connector-suite verification on the Linux CI host.
-test_scope_ok='^[^:]+:[0-9]+:[[:space:]]*testRuntimeOnly .*(com\.mysql:mysql-connector|mysql:mysql-connector-java)'
-filtered="$(printf '%s\n' "$hits" | grep -vE "$test_scope_ok" || true)"
-if [ -n "$filtered" ]; then
+if [ -n "$hits" ]; then
   echo "ERROR: copyleft dependencies are banned from the default distribution build files:"
-  echo "$filtered" | sed 's/^/  /'
-  if printf '%s\n' "$hits" | grep -qE "$test_scope_ok"; then
-    echo ""
-    echo "Note: testRuntimeOnly-scoped matches were exempted (test classpath is"
-    echo "not part of the distribution), but replacing them entirely is tracked"
-    echo "as follow-up work."
-  fi
+  echo "$hits" | sed 's/^/  /'
   echo ""
   echo "These coordinates were removed for license reasons. If the capability is"
   echo "needed, move it behind an explicitly opted-in module (see"
