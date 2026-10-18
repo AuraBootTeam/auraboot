@@ -56,7 +56,6 @@ const parseTabFromHash = (hash: string): TabType => {
   return VALID_TABS.includes(tab as TabType) ? (tab as TabType) : 'basic';
 };
 
-
 const flattenTreeNodes = (root: DictTreeNode | undefined): DictItemData[] => {
   if (!root) return [];
   const rows: DictItemData[] = [];
@@ -428,20 +427,19 @@ export default function DictDetailPage() {
     }
   };
 
-
   return (
-    <div className="mx-auto max-w-7xl p-6">
+    <div className="mx-auto w-full max-w-7xl min-w-0 p-6">
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{dict.name}</h1>
-          <p className="mt-1 text-sm text-gray-500">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-bold break-words text-gray-900">{dict.name}</h1>
+          <p className="mt-1 text-sm break-all text-gray-500" data-testid="dictionary-code-header">
             字典编码: <span className="font-mono text-blue-600">{dict.code}</span>
             {dict.description && ` · ${dict.description}`}
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {(dict.status === 'draft' || dict.status === 'deprecated') && (
             <button
               onClick={handlePublish}
@@ -537,7 +535,9 @@ export default function DictDetailPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">状态</label>
-                  <div className="text-sm"><StatusBadge status={dict.status} /></div>
+                  <div className="text-sm">
+                    <StatusBadge status={dict.status} />
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">版本号</label>
@@ -555,13 +555,21 @@ export default function DictDetailPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">创建时间</label>
-                  <time dateTime={dict.createdAt} data-testid="dict-created-at" className="text-sm text-gray-900">
+                  <time
+                    dateTime={dict.createdAt}
+                    data-testid="dict-created-at"
+                    className="text-sm text-gray-900"
+                  >
                     {formatInTimezone(dict.createdAt, formats.datetime, userTimezone)}
                   </time>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">更新时间</label>
-                  <time dateTime={dict.updatedAt} data-testid="dict-updated-at" className="text-sm text-gray-900">
+                  <time
+                    dateTime={dict.updatedAt}
+                    data-testid="dict-updated-at"
+                    className="text-sm text-gray-900"
+                  >
                     {formatInTimezone(dict.updatedAt, formats.datetime, userTimezone)}
                   </time>
                 </div>
@@ -751,7 +759,11 @@ export default function DictDetailPage() {
                             )}
                             <StatusBadge status={version.status} />
                           </div>
-                          <time dateTime={version.createdAt} data-testid={`dict-version-created-at-${version.pid}`} className="mt-1 block text-xs text-gray-400">
+                          <time
+                            dateTime={version.createdAt}
+                            data-testid={`dict-version-created-at-${version.pid}`}
+                            className="mt-1 block text-xs text-gray-400"
+                          >
                             {formatInTimezone(version.createdAt, formats.datetime, userTimezone)}
                           </time>
                         </div>

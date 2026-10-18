@@ -20,7 +20,9 @@ const catalog = JSON.parse(
   ),
 );
 const validate = createResponseShapeValidator(document);
-const imageBytes = await fs.readFile(new URL('../../../public/favicon-32x32.png', import.meta.url));
+const imageBytes = await fs.readFile(
+  new URL('../../../public/android-chrome-512x512.png', import.meta.url),
+);
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 test.use({
   storageState: { cookies: [], origins: [] },

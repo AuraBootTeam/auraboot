@@ -72,6 +72,10 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
     true,
   );
   await expect(page).toHaveURL(/\/meta\/dict\/new$/);
+  // Native popup animations are outside DOM animation control. Keep the verified
+  // invalid field focused and dismiss the transient popup before the golden.
+  await codeInput.press('Escape');
+  await expect(codeInput).toBeFocused();
   await capture('DICT-02', page, info);
 
   const code = uniqueId('e2e_contract_status');
@@ -182,6 +186,10 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
     page.getByRole('heading', { name: `版本 ${createdBody.data.version}`, exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId(`dict-version-created-at-${pid}`)).toHaveText(expectedDate);
+  const codeBox = await page.getByTestId('dictionary-code-header').boundingBox();
+  const actionBox = await page.getByRole('button', { name: '取消发布', exact: true }).boundingBox();
+  if (!codeBox || !actionBox) throw new Error('Dictionary header controls are not laid out');
+  expect(codeBox.x + codeBox.width).toBeLessThanOrEqual(actionBox.x);
   await capture('DICT-08', page, info);
 
   await page.locator('nav a[href="/meta/dict"]').click();
