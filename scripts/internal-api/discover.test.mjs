@@ -140,8 +140,12 @@ test('retains aliased bound and injected network transports without marking shad
     operation('get', '/api/views/{pid}', {path:{pid}});
     function shadow(call: Function) { call('get', '/api/views/{pid}'); }
     function shadowNamedFetch(fetch: Function) { fetch('/api/views/accessible'); }
+    let mutable = call;
+    mutable = replacement;
+    mutable('get', '/api/views/{pid}');
+    function overridable(request = call) { request('get', '/api/views/{pid}'); }
   ` }], document);
-  assert.equal(result.calls.length, 7);
+  assert.equal(result.calls.length, 9);
   for (const row of result.calls.slice(0, 5)) {
     assert.equal(row.classification, 'source-linked');
     assert.equal(row.migration, 'not-migrated');
@@ -155,4 +159,8 @@ test('retains aliased bound and injected network transports without marking shad
   assert.equal(result.calls[5].matches[0].operationId, 'read');
   assert.equal(result.calls[6].migration, 'not-migrated');
   assert.equal(result.calls[6].transportResolution, 'name-heuristic-candidate');
+  for (const row of result.calls.slice(7)) {
+    assert.equal(row.migration, 'not-migrated');
+    assert.equal(row.transportResolution, 'candidate');
+  }
 });

@@ -73,7 +73,13 @@ export function discoverCalls(sources, document) {
         // A typed injected fetch remains a network candidate even without a default.
         if (declaration?.type && ts.isTypeQueryNode(declaration.type)
           && declaration.type.exprName.getText(sf) === 'fetch') return 'fetch';
-        if (declaration?.initializer) return transport(declaration.initializer, next);
+        if (declaration?.initializer) {
+          const kind = transport(declaration.initializer, next);
+          const immutable = ts.isVariableDeclaration(declaration)
+            && ts.isVariableDeclarationList(declaration.parent)
+            && Boolean(declaration.parent.flags & ts.NodeFlags.Const);
+          return kind && !immutable ? 'candidate' : kind;
+        }
       }
       if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)
         && n.expression.name.text === 'bind') {

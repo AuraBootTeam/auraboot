@@ -71,6 +71,14 @@ statically linked to an entry is not automatically excluded. Local collections
 such as a `Map` cache retain candidate rows with declaration evidence instead of
 being mistaken for HTTP calls or silently removed.
 
+Route alternatives retain a separate result for every finite conditional branch.
+A missing, external or unresolved branch prevents the whole call from being
+classified as linked; enumeration overflow stays unresolved. Calls through local
+aliases, bound fetch functions and typed injected fetch parameters remain in the
+inventory. Mutable aliases and replaceable injected operation defaults do not
+prove generated-operation migration. These static facts do not establish wire
+type propagation or runtime branch coverage.
+
 ## Typed JSON operations
 
 `internalRequest(method, template, input)` binds method, path, query, headers,
