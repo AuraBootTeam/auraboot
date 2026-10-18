@@ -1,6 +1,10 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.dto.AuthenticationRequest;
@@ -57,14 +61,30 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  */
 @SpringBootTest(classes=TestApplication.class,properties={
     "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
-    "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
-    "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
+    "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}"})
 @ActiveProfiles("integration-test")
 @Import(ProcurementPublicSourceCommandRealDbIT.IsolatedScheduling.class)
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_PUBLIC_SOURCE_IT",matches="true")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ProcurementPublicSourceCommandRealDbIT extends ProcurementPublicSourceNativeFixture {
+
+    @Autowired FieldEncryptionService fieldEncryption;
+
+    @DynamicPropertySource
+    static void matchingEncryption(DynamicPropertyRegistry registry) {
+        registerMatchingEncryption(registry,System.getenv());
+    }
+
+    static void registerMatchingEncryption(DynamicPropertyRegistry registry,Map<String,String> environment) {
+        String key=S06NativeEncryptionAdmission.requiredKey(environment);
+        registry.add("security.field-encryption.key",()->key);
+    }
+
+    @Override protected void admitEncryption() throws Exception {
+        writeArtifact("matching-encryption-admission.json",S06NativeEncryptionAdmission.admit(
+            System.getenv(),json,fieldEncryption,getClass(),application.getEnvironment().getActiveProfiles()));
+    }
 
     @Test @Order(1) void publicConfiguredReadCreatesThenReplaysWithoutDuplicatePgFacts() throws Exception {
         configurePolicy();var first=call(token,selected("11"));assertEquals(200,first.status());assertEquals("added",first.body().path("data").path("data").path("items").get(0).path("status").asText());

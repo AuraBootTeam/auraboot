@@ -13,6 +13,38 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Pure input-contract checks: no Spring context, authentication, plugin execution, or database. */
 class ProcurementPublicSourceReadinessTest {
+    @Test void sourceNativeHasNoEmbeddedEncryptionKeyAndRequiresExplicitMatchingKey() throws Exception {
+        var properties=ProcurementPublicSourceCommandRealDbIT.class
+            .getAnnotation(org.springframework.boot.test.context.SpringBootTest.class).properties();
+        assertTrue(java.util.Arrays.stream(properties).noneMatch(value->value.startsWith("security.field-encryption.key=")));
+        var method=ProcurementPublicSourceCommandRealDbIT.class.getDeclaredMethod("matchingEncryption",
+            org.springframework.test.context.DynamicPropertyRegistry.class);
+        assertTrue(method.isAnnotationPresent(org.springframework.test.context.DynamicPropertySource.class));
+        var register=ProcurementPublicSourceCommandRealDbIT.class.getDeclaredMethod("registerMatchingEncryption",
+            org.springframework.test.context.DynamicPropertyRegistry.class,Map.class);
+        var bound=new LinkedHashMap<String,java.util.function.Supplier<Object>>();
+        org.springframework.test.context.DynamicPropertyRegistry registry=bound::put;
+        String key=java.util.Base64.getEncoder().encodeToString(new byte[32]);
+        register.invoke(null,registry,Map.of("S06_NATIVE_FIELD_ENCRYPTION_KEY",key));
+        assertEquals(java.util.Set.of("security.field-encryption.key"),bound.keySet());
+        assertEquals(key,bound.get("security.field-encryption.key").get());
+        bound.clear();
+        var failure=assertThrows(java.lang.reflect.InvocationTargetException.class,()->register.invoke(null,registry,Map.of()));
+        assertInstanceOf(IllegalStateException.class,failure.getCause());
+        assertTrue(bound.isEmpty(),"A missing explicit key cannot fall back to a fixture key");
+    }
+    @Test void encryptionAdmissionFailureStopsPreparationBeforeAnyDatabaseOrUserAccess() {
+        var events=new java.util.ArrayList<String>();
+        var fixture=new ProcurementPublicSourceNativeFixture() {
+            protected void prepareEvidence(org.junit.jupiter.api.TestInfo ignored) {events.add("evidence");}
+            protected void admitEncryption() {events.add("encryption");throw new IllegalStateException("synthetic admission rejected");}
+        };
+        fixture.observed=new ProcurementPublicSourceNativeFixture.SourceWriteObservation();
+        var failure=assertThrows(IllegalStateException.class,()->fixture.prepare(null));
+        assertEquals("synthetic admission rejected",failure.getMessage());
+        assertEquals(List.of("evidence","encryption"),events);
+        assertNull(fixture.tenant);assertNull(fixture.userId);assertNull(fixture.server);
+    }
     private static final ObjectMapper JSON=new ObjectMapper();
     private static final List<String> SOURCES=List.of("oss","quote","enterprise","crm","plugins");
     private ObjectNode fixture() throws Exception {

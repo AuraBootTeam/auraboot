@@ -143,6 +143,7 @@ abstract class ProcurementPublicSourceNativeFixture {
         caseEvidence=null;tenant=null;userId=null;memberId=null;actor=null;provider=null;token=null;deniedToken=null;
         loginCount.set(0);queryCount.set(0);orderSaveCount.set(0);orderLookupCount.set(0);orderReadCount.set(0);readClosedStatus="LOCAL_OPEN";readQuantity="300.000001";readReceivedQuantity="250";savedOrder=null;ambiguousOrderSave=false;publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";observed.targetNotFound.set(false);
         prepareEvidence(test);
+        admitEncryption();
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
         try(var sql=postgres.getConnection()){assertEquals("enterprise_22",sql.getCatalog());}
         assertTrue(extensions.getCommandHandler(SYNC).isPresent(),"Frozen production PF4J artifact must register source sync");
@@ -239,6 +240,9 @@ abstract class ProcurementPublicSourceNativeFixture {
         if(!isolated && baselineTargetTask==null) baselineTargetTask=task;
     }
     /** Override only prerequisite writes; the original Source/Order fixture retains this exact body. */
+    /** Optional admission for consumers that bind the Native bean to the current runtime crypto proof. */
+    protected void admitEncryption() throws Exception {}
+
     protected void prepareInitialSourceRecords() throws Exception {
         fixture(SYNC,()->{
             String product=pid(db.create("prod_product",Map.of("prod_code",provider,"prod_name","Public source material","prod_type","raw_material","prod_unit","pcs","prod_status","active")));

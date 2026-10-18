@@ -19,7 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /** Test-only admission. Runtime profiles are evidence, not the Native application's profile identity. */
-final class S06NativeEncryptionAdmission {
+public final class S06NativeEncryptionAdmission {
     static final String KEY = "S06_NATIVE_FIELD_ENCRYPTION_KEY";
     private static final Path PRIVATE_PROPERTIES = Path.of("/Users/ghj/work/auraboot/.workspace/private/"
             + "procurement-web-stack-20261010/field-encryption.properties");
@@ -32,12 +32,12 @@ final class S06NativeEncryptionAdmission {
 
     private S06NativeEncryptionAdmission() {}
 
-    static String requiredKey(Map<String, String> environment) {
+    public static String requiredKey(Map<String, String> environment) {
         require(environment.containsKey(KEY) && environment.get(KEY) != null, "S06_MATCHING_KEY_MUST_BE_SET");
         return environment.get(KEY);
     }
 
-    static Map<String, Object> admit(Map<String, String> environment, ObjectMapper json,
+    public static Map<String, Object> admit(Map<String, String> environment, ObjectMapper json,
             FieldEncryptionService bean, Class<?> testClass, String[] nativeProfiles) throws Exception {
         String key = requiredKey(environment);
         Path app = Path.of(required(environment, "S06_NATIVE_APPLICATION_ROOT")).toRealPath();
