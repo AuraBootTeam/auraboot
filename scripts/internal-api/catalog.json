@@ -288,6 +288,13 @@
       "tests": [
         "generated SavedView sharing preserves the owner and anonymous browser journeys"
       ]
+    },
+    "sessionCompatibility": {
+      "purpose": "Real browser compatibility regression exposed by the internal API gate; not full auth or dashboard migration acceptance",
+      "spec": "web-admin/tests/e2e/dashboard/internal-api-session-compatibility.spec.ts",
+      "tests": [
+        "dashboard usage and account logout survive missing randomUUID"
+      ]
     }
   },
   "scenarios": [
@@ -676,6 +683,58 @@
       "feature": "profile",
       "action": "email-only-profile-edit",
       "branch": "edge",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-01",
+      "feature": "sessionCompatibility",
+      "action": "reload-home",
+      "branch": "edge",
+      "expected": "The actual login landing page renders its dashboard with randomUUID absent and getRandomValues available",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-01-home.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-02",
+      "feature": "sessionCompatibility",
+      "action": "open-account-menu",
+      "branch": "edge",
+      "expected": "The real account menu opens on the working dashboard without a root error",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-02-account-menu.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-03",
+      "feature": "sessionCompatibility",
+      "action": "logout-confirmation",
+      "branch": "edge",
+      "expected": "The logout link reaches the confirmation page with an actionable submit button",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-03-logout-confirmation.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-04",
+      "feature": "sessionCompatibility",
+      "action": "logged-out",
+      "branch": "edge",
+      "expected": "Browser confirmation logs out the owned session and subsequent identity access is HTTP401",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-04-logged-out.png",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",
