@@ -2717,3 +2717,5 @@ session_security:
   ip: "IP"
   last_active: "Last active"
   created: "Created"
+
+"permission.capability.ungrouped": "Other capabilities"

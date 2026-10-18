@@ -36,6 +36,17 @@ function consumer() {
   // @ts-expect-error response schema fields cannot be substituted for the request DTO
   internalRequest('post', '/api/meta/dict', { body: { pid: 'wrong-input' } });
   internalRequest('get', '/api/user/profile');
+  internalRequest('get', '/api/permission/capabilities', { query: { rolePid: 'role-pid' } });
+  internalRequest('post', '/api/permission/capabilities/preview', { query: { rolePid: 'role-pid', revokePartial: ['org.cap.edit'] }, body: ['org.cap.read'] });
+  internalRequest('put', '/api/permission/capabilities', { query: { rolePid: 'role-pid' }, body: [] });
+  // @ts-expect-error capability selection requires a real JSON array
+  internalRequest('put', '/api/permission/capabilities', { query: { rolePid: 'role-pid' }, body: { codes: [] } });
+  // @ts-expect-error capability requests require the public role PID query
+  internalRequest('get', '/api/permission/capabilities');
+  // @ts-expect-error legacy numeric IDs cannot replace the role PID
+  internalRequest('get', '/api/permission/capabilities', { query: { rolePid: 123 } });
+  // @ts-expect-error only capability code strings can be revoked
+  internalRequest('post', '/api/permission/capabilities/preview', { query: { rolePid: 'role-pid', revokePartial: [123] }, body: [] });
   internalRequest('get', '/api/roles/{rolePid}/members', {path:{rolePid:'role-pid'},query:{pageNum:1,pageSize:20}});
   internalRequest('post', '/api/roles/{rolePid}/members/remove', {path:{rolePid:'role-pid'},body:['member-pid']});
   internalRequest('post', '/api/roles/{rolePid}/members/assign', {path:{rolePid:'role-pid'},body:{memberPids:['member-pid'],expiryDate:null}});

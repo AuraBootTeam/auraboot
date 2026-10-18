@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: a2f07645b379c350b220fd4214827bf904e1507bb26e6113cce7b0bd1e2db9ee
+ * Contract SHA-256: baf2e0211748c72d587ad5cccb507656aa675334538c81bbac075fec3364bc34
  */
 export interface paths {
     "/api/activities": {
@@ -28483,28 +28483,29 @@ export interface components {
             targetRequired?: boolean;
         };
         Capability: {
-            authorizationState?: string;
-            code?: string;
-            conventionDerived?: boolean;
-            description?: string;
+            /** @enum {string} */
+            authorizationState: "none" | "partial" | "full";
+            code: string;
+            conventionDerived: boolean;
+            description: string | null;
             /** Format: int32 */
-            displayGroupOrder?: number;
+            displayGroupOrder: number;
             /** Format: int32 */
-            displayOrder?: number;
-            granted?: boolean;
-            group?: string;
-            includes?: string[];
-            label?: string;
-            localizedDescriptions?: {
+            displayOrder: number;
+            granted: boolean;
+            group: string | null;
+            includes: string[];
+            label: string;
+            localizedDescriptions: {
                 [key: string]: string;
             };
-            localizedLabels?: {
+            localizedLabels: {
                 [key: string]: string;
             };
-            missingCodes?: string[];
-            sensitive?: boolean;
-            tier?: string;
-            unlockedMenus?: string[];
+            missingCodes: string[];
+            sensitive: boolean;
+            tier: string | null;
+            unlockedMenus: string[] | null;
         };
         CapabilityCatalog: {
             automationActions?: string[];
@@ -28548,8 +28549,8 @@ export interface components {
             taskDescription?: string;
         };
         CapabilityGroup: {
-            capabilities?: components["schemas"]["Capability"][];
-            group?: string;
+            capabilities: components["schemas"]["Capability"][];
+            group: string | null;
         };
         CapabilityManifest: {
             blockType?: string;
@@ -28571,11 +28572,11 @@ export interface components {
             type?: string;
         };
         CapabilitySelectionPreview: {
-            grantedCodes?: string[];
-            preservedCodes?: string[];
-            relatedMenus?: string[];
-            resultingCapabilities?: components["schemas"]["Capability"][];
-            revokedCodes?: string[];
+            grantedCodes: string[];
+            preservedCodes: string[];
+            relatedMenus: string[];
+            resultingCapabilities: components["schemas"]["Capability"][];
+            revokedCodes: string[];
         };
         CapabilityView: {
             code?: string;
@@ -37863,22 +37864,22 @@ export interface components {
             rolePid?: string;
         };
         RoleResponse: {
-            code?: string;
+            code: string | null;
             /** Format: date-time */
-            createdAt?: string;
-            defaultDataScopeType?: string;
-            description?: string;
-            isDefault?: boolean;
-            isSystem?: boolean;
-            name?: string;
-            pid?: string;
+            createdAt: string | null;
+            defaultDataScopeType: string | null;
+            description: string | null;
+            isDefault: boolean | null;
+            isSystem: boolean | null;
+            name: string;
+            pid: string;
             /** Format: int32 */
-            priority?: number;
-            scopeType?: string;
-            status?: string;
-            type?: string;
+            priority: number | null;
+            scopeType: string | null;
+            status: string | null;
+            type: string | null;
             /** Format: date-time */
-            updatedAt?: string;
+            updatedAt: string | null;
         };
         RoleStructureDecisionView: {
             allowed?: boolean;

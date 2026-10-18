@@ -36,6 +36,16 @@ import CapabilityRoleEditor from '../CapabilityRoleEditor';
 
 function cap(code: string, label: string, granted: boolean) {
   return {
+    authorizationState: granted ? ('full' as const) : ('none' as const),
+    description: null,
+    tier: null,
+    displayGroupOrder: 10000,
+    displayOrder: 100,
+    localizedLabels: {},
+    localizedDescriptions: {},
+    missingCodes: [],
+    unlockedMenus: null,
+
     code,
     group: '报价单',
     label,
@@ -100,7 +110,9 @@ describe('CapabilityRoleEditor', () => {
     const edit = screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement;
     expect(edit.disabled).toBe(true);
     expect((screen.getByTestId('data-scope-modify-btn') as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByTestId('capability-preset-admin') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId('capability-preset-admin') as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(edit);
     fireEvent.click(screen.getByTestId('capability-save'));
@@ -120,7 +132,9 @@ describe('CapabilityRoleEditor', () => {
     rerender(<CapabilityRoleEditor rolePid="role-pid-5" readOnly />);
     await waitFor(() => screen.getByTestId('capability-role-editor'));
     expect(screen.queryByTestId('capability-draft')).toBeNull();
-    expect((screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked).toBe(false);
+    expect(
+      (screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked,
+    ).toBe(false);
     expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
     expect(capabilityService.applySelection).not.toHaveBeenCalled();
   });
@@ -151,6 +165,15 @@ describe('CapabilityRoleEditor', () => {
         group: '报价单',
         capabilities: [
           {
+            authorizationState: 'none' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'qo.cap.quote_view',
             group: '报价单',
             label: '查看报价',
@@ -161,6 +184,15 @@ describe('CapabilityRoleEditor', () => {
             conventionDerived: false,
           },
           {
+            authorizationState: 'none' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'qo.cap.quote_edit',
             group: '报价单',
             label: '编辑报价',
@@ -193,6 +225,15 @@ describe('CapabilityRoleEditor', () => {
         group: '报价单',
         capabilities: [
           {
+            authorizationState: 'full' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'qo.cap.quote_view',
             group: '报价单',
             label: '查看报价',
@@ -203,6 +244,15 @@ describe('CapabilityRoleEditor', () => {
             conventionDerived: false,
           },
           {
+            authorizationState: 'none' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'qo.cap.quote_edit',
             group: '报价单',
             label: '编辑报价',
@@ -218,6 +268,15 @@ describe('CapabilityRoleEditor', () => {
         group: 'model',
         capabilities: [
           {
+            authorizationState: 'full' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'model.qo_quote_common',
             group: 'model',
             label: 'Qo_quote_common Read',
@@ -422,7 +481,9 @@ describe('CapabilityRoleEditor', () => {
     const impact = (await screen.findByTestId('capability-preview-impact')) as HTMLDetailsElement;
     expect(impact.open).toBe(false);
     expect(screen.getByText('Grant: 编辑报价')).toBeTruthy();
-    expect(impact.querySelector('summary')).toHaveTextContent('Review related capability states, menus and action details');
+    expect(impact.querySelector('summary')).toHaveTextContent(
+      'Review related capability states, menus and action details',
+    );
     expect(screen.getByTestId('capability-preview-state-counts')).toHaveTextContent(
       'Related capabilities after saving: 1 fully granted · 31 with partial actions · 1 not granted',
     );

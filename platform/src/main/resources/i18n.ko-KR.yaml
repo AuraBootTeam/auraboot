@@ -411,3 +411,5 @@ aurabot:
     saving: 저장 중…
     saved_as_dashboard: 대시보드에 저장됨
     save_failed: 대시보드 저장 실패
+
+"permission.capability.ungrouped": "기타 권한"

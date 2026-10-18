@@ -6129,5 +6129,12 @@
     "key": "admin.permission.members.readOnlyHint",
     "zh-CN": "查看成员与授权有效期；修改成员关系需要相应权限。",
     "en-US": "View members and access periods. Membership changes require permission."
+  },
+  {
+    "key": "permission.capability.ungrouped",
+    "en-US": "Other capabilities",
+    "zh-CN": "其他能力",
+    "ja-JP": "その他の権限",
+    "ko-KR": "기타 권한"
   }
 ]

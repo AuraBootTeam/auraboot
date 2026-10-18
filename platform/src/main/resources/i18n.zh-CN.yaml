@@ -2908,3 +2908,5 @@ session_security:
   ip: "IP"
   last_active: "最近活跃"
   created: "创建时间"
+
+"permission.capability.ungrouped": "其他能力"

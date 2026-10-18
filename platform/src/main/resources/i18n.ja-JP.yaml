@@ -411,3 +411,5 @@ aurabot:
     saving: 保存中…
     saved_as_dashboard: ダッシュボードに保存しました
     save_failed: ダッシュボードへの保存に失敗しました
+
+"permission.capability.ungrouped": "その他の権限"

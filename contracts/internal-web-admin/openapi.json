@@ -18446,6 +18446,11 @@
       "Capability": {
         "properties": {
           "authorizationState": {
+            "enum": [
+              "none",
+              "partial",
+              "full"
+            ],
             "type": "string"
           },
           "code": {
@@ -18455,7 +18460,10 @@
             "type": "boolean"
           },
           "description": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "displayGroupOrder": {
             "format": "int32",
@@ -18469,7 +18477,10 @@
             "type": "boolean"
           },
           "group": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "includes": {
             "items": {
@@ -18502,15 +18513,39 @@
             "type": "boolean"
           },
           "tier": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "unlockedMenus": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           }
         },
+        "required": [
+          "authorizationState",
+          "code",
+          "conventionDerived",
+          "description",
+          "displayGroupOrder",
+          "displayOrder",
+          "granted",
+          "group",
+          "includes",
+          "label",
+          "localizedDescriptions",
+          "localizedLabels",
+          "missingCodes",
+          "sensitive",
+          "tier",
+          "unlockedMenus"
+        ],
         "type": "object"
       },
       "CapabilityCatalog": {
@@ -18665,9 +18700,16 @@
             "type": "array"
           },
           "group": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
+        "required": [
+          "capabilities",
+          "group"
+        ],
         "type": "object"
       },
       "CapabilityManifest": {
@@ -18757,6 +18799,13 @@
             "type": "array"
           }
         },
+        "required": [
+          "grantedCodes",
+          "preservedCodes",
+          "relatedMenus",
+          "resultingCapabilities",
+          "revokedCodes"
+        ],
         "type": "object"
       },
       "CapabilityView": {
@@ -44959,23 +45008,41 @@
       "RoleResponse": {
         "properties": {
           "code": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "createdAt": {
             "format": "date-time",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "defaultDataScopeType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "description": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "isDefault": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "isSystem": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "name": {
             "type": "string"
@@ -44985,22 +45052,52 @@
           },
           "priority": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "scopeType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "type": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "updatedAt": {
             "format": "date-time",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
+        "required": [
+          "code",
+          "createdAt",
+          "defaultDataScopeType",
+          "description",
+          "isDefault",
+          "isSystem",
+          "name",
+          "pid",
+          "priority",
+          "scopeType",
+          "status",
+          "type",
+          "updatedAt"
+        ],
         "type": "object"
       },
       "RoleStructureDecisionView": {
