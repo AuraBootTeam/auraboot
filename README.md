@@ -71,6 +71,9 @@ Define models, fields, commands, pages, and formulas in declarative JSON. A sing
 
 Use [model mutation policies](docs/system-reference/model-mutation-policy.md) to protect immutable history and require command authorization for creation or deletion.
 
+See [model-driven condition editing](docs/system-reference/web/model-driven-condition-editor.md) for typed model selectors, nested conditions, field comparisons, and authoritative trial explanations.
+
+
 ### 20+ Stage Command Pipeline
 Every data operation flows through a unified pipeline: schema validation → permission check → state machine → field mapping → handler → side effects → webhooks → audit. Fully configurable per command through DSL.
 

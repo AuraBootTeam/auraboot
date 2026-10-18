@@ -1391,6 +1391,15 @@
   min-width: 0;
 }
 
+.cfl-grid--readonly {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.strategy-studio-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .cfl-table {
   min-width: 760px;
 }

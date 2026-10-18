@@ -94,7 +94,7 @@
     "component": null,
     "icon": "blocks",
     "type": 1,
-    "permissionCode": "decision.definition.manage",
+    "permissionCode": "decision.definition.read",
     "orderNo": 25,
     "visible": true,
     "extension": {

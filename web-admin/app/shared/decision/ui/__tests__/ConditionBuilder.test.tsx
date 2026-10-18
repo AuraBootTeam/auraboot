@@ -5,7 +5,13 @@ import { ConditionBuilder, type FieldOption } from '../ConditionBuilder';
 import { group, cmp, path, lit, type GroupNode } from '../../ast/conditionAst';
 
 const FIELDS: FieldOption[] = [
-  { scope: 'record', path: 'data.priority', label: '优先级', dataType: 'enum', options: ['HIGH', 'LOW'] },
+  {
+    scope: 'record',
+    path: 'data.priority',
+    label: '优先级',
+    dataType: 'enum',
+    options: ['HIGH', 'LOW'],
+  },
   { scope: 'record', path: 'data.amount', label: '金额', dataType: 'decimal' },
 ];
 
@@ -22,10 +28,11 @@ function Harness({ initial }: { initial: GroupNode }) {
 const oneHighPriority = (): GroupNode =>
   group('AND', [cmp(path('record', 'data.priority', 'enum'), 'EQ', lit('HIGH', 'enum'))]);
 
-const responseJson = (body: unknown): Response => ({
-  ok: true,
-  json: async () => body,
-}) as Response;
+const responseJson = (body: unknown): Response =>
+  ({
+    ok: true,
+    json: async () => body,
+  }) as Response;
 
 describe('ConditionBuilder', () => {
   afterEach(() => {
@@ -45,7 +52,11 @@ describe('ConditionBuilder', () => {
     render(
       <ConditionBuilder
         value={group('AND', [
-          cmp(path('record', 'data.targetKey', 'string'), 'EQ', lit('task_manager_approve', 'string')),
+          cmp(
+            path('record', 'data.targetKey', 'string'),
+            'EQ',
+            lit('task_manager_approve', 'string'),
+          ),
         ])}
         fields={[
           {
@@ -72,9 +83,7 @@ describe('ConditionBuilder', () => {
   it('authors dict IN values as arrays while rendering value labels', () => {
     function DictInHarness() {
       const [v, setV] = useState<GroupNode>(
-        group('AND', [
-          cmp(path('record', 'data.wd_req_type', 'dict'), 'EQ', lit('', 'dict')),
-        ]),
+        group('AND', [cmp(path('record', 'data.wd_req_type', 'dict'), 'EQ', lit('', 'dict'))]),
       );
       return (
         <>
@@ -103,23 +112,19 @@ describe('ConditionBuilder', () => {
     render(<DictInHarness />);
 
     fireEvent.change(screen.getByLabelText('operator-0'), { target: { value: 'IN' } });
-    const selector = screen.getByLabelText('value-0') as HTMLSelectElement;
-    expect(selector.multiple).toBe(true);
-    expect(selector).toHaveTextContent('年假');
-    expect(selector).toHaveTextContent('病假');
-    expect(selector).not.toHaveTextContent('annual');
-
-    Array.from(selector.options).forEach((option) => {
-      option.selected = ['annual', 'sick'].includes(option.value);
-    });
-    fireEvent.change(selector);
+    expect(screen.getByText('选择值', { selector: 'summary' })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('value-0-annual'));
+    fireEvent.click(screen.getByLabelText('value-0-sick'));
 
     const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as GroupNode;
     const first = dump.children[0];
     expect(first.type).toBe('compare');
     if (first.type !== 'compare') return;
     expect(first.operator).toBe('IN');
-    expect(first.right && 'value' in first.right ? first.right.value : null).toEqual(['annual', 'sick']);
+    expect(first.right && 'value' in first.right ? first.right.value : null).toEqual([
+      'annual',
+      'sick',
+    ]);
     const preview = screen.getByTestId('cb-preview');
     expect(preview).toHaveTextContent('年假');
     expect(preview).toHaveTextContent('病假');
@@ -169,7 +174,9 @@ describe('ConditionBuilder', () => {
     });
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('王经理');
     expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('user-pid-1');
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/user-pid-1', { credentials: 'same-origin' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/user-pid-1', {
+      credentials: 'same-origin',
+    });
   });
 
   it('uses the user picker API to author user reference values while saving raw ids', async () => {
@@ -194,9 +201,7 @@ describe('ConditionBuilder', () => {
 
     function UserReferenceHarness() {
       const [v, setV] = useState<GroupNode>(
-        group('AND', [
-          cmp(path('record', 'data.approverPid', 'user'), 'EQ', lit('', 'user')),
-        ]),
+        group('AND', [cmp(path('record', 'data.approverPid', 'user'), 'EQ', lit('', 'user'))]),
       );
       return (
         <>
@@ -228,7 +233,9 @@ describe('ConditionBuilder', () => {
     const option = await screen.findByTestId('reference-value-option-0-user-pid-1');
     expect(option).toHaveTextContent('王经理');
     expect(option).toHaveTextContent('manager@example.com · 采购部');
-    expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent('用户 · pid / displayName');
+    expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent(
+      '用户 · pid / displayName',
+    );
     fireEvent.click(option);
 
     const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as GroupNode;
@@ -264,9 +271,7 @@ describe('ConditionBuilder', () => {
 
     function GenericReferenceHarness() {
       const [v, setV] = useState<GroupNode>(
-        group('AND', [
-          cmp(path('record', 'data.supplierPid', 'object'), 'EQ', lit('', 'object')),
-        ]),
+        group('AND', [cmp(path('record', 'data.supplierPid', 'object'), 'EQ', lit('', 'object'))]),
       );
       return (
         <>
@@ -299,7 +304,9 @@ describe('ConditionBuilder', () => {
 
     const option = await screen.findByTestId('reference-value-option-0-supplier-1');
     expect(option).toHaveTextContent('上海供应商');
-    expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent('sc_supplier · pid / name');
+    expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent(
+      'sc_supplier · pid / name',
+    );
     fireEvent.click(option);
 
     const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as GroupNode;
@@ -310,9 +317,12 @@ describe('ConditionBuilder', () => {
     expect(screen.getByLabelText('value-0')).toHaveTextContent('上海供应商');
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('上海供应商');
     expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('supplier-1');
-    expect(fetchMock).toHaveBeenCalledWith('/api/dynamic/wd_leave_request/field-options/supplierPid', {
-      credentials: 'same-origin',
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/dynamic/wd_leave_request/field-options/supplierPid',
+      {
+        credentials: 'same-origin',
+      },
+    );
   });
 
   it('adds and deletes condition rows', () => {
@@ -337,7 +347,9 @@ describe('ConditionBuilder', () => {
   it('uses fact catalog operator constraints before local data-type defaults', () => {
     render(
       <ConditionBuilder
-        value={group('AND', [cmp(path('record', 'data.amount', 'decimal'), 'EQ', lit('100', 'decimal'))])}
+        value={group('AND', [
+          cmp(path('record', 'data.amount', 'decimal'), 'EQ', lit('100', 'decimal')),
+        ])}
         fields={[
           {
             scope: 'record',
@@ -393,50 +405,63 @@ describe('ConditionBuilder', () => {
 
     render(
       <ConditionBuilder
-        value={group('AND', [cmp(path('record', 'data.wd_req_days', 'integer'), 'GT', lit('1', 'integer'))])}
+        value={group('AND', [
+          cmp(path('record', 'data.wd_req_days', 'integer'), 'GT', lit('1', 'integer')),
+        ])}
         fields={fields}
         onChange={() => undefined}
       />,
     );
 
+    const modelPicker = screen.getByLabelText('model-0');
     const fieldPicker = screen.getByLabelText('field-0');
-    expect(fieldPicker.querySelector('optgroup[label="请假申请"]')).not.toBeNull();
-    expect(fieldPicker.querySelector('optgroup[label="操作者"]')).not.toBeNull();
-    expect(fieldPicker).toHaveTextContent('Agent 记忆 / 访问次数');
-
+    expect(modelPicker).toHaveTextContent('请假申请');
+    expect(modelPicker).toHaveTextContent('操作者');
+    expect(fieldPicker).toHaveTextContent('请假申请 / 请假天数');
     fireEvent.change(screen.getByLabelText('condition-field-search'), {
       target: { value: '请假' },
     });
-
-    expect(screen.getByTestId('cb-field-result-count')).toHaveTextContent('1 / 3');
-    expect(fieldPicker).toHaveTextContent('请假申请 / 请假天数');
-    expect(fieldPicker).not.toHaveTextContent('Agent 记忆 / 访问次数');
+    expect(modelPicker).toHaveTextContent('请假申请');
+    expect(modelPicker).not.toHaveTextContent('操作者');
   });
 
   it('unary operator hides the value input', () => {
-    render(<Harness initial={group('AND', [cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('100', 'decimal'))])} />);
+    render(
+      <Harness
+        initial={group('AND', [
+          cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('100', 'decimal')),
+        ])}
+      />,
+    );
     expect(screen.getByLabelText('value-0')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('operator-0'), { target: { value: 'IS_NULL' } });
     expect(screen.queryByLabelText('value-0')).not.toBeInTheDocument();
   });
 
   it('editing the value updates the preview', () => {
-    render(<Harness initial={group('AND', [cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('100', 'decimal'))])} />);
+    render(
+      <Harness
+        initial={group('AND', [
+          cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('100', 'decimal')),
+        ])}
+      />,
+    );
     fireEvent.change(screen.getByLabelText('value-0'), { target: { value: '5000' } });
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('5000');
   });
 
   it('toggling AND/OR changes the preview connector', () => {
-    render(<Harness initial={group('AND', [
-      cmp(path('record', 'data.priority', 'enum'), 'EQ', lit('HIGH', 'enum')),
-      cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('100', 'decimal')),
-    ])} />);
-    expect(screen.getByTestId('op-and')).toHaveTextContent('全部满足');
-    expect(screen.getByTestId('op-or')).toHaveTextContent('任一满足');
-    expect(screen.getByTestId('op-and')).not.toHaveTextContent('AND');
-    expect(screen.getByTestId('op-or')).not.toHaveTextContent('OR');
+    render(
+      <Harness
+        initial={group('AND', [
+          cmp(path('record', 'data.priority', 'enum'), 'EQ', lit('HIGH', 'enum')),
+          cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('100', 'decimal')),
+        ])}
+      />,
+    );
+    expect(screen.getByLabelText('group-op')).toHaveDisplayValue('AND · 全部满足');
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('并且');
-    fireEvent.click(screen.getByTestId('op-or'));
+    fireEvent.change(screen.getByLabelText('group-op'), { target: { value: 'OR' } });
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('或');
   });
 
@@ -451,7 +476,7 @@ describe('ConditionBuilder', () => {
 
     fireEvent.click(screen.getByTestId('cb-add-group'));
     expect(screen.getByTestId('cb-group-1')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('op-or-1'));
+    fireEvent.change(screen.getByLabelText('group-op-1'), { target: { value: 'OR' } });
     fireEvent.change(screen.getByLabelText('field-1-0'), {
       target: { value: 'record:data.amount' },
     });
@@ -490,7 +515,7 @@ describe('ConditionBuilder', () => {
           type: 'compare',
           operator: 'GT',
           left: { scope: 'record', path: 'data.amount' },
-          right: { value: '5000' },
+          right: { value: 5000 },
         },
         {
           type: 'compare',

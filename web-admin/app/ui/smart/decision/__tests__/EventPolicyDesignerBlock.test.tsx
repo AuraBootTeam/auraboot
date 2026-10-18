@@ -123,7 +123,10 @@ describe('EventPolicyDesignerBlock', () => {
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('Complaint Policy');
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
     await waitFor(() =>
-      expect(get).toHaveBeenCalledWith('/event-policy/definitions/complaint_policy/versions', undefined),
+      expect(get).toHaveBeenCalledWith(
+        '/event-policy/definitions/complaint_policy/versions',
+        undefined,
+      ),
     );
   });
 
@@ -141,6 +144,8 @@ describe('EventPolicyDesignerBlock', () => {
 
     const fieldPicker = screen.getByLabelText('field-0');
     expect(fieldPicker).toHaveTextContent('客户等级');
+    const modelPicker = screen.getByLabelText('model-0');
+    fireEvent.change(modelPicker, { target: { value: 'record:record' } });
     expect(fieldPicker).toHaveTextContent('优先级');
     expect(fieldPicker).toHaveTextContent('金额');
   });
@@ -234,7 +239,9 @@ describe('EventPolicyDesignerBlock', () => {
     );
 
     await waitFor(() =>
-      expect(get).toHaveBeenCalledWith('/decision/facts/catalog', { modelCode: 'wd_leave_request' }),
+      expect(get).toHaveBeenCalledWith('/decision/facts/catalog', {
+        modelCode: 'wd_leave_request',
+      }),
     );
     expect(get).not.toHaveBeenCalledWith('/decision/model/fields', undefined);
 
@@ -262,32 +269,47 @@ describe('EventPolicyDesignerBlock', () => {
     await screen.findByTestId('epd-workflow');
     fireEvent.click(screen.getByTestId('epd-step-test'));
     expect(screen.getByTestId('condition-testrun')).toHaveTextContent('5天长假申请');
-    await waitFor(() => expect(screen.getByTestId('trp-context')).toHaveTextContent('01ADMINUSERPID'));
+    await waitFor(() =>
+      expect(screen.getByTestId('trp-context')).toHaveTextContent('01ADMINUSERPID'),
+    );
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/event-policy/run-and-execute', expect.objectContaining({
-      eventType: 'LEAVE_REQUEST_CREATED',
-      targetType: 'MODEL',
-      targetKey: 'wd_leave_request',
-      context: expect.objectContaining({
-        record: expect.objectContaining({
-          modelCode: 'wd_leave_request',
-          entityCode: 'wd_leave_request',
-          data: expect.objectContaining({
-            wd_req_no: expect.stringMatching(/^REQ-LONG-LEAVE-SAMPLE-RUN-/),
-            wd_req_days: 5,
-            wd_req_applicant: '01ADMINUSERPID',
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/event-policy/run-and-execute',
+        expect.objectContaining({
+          eventType: 'LEAVE_REQUEST_CREATED',
+          targetType: 'MODEL',
+          targetKey: 'wd_leave_request',
+          context: expect.objectContaining({
+            record: expect.objectContaining({
+              modelCode: 'wd_leave_request',
+              entityCode: 'wd_leave_request',
+              data: expect.objectContaining({
+                wd_req_no: expect.stringMatching(/^REQ-LONG-LEAVE-SAMPLE-RUN-/),
+                wd_req_days: 5,
+                wd_req_applicant: '01ADMINUSERPID',
+              }),
+            }),
           }),
         }),
-      }),
-    })));
+      ),
+    );
     const requestBody = post.mock.calls[0]?.[1] as {
-      context?: { record?: { recordPid?: string; data?: { wd_req_no?: string; recordPid?: string } } };
+      context?: {
+        record?: { recordPid?: string; data?: { wd_req_no?: string; recordPid?: string } };
+      };
     };
     expect(requestBody.context?.record?.recordPid).toMatch(/^REQ-LONG-LEAVE-SAMPLE-RUN-/);
-    expect(requestBody.context?.record?.data?.recordPid).toBe(requestBody.context?.record?.recordPid);
-    expect(requestBody.context?.record?.data?.wd_req_no).toBe(requestBody.context?.record?.recordPid);
-    await waitFor(() => expect(screen.getByTestId('epd-run-summary')).toHaveTextContent('已命中 / 全部成功'));
+    expect(requestBody.context?.record?.data?.recordPid).toBe(
+      requestBody.context?.record?.recordPid,
+    );
+    expect(requestBody.context?.record?.data?.wd_req_no).toBe(
+      requestBody.context?.record?.recordPid,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('epd-run-summary')).toHaveTextContent('已命中 / 全部成功'),
+    );
     expect(screen.getByTestId('epd-abnormal-actions')).toHaveTextContent('无异常动作');
   });
 });
