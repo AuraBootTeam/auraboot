@@ -20,7 +20,8 @@
         "response-shape.test.mjs",
         "source-graph.test.mjs",
         "browser-catalog.test.mjs",
-        "browser-evidence.test.mjs"
+        "browser-evidence.test.mjs",
+        "browser-runner.test.mjs"
       ],
       "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json",
       "unitTests": [
@@ -56,7 +57,8 @@
         "browser catalog reconciles independent spec tests scenes and mandatory JSON evidence",
         "browser catalog rejects missing empty skipped shadowed dynamic duplicated or unregistered evidence",
         "browser evidence separates functional execution from exact original review and source runtime identity",
-        "browser evidence rejects stale failed skipped retried missing mismatched or unreviewed attempts"
+        "browser evidence rejects stale failed skipped retried missing mismatched or unreviewed attempts",
+        "browser runner binds verified manifest addresses and rejects missing or conflicting runtime namespaces"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },

@@ -31,6 +31,18 @@ export function collectBrowserAttempt(directory, reviewPath) {
   return result;
 }
 
+export function bindBrowserEnvironment(producer, environment) {
+  for (const [key, value] of [['PLAYWRIGHT_BASE_URL', producer.webUrl], ['BACKEND_URL', producer.backendUrl]])
+    requireCondition(environment[key] === value, `Managed runtime environment mismatch: ${key}`);
+  for (const [key, value] of [['BE_PORT', new URL(producer.backendUrl).port], ['BFF_PORT', new URL(producer.bffUrl).port]])
+    requireCondition(environment[key] === value, `Managed runtime port mismatch: ${key}`);
+  for (const [key, value] of [['BFF_URL', producer.bffUrl], ['SPRING_BOOT_URL', producer.backendUrl], ['PG_DB', producer.database], ['PGDATABASE', producer.database]])
+    requireCondition(environment[key] === undefined || environment[key] === value, `Conflicting managed runtime environment: ${key}`);
+  requireCondition((environment.PG_DB ?? environment.PGDATABASE) === producer.database && environment.PW_SKIP_WEBSERVER === '1', 'Managed database or existing server binding missing');
+  return { PLAYWRIGHT_BASE_URL: producer.webUrl, BACKEND_URL: producer.backendUrl,
+    BFF_URL: producer.bffUrl, SPRING_BOOT_URL: producer.backendUrl, PG_DB: producer.database };
+}
+
 export function runBrowserAttempt({ evidence, manifest, runtimeCommand, runtime }) {
   const root = path.resolve(evidence);
   requireCondition(!root.startsWith(path.resolve(sourceRoot) + path.sep) && root !== path.resolve(sourceRoot), 'Evidence must be outside source checkout');
@@ -47,9 +59,7 @@ export function runBrowserAttempt({ evidence, manifest, runtimeCommand, runtime 
       && producer.sourceRoots?.length === 1 && producer.sourceRoots[0].commit === sourceCommit
       && producer.sourceRoots[0].dirtyFingerprint === 'clean'
       && fs.realpathSync(producer.sourceRoots[0].root) === fs.realpathSync(sourceRoot), 'Runtime manifest source identity mismatch');
-    for (const [env, value] of [['PLAYWRIGHT_BASE_URL', producer.webUrl], ['BACKEND_URL', producer.backendUrl], ['BFF_URL', producer.bffUrl]])
-      requireCondition(process.env[env] === value, `Managed runtime environment mismatch: ${env}`);
-    requireCondition((process.env.PG_DB ?? process.env.PGDATABASE) === producer.database && process.env.PW_SKIP_WEBSERVER === '1', 'Managed database or existing server binding missing');
+    const managedEnvironment = bindBrowserEnvironment(producer, process.env);
     const catalog = read(path.join(sourceRoot, 'scripts/internal-api/catalog.json')), registry = loadBrowserCatalog(sourceRoot, catalog);
     const identity = { sourceCommit, sourceTree: git('rev-parse', 'HEAD^{tree}'), catalogSha256: sha256(canonicalJson(catalog)),
       registrySha256: sha256(canonicalJson(registry)), specSha256: sha256(fs.readFileSync(path.join(sourceRoot, 'contracts/internal-web-admin/openapi.json'))),
@@ -62,10 +72,10 @@ export function runBrowserAttempt({ evidence, manifest, runtimeCommand, runtime 
     fs.copyFileSync(manifest, path.join(root, 'runtime-manifest.json'));
     fs.writeFileSync(path.join(root, 'runtime-before.log'), verified, { flag: 'wx', mode: 0o600 });
     before = { schemaVersion: 1, identity, nonce: randomUUID(), startedAt: new Date().toISOString(), runtimeVerified: true, args,
-      runtimeVerificationSha256: sha256(verified), sourceClaim: 'clean-git-and-verified-running-product' };
+      runtimeVerificationSha256: sha256(verified), managedEnvironment, sourceClaim: 'clean-git-and-verified-running-product' };
     write(path.join(root, 'before.json'), before);
     const execution = spawnSync('pnpm', args, { cwd: path.join(sourceRoot, 'web-admin'), stdio: 'inherit', timeout: 30 * 60_000,
-      env: { ...process.env, PW_PROFILE: 'contract', PW_INTERNAL_API_OWNED_FIXTURES_ONLY: '1', PW_ARTIFACT_DIR: path.join(root, 'artifacts'),
+      env: { ...process.env, ...managedEnvironment, PW_PROFILE: 'contract', PW_INTERNAL_API_OWNED_FIXTURES_ONLY: '1', PW_ARTIFACT_DIR: path.join(root, 'artifacts'),
         PW_REPORT_DIR: path.join(root, 'report'), PW_RESULTS_JSON: path.join(root, 'results.json') } });
     let runtimeVerified = false, verificationError;
     try {

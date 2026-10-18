@@ -185,7 +185,9 @@ node scripts/internal-api/browser.mjs run \
 ```
 
 The runner requires a clean checkout, matching Web/BFF/backend/database bindings,
-and successful managed runtime verification before and after execution. It saves
+and successful managed runtime verification before and after execution. Optional BFF
+and Spring aliases are bound from that verified manifest when absent; explicit
+conflicts or mismatched managed ports still fail. It saves
 source/tree, contract/type/toolchain/catalog/registry digests and the exact runtime
 manifest before running all registered tests without dependencies, retries or skips.
 The attempt directory and credentials-bearing traces remain private. Its explicit

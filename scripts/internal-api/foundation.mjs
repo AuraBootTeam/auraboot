@@ -36,7 +36,7 @@ export async function main(args) {
     const scopedFiles = fs.readdirSync(path.join(root, 'scripts/internal-api'), {recursive:true})
       .filter(file => !file.includes('node_modules') && fs.statSync(path.join(root, 'scripts/internal-api', file)).isFile())
       .map(file => `scripts/internal-api/${file}`)
-      .concat(['contracts/internal-web-admin/openapi.json', 'web-admin/app/generated/internal-api/schema.d.ts']);
+      .concat(['contracts/internal-web-admin/openapi.json', 'web-admin/app/generated/internal-api/schema.d.ts', 'scripts/gates/hifi-golden-results.mjs']);
     const inputDigest = () => sha256([...new Set([...scopedFiles, ...listBrowserSpecFiles(root)])].sort().map(file => `${file}\n${sha256(fs.readFileSync(path.join(root,file)))}`).join('\n'));
     result.inputSha256 = inputDigest();
     const catalog = JSON.parse(fs.readFileSync(path.join(root, 'scripts/internal-api/catalog.json'), 'utf8'));
