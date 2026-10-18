@@ -45,4 +45,11 @@ test('response shape detects stale nullable metadata without claiming format or 
   assert.equal(result.valid, false);
   assert.equal(result.claim, 'json-response-structure-only');
   assert.equal(result.formatValidation, 'not-performed');
+  const references = fixture();
+  references.components.schemas.Name = { type: 'string' };
+  references.components.schemas.Item.properties.name = { $ref: '#/components/schemas/Name', type: 'null' };
+  assert.equal(createResponseShapeValidator(references)(response({ items: [{ name: null }], count: 0 })).valid, false);
+  references.components.schemas.Item.properties.name = { anyOf: [{ $ref: '#/components/schemas/Name' }, { type: 'null' }] };
+  const union = createResponseShapeValidator(references);
+  assert.equal(union(response({ items: [{ name: null }, { name: 'Name' }], count: 2 })).valid, true);
 });

@@ -50,6 +50,7 @@ public class OpenApiConfig {
     public GroupedOpenApi internalWebAdminApi() {
         return GroupedOpenApi.builder()
                 .group("internal-web-admin")
+                .addOpenApiCustomizer(new NullableReferenceOpenApiCustomizer())
                 .packagesToScan("com.auraboot.framework", "com.auraboot.module")
                 .pathsToMatch("/api/**")
                 .pathsToExclude("/api/open/v1/**", "/api/test/**", "/api/mobile/**")
