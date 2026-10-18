@@ -109,6 +109,61 @@ final class ProductQuoteReminderNativeFacet {
         evidence = Files.createDirectory(parent.resolve("product-quote-facet"));
     }
 
+    // BEGIN additive controlled-tick setup. Existing facet methods remain unchanged.
+    record TickFixture(long tenantId, String namespace, String supplierPid, String taskPid, String quotePid,
+                       List<Long> recipientIds, Binding binding, Map<String, String> tables,
+                       Path productJar, Path setupEvidence, String setupSha256) {
+        TickFixture {
+            recipientIds = List.copyOf(recipientIds);
+            tables = Map.copyOf(tables);
+        }
+    }
+
+    static TickFixture prepareTickFixture(Services services, Path parent) throws Exception {
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        try {
+            var fixture = new ProductQuoteReminderNativeFacet(services, parent);
+            JsonNode input = fixture.admission();
+            fixture.loadCanonicalNativeOrg(input);
+            fixture.initializeTenant();
+            fixture.importProduct(input);
+            fixture.importInitializationAppendix(input);
+            fixture.authenticateInitializer();
+            String supplier = fixture.create("pr_supplier_common", "pr_supplier_pcba_contact:sync_directory", Map.of(
+                    "pr_supplier_code", fixture.namespace, "pr_supplier_name", "Synthetic S06 supplier", "pr_supplier_status", "enabled"));
+            String firstContact = fixture.contact(supplier, "first");
+            String secondContact = fixture.contact(supplier, "second");
+            fixture.membership(fixture.first, supplier, firstContact);
+            fixture.membership(fixture.second, supplier, secondContact);
+            String task = fixture.create("s2p_sourcing_event", "qo_procurement_task_common:create", Map.of(
+                    "s2p_se_code", fixture.namespace, "s2p_se_title", "Synthetic S06 quotation", "s2p_se_event_type", "rfq",
+                    "s2p_se_status", "bidding", "s2p_se_collaboration_managed", true));
+            String quote = fixture.create("s2p_bid", "qo_procurement_task_common:dispatch", Map.of(
+                    "s2p_bid_sourcing_event_id", task, "s2p_bid_supplier_id", supplier, "s2p_bid_status", "draft",
+                    "s2p_bid_collaboration_managed", true, "qo_pr_quote_cutoff_at", SLOT.plusSeconds(3600)));
+            fixture.bind();
+            Binding binding = fixture.approval(fixture.ruleAndTemplate());
+            fixture.trace.put("stage", "controlled-tick-fixture-prepared");
+            fixture.trace.put("nativeTickExecuted", false);
+            fixture.trace.put("tenantId", fixture.tenant.getId());
+            fixture.trace.put("supplierPid", supplier);
+            fixture.trace.put("taskPid", task);
+            fixture.trace.put("quotePid", quote);
+            fixture.trace.put("recipientIds", List.of(fixture.first.getId(), fixture.second.getId()));
+            fixture.trace.put("binding", binding);
+            Path sealed = fixture.evidence.resolve("tick-fixture-setup.json");
+            Files.writeString(sealed, services.json.writerWithDefaultPrettyPrinter().writeValueAsString(fixture.trace),
+                    StandardOpenOption.CREATE_NEW);
+            return new TickFixture(fixture.tenant.getId(), fixture.namespace, supplier, task, quote,
+                    List.of(fixture.first.getId(), fixture.second.getId()), binding, fixture.tables,
+                    Path.of(input.path("productJarPath").asText()).toRealPath(), sealed, sha(sealed));
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(previous);
+        }
+    }
+    // END additive controlled-tick setup.
+
     static void run(Services services, Path evidence) throws Exception {
         MetaContext.Snapshot previous = MetaContext.snapshot();
         try {
