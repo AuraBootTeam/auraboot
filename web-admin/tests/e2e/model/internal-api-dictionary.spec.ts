@@ -176,7 +176,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await page.reload();
   await expect(page.getByRole('button', { name: '取消发布', exact: true })).toBeVisible();
   await page.getByTestId('dict-tab-versions').click();
-  await expect(page.getByRole('heading', { name: '版本 v1', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `版本 ${createdBody.data.version}`, exact: true })).toBeVisible();
   await capture('DICT-08', page, info);
 
   await page.locator('nav a[href="/meta/dict"]').click();
