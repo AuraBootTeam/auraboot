@@ -196,6 +196,12 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
   const name = `Contract access ${code.slice(-8)}`;
   let journeyError: unknown;
   async function denied(actor: InternalApiOwnedUser, method: string, path: string, body?: object) {
+    let createdCode: string | undefined;
+    if (method === 'post' && path === '/api/org/teams') {
+      if (!body || !('code' in body) || typeof body.code !== 'string')
+        throw new Error('A unique owned code is required for creation probes');
+      createdCode = body.code;
+    }
     const response = await actor.context.request.fetch(path, {
       method,
       headers: { Origin: actor.origin },
@@ -204,7 +210,7 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
     const payload = await response.json();
     // Even an authorization regression may create an owned resource. Track it before asserting.
     if (method === 'post' && path === '/api/org/teams' && typeof payload.data?.pid === 'string') {
-      const createdCode = (body as { code: string }).code;
+      if (!createdCode) throw new Error('Missing owned creation code');
       owned.set(payload.data.pid, createdCode);
     }
     denials.push({ role: actor.role ?? 'unassigned', method, path, status: response.status() });
@@ -345,8 +351,8 @@ test('team viewer reads the real menu while viewer and unassigned writes are for
         reads,
         denials,
         sessionCleanup: [viewer, unassigned, owner]
-          .filter(Boolean)
-          .map((actor) => ({ role: actor!.role, sessions: actor!.sessionCleanup })),
+          .filter((actor): actor is InternalApiOwnedUser => Boolean(actor))
+          .map((actor) => ({ role: actor.role, sessions: actor.sessionCleanup })),
         journeyError: journeyError ? String(journeyError) : null,
         cleanupErrors: cleanupErrors.map(String),
       }),

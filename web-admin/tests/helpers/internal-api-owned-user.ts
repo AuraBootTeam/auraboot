@@ -13,7 +13,7 @@ export async function loginInternalApiUser(page: Page, username: string, passwor
   await login.expectLoggedIn();
 }
 
-/** Provision only a uniquely owned no-email account; no shared administrator mutations. */
+/** Provision unique no-email accounts; revoke only sessions issued to these fresh contexts. */
 export async function provisionInternalApiUser(
   browser: Browser,
   baseURL: string,
