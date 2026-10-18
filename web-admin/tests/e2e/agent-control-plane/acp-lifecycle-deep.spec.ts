@@ -35,6 +35,7 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, findRowInPaginatedList, queryFilteredList } from '../helpers/index';
 import { gotoAcpUiPage } from './route-helpers';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const dictionaries = JSON.parse(readFileSync(new URL('../../../../plugins/agent-control-plane/config/dicts.json', import.meta.url), 'utf8')) as Array<{
   code: string;
@@ -214,9 +215,9 @@ async function clickActionAndWaitForTransition(
   rowTitle: string,
 ): Promise<Locator> {
   const responsePromise = page.waitForResponse(
-    (r) => r.url().includes('/commands/execute/') && r.status() === 200,
+    (r) => r.url().includes('/commands/execute/') && r.request().method() === 'POST',
     { timeout: 15_000 },
-  ).catch(() => null);
+  );
 
   await clickRowActionBtn(page, row, btnCode);
 
@@ -227,7 +228,10 @@ async function clickActionAndWaitForTransition(
     await confirmBtn.click();
   }
 
-  await responsePromise;
+  const response = await responsePromise;
+  const body = await response.json();
+  expect(response.ok(), JSON.stringify(body)).toBe(true);
+  expect(String(body.code)).toBe('0');
 
   // Wait for list to refresh and re-locate row
   await expect.poll(
@@ -279,7 +283,10 @@ async function createApprovalRecord(
     data: payload,
   });
   const body = await resp.json();
-  return String(body?.data?.pid ?? body?.data?.id ?? '');
+  expect(resp.ok(), JSON.stringify(body)).toBe(true);
+  expect(String(body.code)).toBe('0');
+  expect(body.data.pid).toMatch(/^[0-9A-Z]{26}$/);
+  return body.data.pid;
 }
 
 // ---------------------------------------------------------------------------
@@ -510,8 +517,30 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
       runPid = runRes.recordId;
       expect(runPid, 'Run should be created').toBeTruthy();
 
+      // Use an explicit policy for the authenticated approver; missing policies deny by design.
+      const meResponse = await page.request.get('/api/auth/me');
+      expect(meResponse.ok()).toBe(true);
+      const me = await meResponse.json();
+      expect(String(me.code)).toBe('0');
+      const approverId = me.data.user.id;
+      expect(approverId).toMatch(/^[0-9]+$/);
+      const policy = await executeCommandViaApi(page, 'acp:create_approval_policy', {
+        policy_name: `Lifecycle approval ${uid}`,
+        trigger_rules: JSON.stringify([{ type: 'tool_call' }]),
+        approver_rules: JSON.stringify([{ type: 'USER', userId: approverId }]),
+        auto_approve: false, timeout_hours: 24, timeout_action: 'reject', policy_status: 'active',
+      }, undefined, 'create');
+      expect(policy.recordId).toBeTruthy();
+      const requestData = JSON.stringify({ operation: 'lifecycle-transition' });
+      const approvalContext = {
+        policy_id: policy.recordId,
+        request_data: requestData,
+        plan_hash: createHash('sha256').update(requestData).digest('hex'),
+      };
+
       // 11) Approval records (pending) — use dynamic create API
       approvalPid1 = await createApprovalRecord(page, {
+        ...approvalContext,
         approval_type: 'tool_call',
         approval_title: approvalTitle1,
         approval_description: 'Approve this action for lifecycle test',
@@ -520,6 +549,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
       });
 
       approvalPid2 = await createApprovalRecord(page, {
+        ...approvalContext,
         approval_type: 'tool_call',
         approval_title: approvalTitle2,
         approval_description: 'Reject this action for lifecycle test',

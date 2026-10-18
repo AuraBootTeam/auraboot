@@ -642,27 +642,16 @@ async function configureFormButtons(page: Page, buttons: any[]): Promise<void> {
 
 async function clickSaveAndWait(page: Page, pid: string): Promise<void> {
   const saveBtn = page.getByTestId('toolbar-save');
-  await expect(saveBtn).toBeVisible({ timeout: 5_000 });
-
-  const putResp = page
-    .waitForResponse(
-      (r) =>
-        r.url().includes(`/api/pages/${pid}`) &&
-        r.request().method() === 'PUT' &&
-        r.status() < 400,
-      { timeout: 5_000 },
-    )
-    .catch(() => null);
-
-  const enabled = await saveBtn.isEnabled().catch(() => false);
-  if (enabled) {
-    await saveBtn.click().catch(() => null);
-  }
-
-  const result = await putResp;
-  if (!result) {
-    await expect(page.locator('text=/Saved|已保存/').first()).toBeVisible({ timeout: 5_000 });
-  }
+  await expect(saveBtn).toBeEnabled();
+  const response = page.waitForResponse(r =>
+    new URL(r.url()).pathname === `/api/pages/${pid}` && r.request().method() === 'PUT',
+  );
+  await saveBtn.click();
+  const saved = await response;
+  const body = await saved.json();
+  expect(saved.ok(), JSON.stringify(body)).toBe(true);
+  expect(String(body.code)).toBe('0');
+  await expect(page.getByTestId('toolbar-draft-state')).toHaveText(/Synced|已同步/);
 }
 
 // ---------------------------------------------------------------------------

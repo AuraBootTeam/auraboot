@@ -155,7 +155,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
             type="button"
             disabled={loading || loadFailed}
             onClick={() => setShowAddModal(true)}
-            className="bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
+            className="disabled:cursor-not-allowed disabled:opacity-50 bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
             data-testid="team-members-add"
           >
             <PlusIcon className="h-4 w-4" />
