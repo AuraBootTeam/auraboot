@@ -1640,13 +1640,22 @@
       "AggregationConfig": {
         "properties": {
           "fieldCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "function": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "label": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -8918,6 +8927,28 @@
         },
         "type": "object"
       },
+      "ApiResponseListSavedViewTeamMembershipDTO": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SavedViewTeamMembershipDTO"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListScheduledTask": {
         "properties": {
           "code": {
@@ -11491,6 +11522,25 @@
         },
         "type": "object"
       },
+      "ApiResponsePublicSharedViewResponse": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "$ref": "#/components/schemas/PublicSharedViewResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePublication": {
         "properties": {
           "code": {
@@ -13125,6 +13175,44 @@
         },
         "type": "object"
       },
+      "ApiResponseViewShareResponse": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "$ref": "#/components/schemas/ViewShareResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseViewShareStatusResponse": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "$ref": "#/components/schemas/ViewShareStatusResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseVoid": {
         "properties": {
           "code": {
@@ -13885,10 +13973,20 @@
             "type": "string"
           },
           "pageKey": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "viewConfig": {
-            "$ref": "#/components/schemas/ViewConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -16414,13 +16512,22 @@
         "properties": {
           "order": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "scope": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "teamId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -16522,13 +16629,22 @@
       "CollaboratorAcl": {
         "properties": {
           "permission": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "principalPid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "principalType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -16547,24 +16663,42 @@
       "ColumnConfig": {
         "properties": {
           "fieldCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "frozen": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "frozenPosition": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "order": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "visible": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "width": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -17738,10 +17872,20 @@
           "name": {
             "maxLength": 100,
             "minLength": 0,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "viewConfig": {
-            "$ref": "#/components/schemas/ViewConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object"
@@ -22446,6 +22590,14 @@
         },
         "type": "object"
       },
+      "DuplicateSavedViewRequest": {
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "DynamicBatchResponse": {
         "properties": {
           "duration": {
@@ -25485,22 +25637,40 @@
       "FilterConfig": {
         "properties": {
           "expression": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "fieldCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "group": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "isExpression": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "logic": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "operator": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "value": {}
         },
@@ -26154,13 +26324,22 @@
             "items": {
               "$ref": "#/components/schemas/AggregationConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "collapsed": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "fieldCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -28194,10 +28373,16 @@
       "KanbanAggregationConfig": {
         "properties": {
           "field": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "function": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "label": {}
         },
@@ -28206,14 +28391,23 @@
       "KanbanCardFieldConfig": {
         "properties": {
           "dictCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "field": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "label": {},
           "type": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -29247,87 +29441,162 @@
       "Meta": {
         "properties": {
           "allowUserCopy": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "allowUserOverride": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "baseActionCodes": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "baseChannelVersion": {
             "format": "int64",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "baseFieldCodes": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "basePageKey": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "basePagePid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "baseReleasePid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "baseSnapshotChecksum": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capabilityReasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "capabilityStatus": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "collaborators": {
             "items": {
               "$ref": "#/components/schemas/CollaboratorAcl"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "locked": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "managedBy": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "originPresetKey": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "originViewPid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "overlayReasonCodes": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "overlayStalePaths": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "overlayStatus": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pinnedAsQuickFilter": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "quickFilterIcon": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "quickFilterOrder": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "viewKey": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -35224,14 +35493,20 @@
         "properties": {
           "pageSize": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "pageSizeOptions": {
             "items": {
               "format": "int32",
               "type": "integer"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -38625,6 +38900,34 @@
         },
         "type": "object"
       },
+      "PublicSharedViewResponse": {
+        "properties": {
+          "modelCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewConfig": {
+            "additionalProperties": {},
+            "description": "Stored JSON view configuration with private share metadata removed",
+            "type": "object"
+          },
+          "viewType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "Publication": {
         "properties": {
           "applicationId": {
@@ -38959,13 +39262,22 @@
       "Reason": {
         "properties": {
           "code": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "field": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "message": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -41962,39 +42274,64 @@
       "SavedViewAuditEventDTO": {
         "properties": {
           "actorName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "changedFields": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "commandCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "entityPid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "entityType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "eventType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
-          "metadata": {
-            "$ref": "#/components/schemas/JsonNode"
-          },
+          "metadata": {},
           "operationType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sequenceNo": {
             "format": "int64",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "timestamp": {
             "format": "date-time",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -42002,16 +42339,32 @@
       "SavedViewCapabilityCheckRequest": {
         "properties": {
           "modelCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pageKey": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "viewConfig": {
-            "$ref": "#/components/schemas/ViewConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "viewType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -42031,10 +42384,16 @@
             "type": "array"
           },
           "status": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "viewType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -42042,15 +42401,24 @@
       "SavedViewCreateRequest": {
         "properties": {
           "allowFullModel": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "description": {
             "maxLength": 500,
             "minLength": 0,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "isDefault": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "modelCode": {
             "minLength": 1,
@@ -42062,26 +42430,51 @@
             "type": "string"
           },
           "pageKey": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "roleId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "scope": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sortOrder": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "teamId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "viewConfig": {
-            "$ref": "#/components/schemas/ViewConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "viewType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -42099,17 +42492,26 @@
             "type": "array"
           },
           "allowFullModel": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "createdAt": {
             "format": "date-time",
             "type": "string"
           },
           "createdBy": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "description": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "dirty": {
             "type": "boolean"
@@ -42118,10 +42520,16 @@
             "type": "string"
           },
           "isDefault": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "isImplicit": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "modelCode": {
             "type": "string"
@@ -42130,50 +42538,96 @@
             "type": "string"
           },
           "ownerId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "ownerName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pageKey": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pid": {
             "type": "string"
           },
           "roleId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "roleName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "scope": {
             "type": "string"
           },
           "sortOrder": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "teamId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "teamName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "updatedAt": {
             "format": "date-time",
             "type": "string"
           },
           "updatedBy": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "viewConfig": {
-            "$ref": "#/components/schemas/ViewConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "viewType": {
             "type": "string"
           }
         },
+        "required": [
+          "actions",
+          "createdAt",
+          "dirty",
+          "effectivePermission",
+          "modelCode",
+          "name",
+          "pid",
+          "scope",
+          "updatedAt",
+          "viewType"
+        ],
         "type": "object"
       },
       "SavedViewDefinitionDTO": {
@@ -42238,42 +42692,109 @@
         },
         "type": "object"
       },
+      "SavedViewTeamMembershipDTO": {
+        "properties": {
+          "joinedAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "teamCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "teamName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "teamPid": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "SavedViewUpdateRequest": {
         "properties": {
           "allowFullModel": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "description": {
             "maxLength": 500,
             "minLength": 0,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "isDefault": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "name": {
             "maxLength": 100,
             "minLength": 0,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "roleId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "scope": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sortOrder": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "teamId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "viewConfig": {
-            "$ref": "#/components/schemas/ViewConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "viewType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -43764,14 +44285,23 @@
       "SortConfig": {
         "properties": {
           "direction": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "fieldCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "priority": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -45419,17 +45949,29 @@
       "ToolbarActionConfig": {
         "properties": {
           "code": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "order": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "pinned": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "visible": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -46895,162 +47437,299 @@
       "ViewConfig": {
         "properties": {
           "calendarColorField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "calendarDateField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "calendarDefaultView": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "calendarEndDateField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "calendarTitleField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "cardFields": {
             "items": {
               "$ref": "#/components/schemas/KanbanCardFieldConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "columns": {
             "items": {
               "$ref": "#/components/schemas/ColumnConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "conditionalFormats": {
             "items": {
               "additionalProperties": {},
               "type": "object"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "density": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "descriptionField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "draggable": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "filters": {
             "items": {
               "$ref": "#/components/schemas/FilterConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "formDescription": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "formFields": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "formSubmitLabel": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "formSuccessMessage": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "formTitle": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "galleryAspectRatio": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "galleryColumns": {
             "format": "int32",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "galleryDescriptionField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "galleryDisplayFields": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "galleryImageField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "galleryShowDescription": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "galleryShowTitle": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "galleryTitleField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "ganttDefaultView": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "ganttDependencyField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "ganttEndDateField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "ganttProgressField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "ganttStartDateField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "ganttTitleField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "groupBy": {
             "items": {
               "$ref": "#/components/schemas/GroupByConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "groupByDictCode": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "groupByField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "idField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "kanbanAggregations": {
             "items": {
               "$ref": "#/components/schemas/KanbanAggregationConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "meta": {
-            "$ref": "#/components/schemas/Meta"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Meta"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pagination": {
-            "$ref": "#/components/schemas/PaginationConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "rowHeight": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "showAggregations": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "showCount": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "showRowNumbers": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "sorts": {
             "items": {
               "$ref": "#/components/schemas/SortConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "terminalStages": {
             "additionalProperties": {
@@ -47059,49 +47738,88 @@
               },
               "type": "array"
             },
-            "type": "object"
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "timelineDefaultView": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "timelineEndField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "timelineResourceField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "timelineShowToday": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "timelineShowWeekends": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "timelineStartField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "timelineTitleField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "titleField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "toolbarActions": {
             "items": {
               "$ref": "#/components/schemas/ToolbarActionConfig"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "treeDisplayFields": {
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "treeParentField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "treeTitleField": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -47154,6 +47872,80 @@
             "type": "array"
           }
         },
+        "type": "object"
+      },
+      "ViewShareRequest": {
+        "properties": {
+          "expireHours": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ViewShareResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "passwordProtected": {
+            "type": "boolean"
+          },
+          "shareUrl": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "passwordProtected",
+          "shareUrl",
+          "token"
+        ],
+        "type": "object"
+      },
+      "ViewShareStatusResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "passwordProtected": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "shared"
+        ],
         "type": "object"
       },
       "Violation": {
@@ -101653,7 +102445,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListMapStringObject"
+                  "$ref": "#/components/schemas/ApiResponseListSavedViewTeamMembershipDTO"
                 }
               }
             },
@@ -101735,7 +102527,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                  "$ref": "#/components/schemas/ApiResponsePublicSharedViewResponse"
                 }
               }
             },
@@ -101996,10 +102788,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
+                "$ref": "#/components/schemas/DuplicateSavedViewRequest"
               }
             }
           },
@@ -102197,8 +102986,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": {},
-                "type": "object"
+                "$ref": "#/components/schemas/ViewShareRequest"
               }
             }
           }
@@ -102208,7 +102996,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                  "$ref": "#/components/schemas/ApiResponseViewShareResponse"
                 }
               }
             },
@@ -102239,7 +103027,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                  "$ref": "#/components/schemas/ApiResponseViewShareStatusResponse"
                 }
               }
             },

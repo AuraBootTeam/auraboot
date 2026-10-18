@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 154f2d26998f525f1857c251d40568ddc10a6ccd8b4ed0594379bb004ee36807
+ * Contract SHA-256: 302fb0b478f176feffe2eeb782d56292f65a06d08e20fed5caf1bd1c14b08e3a
  */
 export interface paths {
     "/api/activities": {
@@ -23046,9 +23046,9 @@ export interface components {
             };
         };
         AggregationConfig: {
-            fieldCode?: string;
-            function?: string;
-            label?: string;
+            fieldCode?: string | null;
+            function?: string | null;
+            label?: string | null;
         };
         AiFillRequest: {
             currentDate?: string;
@@ -25905,6 +25905,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseListSavedViewTeamMembershipDTO: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["SavedViewTeamMembershipDTO"][];
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseListScheduledTask: {
             code?: string;
             context?: unknown;
@@ -26972,6 +26980,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponsePublicSharedViewResponse: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PublicSharedViewResponse"];
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponsePublished: {
             code?: string;
             context?: unknown;
@@ -27644,6 +27660,22 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseViewShareResponse: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ViewShareResponse"];
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseViewShareStatusResponse: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ViewShareStatusResponse"];
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseVoid: {
             code?: string;
             context?: unknown;
@@ -28060,8 +28092,8 @@ export interface components {
         };
         AutoSaveViewRequest: {
             modelCode: string;
-            pageKey?: string;
-            viewConfig?: components["schemas"]["ViewConfig"];
+            pageKey?: string | null;
+            viewConfig?: components["schemas"]["ViewConfig"] | null;
         };
         BackendPluginInfo: {
             dependencies?: string[];
@@ -28843,9 +28875,9 @@ export interface components {
         };
         ChipPinRequest: {
             /** Format: int32 */
-            order?: number;
-            scope?: string;
-            teamId?: string;
+            order?: number | null;
+            scope?: string | null;
+            teamId?: string | null;
         };
         ClientConfig: {
             components?: components["schemas"]["ComponentConfig"][];
@@ -28879,22 +28911,22 @@ export interface components {
             serviceType: string;
         };
         CollaboratorAcl: {
-            permission?: string;
-            principalPid?: string;
-            principalType?: string;
+            permission?: string | null;
+            principalPid?: string | null;
+            principalType?: string | null;
         };
         CollectRequest: {
             events?: components["schemas"]["BehaviorEventInput"][];
         };
         ColumnConfig: {
-            fieldCode?: string;
-            frozen?: boolean;
-            frozenPosition?: string;
+            fieldCode?: string | null;
+            frozen?: boolean | null;
+            frozenPosition?: string | null;
             /** Format: int32 */
-            order?: number;
-            visible?: boolean;
+            order?: number | null;
+            visible?: boolean | null;
             /** Format: int32 */
-            width?: number;
+            width?: number | null;
         };
         CommandAuditLogDTO: {
             commandCode?: string;
@@ -29291,8 +29323,8 @@ export interface components {
             targetRoleId: number;
         };
         CopySavedViewToPersonalRequest: {
-            name?: string;
-            viewConfig?: components["schemas"]["ViewConfig"];
+            name?: string | null;
+            viewConfig?: components["schemas"]["ViewConfig"] | null;
         };
         CorrelationView: {
             adminActions?: components["schemas"]["AdminActionView"][];
@@ -30879,6 +30911,9 @@ export interface components {
             tenantId?: number;
             version?: string;
         };
+        DuplicateSavedViewRequest: {
+            name?: string;
+        };
         DynamicBatchResponse: {
             /** Format: int64 */
             duration?: number;
@@ -31990,12 +32025,12 @@ export interface components {
             value?: unknown;
         };
         FilterConfig: {
-            expression?: string;
-            fieldCode?: string;
-            group?: string;
-            isExpression?: boolean;
-            logic?: string;
-            operator?: string;
+            expression?: string | null;
+            fieldCode?: string | null;
+            group?: string | null;
+            isExpression?: boolean | null;
+            logic?: string | null;
+            operator?: string | null;
             value?: unknown;
         };
         FilterPreset: {
@@ -32222,9 +32257,9 @@ export interface components {
             total?: number;
         };
         GroupByConfig: {
-            aggregations?: components["schemas"]["AggregationConfig"][];
-            collapsed?: boolean;
-            fieldCode?: string;
+            aggregations?: components["schemas"]["AggregationConfig"][] | null;
+            collapsed?: boolean | null;
+            fieldCode?: string | null;
         };
         GroupNode: {
             type: "GroupNode";
@@ -32972,15 +33007,15 @@ export interface components {
         };
         JsonNode: unknown;
         KanbanAggregationConfig: {
-            field?: string;
-            function?: string;
+            field?: string | null;
+            function?: string | null;
             label?: unknown;
         };
         KanbanCardFieldConfig: {
-            dictCode?: string;
-            field?: string;
+            dictCode?: string | null;
+            field?: string | null;
             label?: unknown;
-            type?: string;
+            type?: string | null;
         };
         KbChunk: {
             /** Format: int32 */
@@ -33371,30 +33406,31 @@ export interface components {
             seq?: number;
         };
         Meta: {
-            allowUserCopy?: boolean;
-            allowUserOverride?: boolean;
-            baseActionCodes?: string[];
+            allowUserCopy?: boolean | null;
+            allowUserOverride?: boolean | null;
+            baseActionCodes?: string[] | null;
             /** Format: int64 */
-            baseChannelVersion?: number;
-            baseFieldCodes?: string[];
-            basePageKey?: string;
-            basePagePid?: string;
-            baseReleasePid?: string;
-            baseSnapshotChecksum?: string;
-            capabilityStatus?: string;
-            collaborators?: components["schemas"]["CollaboratorAcl"][];
-            locked?: boolean;
-            managedBy?: string;
-            originPresetKey?: string;
-            originViewPid?: string;
-            overlayReasonCodes?: string[];
-            overlayStalePaths?: string[];
-            overlayStatus?: string;
-            pinnedAsQuickFilter?: boolean;
-            quickFilterIcon?: string;
+            baseChannelVersion?: number | null;
+            baseFieldCodes?: string[] | null;
+            basePageKey?: string | null;
+            basePagePid?: string | null;
+            baseReleasePid?: string | null;
+            baseSnapshotChecksum?: string | null;
+            capabilityReasonCodes?: string[] | null;
+            capabilityStatus?: string | null;
+            collaborators?: components["schemas"]["CollaboratorAcl"][] | null;
+            locked?: boolean | null;
+            managedBy?: string | null;
+            originPresetKey?: string | null;
+            originViewPid?: string | null;
+            overlayReasonCodes?: string[] | null;
+            overlayStalePaths?: string[] | null;
+            overlayStatus?: string | null;
+            pinnedAsQuickFilter?: boolean | null;
+            quickFilterIcon?: string | null;
             /** Format: int32 */
-            quickFilterOrder?: number;
-            viewKey?: string;
+            quickFilterOrder?: number | null;
+            viewKey?: string | null;
         };
         MetaFieldCreateRequest: {
             autoPublish?: boolean;
@@ -35529,8 +35565,8 @@ export interface components {
         };
         PaginationConfig: {
             /** Format: int32 */
-            pageSize?: number;
-            pageSizeOptions?: number[];
+            pageSize?: number | null;
+            pageSizeOptions?: number[] | null;
         };
         PaginationRequest: {
             keyword?: string;
@@ -36798,6 +36834,15 @@ export interface components {
             draftRevision?: number;
             status?: string;
         };
+        PublicSharedViewResponse: {
+            modelCode?: string | null;
+            name?: string | null;
+            /** @description Stored JSON view configuration with private share metadata removed */
+            viewConfig?: {
+                [key: string]: unknown;
+            };
+            viewType?: string | null;
+        };
         PublishBody: {
             pluginCode?: string;
             yaml?: string;
@@ -36907,9 +36952,9 @@ export interface components {
             totalMembers?: number;
         };
         Reason: {
-            code?: string;
-            field?: string;
-            message?: string;
+            code?: string | null;
+            field?: string | null;
+            message?: string | null;
         };
         RebuildResult: {
             errorMessage?: string;
@@ -37963,45 +38008,45 @@ export interface components {
             key?: string;
         };
         SavedViewAuditEventDTO: {
-            actorName?: string;
-            changedFields?: string[];
-            commandCode?: string;
-            entityPid?: string;
-            entityType?: string;
-            eventType?: string;
-            metadata?: components["schemas"]["JsonNode"];
-            operationType?: string;
+            actorName?: string | null;
+            changedFields?: string[] | null;
+            commandCode?: string | null;
+            entityPid?: string | null;
+            entityType?: string | null;
+            eventType?: string | null;
+            metadata?: unknown;
+            operationType?: string | null;
             /** Format: int64 */
-            sequenceNo?: number;
+            sequenceNo?: number | null;
             /** Format: date-time */
-            timestamp?: string;
+            timestamp?: string | null;
         };
         SavedViewCapabilityCheckRequest: {
-            modelCode?: string;
-            pageKey?: string;
-            viewConfig?: components["schemas"]["ViewConfig"];
-            viewType?: string;
+            modelCode?: string | null;
+            pageKey?: string | null;
+            viewConfig?: components["schemas"]["ViewConfig"] | null;
+            viewType?: string | null;
         };
         SavedViewCapabilityCheckResponse: {
             missingFields?: string[];
             reasons?: components["schemas"]["Reason"][];
-            status?: string;
-            viewType?: string;
+            status?: string | null;
+            viewType?: string | null;
         };
         SavedViewCreateRequest: {
-            allowFullModel?: boolean;
-            description?: string;
-            isDefault?: boolean;
+            allowFullModel?: boolean | null;
+            description?: string | null;
+            isDefault?: boolean | null;
             modelCode: string;
             name: string;
-            pageKey?: string;
-            roleId?: string;
-            scope?: string;
+            pageKey?: string | null;
+            roleId?: string | null;
+            scope?: string | null;
             /** Format: int32 */
-            sortOrder?: number;
-            teamId?: string;
-            viewConfig?: components["schemas"]["ViewConfig"];
-            viewType?: string;
+            sortOrder?: number | null;
+            teamId?: string | null;
+            viewConfig?: components["schemas"]["ViewConfig"] | null;
+            viewType?: string | null;
         };
         SavedViewDefinitionDTO: {
             allowUserCopy?: boolean;
@@ -38028,47 +38073,55 @@ export interface components {
             viewType?: string;
         };
         SavedViewDTO: {
-            actions?: string[];
-            allowFullModel?: boolean;
+            actions: string[];
+            allowFullModel?: boolean | null;
             /** Format: date-time */
-            createdAt?: string;
-            createdBy?: string;
-            description?: string;
-            dirty?: boolean;
-            effectivePermission?: string;
-            isDefault?: boolean;
-            isImplicit?: boolean;
-            modelCode?: string;
-            name?: string;
-            ownerId?: string;
-            ownerName?: string;
-            pageKey?: string;
-            pid?: string;
-            roleId?: string;
-            roleName?: string;
-            scope?: string;
+            createdAt: string;
+            createdBy?: string | null;
+            description?: string | null;
+            dirty: boolean;
+            effectivePermission: string;
+            isDefault?: boolean | null;
+            isImplicit?: boolean | null;
+            modelCode: string;
+            name: string;
+            ownerId?: string | null;
+            ownerName?: string | null;
+            pageKey?: string | null;
+            pid: string;
+            roleId?: string | null;
+            roleName?: string | null;
+            scope: string;
             /** Format: int32 */
-            sortOrder?: number;
-            teamId?: string;
-            teamName?: string;
+            sortOrder?: number | null;
+            teamId?: string | null;
+            teamName?: string | null;
             /** Format: date-time */
-            updatedAt?: string;
-            updatedBy?: string;
-            viewConfig?: components["schemas"]["ViewConfig"];
-            viewType?: string;
+            updatedAt: string;
+            updatedBy?: string | null;
+            viewConfig?: components["schemas"]["ViewConfig"] | null;
+            viewType: string;
+        };
+        SavedViewTeamMembershipDTO: {
+            /** Format: date-time */
+            joinedAt?: string | null;
+            role?: string | null;
+            teamCode?: string | null;
+            teamName?: string | null;
+            teamPid?: string;
         };
         SavedViewUpdateRequest: {
-            allowFullModel?: boolean;
-            description?: string;
-            isDefault?: boolean;
-            name?: string;
-            roleId?: string;
-            scope?: string;
+            allowFullModel?: boolean | null;
+            description?: string | null;
+            isDefault?: boolean | null;
+            name?: string | null;
+            roleId?: string | null;
+            scope?: string | null;
             /** Format: int32 */
-            sortOrder?: number;
-            teamId?: string;
-            viewConfig?: components["schemas"]["ViewConfig"];
-            viewType?: string;
+            sortOrder?: number | null;
+            teamId?: string | null;
+            viewConfig?: components["schemas"]["ViewConfig"] | null;
+            viewType?: string | null;
         };
         SaveRequest: {
             appearance: components["schemas"]["JsonNode"];
@@ -38610,10 +38663,10 @@ export interface components {
             summary?: string;
         };
         SortConfig: {
-            direction?: string;
-            fieldCode?: string;
+            direction?: string | null;
+            fieldCode?: string | null;
             /** Format: int32 */
-            priority?: number;
+            priority?: number | null;
         };
         SortItem: {
             /** Format: int32 */
@@ -39164,11 +39217,11 @@ export interface components {
             outputTokens?: number;
         };
         ToolbarActionConfig: {
-            code?: string;
+            code?: string | null;
             /** Format: int32 */
-            order?: number;
-            pinned?: boolean;
-            visible?: boolean;
+            order?: number | null;
+            pinned?: boolean | null;
+            visible?: boolean | null;
         };
         TraceDetailResponse: {
             spans?: components["schemas"]["AiTraceSpan"][];
@@ -39681,67 +39734,67 @@ export interface components {
             status?: string;
         };
         ViewConfig: {
-            calendarColorField?: string;
-            calendarDateField?: string;
-            calendarDefaultView?: string;
-            calendarEndDateField?: string;
-            calendarTitleField?: string;
-            cardFields?: components["schemas"]["KanbanCardFieldConfig"][];
-            columns?: components["schemas"]["ColumnConfig"][];
+            calendarColorField?: string | null;
+            calendarDateField?: string | null;
+            calendarDefaultView?: string | null;
+            calendarEndDateField?: string | null;
+            calendarTitleField?: string | null;
+            cardFields?: components["schemas"]["KanbanCardFieldConfig"][] | null;
+            columns?: components["schemas"]["ColumnConfig"][] | null;
             conditionalFormats?: {
                 [key: string]: unknown;
-            }[];
-            density?: string;
-            descriptionField?: string;
-            draggable?: boolean;
-            filters?: components["schemas"]["FilterConfig"][];
-            formDescription?: string;
-            formFields?: string[];
-            formSubmitLabel?: string;
-            formSuccessMessage?: string;
-            formTitle?: string;
-            galleryAspectRatio?: string;
+            }[] | null;
+            density?: string | null;
+            descriptionField?: string | null;
+            draggable?: boolean | null;
+            filters?: components["schemas"]["FilterConfig"][] | null;
+            formDescription?: string | null;
+            formFields?: string[] | null;
+            formSubmitLabel?: string | null;
+            formSuccessMessage?: string | null;
+            formTitle?: string | null;
+            galleryAspectRatio?: string | null;
             /** Format: int32 */
-            galleryColumns?: number;
-            galleryDescriptionField?: string;
-            galleryDisplayFields?: string[];
-            galleryImageField?: string;
-            galleryShowDescription?: boolean;
-            galleryShowTitle?: boolean;
-            galleryTitleField?: string;
-            ganttDefaultView?: string;
-            ganttDependencyField?: string;
-            ganttEndDateField?: string;
-            ganttProgressField?: string;
-            ganttStartDateField?: string;
-            ganttTitleField?: string;
-            groupBy?: components["schemas"]["GroupByConfig"][];
-            groupByDictCode?: string;
-            groupByField?: string;
-            idField?: string;
-            kanbanAggregations?: components["schemas"]["KanbanAggregationConfig"][];
-            meta?: components["schemas"]["Meta"];
-            pagination?: components["schemas"]["PaginationConfig"];
-            rowHeight?: string;
-            showAggregations?: boolean;
-            showCount?: boolean;
-            showRowNumbers?: boolean;
-            sorts?: components["schemas"]["SortConfig"][];
+            galleryColumns?: number | null;
+            galleryDescriptionField?: string | null;
+            galleryDisplayFields?: string[] | null;
+            galleryImageField?: string | null;
+            galleryShowDescription?: boolean | null;
+            galleryShowTitle?: boolean | null;
+            galleryTitleField?: string | null;
+            ganttDefaultView?: string | null;
+            ganttDependencyField?: string | null;
+            ganttEndDateField?: string | null;
+            ganttProgressField?: string | null;
+            ganttStartDateField?: string | null;
+            ganttTitleField?: string | null;
+            groupBy?: components["schemas"]["GroupByConfig"][] | null;
+            groupByDictCode?: string | null;
+            groupByField?: string | null;
+            idField?: string | null;
+            kanbanAggregations?: components["schemas"]["KanbanAggregationConfig"][] | null;
+            meta?: components["schemas"]["Meta"] | null;
+            pagination?: components["schemas"]["PaginationConfig"] | null;
+            rowHeight?: string | null;
+            showAggregations?: boolean | null;
+            showCount?: boolean | null;
+            showRowNumbers?: boolean | null;
+            sorts?: components["schemas"]["SortConfig"][] | null;
             terminalStages?: {
                 [key: string]: string[];
-            };
-            timelineDefaultView?: string;
-            timelineEndField?: string;
-            timelineResourceField?: string;
-            timelineShowToday?: boolean;
-            timelineShowWeekends?: boolean;
-            timelineStartField?: string;
-            timelineTitleField?: string;
-            titleField?: string;
-            toolbarActions?: components["schemas"]["ToolbarActionConfig"][];
-            treeDisplayFields?: string[];
-            treeParentField?: string;
-            treeTitleField?: string;
+            } | null;
+            timelineDefaultView?: string | null;
+            timelineEndField?: string | null;
+            timelineResourceField?: string | null;
+            timelineShowToday?: boolean | null;
+            timelineShowWeekends?: boolean | null;
+            timelineStartField?: string | null;
+            timelineTitleField?: string | null;
+            titleField?: string | null;
+            toolbarActions?: components["schemas"]["ToolbarActionConfig"][] | null;
+            treeDisplayFields?: string[] | null;
+            treeParentField?: string | null;
+            treeTitleField?: string | null;
         };
         ViewModelSummaryDTO: {
             baseEntityCode?: string;
@@ -39758,6 +39811,25 @@ export interface components {
             errors?: string[];
             valid?: boolean;
             warnings?: string[];
+        };
+        ViewShareRequest: {
+            /** Format: int32 */
+            expireHours?: number | null;
+            password?: string | null;
+        };
+        ViewShareResponse: {
+            /** Format: date-time */
+            expiresAt?: string | null;
+            passwordProtected: boolean;
+            shareUrl: string;
+            token: string;
+        };
+        ViewShareStatusResponse: {
+            /** Format: date-time */
+            expiresAt?: string | null;
+            passwordProtected?: boolean | null;
+            shared: boolean;
+            token?: string | null;
         };
         Violation: {
             code?: string;
@@ -77186,9 +77258,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: string;
-                };
+                "application/json": components["schemas"]["DuplicateSavedViewRequest"];
             };
         };
         responses: {
@@ -77292,9 +77362,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["ViewShareRequest"];
             };
         };
         responses: {
@@ -77304,7 +77372,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                    "*/*": components["schemas"]["ApiResponseViewShareResponse"];
                 };
             };
         };
@@ -77348,7 +77416,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                    "*/*": components["schemas"]["ApiResponseViewShareStatusResponse"];
                 };
             };
         };
@@ -77545,7 +77613,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseListMapStringObject"];
+                    "*/*": components["schemas"]["ApiResponseListSavedViewTeamMembershipDTO"];
                 };
             };
         };
@@ -77594,7 +77662,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                    "*/*": components["schemas"]["ApiResponsePublicSharedViewResponse"];
                 };
             };
         };
