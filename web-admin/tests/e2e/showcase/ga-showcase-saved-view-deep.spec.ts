@@ -247,7 +247,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
   test('Kanban config persists through SavedView API and reload renderer', async ({
     page,
     request,
-  }) => {
+  }, info) => {
     test.setTimeout(90_000);
 
     await createDefaultTableView(request, 'Kanban Base');
@@ -274,12 +274,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
         { timeout: 10_000 },
       )
       .toBe('rendered');
+    await page.screenshot({ path: info.outputPath('saved-view-kanban-restored.png') });
   });
 
   test('Calendar config persists through SavedView API and reload renderer', async ({
     page,
     request,
-  }) => {
+  }, info) => {
     test.setTimeout(90_000);
 
     await createDefaultTableView(request, 'Calendar Base');
@@ -305,12 +306,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
         { timeout: 10_000 },
       )
       .toBe('rendered');
+    await page.screenshot({ path: info.outputPath('saved-view-calendar-restored.png') });
   });
 
   test('Gallery config persists through SavedView API and reload renderer', async ({
     page,
     request,
-  }) => {
+  }, info) => {
     test.setTimeout(90_000);
 
     await createDefaultTableView(request, 'Gallery Base');
@@ -337,12 +339,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
         { timeout: 10_000 },
       )
       .toBe('rendered');
+    await page.screenshot({ path: info.outputPath('saved-view-gallery-restored.png') });
   });
 
   test('Table sort config persists through SavedView API and reload renderer', async ({
     page,
     request,
-  }) => {
+  }, info) => {
     test.setTimeout(90_000);
 
     const { pid, name } = await createDefaultTableView(request, 'Sort');
@@ -392,12 +395,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(
       page.getByTestId('table-header-sc_code').locator('svg path[fill="var(--color-accent)"]').first(),
     ).toBeVisible({ timeout: 5_000 });
+    await page.screenshot({ path: info.outputPath('saved-view-sorts-restored.png') });
   });
 
   test('Table column config persists through SavedView API and reload renderer', async ({
     page,
     request,
-  }) => {
+  }, info) => {
     test.setTimeout(90_000);
 
     const { pid, name } = await createDefaultTableView(request, 'Columns');
@@ -463,12 +467,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
     });
     await expect(seededRow(page).locator('td[data-testid$="-sc_name"]')).toBeVisible({ timeout: 5_000 });
     await expect(seededRow(page).locator('td[data-testid$="-sc_price"]')).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath('saved-view-columns-restored.png') });
   });
 
   test('Table toolbar action config persists through SavedView API and reload renderer', async ({
     page,
     request,
-  }) => {
+  }, info) => {
     test.setTimeout(90_000);
 
     const { pid, name } = await createDefaultTableView(request, 'Toolbar');
@@ -566,12 +571,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await page.getByTestId('toolbar-more-menu').click();
     await expect(page.getByTestId('more-menu-action-create')).toBeVisible({ timeout: 5_000 });
     await expect(page.getByTestId('more-menu-export-csv')).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath('saved-view-toolbar-restored.png') });
   });
 
   test('Table filter config persists through SavedView API and reload renderer', async ({
     page,
     request,
-  }) => {
+  }, info) => {
     test.setTimeout(90_000);
 
     const { pid, name } = await createDefaultTableView(request, 'Filters');
@@ -662,9 +668,11 @@ test.describe('GA showcase SavedView deep persistence', () => {
     );
 
     await page.getByTestId('filters-toggle').click();
+    await expect(page.getByTestId('filter-chip-bar')).toContainText(seed.scName);
     await expect(page.getByTestId('field-sc_name').locator('input, textarea').first()).toHaveValue(
-      seed.scName,
+      '',
       { timeout: 5_000 },
     );
+    await page.screenshot({ path: info.outputPath('saved-view-filters-restored.png') });
   });
 });

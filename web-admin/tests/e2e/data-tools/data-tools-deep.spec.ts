@@ -331,12 +331,15 @@ test.describe('Data Tools Deep — Template Download', () => {
   /**
    * DT-010: Excel template download API for e2et_order
    */
-  test('DT-010: Excel template download API', async ({ page }) => {
+  test('DT-010: Excel template download API', async ({ page }, info) => {
     const resp = await page.request.get('/api/meta/excel/document-template/e2et_order');
     expect(resp.status()).toBe(200);
     expect(resp.headers()['content-type']).toContain('spreadsheetml.sheet');
     expect(resp.headers()['content-disposition']).toContain('e2et_order-document-import-template.xlsx');
     const buffer = await resp.body();
+    await info.attach('e2et_order-document-import-template.xlsx', {
+      body: buffer, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
     expect(buffer.length).toBeGreaterThan(0);
     expect(Array.from(buffer.subarray(0, 2))).toEqual([0x50, 0x4b]);
     const entries = new Set(new AdmZip(buffer).getEntries().map((entry) => entry.entryName));
