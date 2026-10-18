@@ -68,6 +68,47 @@ class LlmProviderFactoryTest {
     }
 
     @Test
+    @DisplayName("explicit stub mode is discoverable and agrees with the effective execution provider")
+    void explicitStubModeIsDiscoverable() {
+        CloudConfigService configs = mock(CloudConfigService.class);
+        LlmProvider stub = mock(LlmProvider.class);
+        when(stub.getProviderCode()).thenReturn(StubLlmProvider.PROVIDER_CODE);
+        LlmProviderFactory factory = factoryWithConfigs(configs, stub);
+        ReflectionTestUtils.setField(factory, "stubMode", true);
+
+        assertThat(factory.listConfiguredProviders(7L)).singleElement().satisfies(info -> {
+            assertThat(info.getProviderCode()).isEqualTo("stub");
+            assertThat(info.getDisplayName()).contains("Stub");
+            assertThat(info.getSource()).isEqualTo("stub_mode");
+            assertThat(info.isConfigured()).isTrue();
+        });
+        assertThat(factory.listAllProviders()).singleElement()
+                .extracting(LlmProviderFactory.ProviderInfo::getProviderCode).isEqualTo("stub");
+        assertThat(factory.resolveDefaultProviderCode(7L)).isEqualTo("stub");
+        assertThat(factory.resolveProvider(7L, "stub").getProvider()).isSameAs(stub);
+        org.mockito.Mockito.verifyNoInteractions(configs);
+    }
+
+    @Test
+    @DisplayName("the registered stub bean is not offered without explicit stub mode")
+    void stubBeanAloneDoesNotConfigureAProvider() {
+        CloudConfigService configs = mock(CloudConfigService.class);
+        LlmProvider stub = mock(LlmProvider.class);
+        when(stub.getProviderCode()).thenReturn(StubLlmProvider.PROVIDER_CODE);
+        LlmProviderFactory factory = factoryWithConfigs(configs, stub);
+
+        assertThat(factory.listConfiguredProviders(7L)).isEmpty();
+        assertThat(factory.listAllProviders()).isEmpty();
+        assertThat(factory.resolveDefaultProviderCode(7L)).isNull();
+    }
+
+    private LlmProviderFactory factoryWithConfigs(CloudConfigService configs, LlmProvider provider) {
+        return new LlmProviderFactory(List.of(provider), configs, new AgentProperties(),
+                new ObjectMapper(), mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
+    }
+
+    @Test
     @DisplayName("getProvider returns null instead of anthropic fallback when chat-completions adapter is missing")
     void getProviderReturnsNullWhenOpenAiCompatibleAdapterIsMissing() {
         LlmProvider anthropicProvider = mock(LlmProvider.class);

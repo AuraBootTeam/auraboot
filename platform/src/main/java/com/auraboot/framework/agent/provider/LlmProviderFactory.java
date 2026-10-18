@@ -451,6 +451,14 @@ public class LlmProviderFactory {
      */
     @SuppressWarnings("unchecked")
     public List<ProviderInfo> listAllProviders() {
+        // Discovery must report the same explicit operator mode used by execution.
+        if (stubMode) {
+            return List.of(ProviderInfo.builder()
+                    .providerCode(StubLlmProvider.PROVIDER_CODE).displayName("Stub (explicit test mode)")
+                    .apiFormat("stub").source("stub_mode").configured(true)
+                    .build());
+        }
+
         List<ProviderInfo> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
@@ -502,6 +510,14 @@ public class LlmProviderFactory {
      */
     @SuppressWarnings("unchecked")
     public List<ProviderInfo> listConfiguredProviders(Long tenantId) {
+        // Discovery must report the same explicit operator mode used by execution.
+        if (stubMode) {
+            return List.of(ProviderInfo.builder()
+                    .providerCode(StubLlmProvider.PROVIDER_CODE).displayName("Stub (explicit test mode)")
+                    .apiFormat("stub").source("stub_mode").configured(true)
+                    .build());
+        }
+
         List<ProviderInfo> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 

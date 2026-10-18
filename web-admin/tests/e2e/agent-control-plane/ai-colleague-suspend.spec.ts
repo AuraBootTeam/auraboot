@@ -14,10 +14,13 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 
 const UNIQUE = `susp${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Suspendable ${UNIQUE}`;
-const SHOTS = 'test-results/digital-employee';
+const SHOTS = path.join(process.env.AURA_EVIDENCE_ROOT ?? 'test-results', 'digital-employee');
+test.beforeEach(async () => { await mkdir(SHOTS, { recursive: true }); });
 const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 async function createColleague(page: Page): Promise<void> {
@@ -111,10 +114,12 @@ test.describe('Digital employee — suspend and resume', () => {
     // --- and now it must not answer ---------------------------------------
     chat = await openChat(page);
     await chat.locator('[data-testid="aurabot-input"]').fill('还在吗?');
+    const rejectedTurn = page.waitForResponse((r) =>
+      r.url().endsWith('/api/ai/aurabot/chat/stream') && r.request().method() === 'POST');
     await chat.locator('[data-testid="aurabot-send"]').click();
-    // Give it as long as a real answer took above. Asserting "not visible"
-    // immediately would pass simply because nothing had arrived yet.
-    await page.waitForTimeout(20_000);
+    const rejected = await rejectedTurn;
+    await rejected.finished();
+    expect(await rejected.text()).toContain('suspended');
     await expect(
       chat.locator('[data-testid="chat-msg-agent"]'),
       'a suspended colleague must not keep taking work',
