@@ -582,7 +582,7 @@ export default function DictDetailPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500">
-                  支持新增、删除、改父级与同级排序；TREE 字典可新增子节点。
+                  支持新增、删除、改父级与同级排序；树形字典可新增子节点。
                 </p>
                 <div className="flex gap-2">
                   <button
