@@ -39,7 +39,11 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(classes=TestApplication.class,properties={
         "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
         "security.field-encryption.key=${PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY}",
-        "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}"})
+        "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
+        "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.slf4j.Slf4jImpl",
+        "logging.level.com.auraboot.framework=INFO","logging.level.org.mybatis=INFO",
+        "logging.level.org.springframework.security=WARN","logging.level.org.springframework.cache=WARN",
+        "spring.jpa.show-sql=false"})
 @ActiveProfiles("integration-test")
 @org.springframework.context.annotation.Import(ProcurementPluginHostRealDbIT.PollerIsolation.class)
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_PLUGIN_JAR",matches=".+")

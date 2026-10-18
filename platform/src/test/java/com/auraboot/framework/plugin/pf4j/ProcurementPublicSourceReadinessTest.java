@@ -45,6 +45,20 @@ class ProcurementPublicSourceReadinessTest {
         assertEquals(List.of("evidence","encryption"),events);
         assertNull(fixture.tenant);assertNull(fixture.userId);assertNull(fixture.server);
     }
+    @Test void currentNativeFixturesUseBoundedSlf4jLoggingInsteadOfDirectSqlStdout() {
+        var required=Map.of("mybatis-plus.configuration.log-impl","org.apache.ibatis.logging.slf4j.Slf4jImpl",
+            "logging.level.com.auraboot.framework","INFO","logging.level.org.mybatis","INFO",
+            "logging.level.org.springframework.security","WARN","logging.level.org.springframework.cache","WARN",
+            "spring.jpa.show-sql","false");
+        for(Class<?> type:List.of(ProcurementPublicSourceCommandRealDbIT.class,ProcurementPluginHostRealDbIT.class,ProcurementQuoteLifecycleNativeIT.class)) {
+            var properties=new LinkedHashMap<String,String>();
+            for(String property:type.getAnnotation(org.springframework.boot.test.context.SpringBootTest.class).properties()) {
+                var pair=property.split("=",2);assertNull(properties.put(pair[0],pair[1]),"Duplicate fixture property");
+                assertFalse(property.contains("StdOutImpl"),"Direct SQL stdout must not bypass logger levels");
+            }
+            required.forEach((key,value)->assertEquals(value,properties.get(key),type.getSimpleName()+":"+key));
+        }
+    }
     private static final ObjectMapper JSON=new ObjectMapper();
     private static final List<String> SOURCES=List.of("oss","quote","enterprise","crm","plugins");
     private ObjectNode fixture() throws Exception {

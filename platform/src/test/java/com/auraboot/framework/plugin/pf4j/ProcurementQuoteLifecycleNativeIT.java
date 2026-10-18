@@ -36,7 +36,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'",
         "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
         "logging.level.com.auraboot.framework=INFO","logging.level.org.mybatis=INFO",
-        "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.slf4j.Slf4jImpl"})
+        "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.slf4j.Slf4jImpl",
+        "logging.level.org.springframework.security=WARN","logging.level.org.springframework.cache=WARN",
+        "spring.jpa.show-sql=false"})
 @ActiveProfiles("integration-test")
 @Import(ProcurementPublicSourceNativeFixture.IsolatedScheduling.class)
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_QUOTE_LIFECYCLE_IT",matches="true")

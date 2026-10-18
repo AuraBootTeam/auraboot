@@ -61,7 +61,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  */
 @SpringBootTest(classes=TestApplication.class,properties={
     "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
-    "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}"})
+    "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
+        "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.slf4j.Slf4jImpl",
+        "logging.level.com.auraboot.framework=INFO","logging.level.org.mybatis=INFO",
+        "logging.level.org.springframework.security=WARN","logging.level.org.springframework.cache=WARN",
+        "spring.jpa.show-sql=false"})
 @ActiveProfiles("integration-test")
 @Import(ProcurementPublicSourceCommandRealDbIT.IsolatedScheduling.class)
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_PUBLIC_SOURCE_IT",matches="true")
