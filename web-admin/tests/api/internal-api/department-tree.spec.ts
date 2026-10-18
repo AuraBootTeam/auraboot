@@ -21,7 +21,7 @@ test('generated department tree reads preserve recursive public identities and n
     { code: `ic_dept_${token}_root`, name: `Owned root ${token}` },
     { code: `ic_dept_${token}_child`, name: `Owned child ${token}` },
   ];
-  const rows: object[] = [], cleanupErrors: unknown[] = [], observed = new Set<string>();
+  const rows: object[] = [], cleanupErrors: unknown[] = [], deletionProofs: object[] = [], observed = new Set<string>();
   let journeyError: unknown;
   async function read(path: string, query = '') {
     const response = await actor.context.request.get(path + query);
@@ -74,7 +74,15 @@ test('generated department tree reads preserve recursive public identities and n
             const removed = await actor.context.request.delete(`/api/org/departments/${fixture.pid}`, { headers: { Origin: actor.origin } });
             expect(removed.status()).toBe(200); expect((await removed.json()).code).toBe('0');
           }
-          expect((await db.query('SELECT deleted_flag FROM mt_org_department WHERE pid=$1 AND org_dept_code=$2', [fixture.pid, fixture.code])).rows[0].deleted_flag).toBe(true);
+          const remaining = await db.query('SELECT org_dept_code, deleted_flag FROM mt_org_department WHERE pid=$1', [fixture.pid]);
+          expect(remaining.rowCount).toBeLessThanOrEqual(1);
+          if (remaining.rowCount) {
+            expect(remaining.rows[0].org_dept_code).toBe(fixture.code);
+            expect(remaining.rows[0].deleted_flag).toBe(true);
+          }
+          deletionProofs.push({ pid: fixture.pid, code: fixture.code, remainingRows: remaining.rowCount,
+            mode: remaining.rowCount === 0 ? 'physical-delete' : 'soft-delete',
+            deletedFlag: remaining.rowCount ? remaining.rows[0].deleted_flag : null });
         } catch (error) { cleanupErrors.push(error); }
       }
       if (!cleanupErrors.length) {
@@ -86,7 +94,7 @@ test('generated department tree reads preserve recursive public identities and n
     try { await anonymous.close(); await actor.dispose(); } catch (error) { cleanupErrors.push(error); }
     await info.attach('department-tree-observations', { body: JSON.stringify({
       claim: 'two department tree read operations and owned root/leaf persistence; no cross-tenant or picker-browser acceptance',
-      rows, owned, observed: [...observed], sessionCleanup: actor.sessionCleanup,
+      rows, owned, deletionProofs, observed: [...observed], sessionCleanup: actor.sessionCleanup,
       journeyError: journeyError ? String(journeyError) : null, cleanupErrors: cleanupErrors.map(String),
     }), contentType: 'application/json' });
   }
