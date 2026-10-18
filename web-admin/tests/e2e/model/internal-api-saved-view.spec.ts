@@ -126,6 +126,8 @@ test('generated SavedView sharing preserves the owner and anonymous browser jour
     await expect(page.getByTestId(`saved-view-share-state-${pid}`)).toContainText(
       'including saved filters',
     );
+    await expect(page.getByTestId('saved-view-manage-panel')).not.toContainText(/[\u3400-\u9fff]/);
+    await expect(page.getByRole('heading', { name: 'Manage views', exact: true })).toBeVisible();
     await capture('SHARE-01', page, info);
     const generatedResponse = page.waitForResponse(
       (r) =>

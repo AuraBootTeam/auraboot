@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
@@ -19,6 +20,7 @@ public class PaginationResult<T> {
      * Pass this value as the "cursor" parameter to fetch the next page.
      * Null when using traditional offset pagination or when there are no more results.
      */
+    @Schema(nullable = true)
     private String nextCursor;
 
     public PaginationResult() {}

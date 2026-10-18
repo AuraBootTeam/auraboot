@@ -106,6 +106,13 @@ common:
   saved_view_scope_personal: 我的
   saved_view_scope_team: 团队
   saved_view_scope_global: 全员
+  saved_view_action_pin_chip: "钉为快捷筛选"
+  saved_view_action_unpin_chip: "取消快捷筛选"
+  saved_view_action_pin_team_chip: "为团队钉为快捷筛选"
+  saved_view_action_unpin_team_chip: "取消团队快捷筛选"
+  saved_view_action_share: "生成分享链接"
+  saved_view_public_share_group: "公开分享链接"
+  saved_view_public_share_subtitle: "管理个人视图与获授权的公开链接"
   saved_view_default: 默认
   saved_view_default_view: 默认视图
   saved_view_new: 新建视图

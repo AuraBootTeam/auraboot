@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.config;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.meta.dto.PaginationResult;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Components;
@@ -67,6 +68,15 @@ class SavedViewOpenApiContractTest {
         assertThat(metadata.isObject()).isTrue();
         assertThat(metadata.path("$ref").isMissingNode()).isTrue();
         assertThat(metadata.path("properties").isMissingNode()).isTrue();
+    }
+
+    @Test
+    void offsetPaginationDeclaresAnAbsentCursorRatherThanAnInventedEmptyString() {
+        var cursor = schema(PaginationResult.class).at("/properties/nextCursor");
+        assertThat(cursor.path("type").toString()).contains("string", "null");
+        assertThat(PaginationResult.empty(1, 10).getNextCursor()).isNull();
+        assertThat(PaginationResult.ofCursor(java.util.List.of("owned"), 1L, 10, "owned-pid")
+                .getNextCursor()).isEqualTo("owned-pid");
     }
 
     @Test
