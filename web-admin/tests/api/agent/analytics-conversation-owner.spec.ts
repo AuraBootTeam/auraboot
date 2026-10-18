@@ -2,7 +2,7 @@
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { PG_CONN } from '../../helpers/environments';
+import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 for (const scope of ['same-tenant', 'cross-tenant']) {
@@ -82,7 +82,7 @@ for (const scope of ['same-tenant', 'cross-tenant']) {
       if (scope === 'cross-tenant') expect(tokenTenant).not.toBe(String(owner.tenant_id));
       else expect(tokenTenant).toBe(String(owner.tenant_id));
       other = await requestFactory.newContext({
-        baseURL: process.env.BACKEND_URL,
+        baseURL: BACKEND_URL,
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       const foreignConversation = await create(other);

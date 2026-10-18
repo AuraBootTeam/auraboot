@@ -109,6 +109,9 @@ Multi-channel notifications (email, in-app, webhook), event bus for cross-module
 ```bash
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
+cp .env.example .env
+# Generate once; keep this installation key in .env across restarts.
+printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose --profile full up --build -d   # 2–4 min cold start
 ./scripts/quickstart.sh                       # creates the admin, imports the plugins
 ```

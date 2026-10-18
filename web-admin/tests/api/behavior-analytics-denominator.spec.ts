@@ -1,3 +1,4 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** Metric denominator semantics: identity/session counting, UTC day bucketing, fallback, and self-describing definitions. */
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -34,7 +35,7 @@ test('overview counts identities, sessions and page views with exact denominator
       expect(login.status(), await login.text()).toBe(200);
       peers.push(
         await requestFactory.newContext({
-          baseURL: process.env.BACKEND_URL,
+          baseURL: BACKEND_URL,
           extraHTTPHeaders: { Authorization: `Bearer ${(await login.json()).data.jwt}` },
         }),
       );

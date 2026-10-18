@@ -204,15 +204,6 @@ async function loginViaApi(
     return true;
   };
 
-  const extractSessionCookieFromHeaders = (setCookieHeader?: string): string | null => {
-    const match = setCookieHeader?.match(/__session=([^;]+)/);
-    return match?.[1] ?? null;
-  };
-
-  const extractSessionCookieFromContext = async (): Promise<string | null> => {
-    const cookies = await page.context().cookies();
-    return cookies.find((c) => c.name === '__session')?.value ?? null;
-  };
 
   try {
     const resp = await page.request.post(`${baseURL}/api/auth/login`, {
@@ -227,75 +218,19 @@ async function loginViaApi(
         if (user.email === DEFAULT_TEST_ACCOUNT.email) {
           const resolved = await autoSelectSpace(page, baseURL);
           if (!resolved) {
-            console.log(`   [${user.email}] Warning: admin API login auto-select failed`);
+            throw new Error('Admin business-space selection failed; refusing an unscoped storage state');
           }
         } else if (!body?.data?.tenantId) {
           const resolved = await autoSelectSpace(page, baseURL);
           if (!resolved) {
-            console.log(
-              `   [${user.email}] Warning: API login returned no tenantId and auto-select failed`,
-            );
+            throw new Error('Business-space selection failed; refusing an unscoped storage state');
           }
         }
         return true;
       }
     }
-  } catch {
-    // Fall back to the legacy form action path below.
-  }
-
-  // Retry up to 3 times with increasing delays to handle intermittent
-  // BFF cold-start issues where it returns 200 instead of 302.
-  const maxAttempts = 3;
-  const delays = [500, 1500, 0]; // delay after each failed attempt
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const resp = await page.request.post(`${baseURL}/login`, {
-        form: {
-          email: user.email,
-          password: user.password,
-          remember: 'on',
-          redirectTo: '/',
-        },
-        maxRedirects: 0,
-      });
-
-      if (resp.ok() || resp.status() === 302) {
-        const sessionCookie =
-          extractSessionCookieFromHeaders(resp.headers()['set-cookie']) ||
-          (await extractSessionCookieFromContext());
-        if (await persistSessionCookie(sessionCookie || '')) {
-          // Always pin to the canonical "AuraBoot Demo" business space.
-          // We previously only ran autoSelectSpace when the login response
-          // included a /tenant-selection redirect — but on stacks where
-          // bpm/tenant-isolation-ui (or similar) has added admin to extra
-          // p3d_isolation_ui_* tenants, login lands directly with a JWT
-          // for whichever tenant the backend picks as primary, which is
-          // non-deterministic. Calling autoSelectSpace unconditionally
-          // overrides that JWT with one explicitly bound to AuraBoot Demo.
-          // Errors are non-fatal — the original cookie remains usable as
-          // a fallback.
-          if (user.email === 'admin@auraboot.com') {
-            await autoSelectSpace(page, baseURL).catch(() => false);
-          } else {
-            const location = resp.headers()['location'] || '';
-            if (location.includes('tenant-selection')) {
-              await autoSelectSpace(page, baseURL).catch(() => false);
-            }
-          }
-
-          return true;
-        }
-      }
-    } catch {
-      // Network error — fall through to retry
-    }
-
-    // Retry after delay
-    if (attempt < maxAttempts) {
-      await new Promise((r) => setTimeout(r, delays[attempt - 1]));
-    }
+  } catch (error) {
+    throw new Error(`Auth setup failed for ${user.role}: ${error instanceof Error ? error.message : 'invalid login response'}`);
   }
   return false;
 }

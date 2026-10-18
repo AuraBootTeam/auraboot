@@ -284,6 +284,8 @@ services:
     environment:
       CI: "true"
       NODE_ENV: test
+      # Auth storage fixtures must sign cookies with the same key as the BFF.
+      SESSION_SECRET: ${SESSION_SECRET:-isolated-dev-session-secret}
       PNPM_STORE_DIR: /pnpm-store
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
       PLAYWRIGHT_BASE_URL: http://isolated-frontend:5173
