@@ -31,6 +31,8 @@ async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), {recursive:true});
   if (['d01','d02','d03','d04','d02-published','d02-compact'].includes(id)) await page.getByTestId('decisionops-console').evaluate(el=>el.scrollIntoView({block:'start'}));
   if (['d13','d13-assigned'].includes(id)) await page.getByTestId('detail-pdf-target').scrollIntoViewIfNeeded();
+  const details=page.getByRole('tab',{name:'验收详情',exact:true});
+  if(await details.isVisible() && await details.getAttribute('aria-selected')==='true') await expect(page.getByTestId('bpm-bound-form').getByTestId('dsl-form-readonly')).toBeVisible();
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
   await page.screenshot({path:join(evidence!, 'screenshots', `${id}.png`),fullPage:true});
 }
@@ -309,7 +311,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
     await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>{expect(ids.has(code),code).toBe(true);return {permissionId:ids.get(code),granted:true};})}));
     const email=`${code}@e2e.local`;
     await data(await page.request.post('/api/admin/users',{data:{email,displayName:reviewer?'验收协作成员':'交付只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
-    const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+    const context=await browser.newContext({baseURL:test.info().project.use.baseURL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
     try {
       const actor=await context.newPage();const actorUser=await login(actor,email,String(admin.tenantId));
       const identity=await data(await actor.request.get('/api/auth/me'));expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
@@ -584,7 +586,7 @@ test('SLA policies use business summaries and save fixed durations through the e
     await page.getByLabel('时长单位',{exact:true}).selectOption('minutes');await page.getByLabel('时长数值',{exact:true}).fill('15');await shot(page,'S10');
     const saved=page.waitForResponse(response=>response.url().includes('/execute/admin:update_sla_config')&&response.request().method()==='POST');
     await page.getByRole('button',{name:'保存',exact:true}).click();const response=await saved;await data(response);
-    expect(response.request().postDataJSON().payload).toMatchObject({deadline_mode:'FIXED',deadline_value:'PT900S',rule_binding:{enabled:false,decisionBinding:{enabled:false}}});
+    const payload=response.request().postDataJSON().payload;expect(payload).toMatchObject({deadline_mode:'FIXED',deadline_value:'PT900S'});const binding=typeof payload.rule_binding==='string'?JSON.parse(payload.rule_binding):payload.rule_binding;expect(binding).toMatchObject({enabled:false,decisionBinding:{enabled:false}});expect(Object.keys(binding)).not.toContain('0');
     const actual=await data(await page.request.get(`/api/bpm/sla-configs/${config.pid}`));expect(actual.deadlineMode).toBe('FIXED');expect(actual.deadlineValue).toBe('PT900S');expect(actual.ruleBinding.enabled).toBe(false);
     await menu(page,'SLA 配置');await expect(page.getByTestId('sla-policy-row').filter({hasText:config.name})).toContainText('15 分钟');await shot(page,'S11');
     await page.getByTestId('sla-policy-row').filter({hasText:config.name}).getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByLabel('时长数值',{exact:true})).toHaveValue('15');await expect(page.getByLabel('时长单位',{exact:true})).toHaveValue('minutes');
