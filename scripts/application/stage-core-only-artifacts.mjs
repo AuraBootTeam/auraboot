@@ -35,6 +35,7 @@ function parseArgs(argv) {
     if (argument === '--repo-root') options.repoRoot = resolve(argv[++index]);
     else if (argument === '--output') options.output = resolve(argv[++index]);
     else if (argument === '--skip-oci') options.skipOci = true;
+    else if (argument === '--web-only') options.webOnly = true;
     else throw new Error(`unknown argument: ${argument}`);
   }
   if (!options.output) throw new Error('--output is required');
@@ -386,6 +387,30 @@ function packSourceFacade(repoRoot, destination, directory, label) {
   }
 }
 
+/** Stage independently versioned Web packages without relabeling an existing backend. */
+function stageWebPackages({ repoRoot, output, version, repository, commit, manifest }) {
+  mkdirSync(output, { recursive: false });
+  const npmRoot = resolve(output, 'npm');
+  const inputs = [
+    { id: '@auraboot/dsl-types', version: '0.0.1', path: packCompiledPackage(repoRoot, npmRoot, 'dsl-types', 'DSL types') },
+    { id: '@auraboot/nav-model', version: '0.0.1', path: packCompiledPackage(repoRoot, npmRoot, 'nav-model', 'navigation model') },
+    { id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk, path: packPluginSdk(repoRoot, npmRoot) },
+    { id: '@auraboot/ui', version: '1.0.0', path: packUi(repoRoot, npmRoot) },
+    { id: '@auraboot/dsl-runtime', version, path: packSourceFacade(repoRoot, npmRoot, 'dsl-runtime', 'DSL runtime') },
+    { id: '@auraboot/designer-sdk', version, path: packSourceFacade(repoRoot, npmRoot, 'designer-sdk', 'designer SDK') },
+    { id: '@auraboot/web-testkit', version, path: packSourceFacade(repoRoot, npmRoot, 'web-testkit', 'Web testkit') },
+    { id: '@auraboot/web-shell', version, path: packWebShell(repoRoot, npmRoot, version) },
+  ];
+  const catalog = { schemaVersion: 1, artifacts: inputs.map(input => catalogArtifact({ ...input, type: 'npm', output, repository, commit })) };
+  writeFileSync(resolve(output, 'artifact-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
+  writeFileSync(resolve(output, 'release-receipt.json'), `${JSON.stringify({
+    schemaVersion: 1, source: sourceRecord(repository, commit), scope: 'web-packages-only',
+    artifacts: catalog.artifacts,
+    verification: { archiveChecksums: 'sha256-recorded', applicationBuild: 'not-run', backend: 'not-staged', image: 'not-staged' },
+  }, null, 2)}\n`);
+  console.log(`Staged ${inputs.length} Web package artifacts from ${commit}; no runtime, application build or image staged.`);
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const { repoRoot, output } = options;
@@ -405,6 +430,11 @@ function main() {
     webShell: manifest.platform.webShell,
   })) {
     if (actual !== version) throw new Error(`${name} version ${actual} does not match VERSION ${version}`);
+  }
+
+  if (options.webOnly) {
+    stageWebPackages({ repoRoot, output, version, repository, commit, manifest });
+    return;
   }
 
   // Never attach the current Git identity to whatever happens to be left in
