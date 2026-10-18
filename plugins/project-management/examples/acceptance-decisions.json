@@ -29,6 +29,26 @@
             "path": "data.tpm_ac_risk",
             "dataType": "enum"
           }
+        },
+        {
+          "id": "issues",
+          "label": "未解决问题数",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_open_issues",
+            "dataType": "integer"
+          }
+        },
+        {
+          "id": "materials",
+          "label": "材料内容已齐全",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_materials_complete",
+            "dataType": "boolean"
+          }
         }
       ],
       "outputs": [
@@ -53,12 +73,29 @@
           }
         },
         {
+          "ruleId": "incomplete-evidence",
+          "priority": 15,
+          "when": {
+            "materials": {
+              "operator": "EQ",
+              "value": false
+            }
+          },
+          "then": {
+            "route": "enhanced"
+          }
+        },
+        {
           "ruleId": "large-amount",
           "priority": 20,
           "when": {
             "amount": {
               "operator": "GTE",
               "value": 100000
+            },
+            "issues": {
+              "operator": "GT",
+              "value": 0
             }
           },
           "then": {

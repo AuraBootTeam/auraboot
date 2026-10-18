@@ -1,3 +1,4 @@
+import { useAuth } from '~/contexts/AuthContext';
 import './decision-workbench.css';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -66,7 +67,7 @@ const TABS: { key: ConsoleTab; label: string; description: string }[] = [
   { key: 'studio', label: '策略编排器', description: '跨模块规则复用' },
   { key: 'dashboard', label: '概览', description: '运行态总览' },
   { key: 'policies', label: '事件策略', description: '事件触发策略' },
-  { key: 'definitions', label: '决策定义', description: '版本与影响面' },
+  { key: 'definitions', label: '业务规则', description: '业务用途、判断逻辑与处理结果' },
   { key: 'designer', label: '策略设计器', description: '规则编排' },
   { key: 'tables', label: '决策表', description: 'DMN 表格' },
   { key: 'rollouts', label: '发布治理', description: '灰度与回滚' },
@@ -123,6 +124,7 @@ function asConditionFragmentList(raw: unknown): ConditionFragment[] {
 }
 
 export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
+  const { hasPermission } = useAuth();
   const {
     api,
     fields,
@@ -134,6 +136,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     initialTab = 'studio',
   } = props;
   const st = useSmartText();
+  const [selectedDecisionCode, setSelectedDecisionCode] = useState('');
   const [tab, setTab] = useState<ConsoleTab>(initialTab);
   const [selectedPolicy, setSelectedPolicy] = useState<EventPolicySummary | null>(null);
   const [tableDraft, setTableDraft] = useState<DecisionTable>(DEFAULT_TABLE);
@@ -338,7 +341,8 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
 
       <div className="decisionops-layout">
         <nav className="doc-tabs decisionops-nav" role="tablist" aria-label="Rule Center modules">
-          {TABS.map((t) => (
+          {TABS.filter((item) => ['definitions', 'policies', 'logs'].includes(item.key)
+            || item.key === tab).map((t) => (
             <a
               key={t.key}
               href={`?tab=${t.key}`}
@@ -354,6 +358,12 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
               <span className="decisionops-nav-desc">{t.description}</span>
             </a>
           ))}
+          <details className="decisionops-professional-entry">
+            <summary>{st('$i18n:decisionops.professional', '专业配置')}</summary>
+            <div>{TABS.filter(item => !['definitions', 'policies', 'logs'].includes(item.key) && item.key !== tab).map(item => (
+              <button key={item.key} type="button" data-testid={`doc-tab-${item.key}`} onClick={() => setTab(item.key)}>{item.label}</button>
+            ))}</div>
+          </details>
         </nav>
 
         <main className="decisionops-main">
@@ -368,6 +378,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
             {tab === 'studio' && (
               <StrategyStudioWorkbench
                 api={api}
+                initialDecisionCode={selectedDecisionCode}
                 fields={strategyFields}
                 decisions={strategyDecisions}
                 conditionFragments={asConditionFragmentList(conditionFragmentQuery.data)}
@@ -405,9 +416,14 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                 onOpenLogs={() => setTab('logs')}
               />
             )}
-            {tab === 'definitions' && <DecisionDefinitionListPage api={api} />}
+            {tab === 'definitions' && <DecisionDefinitionListPage api={api} onOpen={definition => {
+              setSelectedDecisionCode(definition.decisionCode); setTab('studio');
+            }} />}
             {tab === 'designer' && (
               <EventPolicyDesignerWorkflow
+                readOnly={!hasPermission('decision.policy.manage')}
+                canPublish={hasPermission('decision.policy.publish')}
+                canRun={hasPermission('decision.policy.run')}
                 api={api}
                 fields={designerFields}
                 samples={designerSamples}

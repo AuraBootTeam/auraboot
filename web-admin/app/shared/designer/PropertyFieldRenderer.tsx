@@ -6,7 +6,7 @@
  * duplication between DashboardPropertyField and Flow PropertyField.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Check } from 'lucide-react';
 import {
   BaseInput,
@@ -314,15 +314,8 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       );
 
     case 'command-select':
-      return (
-        <ResourceSelectField
-          adapter={adapter}
-          label={label}
-          placeholder={placeholder || 'Select command...'}
-          helpText={helpText}
-          fetchOptions={fetchCommandOptions}
-        />
-      );
+      return <CommandResourceField adapter={adapter} label={label}
+        placeholder={placeholder} helpText={helpText} />;
 
     case 'rule-binding':
       return (
@@ -1235,3 +1228,13 @@ function DictSelectField({
 }
 
 export default PropertyFieldRenderer;
+
+/** Model-scoped command discovery shared by schema-driven action editors. */
+function CommandResourceField({ adapter, label, placeholder, helpText }: {
+  adapter: FieldAdapter<unknown>; label: string; placeholder?: string; helpText?: string;
+}) {
+  const modelCode = typeof adapter.context?.modelCode === 'string' ? adapter.context.modelCode : undefined;
+  const fetchOptions = useCallback(() => fetchCommandOptions(modelCode), [modelCode]);
+  return <ResourceSelectField key={modelCode ?? 'all'} adapter={adapter} label={label}
+    placeholder={placeholder ?? ''} helpText={helpText} fetchOptions={fetchOptions} />;
+}

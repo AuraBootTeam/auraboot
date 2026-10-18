@@ -112,6 +112,7 @@ const LEAVE_APPLICANT_REFERENCE_FIELD: FieldOption = {
 };
 
 export interface StrategyStudioWorkbenchProps {
+  initialDecisionCode?: string
   fields: FieldOption[]
   decisions?: DecisionOption[]
   api: DecisionApi
@@ -1002,6 +1003,7 @@ function sampleContext() {
 }
 
 export function StrategyStudioWorkbench({
+  initialDecisionCode = '',
   fields,
   decisions = [],
   api,
@@ -1012,7 +1014,7 @@ export function StrategyStudioWorkbench({
   const st = useSmartText()
   const { text } = useStrategyStudioText()
   const [scenarioKey, setScenarioKey] = useState<StrategyScenarioKey>('SLA')
-  const [selectedDecisionCode, setSelectedDecisionCode] = useState<string>('')
+  const [selectedDecisionCode, setSelectedDecisionCode] = useState<string>(initialDecisionCode)
   const [businessTestValues, setBusinessTestValues] = useState<Record<string, string>>({})
   const [testTrace, setTestTrace] = useState<string | null>(null)
   const [testOutputs, setTestOutputs] = useState<Record<string, unknown> | null>(null)

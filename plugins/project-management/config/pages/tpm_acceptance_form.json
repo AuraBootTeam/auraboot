@@ -86,8 +86,8 @@
               "en": "e.g. 68000"
             },
             "helpText": {
-              "zh-CN": "单位为人民币元；达到10万元进入加强审批。",
-              "en": "Amount in CNY; at least 100,000 requires enhanced review."
+              "zh-CN": "人民币元；金额与问题数共同决定审核路径。",
+              "en": "CNY; amount and unresolved issues jointly determine the review path."
             }
           }
         },
@@ -97,8 +97,8 @@
           "required": true,
           "props": {
             "helpText": {
-              "zh-CN": "高风险或金额达到10万元进入加强审批；普通8小时，加强2小时。",
-              "en": "High risk or at least CNY 100,000 requires enhanced review: 2 hours; standard review: 8 hours."
+              "zh-CN": "高风险直接加强审核；材料不齐全或大额且有未解决问题也加强审核。",
+              "en": "High risk, incomplete evidence, or large amounts with unresolved issues require enhanced review."
             }
           }
         },
@@ -114,6 +114,30 @@
             "helpText": {
               "zh-CN": "审批任务仅分配给所选成员；提交人不能代替他人审批。",
               "en": "Only the selected member receives this review task."
+            }
+          }
+        },
+        {
+          "field": "tpm_ac_open_issues",
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：2",
+              "en": "e.g. 2"
+            },
+            "helpText": {
+              "zh-CN": "金额达到10万元且存在未解决问题时进入加强审核。",
+              "en": "Amounts of at least CNY 100,000 with unresolved issues require enhanced review."
+            }
+          }
+        },
+        {
+          "field": "tpm_ac_materials_complete",
+          "colSpan": 6,
+          "props": {
+            "helpText": {
+              "zh-CN": "已上传材料但内容尚未齐全时，也进入加强审核。",
+              "en": "Incomplete uploaded evidence also requires enhanced review."
             }
           }
         }

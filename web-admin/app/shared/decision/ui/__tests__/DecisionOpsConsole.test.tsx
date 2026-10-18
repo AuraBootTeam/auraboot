@@ -17,6 +17,8 @@ vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => traceHttp,
 }));
 
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }), usePermissions: () => ({ hasPermission: () => true }) }));
+
 const FIELDS: FieldOption[] = [
   {
     scope: 'record',

@@ -98,6 +98,7 @@ export function createEventPolicyPresentation(locale: string) {
   };
 
   const ACTION_LABELS: Record<string, string> = {
+    EXECUTE_COMMAND: copy('execute_business_operation'),
     NOTIFY: copy('send_in_app_notification'),
     SEND_SMS: copy('send_sms'),
     SEND_IM: copy('send_im_message'),
@@ -262,6 +263,7 @@ export function createEventPolicyPresentation(locale: string) {
     'payload.processDefinitionId': copy('process_definition'),
     'payload.fields': copy('updated_fields'),
     'payload.content': copy('comment_content'),
+    EXECUTE_COMMAND: copy('execute_business_operation'),
     NOTIFY: copy('send_in_app_notification'),
     SEND_SMS: copy('send_sms'),
     SEND_IM: copy('send_im_message'),

@@ -20,6 +20,7 @@ export interface DefinitionSummary {
 
 export interface DecisionDefinitionListPageProps {
   api: DecisionApi;
+  onOpen?: (definition: DefinitionSummary) => void;
 }
 
 /** Normalize the list response: tolerate array | {records:[]} | {data:[]} shapes. */
@@ -80,7 +81,7 @@ function rolloutStartHref(
   return `/p/decisionops_rollouts?${params.toString()}`;
 }
 
-export function DecisionDefinitionListPage({ api }: DecisionDefinitionListPageProps) {
+export function DecisionDefinitionListPage({ api, onOpen }: DecisionDefinitionListPageProps) {
   const [impactCode, setImpactCode] = useState<string | null>(null);
   const [impactAcknowledged, setImpactAcknowledged] = useState(false);
   const [transitioningPid, setTransitioningPid] = useState<string | null>(null);
@@ -236,7 +237,10 @@ export function DecisionDefinitionListPage({ api }: DecisionDefinitionListPagePr
                 <td className="mono decisionops-code" title={d.decisionCode}>
                   {d.decisionCode}
                 </td>
-                <td className="decisionops-main-cell">{d.decisionName ?? '—'}</td>
+                <td className="decisionops-main-cell">{onOpen ? <button type="button"
+                  className="decisionops-rule-link" onClick={() => onOpen(d)}
+                  data-testid={`ddl-open-${d.decisionCode}`}>{d.decisionName ?? d.decisionCode}</button>
+                  : d.decisionName ?? '—'}</td>
                 <td>
                   <span className="decisionops-badge is-neutral">{d.scopeType ?? '—'}</span>
                 </td>

@@ -4,7 +4,12 @@ import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
 import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
-import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.CommandService;
+import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.BeforeEach;
+import static org.mockito.ArgumentMatchers.any;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -24,8 +29,12 @@ import static org.mockito.Mockito.when;
  */
 class UpdateRecordActionHandlerTest {
 
-    private final DynamicDataService dynamicDataService = mock(DynamicDataService.class);
-    private final UpdateRecordActionHandler handler = new UpdateRecordActionHandler(dynamicDataService);
+    private final CommandService commandService = mock(CommandService.class);
+    private final CommandExecutor commandExecutor = mock(CommandExecutor.class);
+    private final UpdateRecordActionHandler handler = new UpdateRecordActionHandler(commandService, commandExecutor);
+    @BeforeEach void command() {
+        when(commandService.resolveCrudCommands("complaint")).thenReturn(Map.of("update", "complaint:update"));
+    }
 
     private DecisionContext ctx(Map<String, Object> record) {
         return DecisionContext.builder().scope(Scope.RECORD, record).build();
@@ -47,7 +56,11 @@ class UpdateRecordActionHandlerTest {
         var record = Map.<String, Object>of("entityCode", "complaint", "recordPid", "CMP-1",
                 "data", Map.of("priority", "HIGH"));
         handler.execute(plan("UPDATE_RECORD", Map.of("fields", Map.of("status", "ESCALATED"))), ctx(record));
-        verify(dynamicDataService).update(eq("complaint"), eq("CMP-1"), eq(Map.of("status", "ESCALATED")));
+        var request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor).execute(eq("complaint:update"), request.capture());
+        assertThat(request.getValue().getTargetRecordPid()).isEqualTo("CMP-1");
+        assertThat(request.getValue().getPayload()).containsEntry("status", "ESCALATED");
+        assertThat(request.getValue().getClientRequestId()).isEqualTo("idem-1");
     }
 
     @Test
@@ -55,8 +68,7 @@ class UpdateRecordActionHandlerTest {
         var fields = new java.util.LinkedHashMap<String, Object>();
         fields.put("status", "ESCALATED");
         fields.put("priority", "HIGH");
-        when(dynamicDataService.update(eq("complaint"), eq("CMP-1"), eq(fields)))
-                .thenReturn(Map.of("pid", "CMP-1", "status", "ESCALATED", "priority", "HIGH"));
+
 
         var record = Map.<String, Object>of("entityCode", "complaint", "recordPid", "CMP-1");
         Map<String, Object> result = handler.executeWithResult(
@@ -105,11 +117,11 @@ class UpdateRecordActionHandlerTest {
     }
 
     @Test
-    void wrapsDynamicDataUpdateFailureWithStructuredPayload() {
+    void wrapsAuthorizedCommandFailureWithStructuredPayload() {
         var fields = new java.util.LinkedHashMap<String, Object>();
         fields.put("status", "ESCALATED");
         fields.put("priority", "HIGH");
-        when(dynamicDataService.update(eq("complaint"), eq("CMP-1"), eq(fields)))
+        when(commandExecutor.execute(eq("complaint:update"), any()))
                 .thenThrow(new IllegalStateException("model field status is readonly"));
 
         var record = Map.<String, Object>of("entityCode", "complaint", "recordPid", "CMP-1");

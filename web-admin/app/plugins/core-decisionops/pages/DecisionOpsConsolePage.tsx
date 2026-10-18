@@ -41,7 +41,7 @@ const CONSOLE_TABS = new Set<ConsoleTab>([
 ])
 
 function tabFromSearch(value: string | null): ConsoleTab {
-  return value && CONSOLE_TABS.has(value as ConsoleTab) ? (value as ConsoleTab) : 'studio'
+  return value && CONSOLE_TABS.has(value as ConsoleTab) ? (value as ConsoleTab) : 'definitions'
 }
 
 function createApi() {

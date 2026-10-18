@@ -1,0 +1,62 @@
+{
+  "model": {
+    "zh-CN": "目标模型",
+    "en": "Target model"
+  },
+  "command": {
+    "zh-CN": "业务操作",
+    "en": "Business operation"
+  },
+  "target": {
+    "zh-CN": "目标记录来源",
+    "en": "Target record source"
+  },
+  "targetHint": {
+    "zh-CN": "更新操作请选择当前记录或关联记录的标识字段；新建操作可留空。",
+    "en": "For updates, select the identifier of the current or related record. Leave empty for creation."
+  },
+  "field": {
+    "zh-CN": "添加要更新的字段",
+    "en": "Add field to update"
+  },
+  "loading": {
+    "zh-CN": "正在读取模型与操作参数…",
+    "en": "Loading model and operation parameters…"
+  },
+  "loadError": {
+    "zh-CN": "参数元数据加载失败，请重新选择或检查权限",
+    "en": "Parameter metadata could not be loaded. Reselect or check permissions"
+  },
+  "source": {
+    "zh-CN": "取值方式",
+    "en": "Value source"
+  },
+  "fixed": {
+    "zh-CN": "固定值",
+    "en": "Fixed value"
+  },
+  "reference": {
+    "zh-CN": "业务字段",
+    "en": "Business field"
+  },
+  "value": {
+    "zh-CN": "设置为",
+    "en": "Set to"
+  },
+  "noParams": {
+    "zh-CN": "此操作没有声明可配置参数。",
+    "en": "This operation declares no configurable parameters."
+  },
+  "permissionHint": {
+    "zh-CN": "实际执行仍受业务操作权限、字段校验和状态约束控制。",
+    "en": "Execution remains subject to operation permissions, field validation and state constraints."
+  },
+  "currentRecord": {
+    "zh-CN": "当前业务记录",
+    "en": "Current business record"
+  },
+  "remove": {
+    "zh-CN": "移除",
+    "en": "Remove"
+  }
+}

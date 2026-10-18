@@ -39,5 +39,39 @@
       "tpm_acceptance",
       "tpm_project"
     ]
+  },
+  {
+    "code": "tdv:register_acceptance",
+    "displayName:zh-CN": "登记验收通过",
+    "displayName:en": "Register accepted delivery",
+    "modelCode": "tpm_project",
+    "type": "custom",
+    "handler": "tdv:register_acceptance",
+    "permissions": [
+      "tdv.delivery.register"
+    ],
+    "idempotent": true,
+    "reversible": false,
+    "inputFields": [
+      "acceptancePid"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "acceptancePid": {
+          "type": "string",
+          "title": "验收记录"
+        }
+      },
+      "required": [
+        "acceptancePid"
+      ]
+    },
+    "targetModels": [
+      "tpm_project",
+      "tpm_acceptance",
+      "tdv_check"
+    ],
+    "concurrencyKey": "delivery-registration:${payload.acceptancePid}"
   }
 ]

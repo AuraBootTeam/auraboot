@@ -40,14 +40,15 @@ public final class ActionPlanResolver {
     /** A matched rule paired with the actions it contributes, in rule-priority order. */
     public record MatchedRuleActions(PolicyRule rule, List<PolicyAction> actions) {}
 
+    @SuppressWarnings("unchecked")
     public Resolution resolve(List<MatchedRuleActions> matched, DecisionContext context,
                               DedupStrategy dedup, ConflictStrategy conflictStrategy) {
         List<ResolvedActionPlan> all = new ArrayList<>();
         for (MatchedRuleActions m : matched) {
             for (PolicyAction action : m.actions()) {
                 String key = renderTemplate(action.idempotencyKeyTemplate(), context, m.rule(), action);
-                all.add(new ResolvedActionPlan(m.rule().ruleCode(), action.type(), action.target(),
-                        action.order(), action.payload(), key));
+                all.add(new ResolvedActionPlan(m.rule().ruleCode(), action.type(), action.target() == null ? null : String.valueOf(ActionValueResolver.resolve(action.target(), context)),
+                        action.order(), (Map<String, Object>) ActionValueResolver.resolve(action.payload(), context), key));
             }
         }
         // order: rule priority then action order (stable on insertion = declaration)
@@ -60,10 +61,14 @@ public final class ActionPlanResolver {
                 .thenComparingInt(ResolvedActionPlan::order));
 
         List<String> conflicts = detectConflicts(all);
-        if (!conflicts.isEmpty() && conflictStrategy == ConflictStrategy.REJECT_ON_CONFLICT) {
+        if (!conflicts.isEmpty() && (conflictStrategy == null || conflictStrategy == ConflictStrategy.REJECT_ON_CONFLICT
+                || conflictStrategy == ConflictStrategy.MERGE_IF_COMPATIBLE)) {
             return Resolution.conflicted(conflicts);
         }
 
+        if (conflictStrategy == ConflictStrategy.PRIORITY_WINS) {
+            all = priorityWrites(all);
+        }
         return Resolution.ok(dedup(all, dedup));
     }
 
@@ -91,25 +96,48 @@ public final class ActionPlanResolver {
             if (!("UPDATE_RECORD".equals(p.type()) || "PATCH_RECORD".equals(p.type()))) {
                 continue;
             }
-            Object fieldPath = p.payload().get("fieldPath");
-            if (fieldPath == null) {
-                fieldPath = p.payload().get("field");
-            }
-            if (fieldPath == null) {
+            Object fieldsObject = p.payload().get("fields");
+            if (!(fieldsObject instanceof Map<?, ?> fields) || fields.isEmpty()) {
+                conflicts.add("record update requires non-empty payload.fields");
                 continue;
             }
-            Object value = p.payload().get("value");
-            String fp = String.valueOf(fieldPath);
-            if (fieldValue.containsKey(fp)) {
-                Object prev = fieldValue.get(fp);
-                if (prev == null ? value != null : !prev.equals(value)) {
-                    conflicts.add("conflicting writes to field '" + fp + "': " + prev + " vs " + value);
+            // The handler updates the event record. Scope conflict keys to that target;
+            // never compare unrelated records merely because their field names match.
+            String target = "record";
+            for (Map.Entry<?, ?> field : fields.entrySet()) {
+                String key = target + ":" + field.getKey();
+                if (fieldValue.containsKey(key)
+                        && !java.util.Objects.deepEquals(fieldValue.get(key), field.getValue())) {
+                    conflicts.add("conflicting writes to field '" + key + "'");
+                } else {
+                    fieldValue.put(key, field.getValue());
                 }
-            } else {
-                fieldValue.put(fp, value);
             }
         }
         return conflicts;
+    }
+
+    private List<ResolvedActionPlan> priorityWrites(List<ResolvedActionPlan> plans) {
+        java.util.Set<String> written = new java.util.HashSet<>();
+        List<ResolvedActionPlan> result = new ArrayList<>();
+        for (ResolvedActionPlan plan : plans) {
+            if (!("UPDATE_RECORD".equals(plan.type()) || "PATCH_RECORD".equals(plan.type()))
+                    || !(plan.payload().get("fields") instanceof Map<?, ?> fields)) {
+                result.add(plan);
+                continue;
+            }
+            Map<String, Object> remaining = new LinkedHashMap<>();
+            fields.forEach((field, value) -> {
+                if (written.add(String.valueOf(field))) remaining.put(String.valueOf(field), value);
+            });
+            if (!remaining.isEmpty()) {
+                Map<String, Object> payload = new LinkedHashMap<>(plan.payload());
+                payload.put("fields", remaining);
+                result.add(new ResolvedActionPlan(plan.ruleCode(), plan.type(), plan.target(), plan.order(),
+                        payload, plan.idempotencyKey()));
+            }
+        }
+        return result;
     }
 
     private String renderTemplate(String template, DecisionContext context, PolicyRule rule, PolicyAction action) {

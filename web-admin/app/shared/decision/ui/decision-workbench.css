@@ -67,3 +67,19 @@
 .decisionops-shell .decision-table--compact .dt-cell-expression>summary{border:0;padding:4px 0 0;font-size:10px;color:var(--color-text-3);}
 .decisionops-shell .strategy-test-trace{font-size:11px;color:var(--color-text-3);overflow-wrap:anywhere;}
 .decisionops-shell .strategy-test-trace summary{cursor:pointer;}
+
+/* Model-aware actions follow the compact rule workspace layout. */
+.rule-action-model { display: grid; gap: 18px; max-width: 760px; }
+.rule-action-assignment { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(130px, 1fr) minmax(160px, 2fr); align-items: center; gap: 16px; border-top: 1px solid var(--border, #e2e8f0); padding-top: 16px; }
+.epd-action-grid { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 800px) { .rule-action-assignment { grid-template-columns: 1fr; } }
+
+.decisionops-professional-entry { margin-left: auto; position: relative; align-self: center; color: var(--muted-foreground, #64748b); font-size: 13px; }
+.decisionops-professional-entry summary { cursor: pointer; padding: 10px; }
+.decisionops-professional-entry > div { position: absolute; right: 0; z-index: 20; width: 210px; padding: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px #0f172a12; }
+.decisionops-professional-entry button { display: block; width: 100%; text-align: left; padding: 9px 12px; border-radius: 6px; }
+.decisionops-professional-entry button:hover { background: #f1f5f9; }
+.decisionops-rule-link { color: var(--primary, #2563eb); text-align: left; font-weight: 600; }
+
+.epd-edit-scope { border: 0; padding: 0; margin: 0; min-width: 0; }
+.epd-edit-scope:disabled { opacity: .8; }

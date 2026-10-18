@@ -874,5 +874,13 @@
   "detail_separator": {
     "zh-CN": "，",
     "en": ","
+  },
+  "execute_business_operation": {
+    "zh-CN": "执行业务操作",
+    "en": "Execute business operation"
+  },
+  "read_only_policy": {
+    "zh-CN": "当前为只读权限，可查看规则和历史；修改需策略管理权限。",
+    "en": "Read-only access: view rules and history. Editing requires policy management permission."
   }
 }
