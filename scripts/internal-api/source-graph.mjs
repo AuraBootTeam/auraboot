@@ -9,7 +9,9 @@ const asset = /\.(?:css|scss|svg|png|jpe?g|gif|webp|woff2?|html)$/;
 function exportTarget(value) {
   if (typeof value === 'string') return value;
   if (!value || Array.isArray(value) || typeof value !== 'object') return undefined;
-  for (const key of ['import', 'default', 'module', 'types']) {
+  // Environment-specific branches need an admitted target profile, not an arbitrary fallback.
+  if (Object.keys(value).some(key => !['import', 'default', 'module', 'types'].includes(key))) return undefined;
+  for (const key of ['import', 'default', 'module']) {
     const selected = exportTarget(value[key]);
     if (selected) return selected;
   }
@@ -57,11 +59,14 @@ export function traceSourceGraph({ sources, entries, packages = [], aliases = { 
       const exportsMap = exports && typeof exports === 'object' && !Array.isArray(exports) ? exports : {};
       target = exportTarget(key === '.' && (typeof exports === 'string' || !Object.keys(exportsMap).some(k => k.startsWith('.'))) ? exports : exportsMap[key]);
       if (!target && exports && typeof exports === 'object') {
-        for (const [pattern, value] of Object.entries(exports)) {
+        const patterns = Object.entries(exports).filter(([pattern]) => pattern.includes('*'))
+          .sort(([left], [right]) => right.indexOf('*') - left.indexOf('*') || right.length - left.length);
+        for (const [pattern, value] of patterns) {
           const [prefix, suffix] = pattern.split('*');
           if (!pattern.includes('*') || !key.startsWith(prefix) || !key.endsWith(suffix)) continue;
           const selected = exportTarget(value);
           if (selected) target = selected.replaceAll('*', key.slice(prefix.length, suffix.length ? -suffix.length : undefined));
+          break;
         }
       }
     } else target = subpath ? `.${subpath}` : item.manifest.module ?? item.manifest.main ?? item.manifest.types;

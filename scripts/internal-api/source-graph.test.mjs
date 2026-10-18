@@ -46,4 +46,9 @@ test('source graph respects package export boundaries and rejects ambiguous sour
   assert.equal(graph.files.find(row => row.file === 'packages/client/private.ts').reachable, false);
   assert.throws(() => traceSourceGraph({ sources: [...sources, sources[0]], entries: ['web-admin/app/root.tsx'] }), /duplicate files/);
   assert.throws(() => traceSourceGraph({ sources, entries: ['web-admin/app/root.tsx'], packages: [item, item] }), /duplicate workspace package/);
+  const specific = traceSourceGraph({ sources, entries: ['web-admin/app/root.tsx'], packages: [{ ...item, manifest: { name: '@auraboot/client', exports: { './feature/*': './src/*.ts', './*': './missing/*.ts' } } }] });
+  assert.equal(specific.files.find(row => row.file === 'packages/client/src/read.ts').reachable, true, 'Specific exports win over broad wildcard declarations');
+  const conditional = traceSourceGraph({ sources, entries: ['web-admin/app/root.tsx'], packages: [{ ...item, manifest: { name: '@auraboot/client', exports: { './feature/read': { browser: './browser.ts', default: './src/read.ts' } } } }] });
+  assert.equal(conditional.files.find(row => row.file === 'packages/client/src/read.ts').reachable, false, 'Unknown execution conditions cannot silently select a default');
+  assert.equal(conditional.unresolved.length, 2);
 });
