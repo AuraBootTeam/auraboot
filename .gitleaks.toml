@@ -74,3 +74,7 @@ commits = ['742eb6d3974f2a46b3fbd7e7992bedb7fefef90e']
 description = "RealDb IT fixtures: JDBC config strings embed the *test* field-encryption key name (local fixture value, not a credential). The paths only exist on merged branch history, not on main."
 paths = ['''^platform/src/test/.*\.java$''']
 regexes = ['''security\.field-encryption\.key\s*=''']
+
+[[allowlists]]
+description = "BFF proxy log-redaction unit test: the dummy session token is built by repeating a literal 'test-session-token-' filler (no credential). Historical commits keep the long literal form."
+paths = ['''^web-admin/app/server/services/__tests__/BffProxyService\.test\.ts$''']
