@@ -79,7 +79,10 @@ describe('BffProxyService', () => {
       const headers = await (service as any).sanitizeHeaders({
         originalUrl: '/oauth2/token',
         url: '/oauth2/token',
-        headers: { cookie: '__session=fixture', 'content-type': 'application/x-www-form-urlencoded' },
+        headers: {
+          cookie: '__session=fixture',
+          'content-type': 'application/x-www-form-urlencoded',
+        },
       });
       expect(extract).not.toHaveBeenCalled();
       expect(Object.keys(headers).some((key) => key.toLowerCase() === 'authorization')).toBe(false);
@@ -146,11 +149,87 @@ describe('BffProxyService', () => {
       const renderedLog = log.mock.calls.flat().map(String).join(' ');
       expect(renderedLog).toContain('[REDACTED]');
       expect(renderedLog).not.toContain(token);
-      expect((service as any).sanitizeHeadersForLogging({ Authorization: `Bearer ${token}` }))
-        .toEqual({ Authorization: 'Bearer [REDACTED]' });
+      expect(
+        (service as any).sanitizeHeadersForLogging({ Authorization: `Bearer ${token}` }),
+      ).toEqual({ Authorization: 'Bearer [REDACTED]' });
       expect(response.body).toEqual(payload);
     } finally {
       log.mockRestore();
+    }
+  });
+
+  it('redacts public-link credentials from all success diagnostics without changing forwarded URLs or bytes', async () => {
+    vi.stubEnv('BFF_VERBOSE_LOGGING', 'true');
+    const token = 'owned-share-token-fixture';
+    const password = 'owned-password-fixture';
+    const url = `/api/views/shared/${token}?password=${password}&mode=read`;
+    const payload = Buffer.from(JSON.stringify({ data: { token, shareUrl: `/share/${token}` } }));
+    vi.mocked(axios).mockResolvedValueOnce({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: payload,
+    });
+    const spies = [vi.spyOn(logger, 'info'), vi.spyOn(logger, 'debug'), vi.spyOn(logger, 'error')];
+    for (const spy of spies) spy.mockImplementation(() => undefined as never);
+    try {
+      const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+      const { response } = createResponseRecorder();
+      await service.handleApiRequest(
+        {
+          method: 'GET',
+          originalUrl: url,
+          url,
+          headers: {},
+          ip: '127.0.0.1',
+          connection: {},
+        } as any,
+        response as any,
+      );
+      expect(axios).toHaveBeenCalledWith(
+        expect.objectContaining({ url: `http://127.0.0.1:6443${url}` }),
+      );
+      expect(response.body).toEqual(payload);
+      const diagnostics = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
+      expect(diagnostics).not.toContain(token);
+      expect(diagnostics).not.toContain(password);
+      expect(diagnostics).toContain('[REDACTED]');
+      expect(diagnostics).toContain('mode=read');
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+
+  it('keeps rejected public-link credentials out of error diagnostics while preserving the upstream failure', async () => {
+    const token = 'owned-error-token-fixture';
+    const password = 'owned-error-password-fixture';
+    const url = `/api/views/shared/${token}?password=${password}`;
+    const payload = Buffer.from(
+      JSON.stringify({ code: '35000', context: { error: 'Invalid password' }, data: null }),
+    );
+    vi.mocked(axios).mockRejectedValueOnce({
+      message: `Rejected ${url}`,
+      code: 'ERR_BAD_REQUEST',
+      config: { url, method: 'get' },
+      response: { status: 422, headers: { 'content-type': 'application/json' }, data: payload },
+    });
+    vi.mocked(axios.isAxiosError).mockReturnValueOnce(true);
+    const spies = [vi.spyOn(logger, 'info'), vi.spyOn(logger, 'debug'), vi.spyOn(logger, 'error')];
+    for (const spy of spies) spy.mockImplementation(() => undefined as never);
+    try {
+      const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+      const { response } = createResponseRecorder();
+      await service.handleApiRequest(
+        { method: 'GET', originalUrl: url, url, headers: {}, connection: {} } as any,
+        response as any,
+      );
+      expect(response.statusCode).toBe(422);
+      expect(response.json).toHaveBeenCalledWith(JSON.parse(payload.toString('utf8')));
+      const diagnostics = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
+      expect(diagnostics).not.toContain(token);
+      expect(diagnostics).not.toContain(password);
+      expect(diagnostics).toContain('[REDACTED]');
+    } finally {
+      for (const spy of spies) spy.mockRestore();
     }
   });
 
