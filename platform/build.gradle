@@ -519,18 +519,13 @@ dependencies {
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.13'
 
-    // TestContainers — ephemeral MySQL for connector SDK tests (MySQL is only
-    // ever an *external* data source; the platform's own store is PostgreSQL).
+    // TestContainers — PostgreSQL only for integration tests. MySQL appears in
+    // the product solely as an external data source for the connector feature
+    // (deployer-supplied drivers); the platform itself depends on PostgreSQL.
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
-    testImplementation 'org.testcontainers:mysql'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
-    // MySQL container fixtures connect through the permissive MariaDB driver
-    // (MySqlTestContainer pins org.mariadb.jdbc.Driver). The GPL-family MySQL
-    // driver is not a build dependency in any scope — deployers connecting to
-    // real MySQL sources supply it themselves.
-    testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
