@@ -12,7 +12,7 @@ import {
   findRowInPaginatedList,
   waitForDynamicPageLoad,
 } from '../helpers';
-
+import { EXPLICIT_BASE_URL } from '../../helpers/environments';
 export type CreatedRows = {
   quoteId: string;
   quoteCode: string;
@@ -24,7 +24,7 @@ const fixtureJournals = new WeakMap<Page, FixtureCleanupJournal>();
 export function fixtureJournal(page: Page): FixtureCleanupJournal {
   let journal = fixtureJournals.get(page);
   if (!journal) {
-    const origin = process.env.PLAYWRIGHT_BASE_URL;
+    const origin = EXPLICIT_BASE_URL;
     if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
     if (page.url().startsWith('http') && new URL(page.url()).origin !== new URL(origin).origin) {
       throw new Error('Fixture page belongs to a different runtime origin');

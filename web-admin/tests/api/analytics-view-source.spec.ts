@@ -1,7 +1,7 @@
 /** A view must preserve its own authorization and every underlying source boundary. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-
+import { BACKEND_URL } from '../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 test('view aliases preserve underlying read, row and field protection', async ({ request }) => {
@@ -127,7 +127,7 @@ test('view aliases preserve underlying read, row and field protection', async ({
   const login = await request.post('/api/auth/login', { data: { email, password } });
   expect(login.status()).toBe(200);
   const owner = await requestFactory.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: BACKEND_URL,
     extraHTTPHeaders: { Authorization: `Bearer ${(await login.json()).data.jwt}` },
   });
   try {

@@ -121,13 +121,18 @@ function envValue(primary: string, alias: string, fallback: string): string {
   return process.env[primary] ?? process.env[alias] ?? fallback;
 }
 
+/** Explicit target metadata, distinct from resolved host defaults for ownership guards. */
+export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
+export const EXPLICIT_BACKEND_URL = process.env.BACKEND_URL;
+export const BOOTSTRAP_COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
+
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
-  process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;
+  EXPLICIT_BACKEND_URL ?? `http://localhost:${BE_PORT}`;
 
 /** Vite-served base — what `page.goto` and `page.request` use by default. */
 export const BASE_URL =
-  process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
+  EXPLICIT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
 
 /** Remix BFF base — for specs that need to drive `/login` or BFF-specific endpoints directly. */
 export const BFF_URL =

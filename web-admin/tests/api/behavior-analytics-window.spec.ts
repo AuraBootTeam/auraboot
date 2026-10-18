@@ -1,7 +1,7 @@
 /** Real collect-to-rollup coverage with isolated event-time fixtures. */
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-
+import { BACKEND_URL } from '../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 test('behavior rollups share half-open boundaries and deduplicate delivery', async ({
@@ -147,7 +147,7 @@ test('anonymous site-key collect rejects server provenance and records a genuine
   const siteKey = rows[0].site_key;
   expect(siteKey).toMatch(/^abk_/);
   const anonymous = await playwright.request.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: BACKEND_URL,
     storageState: { cookies: [], origins: [] },
   });
   try {

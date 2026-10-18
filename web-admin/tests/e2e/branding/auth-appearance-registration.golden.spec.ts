@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-
+import { BASE_URL, EXPLICIT_BASE_URL } from '../../helpers/environments';
 test('open registration retains the published appearance and completes real account admission', async ({ browser }, testInfo) => {
-  expect(process.env.PLAYWRIGHT_BASE_URL, 'Owned runtime must be explicit').toBeTruthy();
-  const context = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL, storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 } });
+  expect(EXPLICIT_BASE_URL, 'Owned runtime must be explicit').toBeTruthy();
+  const context = await browser.newContext({ baseURL: BASE_URL, storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 } });
   try {
     const page = await context.newPage();
     const policy = await (await page.request.get('/api/auth/access-policy')).json();

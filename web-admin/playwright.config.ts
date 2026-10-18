@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import dns from 'node:dns';
 import { isAbsolute, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
-
+import { BASE_URL } from './tests/helpers/environments';
 // Force Node.js to prefer IPv4 when resolving localhost.
 // macOS /etc/hosts has both 127.0.0.1 and ::1 for localhost.
 // The BFF only listens on IPv4, so ::1 connections fail with ECONNREFUSED.
@@ -26,8 +26,8 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
   delete process.env.no_color;
 }
 
-// Must use 'localhost' not '127.0.0.1' — the BFF returns 502 on direct IP.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
+// Resolve the same HTTP origin as specs and helpers through the central contract.
+const baseURL = BASE_URL;
 const runProfile = process.env.PW_PROFILE || 'fast';
 // Cross-repository tests keep their source ownership and use explicit runtime roots.
 const enterpriseTestRoot = process.env.PW_ENTERPRISE_TEST_ROOT;

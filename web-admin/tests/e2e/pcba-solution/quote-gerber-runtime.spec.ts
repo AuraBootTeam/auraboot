@@ -9,7 +9,7 @@ import {
   queryDynamicRecords,
   seedGerberRuntimeQuote,
 } from './quote-e2e-helpers';
-
+import { PG_CONN, PG_ENV } from '../../helpers/environments';
 const VIEWER_TOKEN = 'e2e-gerber-viewer-token';
 
 const boardSvg = (label: string) => `
@@ -266,14 +266,14 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
 
     // 仅接受自动链对本次唯一文件写出的审计；历史行或显式手动解析都不能满足它。
     const auditCountForUpload = () => Number(execFileSync('psql', [
-        '-h', process.env.PG_HOST || '127.0.0.1',
-        '-p', process.env.PG_PORT || '5432',
-        '-U', process.env.PG_USER || 'auraboot',
-        '-d', process.env.PG_DB || 'enterprise_105',
+        '-h', PG_CONN.host,
+        '-p', String(PG_CONN.port),
+        '-U', PG_CONN.user,
+        '-d', PG_CONN.database,
         '-tAc',
         `SELECT count(*) FROM ab_command_audit_log WHERE command_code = 'qo_quote_line_common:parse_gerber' AND request_payload->>'gerber_archive_file_id' = '${gerberFileId}'`,
       ], {
-        env: { ...process.env, PGPASSWORD: process.env.POSTGRES_PASSWORD || 'auraboot' },
+        env: PG_ENV,
         timeout: 30_000,
       }).toString().trim());
     await expect.poll(auditCountForUpload, {

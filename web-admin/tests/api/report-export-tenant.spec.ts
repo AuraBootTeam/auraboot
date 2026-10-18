@@ -2,7 +2,7 @@
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-
+import { BACKEND_URL } from '../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 const EXPORT_FORMATS = ['json', 'excel', 'pdf'] as const;
@@ -94,7 +94,7 @@ test('report exports stay tenant-scoped across real business tenants', async ({ 
   const tenant = (await createdTenant.json()).data;
   expect(tenant.jwt).toBeTruthy();
   const foreign = await requestFactory.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: BACKEND_URL,
     extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
   });
   try {

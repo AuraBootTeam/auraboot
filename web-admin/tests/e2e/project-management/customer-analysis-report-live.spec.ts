@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-
+import { EXPLICIT_BASE_URL } from '../../helpers/environments';
 test.use({
   storageState: { cookies: [], origins: [] },
   locale: 'zh-CN',
@@ -35,7 +35,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(model, 'blocked: name the expected real model').toBeTruthy();
   expect(provider).not.toMatch(/stub|fake|mock/i);
   expect(model).not.toMatch(/stub|fake|mock/i);
-  const origin = new URL(process.env.PLAYWRIGHT_BASE_URL || '');
+  const origin = new URL(EXPLICIT_BASE_URL || '');
   expect(['localhost', '127.0.0.1']).toContain(origin.hostname);
   const evidence = process.env.AURA_EVIDENCE_DIR;
   expect(evidence, 'blocked: bind this run to its registered evidence directory').toBeTruthy();

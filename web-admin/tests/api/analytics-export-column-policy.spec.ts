@@ -2,7 +2,7 @@
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import * as XLSX from 'xlsx';
-
+import { BACKEND_URL } from '../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 for (const boundary of ['resource', 'inferred'] as string[]) {
@@ -96,7 +96,7 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
     const jwt = (await login.json()).data.jwt;
     expect(jwt).toBeTruthy();
     const owner = await requestFactory.newContext({
-      baseURL: process.env.BACKEND_URL,
+      baseURL: BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
     });
     try {

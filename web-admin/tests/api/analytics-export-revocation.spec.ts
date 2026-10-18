@@ -1,7 +1,7 @@
 /** Stored artifacts must reauthorize their source before streaming bytes. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-
+import { BACKEND_URL } from '../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 for (const boundary of ['resource', 'root'] as const) {
@@ -87,7 +87,7 @@ for (const boundary of ['resource', 'root'] as const) {
     const jwt = (await login.json()).data.jwt;
     expect(jwt).toBeTruthy();
     const owner = await requestFactory.newContext({
-      baseURL: process.env.BACKEND_URL,
+      baseURL: BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
     });
     try {

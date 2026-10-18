@@ -3,13 +3,13 @@ import { request as requestFactory, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { Client } from 'pg';
-import { PG_CONN } from './environments';
+import { BACKEND_URL, BASE_URL, PG_CONN } from './environments';
 
 async function main() {
   const path = process.env.AURA_APPROVAL_ROLLBACK_FIXTURES;
   if (!path) throw new Error('AURA_APPROVAL_ROLLBACK_FIXTURES is required');
   const request = await requestFactory.newContext({
-    baseURL: process.env.PLAYWRIGHT_BASE_URL,
+    baseURL: BASE_URL,
     storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
   });
   const db = new Client(PG_CONN);
@@ -33,7 +33,7 @@ async function main() {
         tool_name: code,
         tool_description: 'Approval transaction fixture',
         tool_type: 'api_call',
-        source_code: `GET ${process.env.BACKEND_URL}/actuator/health`,
+        source_code: `GET ${BACKEND_URL}/actuator/health`,
         input_schema: JSON.stringify({
           type: 'object',
           properties: { marker: { type: 'string' } },

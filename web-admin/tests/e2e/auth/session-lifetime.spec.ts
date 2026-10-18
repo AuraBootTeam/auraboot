@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { HeaderPage } from '../../pages';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-
+import { EXPLICIT_BACKEND_URL } from '../../helpers/environments';
 // Browser-driven login/logout plus real-backend renewal. Time travel belongs to
 // JwtSessionLifetimeTest; this test never changes production clocks or signs JWTs.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -25,7 +25,7 @@ test('seven-day login, active renewal endpoint and shared-session revocation', a
   expect(claims.exp - claims.iat).toBe(7 * 86400);
   expect(claims.session_exp - claims.auth_time).toBe(180 * 86400);
   expect(Number(session.tokenExpiry)).toBe(claims.exp);
-  const backend = process.env.SPRING_BOOT_URL || process.env.BACKEND_URL;
+  const backend = process.env.SPRING_BOOT_URL || EXPLICIT_BACKEND_URL;
   expect(backend, 'Real backend URL is required').toBeTruthy();
   const renewedResponse = await request.post(`${backend}/api/auth/renew`, { headers: { Authorization: `Bearer ${token}` }, data: {} });
   expect(renewedResponse.ok()).toBe(true);

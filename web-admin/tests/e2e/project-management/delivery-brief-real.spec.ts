@@ -1,3 +1,4 @@
+import { BASE_URL } from '../../helpers/environments';
 import {test,expect} from '@playwright/test';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -55,7 +56,6 @@ test('delivery brief imports through the designer and exports the same governed 
  await page.screenshot({path:join(evidence,'report-toolbar-compact-title.png'),fullPage:true});
  await writeFile(join(evidence,'report-toolbar-layout.json'),JSON.stringify(layout,null,2));
  await page.setViewportSize({width:1440,height:1000});
-
  const toolbar=page.getByTestId('report-designer-toolbar');
  const query=page.waitForResponse(r=>r.url().includes('tpm_delivery_brief')&&r.request().method()==='GET');
  await toolbar.getByRole('button',{name:'预览',exact:true}).click();const queried=await query;expect(queried.status()).toBe(200);const response=await queried.json();expect(String(response.code)).toBe('0');
@@ -130,7 +130,7 @@ test('a rejected report save retains the draft and can recover after the fixture
  const email=`${roleCode}@e2e.local`;const password='Test2026x';
  const user=await page.request.post('/api/admin/users',{data:{email,displayName:roleCode,initialPassword:password,roleCodes:[roleCode],sendInviteEmail:false}});
  expect(user.status()).toBe(200);
- const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+ const context=await browser.newContext({baseURL:BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
  const actor=await context.newPage();const title=`保存失败恢复验证 ${suffix}`;const description='权限恢复前保留当前交付草稿，恢复后保存并核对。';
  try{
   await actor.goto('/login');await expect(actor.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');

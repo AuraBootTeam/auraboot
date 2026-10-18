@@ -5,7 +5,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/auth-fixtures';
 import { openAsRole, makeRoleUser, ensureRoleUser, fetchRoleSnapshot } from '../rbac/rbac-helpers';
 import { ensureSidebarExpanded } from '../helpers';
-
+import { EXPLICIT_BACKEND_URL } from '../../helpers/environments';
 type Resource = { pid: string; i18nKey: string; value: string; source: string; status: string; rejectReason: string | null; reviewedAt: string | null; reviewedBy?: string | null; refType?: string | null; refId?: string | null };
 async function accepted<T>(response: Pick<APIResponse, 'ok' | 'status' | 'url' | 'json'>): Promise<T> {
   expect(response.ok(), `HTTP ${response.status()} from ${response.url()}`).toBe(true);
@@ -137,7 +137,7 @@ test.describe('i18n admin real workflow', () => {
   });
 
   test('same-role tenant administrators cannot read or mutate each other translation resources', async ({ browser }, info) => {
-    const backend = process.env.BACKEND_URL;
+    const backend = EXPLICIT_BACKEND_URL;
     expect(backend, 'an explicit real backend URL is required').toBeTruthy();
     const admin = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
     const clients: APIRequestContext[] = [];

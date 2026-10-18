@@ -13,6 +13,7 @@ const ENV_KEYS = [
   'PLAYWRIGHT_BASE_URL',
   'BACKEND_URL',
   'BE_PORT',
+  'VITE_PORT',
   'BFF_URL',
   'BFF_PORT',
   'PW_SKIP_WEBSERVER',
@@ -42,6 +43,15 @@ describe('Playwright test environment helpers', () => {
   afterEach(() => {
     resetEnv();
     vi.resetModules();
+  });
+
+  it('keeps absent explicit targets distinct from resolved default origins', async () => {
+    for (const key of ['PLAYWRIGHT_BASE_URL', 'BACKEND_URL', 'BE_PORT', 'VITE_PORT']) delete process.env[key];
+    const env = await loadEnvironments();
+    expect(env.EXPLICIT_BASE_URL).toBeUndefined();
+    expect(env.EXPLICIT_BACKEND_URL).toBeUndefined();
+    expect(env.BASE_URL).toBe('http://localhost:5173');
+    expect(env.BACKEND_URL).toBe('http://localhost:6443');
   });
 
   it('uses libpq PG* aliases when Aura PG_* aliases are absent', async () => {
@@ -123,6 +133,8 @@ describe('Playwright test environment helpers', () => {
 
     const env = await loadEnvironments();
 
+    expect(env.EXPLICIT_BASE_URL).toBe('http://localhost:5226');
+    expect(env.EXPLICIT_BACKEND_URL).toBe('http://localhost:6496');
     expect(env.BASE_URL).toBe('http://localhost:5226');
     expect(env.BACKEND_URL).toBe('http://localhost:6496');
     expect(env.BFF_URL).toBe('http://localhost:3553');

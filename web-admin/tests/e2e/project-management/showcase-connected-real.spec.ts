@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { navigateToMenuByClick } from '../helpers';
-
+import { BASE_URL } from '../../helpers/environments';
 const evidence = process.env.AURA_EVIDENCE_DIR;
 if (
   !evidence ||
@@ -168,7 +168,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     }),
   );
   const ctx = await browser.newContext({
-      baseURL: process.env.PLAYWRIGHT_BASE_URL,
+      baseURL: BASE_URL,
       storageState: { cookies: [], origins: [] },
       locale: 'zh-CN',
       viewport: { width: 1440, height: 1000 },

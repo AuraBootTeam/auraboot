@@ -17,7 +17,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-
+import { EXPLICIT_BASE_URL } from '../../helpers/environments';
 import type { Page } from '@playwright/test';
 
 import { test, expect } from '../../fixtures';
@@ -106,7 +106,7 @@ test.describe('BOM material library page @smoke', () => {
   });
 
   test('a terminated fixture creator resumes cleanup from its persisted journal', async ({ page }) => {
-    const origin = process.env.PLAYWRIGHT_BASE_URL!;
+    const origin = EXPLICIT_BASE_URL!;
     const file = test.info().outputPath('interrupted-material-fixture.json');
     const code = `PIPEINT-${uid}`;
     const beforeResponse = await page.request.get('/api/dynamic/bom_material_master/list?pageNum=1&pageSize=1');

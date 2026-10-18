@@ -3,7 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { test, expect, type Response } from '@playwright/test';
-
+import { EXPLICIT_BASE_URL } from '../../helpers/environments';
 // API calls provision the global shared artifact and roles only. Source queries
 // originate from the published viewer after two independent real BFF UI logins.
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
@@ -14,7 +14,7 @@ const template = JSON.parse(fs.readFileSync(path.join(root, 'examples/dashboard-
 const references: unknown[][] = JSON.parse(fs.readFileSync(path.join(root, 'scripts/reference-projects.json'), 'utf8'));
 
 test('SC04-PERMISSIONS global dashboard viewing does not grant customer-project source access', async ({ page, browser }, info) => {
-  const origin = new URL(process.env.PLAYWRIGHT_BASE_URL || '').origin;
+  const origin = new URL(EXPLICIT_BASE_URL || '').origin;
   expect(new URL(origin).hostname).toBe('localhost');
   expect(process.env.PW_ADMIN_STORAGE_STATE).toBeTruthy();
   expect(process.env.DELIVERY_FIXTURE_PATH, 'reuse the retained shared project fixture').toBeTruthy();
