@@ -858,10 +858,15 @@ test.describe('User Profile', () => {
 // ===========================================================================
 
 test.describe('Password Change', () => {
+  test.use({ locale: 'zh-CN' });
+  test.beforeEach(async ({ page }) => {
+    await page.context().addCookies([{ name: 'locale', value: 'zh-CN', url: BASE_URL }]);
+    await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+  });
   test('PWD-001: should not expose self-service password change form', async ({ page }) => {
     await page.goto('/personal/security', { waitUntil: 'load' });
 
-    await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '账号安全', exact: true })).toBeVisible({
       timeout: 15000,
     });
     await expect(page.locator('[data-testid="current-password-input"]')).toHaveCount(0);
@@ -910,38 +915,47 @@ test.describe('Forgot & Reset Password', () => {
 // ===========================================================================
 
 test.describe('Security Settings — Sessions', () => {
+  test.use({ locale: 'zh-CN' });
+  test.beforeEach(async ({ page }) => {
+    await page.context().addCookies([{ name: 'locale', value: 'zh-CN', url: BASE_URL }]);
+    await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+  });
   test('SEC-001: should display security page with active sessions @smoke', async ({ page }) => {
     await page.goto('/personal/security', { waitUntil: 'load' });
     // Wait for the heading to appear as load indicator
-    await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '账号安全', exact: true })).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByRole('heading', { name: 'Active Sessions' })).toBeVisible();
-    await expect(page.getByText('Change Password')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '活跃会话', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '修改密码', exact: true })).toHaveCount(0);
   });
 
   test('SEC-002: should show active sessions list', async ({ page }) => {
-    await page.goto('/personal/security', { waitUntil: 'load' });
-    await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
-      timeout: 15000,
-    });
-
-    // Should show at least one session (current)
+    // Arm the response before navigation; a missing request must fail the test.
     const sessionResponse = page.waitForResponse(
-      (res) => res.url().includes('/api/user/sessions') && res.request().method() === 'get',
+      (res) => new URL(res.url()).pathname === '/api/user/sessions'
+        && res.request().method() === 'GET',
     );
-
-    // Wait for sessions to load
-    const res = await sessionResponse.catch(() => null);
-    if (res) {
-      const data = await res.json();
-      expect(data?.data?.length).toBeGreaterThanOrEqual(1);
+    await page.goto('/personal/security', { waitUntil: 'load' });
+    const res = await sessionResponse;
+    expect(res.status()).toBe(200);
+    const payload = await res.json();
+    expect(payload.code).toBe('0');
+    expect(Array.isArray(payload.data)).toBe(true);
+    expect(payload.data.length).toBeGreaterThanOrEqual(1);
+    await expect(page.getByRole('heading', { name: '账号安全', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '活跃会话', exact: true })).toBeVisible();
+    await expect(page.getByTestId(/^revoke-session-/)).toHaveCount(payload.data.length);
+    for (const session of payload.data) {
+      expect(typeof session.pid).toBe('string');
+      expect(session.pid).not.toBe('');
+      await expect(page.getByTestId(`revoke-session-${session.pid}`)).toBeVisible();
     }
   });
 
   test('SEC-003: should not show password change form in security page', async ({ page }) => {
     await page.goto('/personal/security', { waitUntil: 'load' });
-    await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '账号安全', exact: true })).toBeVisible({
       timeout: 15000,
     });
 
