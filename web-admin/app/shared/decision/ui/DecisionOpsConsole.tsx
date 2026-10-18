@@ -1,3 +1,5 @@
+import { useI18n } from '~/contexts/I18nContext';
+import NAV from './decisionOpsNav.i18n.json';
 import { useAuth } from '~/contexts/AuthContext';
 import './decision-workbench.css';
 import { useEffect, useMemo, useState } from 'react';
@@ -67,12 +69,12 @@ export interface DecisionOpsConsoleProps {
 }
 
 const TABS: { key: ConsoleTab; label: string; description: string }[] = [
-  { key: 'studio', label: '策略编排器', description: '跨模块规则复用' },
+  { key: 'studio', label: '规则工作区', description: '判断逻辑、试算与发布' },
   { key: 'dashboard', label: '概览', description: '运行态总览' },
   { key: 'policies', label: '事件策略', description: '事件触发策略' },
   { key: 'definitions', label: '业务规则', description: '业务用途、判断逻辑与处理结果' },
-  { key: 'designer', label: '策略设计器', description: '规则编排' },
-  { key: 'tables', label: '决策表', description: 'DMN 表格' },
+  { key: 'designer', label: '事件策略工作区', description: '触发条件与后续动作' },
+  { key: 'tables', label: 'DMN 互操作', description: '专业导入、导出与互操作验证' },
   { key: 'rollouts', label: '发布治理', description: '灰度与回滚' },
   { key: 'logs', label: '执行日志', description: 'Trace 查询' },
   { key: 'model', label: '数据模型', description: '字段引用' },
@@ -139,6 +141,8 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     initialTab = 'studio',
   } = props;
   const st = useSmartText();
+  const {locale}=useI18n();
+  const tabs = TABS.map(item => ({...item, ...NAV[item.key][locale.startsWith('zh')?'zh-CN':'en']}));
   const [selectedDecisionCode, setSelectedDecisionCode] = useState(props.initialDecisionCode ?? '');
   useEffect(() => { if (props.initialDecisionCode != null) setSelectedDecisionCode(props.initialDecisionCode); }, [props.initialDecisionCode]);
   const [tab, setTab] = useState<ConsoleTab>(initialTab);
@@ -232,7 +236,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     enabled: permissionGrants == null && tab === 'permissions',
   });
   const permissionGrantData = permissionGrants ?? permissionQuery.data?.roles ?? [];
-  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+  const activeTab = tabs.find((t) => t.key === tab) ?? tabs[0];
   const headerEyebrow = st('$i18n:decisionops.header.eyebrow', 'Strategy Studio');
   const definitionsLabel = st('$i18n:decisionops.header.definitions', 'Definitions');
   const policiesLabel = st('$i18n:decisionops.header.policies', 'Policies');
@@ -357,7 +361,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
 
       <div className="decisionops-layout">
         <nav className="doc-tabs decisionops-nav" role="tablist" aria-label="Rule Center modules">
-          {TABS.filter((item) => ['definitions', 'policies', 'logs'].includes(item.key)
+          {tabs.filter((item) => ['definitions', 'policies', 'logs'].includes(item.key)
             || item.key === tab).sort((a,b) => ['definitions','policies','logs'].indexOf(a.key)-['definitions','policies','logs'].indexOf(b.key)).map((t) => (
             <a
               key={t.key}
@@ -376,7 +380,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           ))}
           <details className="decisionops-professional-entry">
             <summary>{st('$i18n:decisionops.professional', '专业配置')}</summary>
-            <div>{TABS.filter(item => !['definitions', 'policies', 'logs'].includes(item.key) && item.key !== tab).map(item => (
+            <div>{tabs.filter(item => !['definitions', 'policies', 'logs'].includes(item.key) && item.key !== tab).map(item => (
               <button key={item.key} type="button" data-testid={`doc-tab-${item.key}`} onClick={() => selectTab(item.key)}>{item.label}</button>
             ))}</div>
           </details>

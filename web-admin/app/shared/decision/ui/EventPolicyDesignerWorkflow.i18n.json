@@ -914,5 +914,9 @@
   "all_statuses": {
     "zh-CN": "全部状态",
     "en": "All statuses"
+  },
+  "model_name_unavailable": {
+    "zh-CN": "对象名称待核对",
+    "en": "Object name unavailable"
   }
 }

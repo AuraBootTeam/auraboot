@@ -48,6 +48,15 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByTestId('decision-binding-preview')).not.toHaveTextContent('data.amount');
   });
 
+  it('does not silently activate a disabled consumer binding when opening or editing its mapping', async () => {
+    const updateField=vi.fn();
+    render(<DecisionRuleBindingBlock runtime={{getFieldValue:()=>undefined,updateField}} block={{props:{mode:'decision',valueField:'rule_binding',initialDecisionCode:'',initialValue:JSON.stringify({bindingKind:'DECISION_REF',enabled:false,decisionBinding:{decisionCode:'',enabled:false}})}}}/>);
+    await waitFor(()=>expect(updateField).toHaveBeenCalled());
+    expect(updateField.mock.calls.at(-1)?.[1]).toMatchObject({enabled:false,decisionBinding:{decisionCode:'',enabled:false}});
+    fireEvent.change(screen.getByLabelText('version-policy'),{target:{value:'ROLLOUT'}});
+    expect(updateField.mock.calls.at(-1)?.[1]).toMatchObject({enabled:false,decisionBinding:{enabled:false}});
+  });
+
   it('loads live decision definitions into the decision picker for DSL-hosted consumers', async () => {
     const api = {
       getDecisionImpact: vi.fn(),

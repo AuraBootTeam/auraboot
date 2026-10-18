@@ -1027,6 +1027,7 @@ export function StrategyStudioWorkbench({
   const [selectedDecisionCode, setSelectedDecisionCode] = useState<string>(initialDecisionCode)
   const [businessTestValues, setBusinessTestValues] = useState<Record<string, string>>({})
   const [testTrace, setTestTrace] = useState<string | null>(null)
+  const [testMatchedRules, setTestMatchedRules] = useState<{ruleId?:string;reason?:string}[]>([])
   const [testOutputs, setTestOutputs] = useState<Record<string, unknown> | null>(null)
   const [selectedFragmentCode, setSelectedFragmentCode] = useState<string | null>(null)
   const [operationStatus, setStatus] = useState<string | null>(null)
@@ -1353,6 +1354,7 @@ export function StrategyStudioWorkbench({
   const runTest = async () => {
     if (!canRun) return;
     setTestTrace(null)
+    setTestMatchedRules([])
     setOperationStatus(text('testRunning'))
     setTestOutputs(null)
     try {
@@ -1364,6 +1366,7 @@ export function StrategyStudioWorkbench({
       })
       if (!result) throw new Error(text('evaluateNoResult'))
       if (result.status === 'ERROR') throw new Error(result.errors?.join('; ') || text('evaluateNoResult'))
+      setTestMatchedRules(result.matchedRules ?? [])
       setTestOutputs(result.outputs ?? {})
       setTestTrace(result.traceId ?? null)
       setOperationStatus(result.matched ? text('testMatched') : text('testNotMatched'), 'success')
@@ -1915,6 +1918,18 @@ export function StrategyStudioWorkbench({
       )}
 
       {testOutputs && <dl className="strategy-test-outputs" data-testid="strategy-test-outputs">{Object.entries(testOutputs).map(([key, value]) => <div key={key}><dt>{scenarioTable.outputs.find((output) => output.id === key)?.label || key}</dt><dd>{typeof value === 'object' ? text('structuredOutput') : scenarioTable.outputs.find(output => output.id === key)?.valueLabels?.[String(value)] ?? String(value)}</dd></div>)}</dl>}
+      {testOutputs && <section className="mt-4 rounded-lg border border-slate-200 bg-slate-50/40 p-4 text-sm" data-testid="strategy-test-reason">
+        <h5 className="mb-2 font-semibold">{text('matchExplanation')}</h5>
+        {testMatchedRules.length ? testMatchedRules.map((hit,index)=>{
+          const row=scenarioTable.rules.find(rule=>rule.ruleId===hit.ruleId);
+          const operators:Record<string,string>={EQ:'=',NE:'≠',GT:'>',GTE:'≥',LT:'<',LTE:'≤',IN:'∈',NOT_IN:'∉'};
+          const conditions=row?Object.entries(row.when).filter(([,cell])=>cell.value!==undefined&&cell.value!==null&&cell.value!==''&&cell.value!=='-').map(([id,cell])=>{
+            const input=scenarioTable.inputs.find(input=>input.id===id);const value=Array.isArray(cell.value)?cell.value.map(value=>input?.valueLabels?.[String(value)]??String(value)).join(', '):typeof cell.value==='object'?text('structuredOutput'):input?.valueLabels?.[String(cell.value)]??String(cell.value);
+            return `${input?.label||id} ${operators[cell.operator]||cell.operator} ${value}`;
+          }):[];
+          return <p key={hit.ruleId||index} className="leading-7">{row?text('matchedTableRow',{row:scenarioTable.rules.indexOf(row)+1}):text('explanationUnavailable')}{conditions.length?` · ${conditions.join(text('conditionAnd'))}`:''}</p>;
+        }):<p className="text-slate-500">{text('explanationUnavailable')}</p>}
+      </section>}
       {testOutputs && testTrace && <details className="strategy-test-trace"><summary>{text('testTraceTitle')}</summary><code>{testTrace}</code></details>}
           <button
             type="button"

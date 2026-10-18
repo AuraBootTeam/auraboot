@@ -205,7 +205,8 @@ describe('EventPolicyDesignerWorkflow', () => {
     expect(screen.getByTestId('epd-workflow')).toBeInTheDocument();
     expect(screen.getByTestId('epd-step-trigger')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('投诉表单提交策略');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('FORM_SUBMITTED');
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('草稿');
     expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('DRAFT');
     expect(screen.getByTestId('epd-step-rules')).toBeInTheDocument();

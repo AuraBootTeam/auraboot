@@ -2740,10 +2740,19 @@ export function FormPageContent(props: PageContentProps) {
                             data-block-id={block.id}
                             className={`block-custom mb-5 ${block.className || ''}`}
                           >
-                            <ComponentLoader
+                            {block.extension?.collapsible ? (
+                              <FormSection
+                                title={getLocalizedText(block.title, locale, t)}
+                                collapsible
+                                defaultCollapsed={block.extension.defaultCollapsed === true}
+                                testId={`custom-section-${block.id}`}
+                              >
+                                <ComponentLoader componentName={block.component} props={{ block, runtime: customBlockRuntime }} />
+                              </FormSection>
+                            ) : <ComponentLoader
                               componentName={block.component}
                               props={{ block, runtime: customBlockRuntime }}
-                            />
+                            />}
                           </div>
                         </BlockErrorBoundary>
                       );

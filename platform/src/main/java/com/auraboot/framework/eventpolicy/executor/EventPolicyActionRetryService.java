@@ -34,6 +34,8 @@ public class EventPolicyActionRetryService {
 
     private final DrtPolicyExecLogMapper execLogMapper;
     private final PolicyExecutor policyExecutor;
+    private final com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor identities;
+    private final com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper members;
 
     @Value("${auraboot.event-policy.retry.batch-size:50}")
     private int defaultBatchSize;
@@ -90,7 +92,25 @@ public class EventPolicyActionRetryService {
         MetaContextSnapshot snapshot = MetaContextSnapshot.capture();
         try {
             MetaContext.setSystemTenantContext(row.getTenantId());
-            MetaContext.runWithCommandPermitScope("ALL", () -> {
+            Map<String,Object> actor = row.getContextPayload() != null && row.getContextPayload().get("actor") instanceof Map<?,?> rawActor
+                    ? toStringKeyMap(rawActor) : Map.of();
+            Long actorId = actor.get("userId") instanceof Number number ? number.longValue() : null;
+            if (actorId != null && actorId > 0) {
+                var user = identities.findActiveTenantUser(row.getTenantId(), actorId.toString());
+                var member = members.findByTenantIdAndUserId(row.getTenantId(), actorId);
+                if (user == null || member == null || !row.getTenantId().equals(member.getTenantId())
+                        || !actorId.equals(member.getUserId()) || Boolean.TRUE.equals(member.getDeletedFlag())
+                        || !"active".equalsIgnoreCase(member.getStatus())) {
+                    throw new IllegalStateException("The original action actor is no longer an active member");
+                }
+                MetaContext.setContext(row.getTenantId(), actorId, user.pid(), user.username());
+                MetaContext.setMemberId(member.getId());
+            }
+            var previousPrincipal = com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current().orElse(null);
+            var previousEnvelope = com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current().orElse(null);
+            com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear();
+            com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear();
+            try {
                 ResolvedActionPlan plan = actionPlan(row);
                 DecisionContext context = decisionContext(row.getContextPayload());
                 EventPolicyResult policyResult = new EventPolicyResult(
@@ -104,7 +124,10 @@ public class EventPolicyActionRetryService {
                         StringUtils.hasText(row.getDecisionTraceId()) ? List.of(row.getDecisionTraceId()) : List.of());
                 policyExecutor.execute(policyResult, context, FailureStrategy.RETRY_ASYNC,
                         row.getTenantId(), row.getDecisionTraceId(), row.getCorrelationId());
-            });
+            } finally {
+                com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.restore(previousEnvelope);
+                com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(previousPrincipal);
+            }
             return true;
         } catch (Exception e) {
             log.warn("EventPolicy retry worker failed for idempotencyKey={}: {}",

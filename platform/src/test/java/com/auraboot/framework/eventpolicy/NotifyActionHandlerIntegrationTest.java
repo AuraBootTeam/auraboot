@@ -62,7 +62,7 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
 
         Long tid = getTestTenant().getId();
         EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
-                Map.of("record", Map.of("entityCode", targetKey, "recordPid", "CMP-N-1",
+                Map.of("actor", Map.of("userId", -1L, "userPid", "forged-actor"), "record", Map.of("entityCode", targetKey, "recordPid", "CMP-N-1",
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
@@ -72,6 +72,11 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
                 .containsEntry("recipientType", "USER")
                 .containsEntry("recipientId", String.valueOf(userId))
                 .containsEntry("sentCount", 1);
+
+        String loggedActor = jdbcTemplate.queryForObject(
+                "select context_payload->'actor'->>'userId' from ab_drt_policy_exec_log where tenant_id=? and policy_code=?",
+                String.class, tid, code);
+        assertThat(loggedActor).isEqualTo(String.valueOf(userId));
 
         // a real in-app notification was persisted for the target user by NotificationService
         Map<String, Object> n = jdbcTemplate.queryForMap(

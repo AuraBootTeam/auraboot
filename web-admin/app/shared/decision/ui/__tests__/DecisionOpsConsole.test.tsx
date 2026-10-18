@@ -2160,8 +2160,10 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('doc-panel-designer')).toBeInTheDocument();
     expect(screen.getByTestId('epd-workflow')).toBeInTheDocument();
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('Policy One');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('p1');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('p1');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('p1');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('FORM_SUBMITTED');
   });
 
   it('switches to Designer (F3) tab and shows the workflow stepper', () => {

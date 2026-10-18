@@ -759,13 +759,7 @@ export function EventPolicyDesignerWorkflow({
                   selectedPolicy?.policyCode ??
                   copy('no_policy_selected')}
               </strong>
-              <div className="epd-context-meta">
-                <span>{selectedPolicy?.policyCode ?? '-'}</span>
-                <span>{selectedPolicy?.eventType ?? '-'}</span>
-                <span>
-                  {selectedPolicy?.targetType ?? '-'} / {selectedPolicy?.targetKey ?? '-'}
-                </span>
-              </div>
+
             </div>
             <span className={`epd-status epd-status-${String(publishStatus).toLowerCase()}`}>
               {policyStatusLabel(publishStatus)}
@@ -783,18 +777,12 @@ export function EventPolicyDesignerWorkflow({
           )}
           <div className="epd-summary-grid">
             <div className="epd-summary-card">
-              <span>{copy('policy_code')}</span>
-              <strong>{selectedPolicy?.policyCode ?? '-'}</strong>
-            </div>
-            <div className="epd-summary-card">
               <span>{copy('trigger_event')}</span>
-              <strong>{selectedPolicy?.eventType ?? '-'}</strong>
+              <strong>{selectedPolicy?.eventType === 'COMMAND_COMPLETED' ? copy('business_operation_committed') : copy('event_driven_policy')}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('target_object')}</span>
-              <strong>
-                {selectedPolicy?.targetType ?? '-'} / {selectedPolicy?.targetKey ?? '-'}
-              </strong>
+              <strong>{fields.find(field => field.modelCode === selectedPolicy?.targetKey)?.modelName || copy('model_name_unavailable')}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('match_mode')}</span>
