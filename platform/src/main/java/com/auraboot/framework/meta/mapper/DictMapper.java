@@ -371,11 +371,11 @@ public interface DictMapper extends BaseMapper<Dict> {
      * @param status 状态（可选）
      * @return 字典列表
      */
+    // Administration includes non-current drafts/deprecated versions needed for lifecycle actions.
     @Select("""
         <script>
         SELECT * FROM ab_dict
         WHERE tenant_id = #{tenantId}
-          AND is_current = TRUE
           AND status != 'disabled'
         <if test="code != null and code != ''">
           AND code LIKE CONCAT('%', #{code}, '%')

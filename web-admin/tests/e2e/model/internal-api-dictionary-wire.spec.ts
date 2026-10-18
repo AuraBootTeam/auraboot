@@ -174,6 +174,16 @@ test('all registered dictionary operations satisfy their real JSON response stru
       (await call('post', '/api/meta/dict/{pid}/unpublish', `/api/meta/dict/${pid}/unpublish`))
         .status,
     ).toBe('deprecated');
+    const manageable = await call(
+      'get',
+      '/api/meta/dict',
+      `/api/meta/dict?code=${code}&pageNum=1&pageSize=10`,
+    );
+    expect(manageable.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ pid, status: 'deprecated', isCurrent: false }),
+      ]),
+    );
     expect(
       (await call('post', '/api/meta/dict/{pid}/publish', `/api/meta/dict/${pid}/publish`)).status,
     ).toBe('published');

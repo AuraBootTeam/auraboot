@@ -118,3 +118,12 @@ are checked against their own status declaration. Its claim is
 `json-response-structure-only`: format validation and business invariants need
 separate assertions. A permissive or optional producer schema remains a producer
 contract gap; a passing structural check cannot prove a complete API contract.
+
+## Dictionary lifecycle queries
+
+The administrative dictionary list includes non-current versions so that an
+unpublished dictionary remains available for management and deletion. Disabled
+versions remain excluded from the normal management list. Version, status and
+PID identify the selected record; unpublish changes status to `deprecated` and
+clears its current-version flag. A batch deletion response is the actual number
+deleted and may be zero for protected published records.
