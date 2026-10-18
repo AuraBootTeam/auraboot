@@ -165,8 +165,11 @@ describe('LlmProvidersPage scoped configuration', () => {
     await waitFor(() => expect(state.save).toHaveBeenCalledWith(expect.objectContaining({ pid: 'existing-llm', priority: 7, serviceType: 'llm', configLevel: 'tenant' })));
     expect(screen.getByTestId('provider-edit-panel')).toBeInTheDocument();
     expect(screen.getByTestId('field-priority')).toHaveValue(7);
+    // The first failed request must finish before the disabled button can accept a retry.
+    await waitFor(() => expect(screen.getByTestId('panel-save-btn')).toBeEnabled());
     state.save.mockResolvedValue(true);
     fireEvent.click(screen.getByTestId('panel-save-btn'));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByTestId('provider-edit-panel')).not.toBeInTheDocument());
   });
 });
