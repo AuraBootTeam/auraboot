@@ -1,368 +1,261 @@
-/**
- * Team Management Depth E2E Tests
- *
- * Tests TM-010 to TM-015: Advanced team management features
- * - Add member to team
- * - Remove member from team
- * - Role change for team member
- * - Non-empty team delete prevention
- * - Search/filter teams
- * - Team member list display
- *
- * Navigate to /organization/teams (platform tsx pages).
- * Uses real database + API, NO MOCKING.
- *
- * @since 6.3.0
- */
-
-import { test, expect } from '../../fixtures';
-import { uniqueId } from '../helpers';
-import { ErrorCodes } from '~/shared/services/http-client/types';
+/** Team membership journeys use the current DSL entry and real tenant members. */
+import { test, expect, type Page } from '../../fixtures';
+import type { APIResponse, TestInfo } from '@playwright/test';
 import { BASE_URL } from '../../helpers/environments';
+import {
+  ensureSidebarExpanded, navigateToMenuByClick, findRowInPaginatedList,
+  clickRowActionByLocator, acceptConfirmDialog, ensureFilterFormOpen,
+} from '../helpers';
 
+type Locale = 'zh-CN' | 'en-US';
+type Team = { pid: string; code: string; name: string };
+type Member = { pid: string; memberPid: string; userPid: string; userName: string; userEmail: string; role: string };
+type Candidate = { pid: string; userPid?: string; email?: string; user?: { pid: string; email: string } };
 
-async function getCurrentUserId(page: import('@playwright/test').Page): Promise<string | null> {
-  const resp = await page.request.get(`${BASE_URL}/api/auth/me`);
-  if (!resp.ok()) return null;
-  const body = await resp.json().catch(() => ({} as any));
-  const id = body?.data?.id ?? body?.data?.userId ?? body?.data?.user?.id;
-  return id ? String(id) : null;
+async function success<T>(response: Pick<APIResponse, 'ok' | 'url' | 'status' | 'json'>): Promise<T> {
+  expect(response.ok(), `${response.url()} returned HTTP ${response.status()}`).toBe(true);
+  const body = await response.json();
+  expect(String(body.code)).toBe('0');
+  return body.data as T;
+}
+async function createTeam(page: Page, label: string): Promise<Team> {
+  const code = `e2e-${label}-${Date.now()}`;
+  const team = await success<Team>(await page.request.post('/api/org/teams', {
+    data: { code, name: `Team ${code}`, description: 'Team membership acceptance' },
+  }));
+  expect(team.pid).toMatch(/^[0-9A-Z]{26}$/);
+  return team;
+}
+async function candidates(page: Page): Promise<Candidate[]> {
+  const body = await success<{ records: Candidate[] }>(await page.request.post('/api/tenant/members/search', {
+    data: { status: 'active', pageNum: 1, pageSize: 100 },
+  }));
+  expect(body.records.length).toBeGreaterThanOrEqual(2);
+  return body.records;
+}
+async function addFixture(page: Page, team: Team, candidate: Candidate): Promise<Member> {
+  return success<Member>(await page.request.post(`/api/org/teams/${team.pid}/members`, {
+    data: { memberPid: candidate.pid, role: 'member' },
+  }));
+}
+async function members(page: Page, team: Team): Promise<Member[]> {
+  return success<Member[]>(await page.request.get(`/api/org/teams/${team.pid}/members`));
+}
+async function openList(page: Page, locale: Locale): Promise<void> {
+  await page.goto('/home');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  await ensureSidebarExpanded(page);
+  await navigateToMenuByClick(page, locale === 'zh-CN' ? ['组织管理', '团队'] : ['Organization', 'Teams']);
+  await expect(page).toHaveURL(/\/organization\/teams(?:[?#]|$)/);
+  await expect(page.locator('table')).toBeVisible();
+}
+async function openTeam(page: Page, team: Team, locale: Locale, info?: TestInfo): Promise<void> {
+  await openList(page, locale);
+  const row = await findRowInPaginatedList(page, team.name);
+  await expect(row).toBeVisible();
+  if (info) await capture(page, info, `tm-001-${locale}.png`);
+  await clickRowActionByLocator(page, row, 'members');
+  await expect(page).toHaveURL(new RegExp(`/organization/teams/${team.pid}(?:[?#]|$)`));
+  await expect(page.getByText(team.name, { exact: true }).first()).toBeVisible();
+}
+function memberSection(page: Page, locale: Locale) {
+  return page.locator('section').filter({ has: page.getByRole('heading', {
+    level: 3, name: locale === 'zh-CN' ? /^团队成员 \(/ : /^Team members \(/,
+  }) });
+}
+async function capture(page: Page, info: TestInfo, name: string): Promise<void> {
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /出错了|Something went wrong/i })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath(name), fullPage: true });
 }
 
-test.describe('Team Management Depth', () => {
-  const teamCodes: string[] = [];
-
-  test.afterAll(async ({ browser }) => {
-    if (teamCodes.length === 0) return;
-
-    const context = await browser.newContext({
-      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+for (const locale of ['zh-CN', 'en-US'] as const) {
+  test.describe(`Team Management Depth ${locale}`, () => {
+    test.use({ locale, viewport: { width: 1440, height: 1000 } });
+    test.setTimeout(90_000);
+    test.beforeEach(async ({ context }) => {
+      await context.addCookies([{ name: 'locale', value: locale, url: BASE_URL }]);
     });
-    const page = await context.newPage();
 
-    for (const code of teamCodes) {
-      try {
-        const resp = await page.request.get(`${BASE_URL}/api/org/teams`);
-        const body = await resp.json();
-        const teams = body?.data || [];
-        const team = teams.find((t: any) => t.code === code);
-        if (team) {
-          // Remove all members first to allow deletion
-          const membersResp = await page.request.get(`${BASE_URL}/api/org/teams/${team.pid}/members`);
-          if (membersResp.ok()) {
-            const membersBody = await membersResp.json();
-            const members = membersBody?.data || [];
-            for (const member of members) {
-              await page.request.delete(
-                `${BASE_URL}/api/org/teams/${team.pid}/members/${member.pid}`
-              ).catch(() => {});
-            }
-          }
-          await page.request.delete(`${BASE_URL}/api/org/teams/${team.pid}`);
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
-
-    await page.close();
-    await context.close();
-  });
-
-  /**
-   * TM-010: Add member to team via UI @smoke
-   */
-  test('TM-010: add member to team via UI @smoke', async ({ page }) => {
-    // Create team via API
-    const code = `e2e-addm-${Date.now()}`;
-    const name = `AddMember Test ${Date.now()}`;
-    teamCodes.push(code);
-
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name, description: 'Add member test' },
+    test('TM-010: add member to team via UI @smoke', async ({ page }, info) => {
+      const team = await createTeam(page, 'add');
+      const candidate = (await candidates(page))[0];
+      await openTeam(page, team, locale, info);
+      const add = page.getByTestId('team-members-add');
+      await expect(add).toBeEnabled();
+      await add.click();
+      const dialog = page.getByRole('dialog', { name: locale === 'zh-CN' ? '添加团队成员' : 'Add team member' });
+      await expect(dialog).toBeVisible();
+      await dialog.getByTestId('team-members-select').selectOption(candidate.pid);
+      await expect(dialog.getByTestId('team-members-confirm')).toBeEnabled();
+      await capture(page, info, `tm-010-open-${locale}.png`);
+      const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/org/teams/${team.pid}/members` && r.request().method() === 'POST');
+      await dialog.getByTestId('team-members-confirm').click();
+      const addedResponse = await response;
+      expect(addedResponse.request().postDataJSON()).toEqual({ memberPid: candidate.pid, role: 'member' });
+      const added = await success<Member>(addedResponse);
+      expect(added.memberPid).toBe(candidate.pid);
+      expect(added.pid).not.toBe(candidate.pid);
+      await expect(dialog).toBeHidden();
+      await page.reload();
+      await expect(memberSection(page, locale).getByRole('row').filter({ hasText: added.userEmail })).toBeVisible();
+      expect((await members(page, team)).map(member => member.pid)).toContain(added.pid);
+      await capture(page, info, `tm-010-save-${locale}.png`);
     });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
-    const teamPid = createBody.data.pid;
 
-    // Navigate to team detail
-    await page.goto(`/organization/teams/${teamPid}`);
-    await expect(page.locator(`h1:has-text("${name}")`)).toBeVisible({ timeout: 10000 });
-
-    // Click add member button
-    const addMemberBtn = page.locator('[data-testid="add-member-btn"]');
-    await expect(addMemberBtn).toBeVisible({ timeout: 5000 });
-    await addMemberBtn.click();
-
-    // Wait for member select
-    const memberSelect = page.locator('[data-testid="member-select"]');
-    const hasMemberSelect = await memberSelect.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (hasMemberSelect) {
-      const options = memberSelect.locator('option');
-      const optionCount = await options.count();
-
-      if (optionCount > 1) {
-        const firstOption = await options.nth(1).getAttribute('value');
-        if (firstOption) {
-          await memberSelect.selectOption(firstOption);
-
-          // Confirm add member
-          const confirmBtn = page.locator('[data-testid="add-member-confirm-btn"]');
-          await confirmBtn.click();
-
-          // Verify member appears in the table
-          await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 5000 });
-        }
-      }
-    }
-  });
-
-  /**
-   * TM-011: Remove member from team via UI
-   */
-  test('TM-011: remove member from team via UI', async ({ page }) => {
-    // Create team via API
-    const code = `e2e-rmm-${Date.now()}`;
-    const name = `RemoveMember Test ${Date.now()}`;
-    teamCodes.push(code);
-
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name },
-    });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
-    const teamPid = createBody.data.pid;
-
-    // Navigate to team detail
-    await page.goto(`/organization/teams/${teamPid}`);
-    await expect(page.locator(`h1:has-text("${name}")`)).toBeVisible({ timeout: 10000 });
-
-    // Add member first (API fallback avoids UI picker variant differences)
-    const currentUserId = await getCurrentUserId(page);
-    await page.request.post(`${BASE_URL}/api/org/teams/${teamPid}/members`, {
-      data: { userId: currentUserId ?? 'self', role: 'member' },
-    }).catch(() => null);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-
-    // Wait for member to appear
-    const firstRow = page.locator('table tbody tr').first();
-    const hasRow = await firstRow.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasRow) {
-      const membersResp = await page.request.get(`${BASE_URL}/api/org/teams/${teamPid}/members`);
-      const membersBody = await membersResp.json().catch(() => ({} as any));
-      const members = Array.isArray(membersBody?.data) ? membersBody.data : [];
-      expect(members.length).toBeGreaterThan(0);
-      return;
-    }
-
-    // Auto-accept confirm dialog for removal
-    page.on('dialog', (dialog) => dialog.accept());
-
-    // Click remove button
-    const removeBtn = page.locator('table tbody tr button').first();
-    await removeBtn.click();
-
-    // Verify member removed
-    const emptyState = page.getByText(/No members yet|暂无成员/i).first();
-    const hasEmptyState = await emptyState.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasEmptyState) {
-      await expect(page.locator('table tbody tr').first()).not.toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  /**
-   * TM-012: Team member role change
-   */
-  test('TM-012: team member role change', async ({ page }) => {
-    // Create team via API
-    const code = `e2e-role-${Date.now()}`;
-    const name = `RoleChange Test ${Date.now()}`;
-    teamCodes.push(code);
-
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name },
-    });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
-    const teamPid = createBody.data.pid;
-
-    // Navigate to team detail
-    await page.goto(`/organization/teams/${teamPid}`);
-    await expect(page.locator(`h1:has-text("${name}")`)).toBeVisible({ timeout: 10000 });
-
-    // Add member via API to avoid UI picker variant differences
-    const currentUserId = await getCurrentUserId(page);
-    await page.request.post(`${BASE_URL}/api/org/teams/${teamPid}/members`, {
-      data: { userId: currentUserId ?? 'self', role: 'member' },
-    }).catch(() => null);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    const firstRow = page.locator('table tbody tr').first();
-    const hasRow = await firstRow.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!hasRow) {
-      const membersResp = await page.request.get(`${BASE_URL}/api/org/teams/${teamPid}/members`);
-      const membersBody = await membersResp.json().catch(() => ({} as any));
-      const members = Array.isArray(membersBody?.data) ? membersBody.data : [];
-      expect(members.length).toBeGreaterThan(0);
-      return;
-    }
-
-    // Look for role selector in the member row
-    const roleSelect = page.locator('table tbody tr select, table tbody tr [data-testid*="role"]').first();
-    const hasRoleSelect = await roleSelect.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (hasRoleSelect) {
-      // Try to change the role
-      const roleOptions = roleSelect.locator('option');
-      const roleOptionCount = await roleOptions.count();
-
-      if (roleOptionCount > 1) {
-        const secondRole = await roleOptions.nth(1).getAttribute('value');
-        if (secondRole) {
-          await roleSelect.selectOption(secondRole);
-
-          // Wait for API response
-          await page.waitForResponse(
-            (r) => r.url().includes('/api/org/teams') && r.request().method().toLowerCase() === 'put',
-            { timeout: 5000 }
-          ).catch(() => null);
-        }
-      }
-    } else {
-      // Role change might use a different UI pattern
-      test.info().annotations.push({
-        type: 'note',
-        description: 'Role selector not found — role change may use edit dialog',
+    test('TM-011: remove member from team via UI', async ({ page }, info) => {
+      const team = await createTeam(page, 'remove');
+      const added = await addFixture(page, team, (await candidates(page))[0]);
+      await openTeam(page, team, locale);
+      const row = memberSection(page, locale).getByRole('row').filter({ hasText: added.userEmail });
+      await expect(row).toBeVisible();
+      const remove = page.getByTestId(`team-members-remove-${added.pid}`);
+      const deletes: string[] = [];
+      page.on('request', request => { if (request.method() === 'DELETE' && new URL(request.url()).pathname.startsWith(`/api/org/teams/${team.pid}/members/`)) deletes.push(request.url()); });
+      const expectedMessage = locale === 'zh-CN' ? `确认将 ${added.userName} 移出团队？` : `Remove ${added.userName} from the team?`;
+      page.once('dialog', async dialog => {
+        expect(dialog.type()).toBe('confirm'); expect(dialog.message()).toBe(expectedMessage);
+        await info.attach('remove-confirm-cancel', { body: JSON.stringify({ message: dialog.message(), accepted: false }), contentType: 'application/json' });
+        await dialog.dismiss();
       });
-    }
-  });
-
-  /**
-   * TM-013: Non-empty team cascade deletion
-   * Backend cascade-deletes members and the team in a single transaction.
-   */
-  test('TM-013: non-empty team can be cascade deleted', async ({ page }) => {
-    // Create team via API
-    const code = `e2e-cascade-${Date.now()}`;
-    const name = `CascadeDel Test ${Date.now()}`;
-    teamCodes.push(code);
-
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name },
-    });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
-    const teamPid = createBody.data.pid;
-
-    // Add a member via API to make the team non-empty
-    await page.request.post(`${BASE_URL}/api/org/teams/${teamPid}/members`, {
-      data: { userId: 'self', role: 'member' },
-    }).catch(() => null);
-
-    // Navigate to team list
-    await page.goto('/organization/teams');
-    await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 5000 });
-
-    // Auto-accept confirm dialog
-    page.on('dialog', (dialog) => dialog.accept());
-
-    const deleteBtn = page.locator(`[data-testid="team-delete-${code}"]`);
-    const hasDeleteBtn = await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (hasDeleteBtn) {
-      // Set up response listener BEFORE clicking
-      const deleteResponsePromise = page.waitForResponse(
-        (r) => r.url().includes('/api/org/teams') && r.request().method().toLowerCase() === 'delete',
-        { timeout: 5000 }
-      ).catch(() => null);
-
-      await deleteBtn.click();
-
-      // Wait for the DELETE response
-      const deleteResp = await deleteResponsePromise;
-
-      // Backend cascade-deletes members then team — team should be removed from list
-      await expect(page.locator(`text=${name}`)).not.toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  /**
-   * TM-014: Search teams on list page
-   */
-  test('TM-014: search teams on list page', async ({ page }) => {
-    // Create a team with unique name
-    const code = `e2e-search-${Date.now()}`;
-    const name = `SearchUnique${Date.now()}`;
-    teamCodes.push(code);
-
-    await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name },
+      await remove.click();
+      await expect(row).toBeVisible();
+      expect(deletes).toHaveLength(0);
+      expect((await members(page, team)).map(member => member.pid)).toContain(added.pid);
+      await capture(page, info, `tm-011-cancel-${locale}.png`);
+      page.once('dialog', async dialog => { expect(dialog.message()).toBe(expectedMessage); await dialog.accept(); });
+      const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/org/teams/${team.pid}/members/${added.pid}` && r.request().method() === 'DELETE');
+      await remove.click();
+      await success<boolean>(await response);
+      expect(deletes).toHaveLength(1);
+      await page.reload();
+      await expect(memberSection(page, locale).getByText(locale === 'zh-CN' ? '暂无团队成员' : 'No team members', { exact: true })).toBeVisible();
+      expect(await members(page, team)).toEqual([]);
+      await capture(page, info, `tm-011-save-${locale}.png`);
     });
 
-    await page.goto('/organization/teams');
-    await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 5000 });
-
-    // Look for a search input
-    const searchInput = page.locator(
-      'input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]'
-    ).first();
-    const hasSearch = await searchInput.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (hasSearch) {
-      await searchInput.fill('SearchUnique');
-
-      // Wait for filter to apply
-      await page.waitForResponse(
-        (r) => r.url().includes('/api/org/teams'),
-        { timeout: 5000 }
-      ).catch(() => null);
-
-      // Team should still be visible after filtering
-      const teamVisible = await page.locator(`text=${name}`)
-        .isVisible({ timeout: 5000 }).catch(() => false);
-      expect(teamVisible).toBe(true);
-    } else {
-      // No search input — just verify team list shows data
-      const rows = page.locator('table tbody tr, [data-testid*="team-card"]');
-      const rowCount = await rows.count();
-      expect(rowCount).toBeGreaterThan(0);
-    }
-  });
-
-  /**
-   * TM-015: Team member list displays correctly
-   */
-  test('TM-015: team member list displays correctly @smoke', async ({ page }) => {
-    // Create team and add member via API
-    const code = `e2e-mlist-${Date.now()}`;
-    const name = `MemberList Test ${Date.now()}`;
-    teamCodes.push(code);
-
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name, description: 'Member list test' },
+    test('TM-012: governed team leadership changes persist in the member role display', async ({ page }) => {
+      const team = await createTeam(page, 'leader');
+      const candidate = (await candidates(page))[0];
+      const added = await addFixture(page, team, candidate);
+      await openTeam(page, team, locale);
+      const row = memberSection(page, locale).getByRole('row').filter({ hasText: added.userEmail });
+      await expect(row.getByText(locale === 'zh-CN' ? '成员' : 'Member', { exact: true })).toBeVisible();
+      // Leadership is governed by the team API; the membership picker adds ordinary members.
+      const userPid = candidate.userPid ?? candidate.user?.pid;
+      expect(userPid).toEqual(expect.any(String));
+      await success<Team>(await page.request.put(`/api/org/teams/${team.pid}`, { data: { leaderId: userPid } }));
+      expect((await members(page, team)).find(member => member.pid === added.pid)?.role).toBe('LEADER');
+      await page.reload();
+      await expect(row.getByText(locale === 'zh-CN' ? '负责人' : 'Leader', { exact: true })).toBeVisible();
     });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
-    const teamPid = createBody.data.pid;
 
-    // Navigate to team detail
-    await page.goto(`/organization/teams/${teamPid}`);
-    await expect(page.locator(`h1:has-text("${name}")`)).toBeVisible({ timeout: 10000 });
+    test('TM-013: non-empty team can be cascade deleted', async ({ page }) => {
+      const team = await createTeam(page, 'cascade');
+      await addFixture(page, team, (await candidates(page))[0]);
+      expect(await members(page, team)).toHaveLength(1);
+      await openList(page, locale);
+      const row = await findRowInPaginatedList(page, team.name);
+      const response = page.waitForResponse(r => decodeURIComponent(new URL(r.url()).pathname).endsWith('/commands/execute/org:delete_team') && r.request().method() === 'POST');
+      await clickRowActionByLocator(page, row, 'delete');
+      await acceptConfirmDialog(page);
+      const deleted = await response;
+      expect(deleted.request().postDataJSON().targetRecordPid).toBe(team.pid);
+      await success<unknown>(deleted);
+      await expect(page.getByText(team.name, { exact: true })).toHaveCount(0);
+      expect((await success<Team[]>(await page.request.get('/api/org/teams'))).some(item => item.pid === team.pid)).toBe(false);
+    });
 
-    // Verify the add member button exists
-    await expect(page.locator('[data-testid="add-member-btn"]')).toBeVisible();
+    test('TM-014: search teams on list page', async ({ page }) => {
+      const team = await createTeam(page, 'search');
+      await openList(page, locale);
+      await ensureFilterFormOpen(page);
+      const input = page.locator('[data-authoring-node-id="name"] input').first();
+      await expect(input).toBeVisible();
+      await input.fill(team.name);
+      const response = page.waitForResponse(r => r.url().includes('/api/dynamic/ab_team/list') && r.request().method() === 'GET');
+      await page.getByTestId('filter-search').click();
+      const body = await success<{ records: Array<{ name: string }> }>(await response);
+      expect(body.records.map(item => item.name)).toEqual([team.name]);
+      await expect(page.locator('tbody tr').filter({ hasText: team.name })).toBeVisible();
+    });
 
-    // Page should have member section — either a member table or empty state text
-    // Use separate locators to avoid mixing CSS and text= selectors
-    const hasTable = await page.locator('table').first().isVisible({ timeout: 3000 }).catch(() => false);
-    const hasEmptyState = await page.getByText(/No members yet|暂无成员/i).isVisible({ timeout: 3000 }).catch(() => false);
-    expect(hasTable || hasEmptyState).toBe(true);
+    test('TM-015: team member list displays correctly @smoke', async ({ page }, info) => {
+      const team = await createTeam(page, 'list');
+      const options = await candidates(page);
+      const added = await Promise.all(options.slice(0, 2).map(candidate => addFixture(page, team, candidate)));
+      await openTeam(page, team, locale);
+      const section = memberSection(page, locale);
+      for (const member of added) {
+        const row = section.getByRole('row').filter({ hasText: member.userEmail });
+        await expect(row).toContainText(member.userName);
+        await expect(row.getByText(locale === 'zh-CN' ? '成员' : 'Member', { exact: true })).toBeVisible();
+      }
+      await expect(section.getByRole('columnheader')).toHaveText(locale === 'zh-CN' ? ['用户', '邮箱', '角色', '加入时间', '操作'] : ['User', 'Email', 'Role', 'Joined', 'Actions']);
+      await capture(page, info, `tm-015-${locale}.png`);
+    });
 
-    // Team detail page structure:
-    // - Heading with team name
-    // - Add member button
-    // - Member table (or empty state)
-    const heading = page.locator(`h1:has-text("${name}")`);
-    await expect(heading).toBeVisible();
+    test('TM-readonly: the declared view capability exposes facts without member writes', async ({ page, browser }, info) => {
+      const team = await createTeam(page, 'readonly');
+      const added = await addFixture(page, team, (await candidates(page))[0]);
+      const roleCode = `team_reader_${Date.now()}`;
+      const role = await success<{ pid: string }>(await page.request.post('/api/roles', {
+        data: { code: roleCode, name: roleCode, type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'all' },
+      }));
+      await success<unknown>(await page.request.put(`/api/permission/capabilities?rolePid=${role.pid}`, {
+        data: ['org.cap.team_view'],
+      }));
+      const email = `${roleCode}@e2e.local`;
+      await success<unknown>(await page.request.post('/api/admin/users', {
+        data: { email, displayName: 'Team reader', initialPassword: 'Test2026x', roleCodes: [roleCode], sendInviteEmail: false },
+      }));
+      const context = await browser.newContext({
+        baseURL: BASE_URL, locale, viewport: { width: 1440, height: 1000 },
+        storageState: { cookies: [], origins: [] }, extraHTTPHeaders: { Referer: `${BASE_URL}/` },
+      });
+      try {
+        await context.addCookies([{ name: 'locale', value: locale, url: BASE_URL }]);
+        const reader = await context.newPage();
+        await reader.goto('/login');
+        await expect(reader.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+        await reader.locator('input#identifier').fill(email);
+        await reader.locator('input#password').fill('Test2026x');
+        await reader.locator('form button[type="submit"]').click();
+        await reader.waitForURL(url => !url.pathname.includes('/login'));
+        const writes: string[] = [];
+        reader.on('request', request => {
+          if (request.method() !== 'GET' && new URL(request.url()).pathname.startsWith(`/api/org/teams/${team.pid}/members`)) writes.push(request.method());
+        });
+        await openTeam(reader, team, locale);
+        await expect(memberSection(reader, locale).getByRole('row').filter({ hasText: added.userEmail })).toBeVisible();
+        await expect(reader.getByTestId('team-members-add')).toHaveCount(0);
+        await expect(reader.locator('[data-testid^="team-members-remove-"]')).toHaveCount(0);
+        expect(writes).toEqual([]);
+        await capture(reader, info, `tm-readonly-${locale}.png`);
+        const denied = await reader.request.post(`/api/org/teams/${team.pid}/members`, {
+          data: { memberPid: added.memberPid, role: 'member' },
+        });
+        expect(denied.status()).toBe(403);
+        expect(String((await denied.json()).code)).toBe('403');
+        expect((await members(page, team)).map(member => member.pid)).toEqual([added.pid]);
+      } finally { await context.close(); }
+    });
+
+    test('TM-recovery: a failed member request requires explicit retry before adding', async ({ page }, info) => {
+      const team = await createTeam(page, 'recovery');
+      let fail = true;
+      await page.route(`**/api/org/teams/${team.pid}/members`, route => fail ? route.abort('failed') : route.continue());
+      await openTeam(page, team, locale);
+      await expect(page.getByTestId('team-members-load-error')).toBeVisible();
+      await expect(page.getByTestId('team-members-add')).toBeDisabled();
+      await capture(page, info, `tm-recovery-${locale}.png`);
+      fail = false;
+      const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/org/teams/${team.pid}/members`);
+      await page.getByTestId('team-members-retry').click();
+      await success<Member[]>(await response);
+      await expect(page.getByTestId('team-members-load-error')).toHaveCount(0);
+      await expect(page.getByTestId('team-members-add')).toBeEnabled();
+      await capture(page, info, `tm-recovered-${locale}.png`);
+    });
   });
-});
+}

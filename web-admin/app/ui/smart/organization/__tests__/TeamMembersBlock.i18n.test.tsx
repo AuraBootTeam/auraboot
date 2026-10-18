@@ -24,7 +24,8 @@ beforeEach(() => { vi.resetAllMocks(); f.locale = 'en-US'; f.fetch.mockResolvedV
 describe('team-member DSL title, localized states and API payloads', () => {
   for (const locale of ['en-US', 'zh-CN']) {
     const english = locale === 'en-US';
-    it(`${locale} resolves the imported DSL title, table labels and unchanged record/member identity`, async () => {
+    it.each(['leader', 'LEADER'])(`${locale} resolves the imported DSL title, table labels and unchanged record/member identity (%s)`, async (role) => {
+      f.fetch.mockResolvedValue([{ ...member, role }]);
       f.locale = locale; view(true); await screen.findByText('Aaron');
       expect(screen.getByRole('heading')).toHaveTextContent(english ? 'Team members (1)' : '\u56e2\u961f\u6210\u5458 (1)');
       expect(screen.getByRole('button', { name: english ? 'Add member' : '\u6dfb\u52a0\u6210\u5458' })).toBeEnabled();
