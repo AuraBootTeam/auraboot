@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import TEAM_TEXT from '~/ui/smart/organization/TeamMembers.i18n.json';
 import {
   fetchTeam,
   fetchTeamMembers,
@@ -21,6 +24,7 @@ interface TenantMemberOption {
 }
 
 export default function TeamDetailPage() {
+  const { locale } = useI18n();
   const { teamPid } = useParams();
   const navigate = useNavigate();
   const { showSuccessToast, showErrorToast } = useToastContext();
@@ -153,7 +157,7 @@ export default function TeamDetailPage() {
               {members.map((member) => (
                 <tr key={member.pid} className="hover:bg-subtle/70">
                   <td className="text-text px-6 py-4 text-sm font-medium">
-                    {member.userName || `User #${member.userId}`}
+                    {member.userName || member.userEmail || getLocalizedText(TEAM_TEXT.member, locale)}
                   </td>
                   <td className="text-text-2 px-6 py-4 text-sm">
                     {member.userEmail || '-'}

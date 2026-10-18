@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: c26e13f3c8880b6042ed01f5a884020f8faf514d10919e498924f463543349cb
+ * Contract SHA-256: b8908ee8d846908eac55472014a994000b0a0d07b4a1bbe9f7560b7be5a34592
  */
 export interface paths {
     "/api/activities": {
@@ -39040,30 +39040,30 @@ export interface components {
         };
         TeamMemberResponse: {
             /** Format: date-time */
-            joinedAt?: string;
-            memberPid?: string;
-            pid?: string;
-            role?: string;
-            userEmail?: string;
+            joinedAt: string;
+            memberPid?: string | null;
+            pid: string;
+            role: string;
+            userEmail?: string | null;
             /** Format: int64 */
-            userId?: number;
-            userName?: string;
-            userPid?: string;
+            userId: number;
+            userName?: string | null;
+            userPid?: string | null;
         };
         TeamResponse: {
-            code?: string;
+            code: string;
             /** Format: date-time */
-            createdAt?: string;
-            description?: string;
-            leaderId?: string;
-            leaderName?: string;
+            createdAt: string;
+            description?: string | null;
+            leaderId?: string | null;
+            leaderName?: string | null;
             /** Format: int32 */
-            memberCount?: number;
-            name?: string;
-            pid?: string;
-            status?: string;
+            memberCount: number;
+            name: string;
+            pid: string;
+            status: string;
             /** Format: date-time */
-            updatedAt?: string;
+            updatedAt: string;
         };
         TeamUpdateRequest: {
             description?: string;

@@ -298,6 +298,58 @@
       "tests": [
         "dashboard usage and account logout survive missing randomUUID"
       ]
+    },
+    "teamsWire": {
+      "purpose": "Nine real team REST operations, nullable fields, owned membership transitions and anonymous refusal; not browser, role or tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/team.spec.ts",
+      "tests": [
+        "generated team operations preserve owned memberships and nullable response fields"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/org/teams"
+        },
+        {
+          "method": "post",
+          "path": "/api/org/teams"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/teams/{pid}"
+        },
+        {
+          "method": "put",
+          "path": "/api/org/teams/{pid}"
+        },
+        {
+          "method": "delete",
+          "path": "/api/org/teams/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/teams/{teamPid}/members"
+        },
+        {
+          "method": "post",
+          "path": "/api/org/teams/{teamPid}/members"
+        },
+        {
+          "method": "delete",
+          "path": "/api/org/teams/{teamPid}/members/{memberPid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/teams/current-user"
+        }
+      ]
+    },
+    "teams": {
+      "purpose": "Owned team member UI journey through the registered DSL menu; not all organization or authorization coverage",
+      "spec": "web-admin/tests/e2e/model/internal-api-team.spec.ts",
+      "tests": [
+        "generated team memberships preserve the menu add reload and remove journey"
+      ]
     }
   },
   "scenarios": [
@@ -738,6 +790,58 @@
       "expected": "Browser confirmation logs out the owned session and subsequent identity access is HTTP401",
       "test": "dashboard usage and account logout survive missing randomUUID",
       "screenshot": "SESSION-04-logged-out.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-01",
+      "feature": "teams",
+      "action": "menu-detail-empty",
+      "branch": "happy",
+      "expected": "Real team menu and row member action open the persisted team with an empty members block",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-01-menu-detail-empty.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-02",
+      "feature": "teams",
+      "action": "select-owned-member",
+      "branch": "happy",
+      "expected": "The actual member dialog selects the owned actor by tenant-member PID",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-02-select-owned-member.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-03",
+      "feature": "teams",
+      "action": "add-reload",
+      "branch": "happy",
+      "expected": "Actual generated add operation persists a team membership and it remains visible after reload",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-03-add-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-04",
+      "feature": "teams",
+      "action": "remove-reload",
+      "branch": "happy",
+      "expected": "Actual remove operation targets the team-membership row PID and reload remains empty",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-04-remove-reload.png",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",

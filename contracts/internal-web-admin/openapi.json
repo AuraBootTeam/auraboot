@@ -48533,7 +48533,10 @@
             "type": "string"
           },
           "memberPid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pid": {
             "type": "string"
@@ -48542,19 +48545,34 @@
             "type": "string"
           },
           "userEmail": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "userId": {
             "format": "int64",
             "type": "integer"
           },
           "userName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "userPid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
+        "required": [
+          "joinedAt",
+          "pid",
+          "role",
+          "userId"
+        ],
         "type": "object"
       },
       "TeamResponse": {
@@ -48567,13 +48585,22 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "leaderId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "leaderName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "memberCount": {
             "format": "int32",
@@ -48593,6 +48620,15 @@
             "type": "string"
           }
         },
+        "required": [
+          "code",
+          "createdAt",
+          "memberCount",
+          "name",
+          "pid",
+          "status",
+          "updatedAt"
+        ],
         "type": "object"
       },
       "TeamUpdateRequest": {
