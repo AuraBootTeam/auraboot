@@ -1,14 +1,17 @@
 package com.auraboot.framework.plugin.validation;
 
+import com.auraboot.framework.meta.constant.CommandTargetVersionPolicy;
 import com.auraboot.framework.meta.constant.DslRegistry;
 import com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
-import org.springframework.stereotype.Component;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import org.springframework.stereotype.Component;
 
 import static com.auraboot.framework.plugin.validation.PluginValidationMessage.error;
 import static com.auraboot.framework.plugin.validation.PluginValidationMessage.warning;
@@ -24,6 +27,8 @@ import static com.auraboot.framework.plugin.validation.PluginValidationMessage.w
  */
 @Component
 public class ExecutionConfigValidator implements PluginValidator {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final Set<String> VALID_EXEC_TYPES = DslRegistry.CommandType.codes();
     private static final Set<String> VALID_AUTO_SET_STRATEGIES = DslRegistry.AutoSetStrategy.codes();
@@ -51,6 +56,38 @@ public class ExecutionConfigValidator implements PluginValidator {
             if (execConfig == null) continue;
 
             String path = "commands[" + i + "]";
+
+            // Preserve all existing modes; the new version-free intent is deliberately bounded.
+            try {
+                Map<String, Object> declared = new LinkedHashMap<>(execConfig);
+                if (cmd.getUnknownFields() != null)
+                    cmd.getUnknownFields().forEach(declared::putIfAbsent);
+                var policy = CommandTargetVersionPolicy.parse(OBJECT_MAPPER.valueToTree(declared));
+                if (policy == CommandTargetVersionPolicy.UNSUPPORTED) {
+                    boolean local =
+                            cmd.getBindingRules() != null && !cmd.getBindingRules().isEmpty();
+                    boolean global =
+                            manifest.getBindingRules() != null
+                                    && manifest.getBindingRules().stream()
+                                            .anyMatch(
+                                                    rule ->
+                                                            rule != null
+                                                                    && Objects.equals(
+                                                                            cmd.getCode(),
+                                                                            rule.getCommandCode()));
+                    if (local || global)
+                        throw new IllegalArgumentException(
+                                "Unsupported-version intent cannot declare binding rules");
+                }
+            } catch (IllegalArgumentException invalid) {
+                messages.add(
+                        error(
+                                "S-EXEC-TARGET-VERSION-POLICY",
+                                category(),
+                                path + ".executionConfig.options.targetVersionPolicy",
+                                "Command target version policy is invalid or incompatible with its"
+                                    + " execution contract"));
+            }
 
             // Validate type
             Object type = execConfig.get("type");

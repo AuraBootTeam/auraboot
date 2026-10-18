@@ -6104,5 +6104,15 @@
     "en-US": "No downstream consumers",
     "ja-JP": "下流の参照先はありません",
     "ko-KR": "다운스트림 소비자가 없습니다"
+  },
+  {
+    "key": "command.expected_version.unsupported",
+    "zh-CN": "此命令不接受版本参数，请刷新页面后重新操作。",
+    "en-US": "This command does not accept a version parameter. Refresh the page and try again."
+  },
+  {
+    "key": "command.target_version_policy.invalid",
+    "zh-CN": "命令版本策略配置无效，请联系管理员。",
+    "en-US": "The command version policy is invalid. Contact an administrator."
   }
 ]
