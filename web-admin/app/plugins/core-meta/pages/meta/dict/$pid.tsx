@@ -763,9 +763,9 @@ export default function DictDetailPage() {
                             )}
                             <StatusBadge status={version.status} />
                           </div>
-                          <p className="mt-1 text-xs text-gray-400">
+                          <time dateTime={version.createdAt} data-testid={`dict-version-created-at-${version.pid}`} className="mt-1 block text-xs text-gray-400">
                             {formatInTimezone(version.createdAt, formats.datetime, userTimezone)}
-                          </p>
+                          </time>
                         </div>
                       </div>
                     </div>

@@ -42,6 +42,8 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await page.locator('nav a[href="/meta/dict"]').click();
   await expect(page.getByTestId('dictionary-list')).toBeVisible();
   await expect(page.locator('tbody')).toContainText('org_team_status');
+  const controlledRow = page.locator('tbody tr').filter({ hasText: 'org_team_status' });
+  await expect(controlledRow.getByRole('link', { name: '查看', exact: true })).toBeInViewport();
   await capture('DICT-01', page, info);
 
   // Force a deterministic second page, then inspect the CSR operation query.
@@ -176,7 +178,10 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await page.reload();
   await expect(page.getByRole('button', { name: '取消发布', exact: true })).toBeVisible();
   await page.getByTestId('dict-tab-versions').click();
-  await expect(page.getByRole('heading', { name: `版本 ${createdBody.data.version}`, exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: `版本 ${createdBody.data.version}`, exact: true }),
+  ).toBeVisible();
+  await expect(page.getByTestId(`dict-version-created-at-${pid}`)).toHaveText(expectedDate);
   await capture('DICT-08', page, info);
 
   await page.locator('nav a[href="/meta/dict"]').click();
