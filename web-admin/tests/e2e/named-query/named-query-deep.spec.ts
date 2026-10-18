@@ -1,585 +1,244 @@
-/**
- * Named Query Deep E2E Tests
- *
- * Tests NQ-D01 ~ NQ-D12: Deep NamedQuery functionality
- * - Multi-table JOIN UI, aggregate functions
- * - Parameterized query, nq: datasource reference
- * - Editor execution, version history
- * - Strategy config, status flow, field management
- * - SQL injection protection, published read-only
- * - Deprecate + archive lifecycle
- *
- * Uses real database, NO MOCKING.
- * Uses NamedQueryPage PO for all interactions.
- *
- * @since 7.0.0
- */
-
+/** Deep NamedQuery contracts against owned business records and the real database. */
 import { test, expect } from '../../fixtures';
+import type { APIRequestContext, APIResponse, Page, Response, TestInfo } from '@playwright/test';
 import { NamedQueryPage } from '../../pages/NamedQueryPage';
-import { ErrorCodes } from '~/shared/services/http-client/types';
 
-function generateCode(): string {
-  const ts = Date.now().toString(36);
-  const rand = Math.random().toString(36).substring(2, 6);
-  return `nqd_e2e_${ts}_${rand}`;
+type Query = { pid: string; code: string };
+const suffix = `nqd_${Date.now().toString(36)}`;
+const customerName = `NamedQuery customer ${suffix}`;
+const titles = [`${suffix}_first`, `${suffix}_second`];
+
+async function success(response: APIResponse | Response) {
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  expect(String(body.code)).toBe('0');
+  return body.data;
+}
+
+async function status(request: APIRequestContext, query: Query, next: string) {
+  const result = await success(await request.put(`/api/meta/named-queries/${query.pid}/status`, {
+    data: { status: next },
+  }));
+  expect(result).toMatchObject({ pid: query.pid, code: query.code, status: next });
+}
+
+async function createThroughUi(page: Page, code: string, sql: string): Promise<Query> {
+  const nq = new NamedQueryPage(page);
+  await nq.gotoNew();
+  await nq.fillCreateForm(code, code, 'Owned business data; no metadata-table exemption', sql);
+  const result = await success(await nq.submitCreate());
+  expect(result).toMatchObject({ code, status: 'draft' });
+  expect(result.pid).toMatch(/^[0-9A-Z]{26}$/);
+  await expect(page).toHaveURL(new RegExp(`/meta/named-queries/${result.pid}(?:[?#]|$)`));
+  return { pid: result.pid, code };
+}
+
+async function tab(page: Page, query: Query, name: 'basic' | 'fields' | 'test' | 'policy' | 'versions') {
+  const nq = new NamedQueryPage(page);
+  await nq.gotoEdit(query.pid);
+  await nq.clickTab(name);
+  return nq;
+}
+
+async function capture(page: Page, info: TestInfo, name: string) {
+  await expect(page.getByText('Page Unavailable', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true });
 }
 
 test.describe('Named Query Deep', () => {
   test.describe.configure({ mode: 'serial', timeout: 30000 });
+  let base: Query;
+  let joinSql: string;
+  let simpleSql: string;
+  const orderPids: string[] = [];
 
-  let queryPid: string | null = null;
-  let queryCode: string | null = null;
-  const testCode = generateCode();
-  const joinSql =
-    'ab_meta_model m LEFT JOIN ab_meta_model_field_binding b ON m.id = b.model_id LEFT JOIN ab_meta_field f ON f.id = b.field_id';
-
-  async function ensureBaseQuery(page: import('@playwright/test').Page): Promise<void> {
-    if (queryPid && queryCode) return;
-    const code = `nqd_bootstrap_${generateCode()}`;
-    const createResp = await page.request.post('/api/meta/named-queries', {
-      data: {
-        code,
-        title: 'E2E Bootstrap Query',
-        description: 'Bootstrap query for isolated/retry execution',
-        fromSql: joinSql,
-        status: 'draft',
-      },
-    });
-    if (!createResp.ok()) {
-      throw new Error(`Failed to bootstrap base named query: HTTP ${createResp.status()}`);
+  test.beforeAll(async ({ request }) => {
+    const customer = await success(await request.post('/api/dynamic/e2et_customer/create', {
+      data: { e2et_cust_code: suffix, e2et_cust_name: customerName, e2et_cust_region: 'north' },
+    }));
+    expect(customer.pid).toMatch(/^[0-9A-Z]{26}$/);
+    for (const [index, amount] of [11, 29].entries()) {
+      const row = await success(await request.post('/api/dynamic/e2et_order/create', {
+        data: { e2et_order_title: titles[index], e2et_order_type: 'normal',
+          e2et_order_status: 'draft', e2et_order_urgent: false,
+          e2et_order_customer: customer.pid, e2et_order_amount: amount },
+      }));
+      expect(row.pid).toMatch(/^[0-9A-Z]{26}$/);
+      orderPids.push(row.pid);
     }
-    const data = await createResp.json();
-    const pid = data?.data?.pid;
-    if (!pid) {
-      throw new Error('Failed to bootstrap base named query: missing pid');
-    }
-    queryPid = pid;
-    queryCode = code;
-  }
-
-  // =====================================================================
-  // NQ-D01: Multi-table JOIN UI
-  // =====================================================================
-
-  test('NQ-D01: Create named query with multi-table JOIN', async ({ page }) => {
-    const nq = new NamedQueryPage(page);
-    await nq.gotoNew();
-
-    await expect(nq.codeInput).toBeVisible({ timeout: 10000 });
-
-    // Fill form with a JOIN query
-    await nq.fillCreateForm(testCode, 'E2E JOIN Test', 'Multi-table join test', joinSql);
-
-    const apiResponse = await nq.submitCreate();
-    if (apiResponse?.ok()) {
-      await page.waitForURL(
-        (url) =>
-          /\/meta\/named-queries\/[^/]+/.test(url.toString()) && !url.toString().includes('/new'),
-        { timeout: 10000 },
-      );
-    }
-
-    // Extract pid from URL
-    const url = page.url();
-    const match = url.match(/\/meta\/named-queries\/([^/?#]+)/);
-    if (match) {
-      queryPid = match[1];
-      queryCode = testCode;
-    }
-
-    // API fallback: if URL-based extraction failed, query the API to find the just-created named query
-    if (!queryPid) {
-      const listResp = await page.request.get(
-        '/api/meta/named-queries?pageSize=10&sortBy=createdAt&sortOrder=desc',
-      );
-      if (listResp.ok()) {
-        const listData = await listResp.json();
-        const records = listData.data?.data || listData.data?.records || [];
-        const found = records.find((r: any) => r.code === testCode);
-        if (found) {
-          queryPid = found.pid;
-          queryCode = testCode;
-        }
-      }
-    }
-
-    // API fallback: if UI creation failed entirely, create via API
-    if (!queryPid) {
-      const createResp = await page.request.post('/api/meta/named-queries', {
-        data: {
-          code: testCode,
-          title: 'E2E JOIN Test',
-          description: 'Auto-created for E2E deep tests (API fallback)',
-          fromSql: joinSql,
-          status: 'draft',
-        },
-      });
-      if (createResp.ok()) {
-        const createData = await createResp.json();
-        queryPid = createData.data?.pid || null;
-        if (queryPid) {
-          queryCode = testCode;
-        }
-      }
-    }
-
-    expect(queryPid).not.toBeNull();
+    const ids = orderPids.map(pid => `'${pid}'`).join(',');
+    simpleSql = `SELECT pid, e2et_order_title AS title FROM mt_e2et_order WHERE pid IN (${ids})`;
+    joinSql = `SELECT o.pid, o.e2et_order_title AS title, o.e2et_order_amount AS amount, c.e2et_cust_name AS customer_name FROM mt_e2et_order o JOIN mt_e2et_customer c ON o.e2et_order_customer = c.pid WHERE o.pid IN (${ids})`;
   });
 
-  // =====================================================================
-  // NQ-D02: Aggregate SUM/COUNT/AVG
-  // =====================================================================
-
-  test('NQ-D02: Aggregate functions SUM/COUNT/AVG', async ({ page }) => {
-    const aggCode = generateCode();
-    const nq = new NamedQueryPage(page);
-    await nq.gotoNew();
-
-    await expect(nq.codeInput).toBeVisible({ timeout: 10000 });
-
-    const aggSql =
-      'SELECT COUNT(*) AS total_count, COUNT(DISTINCT source_type) AS type_count FROM ab_meta_model';
-    await nq.fillCreateForm(aggCode, 'E2E Aggregate Test', 'Aggregate query', aggSql);
-
-    const resp = await nq.submitCreate();
-    // Verify creation succeeded or at least reached edit route.
-    if (resp) {
-      expect(resp.status()).toBeLessThan(400);
-    } else {
-      await expect(page).toHaveURL(/\/meta\/named-queries\/[^/]+/, { timeout: 10000 });
-    }
-
-    // Cleanup via API
-    const createdUrl = page.url();
-    const pidMatch = createdUrl.match(/\/meta\/named-queries\/([^/?#]+)/);
-    if (pidMatch) {
-      await page.request.delete(`/api/meta/named-queries/${pidMatch[1]}`).catch(() => {});
-    }
-  });
-
-  // =====================================================================
-  // NQ-D03: Parameterized query
-  // =====================================================================
-
-  test('NQ-D03: Parameterized query with search fields', async ({ page }) => {
-    await ensureBaseQuery(page);
-    if (!queryPid || !queryCode) {
-      throw new Error(String('Base query not created'));
-    }
-
-    // Add a searchable field
-    await page.request
-      .post(`/api/meta/named-queries/${queryCode}/fields`, {
-        data: {
-          fieldCode: 'source_type',
-          columnExpr: 'm.source_type',
-          dataType: 'string',
-          searchable: true,
-          sortable: true,
-        },
-      })
-      .catch(() => {}); // Ignore if exists
-
-    const nq = new NamedQueryPage(page);
-    await nq.gotoEditTab(queryPid!, 'fields');
-    // The hash fragment alone does not always activate the fields tab on
-    // initial load (especially under chromium-deep cold start). Click the tab
-    // explicitly so the field-management surface is rendered.
-    await nq.clickTab('fields').catch(() => {});
-
-    // Verify via API first (field may be rendered by i18n label, not raw code text).
-    const fieldsResp = await page.request.get(`/api/meta/named-queries/${queryCode}/fields`);
-    expect(fieldsResp.ok()).toBe(true);
-    const fieldsData = await fieldsResp.json().catch(() => ({}) as any);
-    const fields = Array.isArray(fieldsData?.data) ? fieldsData.data : [];
-    const hasField = fields.some(
-      (f: any) => String(f?.fieldCode ?? f?.code ?? '') === 'source_type',
-    );
-    expect(hasField).toBe(true);
-
-    // UI should render field-management surface (table row or field tag/text in non-table variants).
-    const hasTableRow = await page
-      .locator('table tbody tr')
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasFieldText = await page
-      .locator('main')
-      .getByText(/source_type|来源类型|Source Type/i)
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    expect(hasTableRow || hasFieldText).toBe(true);
-  });
-
-  // =====================================================================
-  // NQ-D04: nq: datasource reference
-  // =====================================================================
-
-  test('NQ-D04: DataSource nq: prefix reference', async ({ page }) => {
-    const dsQueryCode = `nqd_ds_${generateCode()}`;
-    const createResp = await page.request.post('/api/meta/named-queries', {
-      data: {
-        code: dsQueryCode,
-        title: 'E2E Datasource Probe',
-        description: 'Probe query for datasource nq: prefix',
-        fromSql: 'ab_meta_model m',
-        status: 'draft',
-      },
-    });
-    if (!createResp.ok()) {
-      throw new Error(`Failed to create datasource probe query: HTTP ${createResp.status()}`);
-    }
-    const createData = await createResp.json().catch(() => null);
-    const dsQueryPid = createData?.data?.pid;
-    if (!dsQueryPid) {
-      throw new Error('Failed to create datasource probe query: missing pid');
-    }
-
-    await page.request
-      .post(`/api/meta/named-queries/${dsQueryCode}/fields`, {
-        data: {
-          fieldCode: 'pid',
-          columnExpr: 'm.pid',
-          dataType: 'string',
-          searchable: false,
-          sortable: true,
-        },
-      })
-      .catch(() => {});
-    await page.request
-      .post(`/api/meta/named-queries/${dsQueryCode}/fields`, {
-        data: {
-          fieldCode: 'code',
-          columnExpr: 'm.code',
-          dataType: 'string',
-          searchable: true,
-          sortable: true,
-        },
-      })
-      .catch(() => {});
-
-    await page.request.put(`/api/meta/named-queries/${dsQueryPid}/status`, {
-      data: { status: 'testing' },
-    });
-    await page.request.put(`/api/meta/named-queries/${dsQueryPid}/status`, {
-      data: { status: 'published' },
-    });
-
-    const resp = await page.request.get(
-      `/api/datasource/list?datasourceId=nq:${dsQueryCode}&valueField=pid&labelField=code&maxItems=20`,
-    );
-    if (!resp.ok()) {
-      const body = await resp.text().catch(() => '');
-      throw new Error(
-        `DataSource nq: API not available or query not published (HTTP ${resp.status()}): ${body}`,
-      );
-      return;
-    }
-
-    const result = await resp.json();
-    expect(result.data).toBeDefined();
-  });
-
-  // =====================================================================
-  // NQ-D05: Editor execution via test tab
-  // =====================================================================
-
-  test('NQ-D05: Editor test execution', async ({ page }) => {
-    if (!queryPid || !queryCode) {
-      throw new Error(String('Query not available'));
-    }
-
-    const nq = new NamedQueryPage(page);
-    await nq.gotoEditTab(queryPid!, 'test');
-
-    // Verify test tab is active
-    await expect(nq.tabTest).toBeVisible({ timeout: 5000 });
-
-    // Look for "Execute" / "Run" button
-    const executeBtn = page
-      .locator(
-        'main button:has-text("执行"), main button:has-text("Execute"), main button:has-text("Run"), main button:has-text("测试")',
-      )
-      .first();
-    const hasExecuteBtn = await executeBtn.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (hasExecuteBtn) {
-      await executeBtn.click();
-
-      // Wait for results
-      const resultArea = page.locator('table, pre, [data-testid="query-result"], .result-area');
-      await resultArea
-        .first()
-        .waitFor({ state: 'visible', timeout: 10000 })
-        .catch(() => null);
-    }
-
-    // Verify execution via the test API (uses pid, not code) which works for any status
-    const testResp = await page.request.post(`/api/meta/named-queries/${queryPid}/test`, {
+  test('NQ-D01: Create named query with multi-table JOIN', async ({ page }, info) => {
+    base = await createThroughUi(page, `${suffix}_join`, joinSql);
+    const result = await success(await page.request.post(`/api/meta/named-queries/${base.pid}/test`, {
       data: { page: 1, size: 5 },
+    }));
+    expect(result.success).toBe(true);
+    expect(result.sampleData).toHaveLength(2);
+    expect(result.sampleData).toEqual(expect.arrayContaining(orderPids.map((pid, index) =>
+      expect.objectContaining({ pid, title: titles[index], customer_name: customerName, amount: [11, 29][index] }))));
+    await capture(page, info, 'NQ-D01-owned-join');
+  });
+
+  test('NQ-D02: Aggregate functions SUM/COUNT/AVG', async ({ page }, info) => {
+    const sql = `SELECT COUNT(*) AS total_count, SUM(e2et_order_amount) AS total_amount, AVG(e2et_order_amount) AS average_amount FROM mt_e2et_order WHERE pid IN (${orderPids.map(pid => `'${pid}'`).join(',')})`;
+    const aggregate = await createThroughUi(page, `${suffix}_aggregate`, sql);
+    const result = await success(await page.request.post(`/api/meta/named-queries/${aggregate.pid}/test`, {
+      data: { page: 1, size: 5 },
+    }));
+    expect(result.success).toBe(true);
+    expect(result.sampleData).toHaveLength(1);
+    expect(result.sampleData[0]).toMatchObject({ total_count: 2, total_amount: 40, average_amount: 20 });
+    await tab(page, aggregate, 'test');
+    await capture(page, info, 'NQ-D02-aggregate');
+  });
+
+  test('NQ-D03: Parameterized query with search fields', async ({ page }, info) => {
+    for (const field of ['pid', 'title']) {
+      const added = await success(await page.request.post(`/api/meta/named-queries/${base.code}/fields`, {
+        data: { fieldCode: field, columnExpr: field, dataType: 'string',
+          operators: ['eq'], searchable: true, sortable: true },
+      }));
+      expect(added).toMatchObject({ fieldCode: field, columnExpr: field, searchable: true });
+    }
+    await status(page.request, base, 'testing');
+    await status(page.request, base, 'published');
+    const result = await success(await page.request.post(`/api/meta/named-queries/${base.code}/execute`, {
+      data: { whereConditions: [{ field: 'title', operator: 'eq', value: titles[0] }], page: 1, size: 5 },
+    }));
+    expect(result.total).toBe(1);
+    expect(result.records).toEqual([{ pid: orderPids[0], title: titles[0] }]);
+    await tab(page, base, 'fields');
+    await expect(page.locator('table tbody tr').filter({ hasText: 'title' })).toHaveCount(1);
+    await capture(page, info, 'NQ-D03-searchable-fields');
+  });
+
+  test('NQ-D04: DataSource nq: prefix reference', async ({ page }, info) => {
+    const query = await createThroughUi(page, `${suffix}_datasource`, simpleSql);
+    for (const field of ['pid', 'title']) {
+      await success(await page.request.post(`/api/meta/named-queries/${query.code}/fields`, {
+        data: { fieldCode: field, columnExpr: field, dataType: 'string', searchable: true, sortable: true },
+      }));
+    }
+    await status(page.request, query, 'testing');
+    await status(page.request, query, 'published');
+    const options = await success(await page.request.get('/api/datasource/list', {
+      params: { datasourceId: `nq:${query.code}`, valueField: 'pid', labelField: 'title', maxItems: 20 },
+    }));
+    expect(options).toHaveLength(2);
+    expect(options).toEqual(expect.arrayContaining(orderPids.map((value, index) =>
+      expect.objectContaining({ value, label: titles[index] }))));
+    await tab(page, query, 'basic');
+    await capture(page, info, 'NQ-D04-published-datasource');
+  });
+
+  test('NQ-D05: Editor test execution', async ({ page }, info) => {
+    await tab(page, base, 'test');
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/meta/named-queries/${base.pid}/test`
+      && r.request().method() === 'POST');
+    await page.getByRole('button', { name: '执行查询', exact: true }).click();
+    const result = await success(await response);
+    expect(result.success).toBe(true);
+    expect(result.sampleData).toHaveLength(2);
+    expect(result.sampleData.map((r: { pid: string }) => r.pid).sort()).toEqual([...orderPids].sort());
+    for (const title of titles) await expect(page.locator('table tbody tr').filter({ hasText: title })).toBeVisible();
+    await capture(page, info, 'NQ-D05-exact-ui-results');
+  });
+
+  test('NQ-D06: Version history displays entries', async ({ page }, info) => {
+    const versions = await success(await page.request.get(`/api/meta/named-queries/${base.code}/versions`));
+    expect(versions).toHaveLength(1);
+    expect(versions[0].versionNo).toBe(1);
+    await tab(page, base, 'versions');
+    await expect(page.getByText('v1', { exact: true }).first()).toBeVisible();
+    await capture(page, info, 'NQ-D06-version-one');
+  });
+
+  test('NQ-D07: Strategy config via policy tab', async ({ page }, info) => {
+    const nq = await tab(page, base, 'policy');
+    await expect(nq.policyMaxRows).toHaveValue('5000');
+    await nq.policyMaxRows.fill('2000');
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/meta/named-queries/${base.pid}`
+      && r.request().method() === 'PUT');
+    await nq.savePolicyButton.click();
+    expect((await success(await response)).policy.maxRows).toBe(2000);
+    await page.reload();
+    await new NamedQueryPage(page).clickTab('policy');
+    await expect(nq.policyMaxRows).toHaveValue('2000');
+    expect((await success(await page.request.get(`/api/meta/named-queries/${base.pid}`))).policy.maxRows).toBe(2000);
+    await capture(page, info, 'NQ-D07-policy-reloaded');
+  });
+
+  test('NQ-D08: Status flow transitions', async ({ page }, info) => {
+    await status(page.request, base, 'deprecated');
+    await tab(page, base, 'basic');
+    await expect(page.getByText('已废弃', { exact: true }).first()).toBeVisible();
+    await capture(page, info, 'NQ-D08-deprecated');
+  });
+
+  test('NQ-D09: Field management in fields tab', async ({ page }, info) => {
+    await status(page.request, base, 'archived');
+    await status(page.request, base, 'draft');
+    await tab(page, base, 'fields');
+    await page.getByRole('button', { name: '添加字段', exact: true }).click();
+    await page.getByPlaceholder('e.g. user_name', { exact: true }).fill('customer_name');
+    await page.getByPlaceholder('e.g. u.user_name', { exact: true }).fill('customer_name');
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/meta/named-queries/${base.code}/fields`
+      && r.request().method() === 'POST');
+    await page.getByRole('button', { name: '添加', exact: true }).click();
+    expect(await success(await response)).toMatchObject({ fieldCode: 'customer_name', columnExpr: 'customer_name' });
+    await page.reload();
+    await new NamedQueryPage(page).clickTab('fields');
+    await expect(page.locator('table tbody tr').filter({ hasText: 'customer_name' })).toHaveCount(1);
+    const fields = await success(await page.request.get(`/api/meta/named-queries/${base.code}/fields`));
+    expect(fields.map((f: { fieldCode: string }) => f.fieldCode).sort()).toEqual(['customer_name', 'pid', 'title']);
+    await capture(page, info, 'NQ-D09-ui-added-field');
+  });
+
+  test('NQ-D10: SQL injection protection', async ({ page }, info) => {
+    await status(page.request, base, 'testing');
+    await status(page.request, base, 'published');
+    const execute = (value: string) => page.request.post(`/api/meta/named-queries/${base.code}/execute`, {
+      data: { whereConditions: [{ field: 'title', operator: 'eq', value }], page: 1, size: 5 },
     });
-
-    if (testResp.ok()) {
-      const testResult = await testResp.json();
-      // Test endpoint wraps result in ApiResponse — verify structure
-      expect(testResult.data || testResult.code === ErrorCodes.SUCCESS).toBeTruthy();
-    } else {
-      // Fallback: try the execute endpoint (requires published status)
-      const resp = await page.request.post(`/api/meta/named-queries/${queryCode}/execute`, {
-        data: { page: 1, size: 5 },
-      });
-      // Accept both success and "not executable" errors (4xx) — just not 5xx crashes
-      expect(resp.status()).toBeLessThan(400);
-    }
+    const positive = await success(await execute(titles[0]));
+    expect(positive.total).toBe(1);
+    expect(positive.records[0]).toMatchObject({ pid: orderPids[0], title: titles[0], customer_name: customerName });
+    const injected = await success(await execute(`${titles[0]}' OR 1=1; --`));
+    expect(injected.total).toBe(0);
+    expect(injected.records).toEqual([]);
+    const unchanged = await success(await execute(titles[0]));
+    expect(unchanged.records).toEqual(positive.records);
+    await tab(page, base, 'test');
+    await capture(page, info, 'NQ-D10-bound-input');
   });
 
-  // =====================================================================
-  // NQ-D06: Version history tab
-  // =====================================================================
-
-  test('NQ-D06: Version history displays entries', async ({ page }) => {
-    if (!queryPid || !queryCode) {
-      throw new Error(String('Query not available'));
-    }
-
-    const nq = new NamedQueryPage(page);
-    await nq.gotoEditTab(queryPid!, 'versions');
-
-    // Verify versions tab content
-    const versionEntry = page.getByText(/v1|Version 1|版本/).first();
-    const hasVersions = await versionEntry.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (!hasVersions) {
-      // Verify via API
-      const resp = await page.request.get(`/api/meta/named-queries/${queryCode}/versions`);
-      expect(resp.ok()).toBe(true);
-      const data = await resp.json();
-      expect(data.data?.length).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  // =====================================================================
-  // NQ-D07: Strategy/policy config
-  // =====================================================================
-
-  test('NQ-D07: Strategy config via policy tab', async ({ page }) => {
-    if (!queryPid) {
-      throw new Error(String('Query not available'));
-    }
-
-    const nq = new NamedQueryPage(page);
-    await nq.gotoEditTab(queryPid!, 'policy');
-
-    // Verify policy fields
-    const maxRowsInput = nq.policyMaxRows;
-    const hasMaxRows = await maxRowsInput.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (hasMaxRows) {
-      const currentVal = await maxRowsInput.inputValue();
-      expect(parseInt(currentVal, 10)).toBeGreaterThan(0);
-
-      // Update max rows
-      await maxRowsInput.clear();
-      await maxRowsInput.fill('2000');
-      await nq.savePolicy();
-
-      // Verify via API
-      const resp = await page.request.get(`/api/meta/named-queries/${queryPid}`);
-      if (resp.ok()) {
-        const data = await resp.json();
-        expect(data.data?.policy?.maxRows).toBe(2000);
-      }
-    } else {
-      // Policy tab may not have fields visible in published state
-      expect(true).toBe(true);
-    }
-  });
-
-  // =====================================================================
-  // NQ-D08: Status flow transitions
-  // =====================================================================
-
-  test('NQ-D08: Status flow transitions', async ({ page }) => {
-    if (!queryPid) {
-      throw new Error(String('Query not available'));
-    }
-
-    // Already published from NQ-D04, move to deprecated
-    const nq = new NamedQueryPage(page);
-    const deprecateResp = await nq.updateStatusViaApi(queryPid!, 'deprecated');
-
-    if (deprecateResp.ok()) {
-      const data = await deprecateResp.json();
-      expect(data.data?.status).toBe('deprecated');
-    } else {
-      // May already be in a different state — check current
-      const currentResp = await page.request.get(`/api/meta/named-queries/${queryPid}`);
-      expect(currentResp.ok()).toBe(true);
-    }
-  });
-
-  // =====================================================================
-  // NQ-D09: Field management UI
-  // =====================================================================
-
-  test('NQ-D09: Field management in fields tab', async ({ page }) => {
-    if (!queryPid || !queryCode) {
-      throw new Error(String('Query not available'));
-    }
-
-    // Move back to draft for editing
-    const nq = new NamedQueryPage(page);
-    await nq.updateStatusViaApi(queryPid!, 'draft').catch(() => {});
-
-    // Add another field via API
-    await page.request
-      .post(`/api/meta/named-queries/${queryCode}/fields`, {
-        data: {
-          fieldCode: 'code',
-          columnExpr: 'm.code',
-          dataType: 'string',
-          searchable: true,
-          sortable: true,
-        },
-      })
-      .catch(() => {});
-
-    await nq.gotoEditTab(queryPid!, 'fields');
-
-    // Verify fields tab loaded — look for field management UI elements
-    const hasFieldContent = await Promise.race([
-      page
-        .getByText('code')
-        .first()
-        .isVisible({ timeout: 5000 })
-        .then(() => true),
-      page
-        .locator('table, [role="grid"], [data-testid*="field"]')
-        .first()
-        .isVisible({ timeout: 5000 })
-        .then(() => true),
-      page
-        .getByText(/field|字段/i)
-        .first()
-        .isVisible({ timeout: 5000 })
-        .then(() => true),
-    ]).catch(() => false);
-    expect(hasFieldContent).toBe(true);
-  });
-
-  // =====================================================================
-  // NQ-D10: SQL injection protection
-  // =====================================================================
-
-  test('NQ-D10: SQL injection protection', async ({ page }) => {
-    if (!queryCode) {
-      throw new Error(String('Query code not available'));
-    }
-
-    // Try executing with injection-style parameter
-    const resp = await page.request.post(`/api/meta/named-queries/${queryCode}/execute`, {
-      data: {
-        page: 1,
-        size: 5,
-        params: { source_type: "'; DROP TABLE ab_meta_model; --" },
-      },
+  test('NQ-D11: Published state — fields frozen', async ({ page }, info) => {
+    await tab(page, base, 'basic');
+    await expect(page.getByText('(只读 — 查询已冻结)', { exact: true })).toBeVisible();
+    const denied = await page.request.post(`/api/meta/named-queries/${base.code}/fields`, {
+      data: { fieldCode: 'forbidden_field', columnExpr: 'title', dataType: 'string' },
     });
-
-    // Should either sanitize or reject — NOT execute the injection
-    const body = await resp.json().catch(() => ({}));
-
-    // Verify ab_meta_model table still exists
-    const checkResp = await page.request.get('/api/meta/models');
-    expect(checkResp.ok()).toBe(true);
+    expect(denied.status()).toBe(400);
+    const fields = await success(await page.request.get(`/api/meta/named-queries/${base.code}/fields`));
+    expect(fields.map((f: { fieldCode: string }) => f.fieldCode).sort()).toEqual(['customer_name', 'pid', 'title']);
+    expect((await success(await page.request.get(`/api/meta/named-queries/${base.pid}`))).fromSql).toBe(joinSql);
+    await capture(page, info, 'NQ-D11-frozen');
   });
 
-  // =====================================================================
-  // NQ-D11: Published state is read-only
-  // =====================================================================
-
-  test('NQ-D11: Published state — fields frozen', async ({ page }) => {
-    if (!queryPid) {
-      throw new Error(String('Query not available'));
-    }
-
-    // Publish the query
+  test('NQ-D12: Deprecate and archive lifecycle', async ({ page }, info) => {
+    await status(page.request, base, 'deprecated');
+    await status(page.request, base, 'archived');
     const nq = new NamedQueryPage(page);
-    await nq.updateStatusViaApi(queryPid!, 'testing').catch(() => {});
-    await nq.updateStatusViaApi(queryPid!, 'published').catch(() => {});
-
-    // Navigate to edit page
-    await nq.gotoEdit(queryPid!);
-    await nq.clickTab('basic');
-
-    // Verify fromSql is disabled in published state
-    const disabledInputs = page.locator('textarea[disabled], input[disabled]');
-    const hasDisabled = await disabledInputs
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    // Published query should show frozen state
-    const frozenLabel = page.getByText(/冻结|Frozen|只读|Read-only/i).first();
-    const hasFrozen = await frozenLabel.isVisible({ timeout: 3000 }).catch(() => false);
-
-    expect(hasDisabled || hasFrozen).toBe(true);
-  });
-
-  // =====================================================================
-  // NQ-D12: Deprecate + archive lifecycle
-  // =====================================================================
-
-  test('NQ-D12: Deprecate and archive lifecycle', async ({ page }) => {
-    if (!queryPid) {
-      throw new Error(String('Query not available'));
-    }
-
-    const nq = new NamedQueryPage(page);
-
-    // published -> deprecated
-    const deprecateResp = await nq.updateStatusViaApi(queryPid!, 'deprecated');
-    if (deprecateResp.ok()) {
-      const data = await deprecateResp.json();
-      expect(data.data?.status).toBe('deprecated');
-    }
-
-    // deprecated -> archived
-    const archiveResp = await nq.updateStatusViaApi(queryPid!, 'archived');
-    if (archiveResp.ok()) {
-      const data = await archiveResp.json();
-      expect(data.data?.status).toBe('archived');
-    }
-
-    // Verify in UI
     await nq.gotoList();
-    await expect(nq.pageTitle).toBeVisible({ timeout: 10000 });
-  });
-
-  // =====================================================================
-  // Cleanup
-  // =====================================================================
-
-  test.afterAll(async ({ request }) => {
-    if (!queryPid) return;
-
-    try {
-      await request
-        .put(`/api/meta/named-queries/${queryPid}/status`, {
-          data: { status: 'draft' },
-        })
-        .catch(() => {});
-
-      if (queryCode) {
-        await request
-          .delete(`/api/meta/named-queries/${queryCode}/fields/source_type`)
-          .catch(() => {});
-        await request.delete(`/api/meta/named-queries/${queryCode}/fields/code`).catch(() => {});
-      }
-      await request.delete(`/api/meta/named-queries/${queryPid}`).catch(() => {});
-    } catch {
-      // Ignore cleanup errors
-    }
+    await page.locator('select').first().selectOption('archived');
+    const row = nq.queryTable.locator('tbody tr').filter({ hasText: base.code });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('已归档');
+    expect((await success(await page.request.get(`/api/meta/named-queries/${base.pid}`))).status).toBe('archived');
+    await capture(page, info, 'NQ-D12-archived');
   });
 });
