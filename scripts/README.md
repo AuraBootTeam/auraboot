@@ -19,6 +19,18 @@
 - **One-off migrations** (`migrate-*`, `*-split`, casing/backfill scripts) are **removed once the migration lands** — git history keeps them (`git log --all --full-history -- scripts/<name>`).
 - Before adding a script, check the tables below for an existing one to extend.
 
+### Owned OSS frontend restarts
+
+`oss-golden-stack.sh up` and retained `resume` launch a stable registered Node
+supervisor around the existing frontend command. Its inherited Node preload
+registers each actual Web/BFF entrypoint before it can listen, including children
+restarted by concurrently. pnpm/tsx helper processes never replace listener records.
+Registration requires the current supervisor generation, complete owned ancestry,
+the source cwd and runtime token; a still-live previous listener is not overwritten.
+Use Workspace `runtime suspend` / `runtime resume` for whole-stack lifecycle.
+Direct supervisor termination stops only its authenticated frontend tree and
+prevents further child restarts; runtime databases and evidence remain retained.
+
 ## gate (44)
 
 | script | refs | updated | purpose |
