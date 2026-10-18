@@ -51,6 +51,17 @@ function auditObservation(name, value) {
       && value.denials.every(row=>row.status===(row.actor==='anonymous'?401:403))
       && isDeepStrictEqual(value.denials.map(row=>`${row.actor} ${row.method} ${row.suffix}`).sort(),expected),
     'Missing role member refusal probes');
+    const pid=value.expectedMemberPid;
+    requireCondition(typeof pid==='string' && pid.length>0 && isDeepStrictEqual(value.writes,[
+      {method:'post',path:'/api/roles/{rolePid}/members/assign',body:{memberPids:[pid]}},
+      {method:'post',path:'/api/roles/{rolePid}/members/remove',body:[pid]},
+    ]), 'Invalid role member browser write payloads');
+    requireCondition(isDeepStrictEqual(value.membershipProofs,[
+      {phase:'candidate',memberPids:[pid],assignedAt:null},
+      {phase:'assigned-reload',memberPids:[pid],total:1},
+      {phase:'removed-reload',memberPids:[],total:0},
+      {phase:'after-denials',memberPids:[],total:0},
+    ]), 'Missing role member persisted transitions');
   }
   return rows.length;
 }

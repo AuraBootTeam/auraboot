@@ -1,4 +1,4 @@
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import PermissionManagement from '../../PermissionManagement';
@@ -104,5 +104,26 @@ describe('PermissionManagement access feedback', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('角色加载失败'));
     expect(screen.queryByText('无权限访问')).toBeNull();
     expect(screen.queryByTestId('role-table')).toBeNull();
+  });
+  it('explains membership management on the members tab instead of capability editing', async () => {
+    for (const code of ['org.role.read','org.role.update','org.user_role.update']) mocks.permissions.add(code);
+    showPage();
+    await screen.findByRole('heading', {name:'Warehouse'});
+    fireEvent.click(screen.getByTestId('permission-right-tab-members'));
+    expect(screen.getByText('Manage membership and access periods for this role.')).toBeVisible();
+    expect(screen.queryByText(/Select business capabilities/)).not.toBeInTheDocument();
+  });
+  it('explains read-only membership access using assignment permission rather than role-edit permission', async () => {
+    mocks.permissions.add('org.role.read'); mocks.permissions.add('org.role.update');
+    showPage();
+    await screen.findByRole('heading', {name:'Warehouse'});
+    fireEvent.click(screen.getByTestId('permission-right-tab-members'));
+    expect(screen.getByText('View members and access periods. Membership changes require permission.')).toBeVisible();
+  });
+  it('uses an English audit fallback when a locale has no override', async () => {
+    mocks.permissions.add('org.role.read'); mocks.permissions.add('meta.permission.update');
+    showPage();
+    await screen.findByTestId('role-row-warehouse');
+    expect(screen.getByTestId('permission-right-tab-audit')).toHaveTextContent('Audit');
   });
 });

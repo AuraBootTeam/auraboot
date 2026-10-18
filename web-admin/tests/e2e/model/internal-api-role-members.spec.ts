@@ -23,6 +23,7 @@ test('generated role memberships preserve public PID selection assignment reload
   const anonymous=await browser.newContext({baseURL,storageState:{cookies:[],origins:[]}});
   const code=`ic_role_${randomUUID().replaceAll('-','').slice(0,16)}`;
   const rows: object[]=[],denials: object[]=[],cleanupErrors:unknown[]=[],pageErrors:string[]=[];
+  const writes: object[]=[],membershipProofs: object[]=[];
   const {page,context,origin}=owner;
   const headers={Origin:origin};
   let rolePid:string|undefined,journeyError:unknown;
@@ -43,6 +44,8 @@ test('generated role memberships preserve public PID selection assignment reload
     await page.getByTestId('permission-right-tab-members').click();
     const result=await checked(await loaded,'get','/api/roles/{rolePid}/members');
     expect(result.page).toBe(1);expect(result.pageSize).toBe(20);expect(result).not.toHaveProperty('pageNum');
+    await expect(page.getByText('Manage membership and access periods for this role.',{exact:true})).toBeVisible();
+    await expect(page.getByTestId('permission-right-tab-audit')).toHaveText(/^Audit$/);
     return result;
   }
   try {
@@ -67,13 +70,16 @@ test('generated role memberships preserve public PID selection assignment reload
     expect(candidates).toHaveLength(1);expect(candidates[0]).toMatchObject({memberPid:target.memberPid,email:null,departmentName:null,positionName:null,assignedAt:null,effectiveDate:null,expiryDate:null});
     expect(Object.keys(candidates[0]).sort()).toEqual(['assignedAt','departmentName','effectiveDate','email','expiryDate','memberId','memberPid','positionName','userName']);
     expect(Number.isSafeInteger(candidates[0].memberId)).toBe(false);
+    membershipProofs.push({phase:'candidate',memberPids:candidates.map((m:{memberPid:string})=>m.memberPid),assignedAt:candidates[0].assignedAt});
     expect(await candidate.innerText()).not.toContain(target.memberPid);
     await candidate.locator('input[type="checkbox"]').check();
     await capture('ROLEMEM-02',page,info);
     const assigned=responseFor('/assign','POST');
     await page.getByTestId('add-member-confirm').click();
     const assignedResponse=await assigned;
-    expect(assignedResponse.request().postDataJSON()).toEqual({memberPids:[target.memberPid]});
+    const assignBody=assignedResponse.request().postDataJSON();
+    writes.push({method:'post',path:'/api/roles/{rolePid}/members/assign',body:assignBody});
+    expect(assignBody).toEqual({memberPids:[target.memberPid]});
     await checked(assignedResponse,'post','/api/roles/{rolePid}/members/assign');
     await expect(page.getByTestId('add-member-dialog')).not.toBeVisible();
     await expect(page.getByTestId(`role-member-row-${target.memberPid}`)).toBeVisible();
@@ -81,15 +87,19 @@ test('generated role memberships preserve public PID selection assignment reload
     const persisted=await selectRole();expect(persisted.total).toBe(1);expect(persisted.records).toHaveLength(1);
     expect(persisted.records[0]).toMatchObject({memberPid:target.memberPid,email:null,effectiveDate:null,expiryDate:null});
     expect(typeof persisted.records[0].assignedAt).toBe('string');
+    membershipProofs.push({phase:'assigned-reload',memberPids:persisted.records.map((m:{memberPid:string})=>m.memberPid),total:persisted.total});
     await expect(page.getByTestId(`role-member-row-${target.memberPid}`)).toContainText(target.username);
     await capture('ROLEMEM-03',page,info);
     await page.getByTestId(`role-member-remove-${target.memberPid}`).click();
     const removed=responseFor('/remove','POST');
     await page.getByTestId('confirm-ok').click();
-    const removedResponse=await removed;expect(removedResponse.request().postDataJSON()).toEqual([target.memberPid]);
+    const removedResponse=await removed;const removeBody=removedResponse.request().postDataJSON();
+    writes.push({method:'post',path:'/api/roles/{rolePid}/members/remove',body:removeBody});
+    expect(removeBody).toEqual([target.memberPid]);
     await checked(removedResponse,'post','/api/roles/{rolePid}/members/remove');
     await expect(page.getByTestId('role-member-empty')).toBeVisible();
-    await page.reload();expect((await selectRole()).records).toEqual([]);
+    await page.reload();const removedPage=await selectRole();expect(removedPage.records).toEqual([]);
+    membershipProofs.push({phase:'removed-reload',memberPids:removedPage.records.map((m:{memberPid:string})=>m.memberPid),total:removedPage.total});
     await capture('ROLEMEM-04',page,info);
     for(const [label,client,status] of [['anonymous',anonymous,401],['no-role',target.context,403]] as const){
       for(const [method,suffix,body] of [['get','',undefined],['get','/candidates',undefined],['post','/assign',{memberPids:[target.memberPid]}],['post','/remove',[target.memberPid]]] as const){
@@ -97,7 +107,9 @@ test('generated role memberships preserve public PID selection assignment reload
         denials.push({actor:label,method,suffix,status:response.status()});expect(response.status()).toBe(status);
       }
     }
-    expect((await checked(await context.request.get(`/api/roles/${rolePid}/members`),'get','/api/roles/{rolePid}/members')).records).toEqual([]);
+    const afterDenials=await checked(await context.request.get(`/api/roles/${rolePid}/members`),'get','/api/roles/{rolePid}/members');
+    expect(afterDenials.records).toEqual([]);
+    membershipProofs.push({phase:'after-denials',memberPids:afterDenials.records.map((m:{memberPid:string})=>m.memberPid),total:afterDenials.total});
   }catch(error){journeyError=error;}
   finally{
     try{
@@ -111,7 +123,7 @@ test('generated role memberships preserve public PID selection assignment reload
       }
     }catch(error){cleanupErrors.push(error);}
     for(const dispose of [()=>anonymous.close(),()=>target?.dispose(),()=>owner.dispose()])try{await dispose();}catch(error){cleanupErrors.push(error);}
-    await info.attach('role-member-browser-observations',{body:JSON.stringify({rows,denials,pageErrors,sessionCleanup:[owner.sessionCleanup,...(target?[target.sessionCleanup]:[])],
+    await info.attach('role-member-browser-observations',{body:JSON.stringify({rows,denials,writes,membershipProofs,expectedMemberPid:target?.memberPid,pageErrors,sessionCleanup:[owner.sessionCleanup,...(target?[target.sessionCleanup]:[])],
       claim:'four member operations through the actual role menu, permanent assignment persistence and owned removal; cross-tenant and time-window UI remain pending',
       journeyError:journeyError?String(journeyError):null,cleanupErrors:cleanupErrors.map(String)}),contentType:'application/json'});
   }

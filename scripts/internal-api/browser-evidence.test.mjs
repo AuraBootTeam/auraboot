@@ -33,6 +33,12 @@ function roleMemberObservation(f, denials) {
   f.before.identity.registrySha256=f.after.identity.registrySha256=f.expected.registrySha256;
   const attachment=f.report.suites[0].specs[0].tests[0].results[0].attachments[0];
   const payload=JSON.parse(Buffer.from(attachment.body,'base64'));
+  const pid='public-member-pid';payload.expectedMemberPid=pid;
+  payload.writes=[{method:'post',path:'/api/roles/{rolePid}/members/assign',body:{memberPids:[pid]}},
+    {method:'post',path:'/api/roles/{rolePid}/members/remove',body:[pid]}];
+  payload.membershipProofs=[{phase:'candidate',memberPids:[pid],assignedAt:null},
+    {phase:'assigned-reload',memberPids:[pid],total:1},{phase:'removed-reload',memberPids:[],total:0},
+    {phase:'after-denials',memberPids:[],total:0}];
   payload.denials=denials;attachment.name=name;attachment.body=Buffer.from(JSON.stringify(payload)).toString('base64');
   rebindReport(f);
 }
@@ -62,6 +68,8 @@ test('browser evidence rejects stale failed skipped retried missing mismatched o
     f => { roleMemberObservation(f,roleMemberDenials.slice(1)); },
     f => { roleMemberObservation(f,roleMemberDenials.map(row=>({...row,status:200}))); },
     f => { roleMemberObservation(f,[roleMemberDenials[1],...roleMemberDenials.slice(1)]); },
+    f => { roleMemberObservation(f,roleMemberDenials); const a=f.report.suites[0].specs[0].tests[0].results[0].attachments[0];const p=JSON.parse(Buffer.from(a.body,'base64'));p.writes[1].body={memberPids:['public-member-pid']};a.body=Buffer.from(JSON.stringify(p)).toString('base64');rebindReport(f); },
+    f => { roleMemberObservation(f,roleMemberDenials); const a=f.report.suites[0].specs[0].tests[0].results[0].attachments[0];const p=JSON.parse(Buffer.from(a.body,'base64'));p.membershipProofs[2].memberPids=['public-member-pid'];a.body=Buffer.from(JSON.stringify(p)).toString('base64');rebindReport(f); },
     f => { f.after.identity.runtimeManifestSha256 = 'f'.repeat(64); }, f => { f.after.sourceUnchanged = false; },
     f => { f.before.runtimeVerified = false; }, f => { f.after.exitCode = 1; },
     f => { f.after.reportSha256 = 'f'.repeat(64); }, f => { f.before.startedAt = '2026-10-19T00:00:02Z'; },

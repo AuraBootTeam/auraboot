@@ -71,6 +71,23 @@ class I18nServiceTest {
     }
 
     @Test
+    void roleMembershipContextAndFailureLabelsAreBundledAndConsistentWithoutTenantOverrides() {
+        when(i18nResourceService.getResourceMapByLang(anyString())).thenReturn(Map.of());
+        Map<String, String> english = Map.of(
+                "admin.permission.tab.audit", "Audit",
+                "admin.permission.members.unnamed", "Member",
+                "admin.permission.members.loadFailed", "Members could not be loaded. Please retry.",
+                "admin.permission.members.manageHint", "Manage membership and access periods for this role.",
+                "admin.permission.members.readOnlyHint", "View members and access periods. Membership changes require permission.");
+        for (var entry : english.entrySet()) {
+            assertEquals(entry.getValue(), service.loadBundledBase("en-US").get(entry.getKey()));
+            assertEquals(entry.getValue(), service.getI18nData("en-US").get(entry.getKey()));
+            assertThat(service.loadBundledBase("zh-CN").get(entry.getKey())).isInstanceOf(String.class).isNotEqualTo(entry.getValue());
+        }
+        assertEquals("审计", service.getI18nData("zh-CN").get("admin.permission.tab.audit"));
+    }
+
+    @Test
     void getI18nData_emptyOrNullLocale_usesDefaultLocale() {
         Map<String, String> dbData = Map.of("k", "v");
         when(i18nResourceService.getResourceMapByLang("zh-CN")).thenReturn(dbData);
