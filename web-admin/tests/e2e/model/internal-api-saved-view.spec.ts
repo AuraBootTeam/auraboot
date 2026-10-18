@@ -42,6 +42,7 @@ test('generated SavedView sharing preserves the owner and anonymous browser jour
     viewport: { width: 1440, height: 1000 },
     locale: 'en-US',
   });
+  await anonymous.addCookies([{ name: 'locale', value: 'en-US', url: actor.origin }]);
   await anonymous.addInitScript(() => localStorage.setItem('locale', 'en-US'));
   const recipient = await anonymous.newPage();
   const page = actor.page;

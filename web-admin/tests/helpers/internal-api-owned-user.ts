@@ -83,6 +83,7 @@ export async function provisionInternalApiUser(browser: Browser, baseURL: string
     expect(payload.code).toBe('0');
     expect(userPid).toBeTruthy();
     expect(payload.data.assignedRoles).toContain('tenant_admin');
+    await context.addCookies([{ name: 'locale', value: 'en-US', url: origin }]);
     await context.addInitScript(() => localStorage.setItem('locale', 'en-US'));
     const page = await context.newPage();
     await loginInternalApiUser(page, username, password);

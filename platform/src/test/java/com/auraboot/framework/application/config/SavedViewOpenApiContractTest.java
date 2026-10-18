@@ -1,5 +1,9 @@
 package com.auraboot.framework.application.config;
 
+import com.auraboot.framework.common.dto.ApiResponse;
+import com.fasterxml.jackson.core.type.TypeReference;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Components;
 import com.auraboot.framework.view.dto.PublicSharedViewResponse;
 import com.auraboot.framework.tenant.dto.MemberSearchOption;
 import com.auraboot.framework.view.dto.SavedViewAuditEventDTO;
@@ -18,6 +22,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SavedViewOpenApiContractTest {
     private JsonNode schema(Class<?> type) {
         return Json31.mapper().valueToTree(new ModelConverters(true).readAll(type).get(type.getSimpleName()));
+    }
+
+    @Test
+    void successfulAbsentDefaultViewRetainsNullInTheGenericEnvelopeContract() {
+        var type = new TypeReference<ApiResponse<SavedViewDTO>>() {}.getType();
+        var schemas = new ModelConverters(true).readAll(type);
+        var document = new OpenAPI().components(new Components().schemas(new java.util.LinkedHashMap<>(schemas)));
+        new NullableReferenceOpenApiCustomizer().customise(document);
+        var node = Json31.mapper().valueToTree(document);
+        var data = node.at("/components/schemas/ApiResponseSavedViewDTO/properties/data");
+        assertThat(data.at("/anyOf/0/$ref").asText()).isEqualTo("#/components/schemas/SavedViewDTO");
+        assertThat(data.at("/anyOf/1/type").asText()).isEqualTo("null");
+        var wire = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(ApiResponse.<SavedViewDTO>success(null));
+        assertThat(wire.path("code").asText()).isEqualTo("0");
+        assertThat(wire.path("data").isNull()).isTrue();
     }
 
     @Test
