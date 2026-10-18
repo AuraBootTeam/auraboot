@@ -49,9 +49,10 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
   const [error, setError] = useState('');
   const values = object(isCommand ? payload.params : payload.fields);
   const [selectedField, setSelectedField] = useState('');
-  const references = useMemo(() => fields.filter(field => field.visible !== false && !field.masked)
+  const references = useMemo(() => fields.filter(field => field.visible !== false && !field.masked
+      && (field.scope !== 'record' || !currentModelCode || !field.modelCode || field.modelCode === currentModelCode))
     .map(field => ({ label: `${field.modelName ? `${field.modelName} · ` : ''}${field.label}`,
-      value: `\u0024{${field.scope}.${field.path}}` })), [fields]);
+      value: `\u0024{${field.scope}.${field.path}}` })), [fields, currentModelCode]);
 
   useEffect(() => {
     let cancelled = false;

@@ -123,6 +123,7 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   await expect(page.getByTestId('bpm-task-drawer').or(page.getByTestId(`bpm-${action}-comment`))).toBeVisible();
   if (await page.getByTestId('bpm-task-drawer').count()) {
     await page.getByTestId('approval-comment-textarea').fill(comment);
+    await page.getByTestId(`bpm-drawer-${action}-btn`).scrollIntoViewIfNeeded();
     const footer=await page.getByTestId('bpm-drawer-footer').boundingBox();
     expect(footer).toBeTruthy();expect(footer!.y).toBeGreaterThanOrEqual(0);expect(footer!.y+footer!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
     await page.getByTestId(`bpm-drawer-${action}-btn`).click({timeout:10000});
@@ -165,6 +166,14 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
     expect(afterReplay.records.filter((r:any)=>r.tdv_ck_acceptance===pid)).toHaveLength(1);
     const projectsAfterReplay=await data(await observer.request.get('/api/dynamic/tpm_project/list?size=100'));
     expect(Number(projectsAfterReplay.records.find((r:any)=>r.pid===project.pid).tpm_pj_accepted_total)).toBe(sum);
+    let actions:any[]=[];
+    await expect.poll(async()=>{
+      const logs=await data(await observer.request.get('/api/event-policy/action-logs?policyCode=tpm_acceptance_registered&size=100'));
+      actions=logs.filter((log:any)=>log.contextPayload?.record?.recordPid===pid);
+      return actions.filter((log:any)=>log.status==='SUCCESS').length;
+    },{timeout:15000}).toBe(2);
+    expect(actions.map((log:any)=>log.actionType).sort()).toEqual(['EXECUTE_COMMAND','NOTIFY']);
+    expect(actions.find((log:any)=>log.actionType==='NOTIFY').resultPayload.sentCount).toBe(1);
     receipts.push({case:'C02',acceptancePid:pid,projectPid:project.pid,acceptedTotal:sum,checkCount:1});
     await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   }
@@ -208,7 +217,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     await shot(page,`R03-${width}`);
   }
   await page.getByText('字段与输出配置',{exact:true}).click();
-  await page.getByLabel('input-label-0').fill('交付金额（草稿修改）');
+  await page.getByLabel('input-label-0').fill('本次交付金额');
   await page.getByTestId('strategy-workspace-tab-test').click();
   await page.getByTestId('strategy-check-readiness').click();
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','success');
@@ -218,7 +227,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
   await page.getByTestId('strategy-business-decision').selectOption('tpm_acceptance_route');
   await page.getByTestId('strategy-workspace-tab-dmn').click();
   await page.getByText('字段与输出配置',{exact:true}).click();
-  await expect(page.getByLabel('input-label-0',{exact:true})).toHaveValue('交付金额（草稿修改）');
+  await expect(page.getByLabel('input-label-0',{exact:true})).toHaveValue('本次交付金额');
   await shot(page,'rule-published-roundtrip');
 });
 
@@ -296,7 +305,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
   for(const reviewer of [false,true]) {
     const code=`acceptance_${reviewer?'unassigned':'readonly'}_${Date.now()}`;
     const role=await data(await page.request.post('/api/roles',{data:{code,name:code,type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}}));
-    const grants=['tpm.acceptance.read','model.tpm_acceptance.read','tpm.project.read','model.tpm_project.read','decision.definition.read','decision.policy.read',...(reviewer?['tpm.acceptance.manage','bpm.process.read','bpm.process.execute']:[])];
+    const grants=['tpm.acceptance.read','model.tpm_acceptance.read','tpm.project.read','model.tpm_project.read','decision.definition.read','decision.policy.read',...(reviewer?['tpm.acceptance.manage','bpm.process.read','bpm.process.execute','tdv.delivery.register']:[])];
     await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>{expect(ids.has(code),code).toBe(true);return {permissionId:ids.get(code),granted:true};})}));
     const email=`${code}@e2e.local`;
     await data(await page.request.post('/api/admin/users',{data:{email,displayName:reviewer?'验收协作成员':'交付只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
@@ -531,6 +540,7 @@ test('model actions select real metadata, save typed references and reopen the s
   await action.getByRole('textbox',{name:'业务操作',exact:true}).fill('登记验收通过');
   await action.getByRole('button',{name:/^登记验收通过/}).click();
   await action.getByRole('combobox',{name:'目标记录来源',exact:true}).click();
+  await expect(page.getByRole('option')).toHaveCount(1);
   await page.getByRole('option',{name:'交付验收 · 所属项目',exact:true}).click();
   await action.getByRole('combobox',{name:'取值方式',exact:true}).click();
   await page.getByRole('option',{name:'业务字段',exact:true}).click();
