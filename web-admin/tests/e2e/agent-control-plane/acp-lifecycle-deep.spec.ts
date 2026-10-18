@@ -35,7 +35,6 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, findRowInPaginatedList, queryFilteredList } from '../helpers/index';
 import { gotoAcpUiPage } from './route-helpers';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 
 const dictionaries = JSON.parse(readFileSync(new URL('../../../../plugins/agent-control-plane/config/dicts.json', import.meta.url), 'utf8')) as Array<{
   code: string;
@@ -532,10 +531,11 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
       }, undefined, 'create');
       expect(policy.recordId).toBeTruthy();
       const requestData = JSON.stringify({ operation: 'lifecycle-transition' });
+      // Dynamic creation exposes policy/request fields, not the runtime-owned plan hash.
+      // These cases verify command lifecycle; durable approval integrity has its own API suite.
       const approvalContext = {
         policy_id: policy.recordId,
         request_data: requestData,
-        plan_hash: createHash('sha256').update(requestData).digest('hex'),
       };
 
       // 11) Approval records (pending) — use dynamic create API
