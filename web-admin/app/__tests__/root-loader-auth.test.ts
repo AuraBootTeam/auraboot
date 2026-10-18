@@ -167,6 +167,30 @@ describe('root loader authentication guard', () => {
     expect(mocks.destroySession).not.toHaveBeenCalled();
   });
 
+  it('marks dependency timeouts as 503 with a correlated stage without destroying the session', async () => {
+    vi.stubEnv('EDITION', 'standard');
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        ),
+    );
+    const { loader } = await import('~/root');
+    await expect(
+      loader({
+        request: new Request('http://localhost/xy/display', {
+          headers: { 'X-Request-Id': 'timeout-test' },
+        }),
+      } as any),
+    ).rejects.toMatchObject({
+      data: { code: 'root_dependency_unavailable', requestId: 'timeout-test', stage: 'branding' },
+      init: { status: 503 },
+    });
+    expect(mocks.destroySession).not.toHaveBeenCalled();
+  });
+
   it('destroys an authenticated session only after an authoritative auth rejection', async () => {
     mocks.getTokenFromRequest.mockResolvedValue('invalid-token');
     mocks.getUserInfo.mockResolvedValue({ user: null, permissions: null, preferences: null });
@@ -272,7 +296,11 @@ describe('root loader authentication guard', () => {
     const { resolveDeploymentBrandingFromBff } = await import('~/root');
     await expect(
       resolveDeploymentBrandingFromBff({ EDITION: 'standard', BFF_PORT: '4001' }),
-    ).rejects.toThrow('Unable to resolve deployment branding from BFF (503).');
+    ).rejects.toMatchObject({
+      name: 'RootDependencyUnavailableError',
+      dependency: 'branding',
+      upstreamStatus: 503,
+    });
   });
 
   it('refreshes published branding on a public-route cache hit without mutating the cached locale bundle', async () => {
@@ -292,25 +320,23 @@ describe('root loader authentication guard', () => {
     };
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockImplementation(
-          async (url: string) =>
-            new Response(
-              JSON.stringify(
-                String(url).endsWith('/api/runtime/branding')
-                  ? {
-                      branding: {
-                        mode: 'commercial',
-                        productName: 'Northstar',
-                        authAppearance: appearance,
-                      },
-                    }
-                  : { code: '0', data: {} },
-              ),
-              { status: 200, headers: { 'Content-Type': 'application/json' } },
+      vi.fn().mockImplementation(
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              String(url).includes('/api/runtime/branding')
+                ? {
+                    branding: {
+                      mode: 'commercial',
+                      productName: 'Northstar',
+                      authAppearance: appearance,
+                    },
+                  }
+                : { code: '0', data: {} },
             ),
-        ),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      ),
     );
     const { loader } = await import('~/root');
     const result = await loader({
@@ -323,6 +349,38 @@ describe('root loader authentication guard', () => {
     expect(cached.branding.productName).toBe('Stale release');
     expect(mocks.getI18nData).not.toHaveBeenCalled();
   });
+
+  it.each(['/login', '/admin-login', '/signup', '/forgot-password', '/reset-password'])(
+    'requests published appearance only on authentication page %s',
+    async (pathname) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ branding: { mode: 'commercial' } })));
+      vi.stubGlobal('fetch', fetchMock);
+      const { resolveDeploymentBrandingFromBff } = await import('~/root');
+      await resolveDeploymentBrandingFromBff({ EDITION: 'standard' }, 'branding-route', pathname);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:3500/api/runtime/branding?include=auth-appearance',
+        expect.anything(),
+      );
+    },
+  );
+
+  it.each(['/xy/display', '/xy/display/class-123', '/home', '/login-other'])(
+    'does not request login appearance for application route %s',
+    async (pathname) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ branding: { mode: 'commercial' } })));
+      vi.stubGlobal('fetch', fetchMock);
+      const { resolveDeploymentBrandingFromBff } = await import('~/root');
+      await resolveDeploymentBrandingFromBff({ EDITION: 'standard' }, 'branding-route', pathname);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:3500/api/runtime/branding',
+        expect.anything(),
+      );
+    },
+  );
 
   it('always emits a stable product title when ICP mode is disabled', async () => {
     const { COMMUNITY_BRANDING } = await import('~/config/branding');

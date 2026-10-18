@@ -4,6 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
+import { trace } from '@opentelemetry/api';
 import logger from '~/server/utils/logger';
 
 /**
@@ -36,7 +37,16 @@ function shouldSkipLogging(path: string): boolean {
  */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   // Generate or use existing request ID
-  const requestId = (req.headers['x-request-id'] as string) || generateRequestId();
+  const supplied = req.headers['x-request-id'];
+  const requestId =
+    typeof supplied === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(supplied)
+      ? supplied
+      : generateRequestId();
+  // Express's Fetch Request adapter copies headers, not arbitrary request properties.
+  req.headers['x-request-id'] = requestId;
+  const spanContext = trace.getActiveSpan()?.spanContext();
+  const traceId =
+    spanContext && !/^0+$/.test(spanContext.traceId) ? spanContext.traceId : undefined;
   const startTime = Date.now();
   const path = req.originalUrl || req.url;
   const skipLogging = shouldSkipLogging(path);
@@ -46,12 +56,14 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
 
   // Set request ID in response header
   res.setHeader('X-Request-Id', requestId);
+  if (traceId) res.setHeader('X-Trace-Id', traceId);
 
   // Log request start
   if (!skipLogging) {
     logger.info(
       {
         requestId,
+        traceId,
         method: req.method,
         path,
         clientIp: req.ip || req.socket?.remoteAddress,
@@ -68,6 +80,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     if (!skipLogging) {
       const logData = {
         requestId,
+        traceId,
         method: req.method,
         path,
         statusCode: res.statusCode,
@@ -92,6 +105,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       logger.info(
         {
           requestId,
+          traceId,
           method: req.method,
           path,
           duration: `${duration}ms`,

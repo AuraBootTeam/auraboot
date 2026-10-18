@@ -17,8 +17,9 @@ import { register, proxyDurationHistogram } from './metrics.server';
 import { buildLoginFailureRedirect } from './login-failure';
 import { sessionStorage, commitUserSession, maybeRenewSession } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
-import { resolveDeploymentBranding } from '~/config/branding.server';
-import { resolveAuthAppearance } from '~/config/auth-appearance';
+import { safeLoaderError } from './observability/loaderDiagnostics.server';
+import { createRuntimeBrandingHandler } from './routes/runtimeBranding';
+import { createSessionContextHandler } from './routes/sessionContext';
 import { enforceCsrfProtection, hasSameOrigin } from './middlewares/CsrfProtection';
 import { handleLegacySessionMigration } from './auth/legacy-session-migration';
 import { handleSocialSessionExchange } from './auth/social-session-exchange';
@@ -348,24 +349,8 @@ app.get('/metrics', async (_req, res) => {
 // Root route modules are also compiled into the browser graph. Keep License
 // verification and deployment file access behind this BFF-only boundary and
 // return only the public, serialized branding contract.
-app.get('/api/runtime/branding', async (_req, res, next) => {
-  try {
-    const branding = await resolveDeploymentBranding(process.env);
-    if (branding.mode === 'commercial') {
-      const response = await axios.get(`${SPRING_BOOT_URL}/api/auth/appearance`);
-      if (String(response.data?.code) !== '0' || !response.data?.data) {
-        throw new Error('Unable to resolve published authentication appearance');
-      }
-      if (response.data.data.appearance !== null) {
-        branding.authAppearance = resolveAuthAppearance(response.data.data.appearance);
-      }
-    }
-    res.set('Cache-Control', 'no-store');
-    res.json({ branding });
-  } catch (error) {
-    next(error);
-  }
-});
+app.get('/api/runtime/branding', createRuntimeBrandingHandler(SPRING_BOOT_URL));
+app.get('/api/runtime/session-context', createSessionContextHandler(SPRING_BOOT_URL));
 
 // Proxy timing middleware — measure BFF→backend latency
 app.use('/api', (req, res, next) => {
@@ -479,6 +464,15 @@ if (process.env.NODE_ENV === 'development') {
 } else {
   app.all(
     '*',
+    (req, res, next) => {
+      // The React Router adapter appends Fetch response headers. Its data hook
+      // owns these headers; pre-setting them here would duplicate both IDs.
+      if (req.path.endsWith('.data')) {
+        res.removeHeader('X-Request-Id');
+        res.removeHeader('X-Trace-Id');
+      }
+      next();
+    },
     createRequestHandler({
       // @ts-expect-error - build output exists at runtime in the docker image
       // (web-admin/Dockerfile stage 1 runs `pnpm exec react-router build`),
@@ -495,7 +489,7 @@ app.use(errorLogger);
 // Error handling middleware
 app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const requestId = (req as any).requestId || 'unknown';
-  console.error(`[${requestId}] BFF Server Error:`, error);
+  console.error(`[${requestId}] BFF Server Error:`, safeLoaderError(error));
   // Express body-parser marks malformed JSON as a client error before proxying.
   if (error?.type === 'entity.parse.failed' && error?.status === 400) {
     res.status(400).json({
@@ -503,6 +497,10 @@ app.use((error: any, req: express.Request, res: express.Response, _next: express
       message: 'Invalid JSON request body',
       requestId,
     });
+    return;
+  }
+  if (error?.status === 503 && error?.code === 'root_dependency_unavailable') {
+    res.status(503).json({ error: 'Service Unavailable', code: error.code, requestId });
     return;
   }
   res.status(500).json({

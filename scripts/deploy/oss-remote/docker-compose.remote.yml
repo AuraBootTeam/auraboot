@@ -44,7 +44,8 @@ services:
       AURA_PLUGINS_DIR: /app/pf4j-plugins
       OPEN_PLATFORM_PROTOCOL_SIGNING_KEY: ${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:-}
       FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:-}
-      MANAGEMENT_TRACING_ENABLED: "false"
+      MANAGEMENT_TRACING_ENABLED: ${MANAGEMENT_TRACING_ENABLED:-true}
+      AURA_TRACE_LOG_DIR: /app/data/traces
       MANAGEMENT_HEALTH_DISKSPACE_ENABLED: "false"
       JAVA_OPTS: ${BACKEND_JAVA_OPTS:--Xms384m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200}
     volumes:
@@ -67,6 +68,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      AURA_TRACE_LOG_DIR: /app/logs/traces
       BFF_PORT: "3000"
       SPRING_BOOT_URL: http://backend:6443
       # SSR data loaders reach the backend via BFF_INTERNAL_URL (not SPRING_BOOT_URL);
@@ -77,6 +79,8 @@ services:
       ICP_COMPLIANCE_ENABLED: ${ICP_COMPLIANCE_ENABLED:-0}
       ICP_SITE_TITLE: ${ICP_SITE_TITLE:-}
       ICP_RECORD_NUMBER: ${ICP_RECORD_NUMBER:-}
+    volumes:
+      - oss_frontend_traces:/app/logs/traces
     depends_on:
       backend: { condition: service_healthy }
     networks: [oss]
@@ -93,6 +97,7 @@ services:
     logging: { driver: json-file, options: { max-size: "50m", max-file: "5" } }
 
 volumes:
+  oss_frontend_traces:
   oss_pg_data:
   oss_backend_data:
 
