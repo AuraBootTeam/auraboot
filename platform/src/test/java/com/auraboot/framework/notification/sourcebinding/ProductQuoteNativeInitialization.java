@@ -430,4 +430,86 @@ public final class ProductQuoteNativeInitialization {
         return Map.of("sourceDirectory", original.toRealPath().toString(), "testDirectory", destination.toRealPath().toString(),
                 "sourceResourceHashes", originals, "generatedResourceHashes", generated, "exactWriterAppendix", writers, "commands", commands);
     }
+    // BEGIN additive automatic-registry fixture.
+    static final Map<String, List<String>> AUTOMATIC_FIELDS = Map.of(
+            "prod_product", List.of("prod_name", "prod_unit", "prod_type", "prod_status"),
+            "pr_purchase_order", List.of("pr_po_code", "pr_po_supplier", "pr_po_date", "pr_po_status",
+                    "pr_po_collaboration_managed", "qo_pr_order_state"),
+            "pr_purchase_order_line", List.of("pr_pol_order_id", "pr_pol_product_id", "pr_pol_qty",
+                    "pr_pol_received_qty", "pr_pol_collaboration_managed", "qo_pr_order_line_submitted_qty"));
+
+    static String automaticCommand(String model) {
+        if (!AUTOMATIC_FIELDS.containsKey(model)) throw new IllegalArgumentException("Unsupported automatic fixture model");
+        return model + ":initialize_s06_automatic_fixture";
+    }
+    static void validateAutomaticPayload(String model, Map<String, Object> facts) {
+        if (!AUTOMATIC_FIELDS.containsKey(model) || !facts.keySet().equals(Set.copyOf(AUTOMATIC_FIELDS.get(model))))
+            throw new IllegalArgumentException("Automatic fixture requires exact fields");
+    }
+    static Map<String, Object> prepareAutomaticQuoteOwner(Path original, Path destination, ObjectMapper json) throws Exception {
+        if (!"com.auraboot.quote-procurement".equals(json.readTree(original.resolve("plugin.json").toFile()).path("pluginId").asText()))
+            throw new IllegalArgumentException("Automatic fixture requires the actual quote owner");
+        return prepare(original, destination, json, AUTOMATIC_FIELDS, ProductQuoteNativeInitialization::automaticCommand,
+                "s06-automatic-native-initialization.json");
+    }
+    /** Only the actual native owner may amend the two managed policies/markers. */
+    static Map<String, Object> prepareAutomaticProcurementOwner(Path original, Path destination, ObjectMapper json) throws Exception {
+        JsonNode manifest = json.readTree(original.resolve("plugin.json").toFile());
+        if (!"com.auraboot.procurement".equals(manifest.path("pluginId").asText())
+                || !"pr".equals(manifest.path("namespace").asText()) || Files.exists(destination))
+            throw new IllegalArgumentException("Automatic fixture requires a fresh actual procurement owner");
+        var originals = new LinkedHashMap<String, String>();
+        try (var paths = Files.walk(original)) {
+            for (Path file : paths.sorted().toList()) {
+                if (Files.isSymbolicLink(file)) throw new IllegalArgumentException("No symbolic fixture resources");
+                Path target = destination.resolve(original.relativize(file));
+                if (Files.isDirectory(file)) Files.createDirectories(target);
+                else { Files.copy(file, target); originals.put(original.relativize(file).toString(), sha(file)); }
+            }
+        }
+        var markers = Map.of("pr_purchase_order", "pr_po_collaboration_managed",
+                "pr_purchase_order_line", "pr_pol_collaboration_managed");
+        var audit = new LinkedHashMap<String, Object>();
+        for (var entry : markers.entrySet()) {
+            Path fieldFile = destination.resolve("config/fields/" + entry.getValue() + ".json");
+            JsonNode field = json.readTree(fieldFile.toFile());
+            if (!(field instanceof ObjectNode object) || !entry.getValue().equals(field.path("code").asText())
+                    || !"boolean".equals(field.path("dataType").asText()) || !field.path("immutable").isBoolean() || !field.path("immutable").booleanValue()
+                    || !field.path("extension").path("systemManaged").isBoolean() || !field.path("extension").path("systemManaged").booleanValue())
+                throw new IllegalArgumentException("Automatic marker policy changed");
+            JsonNode before = field.deepCopy();
+            object.set("allowedWriterCommands", appendWriter(field.path("allowedWriterCommands"), automaticCommand(entry.getKey())));
+            Files.writeString(fieldFile, json.writerWithDefaultPrettyPrinter().writeValueAsString(field));
+            audit.put(entry.getValue(), Map.of("before", before, "after", field.deepCopy()));
+        }
+        Path modelsFile = destination.resolve("config/models.json");
+        JsonNode models = json.readTree(modelsFile.toFile());
+        if (!models.isArray()) throw new IllegalArgumentException("Native model resources must be an array");
+        var seen = new java.util.HashSet<String>();
+        for (JsonNode model : models) {
+            String code = model.path("code").asText();
+            if (!markers.containsKey(code)) continue;
+            if (!seen.add(code) || !(model.path("extension").path("recordCommandWriters") instanceof ObjectNode policy)
+                    || !markers.get(code).equals(policy.path("field").asText())
+                    || !(policy.path("commands") instanceof ObjectNode operations)
+                    || !json.convertValue(operations, Map.class).keySet().equals(Set.of("create", "update", "delete")))
+                throw new IllegalArgumentException("Automatic native policy must be exact");
+            JsonNode before = policy.deepCopy();
+            operations.set("create", appendWriter(operations.path("create"), automaticCommand(code)));
+            // checkParent validates the managed parent for a child CREATE using its update list.
+            if (code.equals("pr_purchase_order")) operations.set("update",
+                    appendWriter(operations.path("update"), automaticCommand("pr_purchase_order_line")));
+            audit.put(code, Map.of("before", before, "after", policy.deepCopy()));
+        }
+        if (!seen.equals(markers.keySet())) throw new IllegalArgumentException("Both native policies are required");
+        Files.writeString(modelsFile, json.writerWithDefaultPrettyPrinter().writeValueAsString(models));
+        var generated = new LinkedHashMap<String, String>();
+        for (var entry : originals.entrySet()) {
+            if (!sha(original.resolve(entry.getKey())).equals(entry.getValue())) throw new IllegalArgumentException("Native owner changed");
+            generated.put(entry.getKey(), sha(destination.resolve(entry.getKey())));
+        }
+        return Map.of("sourceDirectory", original.toRealPath().toString(), "testDirectory", destination.toRealPath().toString(),
+                "sourceResourceHashes", originals, "generatedResourceHashes", generated, "exactAutomaticAppendix", audit);
+    }
+    // END additive automatic-registry fixture.
 }

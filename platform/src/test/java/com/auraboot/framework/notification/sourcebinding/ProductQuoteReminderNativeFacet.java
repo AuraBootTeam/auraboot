@@ -162,6 +162,214 @@ final class ProductQuoteReminderNativeFacet {
             MetaContext.restore(previous);
         }
     }
+    // BEGIN additive PF4J automatic fixture.
+    record AutomaticFixture(TickFixture quote, String orderPid, String linePid, String productPid,
+                            Binding shipmentBinding, Path setupEvidence, String setupSha256) {}
+
+    static AutomaticFixture prepareAutomaticFixture(Services services, Path parent) throws Exception {
+        var previous = MetaContext.snapshot();
+        try {
+            var f = new ProductQuoteReminderNativeFacet(services, parent);
+            JsonNode input = f.admission();
+            f.loadCanonicalNativeOrg(input);
+            f.initializeTenant();
+            f.importProduct(input);
+            f.importInitializationAppendix(input);
+            f.importAutomaticAppendices(input);
+            f.authenticateInitializer();
+            String supplier = f.create("pr_supplier_common", "pr_supplier_pcba_contact:sync_directory", Map.of(
+                    "pr_supplier_code", f.namespace, "pr_supplier_name", "Synthetic S06 automatic supplier", "pr_supplier_status", "enabled"));
+            f.membership(f.first, supplier, f.contact(supplier, "automatic-first"));
+            f.membership(f.second, supplier, f.contact(supplier, "automatic-second"));
+            String task = f.create("s2p_sourcing_event", "qo_procurement_task_common:create", Map.of(
+                    "s2p_se_code", f.namespace, "s2p_se_title", "Synthetic S06 automatic quote", "s2p_se_event_type", "rfq",
+                    "s2p_se_status", "bidding", "s2p_se_collaboration_managed", true));
+            String quote = f.create("s2p_bid", "qo_procurement_task_common:dispatch", Map.of(
+                    "s2p_bid_sourcing_event_id", task, "s2p_bid_supplier_id", supplier, "s2p_bid_status", "draft",
+                    "s2p_bid_collaboration_managed", true, "qo_pr_quote_cutoff_at", SLOT.plusSeconds(3600)));
+            String product = f.automaticCreate("prod_product", Map.of("prod_name", "Synthetic S06 automatic material",
+                    "prod_unit", "pcs", "prod_type", "raw_material", "prod_status", "planned"));
+            String order = f.automaticCreate("pr_purchase_order", Map.of("pr_po_code", f.namespace + "-auto",
+                    "pr_po_supplier", supplier, "pr_po_date", "2026-10-17", "pr_po_status", "approved",
+                    "pr_po_collaboration_managed", true, "qo_pr_order_state", "open"));
+            String line = f.automaticCreate("pr_purchase_order_line", Map.of("pr_pol_order_id", order,
+                    "pr_pol_product_id", product, "pr_pol_qty", new java.math.BigDecimal("100"),
+                    "pr_pol_received_qty", java.math.BigDecimal.ZERO, "pr_pol_collaboration_managed", true,
+                    "qo_pr_order_line_submitted_qty", java.math.BigDecimal.ZERO));
+            f.bind();
+            Binding quotation = f.approval(f.ruleAndTemplate());
+            Binding shipment = f.automaticShipmentApproval(f.automaticShipmentRule());
+            f.trace.put("stage", "automatic-registry-fixture-prepared");
+            f.trace.put("nativeTickExecuted", false);
+            f.trace.put("automaticTimerVerified", false);
+            f.trace.put("tenantId", f.tenant.getId());
+            f.trace.put("namespace", f.namespace);
+            f.trace.put("supplierPid", supplier);
+            f.trace.put("quotePid", quote);
+            f.trace.put("orderPid", order);
+            f.trace.put("orderLinePid", line);
+            f.trace.put("productPid", product);
+            f.trace.put("recipientIds", List.of(f.first.getId(), f.second.getId()));
+            f.trace.put("quoteBinding", quotation);
+            f.trace.put("shipmentBinding", shipment);
+            // No guessed mt_* name: use the actual published model projection for the two new targets.
+            for (String model : List.of("pr_purchase_order", "pr_purchase_order_line", "prod_product")) {
+                String table = services.metadata.getTableName(model);
+                ProcurementReminderTickNativeIT.identifier(table);
+                assertThat(table).startsWith("mt_");
+                assertThat(services.jdbc.queryForObject("SELECT to_regclass(?)::text", String.class, table)).isEqualTo(table);
+                f.tables.put(model, table);
+            }
+            Path sealed = f.evidence.resolve("automatic-fixture-setup.json");
+            Files.writeString(sealed, services.json.writerWithDefaultPrettyPrinter().writeValueAsString(f.trace), StandardOpenOption.CREATE_NEW);
+            var q = new TickFixture(f.tenant.getId(), f.namespace, supplier, task, quote,
+                    List.of(f.first.getId(), f.second.getId()), quotation, f.tables,
+                    Path.of(input.path("productJarPath").asText()).toRealPath(), sealed, sha(sealed));
+            return new AutomaticFixture(q, order, line, product, shipment, sealed, sha(sealed));
+        } finally { MetaContext.clear(); MetaContext.restore(previous); }
+    }
+
+    private void importAutomaticAppendices(JsonNode input) throws Exception {
+        var owners = new LinkedHashMap<String, Path>();
+        for (JsonNode row : input.path("orderedImportDirectories")) {
+            Path directory = Path.of(row.path("path").asText()).toRealPath();
+            String id = s.json.readTree(directory.resolve("plugin.json").toFile()).path("pluginId").asText();
+            if (Set.of("com.auraboot.procurement", "com.auraboot.quote-procurement").contains(id))
+                assertThat(owners.put(id, directory)).isNull();
+        }
+        assertThat(owners.keySet()).containsExactlyInAnyOrder("com.auraboot.procurement", "com.auraboot.quote-procurement");
+        var nativeCopy = ProductQuoteNativeInitialization.prepareAutomaticProcurementOwner(owners.get("com.auraboot.procurement"),
+                evidence.resolve("automatic-native-owner"), s.json);
+        // Use the already amended Q copy so this reimport cannot erase the old S06 initialization commands/writers.
+        Path quoteCopy = evidence.resolve("initialization-appendix");
+        assertThat(Files.isDirectory(quoteCopy)).isTrue();
+        var quote = ProductQuoteNativeInitialization.prepareAutomaticQuoteOwner(quoteCopy, evidence.resolve("automatic-quote-owner"), s.json);
+        trace.put("automaticNativeOwnerAppendix", nativeCopy);
+        trace.put("automaticQuoteOwnerAppendix", quote);
+        for (Map<String, Object> copy : List.of(nativeCopy, quote)) {
+            var preview = s.imports.parseDirectory((String) copy.get("testDirectory"), true);
+            assertThat(preview.isValid()).as("Automatic exact owner appendix: %s", preview.getErrors()).isTrue();
+            var request = ImportRequest.builder().importId(preview.getImportId())
+                    .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE).autoPublishFields(true)
+                    .autoPublishModels(true).autoPublishCommands(true).autoPublishPages(true).createResourcePermissions(true).build();
+            assertThat(s.imports.execute(preview.getImportId(), request).isSuccess()).isTrue();
+        }
+        assertThat(s.imports.verifyImportReferenceIntegrity()).isEmpty();
+        for (var entry : ProductQuoteNativeInitialization.AUTOMATIC_FIELDS.entrySet()) {
+            var definition = s.metadata.getModelDefinitionFromDb(entry.getKey()).orElseThrow();
+            assertThat(definition.getStatus()).isEqualTo("published");
+            assertThat(definition.getFields().stream().map(field -> field.getCode()).toList()).containsAll(entry.getValue());
+            // A newly required non-system field without a default must stop BEFORE any fixture record creation.
+            for (var field : definition.getFields()) {
+                if (field.isRequired() && field.getDefaultValue() == null && !SystemFieldConstants.ALL_INFRASTRUCTURE.contains(field.getCode()))
+                    assertThat(entry.getValue()).as("Exact required published field %s", field.getCode()).contains(field.getCode());
+            }
+        }
+    }
+    private String automaticCreate(String model, Map<String, Object> facts) {
+        ProductQuoteNativeInitialization.validateAutomaticPayload(model, facts);
+        var request = new CommandExecuteRequest();
+        request.setPayload(new LinkedHashMap<>(facts));
+        request.setClientRequestId(namespace + "-automatic-" + UUID.randomUUID());
+        var result = s.commands.execute(ProductQuoteNativeInitialization.automaticCommand(model), request);
+        assertThat(result.getPhaseReached()).isEqualTo("completed");
+        assertThat(result.getData().get("recordPid")).isInstanceOf(String.class);
+        String pid = (String) result.getData().get("recordPid");
+        assertThat(pid).isNotBlank();
+        @SuppressWarnings("unchecked")
+        var commands = (List<Map<String, Object>>) trace.computeIfAbsent("automaticInitializationCommands", ignored -> new ArrayList<Map<String, Object>>());
+        commands.add(Map.of("command", ProductQuoteNativeInitialization.automaticCommand(model), "model", model,
+                "recordPid", pid, "phase", result.getPhaseReached()));
+        return pid;
+    }
+    static Entity automaticShipmentEntity() {
+        return new Entity("qo_procurement_reminder_common", List.of(new Exact("qo_pr_reminder_kind", "shipment"),
+                new Exact("qo_pr_reminder_state", "pending")));
+    }
+    static Target automaticShipmentTarget() {
+        return new Target("qo_pr_reminder_targets", new Entity("pr_purchase_order", List.of(
+                new Exact("pr_po_collaboration_managed", true), new Exact("qo_pr_order_state", "open"))), "pr_po_supplier", null,
+                new SourceBindingTypes.RemainingChild(new Entity("pr_purchase_order_line", List.of(
+                        new Exact("pr_pol_collaboration_managed", true))), "pr_pol_order_id", "pr_pol_qty",
+                        "qo_pr_order_line_submitted_qty", 1000));
+    }
+    private long automaticShipmentRule() {
+        var template = new NotificationTemplateCreateRequest();
+        template.setCode(namespace + "_shipment_template");
+        template.setName("Synthetic S06 shipment template");
+        template.setChannel("IN_APP");
+        template.setEnabled(true);
+        template.setSubjectTemplate("Synthetic shipment reminder");
+        template.setBodyTemplate("Synthetic open order pending shipment");
+        s.templates.create(template);
+        var rule = new NotificationRuleRequest();
+        rule.setCode(namespace + "_shipment_rule");
+        rule.setName("Synthetic shipment explicit recipients");
+        rule.setEnabled(true);
+        rule.setTriggerType("EVENT");
+        rule.setTriggerConfig("{\"modelCode\":\"qo_procurement_reminder_common\",\"event\":\"created\"}");
+        rule.setConditionModelCode("qo_procurement_reminder_common");
+        rule.setConditionFilter(SourceBindingCanonical.tree(automaticShipmentEntity().equals().stream().map(predicate ->
+                Map.of("fieldName", predicate.fieldCode(), "operator", "EQ", "value", predicate.value().raw())).toList()).toString());
+        rule.setActionChannel("IN_APP");
+        rule.setActionTemplateCode(namespace + "_shipment_template");
+        rule.setRecipientType("SPECIFIC_USERS");
+        rule.setRecipientField(first.getId() + "," + second.getId());
+        return s.rules.createRule(rule).getId();
+    }
+    private Binding automaticShipmentApproval(long rule) {
+        return tx(() -> {
+            List<Approval> approvals = new ArrayList<>();
+            for (String model : List.of("qo_procurement_reminder_common", "pr_purchase_order", "pr_purchase_order_line",
+                    "pr_supplier_common", "qo_procurement_membership_common", "pr_supplier_pcba_contact")) {
+                // Only actual contributors of this imported model/binding/field graph are explicitly approved in this test.
+                List<String> contributors = s.jdbc.queryForList("""
+                        SELECT DISTINCT contributor FROM (
+                          SELECT m.plugin_pid AS contributor FROM ab_meta_model m WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE
+                          UNION ALL
+                          SELECT f.plugin_pid FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id JOIN ab_meta_field f ON f.id=b.field_id
+                            WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE AND b.tenant_id=? AND b.deleted_flag=FALSE
+                          UNION ALL
+                          SELECT r.plugin_pid FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id JOIN ab_plugin_resource r ON r.resource_pid=b.pid
+                            WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE AND b.tenant_id=? AND b.deleted_flag=FALSE
+                              AND r.tenant_id=? AND r.resource_type='model_field_binding'
+                        ) actual WHERE contributor IS NOT NULL ORDER BY contributor
+                        """, String.class, tenant.getId(), model, tenant.getId(), model, tenant.getId(),
+                        tenant.getId(), model, tenant.getId(), tenant.getId());
+                assertThat(contributors).isNotEmpty();
+                List<Owner> owners = new ArrayList<>();
+                for (String pid : contributors) {
+                    var plugin = s.jdbc.queryForMap("SELECT pid,plugin_id,namespace,version FROM ab_plugin WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE", tenant.getId(), pid);
+                    owners.add(new Owner(pid, (String) plugin.get("plugin_id"), (String) plugin.get("namespace"), (String) plugin.get("version")));
+                }
+                List<Map<String, Object>> systemBindings = s.jdbc.queryForList("""
+                        SELECT f.pid,f.code,f.data_type,f.plugin_pid AS field_plugin_pid,
+                               f.tenant_id AS field_tenant_id,b.tenant_id AS binding_tenant_id,
+                               b.is_system_binding,b.editable,b.alias_code,p.pid AS plugin_pid,
+                               p.tenant_id AS plugin_tenant_id,p.plugin_id,p.namespace,p.version
+                        FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id
+                          JOIN ab_meta_field f ON f.id=b.field_id
+                          LEFT JOIN ab_plugin p ON p.pid=f.plugin_pid AND p.tenant_id=? AND p.deleted_flag=FALSE
+                        WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE
+                          AND b.tenant_id=? AND b.deleted_flag=FALSE AND b.is_system_binding=TRUE
+                          AND f.tenant_id=? AND f.deleted_flag=FALSE AND f.is_current=TRUE
+                        """, tenant.getId(), tenant.getId(), model, tenant.getId(), tenant.getId());
+                Set<String> nativeFields = nativeSystemFieldPids(systemBindings, tenant.getId(), canonicalOrgManifest, canonicalOrgFields);
+                trace.put("nativeSystemFieldPids:" + model, nativeFields);
+                Approval lookup = new Approval("METADATA_SHAPE_V1", model, "0".repeat(64), owners, Set.copyOf(nativeFields));
+                JsonNode graph = s.reader.metadata(tenant.getId(), lookup);
+                approvals.add(new Approval(lookup.mode(), model, SourceBindingCanonical.hash(graph), owners, lookup.nativeFieldPids()));
+            }
+            return new Binding(1, "sn" + UUID.randomUUID().toString().replace("-", "").substring(0, 12) + "_notice", tenant.getId(), approvals,
+                    new Source(automaticShipmentEntity(), "pid", "qo_pr_reminder_supplier_pid", "qo_pr_reminder_slot_at", automaticShipmentTarget()),
+                    new Entity("pr_supplier_common", List.of(new Exact("pr_supplier_status", "enabled"))),
+                    new Principal(new Entity("qo_procurement_membership_common", List.of(new Exact("qo_pr_membership_state", "active"))),
+                            "qo_pr_membership_user_pid", "qo_pr_membership_supplier_pid", "qo_pr_membership_contact_pid"),
+                    new Verification(new Entity("pr_supplier_pcba_contact", List.of(new Exact("qo_pr_contact_state", "active"))), "pr_spc_supplier_id"),
+                    rule, namespace + "_shipment_template", Map.of());
+        });
+    }
+    // END additive PF4J automatic fixture.
     // END additive controlled-tick setup.
 
     static void run(Services services, Path evidence) throws Exception {

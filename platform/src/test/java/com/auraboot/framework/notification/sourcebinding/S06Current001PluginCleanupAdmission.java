@@ -54,6 +54,8 @@ final class S06Current001PluginCleanupAdmission {
         Path file = input.toRealPath();
         require(file.startsWith(evidence) && hash(file).equals(expectedHash), "CLEANUP_INPUT_NOT_SEALED_OWNED");
         JsonNode value = json.readTree(file.toFile());
+        if (value.path("kind").asText().equals("s06-automatic-owned-plugin-cleanup-admission-v3"))
+            return automatic(automaticStrict(file, json), evidence, hash(file), json, now);
         if (value.path("kind").asText().equals("s06-owned-native-plugin-cleanup-admission-v2"))
             return current(strict(file, json), evidence, hash(file), json, now);
         exactKeys(value, Set.of("kind", "schemaVersion", "runtime", "database", "redisDatabase", "execute",
@@ -322,4 +324,332 @@ final class S06Current001PluginCleanupAdmission {
     static void require(boolean condition, String code) {
         if (!condition) throw new IllegalStateException(code);
     }
+    // BEGIN automatic sourceFamily cleanup admission.
+    static final String AUTOMATIC_FAMILY = "s06-pf4j-automatic-quote-shipment-v1";
+    static final String AUTOMATIC_CLASS = "com.auraboot.framework.notification.sourcebinding.ProcurementReminderTickNativeIT";
+    static final String AUTOMATIC_METHOD = "actualPf4jRegisteredTimerQueuesQuoteAndShipmentAndDeliversOnlySyntheticInApp";
+    static final String AUTOMATIC_SELECTOR = AUTOMATIC_CLASS + "." + AUTOMATIC_METHOD;
+
+    static Admission automatic(JsonNode input, Path evidence, String inputHash, ObjectMapper json, java.time.Instant now) throws Exception {
+        exactKeys(input, Set.of("kind", "schemaVersion", "sourceFamily", "runtime", "database", "redisDatabase", "execute",
+                "nativeEvidence", "expectedPlugins", "pluginRosterCapturedAtUtc", "pausedVerificationPath", "pausedVerificationSha256", "outputDirectory"));
+        require(input.path("kind").asText().equals("s06-automatic-owned-plugin-cleanup-admission-v3")
+                && input.path("schemaVersion").isInt() && input.path("schemaVersion").intValue() == 3
+                && input.path("sourceFamily").asText().equals(AUTOMATIC_FAMILY)
+                && input.path("runtime").asText().equals(RUNTIME) && input.path("database").asText().equals("enterprise_22")
+                && input.path("redisDatabase").isInt() && input.path("redisDatabase").intValue() == 13
+                && input.path("execute").isBoolean() && input.path("execute").booleanValue(), "CLEANUP_AUTOMATIC_SCOPE_INVALID");
+        freshUtc(input.path("pluginRosterCapturedAtUtc").asText(), now);
+        JsonNode proof = input.path("nativeEvidence");
+        exactKeys(proof, Set.of("sourceFamily", "selector", "appRoot", "appCommit", "sourceSet", "compiledSeal", "xml",
+                "receipt", "trace", "fixtureSetup", "sourceBinding", "classification", "runner"));
+        require(proof.path("sourceFamily").asText().equals(AUTOMATIC_FAMILY)
+                && proof.path("selector").asText().equals(AUTOMATIC_SELECTOR), "CLEANUP_AUTOMATIC_SOURCE_FAMILY_INVALID");
+        Path xml = automaticRef(proof.path("xml"), evidence);
+        automaticXml(xml);
+        JsonNode receipt = automaticRead(proof.path("receipt"), evidence, json);
+        JsonNode trace = automaticRead(proof.path("trace"), evidence, json);
+        JsonNode setup = automaticRead(proof.path("fixtureSetup"), evidence, json);
+        JsonNode binding = automaticRead(proof.path("sourceBinding"), evidence, json);
+        JsonNode classification = automaticRead(proof.path("classification"), evidence, json);
+        require(receipt.path("kind").asText().equals("procurement-pf4j-automatic-quote-shipment-native-v1")
+                && receipt.path("completed").isBoolean() && receipt.path("completed").booleanValue()
+                && receipt.path("stage").asText().equals("automatic-quote-shipment-and-intent-teardown-completed")
+                && receipt.path("nativeTickExecuted").isBoolean() && receipt.path("nativeTickExecuted").booleanValue()
+                && receipt.path("automaticTimerVerified").isBoolean() && receipt.path("automaticTimerVerified").booleanValue()
+                && receipt.path("actualPf4jRegistryUsed").isBoolean() && receipt.path("actualPf4jRegistryUsed").booleanValue()
+                && receipt.path("formalRecipientPolicyApproved").isBoolean() && !receipt.path("formalRecipientPolicyApproved").booleanValue()
+                && receipt.path("automaticSourceWorkerVerified").isBoolean() && !receipt.path("automaticSourceWorkerVerified").booleanValue()
+                && receipt.path("providerCalls").isInt() && receipt.path("providerCalls").intValue() == 0
+                && receipt.path("wechatCalls").isInt() && receipt.path("wechatCalls").intValue() == 0,
+                "CLEANUP_AUTOMATIC_NATIVE_NOT_COMPLETE");
+        require(receipt.path("sealedTrace").equals(proof.path("trace"))
+                && receipt.path("fixtureSetupPath").asText().equals(proof.path("fixtureSetup").path("path").asText())
+                && receipt.path("fixtureSetupSha256").asText().equals(proof.path("fixtureSetup").path("sha256").asText())
+                && trace.path("completed").isBoolean() && !trace.path("completed").booleanValue()
+                && trace.path("businessCompleted").isBoolean() && trace.path("businessCompleted").booleanValue()
+                && trace.path("phases").equals(receipt.path("phases"))
+                && receipt.path("protectedBefore").equals(receipt.path("protectedAfter")), "CLEANUP_AUTOMATIC_TRACE_CHANGED");
+        require(setup.path("stage").asText().equals("automatic-registry-fixture-prepared")
+                && setup.path("namespace").asText().matches("sn[a-f0-9]{12}")
+                && setup.path("tenantId").isIntegralNumber() && setup.path("tenantId").canConvertToLong()
+                && setup.path("tenantId").longValue() > 0
+                && receipt.path("tenantId").isTextual() && receipt.path("tenantId").asText().equals(setup.path("tenantId").asText()),
+                "CLEANUP_AUTOMATIC_TENANT_INVALID");
+        require(classification.path("kind").asText().equals("s06-pf4j-automatic-native-qualified-v1")
+                && classification.path("completed").isBoolean() && classification.path("completed").booleanValue()
+                && classification.path("postSourceClassGuard").isBoolean() && classification.path("postSourceClassGuard").booleanValue()
+                && classification.path("selector").equals(proof.path("selector"))
+                && classification.path("appCommit").equals(proof.path("appCommit"))
+                && classification.path("sourceSet").equals(proof.path("sourceSet")), "CLEANUP_AUTOMATIC_CLASSIFICATION_INVALID");
+        for (String ref : List.of("compiledSeal", "xml", "receipt", "trace", "fixtureSetup", "sourceBinding", "runner"))
+            require(classification.path(ref).equals(proof.path(ref)), "CLEANUP_AUTOMATIC_CLASSIFICATION_REF_CHANGED");
+        automaticPhases(receipt, setup, evidence, json);
+        Path pausedFile = owned(input.path("pausedVerificationPath").asText(), input.path("pausedVerificationSha256").asText(), evidence);
+        JsonNode paused = strict(pausedFile, json);
+        automaticPaused(paused, proof.path("sourceSet"));
+        automaticCompiled(proof, binding, paused, evidence, json);
+        List<Expected> plugins = automaticExpected(input.path("expectedPlugins"), setup, binding, json);
+        Path output = Path.of(input.path("outputDirectory").asText()).toAbsolutePath().normalize();
+        require(!Files.exists(output) && output.getParent().toRealPath().startsWith(evidence), "CLEANUP_OUTPUT_NOT_FRESH_OWNED");
+        return new Admission(plugins, output, inputHash, hash(automaticRef(proof.path("classification"), evidence)), 3);
+    }
+
+    static Path automaticRef(JsonNode ref, Path evidence) throws Exception {
+        exactKeys(ref, Set.of("path", "sha256"));
+        require(ref.path("path").isTextual() && ref.path("sha256").isTextual(), "CLEANUP_AUTOMATIC_REF_MISSING");
+        return owned(ref.path("path").textValue(), ref.path("sha256").textValue(), evidence);
+    }
+    static JsonNode automaticRead(JsonNode ref, Path evidence, ObjectMapper json) throws Exception {
+        return automaticStrict(automaticRef(ref, evidence), json);
+    }
+    static JsonNode automaticStrict(Path file, ObjectMapper json) throws Exception {
+        return json.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+                .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .readTree(Files.readString(file));
+    }
+    static void automaticXml(Path xml) throws Exception {
+        var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setXIncludeAware(false); factory.setExpandEntityReferences(false);
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        var document = factory.newDocumentBuilder().parse(xml.toFile());
+        var suite = document.getDocumentElement();
+        require(suite.getTagName().equals("testsuite") && suite.getAttribute("tests").equals("1")
+                && suite.getAttribute("failures").equals("0") && suite.getAttribute("errors").equals("0") && suite.getAttribute("skipped").equals("0")
+                && document.getElementsByTagName("failure").getLength() == 0 && document.getElementsByTagName("error").getLength() == 0
+                && document.getElementsByTagName("skipped").getLength() == 0 && document.getElementsByTagName("testcase").getLength() == 1,
+                "CLEANUP_AUTOMATIC_XML_NOT_PASS");
+        var test = (org.w3c.dom.Element) document.getElementsByTagName("testcase").item(0);
+        String method = test.getAttribute("name"); if (method.endsWith("()")) method = method.substring(0, method.length() - 2);
+        require(test.getAttribute("classname").equals(AUTOMATIC_CLASS) && method.equals(AUTOMATIC_METHOD), "CLEANUP_AUTOMATIC_XML_WRONG_SELECTOR");
+    }
+    static void automaticPhases(JsonNode receipt, JsonNode setup, Path evidence, ObjectMapper json) throws Exception {
+        require(receipt.path("phases").isArray() && receipt.path("phases").size() == 2, "CLEANUP_AUTOMATIC_PHASES_INVALID");
+        Set<String> kinds = new HashSet<>(), sourcePids = new HashSet<>();
+        var teardowns = json.createArrayNode();
+        for (JsonNode phase : receipt.path("phases")) {
+            String kind = phase.path("kind").asText();
+            require(Set.of("quote", "shipment").contains(kind) && kinds.add(kind)
+                    && phase.path("deliveryAndReplayVerified").isBoolean() && phase.path("deliveryAndReplayVerified").booleanValue()
+                    && phase.path("automaticTransactions").isInt() && phase.path("automaticTransactions").intValue() >= 2
+                    && phase.path("ownedOutboxRows").isArray() && phase.path("ownedOutboxRows").size() == 2
+                    && phase.path("outboxAfterIntentTeardown").isArray() && phase.path("outboxAfterIntentTeardown").isEmpty(),
+                    "CLEANUP_AUTOMATIC_PHASES_INVALID");
+            JsonNode expectedBinding = setup.path(kind.equals("quote") ? "quoteBinding" : "shipmentBinding");
+            require(phase.path("binding").equals(expectedBinding.path("code"))
+                    && phase.path("targetPid").equals(setup.path(kind.equals("quote") ? "quotePid" : "orderPid"))
+                    && !phase.path("sourcePid").asText().isBlank() && sourcePids.add(phase.path("sourcePid").asText())
+                    && phase.path("slot").asText().equals(kind.equals("quote") ? "2026-10-13T01:30:00Z" : "2026-10-17T06:00:00Z"),
+                    "CLEANUP_AUTOMATIC_PHASE_BINDING_CHANGED");
+            teardowns.add(phase.path("intentTeardown"));
+            JsonNode phaseTrace = automaticRead(phase.path("phaseTrace"), evidence, json);
+            JsonNode teardown = automaticRead(phase.path("intentTeardown"), evidence, json);
+            require(phaseTrace.path("kind").asText().equals(kind) && phaseTrace.path("sourcePid").equals(phase.path("sourcePid"))
+                    && phaseTrace.path("ownedOutboxRows").equals(phase.path("ownedOutboxRows"))
+                    && teardown.path("sealedTraceSha256").equals(phase.path("phaseTrace").path("sha256"))
+                    && teardown.path("tenantId").equals(setup.path("tenantId"))
+                    && teardown.path("binding").equals(phase.path("binding")) && teardown.path("sourcePid").equals(phase.path("sourcePid"))
+                    && teardown.path("inboxReceiptReplayPreserved").isBoolean() && teardown.path("inboxReceiptReplayPreserved").booleanValue()
+                    && teardown.path("deliverySuccessClaimed").isBoolean() && !teardown.path("deliverySuccessClaimed").booleanValue(),
+                    "CLEANUP_AUTOMATIC_INTENT_TEARDOWN_INVALID");
+        }
+        require(kinds.equals(Set.of("quote", "shipment")) && receipt.path("intentTeardowns").equals(teardowns), "CLEANUP_AUTOMATIC_PHASES_INVALID");
+    }
+    static void automaticPaused(JsonNode paused, JsonNode sources) {
+        exactKeys(sources, Set.of("oss", "quote", "enterprise", "plugins", "crm"));
+        require(paused.path("runtime").asText().equals(RUNTIME) && paused.path("verdict").asText().equals("ok")
+                && paused.path("findings").isArray() && paused.path("findings").isEmpty()
+                && paused.path("metadata").path("lifecycle").asText().equals("suspended")
+                && paused.path("processes").isArray() && paused.path("processes").size() == 1, "CLEANUP_PUBLIC_WORKERS_NOT_ISOLATED");
+        require(paused.path("environment").path("POSTGRES_DB").asText().equals("enterprise_22")
+                && paused.path("environment").path("REDIS_DATABASE").asText().equals("13"), "CLEANUP_AUTOMATIC_DATA_SCOPE_CHANGED");
+        for (JsonNode process : paused.path("processes")) {
+            require(process.path("key").asText().equals("erp-fixture") && process.path("status").asText().equals("ok")
+                    && process.path("actual").path("alive").isBoolean() && process.path("actual").path("alive").booleanValue()
+                    && process.path("expected").path("pid").isIntegralNumber() && process.path("expected").path("pid").longValue() > 0,
+                    "CLEANUP_FOREIGN_PROCESS");
+            for (String field : List.of("cwd", "commandHash", "tokenHash")) require(!process.path("expected").path(field).asText().isBlank()
+                    && process.path("expected").path(field).equals(process.path("actual").path(field)), "CLEANUP_ERP_IDENTITY_MISMATCH");
+        }
+        require(paused.path("ports").isObject() && !paused.path("ports").isEmpty(), "CLEANUP_PORT_PROOF_MISSING");
+        for (JsonNode port : paused.path("ports")) require(port.path("status").asText().equals("stopped")
+                && (!port.has("pids") || port.path("pids").isEmpty()), "CLEANUP_PUBLIC_PORT_NOT_STOPPED");
+        require(paused.path("sources").isArray() && paused.path("sources").size() == 5, "CLEANUP_AUTOMATIC_SOURCES_INVALID");
+        Set<String> seen = new HashSet<>();
+        for (JsonNode source : paused.path("sources")) {
+            String key = source.path("key").asText();
+            require(sources.has(key) && seen.add(key) && sources.path(key).isTextual() && sources.path(key).asText().matches("[a-f0-9]{40}")
+                    && source.path("status").asText().equals("ok") && source.path("actual").path("commit").equals(sources.path(key))
+                    && source.path("actual").equals(source.path("expected"))
+                    && source.path("actual").path("dirtyFingerprint").asText().equals("clean"), "CLEANUP_AUTOMATIC_SOURCES_INVALID");
+        }
+    }
+    static List<Expected> automaticExpected(JsonNode rows, JsonNode setup, JsonNode binding, ObjectMapper json) throws Exception {
+        long tenant = setup.path("tenantId").longValue();
+        require(tenant > 0 && binding.path("orderedImportDirectories").isArray() && binding.path("orderedImportDirectories").size() == 23
+                && setup.path("orderedImportDirectories").equals(binding.path("orderedImportDirectories"))
+                && setup.path("formalImportedDirectories").isInt() && setup.path("formalImportedDirectories").intValue() == 23
+                && setup.path("formalImportDiagnostics").isArray() && setup.path("formalImportDiagnostics").size() == 23,
+                "CLEANUP_AUTOMATIC_FORMAL23_MISSING");
+        Map<String, JsonNode> manifests = new LinkedHashMap<>();
+        int index = 0;
+        for (JsonNode directory : binding.path("orderedImportDirectories")) {
+            Path path = Path.of(directory.path("path").asText()).toRealPath();
+            Path manifestFile = path.resolve("plugin.json");
+            require(hash(manifestFile).equals(directory.path("pluginJsonSha256").asText()), "CLEANUP_AUTOMATIC_SOURCE_MANIFEST_CHANGED");
+            JsonNode manifest = automaticStrict(manifestFile, json);
+            require(manifests.put(manifest.path("pluginId").asText(), manifest) == null, "CLEANUP_AUTOMATIC_OWNER_DUPLICATED");
+            JsonNode imported = setup.path("formalImportDiagnostics").get(index++);
+            require(imported.path("directory").asText().equals(directory.path("path").asText())
+                    && imported.path("previewValid").isBoolean() && imported.path("previewValid").booleanValue()
+                    && imported.path("executeSuccess").isBoolean() && imported.path("executeSuccess").booleanValue(),
+                    "CLEANUP_AUTOMATIC_FORMAL_IMPORT_NOT_PASS");
+        }
+        require(rows.isArray() && rows.size() == manifests.size(), "CLEANUP_AUTOMATIC_EXACT_PLUGIN_ROSTER_REQUIRED");
+        Set<String> pids = new HashSet<>(), ids = new HashSet<>(); List<Expected> result = new ArrayList<>();
+        for (JsonNode row : rows) {
+            exactKeys(row, Set.of("tenantId", "pluginPid", "pluginId", "namespace", "version", "status", "rowSha256", "manifestSha256"));
+            for (String field : List.of("tenantId", "pluginPid", "pluginId", "namespace", "version", "status", "rowSha256", "manifestSha256"))
+                require(row.path(field).isTextual(), "CLEANUP_AUTOMATIC_PLUGIN_OUTSIDE_OWNED_TENANT");
+            String id = row.path("pluginId").asText(), pid = row.path("pluginPid").asText(); JsonNode manifest = manifests.get(id);
+            require(manifest != null && ids.add(id) && pid.matches("[A-Za-z0-9_-]{1,64}") && pids.add(pid)
+                    && row.path("tenantId").isTextual() && row.path("tenantId").asText().equals(Long.toString(tenant))
+                    && row.path("namespace").equals(manifest.path("namespace")) && row.path("version").equals(manifest.path("version"))
+                    && Set.of("installed", "enabled").contains(row.path("status").asText())
+                    && row.path("rowSha256").asText().matches("[a-f0-9]{64}") && row.path("manifestSha256").asText().matches("[a-f0-9]{64}"),
+                    "CLEANUP_AUTOMATIC_PLUGIN_OUTSIDE_OWNED_TENANT");
+            result.add(new Expected(tenant, pid, id, row.path("namespace").asText(), row.path("version").asText(),
+                    row.path("status").asText(), row.path("rowSha256").asText(), row.path("manifestSha256").asText()));
+        }
+        return List.copyOf(result);
+    }
+    static void automaticCompiled(JsonNode proof, JsonNode binding, JsonNode paused, Path evidence, ObjectMapper json) throws Exception {
+        JsonNode seal = automaticRead(proof.path("compiledSeal"), evidence, json);
+        // Reuse the existing controlled-Tick --seal-compiled layout, not a fabricated historical seal.
+        exactKeys(seal, Set.of("appCommit", "runnerSha256", "inventory", "actualReady"));
+        require(proof.path("appCommit").isTextual() && proof.path("appCommit").asText().matches("[a-f0-9]{40}")
+                && seal.path("appCommit").equals(proof.path("appCommit"))
+                && seal.path("runnerSha256").asText().matches("[a-f0-9]{64}")
+                && hash(automaticRef(proof.path("runner"), evidence)).equals(seal.path("runnerSha256").asText())
+                && seal.path("actualReady").isBoolean() && !seal.path("actualReady").booleanValue()
+                && binding.path("sourceSet").equals(proof.path("sourceSet")), "CLEANUP_AUTOMATIC_COMPILED_SEAL_INVALID");
+        Path app = Path.of(proof.path("appRoot").asText()).toRealPath();
+        require(app.startsWith(Path.of("/Users/ghj/work/auraboot/.workspace/worktrees").toRealPath())
+                && automaticGit(app, "rev-parse", "HEAD").equals(proof.path("appCommit").asText())
+                && automaticGit(app, "status", "--porcelain").isEmpty(), "CLEANUP_AUTOMATIC_APP_NOT_CLEAN");
+        Path testClasses = app.resolve("platform/build/classes/java/test").toRealPath();
+        require(Files.isSameFile(testClasses, Path.of(S06Current001PluginCleanupAdmission.class.getProtectionDomain().getCodeSource().getLocation().toURI())),
+                "CLEANUP_AUTOMATIC_NOT_ACTUAL_APP_CLASSES");
+        JsonNode inv = seal.path("inventory");
+        exactKeys(inv, Set.of("mainSources", "nativeSources", "buildInputs", "nativeClasses", "originalClasses", "offlineClasses",
+                "runtimeBootJarPath", "runtimeBootJarSha256", "productionClassCount", "allNativeSources", "allNativeClasses", "changedTestFiles"));
+        require(json.valueToTree(automaticMainSources(app)).equals(inv.path("mainSources"))
+                && json.valueToTree(automaticFiles(app.resolve("platform/src/test/java"), ".java", "")).equals(inv.path("allNativeSources"))
+                && json.valueToTree(automaticFiles(testClasses, ".class", "")).equals(inv.path("allNativeClasses"))
+                && json.valueToTree(automaticFiles(app.resolve("platform/build/classes/java/main"), ".class", "")).equals(inv.path("originalClasses"))
+                && json.valueToTree(automaticFiles(app.resolve("platform/build/classes-instrumented-main"), ".class", "")).equals(inv.path("offlineClasses")),
+                "CLEANUP_AUTOMATIC_FULL_SOURCE_CLASS_DRIFT");
+        require(inv.path("originalClasses").size() > 0 && inv.path("productionClassCount").isInt()
+                && inv.path("productionClassCount").intValue() == inv.path("originalClasses").size()
+                && automaticKeys(inv.path("originalClasses")).equals(automaticKeys(inv.path("offlineClasses"))),
+                "CLEANUP_AUTOMATIC_FULL_MAIN_ROSTER_MISSING");
+        require(inv.path("allNativeClasses").has(AUTOMATIC_CLASS.replace('.', '/') + ".class")
+                && inv.path("allNativeClasses").has("com/auraboot/framework/notification/sourcebinding/S06Current001PluginCleanupAdmission.class"),
+                "CLEANUP_AUTOMATIC_REQUIRED_CLASS_MISSING");
+        exactKeys(inv.path("buildInputs"), Set.of("platform/build.gradle", "platform/settings.gradle"));
+        for (String file : List.of("platform/build.gradle", "platform/settings.gradle"))
+            require(hash(app.resolve(file)).equals(inv.path("buildInputs").path(file).asText()), "CLEANUP_AUTOMATIC_BUILD_INPUT_DRIFT");
+        for (String file : automaticKeys(inv.path("nativeSources"))) {
+            require(file.matches("[A-Za-z0-9_]+\\.java"), "CLEANUP_AUTOMATIC_NATIVE_SOURCE_PATH_INVALID");
+            require(hash(app.resolve(
+                "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/" + file)).equals(inv.path("nativeSources").path(file).asText()),
+                "CLEANUP_AUTOMATIC_NATIVE_SOURCE_DRIFT");
+        }
+        for (String file : automaticKeys(inv.path("nativeClasses"))) require(inv.path("allNativeClasses").path(file).equals(inv.path("nativeClasses").path(file)),
+                "CLEANUP_AUTOMATIC_NATIVE_CLASS_DRIFT");
+        String main = proof.path("sourceSet").path("oss").asText();
+        var changed = new LinkedHashMap<String, String>();
+        for (String file : automaticGit(app, "diff", "--name-only", main, "HEAD").lines().toList()) {
+            require(file.startsWith("platform/src/test/java/") && file.endsWith(".java"), "CLEANUP_AUTOMATIC_APP_CHANGED_PRODUCTION");
+            changed.put(file, hash(app.resolve(file)));
+        }
+        require(!changed.isEmpty() && json.valueToTree(changed).equals(inv.path("changedTestFiles")), "CLEANUP_AUTOMATIC_CHANGED_SOURCE_ROSTER_DRIFT");
+        Path runtimeCore = null;
+        for (JsonNode source : paused.path("sources")) if (source.path("key").asText().equals("oss"))
+            runtimeCore = Path.of(source.path("actual").path("root").asText()).toRealPath();
+        require(runtimeCore != null && json.valueToTree(automaticMainSources(runtimeCore))
+                .equals(inv.path("mainSources")), "CLEANUP_AUTOMATIC_RUNTIME_MAIN_SOURCE_MISMATCH");
+        Path boot = Path.of(inv.path("runtimeBootJarPath").asText()).toRealPath();
+        require(hash(boot).equals(inv.path("runtimeBootJarSha256").asText()), "CLEANUP_AUTOMATIC_BOOT_JAR_DRIFT");
+        int artifacts = 0;
+        for (JsonNode artifact : paused.path("artifacts")) if (artifact.path("key").asText().equals("enterprise-backend")) {
+            artifacts++;
+            require(artifact.path("status").asText().equals("ok") && Files.isSameFile(boot, Path.of(artifact.path("path").asText()))
+                    && artifact.path("expected").path("hash").equals(inv.path("runtimeBootJarSha256"))
+                    && artifact.path("actual").path("hash").equals(inv.path("runtimeBootJarSha256")), "CLEANUP_AUTOMATIC_BOOT_ARTIFACT_MISMATCH");
+        }
+        require(artifacts == 1 && json.valueToTree(automaticCoreJarClasses(boot)).equals(inv.path("originalClasses")),
+                "CLEANUP_AUTOMATIC_BOOT_MAIN_CLASS_MISMATCH");
+    }
+    static Set<String> automaticKeys(JsonNode map) {
+        require(map.isObject() && !map.isEmpty(), "CLEANUP_AUTOMATIC_COMPLETE_MAP_REQUIRED");
+        Set<String> keys = new HashSet<>(); map.fieldNames().forEachRemaining(keys::add); return keys;
+    }
+    static Map<String, String> automaticMainSources(Path root) throws Exception {
+        String tracked = automaticGit(root, "ls-files", "-z", "--", "platform/src/main");
+        var result = new java.util.TreeMap<String, String>();
+        for (String relative : tracked.split(java.util.regex.Pattern.quote(Character.toString(0)), -1)) {
+            if (relative.isEmpty()) continue;
+            Path file = root.resolve(relative).normalize();
+            require(relative.startsWith("platform/src/main/") && file.startsWith(root)
+                    && root.relativize(file).toString().equals(relative), "CLEANUP_AUTOMATIC_MAIN_PATH_ESCAPE");
+            Path current = file;
+            while (!current.equals(root)) {
+                require(!Files.isSymbolicLink(current), "CLEANUP_AUTOMATIC_SOURCE_SYMLINK");
+                current = current.getParent();
+            }
+            require(Files.isRegularFile(file) && result.put(relative, hash(file)) == null,
+                    "CLEANUP_AUTOMATIC_TRACKED_MAIN_MISSING_OR_DUPLICATED");
+        }
+        require(!result.isEmpty(), "CLEANUP_AUTOMATIC_COMPLETE_MAP_REQUIRED");
+        return result;
+    }
+    static Map<String, String> automaticFiles(Path root, String suffix, String prefix) throws Exception {
+        require(Files.isDirectory(root) && !Files.isSymbolicLink(root), "CLEANUP_AUTOMATIC_CLASS_ROOT_MISSING");
+        var result = new java.util.TreeMap<String, String>();
+        try (var files = Files.walk(root)) {
+            for (Path file : files.sorted().toList()) {
+                require(!Files.isSymbolicLink(file), "CLEANUP_AUTOMATIC_SOURCE_SYMLINK");
+                if (Files.isRegularFile(file) && file.toString().endsWith(suffix)) result.put(prefix + root.relativize(file).toString(), hash(file));
+            }
+        }
+        require(!result.isEmpty(), "CLEANUP_AUTOMATIC_COMPLETE_MAP_REQUIRED"); return result;
+    }
+    static Map<String, String> automaticCoreJarClasses(Path boot) throws Exception {
+        try (var outer = new java.util.zip.ZipFile(boot.toFile())) {
+            var matches = java.util.Collections.list(outer.entries()).stream().filter(entry ->
+                    entry.getName().startsWith("BOOT-INF/lib/auraboot-core-") && entry.getName().endsWith(".jar")).toList();
+            require(matches.size() == 1, "CLEANUP_AUTOMATIC_UNIQUE_CORE_JAR_REQUIRED");
+            var result = new java.util.TreeMap<String, String>();
+            try (var inner = new java.util.zip.ZipInputStream(outer.getInputStream(matches.getFirst()))) {
+                java.util.zip.ZipEntry entry;
+                while ((entry = inner.getNextEntry()) != null) if (!entry.isDirectory() && entry.getName().endsWith(".class")) {
+                    require(result.put(entry.getName(), HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(inner.readAllBytes()))) == null,
+                            "CLEANUP_AUTOMATIC_DUPLICATE_CORE_CLASS");
+                }
+            }
+            return result;
+        }
+    }
+    static String automaticGit(Path root, String... args) throws Exception {
+        List<String> command = new ArrayList<>(List.of("git", "-C", root.toString())); command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        String result = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        require(process.waitFor() == 0, "CLEANUP_AUTOMATIC_GIT_PROOF_FAILED"); return result.strip();
+    }
+    // END automatic sourceFamily cleanup admission.
 }

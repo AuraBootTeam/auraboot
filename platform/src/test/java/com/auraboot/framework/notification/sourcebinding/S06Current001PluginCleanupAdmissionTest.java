@@ -323,4 +323,159 @@ class S06Current001PluginCleanupAdmissionTest {
     }
 
     private record Fixture(ArrayNode rows, Map<Long, S06Current001PluginCleanupAdmission.Target> targets) {}
+    // BEGIN automatic cleanup contracts.
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path automaticRoot;
+    private record AutomaticFixture(ObjectNode setup, ObjectNode binding, ArrayNode rows) {}
+    private AutomaticFixture automaticFixture() throws Exception {
+        var setup = json.createObjectNode().put("tenantId", 987L).put("formalImportedDirectories", 23);
+        ArrayNode directories = json.createArrayNode(), imports = setup.putArray("formalImportDiagnostics"), rows = json.createArrayNode();
+        for (int i = 0; i < 23; i++) {
+            var directory = java.nio.file.Files.createDirectory(automaticRoot.resolve("owner-" + i));
+            var manifest = json.createObjectNode().put("pluginId", "com.test.automatic.owner" + i).put("namespace", "auto_" + i).put("version", "1.0.0");
+            var file = directory.resolve("plugin.json"); java.nio.file.Files.writeString(file, manifest.toString());
+            directories.addObject().put("path", directory.toString()).put("pluginJsonSha256", S06Current001PluginCleanupAdmission.hash(file));
+            imports.addObject().put("directory", directory.toString()).put("previewValid", true).put("executeSuccess", true);
+            rows.addObject().put("tenantId", "987").put("pluginPid", "owned-" + i).put("pluginId", "com.test.automatic.owner" + i)
+                    .put("namespace", "auto_" + i).put("version", "1.0.0").put("status", "installed").put("rowSha256", "a".repeat(64)).put("manifestSha256", "b".repeat(64));
+        }
+        setup.set("orderedImportDirectories", directories);
+        var binding = json.createObjectNode(); binding.set("orderedImportDirectories", directories.deepCopy());
+        return new AutomaticFixture(setup, binding, rows);
+    }
+    @Test
+    void automaticRosterDerivesTwentyThreeActualOwnersInOneFreshTenantWithoutFixedFourteen() throws Exception {
+        var f = automaticFixture();
+        var result = S06Current001PluginCleanupAdmission.automaticExpected(f.rows(), f.setup(), f.binding(), json);
+        assertThat(result).hasSize(23);
+        assertThat(result.stream().map(S06Current001PluginCleanupAdmission.Expected::tenant).distinct()).containsExactly(987L);
+        var enabled = f.rows().deepCopy(); ((ObjectNode) enabled.get(0)).put("status", "enabled");
+        assertThat(S06Current001PluginCleanupAdmission.automaticExpected(enabled, f.setup(), f.binding(), json).getFirst().status()).isEqualTo("enabled");
+    }
+    @Test
+    void automaticRosterRejectsForeignFrozenFixtureMissingExtraDuplicateAndDisabledTargets() throws Exception {
+        var f = automaticFixture();
+        for (var mutation : Map.of("tenantId", "123", "pluginId", "com.auraboot.unrelated", "pluginPid", "owned-1",
+                "namespace", "unrelated", "version", "2.0", "status", "disabled", "rowSha256", "invalid").entrySet()) {
+            var rows = f.rows().deepCopy(); ((ObjectNode) rows.get(0)).put(mutation.getKey(), mutation.getValue());
+            assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticExpected(rows, f.setup(), f.binding(), json))
+                    .as(mutation.getKey()).hasMessage("CLEANUP_AUTOMATIC_PLUGIN_OUTSIDE_OWNED_TENANT");
+        }
+        var missing = f.rows().deepCopy(); missing.remove(0);
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticExpected(missing, f.setup(), f.binding(), json))
+                .hasMessage("CLEANUP_AUTOMATIC_EXACT_PLUGIN_ROSTER_REQUIRED");
+        var extra = f.rows().deepCopy(); extra.add(f.rows().get(0));
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticExpected(extra, f.setup(), f.binding(), json))
+                .hasMessage("CLEANUP_AUTOMATIC_EXACT_PLUGIN_ROSTER_REQUIRED");
+        ((ObjectNode) f.setup().path("formalImportDiagnostics").get(22)).put("executeSuccess", false);
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticExpected(f.rows(), f.setup(), f.binding(), json))
+                .hasMessage("CLEANUP_AUTOMATIC_FORMAL_IMPORT_NOT_PASS");
+    }
+    @Test
+    void automaticXmlAcceptsOnlyTheNewSingleSuccessfulMethodAndNeverTheOldSevenIdentity() throws Exception {
+        String header = "<testsuite tests='1' failures='0' errors='0' skipped='0'>";
+        String body = "<testcase classname='" + S06Current001PluginCleanupAdmission.AUTOMATIC_CLASS + "' name='"
+                + S06Current001PluginCleanupAdmission.AUTOMATIC_METHOD + "()'/></testsuite>";
+        var file = automaticRoot.resolve("native.xml"); java.nio.file.Files.writeString(file, header + body);
+        S06Current001PluginCleanupAdmission.automaticXml(file);
+        java.nio.file.Files.writeString(file, header + body.replace(S06Current001PluginCleanupAdmission.AUTOMATIC_METHOD,
+                "actualImportedMetadataExplicitRecipientsReplayAndConsumePersistExactlyOnce"));
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticXml(file)).hasMessage("CLEANUP_AUTOMATIC_XML_WRONG_SELECTOR");
+        java.nio.file.Files.writeString(file, (header + body).replace("skipped='0'", "skipped='1'"));
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticXml(file)).hasMessage("CLEANUP_AUTOMATIC_XML_NOT_PASS");
+    }
+    @Test
+    void futureNullRefsChangedPhysicalHashesAndEmptyCompiledMapsCannotQualifyCleanup() throws Exception {
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticRef(json.getNodeFactory().nullNode(), automaticRoot)).hasMessage("CLEANUP_SCHEMA_INVALID");
+        var file = automaticRoot.resolve("proof.json"); java.nio.file.Files.writeString(file, "{}");
+        var ref = json.createObjectNode().put("path", file.toString()).put("sha256", S06Current001PluginCleanupAdmission.hash(file));
+        assertThat(S06Current001PluginCleanupAdmission.automaticRef(ref, automaticRoot)).isEqualTo(file.toRealPath());
+        java.nio.file.Files.writeString(file, "{\"changed\":true}");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticRef(ref, automaticRoot)).hasMessage("CLEANUP_INPUT_NOT_SEALED_OWNED");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticKeys(json.createObjectNode())).hasMessage("CLEANUP_AUTOMATIC_COMPLETE_MAP_REQUIRED");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticFiles(automaticRoot.resolve("missing"), ".class", ""))
+                .hasMessage("CLEANUP_AUTOMATIC_CLASS_ROOT_MISSING");
+        java.nio.file.Files.writeString(file, "{} {}");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticStrict(file, json)).isInstanceOf(com.fasterxml.jackson.core.JsonProcessingException.class);
+        java.nio.file.Files.writeString(file, "{\"duplicate\":1,\"duplicate\":2}");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticStrict(file, json)).isInstanceOf(com.fasterxml.jackson.core.JsonProcessingException.class);
+    }
+    @Test
+    void duplicateNestedCoreJarsCannotMakeACompleteClassSealAmbiguous() throws Exception {
+        var boot = automaticRoot.resolve("boot.jar");
+        try (var out = new java.util.zip.ZipOutputStream(java.nio.file.Files.newOutputStream(boot))) {
+            for (String name : java.util.List.of("BOOT-INF/lib/auraboot-core-1.jar", "BOOT-INF/lib/auraboot-core-2.jar")) {
+                out.putNextEntry(new java.util.zip.ZipEntry(name)); out.write(new byte[]{0}); out.closeEntry();
+            }
+        }
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticCoreJarClasses(boot)).hasMessage("CLEANUP_AUTOMATIC_UNIQUE_CORE_JAR_REQUIRED");
+    }
+    @Test
+    void automaticCleanupCannotReinterpretAQuoteOnlyOrUnsealedIntentPhaseAsShipmentDelivery() {
+        var receipt = json.createObjectNode(); receipt.putArray("phases").addObject().put("kind", "quote");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPhases(receipt, json.createObjectNode(), automaticRoot, json))
+                .hasMessage("CLEANUP_AUTOMATIC_PHASES_INVALID");
+        ((ArrayNode) receipt.path("phases")).addObject().put("kind", "shipment").put("automaticTransactions", 2).put("deliveryAndReplayVerified", true);
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPhases(receipt, json.createObjectNode(), automaticRoot, json))
+                .hasMessage("CLEANUP_AUTOMATIC_PHASES_INVALID");
+    }
+    @Test
+    void originalCleanupV1V2AndOfficialTransactionBodiesAreBytePreserved() throws Exception {
+        java.nio.file.Path root = java.nio.file.Path.of("src/test/java/com/auraboot/framework/notification/sourcebinding");
+        if (!java.nio.file.Files.isDirectory(root)) root = java.nio.file.Path.of("platform").resolve(root);
+        for (var entry : Map.of("S06Current001PluginCleanupAdmission.java", "fbb3851b34b42d721d5a131e81d36a7c47454a0dd028f48a9df39209edf37395", "S06Current001PluginRegistryCleanupIT.java", "3229a0796894a033226875ba89b3171d1a8e35ca77e1fdc539d4eb275787f216").entrySet()) {
+            String source = java.nio.file.Files.readString(root.resolve(entry.getKey()));
+            String start = entry.getKey().equals("S06Current001PluginCleanupAdmission.java") ? "    // BEGIN automatic sourceFamily cleanup admission.\n" : "    // BEGIN automatic sourceFamily official cleanup.\n";
+            String end = entry.getKey().equals("S06Current001PluginCleanupAdmission.java") ? "    // END automatic sourceFamily cleanup admission.\n" : "    // END automatic sourceFamily official cleanup.\n";
+            int first = source.indexOf(start), last = source.indexOf(end, first);
+            assertThat(first).isNotNegative(); assertThat(last).isGreaterThan(first);
+            String original = source.substring(0, first) + source.substring(last + end.length());
+            if (entry.getKey().equals("S06Current001PluginCleanupAdmission.java")) original = original.replace("        if (value.path(\"kind\").asText().equals(\"s06-automatic-owned-plugin-cleanup-admission-v3\"))\n            return automatic(automaticStrict(file, json), evidence, hash(file), json, now);\n", "");
+            else original = original.replace("        if (admission.schemaVersion() == 3) {\n            uninstallAutomaticOwnedRegistrations(admission, crypto, sessionTimezone);\n            return;\n        }\n", "");
+            assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(original.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isEqualTo(entry.getValue());
+        }
+    }
+    @Test
+    void automaticTrackedMainIncludesResourcesAndRejectsMissingOrSymlinkedTrackedResource() throws Exception {
+        java.nio.file.Path root = java.nio.file.Files.createDirectory(automaticRoot.resolve("tracked"));
+        assertThat(new ProcessBuilder("git", "init", "--quiet", root.toString()).start().waitFor()).isZero();
+        java.nio.file.Path javaFile = root.resolve("platform/src/main/java/Example.java"), resource = root.resolve("platform/src/main/resources/application.yml");
+        java.nio.file.Files.createDirectories(javaFile.getParent()); java.nio.file.Files.createDirectories(resource.getParent());
+        java.nio.file.Files.writeString(javaFile, "class Example {}\n"); java.nio.file.Files.writeString(resource, "guard: exact\n");
+        assertThat(new ProcessBuilder("git", "-C", root.toString(), "add", "platform/src/main").start().waitFor()).isZero();
+        var map = S06Current001PluginCleanupAdmission.automaticMainSources(root);
+        assertThat(map).containsOnlyKeys("platform/src/main/java/Example.java", "platform/src/main/resources/application.yml");
+        assertThat(map.get("platform/src/main/resources/application.yml")).isEqualTo(S06Current001PluginCleanupAdmission.hash(resource));
+        java.nio.file.Files.delete(resource);
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticMainSources(root))
+                .hasMessage("CLEANUP_AUTOMATIC_TRACKED_MAIN_MISSING_OR_DUPLICATED");
+        java.nio.file.Files.createSymbolicLink(resource, javaFile);
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticMainSources(root)).hasMessage("CLEANUP_AUTOMATIC_SOURCE_SYMLINK");
+    }
+    @Test
+    void automaticPausedRequiresSuspendedExactSoleErpAndNoPublicWorker() {
+        var pins = json.createObjectNode(); var paused = json.createObjectNode().put("runtime", S06Current001PluginCleanupAdmission.RUNTIME).put("verdict", "ok");
+        paused.putArray("findings"); paused.putObject("metadata").put("lifecycle", "suspended");
+        paused.putObject("environment").put("POSTGRES_DB", "enterprise_22").put("REDIS_DATABASE", "13");
+        paused.putObject("ports").putObject("backend").put("status", "stopped").putArray("pids");
+        var process = paused.putArray("processes").addObject().put("key", "erp-fixture").put("status", "ok");
+        var expected = process.putObject("expected").put("pid", 123).put("cwd", "/owned/quote").put("commandHash", "a").put("tokenHash", "b");
+        process.set("actual", expected.deepCopy().put("alive", true));
+        var sources = paused.putArray("sources");
+        for (String key : java.util.List.of("oss", "quote", "enterprise", "plugins", "crm")) {
+            pins.put(key, "a".repeat(40)); var source = sources.addObject().put("key", key).put("status", "ok");
+            var identity = json.createObjectNode().put("commit", "a".repeat(40)).put("dirtyFingerprint", "clean");
+            source.set("expected", identity); source.set("actual", identity.deepCopy());
+        }
+        S06Current001PluginCleanupAdmission.automaticPaused(paused, pins);
+        var zero = paused.deepCopy(); ((ArrayNode) zero.path("processes")).removeAll();
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPaused(zero, pins)).hasMessage("CLEANUP_PUBLIC_WORKERS_NOT_ISOLATED");
+        var backend = paused.deepCopy(); ((ObjectNode) backend.path("processes").get(0)).put("key", "backend");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPaused(backend, pins)).hasMessage("CLEANUP_FOREIGN_PROCESS");
+        var open = paused.deepCopy(); ((ObjectNode) open.path("metadata")).put("lifecycle", "open");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPaused(open, pins)).hasMessage("CLEANUP_PUBLIC_WORKERS_NOT_ISOLATED");
+        var token = paused.deepCopy(); ((ObjectNode) token.path("processes").get(0).path("actual")).put("tokenHash", "changed");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPaused(token, pins)).hasMessage("CLEANUP_ERP_IDENTITY_MISMATCH");
+    }
+    // END automatic cleanup contracts.
 }

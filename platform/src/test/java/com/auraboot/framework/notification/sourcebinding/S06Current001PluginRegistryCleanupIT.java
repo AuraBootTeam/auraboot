@@ -84,6 +84,10 @@ class S06Current001PluginRegistryCleanupIT {
                 Path.of(required("S06_NATIVE_PLUGIN_CLEANUP_INPUT")), required("S06_NATIVE_PLUGIN_CLEANUP_INPUT_SHA256"), json);
         Map<String, Object> crypto = S06NativeEncryptionAdmission.admit(System.getenv(), json, encryption,
                 getClass(), context.getEnvironment().getActiveProfiles());
+        if (admission.schemaVersion() == 3) {
+            uninstallAutomaticOwnedRegistrations(admission, crypto, sessionTimezone);
+            return;
+        }
         Files.createDirectory(admission.output());
         verifyCurrentPaused(admission.output());
         MetaContext.Snapshot caller = MetaContext.snapshot();
@@ -285,4 +289,94 @@ class S06Current001PluginRegistryCleanupIT {
         require(value != null && !value.isBlank(), "CLEANUP_REQUIRED_INPUT_MISSING:" + key);
         return value;
     }
+    // BEGIN automatic sourceFamily official cleanup.
+    private void uninstallAutomaticOwnedRegistrations(S06Current001PluginCleanupAdmission.Admission admission,
+                                                     Map<String, Object> crypto, String sessionTimezone) throws Exception {
+        require(admission.schemaVersion() == 3 && !admission.plugins().isEmpty(), "CLEANUP_AUTOMATIC_ADMISSION_REQUIRED");
+        Set<Long> tenantSet = admission.plugins().stream().map(S06Current001PluginCleanupAdmission.Expected::tenant).collect(java.util.stream.Collectors.toSet());
+        require(tenantSet.size() == 1, "CLEANUP_AUTOMATIC_ONE_FRESH_TENANT_ONLY");
+        long tenant = tenantSet.iterator().next();
+        Set<String> pids = admission.plugins().stream().map(S06Current001PluginCleanupAdmission.Expected::pid).collect(java.util.stream.Collectors.toSet());
+        require(pids.size() == admission.plugins().size(), "CLEANUP_DUPLICATE_ACTUAL_PID");
+        Files.createDirectory(admission.output());
+        verifyCurrentPaused(admission.output());
+        var caller = MetaContext.snapshot();
+        var transaction = new TransactionTemplate(manager);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        Map<String, Object> completed;
+        try {
+            completed = transaction.execute(status -> {
+                try {
+                    // Tenant is derived from the new single-method setup, never pluginId-global or a fixed14 list.
+                    List<String> locked = jdbc.queryForList("SELECT row_to_json(p)::text FROM ab_plugin p WHERE p.tenant_id=? "
+                            + "AND p.deleted_flag=FALSE ORDER BY p.pid FOR UPDATE", String.class, tenant);
+                    require(locked.size() == admission.plugins().size(), "CLEANUP_AUTOMATIC_ACTUAL_ROSTER_CHANGED");
+                    Map<String, JsonNode> actual = new LinkedHashMap<>();
+                    for (String raw : locked) {
+                        JsonNode row = json.readTree(raw);
+                        String pid = row.path("pid").asText();
+                        var target = admission.plugins().stream().filter(expected -> expected.pid().equals(pid)).findFirst()
+                                .orElseThrow(() -> new IllegalStateException("CLEANUP_AUTOMATIC_UNEXPECTED_PLUGIN"));
+                        require(actual.put(pid, row) == null && row.path("tenant_id").longValue() == target.tenant()
+                                && row.path("plugin_id").asText().equals(target.pluginId()) && row.path("namespace").asText().equals(target.namespace())
+                                && row.path("version").asText().equals(target.version()) && row.path("status").asText().equals(target.status())
+                                && row.path("deleted_flag").isBoolean() && !row.path("deleted_flag").booleanValue()
+                                && digest(raw).equals(target.rowSha256()) && SourceBindingCanonical.hash(row.path("manifest")).equals(target.manifestSha256()),
+                                "CLEANUP_AUTOMATIC_ACTUAL_TUPLE_CHANGED");
+                    }
+                    require(actual.keySet().equals(pids), "CLEANUP_AUTOMATIC_MISSING_PID");
+                    Snapshot before = snapshot(List.of(tenant), pids);
+                    write(admission.output().resolve("preview.json"), Map.of("sourceFamily", S06Current001PluginCleanupAdmission.AUTOMATIC_FAMILY,
+                            "inputSha256", admission.inputSha256(), "expectedPlugins", admission.plugins(), "preservedBefore", summary(before),
+                            "crypto", crypto, "sessionTimezone", sessionTimezone, "executed", false));
+                    List<Map<String, Object>> results = new ArrayList<>();
+                    for (var target : admission.plugins()) {
+                        MetaContext.setContext(tenant, 0L, "SYSTEM", "s06-automatic-owned-lifecycle-cleanup");
+                        var result = packages.uninstall(target.pid(), S06Current001PluginCleanupAdmission.options());
+                        require(result != null && result.isSuccess() && target.pid().equals(result.getPluginPid())
+                                && target.pluginId().equals(result.getPluginId()) && result.getConfigResult() == null
+                                && result.getBackendResult() == null && result.getFrontendResult() == null,
+                                "CLEANUP_OFFICIAL_PACKAGE_UNINSTALL_FAILED");
+                        results.add(Map.of("tenantId", Long.toString(tenant), "pluginPid", target.pid(), "pluginId", target.pluginId(), "success", true));
+                    }
+                    for (var target : admission.plugins()) {
+                        JsonNode after = json.readTree(jdbc.queryForObject("SELECT row_to_json(p)::text FROM ab_plugin p WHERE pid=? AND tenant_id=?",
+                                String.class, target.pid(), tenant));
+                        require(after.path("deleted_flag").isBoolean() && after.path("deleted_flag").booleanValue()
+                                && normalizePlugin(after, pids).equals(normalizePlugin(actual.get(target.pid()), pids)),
+                                "CLEANUP_AUTOMATIC_PLUGIN_OTHER_FIELDS_CHANGED");
+                    }
+                    Snapshot after = snapshot(List.of(tenant), pids);
+                    require(before.equals(after), "CLEANUP_CHANGED_PRESERVED_FACTS");
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("officialResults", results); result.put("preservedBefore", summary(before)); result.put("preservedAfter", summary(after));
+                    return result;
+                } catch (Exception | AssertionError failure) {
+                    status.setRollbackOnly(); throw new IllegalStateException("CLEANUP_AUTOMATIC_EXACT_ROSTER_ROLLED_BACK", failure);
+                }
+            });
+        } finally { MetaContext.clear(); MetaContext.restore(caller); }
+        require(completed != null, "CLEANUP_NO_TRANSACTION_RESULT");
+        var readback = new TransactionTemplate(manager);
+        readback.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        readback.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        readback.setReadOnly(true);
+        var persisted = readback.execute(status -> {
+            try {
+                for (var target : admission.plugins()) require(Boolean.TRUE.equals(jdbc.queryForObject(
+                        "SELECT deleted_flag FROM ab_plugin WHERE pid=? AND tenant_id=?", Boolean.class, target.pid(), tenant)),
+                        "CLEANUP_COMMIT_SOFT_DELETE_NOT_PERSISTED");
+                return summary(snapshot(List.of(tenant), pids));
+            } catch (Exception failure) { throw new IllegalStateException("CLEANUP_AUTOMATIC_READBACK_FAILED", failure); }
+        });
+        require(persisted != null && persisted.equals(completed.get("preservedAfter")), "CLEANUP_COMMIT_READBACK_CHANGED");
+        completed.put("persistedAfter", persisted);
+        completed.put("kind", "s06-automatic-owned-plugin-cleanup-receipt-v1");
+        completed.put("sourceFamily", S06Current001PluginCleanupAdmission.AUTOMATIC_FAMILY);
+        completed.put("inputSha256", admission.inputSha256()); completed.put("sourceClassificationSha256", admission.classificationSha256());
+        completed.put("softDeletedPluginRegistrations", admission.plugins().size()); completed.put("sessionTimezone", sessionTimezone);
+        completed.put("businessDeliverySuccessClaimed", false); completed.put("stage", "automatic-owned-plugin-registration-cleanup-completed");
+        write(admission.output().resolve("cleanup-receipt.json"), completed);
+    }
+    // END automatic sourceFamily official cleanup.
 }
