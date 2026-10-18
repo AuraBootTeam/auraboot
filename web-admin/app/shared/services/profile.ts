@@ -13,13 +13,13 @@ function profileForView(data: UserProfileWire | null | undefined): UserProfile {
     !data ||
     Array.isArray(data) ||
     typeof data.pid !== 'string' ||
-    !data.pid ||
-    typeof data.userName !== 'string' ||
-    !data.userName
+    !data.pid
   ) {
     throw new Error('Profile response is missing its identity');
   }
-  return { ...data, pid: data.pid, userName: data.userName };
+  if (data.userName != null && typeof data.userName !== 'string')
+    throw new Error('Profile response has an invalid username');
+  return { ...data, pid: data.pid };
 }
 
 function uploadForView(data: FileUploadResponseWire | null | undefined): FileUploadResponse {

@@ -404,6 +404,7 @@ describe('ViewManagePanel public share link', () => {
       expect(confirmDialog).toHaveBeenCalledWith(
         expect.objectContaining({
           content: 'Revoke this public link? The current link will stop working immediately.',
+          title: 'Public share link',
         }),
       ),
     );

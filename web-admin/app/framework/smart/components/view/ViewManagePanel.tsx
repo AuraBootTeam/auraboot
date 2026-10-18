@@ -763,6 +763,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   const handleRevokeShareLink = useCallback(async () => {
     if (!sharingView) return;
     const confirmed = await confirmDialog({
+      title: tx('common.saved_view_share_title', '公开分享链接'),
       content: tx(
         'common.saved_view_share_revoke_confirm',
         '撤销后该链接立即失效，已拿到链接的人将无法访问。确定撤销？',

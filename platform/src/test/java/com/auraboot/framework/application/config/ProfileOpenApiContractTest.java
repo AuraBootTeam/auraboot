@@ -40,7 +40,7 @@ class ProfileOpenApiContractTest {
     void nullableProfileAndUnpopulatedUploadMetadataIncludeJsonNull() {
         var converters = new ModelConverters(true);
         var profile = Json31.mapper().valueToTree(converters.readAll(UserProfileResponse.class).get("UserProfileResponse"));
-        for (var field : new String[]{"nickName", "email", "mobile", "area", "signature", "imgId", "avatarUrl", "lastSignInAt", "createdAt"}) {
+        for (var field : new String[]{"userName", "nickName", "email", "mobile", "area", "signature", "imgId", "avatarUrl", "lastSignInAt", "createdAt"}) {
             assertThat(profile.at("/properties/" + field + "/type").toString()).contains("null");
         }
         var upload = Json31.mapper().valueToTree(converters.readAll(FileUploadResponseDTO.class).get("FileUploadResponseDTO"));

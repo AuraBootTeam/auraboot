@@ -34,13 +34,22 @@ describe('generated profile service', () => {
     expect(await getUserProfile(request)).toEqual(profile);
     expect(requestMock).toHaveBeenCalledWith('get', '/api/user/profile', { request });
   });
-  it.each([undefined, null, {}, { pid: 'pid' }, { userName: 'name' }])(
+  it.each([undefined, null, {}, { userName: 'name' }])(
     'refuses missing profile identity: %j',
     async (data) => {
       requestMock.mockResolvedValue(ok(data));
       await expect(getUserProfile(request)).rejects.toThrow('identity');
     },
   );
+  it.each([null, undefined, ''])('accepts an email account without a username: %j', async userName => {
+    const emailAccount = { ...profile, userName, email: 'owned@example.invalid' };
+    requestMock.mockResolvedValue(ok(emailAccount));
+    expect(await getUserProfile(request)).toEqual(emailAccount);
+  });
+  it('rejects a malformed username without replacing the wire value', async () => {
+    requestMock.mockResolvedValue(ok({ ...profile, userName: 123 }));
+    await expect(getUserProfile(request)).rejects.toThrow('invalid username');
+  });
   it('throws the actual read failure', async () => {
     requestMock.mockResolvedValue(failure);
     await expect(getUserProfile(request)).rejects.toThrow('Denied');

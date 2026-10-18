@@ -361,3 +361,74 @@ test('anonymous profile access is refused', async ({ page }, info) => {
   await expect(page.locator('input#identifier, input#email').first()).toBeVisible();
   await capture('PROFILE-05', page, info);
 });
+
+test('generated profile operations preserve an email-only account without a username', async ({ page, browser }, info) => {
+  test.setTimeout(90_000);
+  expect(PG_CONN.database).toMatch(/^auraboot_\d+$/);
+  const origin = new URL(String(info.project.use.baseURL)).origin;
+  const email = `ic_profile_${randomUUID().replaceAll('-', '')}@example.invalid`;
+  const password = `Aa7!${randomUUID()}`;
+  const context = await browser.newContext({ baseURL: origin, storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+  const rows: object[] = [], cleanupErrors: unknown[] = [];
+  let userPid: string | undefined, journeyError: unknown;
+  async function record(response: APIResponse, method: string) {
+    const payload = await response.json();
+    const shape = validate({ method, path: '/api/user/profile', status: response.status(), contentType: response.headers()['content-type'], payload });
+    rows.push({ method, path: '/api/user/profile', status: response.status(), payload, shape });
+    expect(response.status()).toBe(200);
+    expect(payload.code).toBe('0');
+    expect(shape.errors).toEqual([]);
+    expect(shape.valid).toBe(true);
+    expect(payload.data.pid).toBe(userPid);
+    expect(payload.data.userName).toBeNull();
+    expect(payload.data.email).toBe(email);
+    return payload.data;
+  }
+  try {
+    await login(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    const created = await page.request.post('/api/admin/users', { headers: { Origin: origin }, data: { email, displayName: 'Owned email-only profile', initialPassword: password, roleCodes: ['tenant_admin'], sendInviteEmail: false } });
+    const provision = await created.json();
+    if (typeof provision.data?.userPid === 'string') userPid = provision.data.userPid;
+    expect(created.status()).toBe(200);
+    expect(provision.code).toBe('0');
+    expect(userPid).toBeTruthy();
+    const owned = await context.newPage();
+    await login(owned, email, password);
+    await record(await owned.request.get('/api/user/profile'), 'get');
+    await owned.goto('/personal/profile');
+    await expect(owned.getByRole('heading', { name: '个人资料', exact: true })).toBeVisible();
+    await owned.getByTestId('profile-edit-btn').click();
+    await expect(owned.getByLabel('用户名', { exact: true })).toBeDisabled();
+    await expect(owned.getByLabel('用户名', { exact: true })).toHaveValue('');
+    await owned.getByLabel('昵称', { exact: true }).fill('Owned email-only edited');
+    const saved = owned.waitForResponse(r => /^\/personal\/profile(?:\.data)?$/.test(new URL(r.url()).pathname) && r.request().method() === 'POST');
+    await owned.getByTestId('profile-save-btn').click();
+    expect((await saved).ok()).toBe(true);
+    await expect(owned.getByTestId('profile-edit-btn')).toBeVisible();
+    const persisted = await record(await owned.request.get('/api/user/profile'), 'get');
+    expect(persisted.nickName).toBe('Owned email-only edited');
+    await owned.reload();
+    await expect(owned.getByRole('heading', { name: '个人资料', exact: true })).toBeVisible();
+    await expect(owned.locator('body')).toContainText('Owned email-only edited');
+    await capture('PROFILE-06', owned, info);
+  } catch (error) { journeyError = error; }
+  finally {
+    const db = new pg.Client(PG_CONN);
+    try {
+      await db.connect();
+      const found = await db.query('SELECT id, pid FROM ab_user WHERE email=$1 AND user_name IS NULL', [email]);
+      expect(found.rowCount).toBe(userPid ? 1 : 0);
+      if (userPid) {
+        expect(found.rows[0].pid).toBe(userPid);
+        const updated = await db.query('UPDATE ab_user SET is_enabled=false, deleted_flag=true, security_version=COALESCE(security_version,0)+1 WHERE pid=$1 AND email=$2 AND user_name IS NULL RETURNING id', [userPid, email]);
+        expect(updated.rowCount).toBe(1);
+        await db.query('UPDATE ab_tenant_member SET deleted_flag=true WHERE user_id=$1', [updated.rows[0].id]);
+        const remaining = await db.query('SELECT count(*)::int AS count FROM ab_tenant_member WHERE user_id=$1 AND deleted_flag=false', [updated.rows[0].id]);
+        expect(remaining.rows[0].count).toBe(0);
+      }
+    } catch (error) { cleanupErrors.push(error); }
+    finally { await db.end(); await context.close(); }
+    await info.attach('profile-email-only-observations', { body: JSON.stringify({ claim: 'owned-email-only-profile-browser-journey', userPid, rows, journeyError: journeyError ? String(journeyError) : null, cleanupErrors: cleanupErrors.map(String) }), contentType: 'application/json' });
+  }
+  if (journeyError || cleanupErrors.length) throw new AggregateError([...(journeyError ? [journeyError] : []), ...cleanupErrors], 'Email-only profile journey or cleanup failed');
+});

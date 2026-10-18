@@ -435,7 +435,7 @@ export default function PersonalProfile() {
                     <FormField
                       label="用户名"
                       name="userName"
-                      value={profile.userName}
+                      value={profile.userName ?? ''}
                       onChange={() => {}}
                       disabled
                       helpText="用户名不可修改"
@@ -516,7 +516,7 @@ export default function PersonalProfile() {
               ) : (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <InfoDisplay label="用户名" value={profile.userName} />
+                    <InfoDisplay label="用户名" value={profile.userName ?? ''} />
                     <InfoDisplay label="昵称" value={profile.nickName || ''} />
                     <InfoDisplay label="邮箱" value={profile.email || ''} />
                     <InfoDisplay label="手机号" value={profile.mobile || ''} />

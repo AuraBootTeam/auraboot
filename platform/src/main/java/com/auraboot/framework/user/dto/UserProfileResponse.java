@@ -19,6 +19,7 @@ public class UserProfileResponse {
     /**
      * 用户名
      */
+    @Schema(nullable = true)
     private String userName;
     
     /**

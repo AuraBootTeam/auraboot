@@ -146,7 +146,8 @@
       "spec": "web-admin/tests/e2e/model/internal-api-profile.spec.ts",
       "tests": [
         "generated profile operations persist an owned avatar and no-email profile",
-        "anonymous profile access is refused"
+        "anonymous profile access is refused",
+        "generated profile operations preserve an email-only account without a username"
       ],
       "operations": [
         {
@@ -657,6 +658,19 @@
       "expected": "An expired link shows the actual expiration error with a retry action",
       "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
       "screenshot": "SHARE-09-expired.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-06",
+      "test": "generated profile operations preserve an email-only account without a username",
+      "screenshot": "PROFILE-06-email-only-reload.png",
+      "expected": "Email-only identity retains null username, supports profile edit and reload, and never fabricates a username.",
+      "feature": "profile",
+      "action": "email-only-profile-edit",
+      "branch": "edge",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",
