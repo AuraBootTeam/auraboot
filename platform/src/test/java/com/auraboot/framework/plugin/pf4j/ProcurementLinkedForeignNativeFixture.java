@@ -47,6 +47,7 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
     @Autowired CommandExecutor actualCommands;
     @Autowired MetaModelService actualMetadata;
     @Autowired FieldEncryptionService actualEncryption;
+    @Autowired org.springframework.core.env.Environment nativeEnvironment;
     private JsonNode input;
     private JsonNode binding;
     private String makerJwt;
@@ -81,9 +82,7 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
     }
 
     static void requireSelectedInput(JsonNode value) {
-        assertEquals("procurement-linked-foreign-native-admission-v1", value.path("kind").asText());
-        assertTrue(value.path("schemaVersion").isIntegralNumber());
-        assertEquals(1, value.path("schemaVersion").asInt(-1));
+        ProcurementLinkedForeignNativeAdmission.mainBase(value);
         assertTrue(value.path("fixtureEnabled").isBoolean() && value.path("fixtureEnabled").booleanValue());
     }
 
@@ -98,6 +97,11 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
         assertTrue(selectedInput.startsWith(evidenceRoot));
         input = json.readTree(selectedInput.toFile());
         requireSelectedInput(input);
+        if(input.path("schemaVersion").intValue()==2) {
+            assertEquals("nativePhoneBindingIgnoresActualForeignTenantDirectory",info.getTestMethod().orElseThrow().getName());
+            assertEquals("true",required("PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE"));
+            assertFalse("true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE")));
+        }
         assertEquals(required("PROCUREMENT_LINKED_NATIVE_INPUT_SHA256"), sha(Path.of(required("PROCUREMENT_LINKED_NATIVE_INPUT"))));
         super.prepareEvidence(info);
         binding = json.readTree(Path.of(required("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT")).toFile());
@@ -106,16 +110,16 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
         Path app = Path.of(input.path("applicationCoreRoot").asText()).toRealPath();
         assertEquals(input.path("applicationCoreCommit").asText(), gitRead(app, "rev-parse", "HEAD").strip());
         assertEquals("", gitRead(app, "status", "--porcelain").strip());
-        assertEquals("", gitRead(app, "diff", MAIN_BASE, "HEAD", "--", "platform/src/main").strip());
+        assertEquals("", gitRead(app, "diff", ProcurementLinkedForeignNativeAdmission.mainBase(input), "HEAD", "--", "platform/src/main").strip());
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(),
                 Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath());
         assertTrue(input.path("nativeSourceSha256").isObject());
-        assertEquals(Set.copyOf(SOURCE_FILES), json.convertValue(input.path("nativeSourceSha256"), Map.class).keySet());
+        assertEquals(Set.copyOf(ProcurementLinkedForeignNativeAdmission.sources(input)), json.convertValue(input.path("nativeSourceSha256"), Map.class).keySet());
         for (var file : input.path("nativeSourceSha256").properties())
             assertEquals(file.getValue().asText(), sha(app.resolve(file.getKey())));
         assertTrue(System.getenv().containsKey("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY"));
         ProcurementLinkedForeignNativeAdmission.validate(input, evidenceRoot, app, actualEncryption,
-                System.getenv("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY"), plugins, json);
+                System.getenv("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY"), plugins, json,nativeEnvironment.getActiveProfiles());
         assertEquals("13", required("TEST_REDIS_DATABASE"));
         try (var sql = postgres.getConnection()) { assertEquals("enterprise_22", sql.getCatalog()); }
         assertTrue(extensions.getCommandHandler(SYNC).isPresent());
@@ -580,8 +584,8 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
         } finally {second.close();context();}
     }
     private Map<String,Object> bindingReceipt() throws Exception {
-        var bound=new LinkedHashMap<String,Object>();bound.put("schemaVersion",1);bound.put("runtime","procurement-web-stack-20261010");
-        bound.put("database","enterprise_22");bound.put("tenantId",tenant.toString());bound.put("nativeHostBaseCommit",MAIN_BASE);
+        var bound=new LinkedHashMap<String,Object>();bound.put("schemaVersion",input.path("schemaVersion").intValue());bound.put("runtime","procurement-web-stack-20261010");
+        bound.put("database","enterprise_22");bound.put("tenantId",tenant.toString());bound.put("nativeHostBaseCommit",ProcurementLinkedForeignNativeAdmission.mainBase(input));
         bound.put("productJarSha256",input.path("productJarSha256").asText());
         String testFile="platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementPluginHostRealDbIT.java";
         bound.put("nativeHostTestSha256",input.path("nativeSourceSha256").path(testFile).asText());
@@ -603,7 +607,7 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
         Path sourceBinding=attempt.resolve("source-binding.json");
         var bound=bindingReceipt();Files.writeString(sourceBinding,json.writerWithDefaultPrettyPrinter().writeValueAsString(bound),StandardOpenOption.CREATE_NEW);
         receipt.put("sourceBindingSha256",sha(sourceBinding));
-        var preparation=Map.of("baseCommit",MAIN_BASE,"testPath",Path.of(input.path("applicationCoreRoot").asText()).resolve(
+        var preparation=Map.of("baseCommit",ProcurementLinkedForeignNativeAdmission.mainBase(input),"testPath",Path.of(input.path("applicationCoreRoot").asText()).resolve(
                 "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementPluginHostRealDbIT.java").toString(),
                 "sealedTestSha256",bound.get("nativeHostTestSha256"),"method",testInfo.getTestMethod().orElseThrow().getName());
         Files.writeString(attempt.resolve("preparation.json"),json.writerWithDefaultPrettyPrinter().writeValueAsString(preparation),StandardOpenOption.CREATE_NEW);

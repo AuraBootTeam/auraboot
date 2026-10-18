@@ -25,21 +25,38 @@ final class ProcurementLinkedForeignNativeAdmission {
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementSourceUiFixtureProducerIT.java",
         "platform/src/test/java/com/auraboot/framework/plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java",
         "platform/src/test/java/com/auraboot/framework/notification/sourcebinding/ProductQuoteNativeInitialization.java");
+    static final String MAIN_BASE_V2="69493861397abec3205edb8fd62ba54001ff5013";
+    static final String CRYPTO_SOURCE="platform/src/test/java/com/auraboot/framework/notification/sourcebinding/S06NativeEncryptionAdmission.java";
+    static String mainBase(JsonNode input) {
+        assertTrue(input.path("schemaVersion").isInt());
+        int version=input.path("schemaVersion").intValue();
+        assertTrue(version==1 || version==2);
+        assertEquals("procurement-linked-foreign-native-admission-v"+version,input.path("kind").asText());
+        return version==1?MAIN_BASE:MAIN_BASE_V2;
+    }
+    static List<String> sources(JsonNode input) {
+        mainBase(input);
+        if(input.path("schemaVersion").intValue()==1)return SOURCES;
+        var sources=new java.util.ArrayList<>(SOURCES);sources.add(CRYPTO_SOURCE);return List.copyOf(sources);
+    }
     static void validate(JsonNode input,Path attempt,Path app,FieldEncryptionService encryption,String matchingKey,
                          AuraPluginManager plugins,ObjectMapper json) throws Exception {
+        validate(input,attempt,app,encryption,matchingKey,plugins,json,null);
+    }
+    static void validate(JsonNode input,Path attempt,Path app,FieldEncryptionService encryption,String matchingKey,
+                         AuraPluginManager plugins,ObjectMapper json,String[] nativeProfiles) throws Exception {
         app=app.toRealPath();attempt=attempt.toRealPath();
-        assertEquals("procurement-linked-foreign-native-admission-v1",input.path("kind").asText());
-        assertEquals(1,input.path("schemaVersion").asInt(-1));
-        assertEquals(MAIN_BASE,input.path("productionMainBase").asText());
+        String mainBase=mainBase(input);
+        assertEquals(mainBase,input.path("productionMainBase").asText());
         assertEquals(input.path("applicationCoreCommit").asText(),ProcurementPublicSourceNativeFixture.gitRead(app,"rev-parse","HEAD").strip());
         assertTrue(input.path("applicationCoreCommit").asText().matches("[a-f0-9]{40}"));
         assertEquals("",ProcurementPublicSourceNativeFixture.gitRead(app,"status","--porcelain").strip());
-        assertEquals("",ProcurementPublicSourceNativeFixture.gitRead(app,"diff",MAIN_BASE,"HEAD","--","platform/src/main").strip());
+        assertEquals("",ProcurementPublicSourceNativeFixture.gitRead(app,"diff",mainBase,"HEAD","--","platform/src/main").strip());
         Path loaded=Path.of(ProcurementPluginHostRealDbIT.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
         assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(),loaded);
-        assertEquals(Set.copyOf(SOURCES),keys(input.path("nativeSourceSha256")));
-        for(String source:SOURCES)assertEquals(input.path("nativeSourceSha256").path(source).asText(),sha(app.resolve(source)));
-        validateClassRoster(input.path("classSha256"), loaded);
+        assertEquals(Set.copyOf(sources(input)),keys(input.path("nativeSourceSha256")));
+        for(String source:sources(input))assertEquals(input.path("nativeSourceSha256").path(source).asText(),sha(app.resolve(source)));
+        validateClassRoster(input.path("classSha256"), loaded, sources(input));
         Path evidenceRoot=Path.of(input.path("workspaceRoot").asText()).resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath();
         assertTrue(attempt.startsWith(evidenceRoot));
         Path proofPath=Path.of(input.path("encryptionConfigProofPath").asText()).toRealPath();assertTrue(proofPath.startsWith(evidenceRoot));
@@ -47,7 +64,19 @@ final class ProcurementLinkedForeignNativeAdmission {
         assertEquals(input.path("sourceSet").path("oss").asText(),proof.path("sourceCommit").asText());
         assertEquals(sha(app.resolve("platform/src/main/java/com/auraboot/framework/common/crypto/FieldEncryptionService.java")),proof.path("fieldEncryptionServiceSha256").asText());
         assertEquals(sha(app.resolve("platform/src/main/resources/application.yml")),proof.path("applicationYmlSha256").asText());
-        String mode=ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof,matchingKey);
+        String mode;
+        if(input.path("schemaVersion").intValue()==1) {
+            mode=ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof,matchingKey);
+        } else {
+            var env=System.getenv();
+            validatePrivateCryptoBindings(input,proof,app,proofPath,matchingKey,env);
+            assertNotNull(nativeProfiles,"Native actual profiles must come from Spring Environment");
+            var admitted=com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission.admit(env,json,encryption,
+                    ProcurementPluginHostRealDbIT.class,nativeProfiles);
+            assertEquals(proofPath.toString(),admitted.get("proofPath"));
+            assertEquals(input.path("encryptionConfigProofSha256").asText(),admitted.get("proofSha256"));
+            mode=(String)admitted.get("mode");
+        }
         assertEquals(input.path("encryptionMode").asText(),mode);
         for(String stem:List.of("runtimeAdmission","runtimeEnvironmentEvidence","runtimeProfileEvidence")){
             Path file=Path.of(proof.path(stem+"Path").asText()).toRealPath();assertTrue(file.startsWith(evidenceRoot));
@@ -78,11 +107,27 @@ final class ProcurementLinkedForeignNativeAdmission {
             assertEquals(1,locked.size());assertEquals(digest,locked.getFirst().path("sha256").asText());
         }
     }
+    static void validatePrivateCryptoBindings(JsonNode input,JsonNode proof,Path app,Path proofPath,
+                                              String matchingKey,java.util.Map<String,String> environment) throws Exception {
+        assertEquals("private-additional-properties",proof.path("keySource").asText());
+        assertEquals("encrypted",input.path("encryptionMode").asText());
+        for(String name:List.of("S06_NATIVE_APPLICATION_ROOT","S06_NATIVE_ENCRYPTION_PROOF_PATH",
+                "S06_NATIVE_ENCRYPTION_PROOF_SHA256","PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY"))
+            assertNotNull(environment.get(name),"Matching managed alias must be explicit: "+name);
+        assertEquals(app.toRealPath(),Path.of(environment.get("S06_NATIVE_APPLICATION_ROOT")).toRealPath());
+        assertEquals(proofPath.toRealPath(),Path.of(environment.get("S06_NATIVE_ENCRYPTION_PROOF_PATH")).toRealPath());
+        assertEquals(input.path("encryptionConfigProofSha256").asText(),environment.get("S06_NATIVE_ENCRYPTION_PROOF_SHA256"));
+        assertEquals(matchingKey,environment.get("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY"));
+        assertEquals(matchingKey,com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission.requiredKey(environment));
+    }
     static void validateClassRoster(JsonNode declared,Path classes) throws Exception {
+        validateClassRoster(declared,classes,SOURCES);
+    }
+    static void validateClassRoster(JsonNode declared,Path classes,List<String> sources) throws Exception {
         assertTrue(declared.isObject() && !declared.isEmpty());
         var actual=new java.util.LinkedHashMap<String,String>();
         var families=new java.util.ArrayList<String>();
-        for(String source:SOURCES)families.add(source.substring("platform/src/test/java/".length(),source.length()-".java".length()));
+        for(String source:sources)families.add(source.substring("platform/src/test/java/".length(),source.length()-".java".length()));
         families.add("com/auraboot/framework/application/TestApplication");
         for(String family:families) {
             Path main=classes.resolve(family+".class");assertTrue(Files.isRegularFile(main) && !Files.isSymbolicLink(main));

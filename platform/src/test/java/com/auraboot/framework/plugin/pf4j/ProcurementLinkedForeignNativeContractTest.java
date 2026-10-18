@@ -14,6 +14,76 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Hermetic fixture-authority counterexamples; not PG, PF4J or browser acceptance. */
 class ProcurementLinkedForeignNativeContractTest {
+    @Test void modernPrivateCryptoAdmissionUsesExplicitV2InsteadOfRebrandingLegacyInput() {
+        var json=new ObjectMapper();
+        var value=json.createObjectNode().put("kind","procurement-linked-foreign-native-admission-v2")
+                .put("schemaVersion",2).put("fixtureEnabled",true);
+        ProcurementLinkedForeignNativeFixture.requireSelectedInput(value);
+    }
+
+    @Test void admissionVersionsKeepLegacyMainAndPrivateSourceFamiliesSeparate() {
+        var json=new ObjectMapper();
+        var legacy=json.createObjectNode().put("kind","procurement-linked-foreign-native-admission-v1")
+                .put("schemaVersion",1).put("fixtureEnabled",true);
+        assertEquals("50924063538e4181cb601300f0c26c6bbfcce2f0",ProcurementLinkedForeignNativeAdmission.mainBase(legacy));
+        assertEquals(ProcurementLinkedForeignNativeAdmission.SOURCES,ProcurementLinkedForeignNativeAdmission.sources(legacy));
+        var modern=legacy.deepCopy().put("kind","procurement-linked-foreign-native-admission-v2").put("schemaVersion",2);
+        assertEquals("69493861397abec3205edb8fd62ba54001ff5013",ProcurementLinkedForeignNativeAdmission.mainBase(modern));
+        assertEquals(10,ProcurementLinkedForeignNativeAdmission.sources(modern).size());
+        assertTrue(ProcurementLinkedForeignNativeAdmission.sources(modern).contains(ProcurementLinkedForeignNativeAdmission.CRYPTO_SOURCE));
+        for(var invalid:List.of(modern.deepCopy().put("kind","procurement-linked-foreign-native-admission-v1"),
+                legacy.deepCopy().put("schemaVersion",2),modern.deepCopy().put("schemaVersion","2"),
+                modern.deepCopy().put("schemaVersion",3),modern.deepCopy().put("fixtureEnabled",1)))
+            assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeFixture.requireSelectedInput(invalid));
+    }
+
+    @Test void privateCryptoMustUseExactAppProofAndSpringAliasBeforeFullS06Admission() throws Exception {
+        var json=new ObjectMapper();Path app=Files.createDirectory(root.resolve("app"));
+        Path proofPath=Files.writeString(root.resolve("proof.json"),"inert-proof");
+        Path otherApp=Files.createDirectory(root.resolve("foreign-app"));
+        Path otherProof=Files.writeString(root.resolve("other-proof.json"),"inert-other-proof");
+        var input=json.createObjectNode().put("encryptionMode","encrypted").put("encryptionConfigProofSha256","a".repeat(64));
+        var proof=json.createObjectNode().put("keySource","private-additional-properties");
+        var env=new LinkedHashMap<String,String>(Map.of("S06_NATIVE_APPLICATION_ROOT",app.toString(),
+                "S06_NATIVE_ENCRYPTION_PROOF_PATH",proofPath.toString(),"S06_NATIVE_ENCRYPTION_PROOF_SHA256","a".repeat(64),
+                "S06_NATIVE_FIELD_ENCRYPTION_KEY","synthetic-key","PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY","synthetic-key"));
+        ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input,proof,app,proofPath,"synthetic-key",env);
+        for(var drift:List.of(Map.entry("S06_NATIVE_APPLICATION_ROOT",otherApp.toString()),
+                Map.entry("S06_NATIVE_ENCRYPTION_PROOF_PATH",otherProof.toString()),
+                Map.entry("S06_NATIVE_ENCRYPTION_PROOF_SHA256","b".repeat(64)),
+                Map.entry("S06_NATIVE_FIELD_ENCRYPTION_KEY","wrong-key"),
+                Map.entry("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY","wrong-key"))) {
+            var bad=new LinkedHashMap<>(env);bad.put(drift.getKey(),drift.getValue());
+            assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input,proof,app,proofPath,"synthetic-key",bad));
+        }
+        var absent=new LinkedHashMap<>(env);absent.remove("S06_NATIVE_FIELD_ENCRYPTION_KEY");
+        assertThrows(IllegalStateException.class,()->ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input,proof,app,proofPath,"synthetic-key",absent));
+        for(String source:List.of("environment","unknown",""))
+            assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input,proof.deepCopy().put("keySource",source),app,proofPath,"synthetic-key",env));
+        assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input.deepCopy().put("encryptionMode","dev-passthrough"),proof,app,proofPath,"synthetic-key",env));
+    }
+
+    @Test void v2ClassSealRequiresCryptoOuterAndInnerWithExactDigests() throws Exception {
+        var json=new ObjectMapper();Path classes=Files.createDirectory(root.resolve("v2-classes"));
+        var input=json.createObjectNode().put("kind","procurement-linked-foreign-native-admission-v2").put("schemaVersion",2);
+        var sources=ProcurementLinkedForeignNativeAdmission.sources(input);
+        var declared=new LinkedHashMap<String,String>();
+        for(String source:sources) {
+            Path file=classes.resolve(source.substring("platform/src/test/java/".length()).replace(".java",".class"));
+            Files.createDirectories(file.getParent());Files.writeString(file,"inert-class-probe");declared.put(file.toRealPath().toString(),ProcurementPublicSourceNativeFixture.sha(file));
+        }
+        Path app=classes.resolve("com/auraboot/framework/application/TestApplication.class");Files.createDirectories(app.getParent());Files.writeString(app,"app-probe");declared.put(app.toRealPath().toString(),ProcurementPublicSourceNativeFixture.sha(app));
+        Path crypto=classes.resolve(ProcurementLinkedForeignNativeAdmission.CRYPTO_SOURCE.substring("platform/src/test/java/".length()).replace(".java",".class"));
+        Path inner=crypto.resolveSibling("S06NativeEncryptionAdmission$InertNested.class");Files.writeString(inner,"inert-inner");declared.put(inner.toRealPath().toString(),ProcurementPublicSourceNativeFixture.sha(inner));
+        ProcurementLinkedForeignNativeAdmission.validateClassRoster(json.valueToTree(declared),classes,sources);
+        for(Path required:List.of(crypto,inner)) {
+            var missing=new LinkedHashMap<>(declared);missing.remove(required.toRealPath().toString());
+            assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeAdmission.validateClassRoster(json.valueToTree(missing),classes,sources));
+        }
+        Files.writeString(inner,"changed");
+        assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeAdmission.validateClassRoster(json.valueToTree(declared),classes,sources));
+    }
+
     @Test void controlledOrderWriteContractIncludesExplicitStrictSourceLinkSaveOptions() {
         assertEquals(ProcurementLinkedForeignNativeAdmission.MAIN_BASE, ProcurementLinkedForeignNativeFixture.MAIN_BASE,
                 "Producer prepare and admission must share the same exact Main authority");
