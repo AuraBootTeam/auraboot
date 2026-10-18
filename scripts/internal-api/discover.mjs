@@ -32,6 +32,51 @@ export function matchOperation(route, method, document) {
   return rows.filter(r => r.score === best).map(({ score, ...row }) => row);
 }
 
+function withoutTypeWrappers(node) {
+  while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+    || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node))) node = node.expression;
+  return node;
+}
+
+// Token/value identity, not an AST equivalence test. Preserve every scalar token;
+// omit comments, layout and erased type arguments of URL-builder calls.
+function syntaxIdentity(node, source) {
+  node = withoutTypeWrappers(node);
+  if (!node) return ['missing'];
+  if (typeof node.text === 'string') return [node.kind, node.text];
+  if (ts.isCallExpression(node) || ts.isNewExpression(node))
+    return [node.kind, syntaxIdentity(node.expression, source), (node.arguments ?? []).map(n => syntaxIdentity(n, source))];
+  const children = node.getChildren(source).filter(n => !(n.kind >= ts.SyntaxKind.FirstJSDocNode && n.kind <= ts.SyntaxKind.LastJSDocNode));
+  return [node.kind, children.length ? children.map(n => syntaxIdentity(n, source)) : node.getText(source)];
+}
+function identityName(node, source) {
+  return node && typeof node.text === 'string' ? node.text : canonicalJson(syntaxIdentity(node, source));
+}
+function lexicalScope(node, source) {
+  const scopes = [];
+  for (let cursor = node.parent; cursor && cursor !== source; cursor = cursor.parent) {
+    if (ts.isClassDeclaration(cursor) || ts.isClassExpression(cursor) || ts.isModuleDeclaration(cursor))
+      scopes.push(`container:${cursor.name ? identityName(cursor.name, source) : '<anonymous>'}`);
+    if (ts.isVariableDeclaration(cursor) && ts.isObjectLiteralExpression(withoutTypeWrappers(cursor.initializer) ?? source))
+      scopes.push(`object:${identityName(cursor.name, source)}`);
+    if (ts.isFunctionLike(cursor)) {
+      let parent = cursor.parent;
+      while (parent && (ts.isParenthesizedExpression(parent) || ts.isAsExpression(parent) || ts.isSatisfiesExpression(parent))) parent = parent.parent;
+      if (ts.isConstructorDeclaration(cursor)) scopes.push('callable:constructor');
+      else if (cursor.name) scopes.push(`callable:${identityName(cursor.name, source)}`);
+      else if (parent && (ts.isVariableDeclaration(parent) || ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent)))
+        scopes.push(`callable:${identityName(parent.name, source)}`);
+      else if (parent && ts.isCallExpression(parent)) {
+        const callee = parent.expression;
+        const name = ts.isPropertyAccessExpression(callee) ? identityName(callee.name, source) : identityName(callee, source);
+        const index = parent.arguments.findIndex(argument => withoutTypeWrappers(argument) === cursor);
+        scopes.push(`callback:${name}:${index}`);
+      } else scopes.push('callable:<anonymous>');
+    }
+  }
+  return scopes.reverse();
+}
+
 /** Static source reconciliation. Unresolved routes remain visible and block completion. */
 export function discoverCalls(sources, document) {
   validateDocument(document);
@@ -243,7 +288,11 @@ export function discoverCalls(sources, document) {
           if (classification === 'source-linked' && routeInputEvidence.length) classification = 'route-input-needs-review';
           const matches = [...new Map(branches.flatMap(branch => branch.matches)
             .map(match => [`${match.method} ${match.path}`, match])).values()];
-          calls.push({ id: sha256(`${source.file}:${n.getStart(sf)}:${callee}:${target}`).slice(0, 20),
+          const identityTargets = [...new Set(branches.flatMap(branch => branch.matches.length
+            ? branch.matches.map(match => `operation:${match.method} ${match.path}`)
+            : [`route:${branch.route ?? canonicalJson(syntaxIdentity(targetNode, sf))}`]))].sort();
+          calls.push({ legacyId: sha256(`${source.file}:${n.getStart(sf)}:${callee}:${target}`).slice(0, 20),
+            identityVersion: 2, identityAnchor: { file: source.file.replaceAll('\\', '/'), scope: lexicalScope(n, sf), method, targets: identityTargets },
             file: source.file, line: line(), callee, method, target, route: route ?? null,
             transportResolution: resolvedTransport ?? 'name-heuristic-candidate', routeInputEvidence,
             typeArguments: (n.typeArguments ?? []).map(t => t.getText(sf)), classification, matches, branches,
@@ -255,6 +304,19 @@ export function discoverCalls(sources, document) {
     }
     visit(sf);
   }
+  const identityGroups = new Map();
+  for (const call of calls) {
+    const anchor = canonicalJson(call.identityAnchor);
+    if (!identityGroups.has(anchor)) identityGroups.set(anchor, []);
+    identityGroups.get(anchor).push(call);
+  }
+  for (const [anchor, group] of identityGroups) group.forEach((call, index) => {
+    call.id = sha256(index === 0 ? anchor : `${anchor}occurrence:${index + 1}`).slice(0, 20);
+    call.identityStability = group.length === 1 ? 'unique-anchor' : 'duplicate-order-dependent';
+    call.identityOccurrence = index + 1;
+    call.identityCount = group.length;
+  });
+  requireCondition(new Set(calls.map(call => call.id)).size === calls.length, 'Network call identity collision');
   const summary = Object.fromEntries([...new Set(calls.map(c => c.classification))].sort()
     .map(key => [key, calls.filter(c => c.classification === key).length]));
   const selected = new Map(), linked = new Set();
@@ -263,7 +325,7 @@ export function discoverCalls(sources, document) {
     selected.set(key, match);
     if (call.classification === 'source-linked') linked.add(key);
   }
-  return { summary: { files: sources.length, calls: calls.length, declarations: declarations.length,
+  return { callIdentityVersion: 2, summary: { files: sources.length, calls: calls.length, declarations: declarations.length,
     sourceLinkedOperations: linked.size, candidateOperations: selected.size, classifications: summary },
     calls, declarations, operations: [...selected.values()].sort((a, b) => `${a.path} ${a.method}`.localeCompare(`${b.path} ${b.method}`, 'en')) };
 }
@@ -271,13 +333,20 @@ export function discoverCalls(sources, document) {
 export function inventory(root, document) {
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
   const commit = git('rev-parse', 'HEAD');
+  requireCondition(git('status', '--porcelain') === '', 'Inventory requires a clean source checkout');
   const files = git('ls-files', '--cached', '--others', '--exclude-standard').split('\n');
-  const sources = files.filter(p => /^(?:web-admin\/(?:app|packages)\/|packages\/)/.test(p) && /\.[cm]?[jt]sx?$/.test(p) && PRODUCTION(p))
-    .map(file => ({ file, text: fs.readFileSync(path.join(root, file), 'utf8') }));
-  const packages = files.filter(p => /^(?:packages|web-admin\/packages)\/[^/]+\/package\.json$/.test(p))
-    .map(file => ({ root: path.posix.dirname(file), manifest: JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) }));
-  const configFile = 'web-admin/tsconfig.json';
-  const configText = fs.readFileSync(path.join(root, configFile), 'utf8');
+  const sourceFiles = files.filter(p => /^(?:web-admin\/(?:app|packages)\/|packages\/)/.test(p) && /\.[cm]?[jt]sx?$/.test(p) && PRODUCTION(p));
+  const packageFiles = files.filter(p => /^(?:packages|web-admin\/packages)\/[^/]+\/package\.json$/.test(p));
+  const configFile = 'web-admin/tsconfig.json', inputFiles = [...new Set([...sourceFiles, ...packageFiles, configFile])].sort();
+  const contents = new Map(inputFiles.map(file => [file, fs.readFileSync(path.join(root, file), 'utf8')]));
+  const sourceInputs = Object.fromEntries([...contents].map(([file, text]) => [file, sha256(text)]));
+  const scanInputsSha256 = sha256(canonicalJson(sourceInputs));
+  const toolFiles = ['discover.mjs','source-graph.mjs','contract.mjs','toolchain/package-lock.json'];
+  const toolInputs = () => Object.fromEntries(toolFiles.map(file => [file, sha256(fs.readFileSync(new URL(file, import.meta.url)))]));
+  const toolInputHashes = toolInputs();
+  const sources = sourceFiles.map(file => ({ file, text: contents.get(file) }));
+  const packages = packageFiles.map(file => ({ root: path.posix.dirname(file), manifest: JSON.parse(contents.get(file)) }));
+  const configText = contents.get(configFile);
   const config = ts.parseConfigFileTextToJson(configFile, configText);
   requireCondition(!config.error && config.config?.compilerOptions, 'Cannot read Web Admin source graph compiler options');
   requireCondition(!config.config.extends, 'Inherited source graph aliases require explicit resolution');
@@ -294,8 +363,12 @@ export function inventory(root, document) {
     row.entryReachability = file.reachable ? 'static-entry-linked' : 'not-proven-entry-linked';
     row.reachedBy = file.reachedBy;
   }
-  requireCondition(git('rev-parse', 'HEAD') === commit, 'Source commit changed during inventory');
-  return { sourceCommit: commit, sourceDigest: sha256(sources.map(s => s.file + '\n' + sha256(s.text)).join('\n')),
+  requireCondition(git('rev-parse', 'HEAD') === commit && git('status', '--porcelain') === '', 'Source changed during inventory');
+  requireCondition(sha256(canonicalJson(Object.fromEntries(inputFiles.map(file => [file, sha256(fs.readFileSync(path.join(root, file)))])))) === scanInputsSha256,
+    'Source inputs changed during inventory');
+  requireCondition(canonicalJson(toolInputs()) === canonicalJson(toolInputHashes), 'Inventory tool inputs changed during inventory');
+  return { sourceCommit: commit, sourceClaim: 'clean-git-snapshot', scanInputsSha256, sourceInputs, toolInputHashes,
+    toolVersions: { node: process.version, typescript: ts.version }, sourceDigest: sha256(sources.map(s => s.file + '\n' + sha256(s.text)).join('\n')),
     sourceGraphInputsSha256: sha256(canonicalJson({ packages, entries, aliases, configSha256: sha256(configText) })),
     catalogDigest: sha256(canonicalJson(document)), ...result, sourceGraph };
 }
@@ -303,10 +376,11 @@ export function inventory(root, document) {
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   try {
     const [root, input, output] = process.argv.slice(2);
-    requireCondition(root && input && output, 'Usage: node discover.mjs <repo> <catalog.json> <manifest.json>');
+    requireCondition(process.argv.slice(2).length === 3 && root && input && output, 'Usage: node discover.mjs <repo> <catalog.json> <manifest.json>');
+    requireCondition(!fs.existsSync(output), 'Inventory output exists; use a fresh attempt path');
     const result = inventory(root, JSON.parse(fs.readFileSync(input, 'utf8')));
     fs.mkdirSync(path.dirname(output), { recursive: true });
-    fs.writeFileSync(output, canonicalJson(result));
+    fs.writeFileSync(output, canonicalJson(result), { flag: 'wx' });
     console.log(JSON.stringify(result.summary));
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

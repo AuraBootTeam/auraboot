@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { discoverCalls, matchOperation } from './discover.mjs';
+import { discoverCalls, matchOperation, inventory } from './discover.mjs';
 const response = { 200: { description: 'OK' } };
 const parameter = { name: 'pid', in: 'path', required: true, schema: { type: 'string' } };
 const document = { openapi: '3.1.0', info: { title: 'Test', version: '1' }, paths: {
@@ -196,4 +196,64 @@ test('keeps replaceable route defaults and mutable bases outside proven source l
     assert.equal(row.classification, 'source-linked');
     assert.deepEqual(row.routeInputEvidence, []);
   }
+});
+
+test('network call identities survive unrelated layout and generated transport edits while ambiguous duplicates remain explicit', () => {
+  const file = 'web-admin/app/identity.ts';
+  const original = `import {get} from './http-client';
+    export function left() { return get('/api/views/accessible'); }
+    export function right() { return get('/api/views/accessible'); }
+    export function unknown() { return fetch(route + '/suffix-a'); }
+  `;
+  const before = discoverCalls([{file,text:original}], document);
+  const layout = discoverCalls([{file,text:'// unrelated header\n\n'+original.replace('return get(', '/* note */ return get (')}], document);
+  assert.deepEqual(layout.calls.map(row => row.id), before.calls.map(row => row.id));
+  assert.notDeepEqual(layout.calls.map(row => row.legacyId), before.calls.map(row => row.legacyId));
+  const migrated = original.replace("import {get} from './http-client';", "import {internalRequest} from './http-client/internal-api';")
+    .replaceAll("get('/api/views/accessible')", "internalRequest('get','/api/views/accessible',{})");
+  const after = discoverCalls([{file,text:migrated}], document);
+  assert.deepEqual(after.calls.map(row => row.id), before.calls.map(row => row.id));
+  assert.equal(after.calls[0].migration, 'generated-operation');
+  assert.notEqual(before.calls[0].id, before.calls[1].id);
+  const inserted = discoverCalls([{file,text:original+"\nfunction unrelated(){return fetch('/api/missing');}"}], document);
+  assert.deepEqual(inserted.calls.slice(0,3).map(row => row.id), before.calls.map(row => row.id));
+  const callback = `import {get} from './http-client'; function load(){ useEffect(()=>get('/api/views/accessible'),[]); }`;
+  const wrappedCallback = callback.replace("()=>get('/api/views/accessible')", "((()=>get('/api/views/accessible')))");
+  assert.equal(discoverCalls([{file,text:callback}],document).calls[0].id,
+    discoverCalls([{file,text:wrappedCallback}],document).calls[0].id);
+  const changedLiteral = discoverCalls([{file,text:original.replace('/suffix-a','/suffix-b')}], document);
+  assert.notEqual(changedLiteral.calls[2].id,before.calls[2].id);
+  const duplicates = discoverCalls([{file,text:"function duplicate(){fetch('/api/missing');fetch('/api/missing');}"}], document).calls;
+  assert.equal(new Set(duplicates.map(row => row.id)).size,2);
+  assert.ok(duplicates.every(row => row.identityStability==='duplicate-order-dependent' && row.identityCount===2));
+  assert.deepEqual(duplicates.map(row => row.identityOccurrence),[1,2]);
+  assert.ok(before.calls.every(row => row.identityStability==='unique-anchor' && row.identityVersion===2));
+});
+
+
+test('inventory binds clean source and tool input hashes and refuses dirty snapshots', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const { execFileSync } = await import('node:child_process');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'internal-api-inventory-'));
+  const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
+  try {
+    fs.mkdirSync(path.join(root, 'web-admin/app'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'web-admin/tsconfig.json'), JSON.stringify({compilerOptions:{baseUrl:'.',paths:{}}}));
+    const file = path.join(root, 'web-admin/app/root.tsx');
+    fs.writeFileSync(file, "import {get} from './http-client'; export function root(){return get('/api/views/accessible');}");
+    for (const entry of ['routes.ts','entry.client.tsx','entry.server.tsx','server/bff.server.ts']) {
+      const target = path.join(root,'web-admin/app',entry);
+      fs.mkdirSync(path.dirname(target),{recursive:true}); fs.writeFileSync(target,'export {};');
+    }
+    git('init','-q'); git('add','.'); git('-c','user.name=Contract fixture','-c','user.email=contract@example.invalid','commit','-qm','fixture');
+    const result = inventory(root, document);
+    assert.equal(result.sourceClaim,'clean-git-snapshot'); assert.equal(result.sourceCommit,git('rev-parse','HEAD'));
+    assert.equal(result.calls.length,1); assert.equal(result.callIdentityVersion,2);
+    assert.match(result.scanInputsSha256,/^[a-f0-9]{64}$/);
+    assert.equal(Object.keys(result.sourceInputs).length,6);
+    assert.ok(result.sourceInputs['web-admin/app/root.tsx'] && result.sourceInputs['web-admin/tsconfig.json']);
+    assert.ok(Object.values(result.toolInputHashes).every(value => /^[a-f0-9]{64}$/.test(value)));
+    fs.appendFileSync(file,'\n// uncommitted edit');
+    assert.throws(() => inventory(root,document), /clean source checkout/);
+  } finally { fs.rmSync(root,{recursive:true,force:true}); }
 });

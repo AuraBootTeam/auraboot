@@ -62,6 +62,21 @@ configured runtime endpoints and absolute origins require explicit reconciliatio
 Do not exclude them merely to obtain a green report. A generated-operation marker
 records source migration, not executed test evidence.
 
+Inventory call identity version 2 hashes the source file, lexical callable scope,
+HTTP method and candidate operation paths; unresolved targets retain a token/value
+syntax anchor. Comments, layout and replacing a legacy transport with the same
+generated operation do not change a unique anchor. `legacyId` retains the previous
+position-based ID for an explicit inventory bridge. Repeated indistinguishable
+calls have distinct IDs but are marked `duplicate-order-dependent`; moving files
+or scopes and resolving previously unknown routes also needs reconciliation.
+An identity match never proves branch coverage or semantic equivalence.
+Inventory requires a clean checkout before and after scanning and a fresh output
+path. It records and rechecks source/config/package and scanner input digests,
+along with Node/TypeScript versions. `sourceCommit` and `sourceDigest` retain
+their separate roles: commit identity and observed production source bytes.
+
+
+
 The inventory includes JavaScript/TypeScript in the application and workspace
 packages. Its source graph follows the shell, router, SSR/CSR and BFF entries,
 configured source aliases, router resource files and package exports. Type-only

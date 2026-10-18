@@ -58,7 +58,9 @@
         "browser catalog rejects missing empty skipped shadowed dynamic duplicated or unregistered evidence",
         "browser evidence separates functional execution from exact original review and source runtime identity",
         "browser evidence rejects stale failed skipped retried missing mismatched or unreviewed attempts",
-        "browser runner binds verified manifest addresses and rejects missing or conflicting runtime namespaces"
+        "browser runner binds verified manifest addresses and rejects missing or conflicting runtime namespaces",
+        "network call identities survive unrelated layout and generated transport edits while ambiguous duplicates remain explicit",
+        "inventory binds clean source and tool input hashes and refuses dirty snapshots"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },
