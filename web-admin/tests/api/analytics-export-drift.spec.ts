@@ -1,5 +1,6 @@
 /** Stored exports must track record-ownership drift and complex SQL must respect scopes. */
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
+import { BACKEND_URL as ENV_BACKEND_URL } from '../helpers/environments';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { PG_CONN } from '../helpers/environments';
@@ -71,7 +72,7 @@ test('department drift invalidates stored exports and complex SQL respects the s
     );
     expect(identity.rows).toHaveLength(1);
     const ctx = await requestFactory.newContext({
-      baseURL: process.env.BACKEND_URL,
+      baseURL: ENV_BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${(await login.json()).data.jwt}` },
     });
     return { ctx, email, userId: String(identity.rows[0].user_id), memberPid: String(identity.rows[0].member_pid) };

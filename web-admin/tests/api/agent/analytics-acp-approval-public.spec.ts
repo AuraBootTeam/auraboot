@@ -1,5 +1,6 @@
 /** ACP approval configuration and dispatch use public APIs; SQL is read-only. */
 import { test, expect, request as requestFactory } from '@playwright/test';
+import { BACKEND_URL as ENV_BACKEND_URL } from '../../helpers/environments';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
@@ -25,7 +26,7 @@ for (const mode of ['approve', 'reject', 'race', 'expired']) {
       tool_name: `Approved health ${tag}`,
       tool_description: 'Read owned runtime health after approval',
       tool_type: 'api_call',
-      source_code: `GET ${process.env.BACKEND_URL}/actuator/health`,
+      source_code: `GET ${ENV_BACKEND_URL}/actuator/health`,
       input_schema: JSON.stringify({
         type: 'object',
         properties: { marker: { type: 'string' } },
@@ -144,7 +145,7 @@ for (const mode of ['approve', 'reject', 'race', 'expired']) {
       expect(JSON.parse(raw).sub).toBe(users[0].pid);
       expect(String(users[0].id)).not.toBe(String(owners[0].created_by));
       const foreign = await requestFactory.newContext({
-        baseURL: process.env.BACKEND_URL,
+        baseURL: ENV_BACKEND_URL,
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       try {

@@ -1,5 +1,6 @@
 /** Real role grants and revocation through the existing AuraBot analysis card. */
 import { test, expect } from '../../fixtures';
+import { BACKEND_URL as ENV_BACKEND_URL } from '../../helpers/environments';
 import { request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -651,7 +652,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         expect(String(tenant.tenantId)).not.toBe(String(currentUser.tenantId));
         expect(tenant.jwt).toBeTruthy();
         const foreign = await requestFactory.newContext({
-          baseURL: process.env.BACKEND_URL,
+          baseURL: ENV_BACKEND_URL,
           extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
         });
         try {

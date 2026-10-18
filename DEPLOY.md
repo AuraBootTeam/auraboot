@@ -202,6 +202,7 @@ Copy `.env.example` to `.env` and configure:
 | `POSTGRES_USER` | `auraboot` | No | Database user |
 | `POSTGRES_PASSWORD` | `auraboot_dev` | **Yes (prod)** | Database password |
 | `JWT_SECRET` | (weak default) | **Yes (prod)** | JWT signing secret (min 32 chars) |
+| `OPEN_PLATFORM_PROTOCOL_SIGNING_KEY` | Evaluation-only key in base Compose | **Yes (prod)** | Separate random signing key for Open Platform cursors and ETags (`openssl rand -hex 32`) |
 | `REDIS_HOST` | (empty) | No | Set to `redis` to enable Redis |
 | `ANTHROPIC_API_KEY` | — | No | Enable AI/AuraBot features |
 | `OPENAI_API_KEY` | — | No | OpenAI provider (alternative LLM) |
@@ -281,6 +282,7 @@ without touching its config. See [`scripts/deploy/oss-remote/README.md`](scripts
 Before going to production:
 
 - [ ] Change `JWT_SECRET` to a cryptographically random value (`openssl rand -hex 32`)
+- [ ] Set a separate random `OPEN_PLATFORM_PROTOCOL_SIGNING_KEY` (`openssl rand -hex 32`); production Compose rejects a missing value
 - [ ] Change `POSTGRES_PASSWORD` to a strong password
 - [ ] Set `REDIS_HOST=redis` and enable `--profile cache` for multi-instance
 - [ ] Change `MINIO_ROOT_PASSWORD` if using MinIO

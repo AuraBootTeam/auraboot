@@ -1,5 +1,6 @@
 /** Public API setup and L2 confirmation; PostgreSQL is read-only evidence. */
 import { test, expect, request as requestFactory } from '@playwright/test';
+import { BACKEND_URL as ENV_BACKEND_URL } from '../../helpers/environments';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
@@ -112,7 +113,7 @@ for (const mode of ['approve', 'deny', 'concurrent']) {
       expect(claims.sub).toBe(users[0].pid);
       expect(String(users[0].id)).not.toBe(String(agentRows[0].created_by));
       const foreign = await requestFactory.newContext({
-        baseURL: process.env.BACKEND_URL,
+        baseURL: ENV_BACKEND_URL,
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       try {

@@ -1,5 +1,6 @@
 /** Real export ownership: a same-tenant administrator cannot retrieve another user's artifact. */
 import { test, expect, request as requestFactory } from '@playwright/test';
+import { BACKEND_URL as ENV_BACKEND_URL } from '../helpers/environments';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { PG_CONN } from '../helpers/environments';
@@ -85,7 +86,7 @@ test('async export task and file belong to their creator', async ({ request }) =
     const tenant = (await createdTenant.json()).data;
     expect(tenant.jwt).toBeTruthy();
     const foreign = await requestFactory.newContext({
-      baseURL: process.env.BACKEND_URL,
+      baseURL: ENV_BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
     });
     try {
@@ -138,7 +139,7 @@ test('async export task and file belong to their creator', async ({ request }) =
   const jwt = (await login.json()).data.jwt;
   expect(jwt).toBeTruthy();
   const peer = await requestFactory.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: ENV_BACKEND_URL,
     extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
   });
   try {

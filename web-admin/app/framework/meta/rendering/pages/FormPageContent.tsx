@@ -1164,6 +1164,17 @@ function mergeFieldValidationRules(
  * runtime via usePageRuntime. Handles create and edit modes, sub-tables,
  * expression-driven visibility, and action dispatch.
  */
+/** Extract only public command response identities, including nested result envelopes. */
+export function extractSavedPublicRecordPid(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  for (const key of ['recordPid', 'pid']) {
+    const pid = record[key];
+    if (typeof pid === 'string' && pid.trim()) return pid;
+  }
+  return extractSavedPublicRecordPid(record.data);
+}
+
 export function FormPageContent(props: PageContentProps) {
   const { sidebarWidth } = usePresentationNavigation();
   const {
@@ -2145,12 +2156,7 @@ export function FormPageContent(props: PageContentProps) {
                 })()
               : result.data;
             if (schema.extension?.linkFileAttachments === true) {
-              const extractPid = (value: any): string | undefined => {
-                if (!value || typeof value !== 'object') return undefined;
-                const pid = value.recordPid || value.recordId || value.pid;
-                return typeof pid === 'string' ? pid : extractPid(value.data);
-              };
-              const savedPid = recordPid || extractPid(responseData);
+              const savedPid = recordPid || extractSavedPublicRecordPid(responseData);
               if (!savedPid) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但未取得附件关联目标。请重新打开项目检查。', en: 'Saved, but attachment target is missing. Reopen the record to check.' }, locale, t));
               for (const [field, meta] of Object.entries(modelFields)) {
                 if (!schema.extension?.attachmentFields?.includes(field) || commandPayload[field] === undefined) continue;

@@ -1,5 +1,6 @@
 /** Real report export isolation: each business tenant exports its own report and cannot export another tenant's. */
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
+import { BACKEND_URL as ENV_BACKEND_URL } from '../helpers/environments';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 
@@ -94,7 +95,7 @@ test('report exports stay tenant-scoped across real business tenants', async ({ 
   const tenant = (await createdTenant.json()).data;
   expect(tenant.jwt).toBeTruthy();
   const foreign = await requestFactory.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: ENV_BACKEND_URL,
     extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
   });
   try {

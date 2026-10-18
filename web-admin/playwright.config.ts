@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { BASE_URL as ENV_BASE_URL } from './tests/helpers/environments';
 import dns from 'node:dns';
 import { isAbsolute, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -27,7 +28,7 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 }
 
 // Must use 'localhost' not '127.0.0.1' — the BFF returns 502 on direct IP.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
+const baseURL = ENV_BASE_URL;
 const runProfile = process.env.PW_PROFILE || 'fast';
 // Cross-repository tests keep their source ownership and use explicit runtime roots.
 const enterpriseTestRoot = process.env.PW_ENTERPRISE_TEST_ROOT;

@@ -326,3 +326,11 @@ export function loadEnv(profile: EnvProfile = 'host'): EnvironmentSpec {
     pg: { host: pgHost, port: pgPort, user: pgUser, db: pgDb },
   };
 }
+
+/** Require the explicitly selected owned Web runtime for isolated acceptance journeys. */
+export function explicitBaseURL(): string {
+  if (!hasEnv('PLAYWRIGHT_BASE_URL')) {
+    throw new Error('[E2E env] PLAYWRIGHT_BASE_URL must explicitly select the owned runtime');
+  }
+  return BASE_URL;
+}

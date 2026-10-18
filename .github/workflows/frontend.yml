@@ -64,6 +64,10 @@ jobs:
         working-directory: web-admin
         run: pnpm lint
 
+      - name: Test environment contract
+        working-directory: web-admin
+        run: node --test scripts/test-environments.test.mjs
+
       - name: Env-drift gate (tests/)
         working-directory: web-admin
         run: pnpm test:env-lint

@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Locator, Page } from '@playwright/test';
+import { explicitBaseURL } from '../../helpers/environments';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -24,7 +25,7 @@ const fixtureJournals = new WeakMap<Page, FixtureCleanupJournal>();
 export function fixtureJournal(page: Page): FixtureCleanupJournal {
   let journal = fixtureJournals.get(page);
   if (!journal) {
-    const origin = process.env.PLAYWRIGHT_BASE_URL;
+    const origin = explicitBaseURL();
     if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
     if (page.url().startsWith('http') && new URL(page.url()).origin !== new URL(origin).origin) {
       throw new Error('Fixture page belongs to a different runtime origin');
