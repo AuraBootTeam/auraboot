@@ -25,12 +25,13 @@ function fixture() {
       export function read() { return get<Renamed>('/api/person',{body: {pid:'p'} as unknown as Record<string,any>}); }
       export function unchecked() { return get<MissingModel>('/api/person'); }
       export function raw() { return fetch('/api/person'); }`,
+    'web-admin/app/legacy.js': `export function read(){return fetch('/api/person');}`,
   };
   for (const [file,text] of Object.entries(sources)) {
     fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true}); fs.writeFileSync(path.join(root,file),text);
   }
   const document = {openapi:'3.1.0',info:{title:'Fixture',version:'1'},paths:{'/api/person':{get:{operationId:'read',responses:{200:{description:'OK'}}}}}};
-  const found = discoverCalls([{file:'web-admin/app/read.ts',text:sources['web-admin/app/read.ts']}],document);
+  const found = discoverCalls(['web-admin/app/read.ts','web-admin/app/legacy.js'].map(file=>({file,text:sources[file]})),document);
   return {root,sources,inventory:{sourceCommit:'a'.repeat(40),sourceInputs:Object.fromEntries(Object.entries(sources).map(([f,t])=>[f,sha256(t)])),...found}};
 }
 
@@ -38,7 +39,7 @@ test('type provenance follows real compiler aliases reexports nested declaration
   const {root,inventory} = fixture();
   try {
     const result = traceCallTypes(root,inventory);
-    assert.equal(result.calls.length,3);
+    assert.equal(result.calls.length,4);
     const [typed,unchecked,raw] = result.calls;
     assert.equal(typed.migration,'not-migrated');
     assert.equal(typed.explicitTypeArguments[0].syntax,'Renamed');
@@ -56,6 +57,9 @@ test('type provenance follows real compiler aliases reexports nested declaration
     assert.match(raw.result.display,/Promise<Response>/);
     assert.ok(raw.result.origins.some(id=>result.declarations.find(d=>d.id===id)?.name==='Response'));
     assert.equal(raw.explicitTypeArguments.length,0);
+    assert.equal(result.calls[3].status,'compiler-excluded-source');
+    assert.equal(result.calls[3].result,null);
+    assert.equal(result.summary.compilerExcludedCalls,1);
     assert.equal(result.claim,'compiler-associated-declaration-provenance-only');
     assert.ok(Object.keys(result.compilerInputs).some(f=>f.includes('lib.dom.d.ts')));
     assert.match(result.compilerInputsSha256,/^[a-f0-9]{64}$/);

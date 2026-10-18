@@ -122,6 +122,10 @@ export function traceCallTypes(root, inventory) {
   }
   const calls = inventory.calls.map(call => {
     const source = program.getSourceFile(path.resolve(root,call.file));
+    if (!source && /\.[cm]?jsx?$/.test(call.file) && !parsed.options.allowJs)
+      return { id: call.id, file: call.file, line: call.line, migration: call.migration,
+        operationCandidates: call.matches, status: 'compiler-excluded-source', reason: 'allowJs-disabled',
+        explicitTypeArguments: [], arguments: [], result: null, signature: null, assertions: [] };
     requireCondition(source, `Compiler source missing: ${call.file}`);
     let node;
     const find = n => {
@@ -157,6 +161,7 @@ export function traceCallTypes(root, inventory) {
     limitations: ['No proof of HTTP serialization or operation compatibility',
       'No downstream result.json or property data-flow tracking',
       'Generated and dependency declarations are terminal provenance nodes',
+      'JavaScript calls excluded by actual compiler options remain explicit boundaries',
       'No complete application semantic diagnostic or runtime reachability claim'],
     typescriptVersion: ts.version, sourceCommit: inventory.sourceCommit,
     inventorySha256: sha256(canonicalJson(inventory)), compilerInputs,
@@ -164,6 +169,7 @@ export function traceCallTypes(root, inventory) {
     summary: { calls: calls.length, declarations: nodes.length, compilerInputs: inputs.size,
       assertions: calls.reduce((n,c) => n+c.assertions.length,0),
       unresolvedSignatures: calls.filter(c => c.status === 'unresolved-signature').length,
+      compilerExcludedCalls: calls.filter(c => c.status === 'compiler-excluded-source').length,
       unresolvedReferences: nodes.reduce((n,d) => n+d.references.filter(r => r.status === 'unresolved-symbol').length,0)
         + calls.reduce((n,c) => n+c.explicitTypeArguments.flatMap(t=>t.references).filter(r=>r.status==='unresolved-symbol').length,0) },
     calls, declarations: nodes };
