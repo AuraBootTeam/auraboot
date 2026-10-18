@@ -81,7 +81,7 @@ export default function DictCreatePage() {
                   value: item.value,
                   label: item.label,
                   sortOrder: item.order || 0,
-                  parentValue: item.parentValue,
+                  parentValue: item.parentValue ?? undefined,
                   disabled: item.disabled || false,
                   extension: item.extension,
                 }))

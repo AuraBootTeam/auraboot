@@ -168,7 +168,7 @@ export async function fetchDictOptions(dictCode: string): Promise<ResourceOption
   return dictionaryData(result.data).items.map((item) => ({
     label: item.label || item.value,
     value: item.value,
-    description: item.description,
+    description: item.description ?? undefined,
   }));
 }
 
