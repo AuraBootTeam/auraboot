@@ -26,7 +26,7 @@ import { BulkEditModal } from '~/framework/smart/components/bulk/BulkEditModal';
 import { BulkFieldCommandModal } from '~/framework/smart/components/bulk/BulkFieldCommandModal';
 import { RecordPreviewDrawer } from '~/framework/smart/components/preview/RecordPreviewDrawer';
 import { ColumnContextMenu } from './ColumnContextMenu';
-import type { ListFilterFieldMetadata } from '../ListPageContent';
+import type { ListFilterFieldMetadata } from './listFieldMetadata';
 import type {
   SavedViewCreateRequest,
   ColumnConfig as ViewColumnConfig,
