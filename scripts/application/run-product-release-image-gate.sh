@@ -505,6 +505,22 @@ env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" start-web >"$A
 mkdir -p "$STATE_ROOT"; docker logs "$APP_CONTAINER" >"$STATE_ROOT/runtime.log" 2>&1
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTIFACTS/logs/verify.log" 2>&1 || fail 'artifact identity verification failed'
 
+INTERNAL_API_ARTIFACTS="$ARTIFACTS/internal-api"
+mkdir "$INTERNAL_API_ARTIFACTS" || fatal 'internal API evidence must be a fresh directory'
+# The product has already completed its own init/publish lifecycle. Authenticate
+# only for capture; never run the community bootstrap against this database.
+env ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+  python3 "$CORE_ROOT/scripts/ci/capture-internal-document.py" \
+    --base-url "http://127.0.0.1:$APP_PORT" \
+    --output "$INTERNAL_API_ARTIFACTS/openapi.json" \
+    --receipt "$INTERNAL_API_ARTIFACTS/capture.json" \
+    >"$ARTIFACTS/logs/internal-api-capture.log" 2>&1 \
+    || fail 'authenticated release-image internal API capture failed'
+node "$CORE_ROOT/scripts/internal-api/drift.mjs" "$INTERNAL_API_ARTIFACTS/openapi.json" \
+  "$INTERNAL_API_ARTIFACTS/core-drift.json" --core-operations \
+  >"$ARTIFACTS/logs/internal-api-drift.log" 2>&1 \
+  || fail 'release-image Core API operation closure drifted'
+
 env "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts >"$ARTIFACTS/logs/pnpm-install.log" 2>&1 || fatal 'product test dependencies unavailable'
 # Run the locked browser on a supported distribution while retaining the host
 # test driver and fixture processes. Source and dependencies are read-only.
@@ -665,6 +681,22 @@ receipt = {"schemaVersion": 1, "status": "PASS", "product": product,
            "logsRoot": "logs",
            "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()}
 receipt["applicationRelease"] = {"required": expect_release == "1"}
+capture = json.load(open(os.path.join(evidence_root, "internal-api/capture.json")))
+contract = json.load(open(os.path.join(evidence_root, "internal-api/core-drift.json")))
+document_hash = digest("internal-api/openapi.json").removeprefix("sha256:")
+assert capture["verdict"] == contract["verdict"] == "pass"
+assert capture["sessionRevoked"] is True and capture["bootstrapExecuted"] is False
+assert capture["documentSha256"] == contract["observedSha256"] == document_hash
+assert contract["claim"] == "captured-core-operation-closure-drift-only" and contract["coreOperations"] > 0
+receipt["internalCoreContract"] = {
+    "status": "PASS", "claim": contract["claim"], "coreCommit": core, "loadedImageId": image_id,
+    "coreOperations": contract["coreOperations"],
+    "additionalProductOperations": contract["productAdditionalOperations"],
+    "productContractAcceptance": "not-assessed",
+    "document": {"path": "internal-api/openapi.json", "digest": "sha256:" + document_hash},
+    "capture": {"path": "internal-api/capture.json", "digest": digest("internal-api/capture.json")},
+    "comparison": {"path": "internal-api/core-drift.json", "digest": digest("internal-api/core-drift.json")},
+}
 corpus_receipt = os.path.join(evidence_root, "corpus/reconciliation.json")
 if os.path.isfile(corpus_receipt):
     corpus = json.load(open(corpus_receipt))

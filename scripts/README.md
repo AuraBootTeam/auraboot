@@ -350,4 +350,5 @@ These local measurement helpers require an explicitly configured runtime and cre
 
 | `internal-api/foundation.mjs` | contract | Verify canonical spec, generated declarations and the exact registered offline unit denominator; emit a fresh source-bound consistency receipt. |
 | `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
+| `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |
 | `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |
