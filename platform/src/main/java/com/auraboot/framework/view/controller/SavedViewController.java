@@ -28,7 +28,8 @@ import org.springframework.web.bind.annotation.*;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 
 import java.util.List;
-import java.util.Map;
+import com.auraboot.framework.view.dto.DuplicateSavedViewRequest;
+import com.auraboot.framework.view.dto.SavedViewTeamMembershipDTO;
 
 /**
  * SavedView Controller
@@ -285,8 +286,8 @@ public class SavedViewController {
     @RequirePermission(MetaPermission.VIEW_MANAGE)
     public ApiResponse<SavedViewDTO> duplicate(
             @Parameter(description = "Source view PID") @PathVariable @NotBlank String pid,
-            @RequestBody Map<String, String> request) {
-        String newName = request.get("name");
+            @RequestBody DuplicateSavedViewRequest request) {
+        String newName = request.name();
         log.info("Duplicating view: pid={}, newName={}", pid, newName);
 
         if (newName == null || newName.isBlank()) {
@@ -327,9 +328,10 @@ public class SavedViewController {
     @Operation(summary = "Get current user's teams",
             description = "Get teams the current user belongs to, for team view scope selection")
     @RequirePermission(MetaPermission.VIEW_READ)
-    public ApiResponse<List<Map<String, Object>>> getMyTeams() {
+    public ApiResponse<List<SavedViewTeamMembershipDTO>> getMyTeams() {
         log.info("Getting current user's teams for view scope");
-        List<Map<String, Object>> teams = currentUserTeamResolver.resolveCurrentUserTeamMemberships();
+        List<SavedViewTeamMembershipDTO> teams = currentUserTeamResolver.resolveCurrentUserTeamMemberships()
+                .stream().map(SavedViewTeamMembershipDTO::from).toList();
         return ApiResponse.success(teams);
     }
 
