@@ -86,7 +86,7 @@ jobs:
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: >-
-          ./gradlew --no-daemon test
+          ./gradlew --no-daemon :test
           --tests com.auraboot.framework.architecture.CoreAgentBoundaryTest
           --max-workers=2 -PauraTestMaxHeap=2g -PauraTestMinHeap=256m
 
