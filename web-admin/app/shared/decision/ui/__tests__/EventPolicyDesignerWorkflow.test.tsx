@@ -1176,3 +1176,26 @@ describe('EventPolicy locale presentation', () => {
     );
   });
 });
+
+
+describe('EventPolicy operation failures and recovery', () => {
+  it.each(['validate', 'publish', 'run'] as const)('shows %s failure without claiming success and recovers through the same operation', async operation => {
+    const service = api();
+    const method = operation === 'validate' ? service.validatePolicyVersion : operation === 'publish' ? service.publishPolicyVersion : service.runAndExecutePolicy;
+    vi.mocked(method).mockRejectedValueOnce(new Error('Owned operation unavailable'));
+    render(<EventPolicyDesignerWorkflow api={service} fields={FIELDS} selectedPolicy={POLICY} />);
+    if (operation !== 'run') {
+      fireEvent.click(screen.getByTestId('epd-step-publish'));
+      fireEvent.click(screen.getByTestId('epd-save-draft'));
+      await waitFor(() => expect(screen.getByTestId('epd-validate-version')).toBeEnabled());
+    } else fireEvent.click(screen.getByTestId('epd-step-test'));
+    const button = screen.getByTestId(operation === 'run' ? 'epd-run-published' : operation === 'validate' ? 'epd-validate-version' : 'epd-publish-version');
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Owned operation unavailable'));
+    expect(screen.queryByTestId('epd-run-result')).not.toBeInTheDocument();
+    if (operation !== 'run') expect(screen.getByTestId('epd-publish-status')).toHaveTextContent('草稿');
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(method).toHaveBeenCalledTimes(2));
+  });
+});

@@ -655,28 +655,44 @@ export function EventPolicyDesignerWorkflow({
   const validateDraft = async () => {
     if (readOnly) return;
     if (!draftPid) return;
-    const result = await api.validatePolicyVersion(draftPid);
-    setPublishStatus(result.status ?? 'VALIDATED');
+    setError('');
+    try {
+      const result = await api.validatePolicyVersion(draftPid);
+      setPublishStatus(result.status ?? 'VALIDATED');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    }
   };
 
   const publishDraft = async () => {
     if (!canPublish) return;
     if (!draftPid) return;
-    const result = await api.publishPolicyVersion(draftPid);
-    setPublishStatus(result.status ?? 'PUBLISHED');
+    setError('');
+    try {
+      const result = await api.publishPolicyVersion(draftPid);
+      setPublishStatus(result.status ?? 'PUBLISHED');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    }
   };
 
   const runPublishedPolicy = async () => {
     if (!canRun) return;
     if (!selectedPolicy?.eventType || !selectedPolicy.targetType || !selectedPolicy.targetKey)
       return;
-    const result = await api.runAndExecutePolicy({
-      eventType: selectedPolicy.eventType,
-      targetType: selectedPolicy.targetType,
-      targetKey: selectedPolicy.targetKey,
-      context: executionContextForSample(samples[0]),
-    });
-    setRunResult(result);
+    setError('');
+    setRunResult(null);
+    try {
+      const result = await api.runAndExecutePolicy({
+        eventType: selectedPolicy.eventType,
+        targetType: selectedPolicy.targetType,
+        targetKey: selectedPolicy.targetKey,
+        context: executionContextForSample(samples[0]),
+      });
+      setRunResult(result);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    }
   };
 
   return (
@@ -748,6 +764,7 @@ export function EventPolicyDesignerWorkflow({
         ))}
       </nav>
 
+      {error && <div className="epd-state is-error" role="alert" data-testid="epd-error">{error}</div>}
       {step === 'trigger' && (
         <section className="epd-panel" data-testid="epd-trigger-panel">
           <fieldset disabled={readOnly} className="epd-edit-scope">
@@ -1204,11 +1221,7 @@ export function EventPolicyDesignerWorkflow({
             <span>{copy('current_status')}</span>
             <strong data-testid="epd-publish-status">{policyStatusLabel(publishStatus)}</strong>
           </div>
-          {error && (
-            <div className="epd-state is-error" data-testid="epd-error">
-              {error}
-            </div>
-          )}
+
         </section>
       )}
 
