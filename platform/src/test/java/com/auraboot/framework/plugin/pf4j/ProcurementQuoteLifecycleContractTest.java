@@ -91,4 +91,37 @@ class ProcurementQuoteLifecycleContractTest {
         var baseline=input.deepCopy();((ObjectNode)baseline.path("sourceSet")).put("oss","50924063538e4181cb601300f0c26c6bbfcce2f0");assertThrows(AssertionError.class,()->ProcurementQuoteLifecycleNativeIT.validateInput(baseline));
         assertEquals(1,Arrays.stream(ProcurementQuoteLifecycleNativeIT.class.getDeclaredMethods()).filter(m->m.isAnnotationPresent(Test.class)).count());
     }
+    private ObjectNode submissionResponse(JsonNode revision) {
+        var response=json.createObjectNode().put("quotePid","controlled-quote").put("recordPid","controlled-quote")
+                .put("state","submitted").put("submissionPid","controlled-submission");response.set("revision",revision);return response;
+    }
+    @Test void submissionReplayAllowsOnlyCanonicalRevisionNumberStringCompatibility() {
+        var first=submissionResponse(json.getNodeFactory().numberNode(5));var replay=submissionResponse(json.getNodeFactory().textNode("5"));
+        ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(first,replay);
+        ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(replay,first);
+        ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(submissionResponse(json.getNodeFactory().numberNode(0)),submissionResponse(json.getNodeFactory().textNode("0")));
+        ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(submissionResponse(json.getNodeFactory().numberNode(Long.MAX_VALUE)),submissionResponse(json.getNodeFactory().textNode(Long.toString(Long.MAX_VALUE))));
+    }
+    @Test void submissionReplayRejectsNoncanonicalTypesSignsPrecisionAndOverflow() {
+        var first=submissionResponse(json.getNodeFactory().numberNode(5));
+        var invalid=new ArrayList<JsonNode>();
+        for(String value:List.of("", "05", "+5", "-5", "-0", "5.0", "5e0", " 5", "5 ", "9223372036854775808")) invalid.add(json.getNodeFactory().textNode(value));
+        invalid.add(json.getNodeFactory().booleanNode(true));invalid.add(json.getNodeFactory().numberNode(new BigDecimal("5.0")));
+        invalid.add(json.getNodeFactory().numberNode(5.0));invalid.add(json.getNodeFactory().numberNode(-5));
+        invalid.add(json.getNodeFactory().numberNode(new java.math.BigInteger("9223372036854775808")));invalid.add(json.getNodeFactory().nullNode());
+        for(JsonNode value:invalid) assertThrows(AssertionError.class,()->ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(first,submissionResponse(value)),value.getNodeType().name());
+    }
+    @Test void submissionReplayRequiresExactFourOtherFieldsAndExactFieldSet() {
+        var first=submissionResponse(json.getNodeFactory().numberNode(5));
+        for(String field:List.of("quotePid","recordPid","state","submissionPid")) {
+            var altered=first.deepCopy();altered.put(field,"changed");assertThrows(AssertionError.class,()->ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(first,altered),field);
+        }
+        var extra=first.deepCopy();extra.put("ignored",true);assertThrows(AssertionError.class,()->ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(first,extra));
+        var missing=first.deepCopy();missing.remove("recordPid");assertThrows(AssertionError.class,()->ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(first,missing));
+    }
+    @Test void submissionReplayRejectsDifferentRevisionEvenWithMatchingAllIdentities() {
+        var first=submissionResponse(json.getNodeFactory().numberNode(5));
+        assertThrows(AssertionError.class,()->ProcurementQuoteLifecycleNativeIT.assertSubmissionReplay(first,submissionResponse(json.getNodeFactory().textNode("6"))));
+    }
+
 }

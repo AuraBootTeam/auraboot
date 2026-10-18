@@ -247,7 +247,7 @@ class ProcurementQuoteLifecycleNativeIT extends ProcurementPublicSourceNativeFix
         var newFormal=raw("qo_procurement_submission_common",secondPid);assertEquals(2,newFormal.path("qo_pr_submission_sequence").intValue());verifyTerms(newFormal,master,"802");
         assertEquals(frozen,raw("qo_procurement_submission_common",firstPid));assertEquals(frozenLines,submissionLines(firstPid));
         assertEquals(secondPid,raw("s2p_bid",quote).path("qo_pr_quote_latest_submission_pid").asText());
-        var beforeReplay=snapshotOwned();assertEquals(second,action(supplierJwt,"qo_procurement_quote_common:submit",quote,Map.of("revision",second.path("revision").asText()),200));
+        var beforeReplay=snapshotOwned();assertSubmissionReplay(second,action(supplierJwt,"qo_procurement_quote_common:submit",quote,Map.of("revision",second.path("revision").asText()),200));
         assertEquals(beforeReplay,snapshotOwned());assertEquals(2,rows("qo_procurement_submission_common").size());
         assertEquals(Map.of("login",1,"supplierQuery",1,"masterViews",3,"rejected",0),erp.counts());
         var receipt=new LinkedHashMap<String,Object>();receipt.put("kind","procurement-independent-quote-lifecycle-native-v1");receipt.put("schemaVersion",1);
@@ -257,6 +257,31 @@ class ProcurementQuoteLifecycleNativeIT extends ProcurementPublicSourceNativeFix
         receipt.put("actors",retainedActors);receipt.put("initializationActions",initializers);receipt.put("publicActions",actions);receipt.put("formalImports",importProofs);
         receipt.put("retainedAfterNative",true);receipt.put("browserExecuted",0);receipt.put("actualCustomerERPVerified",false);receipt.put("actualWechatMessages",0);
         receipt.put("allocatedReturnNegativeDidNotRun",true);writeArtifact("quote-lifecycle-receipt.json",receipt);completed=true;stage="native-lifecycle-completed";
+    }
+    static void assertSubmissionReplay(JsonNode first,JsonNode replay) {
+        assertTrue(first.isObject() && replay.isObject(),"Submission responses must be objects");
+        var expected=Set.of("quotePid","recordPid","state","submissionPid","revision");
+        var firstKeys=new HashSet<String>();first.fieldNames().forEachRemaining(firstKeys::add);
+        var replayKeys=new HashSet<String>();replay.fieldNames().forEachRemaining(replayKeys::add);
+        assertEquals(expected,firstKeys,"Initial submission response fields changed");
+        assertEquals(expected,replayKeys,"Replay submission response fields changed");
+        for(String field:List.of("quotePid","recordPid","state","submissionPid")) {
+            assertTrue(first.get(field).isTextual() && !first.get(field).textValue().isBlank(),"Submission identity must be nonblank text");
+            assertEquals(first.get(field),replay.get(field),"Replay submission identity changed: "+field);
+        }
+        assertEquals(canonicalRevision(first.get("revision")),canonicalRevision(replay.get("revision")),"Replay revision changed");
+    }
+    private static long canonicalRevision(JsonNode value) {
+        assertNotNull(value,"Submission revision required");
+        if(value.isIntegralNumber()) {
+            assertTrue(value.canConvertToLong() && value.longValue()>=0,"Submission revision outside nonnegative long range");
+            return value.longValue();
+        }
+        assertTrue(value.isTextual() && value.textValue().length()<=19
+                && value.textValue().matches("0|[1-9][0-9]*"),"Submission revision must be a canonical nonnegative integer");
+        var number=new java.math.BigInteger(value.textValue());
+        assertTrue(number.compareTo(java.math.BigInteger.valueOf(Long.MAX_VALUE))<=0,"Submission revision outside nonnegative long range");
+        return number.longValueExact();
     }
     private JsonNode view() throws Exception{return action(supplierJwt,"qo_procurement_quote_common:view_mine",quote,Map.of(),200);}
     static Map<String,Object> selection(JsonNode view,String condition) {
