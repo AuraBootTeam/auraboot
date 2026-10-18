@@ -409,6 +409,23 @@
           "path": "/api/user/sessions/{sessionPid}"
         }
       ]
+    },
+    "departmentTreeWire": {
+      "purpose": "Owned recursive department full/permitted tree read structures and nullable roots; not picker browser or cross-tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/department-tree.spec.ts",
+      "tests": [
+        "generated department tree reads preserve recursive public identities and nullable roots"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/org/departments/tree"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/departments/permitted-tree"
+        }
+      ]
     }
   },
   "scenarios": [

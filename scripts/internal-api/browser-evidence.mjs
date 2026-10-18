@@ -31,7 +31,7 @@ function auditObservation(name, value) {
   if (value.sessionCleanup) sessionTree(value.sessionCleanup);
   const sessionRequired = ['profile-wire-observations','profile-email-only-observations','saved-view-wire-observations',
     'saved-view-browser-observations','team-wire-observations','team-browser-observations','team-role-observations',
-    'session-operation-observations','tenant-member-search-observations','session-compatibility-evidence'];
+    'session-operation-observations','tenant-member-search-observations','session-compatibility-evidence','department-tree-observations'];
   if (sessionRequired.includes(name)) requireCondition(Array.isArray(value.sessionCleanup) && value.sessionCleanup.length > 0, `Missing owned session cleanup: ${name}`);
   const rows = value.rows ?? value.reads ?? value.checks;
   requireCondition(Array.isArray(rows) && rows.length > 0, `Empty operation observations: ${name}`);

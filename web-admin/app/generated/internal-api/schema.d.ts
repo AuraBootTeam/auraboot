@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 84dc0843ffe0e048c8f521ca09c919cf804b5d8a9dc24bfe15578b9987974dac
+ * Contract SHA-256: 2f5963dd8857f3dee2758c907aa50acbf7a3f503034a817224c4589043c351e6
  */
 export interface paths {
     "/api/activities": {
@@ -30288,12 +30288,12 @@ export interface components {
             canDelete?: boolean;
         };
         DepartmentTreeNode: {
-            children?: components["schemas"]["DepartmentTreeNode"][];
+            children: components["schemas"]["DepartmentTreeNode"][];
             /** Format: int32 */
-            employeeCount?: number;
-            name?: string;
-            parentPid?: string;
-            pid?: string;
+            employeeCount: number;
+            name: string;
+            parentPid: string | null;
+            pid: string;
         };
         DependencyAnalysis: {
             missingDependencies?: string[];

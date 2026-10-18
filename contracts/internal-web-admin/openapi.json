@@ -23796,12 +23796,22 @@
             "type": "string"
           },
           "parentPid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pid": {
             "type": "string"
           }
         },
+        "required": [
+          "children",
+          "employeeCount",
+          "name",
+          "parentPid",
+          "pid"
+        ],
         "type": "object"
       },
       "DependencyAnalysis": {
