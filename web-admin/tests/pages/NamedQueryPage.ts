@@ -188,6 +188,8 @@ export class NamedQueryPage extends BasePage {
     description?: string,
     fromSql?: string,
   ): Promise<void> {
+    // Monaco mounts in a client effect, so this also proves the form has hydrated.
+    await expect(this.fromSqlInput.locator('.monaco-editor')).toBeVisible({ timeout: 15000 });
     await this.codeInput.click();
     await this.codeInput.fill(code);
 
@@ -201,43 +203,19 @@ export class NamedQueryPage extends BasePage {
     if (fromSql !== undefined) {
       await this.fillFromSql(fromSql);
     }
+    await expect(this.codeInput).toHaveValue(code);
+    await expect(this.titleInput).toHaveValue(title);
   }
 
-  /** Fill the fromSql Monaco Editor field */
+  /** Type through the visible editor and observe its controlled value. */
   async fillFromSql(value: string): Promise<void> {
     const field = this.fromSqlInput;
-    await expect(field).toBeVisible({ timeout: 5000 });
-
-    // SqlEditor exposes a hidden testability input[data-testid="sql-editor-value"].
-    // Wait until editor mounts to avoid submitting with empty SQL.
-    const testInput = field.locator('[data-testid="sql-editor-value"]').first();
-    const hasTestInput = await testInput
-      .waitFor({ state: 'attached', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (hasTestInput) {
-      // Use native setter + input event to trigger React state update.
-      await testInput.evaluate((node, text) => {
-        const input = node as HTMLInputElement;
-        if (input) {
-          const nativeSetter = Object.getOwnPropertyDescriptor(
-            HTMLInputElement.prototype,
-            'value',
-          )!.set!;
-          nativeSetter.call(input, text);
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }, value);
-      await expect(testInput).toHaveValue(value);
-    } else {
-      // Fallback: try any textarea (SSR fallback of SqlEditor)
-      const textarea = field.locator('textarea').first();
-      const hasTextarea = await textarea.isVisible({ timeout: 3000 }).catch(() => false);
-      if (hasTextarea) {
-        await textarea.fill(value);
-      }
-    }
+    const editor = field.locator('.monaco-editor');
+    await expect(editor).toBeVisible({ timeout: 15000 });
+    await editor.click();
+    await this.page.keyboard.press('ControlOrMeta+A');
+    await this.page.keyboard.insertText(value);
+    await expect(field.getByTestId('sql-editor-value')).toHaveValue(value);
   }
 
   /** Observe the create endpoint itself; validation responses are not creation evidence. */

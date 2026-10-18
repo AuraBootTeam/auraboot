@@ -8,6 +8,9 @@
 
 import React, { useState, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
+import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
 import {
   parseFieldShorthand,
   resolveLocalizedText,
@@ -184,6 +187,7 @@ const FieldItem: React.FC<FieldItemProps> = ({
   showAdvanced,
   readonly,
 }) => {
+  const { locale } = useI18n();
   return (
     <div
       className="overflow-hidden rounded-md border border-gray-200"
@@ -320,6 +324,7 @@ const FieldItem: React.FC<FieldItemProps> = ({
             <label className="mb-1 block text-xs text-gray-500">占位文本</label>
             <input
               type="text"
+              data-testid={`field-item-placeholder-${field.field}`}
               value={resolveLocalizedText(field.placeholder) || ''}
               onChange={(e) => onUpdate({ placeholder: e.target.value || undefined })}
               disabled={readonly}
@@ -327,6 +332,14 @@ const FieldItem: React.FC<FieldItemProps> = ({
               placeholder="请输入..."
             />
           </div>
+
+          <LocalizedTextInput
+            label={getLocalizedText({ 'zh-CN': '帮助说明', 'en-US': 'Help text' }, locale)}
+            value={field.props?.helpText as LocalizedTextValue}
+            onChange={(helpText) => onUpdate({ props: { ...field.props, helpText: helpText ?? undefined } })}
+            disabled={readonly}
+            testId={`field-item-help-${field.field}`}
+          />
 
           {/* Visible */}
           <div>

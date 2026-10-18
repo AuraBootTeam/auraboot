@@ -180,6 +180,7 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
         <input
           type="text"
           value={zh}
+          aria-label={label ? `${label} (${l('中文', 'Chinese')})` : undefined}
           onChange={(e) => handleLocaleChange('zh-CN', e.target.value)}
           placeholder={
             i18nMode
@@ -201,6 +202,7 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
           <input
             type="text"
             value={en}
+            aria-label={label ? `${label} (${l('英文', 'English')})` : undefined}
             onChange={(e) => handleLocaleChange('en-US', e.target.value)}
             placeholder={l('英文', 'English')}
             disabled={disabled}
