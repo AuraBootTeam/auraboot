@@ -46,7 +46,86 @@
       "spec": "web-admin/tests/e2e/model/internal-api-dictionary.spec.ts",
       "tests": [
         "generated dictionary operations preserve the UI journey",
-        "anonymous dictionary navigation and API access are refused"
+        "anonymous dictionary navigation and API access are refused",
+        "generated dictionary data supplies labels to the real DSL team list"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/meta/dict"
+        },
+        {
+          "method": "post",
+          "path": "/api/meta/dict"
+        },
+        {
+          "method": "delete",
+          "path": "/api/meta/dict/batch"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/by-code/{code}"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/by-code/{code}/data"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/code/{code}/unique"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/search"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/statistics"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{code}/validate"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{code}/versions"
+        },
+        {
+          "method": "delete",
+          "path": "/api/meta/dict/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}"
+        },
+        {
+          "method": "put",
+          "path": "/api/meta/dict/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}/cascade/children"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}/cascade/tree"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}/data"
+        },
+        {
+          "method": "put",
+          "path": "/api/meta/dict/{pid}/items"
+        },
+        {
+          "method": "post",
+          "path": "/api/meta/dict/{pid}/publish"
+        },
+        {
+          "method": "post",
+          "path": "/api/meta/dict/{pid}/unpublish"
+        }
       ]
     }
   },
@@ -176,6 +255,19 @@
       "expected": "Unpublish returns deprecated, displays the shared status badge and offers the producer-supported publish action",
       "test": "generated dictionary operations preserve the UI journey",
       "screenshot": "DICT-10-deprecated-republish.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-11",
+      "feature": "dictionary",
+      "action": "dsl-dictionary-label",
+      "branch": "happy",
+      "expected": "The actual organization menu displays a fresh owned team with the generated dictionary label and semantic color instead of its raw stored status code",
+      "test": "generated dictionary data supplies labels to the real DSL team list",
+      "screenshot": "DICT-11-dsl-team-label.png",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",

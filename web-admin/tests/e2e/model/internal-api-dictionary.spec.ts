@@ -234,3 +234,59 @@ test('anonymous dictionary navigation and API access are refused', async ({ page
   expect([401, 403]).toContain(denied.status());
   await capture('DICT-06', page, info);
 });
+
+test('generated dictionary data supplies labels to the real DSL team list', async ({
+  page,
+}, info) => {
+  test.setTimeout(60_000);
+  const login = new LoginPage(page);
+  await login.gotoRoot();
+  await login.waitForFormReady();
+  await login.login(DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await login.expectLoggedIn();
+  const code = uniqueId('e2e_contract_team');
+  const name = `契约标签 ${code.split('_').at(-1)}`;
+  const created = await page.request.post('/api/org/teams', { data: { code, name } });
+  expect(created.status()).toBe(200);
+  const fixture = await created.json();
+  expect(fixture.code).toBe('0');
+  expect(typeof fixture.data.pid).toBe('string');
+  const pid: string = fixture.data.pid;
+  try {
+    const menu = page.locator('nav a[href="/organization/teams"]');
+    const organization = page
+      .locator('nav')
+      .getByRole('button', { name: /组织管理/ })
+      .first();
+    await expect(organization).toBeVisible();
+    if (!(await menu.isVisible())) await organization.click();
+    const dictionaryResponse = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/meta/dict/by-code/org_team_status/data',
+      { timeout: 20_000 },
+    );
+    await menu.click();
+    const dictionary = await dictionaryResponse;
+    expect(dictionary.status()).toBe(200);
+    const payload = await dictionary.json();
+    expect(payload.code).toBe('0');
+    expect(payload.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          value: 'active',
+          label: '启用',
+          extension: expect.objectContaining({ color: 'green' }),
+        }),
+      ]),
+    );
+    const row = page.locator('tbody tr').filter({ hasText: name });
+    await expect(row).toBeVisible();
+    await expect(row.getByText('启用', { exact: true })).toBeVisible();
+    await expect(row).not.toContainText(/\bactive\b/);
+    await capture('DICT-11', page, info);
+  } finally {
+    const removed = await page.request.delete(`/api/org/teams/${pid}`);
+    expect(removed.status()).toBe(200);
+    expect((await removed.json()).code).toBe('0');
+  }
+});

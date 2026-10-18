@@ -3,7 +3,7 @@ import path from 'node:path';
 import { run } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { canonicalJson, normalizeDocument, operations, requireCondition, sha256 } from './contract.mjs';
+import { canonicalJson, normalizeDocument, operations, requireCondition, selectOperations, sha256 } from './contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -46,6 +46,12 @@ export async function main(args) {
     requireCondition(raw === canonicalJson(document), 'Committed internal API snapshot is not canonical');
     result.contractSha256 = sha256(raw);
     result.operations = operations(document).length;
+    result.selectedProfiles = [];
+    for (const [name, item] of Object.entries(catalog.profiles)) {
+      if (!item.operations) continue;
+      const selected = selectOperations(document, item.operations);
+      result.selectedProfiles.push({ name, operations: operations(selected).length });
+    }
     result.toolchainLockSha256 = sha256(fs.readFileSync(path.join(root, 'scripts/internal-api/toolchain/package-lock.json')));
     const command = (name, script, values) => {
       execFileSync(process.execPath, [script, ...values], { cwd: root, stdio: 'pipe', timeout: 120_000 });

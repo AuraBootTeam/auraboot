@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
@@ -159,11 +161,7 @@ import {
 import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
 
 // Dict data item type
-interface DictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, any>;
-}
+type DictItem = Pick<import('~/types/dict').DictItemData, 'value' | 'label' | 'extension'>;
 
 interface DynamicEntity {
   [key: string]: any;
@@ -2203,15 +2201,12 @@ function ListPageContentInner(props: PageContentProps) {
     const loadDictData = async () => {
       const promises = unloadedCodes.map(async (code: string) => {
         try {
-          const result = await fetchResult(`/api/meta/dict/by-code/${code}/data`, {
-            method: 'get',
-            token: token || undefined,
+          const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+            path: { code },
+            options: { token: token || undefined },
           });
-          if (ResultHelper.isSuccess(result) && result.data) {
-            // Adapt dict data format
-            const data = result.data as { items?: DictItem[] } | DictItem[];
-            const items: DictItem[] = Array.isArray(data) ? data : data.items || [];
-            dictDataCache.current.set(code, items);
+          if (result.code === '0' && result.data) {
+            dictDataCache.current.set(code, dictionaryData(result.data).items);
           }
         } catch (error) {
           console.error(`[ListPageContent] Failed to load dict: ${code}`, error);
@@ -3526,9 +3521,9 @@ function ListPageContentInner(props: PageContentProps) {
             // to render a leading icon instead of the semantic color dot.
             return (
               <StatusDot
-                tone={resolveStatusTone(item.extension?.color)}
+                tone={resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined)}
                 label={item.label}
-                icon={(item.extension as any)?.icon}
+                icon={typeof item.extension?.icon === 'string' ? item.extension.icon : undefined}
               />
             );
           }

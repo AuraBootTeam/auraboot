@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * Resource Select Service
  *
@@ -68,14 +70,6 @@ interface FieldRecord {
   dictCode?: string;
 }
 
-interface DictItemRecord {
-  items: Array<{
-    value: string;
-    label: string;
-    description?: string;
-  }>;
-}
-
 export async function fetchPageOptions(): Promise<ResourceOption[]> {
   const result = await fetchResult<PageRecord>('/api/pages?size=100');
   return (result?.data?.records || []).map((p) => ({
@@ -95,11 +89,8 @@ export async function fetchDashboardOptions(): Promise<ResourceOption[]> {
 }
 
 export async function fetchWorkflowOptions(): Promise<ResourceOption[]> {
-  const provider = getKernel().contributionRegistry.getPrimaryService(
-    'aura.resource.workflow',
-  )?.provider as
-    | { fetchOptions?: () => Promise<ResourceOption[]> }
-    | undefined;
+  const provider = getKernel().contributionRegistry.getPrimaryService('aura.resource.workflow')
+    ?.provider as { fetchOptions?: () => Promise<ResourceOption[]> } | undefined;
   // Product packages own workflow discovery. An absent capability is empty;
   // errors from a registered provider must propagate to the caller.
   return provider?.fetchOptions ? provider.fetchOptions() : [];
@@ -156,7 +147,10 @@ export async function fetchFieldOptions(modelCode: string): Promise<ResourceOpti
 }
 
 /** Resolve the selected model field's dictionary; field codes are not dictionary codes. */
-export async function fetchFieldDictOptions(modelCode: string, fieldCode: string): Promise<ResourceOption[]> {
+export async function fetchFieldDictOptions(
+  modelCode: string,
+  fieldCode: string,
+): Promise<ResourceOption[]> {
   if (!modelCode || !fieldCode) return [];
   const fields = await fetchFieldOptions(modelCode);
   const dictCode = fields.find((field) => field.value === fieldCode)?.dictCode;
@@ -166,13 +160,12 @@ export async function fetchFieldDictOptions(modelCode: string, fieldCode: string
 
 export async function fetchDictOptions(dictCode: string): Promise<ResourceOption[]> {
   if (!dictCode) return [];
-  const result = await fetchResult<DictItemRecord>(
-    `/api/meta/dict/by-code/${encodeURIComponent(dictCode)}/data`,
-  );
-  if (result?.code != null && String(result.code) !== '0') {
+  const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+    path: { code: dictCode },
+  });
+  if (result.code !== '0' || !result.data)
     throw new Error('Dictionary options could not be loaded');
-  }
-  return (result?.data?.items || []).map((item) => ({
+  return dictionaryData(result.data).items.map((item) => ({
     label: item.label || item.value,
     value: item.value,
     description: item.description,
