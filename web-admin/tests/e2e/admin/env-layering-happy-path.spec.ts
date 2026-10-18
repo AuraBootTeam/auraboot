@@ -101,8 +101,19 @@ async function deleteEnvironmentViaUi(page: Page, code: string) {
   await dialog.accept();
   await clickPromise;
   const response = await responsePromise;
-  expect(response.ok(), `DELETE ${code} should return 2xx`).toBeTruthy();
-  await expect(envCard(page, code)).toHaveCount(0, { timeout: 10_000 });
+  expect(response.status()).toBe(200);
+  expect(String((await response.json()).code)).toBe('0');
+  const remaining = await page.request.get('/api/admin/environments');
+  expect(remaining.status()).toBe(200);
+  const persisted = await remaining.json();
+  expect(String(persisted.code)).toBe('0');
+  expect(persisted.data.some((env: { code: string }) => env.code === code)).toBe(false);
+  const reloadedList = page.waitForResponse(r =>
+    new URL(r.url()).pathname === '/api/admin/environments' && r.request().method() === 'GET');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  expect(String((await (await reloadedList).json()).code)).toBe('0');
+  await expect(page.getByTestId('env-list-grid')).toBeVisible();
+  await expect(envCard(page, code)).toHaveCount(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +251,7 @@ test.describe('Env-layering happy path', () => {
     await expect(page.locator('a', { hasText: 'Back to Environments' })).toBeVisible();
   });
 
-  test('EL-007 cleanup: delete the test envs (D11)', async ({ page }) => {
+  test('EL-007 cleanup: delete the test envs (D11)', async ({ page }, info) => {
     // Delete staging first (no dependency)
     await deleteEnvironmentViaUi(page, STAGING_CODE);
 
@@ -248,5 +259,6 @@ test.describe('Env-layering happy path', () => {
 
     // Delete dev
     await deleteEnvironmentViaUi(page, DEV_CODE);
+    await page.screenshot({ path: info.outputPath('EL-007-persisted-deletion.png'), fullPage: true });
   });
 });
