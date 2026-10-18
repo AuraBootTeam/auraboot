@@ -12,7 +12,7 @@ afterEach(cleanup);
 
 function Controlled({ readonly = false }: { readonly?: boolean }) {
   const [fields, setFields] = useState<DslFieldRef[]>([{
-    field: 'name', required: true, props: {
+    field: 'name', required: true, placeholder: { 'zh-CN': '名称', 'en-US': 'Name' }, props: {
       maxLength: 80, helpText: { 'zh-CN': '原说明', 'en-US': 'Original help' },
     },
   }]);
@@ -22,6 +22,18 @@ function Controlled({ readonly = false }: { readonly?: boolean }) {
 
 describe('field help text authoring', () => {
   for (const locale of ['zh-CN', 'en-US']) {
+    it(`${locale} authors localized placeholders without replacing guidance or validation`, () => {
+      fixture.locale = locale;
+      render(<Controlled />);
+      fireEvent.click(screen.getByTestId('field-item-header-name'));
+      fireEvent.change(screen.getByTestId('field-item-placeholder-name-zh'), { target: { value: '记录名称' } });
+      fireEvent.change(screen.getByTestId('field-item-placeholder-name-en'), { target: { value: 'Record name' } });
+      expect(JSON.parse(screen.getByTestId('saved-fields').textContent!)).toEqual([{
+        field: 'name', required: true, placeholder: { 'zh-CN': '记录名称', 'en-US': 'Record name' }, props: {
+          maxLength: 80, helpText: { 'zh-CN': '原说明', 'en-US': 'Original help' },
+        },
+      }]);
+    });
     it(`${locale} updates both translations while preserving other field properties`, () => {
       fixture.locale = locale;
       const view = render(<Controlled />);
@@ -34,7 +46,7 @@ describe('field help text authoring', () => {
       fireEvent.change(zh, { target: { value: '新的说明' } });
       fireEvent.change(en, { target: { value: 'Updated help' } });
       expect(JSON.parse(screen.getByTestId('saved-fields').textContent!)).toEqual([{
-        field: 'name', required: true, props: {
+        field: 'name', required: true, placeholder: { 'zh-CN': '名称', 'en-US': 'Name' }, props: {
           maxLength: 80, helpText: { 'zh-CN': '新的说明', 'en-US': 'Updated help' },
         },
       }]);
@@ -48,6 +60,7 @@ describe('field help text authoring', () => {
     fixture.locale = 'en-US';
     render(<Controlled readonly />);
     fireEvent.click(screen.getByTestId('field-item-header-name'));
+    expect(screen.getByTestId('field-item-placeholder-name-zh')).toBeDisabled();
     expect(screen.getByTestId('field-item-help-name-zh')).toBeDisabled();
     expect(screen.getByTestId('field-item-help-name-en')).toBeDisabled();
     expect(screen.getByTestId('field-item-help-name-toggle')).toBeDisabled();

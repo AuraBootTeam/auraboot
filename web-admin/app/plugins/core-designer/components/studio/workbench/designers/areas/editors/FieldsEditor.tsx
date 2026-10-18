@@ -13,7 +13,6 @@ import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/utils/i18n';
 import {
   parseFieldShorthand,
-  resolveLocalizedText,
   type DslFieldRef,
   type DslFieldOverride,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
@@ -319,19 +318,13 @@ const FieldItem: React.FC<FieldItemProps> = ({
             />
           </div>
 
-          {/* Placeholder */}
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">占位文本</label>
-            <input
-              type="text"
-              data-testid={`field-item-placeholder-${field.field}`}
-              value={resolveLocalizedText(field.placeholder) || ''}
-              onChange={(e) => onUpdate({ placeholder: e.target.value || undefined })}
-              disabled={readonly}
-              className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm"
-              placeholder="请输入..."
-            />
-          </div>
+          <LocalizedTextInput
+            label={getLocalizedText({ 'zh-CN': '占位文本', 'en-US': 'Placeholder' }, locale)}
+            value={field.placeholder}
+            onChange={(placeholder) => onUpdate({ placeholder: placeholder ?? undefined })}
+            disabled={readonly}
+            testId={`field-item-placeholder-${field.field}`}
+          />
 
           <LocalizedTextInput
             label={getLocalizedText({ 'zh-CN': '帮助说明', 'en-US': 'Help text' }, locale)}

@@ -30,26 +30,20 @@ test.describe('Named Query Management', () => {
   let queryCode: string | null = null;
   const testCode = generateCode();
   const testTitle = 'E2E Lifecycle Test';
-  const testFromSql = 'ab_meta_model';
+  const fixtureTitle = generateCode('nq_source');
+  const testFromSql = `SELECT pid FROM mt_e2et_order WHERE e2et_order_title = '${fixtureTitle}'`;
+  let fixturePid: string;
 
-  async function resolveExecutableQueryCode(
-    page: import('@playwright/test').Page,
-  ): Promise<string> {
-    if (queryCode) return queryCode;
-
-    const listResp = await page.request.get(
-      '/api/meta/named-queries?pageSize=20&sortBy=createdAt&sortOrder=desc',
-    );
-    expect(listResp.ok()).toBe(true);
-    const listBody = await listResp.json();
-    const records = listBody.data?.data || listBody.data?.records || [];
-    const found = records.find((r: any) => r.code === testCode);
-    if (found?.code) {
-      return String(found.code);
-    }
-
-    return 'crm_dashboard_kpi';
-  }
+  test.beforeAll(async ({ request }) => {
+    const response = await request.post('/api/dynamic/e2et_order/create', {
+      data: { e2et_order_title: fixtureTitle, e2et_order_type: 'normal', e2et_order_status: 'draft', e2et_order_urgent: false },
+    });
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    fixturePid = body.data.pid;
+    expect(fixturePid).toEqual(expect.any(String));
+  });
 
   // =====================================================================
   // List page
@@ -164,24 +158,18 @@ test.describe('Named Query Management', () => {
     }
 
     // Add field via API
-    await page.request
-      .post(`/api/meta/named-queries/${queryCode}/fields`, {
-        data: {
-          fieldCode: 'code',
-          columnExpr: 'code',
-          dataType: 'string',
-          sortable: true,
-          searchable: true,
-        },
-      })
-      .catch(() => {}); // ignore if exists
+    const added = await page.request.post(`/api/meta/named-queries/${queryCode}/fields`, {
+      data: { fieldCode: 'pid', columnExpr: 'pid', dataType: 'string', sortable: true, searchable: true },
+    });
+    expect(added.ok()).toBe(true);
+    expect(String((await added.json()).code)).toBe('0');
 
     // View in UI
     const nq = new NamedQueryPage(page);
     await nq.gotoEditTab(queryPid!, 'fields');
 
     // Verify field is shown
-    await expect(page.getByText('code').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('table tbody tr').filter({ hasText: 'pid' })).toBeVisible({ timeout: 5000 });
   });
 
   // =====================================================================
@@ -385,7 +373,8 @@ test.describe('Named Query Management', () => {
    * NQ-E14: Test query execution via API (published state)
    */
   test('NQ-E14: Test query execution', async ({ page }) => {
-    const codeToExecute = await resolveExecutableQueryCode(page);
+    expect(queryCode).toBeTruthy();
+    const codeToExecute = queryCode;
 
     const resp = await page.request.post(`/api/meta/named-queries/${codeToExecute}/execute`, {
       data: {
@@ -396,8 +385,9 @@ test.describe('Named Query Management', () => {
 
     expect(resp.ok()).toBe(true);
     const result = await resp.json();
-    expect(result.data.total).toBeGreaterThan(0);
-    expect((result.data.records ?? result.data.data ?? []).length).toBeGreaterThan(0);
+    expect(String(result.code)).toBe('0');
+    expect(result.data.total).toBe(1);
+    expect(result.data.records).toEqual([expect.objectContaining({ pid: fixturePid })]);
   });
 
   // =====================================================================
@@ -412,10 +402,12 @@ test.describe('Named Query Management', () => {
       throw new Error(String('Named query not created - NQ-E02 failed'));
     }
 
-    const resp = await page.request.get(`/api/datasource/list?datasourceId=nq:${queryCode}`);
+    const resp = await page.request.get('/api/datasource/list', {
+      params: { datasourceId: `nq:${queryCode}`, valueField: 'pid', labelField: 'pid' },
+    });
     expect(resp.ok()).toBe(true);
     const result = await resp.json();
-    expect(result.data.length).toBeGreaterThan(0);
+    expect(result.data).toEqual([expect.objectContaining({ value: fixturePid, label: fixturePid })]);
   });
 
   // =====================================================================
@@ -506,7 +498,7 @@ test.describe('Named Query Management', () => {
           .catch(() => {});
 
         if (queryCode) {
-          await request.delete(`/api/meta/named-queries/${queryCode}/fields/code`);
+          await request.delete(`/api/meta/named-queries/${queryCode}/fields/pid`);
         }
         await request.delete(`/api/meta/named-queries/${queryPid}`);
       } catch (error) {

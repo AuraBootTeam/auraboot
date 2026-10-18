@@ -34,7 +34,12 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, findRowInPaginatedList, queryFilteredList } from '../helpers/index';
 import { gotoAcpUiPage } from './route-helpers';
-import dictionaries from '../../../../plugins/agent-control-plane/config/dicts.json';
+import { readFileSync } from 'node:fs';
+
+const dictionaries = JSON.parse(readFileSync(new URL('../../../../plugins/agent-control-plane/config/dicts.json', import.meta.url), 'utf8')) as Array<{
+  code: string;
+  items?: Array<{ value: string; 'label:zh-CN'?: string }>;
+}>;
 
 // ---------------------------------------------------------------------------
 // Constants

@@ -244,18 +244,29 @@ for (const locale of ['zh-CN', 'en-US'] as const) {
     test('TM-recovery: a failed member request requires explicit retry before adding', async ({ page }, info) => {
       const team = await createTeam(page, 'recovery');
       let fail = true;
-      await page.route(`**/api/org/teams/${team.pid}/members`, route => fail ? route.abort('failed') : route.continue());
-      await openTeam(page, team, locale);
-      await expect(page.getByTestId('team-members-load-error')).toBeVisible();
-      await expect(page.getByTestId('team-members-add')).toBeDisabled();
-      await capture(page, info, `tm-recovery-${locale}.png`);
-      fail = false;
-      const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/org/teams/${team.pid}/members`);
-      await page.getByTestId('team-members-retry').click();
-      await success<Member[]>(await response);
-      await expect(page.getByTestId('team-members-load-error')).toHaveCount(0);
-      await expect(page.getByTestId('team-members-add')).toBeEnabled();
-      await capture(page, info, `tm-recovered-${locale}.png`);
+      let finishLoading!: () => void;
+      const loading = new Promise<void>(resolve => { finishLoading = resolve; });
+      await page.route(`**/api/org/teams/${team.pid}/members`, async route => {
+        if (fail) { await loading; await route.abort('failed'); }
+        else await route.continue();
+      });
+      try {
+        await openTeam(page, team, locale);
+        await expect(memberSection(page, locale).getByRole('status')).toBeVisible();
+        await expect(page.getByTestId('team-members-add')).toBeDisabled();
+        await capture(page, info, `tm-loading-${locale}.png`);
+        finishLoading();
+        await expect(page.getByTestId('team-members-load-error')).toBeVisible();
+        await expect(page.getByTestId('team-members-add')).toBeDisabled();
+        await capture(page, info, `tm-recovery-${locale}.png`);
+        fail = false;
+        const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/org/teams/${team.pid}/members`);
+        await page.getByTestId('team-members-retry').click();
+        await success<Member[]>(await response);
+        await expect(page.getByTestId('team-members-load-error')).toHaveCount(0);
+        await expect(page.getByTestId('team-members-add')).toBeEnabled();
+        await capture(page, info, `tm-recovered-${locale}.png`);
+      } finally { finishLoading(); }
     });
   });
 }

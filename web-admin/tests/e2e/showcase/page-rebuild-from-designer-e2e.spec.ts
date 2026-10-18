@@ -37,7 +37,7 @@
  *     the hand-authored reference.
  */
 
-import { test, expect, type Page } from '../../fixtures';
+import { test, expect, type Page, type Locator } from '../../fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -78,7 +78,7 @@ interface RefBlock {
     readOnly?: boolean;
     required?: boolean;
     visibleWhen?: string;
-    props?: { placeholder?: string; helpText?: string | Record<string, string> };
+    props?: { placeholder?: string | Record<string, string>; helpText?: string | Record<string, string> };
   }>;
   extension?: { collapsible?: boolean; defaultCollapsed?: boolean };
   buttons?: any[];
@@ -468,6 +468,18 @@ async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promi
   }
 }
 
+async function setLocalizedFieldText(panel: Locator, prefix: string, value: string | Record<string, string>): Promise<void> {
+  const zh = typeof value === 'string' ? value : value['zh-CN'];
+  const en = typeof value === 'string' ? undefined : value['en-US'];
+  if (en) await panel.getByTestId(`${prefix}-toggle`).click();
+  await panel.getByTestId(`${prefix}-zh`).fill(zh);
+  await expect(panel.getByTestId(`${prefix}-zh`)).toHaveValue(zh);
+  if (en) {
+    await panel.getByTestId(`${prefix}-en`).fill(en);
+    await expect(panel.getByTestId(`${prefix}-en`)).toHaveValue(en);
+  }
+}
+
 /**
  * Configure per-field overrides via the in-panel FieldsEditor. Each FieldItem
  * exposes data-testid-keyed controls so we don't have to fish through the
@@ -527,22 +539,15 @@ async function configureFieldOverride(
   }
 
   if (field.props?.placeholder !== undefined) {
-    await panel.getByTestId(`field-item-placeholder-${field.field}`).fill(field.props.placeholder);
+    await setLocalizedFieldText(panel, `field-item-placeholder-${field.field}`, field.props.placeholder);
+    if (field.field === 'sc_owner_user') {
+      await panel.screenshot({ path: test.info().outputPath('rebuild-field-placeholder-zh-CN.png') });
+    }
   }
   if (field.props?.helpText !== undefined) {
-    const help = field.props.helpText;
-    const zh = typeof help === 'string' ? help : help['zh-CN'];
-    const en = typeof help === 'string' ? undefined : help['en-US'];
-    const prefix = `field-item-help-${field.field}`;
-    if (en) await panel.getByTestId(`${prefix}-toggle`).click();
-    await panel.getByTestId(`${prefix}-zh`).fill(zh);
-    await expect(panel.getByTestId(`${prefix}-zh`)).toHaveValue(zh);
-    if (en) {
-      await panel.getByTestId(`${prefix}-en`).fill(en);
-      await expect(panel.getByTestId(`${prefix}-en`)).toHaveValue(en);
-    }
+    await setLocalizedFieldText(panel, `field-item-help-${field.field}`, field.props.helpText);
     if (field.field === 'sc_name') {
-      await panel.screenshot({ path: test.info().outputPath('rebuild-field-help-zh.png') });
+      await panel.screenshot({ path: test.info().outputPath('rebuild-field-help-zh-CN.png') });
     }
   }
 
@@ -725,7 +730,7 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
         }
         await expect(initialSwitch).toHaveAttribute('aria-checked', String(initialCollapsed));
         if (refSection.id === 'state_plan') {
-          await panel.screenshot({ path: test.info().outputPath('rebuild-section-behavior.png') });
+          await panel.screenshot({ path: test.info().outputPath('rebuild-section-behavior-zh-CN.png') });
         }
       }
       await panel.getByTestId('property-group-basic').click();
