@@ -553,7 +553,7 @@ class ProcurementControlledOrderNativeIT extends ProcurementPublicSourceNativeFi
         for(int index=0;index<count;index++) {
             String supplier=supplierPids.get(index);var item=directory.path("items").get(index);assertEquals(1,item.path("contacts").size());String contact=item.path("contacts").get(0).path("contactPid").asText();
             var bids=fixture(SYNC,()->db.query("s2p_bid",Map.of("s2p_bid_sourcing_event_id",task,"s2p_bid_supplier_id",supplier)));assertEquals(1,bids.size());String quote=pid(bids.getFirst());
-            String key=provider+"-"+stage+"-supplier-"+index;var user=users.signUp(key+"@example.invalid",required("PROCUREMENT_ORDER_UI_FIXTURE_PASSWORD"),"Current controlled supplier",key);
+            String key=supplierActorKey(provider,stage,index);var user=users.signUp(key+"@example.invalid",required("PROCUREMENT_ORDER_UI_FIXTURE_PASSWORD"),"Current controlled supplier",key);
             var member=members.addMember(user.getId(),tenant,"active");
             initializedCreate("qo_procurement_membership_common",Map.of("qo_pr_membership_key",key,"qo_pr_membership_user_pid",user.getPid(),"qo_pr_membership_supplier_pid",supplier,"qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active"));
             String jwt=exactSupplierActor(user.getId(),user.getPid(),member.getId(),member.getPid(),user.getEmail());supplierIdentities.getLast().put("supplierPid",supplier);supplierIdentities.getLast().put("contactPid",contact);
@@ -840,6 +840,12 @@ class ProcurementControlledOrderNativeIT extends ProcurementPublicSourceNativeFi
 
     private static String digest(byte[] bytes) throws Exception {
         return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+    }
+    static String supplierActorKey(String provider,String stage,int index) {
+        assertNotNull(provider);assertTrue(provider.matches("ps_[0-9a-f]{24}"));
+        int stageIndex=List.of("pending","failed","unknown","mixed","createSuccess","unknownCreation","concurrentCreation","partialCreation").indexOf(stage);
+        assertTrue(stageIndex>=0,"A known order fixture stage is required");assertTrue(index>=0 && index<2,"Supplier fixture index must be zero or one");
+        return provider+"-s"+stageIndex+"-"+index;
     }
     static boolean validSyntheticCredential(String value,int minimum) {return value!=null && value.length()>=minimum && value.length()<=128 && value.chars().allMatch(c->c>=0x21 && c<=0x7e);}
     static void validateStageNames(List<String> stages) {

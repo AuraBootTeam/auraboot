@@ -73,4 +73,26 @@ class ProcurementControlledOrderNativeContractTest {
         assertThrows(Exception.class,()->ProcurementControlledOrderNativeIT.storedJson("{broken"));
         assertThrows(AssertionError.class,()->ProcurementControlledOrderNativeIT.storedJson(null));
     }
+    @Test void everySupplierActorIdentityFitsBothRealUserAndEmailColumnsWithoutCollisions() {
+        var stages=List.of("pending","failed","unknown","mixed","createSuccess","unknownCreation","concurrentCreation","partialCreation");
+        var seen=new java.util.HashSet<String>();
+        for(String provider:List.of("ps_0123456789abcdef01234567","ps_fedcba9876543210fedcba98")) {
+            for(String stage:stages) for(int index=0;index<2;index++) {
+                String key=ProcurementControlledOrderNativeIT.supplierActorKey(provider,stage,index);
+                assertTrue(key.length()<=64,"ab_user.user_name limit for "+stage);
+                assertTrue((key+"@example.invalid").length()<=64,"ab_user.email limit for "+stage);
+                assertTrue(seen.add(key),"Each provider, stage and supplier index must remain distinct");
+                assertEquals(key,ProcurementControlledOrderNativeIT.supplierActorKey(provider,stage,index));
+            }
+        }
+        assertEquals(32,seen.size());
+    }
+
+    @Test void supplierActorKeyRejectsUnknownStagesForeignPrefixesAndInvalidIndexes() {
+        String provider="ps_0123456789abcdef01234567";
+        assertThrows(AssertionError.class,()->ProcurementControlledOrderNativeIT.supplierActorKey(provider,"invented",0));
+        assertThrows(AssertionError.class,()->ProcurementControlledOrderNativeIT.supplierActorKey("foreign","pending",0));
+        for(int index:List.of(-1,2))assertThrows(AssertionError.class,()->ProcurementControlledOrderNativeIT.supplierActorKey(provider,"pending",index));
+    }
+
 }
