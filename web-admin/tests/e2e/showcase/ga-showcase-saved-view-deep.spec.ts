@@ -472,6 +472,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
     test.setTimeout(90_000);
 
     const { pid, name } = await createDefaultTableView(request, 'Toolbar');
+    const beforeInvalid = (await fetchSavedView(request, pid)).viewConfig;
+    const unknownAction = await request.put(`/api/views/${pid}`, { data: {
+      viewConfig: { toolbarActions: [{ code: '_export_unknown', visible: true, pinned: true, order: 0 }] },
+    } });
+    expect(unknownAction.status()).toBe(422);
+    expect((await unknownAction.json()).context.error).toBe('view.overlay.unknown-action:_export_unknown');
+    expect((await fetchSavedView(request, pid)).viewConfig).toEqual(beforeInvalid);
 
     await navigateToShowcaseListViaMenu(page);
     await expect(viewSelectorTrigger(page)).toContainText(name, {
