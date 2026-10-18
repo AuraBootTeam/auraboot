@@ -363,10 +363,9 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
     fireEvent.click(screen.getByTestId('review-drawer-candidate-action-adopt'));
     await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(1));
-    // The call has started; the next user action must wait for the drawer's shared busy state to finish.
-    const download = screen.getByTestId('review-drawer-export-action-download');
-    await waitFor(() => expect(download).toBeEnabled());
-    fireEvent.click(download);
+    const exportAction = screen.getByTestId('review-drawer-export-action-download');
+    await waitFor(() => expect(exportAction).toBeEnabled());
+    fireEvent.click(exportAction);
     await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(2));
     expect(executeSimpleWorkbenchAction.mock.calls[0][1]).toEqual(action);
     permission.allowed = false;

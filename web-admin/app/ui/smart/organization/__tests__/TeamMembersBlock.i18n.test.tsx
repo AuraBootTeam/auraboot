@@ -87,34 +87,38 @@ beforeEach(() => {
 describe('team-member DSL title, localized states and API payloads', () => {
   for (const locale of ['en-US', 'zh-CN']) {
     const english = locale === 'en-US';
-    it(`${locale} resolves the imported DSL title, table labels and unchanged record/member identity`, async () => {
-      f.locale = locale;
-      view(true);
-      await screen.findByText('Aaron');
-      expect(screen.getByRole('heading')).toHaveTextContent(
-        english ? 'Team members (1)' : '\u56e2\u961f\u6210\u5458 (1)',
-      );
-      expect(
-        screen.getByRole('button', { name: english ? 'Add member' : '\u6dfb\u52a0\u6210\u5458' }),
-      ).toBeEnabled();
-      expect(screen.getByText(english ? 'Leader' : '\u8d1f\u8d23\u4eba')).toBeTruthy();
-      expect(screen.getAllByRole('columnheader').map((e: HTMLElement) => e.textContent)).toEqual(
-        english
-          ? ['User', 'Email', 'Role', 'Joined', 'Actions']
-          : [
-              '\u7528\u6237',
-              '\u90ae\u7bb1',
-              '\u89d2\u8272',
-              '\u52a0\u5165\u65f6\u95f4',
-              '\u64cd\u4f5c',
-            ],
-      );
-      expect(screen.getByTestId('team-members-remove-row-1')).toHaveAttribute(
-        'title',
-        english ? 'Remove member' : '\u79fb\u9664\u6210\u5458',
-      );
-      expect(f.fetch).toHaveBeenCalledExactlyOnceWith('team-1');
-    });
+    it.each(['leader', 'LEADER'])(
+      `${locale} resolves the imported DSL title, table labels and unchanged record/member identity (%s)`,
+      async (role) => {
+        f.fetch.mockResolvedValue([{ ...member, role }]);
+        f.locale = locale;
+        view(true);
+        await screen.findByText('Aaron');
+        expect(screen.getByRole('heading')).toHaveTextContent(
+          english ? 'Team members (1)' : '\u56e2\u961f\u6210\u5458 (1)',
+        );
+        expect(
+          screen.getByRole('button', { name: english ? 'Add member' : '\u6dfb\u52a0\u6210\u5458' }),
+        ).toBeEnabled();
+        expect(screen.getByText(english ? 'Leader' : '\u8d1f\u8d23\u4eba')).toBeTruthy();
+        expect(screen.getAllByRole('columnheader').map((e: HTMLElement) => e.textContent)).toEqual(
+          english
+            ? ['User', 'Email', 'Role', 'Joined', 'Actions']
+            : [
+                '\u7528\u6237',
+                '\u90ae\u7bb1',
+                '\u89d2\u8272',
+                '\u52a0\u5165\u65f6\u95f4',
+                '\u64cd\u4f5c',
+              ],
+        );
+        expect(screen.getByTestId('team-members-remove-row-1')).toHaveAttribute(
+          'title',
+          english ? 'Remove member' : '\u79fb\u9664\u6210\u5458',
+        );
+        expect(f.fetch).toHaveBeenCalledExactlyOnceWith('team-1');
+      },
+    );
     it(`${locale} distinguishes pending, successful empty and missing team states`, async () => {
       f.locale = locale;
       const pending = deferred<(typeof member)[]>();

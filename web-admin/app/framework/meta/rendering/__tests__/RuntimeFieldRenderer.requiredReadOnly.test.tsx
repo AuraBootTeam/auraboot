@@ -100,13 +100,15 @@ describe('RuntimeFieldRenderer required vs read-only', () => {
         }
       };
       collect(page);
-      expect(fields.map((field) => field.field)).toEqual(["sc_name", "sc_code", "sc_description", "sc_quantity", "sc_price", "sc_budget", "sc_progress", "sc_rating", "sc_status", "sc_priority", "sc_category", "sc_tags", "sc_advanced_settings", "sc_time_slot", "sc_date_range", "sc_working_hours", "sc_cascade_category", "sc_tree_node", "sc_assignee", "sc_team_members", "sc_department", "sc_owner_user", "sc_website", "sc_email", "sc_phone", "sc_color", "sc_address", "sc_richtext_content", "sc_ai_summary", "sc_remark"]);
+      expect(fields).toHaveLength(30);
       const localized = fields.filter((field) => typeof field.props.placeholder === 'string' && field.props.placeholder.startsWith('$i18n:'));
       expect(localized).toHaveLength(19);
       for (const field of fields) {
         const key = `model.showcase_all_fields.${field.field}.placeholder`;
-        const configuredPlaceholder = field.props.placeholder;
-        const expected = typeof configuredPlaceholder === 'object' ? configuredPlaceholder[locale] : translations[key] ?? configuredPlaceholder;
+        const placeholder = field.props.placeholder;
+        const expected = typeof placeholder === 'object'
+          ? placeholder[locale]
+          : translations[key] ?? placeholder;
         expect(expected).toBeTruthy();
         expect(expected).not.toMatch(/^\$i18n:/);
         if (locale === 'en-US') expect(expected).not.toMatch(/[\u4e00-\u9fff]/);

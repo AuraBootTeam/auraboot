@@ -1062,7 +1062,7 @@ describe('UnifiedDesignerWorkbench', () => {
     const subTableBlock = findBlockById(savedDocument.blocks, 'sub_table_new_sub_table')?.block;
     expect(subTableBlock).toMatchObject({
       blockType: 'sub-table',
-      title: { 'zh-CN': 'Line items' },
+      title: { en: 'New sub table', 'zh-CN': 'Line items' },
       dataSource: {
         model: 'customer',
         parentField: 'id',
@@ -1121,7 +1121,7 @@ describe('UnifiedDesignerWorkbench', () => {
     const repeaterBlock = findBlockById(savedDocument.blocks, 'repeater_new_repeater')?.block;
     expect(repeaterBlock).toMatchObject({
       blockType: 'repeater',
-      title: { 'zh-CN': 'Line items' },
+      title: { en: 'New repeater', 'zh-CN': 'Line items' },
       props: {
         rows: [{ name: 'Ada' }],
       },
@@ -1185,7 +1185,7 @@ describe('UnifiedDesignerWorkbench', () => {
     const subformBlock = findBlockById(savedDocument.blocks, 'subform_new_subform')?.block;
     expect(subformBlock).toMatchObject({
       blockType: 'subform',
-      title: { 'zh-CN': 'Team members' },
+      title: { en: 'New subform', 'zh-CN': 'Team members' },
       props: {
         rows: [{ name: 'Ada' }],
       },
@@ -1193,7 +1193,7 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(subformBlock?.blocks?.[0]).toMatchObject({
       id: 'form_section_new_section',
       blockType: 'form-section',
-      title: { 'zh-CN': 'Member details' },
+      title: { en: 'New section', 'zh-CN': 'Member details' },
       blocks: [
         expect.objectContaining({
           blockType: 'field',

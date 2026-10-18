@@ -106,7 +106,9 @@ describe('TeamMembersBlock', () => {
 
   it('removes an open member dialog when management permission is revoked', async () => {
     const view = renderBlock();
-    fireEvent.click(await screen.findByTestId('team-members-add'));
+    const add = await screen.findByTestId('team-members-add');
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
     expect(await screen.findByTestId('team-members-confirm')).toBeTruthy();
     permissions.clear();
     view.rerender(<TeamMembersBlock block={{ props: { teamPid: 'team-pid-1' } }} />);
@@ -122,7 +124,9 @@ describe('TeamMembersBlock', () => {
   it('adds a tenant member by memberPid and filters existing members', async () => {
     renderBlock();
 
-    fireEvent.click(await screen.findByTestId('team-members-add'));
+    const add = await screen.findByTestId('team-members-add');
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
     const select = await screen.findByTestId('team-members-select');
 
     expect(screen.queryByText(/张三/)).toBeTruthy();

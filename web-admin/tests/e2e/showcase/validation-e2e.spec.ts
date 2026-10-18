@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 /**
  * D8 — Validation E2E for the `showcase_all_fields` plugin.
  *
@@ -83,10 +84,8 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
     page.locator('[data-testid="dynamic-list"] table, [data-testid="dynamic-list"]').first(),
   ).toBeVisible({ timeout: 15_000 });
 
-  // Drop HMR overlay
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  // Development errors must fail the test
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 }
 
 async function openCreateForm(page: Page): Promise<void> {
@@ -100,6 +99,7 @@ async function openCreateForm(page: Page): Promise<void> {
   await createBtn.click();
   await expect(page).toHaveURL(FORM_NEW_URL_RE, { timeout: 10_000 });
   await expect(page.locator('.form-section').first()).toBeVisible({ timeout: 10_000 });
+  await expandFormSections(page);
 }
 
 test.describe('D8 — showcase_all_fields validation runtime', () => {
@@ -366,9 +366,7 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
     }
 
     await page.waitForURL(/\/p\/showcase_all_fields\/edit\//, { timeout: 10_000 });
-    await page.evaluate(() => {
-      document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-    });
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 
     // ---- Step 5: assert sc_advanced_settings now visible ----
     // Confirm the form has loaded the record (sc_name input populated).

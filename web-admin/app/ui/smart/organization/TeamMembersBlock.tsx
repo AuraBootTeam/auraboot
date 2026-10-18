@@ -416,7 +416,7 @@ function HeaderCell({
 
 function RoleBadge({ role }: { role?: string }) {
   const text = useTeamText();
-  const leader = role === 'leader';
+  const leader = role?.toLowerCase() === 'leader';
   return (
     <span
       className={`rounded-pill inline-flex px-2.5 py-1 text-xs font-medium whitespace-nowrap ${

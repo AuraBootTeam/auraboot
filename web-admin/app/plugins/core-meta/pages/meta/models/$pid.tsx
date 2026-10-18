@@ -1058,7 +1058,7 @@ export default function ModelDetailPage() {
                   data-testid="model-more-actions"
                   className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
                 >
-                  更多
+                  {text('moreActions')}
                 </summary>
                 <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
                   {model.status === 'draft' && (

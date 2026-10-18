@@ -66,7 +66,7 @@ runPlaywright([
   '--project=setup',
 ]);
 runPlaywright(['test', 'tests/auth.setup.ts', '--project=auth', '--no-deps']);
-runPlaywright(['test', ...targetSpecs, '--project=chromium', '--no-deps', '--trace=retain-on-failure']);
+runPlaywright(['test', ...targetSpecs, '--project=chromium', '--no-deps', '--trace=retain-on-failure', '--retries=0']);
 
 function runPlaywright(args) {
   const result = spawnSync('playwright', args, {

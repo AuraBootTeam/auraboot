@@ -22,19 +22,10 @@ import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { buildDrillDownTarget, type DrillDownPayload } from '../utils/drillDownNavigation';
 
+import { createDashboardUsageId } from '../utils/usageId';
 import { DashboardQueryContext } from '~/framework/smart/hooks/DashboardQueryContext';
 
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
-
-function createUsageId(): string {
-  // getRandomValues also works on HTTP origins where randomUUID is unavailable.
-  // The query DTO requires a UUID, so a React id or a timestamp is not sufficient.
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
 interface DashboardViewerProps {
   /** Saved analytics dashboard identity; queries are resolved on the server. */
@@ -66,7 +57,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
 }) => {
   const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
-  const usageId = useMemo(createUsageId, [dashboardPid]);
+  const visit = useMemo(() => ({ dashboardPid, usageId: createDashboardUsageId() }), [dashboardPid]);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [linkageFilters, setLinkageFilters] = useState<LinkageFiltersMap>({});
 
@@ -153,7 +144,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
 
     return (
       <DashboardQueryContext.Provider
-        value={dashboardPid ? { dashboardPid, widgetId: widget.id, usageId } : null}
+        value={visit.dashboardPid ? { ...visit, dashboardPid: visit.dashboardPid, widgetId: widget.id } : null}
       >
         <ChartWidgetWrapper
           autoHeight={autoHeight}

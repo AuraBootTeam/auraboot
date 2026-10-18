@@ -7,7 +7,7 @@ import messages from '../modelDetail.i18n.json';
 
 // The locale contract under test: every chrome string on the model detail page
 // must come from the modelDetail catalog via useI18n().locale, while user data
-// (model displayName, codes, raw enum values like `draft`) keeps its source values.
+// (model displayName, codes and version notes) keeps its source values.
 const language = vi.hoisted(() => ({ locale: 'zh-CN' }));
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
@@ -210,16 +210,16 @@ describe('ModelDetailPage locale contracts', () => {
     expect(screen.getByText('创建人')).toBeInTheDocument();
   });
 
-  it('keeps the versions tab zh-CN chrome byte-identical and localizes known status values', () => {
+  it('localizes version status labels while preserving version notes', () => {
     language.locale = 'zh-CN';
     renderPage();
     fireEvent.click(screen.getByText('版本 (2)'));
 
     expect(screen.getByText('版本 3')).toBeInTheDocument();
     expect(screen.getByText('当前版本')).toBeInTheDocument();
-    // Known status values use the same labels as the current model.
-    expect(screen.getAllByText('草稿')).toHaveLength(2);
-    expect(screen.getByText('已发布')).toBeInTheDocument();
+    // Version status is UI chrome; user-authored notes remain unchanged.
+    expect(screen.getByText('版本 3').parentElement).toHaveTextContent('草稿');
+    expect(screen.getByText('版本 2').parentElement).toHaveTextContent('已发布');
     expect(screen.getByText('无说明')).toBeInTheDocument();
     expect(screen.getByText('init')).toBeInTheDocument();
     expect(screen.getAllByText('查看')).toHaveLength(2);

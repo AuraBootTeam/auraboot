@@ -1,9 +1,9 @@
 import React from 'react';
+import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import { SearchPanel } from '../SearchPanel';
@@ -121,10 +121,11 @@ describe.each(['en-US', 'zh-CN'])('designer search in %s', locale => {
     const user = userEvent.setup();
     const onSelect = vi.fn(); localized(locale, { onSelect, placeholder: 'Custom query' });
     const input = screen.getByPlaceholderText('Custom query');
-    fireEvent.change(input, { target: { value: 'amount' } });
+    await user.type(input, 'amount');
     await waitFor(() => expect(screen.getByRole('button', { name: 'amount actions' })).toBeInTheDocument());
-    await user.click(input);
-    await user.keyboard('{ArrowDown}{Enter}');
+    await user.keyboard('{ArrowDown}');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'amount components' })).toHaveClass('bg-blue-50'));
+    await user.keyboard('{Enter}');
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0][0].id).toBe('fixture-components');
     expect(searchService.getState().selectedId).toBe('fixture-components');

@@ -13,9 +13,8 @@
  *
  * Strategy:
  * 1. Admin user (has page.page.manage) — positive test: buttons are not permission-disabled.
- * 2. Permission-stripped loader data — remove `page.page.manage` from the initial
- *    SSR loader payload, then assert the managed toolbar buttons carry the
- *    `disabled` attribute and permission-denial label.
+ * 2. A real scoped viewer without a wildcard or page.page.manage — managed
+ *    toolbar actions are disabled; a real backend write is denied without mutation.
  *
  * Dimensions: D1 (sidebar nav), D6 (toolbar renders), D9 (permission guard), D14 (RBAC)
  *
@@ -25,6 +24,7 @@
 import { test, expect, type Page } from '../../fixtures';
 import { BASE_URL } from '../../helpers/environments';
 import { uniqueId } from '../helpers';
+import { grantRolePermissionByCode, createAuthenticatedRoleContext, collectPermissionCodes } from '../../helpers/designer-role-fixtures';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -80,16 +80,9 @@ async function expectCurrentUserPermission(
   const body = await resp.json();
   expect(body.code).toBe('0');
   const permissions = body.data?.permissions ?? {};
-  const objectCodes = Array.isArray(permissions.permissions)
-    ? permissions.permissions
-        .map((permission: { code?: unknown }) => permission.code)
-        .filter((code: unknown): code is string => typeof code === 'string' && code.length > 0)
-    : [];
-  const codes = [
-    ...(Array.isArray(permissions.permissionCodes) ? permissions.permissionCodes : []),
-    ...objectCodes,
-  ].filter((code: unknown): code is string => typeof code === 'string' && code.length > 0);
-  expect(codes.includes(permissionCode)).toBe(expected);
+  const codes = collectPermissionCodes(permissions);
+  expect(codes.includes('*') || codes.includes(permissionCode)).toBe(expected);
+  if (!expected) expect(codes).not.toContain('*');
 }
 
 async function expectPermissionDisabled(page: Page, testId: string): Promise<void> {
@@ -97,36 +90,6 @@ async function expectPermissionDisabled(page: Page, testId: string): Promise<voi
   await expect(button).toBeVisible();
   await expect(button).toBeDisabled();
   await expect(button).toHaveAttribute('aria-label', /permission|权限|管理/i);
-}
-
-async function stripManagePermissionFromInitialDocument(
-  page: Page,
-  pid: string,
-): Promise<() => number> {
-  let strippedCount = 0;
-  await page.route(`**/page-designer/${pid}**`, async (route) => {
-    const response = await route.fetch();
-    const contentType = response.headers()['content-type'] ?? '';
-    if (!contentType.includes('text/html')) {
-      await route.fulfill({ response });
-      return;
-    }
-
-    const html = await response.text();
-    const stripped = html.replaceAll('page.page.manage', 'page.page.manage__removed_for_e2e');
-    strippedCount += (html.match(/page\.page\.manage/g) ?? []).length;
-    const headers = Object.fromEntries(
-      Object.entries(response.headers()).filter(
-        ([key]) => !['content-encoding', 'content-length'].includes(key.toLowerCase()),
-      ),
-    );
-    await route.fulfill({
-      status: response.status(),
-      headers: { ...headers, 'content-type': contentType },
-      body: stripped,
-    });
-  });
-  return () => strippedCount;
 }
 
 // ── tests ────────────────────────────────────────────────────────────────────
@@ -165,21 +128,40 @@ test.describe('Designer toolbar permission pre-check', () => {
     expect(ariaLabel).not.toContain('没有管理');
   });
 
-  // ── D9, D14: Permission-stripped loader data disables managed toolbar actions.
+  // ── D9, D14: A real scoped identity proves UI and backend denial.
   test('managed toolbar buttons are disabled when page.page.manage permission is absent', async ({
-    page,
-    baseURL,
-  }) => {
+    page, browser, baseURL,
+  }, info) => {
     const pid = await createFixturePage(page);
-    await expectCurrentUserPermission(page, 'page.page.manage', true);
-    const strippedCount = await stripManagePermissionFromInitialDocument(page, pid);
-    await page.goto(appBaseUrl(baseURL), { waitUntil: 'domcontentloaded' });
-    await openDesigner(page, pid);
-    expect(strippedCount(), 'SSR loader HTML must include page.page.manage before stripping').toBeGreaterThan(0);
-    await expectPermissionDisabled(page, 'toolbar-save');
-    await expectPermissionDisabled(page, 'toolbar-publish');
-    await expectPermissionDisabled(page, 'toolbar-import');
-    await expectPermissionDisabled(page, 'toolbar-export');
+    const beforeResponse = await page.request.get(`/api/pages/${pid}`);
+    expect(beforeResponse.status()).toBe(200);
+    const before = await beforeResponse.json();
+    expect(String(before.code)).toBe('0');
+    for (const permission of ['meta.designer.read', 'page.page.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const context = await createAuthenticatedRoleContext(browser, appBaseUrl(baseURL), 'viewer');
+    try {
+      const viewer = await context.newPage();
+      await expectCurrentUserPermission(viewer, 'page.page.manage', false);
+      await openDesigner(viewer, pid);
+      for (const id of ['toolbar-save', 'toolbar-publish', 'toolbar-import', 'toolbar-export']) {
+        await expectPermissionDisabled(viewer, id);
+      }
+      const denied = await viewer.request.put(`/api/pages/${pid}`, {
+        data: { ...before.data, title: 'Forbidden scoped viewer update' },
+      });
+      expect(denied.status()).toBe(403);
+      const afterResponse = await page.request.get(`/api/pages/${pid}`);
+      expect(afterResponse.status()).toBe(200);
+      const after = await afterResponse.json();
+      expect(String(after.code)).toBe('0');
+      expect(after.data.title).toEqual(before.data.title);
+      expect(after.data.blocks).toEqual(before.data.blocks);
+      await viewer.screenshot({ path: info.outputPath('designer-scoped-toolbar-denied.png'), fullPage: true });
+    } finally {
+      await context.close();
+    }
   });
 
   // ── D6: Import and Export buttons have data-testid and are visible
