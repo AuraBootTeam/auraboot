@@ -26,6 +26,8 @@ jobs:
     name: docker compose --profile full + smoke
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      MAVEN_CENTRAL_FIRST: 'true'
     steps:
       - uses: actions/checkout@v7
         with:

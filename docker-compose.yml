@@ -79,6 +79,8 @@ services:
       # below still overrides the baked copies for live dev iteration.
       context: .
       dockerfile: platform/Dockerfile
+      args:
+        MAVEN_CENTRAL_FIRST: ${MAVEN_CENTRAL_FIRST:-false}
     container_name: auraboot-backend
     restart: unless-stopped
     environment:
