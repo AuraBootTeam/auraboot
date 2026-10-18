@@ -278,10 +278,12 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   await expect(page.getByTestId('ddl-version-actions')).toBeVisible();await shot(page,'R02');
   await page.getByTestId('ddl-impact-close').click();
   await page.getByTestId('ddl-open-tpm_acceptance_route').click();
+  await page.getByTestId('strategy-workspace-tab-dmn').click();
+  const expression=page.getByLabel('feel-0-amount',{exact:true});
+  await expression.locator('..').locator('summary').click();
+  await expression.fill('this is not valid (');
   await page.getByTestId('strategy-workspace-tab-test').click();
-  // Missing typed inputs must not reuse a previous green result.
-  for (const input of await page.getByTestId('strategy-test-inputs').locator('input').all()) await input.fill('');
-  for (const input of await page.getByTestId('strategy-test-inputs').locator('select').all()) await input.selectOption('');
+  // A malformed authored expression must fail, rather than claiming a matched business outcome.
   await page.getByTestId('strategy-run-test').click();
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','error');
   await expect(page.getByTestId('strategy-test-outputs')).toHaveCount(0);await shot(page,'R05');
