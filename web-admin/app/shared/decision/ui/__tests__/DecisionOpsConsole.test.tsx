@@ -2580,6 +2580,8 @@ describe('DecisionOpsConsole', () => {
     expect(logRow).not.toHaveTextContent('MATCHED');
     expect(logRow).toHaveTextContent('18ms');
 
+    expect(screen.queryByTestId('elta-filters')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('elta-professional-toggle'));
     fireEvent.change(screen.getByTestId('log-keyword'), { target: { value: 'trace-live' } });
     fireEvent.click(screen.getByTestId('elta-apply'));
 

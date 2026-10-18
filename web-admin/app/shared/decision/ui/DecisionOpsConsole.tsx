@@ -482,7 +482,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
               <DecisionRolloutMonitor api={api} initialDecisionCode="complaint_sla_deadline" />
             )}
             {tab === 'logs' && (
-              <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50 } }} />
+              <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50, businessFirst: true } }} />
             )}
             {tab === 'model' && (
               <>

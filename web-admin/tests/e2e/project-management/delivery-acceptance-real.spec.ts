@@ -573,7 +573,7 @@ test('SLA policies use business summaries and save fixed durations through the e
     await expect(page.getByTestId('sla-policy-workspace')).not.toContainText(/tpm_standard_review|PT2H/);
     await shot(page,'S07');
     await page.getByTestId('sla-policy-row').filter({hasText:config.name}).getByRole('button',{name:'查看策略',exact:true}).click();
-    await expect(page.getByTestId('sla-policy-summary')).toContainText('验收负责人');
+    await expect(page.getByTestId('sla-policy-summary')).toContainText('交付负责人 · 常规验收');
     await expect(page.getByTestId('sla-policy-summary')).toContainText('交付验收 · 处理时限');await shot(page,'S08');
     await page.getByRole('tab',{name:'专业配置',exact:true}).click();await shot(page,'S12');
     await page.getByRole('button',{name:'编辑配置',exact:true}).click();
@@ -611,6 +611,7 @@ test('rule center primary and professional views remain reachable through their 
     await entry.click();await expect(page.getByTestId(`doc-panel-${tab}`)).toBeVisible();
     await expect(page.getByTestId(`doc-panel-${tab}`)).not.toContainText('Failed to load');
     if(error)await expect(page.getByTestId(error)).toHaveCount(0);
+    if(tab==='logs'){await expect(page.getByTestId('elta-business-results')).toBeVisible();await expect(page.getByTestId('elta-filters')).toHaveCount(0);}
     await shot(page,image);
   }
 });
