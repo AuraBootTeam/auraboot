@@ -430,7 +430,7 @@ class S06Current001PluginCleanupAdmissionTest {
             assertThat(first).isNotNegative(); assertThat(last).isGreaterThan(first);
             String original = source.substring(0, first) + source.substring(last + end.length());
             if (entry.getKey().equals("S06Current001PluginCleanupAdmission.java")) original = original.replace("        if (value.path(\"kind\").asText().equals(\"s06-automatic-owned-plugin-cleanup-admission-v3\"))\n            return automatic(automaticStrict(file, json), evidence, hash(file), json, now);\n", "");
-            else original = original.replace("        if (admission.schemaVersion() == 3) {\n            uninstallAutomaticOwnedRegistrations(admission, crypto, sessionTimezone);\n            return;\n        }\n", "");
+            else original = original.replace("        if (uninstallAutomaticAfterExactPostBootRefresh()) return;\n", "").replace("        if (admission.schemaVersion() == 3) {\n            uninstallAutomaticOwnedRegistrations(admission, crypto, sessionTimezone);\n            return;\n        }\n", "");
             assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                     .digest(original.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isEqualTo(entry.getValue());
         }
@@ -476,6 +476,58 @@ class S06Current001PluginCleanupAdmissionTest {
         assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPaused(open, pins)).hasMessage("CLEANUP_PUBLIC_WORKERS_NOT_ISOLATED");
         var token = paused.deepCopy(); ((ObjectNode) token.path("processes").get(0).path("actual")).put("tokenHash", "changed");
         assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticPaused(token, pins)).hasMessage("CLEANUP_ERP_IDENTITY_MISMATCH");
+    }
+    private record PostBootRows(java.util.List<S06Current001PluginCleanupAdmission.Expected> expected, java.util.List<String> raw) {}
+    private PostBootRows postBootRows() throws Exception {
+        var expected = new java.util.ArrayList<S06Current001PluginCleanupAdmission.Expected>();
+        var raw = new java.util.ArrayList<String>();
+        for (int i = 0; i < 23; i++) {
+            var manifest = json.createObjectNode().put("pluginId", "com.test.owner" + i);
+            var row = json.createObjectNode().put("pid", "p" + i).put("tenant_id", 987).put("plugin_id", "com.test.owner" + i)
+                    .put("namespace", "n" + i).put("version", "1.0.0").put("status", "installed").put("deleted_flag", false);
+            row.set("manifest", manifest); String text = row.toString(); raw.add(text);
+            expected.add(new S06Current001PluginCleanupAdmission.Expected(987, "p" + i, "com.test.owner" + i, "n" + i, "1.0.0", "installed",
+                    java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8))),
+                    SourceBindingCanonical.hash(manifest)));
+        }
+        return new PostBootRows(expected, raw);
+    }
+    @Test
+    void postBootReadonlyRosterAcceptsOnlyAllTwentyThreeOriginalRawTuples() throws Exception {
+        var f = postBootRows();
+        S06Current001PluginCleanupAdmission.automaticExactCurrentRoster(f.expected(), f.raw(), json);
+        for (String field : java.util.List.of("pid", "tenant_id", "plugin_id", "namespace", "version", "status", "deleted_flag", "manifest", "updated_at")) {
+            var rows = new java.util.ArrayList<>(f.raw());
+            var changed = (ObjectNode) json.readTree(rows.get(0)); changed.put(field, "changed"); rows.set(0, changed.toString());
+            assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticExactCurrentRoster(f.expected(), rows, json))
+                    .as(field).hasMessage("CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED");
+        }
+        var missing = new java.util.ArrayList<>(f.raw()); missing.remove(0);
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticExactCurrentRoster(f.expected(), missing, json)).hasMessage("CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED");
+        var duplicate = new java.util.ArrayList<>(f.raw()); duplicate.set(0, duplicate.get(1));
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticExactCurrentRoster(f.expected(), duplicate, json)).hasMessage("CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED");
+    }
+    @Test
+    void postBootDerivedInputChangesOnlyActualObservationTimeAndNeverTheWhitelist() {
+        var original = json.createObjectNode().put("kind", "s06-automatic-owned-plugin-cleanup-admission-v3")
+                .put("pluginRosterCapturedAtUtc", "2026-10-19T00:00:00Z"); original.putArray("expectedPlugins").addObject().put("pluginPid", "sealed-original");
+        var derived = S06Current001PluginCleanupAdmission.automaticRefreshedInput(original, java.time.Instant.parse("2026-10-19T01:00:00Z"));
+        assertThat(original.path("pluginRosterCapturedAtUtc").asText()).isEqualTo("2026-10-19T00:00:00Z");
+        assertThat(derived.path("pluginRosterCapturedAtUtc").asText()).isEqualTo("2026-10-19T01:00:00Z");
+        ((ObjectNode) derived.path("expectedPlugins").get(0)).put("pluginPid", "rebaseline");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticOnlyCapturedAtChanged(original, derived)).hasMessage("CLEANUP_POST_BOOT_INPUT_CHANGED");
+    }
+    @Test
+    void postBootPreflightIsNotDeletionAuthorityAndOriginalFutureTimeIsAlwaysRejected() {
+        assertThat(S06Current001PluginCleanupAdmission.AutomaticPreflight.class)
+                .isNotEqualTo(S06Current001PluginCleanupAdmission.Admission.class);
+        var now = java.time.Instant.parse("2026-10-19T01:00:00Z");
+        S06Current001PluginCleanupAdmission.automaticOriginalTimestamp("2026-10-19T00:00:00Z", now);
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.freshUtc("2026-10-19T00:00:00Z", now)).hasMessage("CLEANUP_ROSTER_NOT_FRESH_UTC");
+        for (String bad : java.util.List.of("2026-10-19T01:00:01Z", "invalid", "2026-10-19T01:00:00+00:00"))
+            assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticOriginalTimestamp(bad, now)).hasMessage("CLEANUP_POST_BOOT_ORIGINAL_TIME_INVALID");
+        assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.freshUtc("2026-10-19T01:00:01Z", now)).hasMessage("CLEANUP_ROSTER_NOT_FRESH_UTC");
+        S06Current001PluginCleanupAdmission.freshUtc(now.toString(), now);
     }
     // END automatic cleanup contracts.
 }

@@ -330,7 +330,35 @@ final class S06Current001PluginCleanupAdmission {
     static final String AUTOMATIC_METHOD = "actualPf4jRegisteredTimerQueuesQuoteAndShipmentAndDeliversOnlySyntheticInApp";
     static final String AUTOMATIC_SELECTOR = AUTOMATIC_CLASS + "." + AUTOMATIC_METHOD;
 
+    /** File-only preflight is deliberately not a deletion Admission. */
+    record AutomaticPreflight(List<Expected> plugins, Path output, String classificationSha256) {}
+
+    static AutomaticPreflight automaticPreflight(Path input, String expectedHash, ObjectMapper json) throws Exception {
+        Path evidence = EVIDENCE.toRealPath();
+        Path original = automaticIntentPath(input, expectedHash);
+        JsonNode intent = automaticStrict(original, json);
+        automaticOriginalTimestamp(intent.path("pluginRosterCapturedAtUtc").asText(), java.time.Instant.now());
+        return automaticProof(intent, evidence, json);
+    }
+
+    static Path automaticIntentPath(Path input, String expectedHash) throws Exception {
+        return owned(input.toString(), expectedHash, EVIDENCE.toRealPath());
+    }
+
+    static void automaticOriginalTimestamp(String value, java.time.Instant now) {
+        java.time.Instant captured;
+        try { require(value.endsWith("Z"), "CLEANUP_POST_BOOT_ORIGINAL_TIME_INVALID"); captured = java.time.Instant.parse(value); }
+        catch (java.time.format.DateTimeParseException invalid) { throw new IllegalStateException("CLEANUP_POST_BOOT_ORIGINAL_TIME_INVALID"); }
+        require(!captured.isAfter(now), "CLEANUP_POST_BOOT_ORIGINAL_TIME_INVALID");
+    }
+
     static Admission automatic(JsonNode input, Path evidence, String inputHash, ObjectMapper json, java.time.Instant now) throws Exception {
+        freshUtc(input.path("pluginRosterCapturedAtUtc").asText(), now);
+        AutomaticPreflight proof = automaticProof(input, evidence, json);
+        return new Admission(proof.plugins(), proof.output(), inputHash, proof.classificationSha256(), 3);
+    }
+
+    private static AutomaticPreflight automaticProof(JsonNode input, Path evidence, ObjectMapper json) throws Exception {
         exactKeys(input, Set.of("kind", "schemaVersion", "sourceFamily", "runtime", "database", "redisDatabase", "execute",
                 "nativeEvidence", "expectedPlugins", "pluginRosterCapturedAtUtc", "pausedVerificationPath", "pausedVerificationSha256", "outputDirectory"));
         require(input.path("kind").asText().equals("s06-automatic-owned-plugin-cleanup-admission-v3")
@@ -339,7 +367,6 @@ final class S06Current001PluginCleanupAdmission {
                 && input.path("runtime").asText().equals(RUNTIME) && input.path("database").asText().equals("enterprise_22")
                 && input.path("redisDatabase").isInt() && input.path("redisDatabase").intValue() == 13
                 && input.path("execute").isBoolean() && input.path("execute").booleanValue(), "CLEANUP_AUTOMATIC_SCOPE_INVALID");
-        freshUtc(input.path("pluginRosterCapturedAtUtc").asText(), now);
         JsonNode proof = input.path("nativeEvidence");
         exactKeys(proof, Set.of("sourceFamily", "selector", "appRoot", "appCommit", "sourceSet", "compiledSeal", "xml",
                 "receipt", "trace", "fixtureSetup", "sourceBinding", "classification", "runner"));
@@ -392,7 +419,47 @@ final class S06Current001PluginCleanupAdmission {
         List<Expected> plugins = automaticExpected(input.path("expectedPlugins"), setup, binding, json);
         Path output = Path.of(input.path("outputDirectory").asText()).toAbsolutePath().normalize();
         require(!Files.exists(output) && output.getParent().toRealPath().startsWith(evidence), "CLEANUP_OUTPUT_NOT_FRESH_OWNED");
-        return new Admission(plugins, output, inputHash, hash(automaticRef(proof.path("classification"), evidence)), 3);
+        return new AutomaticPreflight(List.copyOf(plugins), output, hash(automaticRef(proof.path("classification"), evidence)));
+    }
+
+    static void automaticExactCurrentRoster(List<Expected> expected, List<String> rawRows, ObjectMapper json) throws Exception {
+        require(expected.size() == 23 && rawRows.size() == expected.size(), "CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED");
+        Set<String> seen = new HashSet<>();
+        for (String raw : rawRows) {
+            JsonNode row = json.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+                    .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+            String pid = row.path("pid").asText();
+            Expected target = expected.stream().filter(value -> value.pid().equals(pid)).findFirst()
+                    .orElseThrow(() -> new IllegalStateException("CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED"));
+            require(seen.add(pid) && row.path("tenant_id").isIntegralNumber() && row.path("tenant_id").canConvertToLong()
+                    && row.path("tenant_id").longValue() == target.tenant()
+                    && row.path("plugin_id").asText().equals(target.pluginId()) && row.path("namespace").asText().equals(target.namespace())
+                    && row.path("version").asText().equals(target.version()) && row.path("status").asText().equals(target.status())
+                    && row.path("deleted_flag").isBoolean() && !row.path("deleted_flag").booleanValue()
+                    && HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .equals(target.rowSha256())
+                    && SourceBindingCanonical.hash(row.path("manifest")).equals(target.manifestSha256()),
+                    "CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED");
+        }
+        require(seen.equals(expected.stream().map(Expected::pid).collect(java.util.stream.Collectors.toSet())),
+                "CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED");
+    }
+
+    static com.fasterxml.jackson.databind.node.ObjectNode automaticRefreshedInput(JsonNode original, java.time.Instant observedAt) {
+        require(original.isObject(), "CLEANUP_POST_BOOT_INPUT_INVALID");
+        var derived = ((com.fasterxml.jackson.databind.node.ObjectNode) original).deepCopy();
+        derived.put("pluginRosterCapturedAtUtc", observedAt.toString());
+        automaticOnlyCapturedAtChanged(original, derived);
+        return derived;
+    }
+
+    static void automaticOnlyCapturedAtChanged(JsonNode original, JsonNode derived) {
+        require(original.isObject() && derived.isObject() && derived.path("pluginRosterCapturedAtUtc").isTextual(),
+                "CLEANUP_POST_BOOT_INPUT_INVALID");
+        var before = ((com.fasterxml.jackson.databind.node.ObjectNode) original).deepCopy();
+        var after = ((com.fasterxml.jackson.databind.node.ObjectNode) derived).deepCopy();
+        before.remove("pluginRosterCapturedAtUtc"); after.remove("pluginRosterCapturedAtUtc");
+        require(before.equals(after), "CLEANUP_POST_BOOT_INPUT_CHANGED");
     }
 
     static Path automaticRef(JsonNode ref, Path evidence) throws Exception {

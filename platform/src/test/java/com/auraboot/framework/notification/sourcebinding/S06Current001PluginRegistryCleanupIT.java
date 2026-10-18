@@ -71,6 +71,7 @@ class S06Current001PluginRegistryCleanupIT {
 
     @Test
     void uninstallOnlyCurrent001FourteenSealedPluginRegistrations() throws Exception {
+        if (uninstallAutomaticAfterExactPostBootRefresh()) return;
         require(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class).isEmpty(), "CLEANUP_SCHEDULER_ACTIVE");
         require("13".equals(System.getenv("TEST_REDIS_DATABASE")), "CLEANUP_REDIS_SCOPE_INVALID");
         try (var connection = dataSource.getConnection()) {
@@ -290,9 +291,76 @@ class S06Current001PluginRegistryCleanupIT {
         return value;
     }
     // BEGIN automatic sourceFamily official cleanup.
+    private Map<String, Object> automaticPostBootRosterRefresh;
+
+    private boolean uninstallAutomaticAfterExactPostBootRefresh() throws Exception {
+        Path declared = Path.of(required("S06_NATIVE_PLUGIN_CLEANUP_INPUT"));
+        if (!json.readTree(declared.toFile()).path("kind").asText().equals("s06-automatic-owned-plugin-cleanup-admission-v3")) return false;
+        Path original = S06Current001PluginCleanupAdmission.automaticIntentPath(declared,
+                required("S06_NATIVE_PLUGIN_CLEANUP_INPUT_SHA256"));
+        JsonNode intent = S06Current001PluginCleanupAdmission.automaticStrict(original, json);
+        // Complete XML/sourceFamily/owners/PIDs/source/class/Boot/phase proofs BEFORE this method's first database access.
+        var preflight = S06Current001PluginCleanupAdmission.automaticPreflight(original,
+                required("S06_NATIVE_PLUGIN_CLEANUP_INPUT_SHA256"), json);
+        require(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class).isEmpty(), "CLEANUP_SCHEDULER_ACTIVE");
+        require("13".equals(System.getenv("TEST_REDIS_DATABASE")), "CLEANUP_REDIS_SCOPE_INVALID");
+        Map<String, Object> crypto = S06NativeEncryptionAdmission.admit(System.getenv(), json, encryption,
+                getClass(), context.getEnvironment().getActiveProfiles());
+        try (var connection = dataSource.getConnection()) {
+            require(connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")
+                    && connection.getCatalog().equals("enterprise_22"), "CLEANUP_DATABASE_SCOPE_INVALID");
+            validateDatabaseUrl(connection.getMetaData().getURL());
+        }
+        var readonly = new TransactionTemplate(manager);
+        readonly.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        readonly.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        readonly.setReadOnly(true);
+        java.time.Instant observedAt = readonly.execute(status -> {
+            jdbc.execute("SET LOCAL TIME ZONE 'UTC'");
+            require("UTC".equals(jdbc.queryForObject("SELECT current_setting('TimeZone')", String.class)), "CLEANUP_SESSION_TIMEZONE_NOT_UTC");
+            require("on".equals(jdbc.queryForObject("SHOW transaction_read_only", String.class))
+                    && "repeatable read".equals(jdbc.queryForObject("SHOW transaction_isolation", String.class)),
+                    "CLEANUP_POST_BOOT_NOT_READONLY_RR");
+            long tenant = preflight.plugins().getFirst().tenant();
+            List<String> rows = jdbc.queryForList("SELECT row_to_json(p)::text FROM ab_plugin p WHERE p.tenant_id=? "
+                    + "AND p.deleted_flag=FALSE ORDER BY p.pid", String.class, tenant);
+            try { S06Current001PluginCleanupAdmission.automaticExactCurrentRoster(preflight.plugins(), rows, json); }
+            catch (Exception invalid) { throw new IllegalStateException("CLEANUP_POST_BOOT_EXACT_ROSTER_CHANGED", invalid); }
+            return java.time.Instant.now();
+        });
+        require(observedAt != null, "CLEANUP_POST_BOOT_OBSERVATION_MISSING");
+        require(S06Current001PluginCleanupAdmission.hash(original).equals(required("S06_NATIVE_PLUGIN_CLEANUP_INPUT_SHA256")),
+                "CLEANUP_POST_BOOT_ORIGINAL_INPUT_CHANGED");
+        Path refresh = original.getParent().resolve("automatic-postboot-refresh-" + java.util.UUID.randomUUID());
+        Files.createDirectory(refresh, java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")));
+        Path observation = refresh.resolve("fresh-roster-observation.json");
+        write(observation, Map.of("kind", "s06-automatic-post-boot-roster-observation-v1", "capturedAtUtc", observedAt.toString(),
+                "sessionTimezone", "UTC", "readOnly", true, "isolation", "REPEATABLE_READ", "originalIntent", automaticArtifactRef(original),
+                "expectedPlugins", preflight.plugins(), "exactRawRosterUnchanged", true));
+        Path derived = refresh.resolve("derived-input.json");
+        var derivedInput = S06Current001PluginCleanupAdmission.automaticRefreshedInput(intent, observedAt);
+        S06Current001PluginCleanupAdmission.automaticOnlyCapturedAtChanged(intent, derivedInput);
+        write(derived, derivedInput);
+        Files.setPosixFilePermissions(observation, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        Files.setPosixFilePermissions(derived, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        automaticPostBootRosterRefresh = Map.of("originalIntent", automaticArtifactRef(original),
+                "freshRead", automaticArtifactRef(observation), "derivedInput", automaticArtifactRef(derived));
+        // Only this fresh, fully revalidated result is deletion authority. The readonly preflight never is.
+        var admission = S06Current001PluginCleanupAdmission.load(derived, S06Current001PluginCleanupAdmission.hash(derived), json);
+        require(admission.plugins().equals(preflight.plugins()) && admission.output().equals(preflight.output())
+                && admission.classificationSha256().equals(preflight.classificationSha256()), "CLEANUP_POST_BOOT_ADMISSION_CHANGED");
+        uninstallAutomaticOwnedRegistrations(admission, crypto, "UTC");
+        return true;
+    }
+
+    private Map<String, String> automaticArtifactRef(Path file) throws Exception {
+        return Map.of("path", file.toRealPath().toString(), "sha256", S06Current001PluginCleanupAdmission.hash(file));
+    }
+
     private void uninstallAutomaticOwnedRegistrations(S06Current001PluginCleanupAdmission.Admission admission,
                                                      Map<String, Object> crypto, String sessionTimezone) throws Exception {
         require(admission.schemaVersion() == 3 && !admission.plugins().isEmpty(), "CLEANUP_AUTOMATIC_ADMISSION_REQUIRED");
+        require(automaticPostBootRosterRefresh != null && automaticPostBootRosterRefresh.size() == 3, "CLEANUP_POST_BOOT_AUTHORITY_MISSING");
         Set<Long> tenantSet = admission.plugins().stream().map(S06Current001PluginCleanupAdmission.Expected::tenant).collect(java.util.stream.Collectors.toSet());
         require(tenantSet.size() == 1, "CLEANUP_AUTOMATIC_ONE_FRESH_TENANT_ONLY");
         long tenant = tenantSet.iterator().next();
@@ -372,6 +440,7 @@ class S06Current001PluginRegistryCleanupIT {
         require(persisted != null && persisted.equals(completed.get("preservedAfter")), "CLEANUP_COMMIT_READBACK_CHANGED");
         completed.put("persistedAfter", persisted);
         completed.put("kind", "s06-automatic-owned-plugin-cleanup-receipt-v1");
+        completed.put("postBootRosterRefresh", automaticPostBootRosterRefresh);
         completed.put("sourceFamily", S06Current001PluginCleanupAdmission.AUTOMATIC_FAMILY);
         completed.put("inputSha256", admission.inputSha256()); completed.put("sourceClassificationSha256", admission.classificationSha256());
         completed.put("softDeletedPluginRegistrations", admission.plugins().size()); completed.put("sessionTimezone", sessionTimezone);
