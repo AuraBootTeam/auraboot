@@ -183,6 +183,7 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
     'com.auraboot.test-fixtures',
   );
 
+  // Import and role writes require an explicitly selected business session.
   const token = await loginAdmin(request);
 
   const existingCommandsRes = await request.get(

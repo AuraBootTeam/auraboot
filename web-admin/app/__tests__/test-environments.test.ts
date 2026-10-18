@@ -44,6 +44,24 @@ describe('Playwright test environment helpers', () => {
     vi.resetModules();
   });
 
+  it('requires explicit runtime URLs even when host defaults are available', async () => {
+    delete process.env.PLAYWRIGHT_BASE_URL;
+    delete process.env.BACKEND_URL;
+    const env = await loadEnvironments();
+    expect(env.BASE_URL).toBeTruthy();
+    expect(env.BACKEND_URL).toBeTruthy();
+    expect(() => env.requireRuntimeUrl('base')).toThrow(/PLAYWRIGHT_BASE_URL must explicitly/);
+    expect(() => env.requireRuntimeUrl('backend')).toThrow(/BACKEND_URL must explicitly/);
+  });
+
+  it('keeps explicitly configured runtime URLs unchanged', async () => {
+    process.env.PLAYWRIGHT_BASE_URL = 'https://test-web.example';
+    process.env.BACKEND_URL = 'https://test-api.example';
+    const env = await loadEnvironments();
+    expect(env.requireRuntimeUrl('base')).toBe('https://test-web.example');
+    expect(env.requireRuntimeUrl('backend')).toBe('https://test-api.example');
+  });
+
   it('uses libpq PG* aliases when Aura PG_* aliases are absent', async () => {
     resetEnv();
     delete process.env.PG_HOST;

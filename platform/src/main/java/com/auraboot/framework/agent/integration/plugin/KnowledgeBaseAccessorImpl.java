@@ -1,4 +1,4 @@
-package com.auraboot.framework.plugin.pf4j;
+package com.auraboot.framework.agent.integration.plugin;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor;

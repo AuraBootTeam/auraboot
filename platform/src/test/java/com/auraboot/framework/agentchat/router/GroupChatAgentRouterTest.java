@@ -1,6 +1,6 @@
 package com.auraboot.framework.agentchat.router;
 
-import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
+import com.auraboot.framework.im.event.ImMessageSentEvent;
 import com.auraboot.framework.agentchat.reply.AgentReplyTask;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;

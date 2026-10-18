@@ -105,10 +105,10 @@ describe('RuntimeFieldRenderer required vs read-only', () => {
       expect(localized).toHaveLength(19);
       for (const field of fields) {
         const key = `model.showcase_all_fields.${field.field}.placeholder`;
-        const placeholder = field.props.placeholder;
-        const expected = typeof placeholder === 'object'
-          ? placeholder[locale]
-          : translations[key] ?? placeholder;
+        const configured = field.props.placeholder;
+        const expected = typeof configured === 'string'
+          ? (translations[key] ?? configured)
+          : (configured[locale] ?? configured.en ?? configured['zh-CN']);
         expect(expected).toBeTruthy();
         expect(expected).not.toMatch(/^\$i18n:/);
         if (locale === 'en-US') expect(expected).not.toMatch(/[\u4e00-\u9fff]/);

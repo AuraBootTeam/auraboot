@@ -121,6 +121,16 @@ function envValue(primary: string, alias: string, fallback: string): string {
   return process.env[primary] ?? process.env[alias] ?? fallback;
 }
 
+/** Require an explicitly owned runtime URL for tests that must never use host defaults. */
+export function requireRuntimeUrl(target: 'base' | 'backend'): string {
+  const key = target === 'base' ? 'PLAYWRIGHT_BASE_URL' : 'BACKEND_URL';
+  const value = process.env[key];
+  if (!value?.trim()) {
+    throw new Error(`[E2E env] ${key} must explicitly identify the owned test runtime`);
+  }
+  return value;
+}
+
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;

@@ -45,7 +45,7 @@ public class AuraBotConversationService {
     private final ImMessageService imMessageService;
     private final AgentDefinitionMapper agentDefinitionMapper;
     private final ObjectMapper objectMapper;
-    private final com.auraboot.framework.behavior.service.AnalyticsResultHistory analyticsHistory;
+    private final com.auraboot.framework.agent.integration.behavior.AnalyticsResultHistory analyticsHistory;
 
     public List<AuraBotConversationItem> listConversations(Long tenantId, Long memberId) {
         List<Long> conversationIds = memberMapper.findVisibleConversationIdsByMember(

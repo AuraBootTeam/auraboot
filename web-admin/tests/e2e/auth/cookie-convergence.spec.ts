@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '../../helpers/environments';
+import { requireRuntimeUrl } from '../../helpers/environments';
 import { expect, test, type Page } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
@@ -76,7 +76,7 @@ test.describe('httpOnly cookie convergence', () => {
 
   test('a legacy localStorage JWT is exchanged once, then deleted', async ({ page, context }) => {
     test.setTimeout(45_000);
-    const backendUrl = BACKEND_URL;
+    const backendUrl = requireRuntimeUrl('backend');
     expect(backendUrl, 'BACKEND_URL must point at the real backend').toBeTruthy();
     const login = await page.request.post(`${backendUrl}/api/auth/login`, {
       data: {

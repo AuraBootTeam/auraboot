@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 
 class AnalyticsExecutionStatusServiceTest {
     private final NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
-    private final AnalyticsExecutionStatusService service = new AnalyticsExecutionStatusService(jdbc);
+    private final AnalyticsExecutionStatusService service = new AnalyticsExecutionStatusService(new com.auraboot.framework.agent.integration.behavior.AgentAnalyticsExecutionReadModel(null, jdbc));
     @BeforeEach void setup() { MetaContext.setContext(1L, 2L, "user", "user"); }
     @AfterEach void close() { MetaContext.clear(); }
     @Test void missingIdentityCannotReadEvenAnEmptyBatch() {

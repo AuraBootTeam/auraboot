@@ -363,9 +363,8 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
     fireEvent.click(screen.getByTestId('review-drawer-candidate-action-adopt'));
     await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(1));
-    const exportAction = screen.getByTestId('review-drawer-export-action-download');
-    await waitFor(() => expect(exportAction).toBeEnabled());
-    fireEvent.click(exportAction);
+    await waitFor(() => expect(screen.getByTestId('review-drawer-export-action-download')).toBeEnabled());
+    fireEvent.click(screen.getByTestId('review-drawer-export-action-download'));
     await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(2));
     expect(executeSimpleWorkbenchAction.mock.calls[0][1]).toEqual(action);
     permission.allowed = false;

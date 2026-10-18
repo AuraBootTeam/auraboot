@@ -14,7 +14,7 @@ class AnalyticsExecutionSourceServiceTest {
     private final DynamicDataService data = mock(DynamicDataService.class);
     private final ReportAggregateQueryService queries = mock(ReportAggregateQueryService.class);
     private final UserPermissionService permissions = mock(UserPermissionService.class);
-    private final AnalyticsExecutionSourceService service = new AnalyticsExecutionSourceService(data, queries, permissions, new ObjectMapper());
+    private final AnalyticsExecutionSourceService service = new AnalyticsExecutionSourceService(data, queries, permissions, new ObjectMapper(), new com.auraboot.framework.agent.integration.behavior.AgentAnalyticsExecutionContext());
     @BeforeEach void setup() { MetaContext.setContext(1L, 2L, "user", "user"); }
     @AfterEach void close() { MetaContext.clear(); }
     @Test void missingExecutionPermissionCannotReadTheSuggestion() {

@@ -402,8 +402,23 @@ test.describe('Registration Policy — Self-registration disabled', () => {
     test.skip(hasSignupLink, 'Self-registration is enabled in this environment');
     await expect(signupLink).toHaveCount(0);
 
-    await page.goto('/signup', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
+    // Keep the direct navigation independent of the first login page's cold-start reloads.
+    const redirectedPage = await page.context().newPage();
+    const signupRedirect = redirectedPage.waitForResponse(response =>
+      response.request().isNavigationRequest()
+      && new URL(response.url()).pathname === '/signup'
+      && response.status() === 302);
+    await redirectedPage.goto('/signup', { waitUntil: 'domcontentloaded' }).catch(error => {
+      // The server redirect may abort the initial navigation; verify that exact response below.
+      if (!String(error).includes('net::ERR_ABORTED')) throw error;
+    });
+    const response = await signupRedirect;
+    expect(new URL(response.headers().location, redirectedPage.url()).pathname).toBe('/login');
+    await expect(redirectedPage).toHaveURL(/\/login/, { timeout: 10000 });
+    await expect(redirectedPage.getByTestId('login-page-root')).toBeVisible();
+    await expect(redirectedPage.locator('input#identifier, input#email').first()).toBeVisible();
+    await expect(redirectedPage.locator('a[href*="signup"]')).toHaveCount(0);
+    await redirectedPage.screenshot({ path: test.info().outputPath('signup-disabled-redirect.png'), fullPage: true });
   });
 });
 
