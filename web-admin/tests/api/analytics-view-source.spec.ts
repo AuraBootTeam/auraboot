@@ -1,3 +1,4 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** A view must preserve its own authorization and every underlying source boundary. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -127,7 +128,7 @@ test('view aliases preserve underlying read, row and field protection', async ({
   const login = await request.post('/api/auth/login', { data: { email, password } });
   expect(login.status()).toBe(200);
   const owner = await requestFactory.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
     extraHTTPHeaders: { Authorization: `Bearer ${(await login.json()).data.jwt}` },
   });
   try {

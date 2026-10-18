@@ -34,6 +34,7 @@ cd auraboot
 # Configure environment (optional — defaults work for evaluation)
 cp .env.example .env
 # Edit .env with your settings (at minimum, change JWT_SECRET for production)
+python3 scripts/prepare-quickstart-env.py --file .env
 
 # Start the full stack (first run builds images — allow 5-10 min)
 docker compose --profile full up --build -d
@@ -82,6 +83,8 @@ boot needs is baked into the images (postgres schema, backend plugins), so you n
 # Grab the compose file and the bootstrap script (no repo clone needed)
 curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/docker-compose.pull.yml
 curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/scripts/quickstart.sh
+curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/scripts/prepare-quickstart-env.py
+python3 prepare-quickstart-env.py --file .env
 
 # Pull + start (backend + frontend + postgres, all prebuilt)
 docker compose -f docker-compose.pull.yml up -d
@@ -202,6 +205,7 @@ Copy `.env.example` to `.env` and configure:
 | `POSTGRES_USER` | `auraboot` | No | Database user |
 | `POSTGRES_PASSWORD` | `auraboot_dev` | **Yes (prod)** | Database password |
 | `JWT_SECRET` | (weak default) | **Yes (prod)** | JWT signing secret (min 32 chars) |
+| `OPEN_PLATFORM_PROTOCOL_SIGNING_KEY` | none | **Yes (community/prod)** | Persistent cursor/ETag signing material; prepare once and share securely across replicas. Existing `FIELD_ENCRYPTION_KEY` fallback is preserved. |
 | `REDIS_HOST` | (empty) | No | Set to `redis` to enable Redis |
 | `ANTHROPIC_API_KEY` | — | No | Enable AI/AuraBot features |
 | `OPENAI_API_KEY` | — | No | OpenAI provider (alternative LLM) |

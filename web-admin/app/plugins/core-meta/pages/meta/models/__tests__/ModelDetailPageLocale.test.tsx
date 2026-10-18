@@ -154,7 +154,7 @@ describe('ModelDetailPage locale contracts', () => {
     renderPage();
 
     // Header status + meta
-    expect(screen.getByText('草稿')).toBeInTheDocument();
+    expect(screen.getAllByText('草稿')).toHaveLength(2);
     expect(screen.getByText('模型编码:', { exact: false })).toBeInTheDocument();
     // Stat cards
     expect(screen.getByText('字段')).toBeInTheDocument();
@@ -210,16 +210,16 @@ describe('ModelDetailPage locale contracts', () => {
     expect(screen.getByText('创建人')).toBeInTheDocument();
   });
 
-  it('keeps the versions tab zh-CN chrome byte-identical and renders raw enum values', () => {
+  it('keeps the versions tab zh-CN chrome byte-identical and localizes known status values', () => {
     language.locale = 'zh-CN';
     renderPage();
     fireEvent.click(screen.getByText('版本 (2)'));
 
     expect(screen.getByText('版本 3')).toBeInTheDocument();
     expect(screen.getByText('当前版本')).toBeInTheDocument();
-    // Raw version.status enum values stay untranslated.
-    expect(screen.getByText('draft')).toBeInTheDocument();
-    expect(screen.getByText('published')).toBeInTheDocument();
+    // Known status values use the same labels as the current model.
+    expect(screen.getAllByText('草稿')).toHaveLength(2);
+    expect(screen.getByText('已发布')).toBeInTheDocument();
     expect(screen.getByText('无说明')).toBeInTheDocument();
     expect(screen.getByText('init')).toBeInTheDocument();
     expect(screen.getAllByText('查看')).toHaveLength(2);
@@ -251,7 +251,7 @@ describe('ModelDetailPage locale contracts', () => {
     language.locale = locale;
     renderPage();
 
-    expect(screen.getByText('Draft')).toBeInTheDocument();
+    expect(screen.getAllByText('Draft')).toHaveLength(2);
     expect(screen.getByText('Model code:', { exact: false })).toBeInTheDocument();
     expect(screen.getByTestId('model-primary-page-action')).toHaveTextContent('Generate basic CRUD');
     expect(screen.getByText('Edit model')).toBeInTheDocument();

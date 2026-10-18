@@ -1,13 +1,18 @@
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import PermissionManagement from '../../PermissionManagement';
 
 const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(),
+  tenantAdmin: true,
   fetchResult: vi.fn(),
 }));
 vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    hasPermission: (code: string) => mocks.permissions.has(code),
+    hasRole: (role: string) => role === 'tenant_admin' && mocks.tenantAdmin,
+  }),
   usePermissions: () => ({ hasPermission: (code: string) => mocks.permissions.has(code) }),
 }));
 vi.mock('~/contexts/I18nContext', () => ({
@@ -51,14 +56,13 @@ const role = {
 };
 function showPage() {
   render(
-    <MemoryRouter>
-      <PermissionManagement />
-    </MemoryRouter>,
+    <RouterProvider router={createMemoryRouter([{ path: '/', element: <PermissionManagement /> }])} />,
   );
 }
 afterEach(cleanup);
 beforeEach(() => {
   mocks.permissions.clear();
+  mocks.tenantAdmin = true;
   mocks.fetchResult.mockReset();
   mocks.fetchResult.mockResolvedValue({ code: '0', data: { records: [role] } });
 });
@@ -72,19 +76,29 @@ describe('PermissionManagement access feedback', () => {
     expect(screen.getByTestId('role-action-edit-warehouse')).toBeInTheDocument();
   });
 
+  it('keeps a non-administrator read-only even when its stale grants include role updates', async () => {
+    mocks.tenantAdmin = false;
+    mocks.permissions.add('org.role.read');
+    mocks.permissions.add('org.role.update');
+    showPage();
+    expect(await screen.findByTestId('role-row-warehouse')).toBeVisible();
+    expect(screen.getByTestId('role-create-btn')).toBeDisabled();
+    expect(screen.getByTestId('role-action-edit-warehouse')).toBeDisabled();
+  });
+
   it('denies a viewer before loading roles and hides the actual icon creation action', async () => {
     showPage();
     expect(await screen.findByText('无权限访问')).toBeVisible();
     expect(screen.queryByTestId('role-create-btn')).toBeNull();
     expect(mocks.fetchResult).not.toHaveBeenCalled();
   });
-  it('keeps role rows readable while hiding role mutations for a read-only account', async () => {
+  it('keeps role rows readable while disabling role mutations for a read-only account', async () => {
     mocks.permissions.add('org.role.read');
     showPage();
     expect(await screen.findByTestId('role-row-warehouse')).toHaveTextContent('Warehouse');
+    expect(screen.getByTestId('role-create-btn')).toBeDisabled();
+    expect(screen.getByTestId('role-action-edit-warehouse')).toBeDisabled();
     for (const id of [
-      'role-create-btn',
-      'role-action-edit-warehouse',
       'role-action-toggle-warehouse',
       'role-action-delete-warehouse',
     ]) {

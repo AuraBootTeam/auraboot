@@ -1,3 +1,4 @@
+import { EXPLICIT_BASE_URL as CONTRACT_EXPLICIT_BASE_URL } from '../../helpers/environments';
 /** Owner-reviewed showcase. API fixture/maintenance steps are recorded separately from UI actions. */
 import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -168,7 +169,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     }),
   );
   const ctx = await browser.newContext({
-      baseURL: process.env.PLAYWRIGHT_BASE_URL,
+      baseURL: CONTRACT_EXPLICIT_BASE_URL,
       storageState: { cookies: [], origins: [] },
       locale: 'zh-CN',
       viewport: { width: 1440, height: 1000 },

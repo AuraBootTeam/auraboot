@@ -1,3 +1,4 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** Tenant-scoped identities and colliding fixture values must remain isolated. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -18,7 +19,7 @@ for (const shape of ['select', 'cte', 'view'] as const) {
     const identity = await seed.json();
     expect(identity.jwt).toBeTruthy();
     const other = await requestFactory.newContext({
-      baseURL: process.env.BACKEND_URL,
+      baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${identity.jwt}` },
     });
     const scopedReaders: Awaited<ReturnType<typeof requestFactory.newContext>>[] = [];
@@ -134,7 +135,7 @@ for (const shape of ['select', 'cte', 'view'] as const) {
           const login = await client.post('/api/auth/login', { data: { email, password } });
           expect(login.status(), await login.text()).toBe(200);
           const reader = await requestFactory.newContext({
-            baseURL: process.env.BACKEND_URL,
+            baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
             extraHTTPHeaders: { Authorization: `Bearer ${(await login.json()).data.jwt}` },
           });
           scopedReaders.push(reader);

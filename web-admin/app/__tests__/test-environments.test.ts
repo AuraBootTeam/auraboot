@@ -16,6 +16,8 @@ const ENV_KEYS = [
   'BFF_URL',
   'BFF_PORT',
   'PW_SKIP_WEBSERVER',
+  'VITE_PORT',
+  'SPRING_BOOT_URL',
 ] as const;
 
 const originalEnv = new Map<string, string | undefined>(
@@ -44,6 +46,36 @@ describe('Playwright test environment helpers', () => {
     vi.resetModules();
   });
 
+  it('keeps explicit fixture targets absent even when resolved local defaults exist', async () => {
+    resetEnv();
+    delete process.env.PLAYWRIGHT_BASE_URL;
+    delete process.env.BACKEND_URL;
+    delete process.env.SPRING_BOOT_URL;
+    const env = await loadEnvironments();
+    expect(env.EXPLICIT_BASE_URL).toBeUndefined();
+    expect(env.EXPLICIT_BACKEND_URL).toBeUndefined();
+    expect(env.EXPLICIT_SPRING_BOOT_URL).toBeUndefined();
+    expect(env.BASE_URL).toBeTruthy();
+    expect(env.BACKEND_URL).toBeTruthy();
+  });
+
+  it('preserves explicit admitted URL values without replacing them with defaults', async () => {
+    resetEnv();
+    process.env.PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:5911';
+    process.env.BACKEND_URL = 'http://127.0.0.1:6911';
+    process.env.SPRING_BOOT_URL = 'http://127.0.0.1:6911';
+    process.env.VITE_PORT = '5911';
+    process.env.BE_PORT = '6911';
+    process.env.BFF_PORT = '5912';
+    process.env.BFF_URL = 'http://127.0.0.1:5912';
+    process.env.PG_DB = 'owned_fixture_test';
+    process.env.PW_SKIP_WEBSERVER = '1';
+    const env = await loadEnvironments();
+    expect(env.EXPLICIT_BASE_URL).toBe('http://127.0.0.1:5911');
+    expect(env.EXPLICIT_BACKEND_URL).toBe('http://127.0.0.1:6911');
+    expect(env.EXPLICIT_SPRING_BOOT_URL).toBe('http://127.0.0.1:6911');
+  });
+
   it('uses libpq PG* aliases when Aura PG_* aliases are absent', async () => {
     resetEnv();
     delete process.env.PG_HOST;
@@ -58,9 +90,7 @@ describe('Playwright test environment helpers', () => {
 
     const env = await loadEnvironments();
 
-    expect(env.PSQL_BASE).toBe(
-      'psql -h 127.0.0.1 -p 5516 -U auraboot -d aura_boot_e2e',
-    );
+    expect(env.PSQL_BASE).toBe('psql -h 127.0.0.1 -p 5516 -U auraboot -d aura_boot_e2e');
     expect(env.loadEnv('r2').pg).toEqual({
       host: '127.0.0.1',
       port: '5516',

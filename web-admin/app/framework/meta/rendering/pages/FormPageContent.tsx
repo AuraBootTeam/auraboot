@@ -2147,7 +2147,7 @@ export function FormPageContent(props: PageContentProps) {
             if (schema.extension?.linkFileAttachments === true) {
               const extractPid = (value: any): string | undefined => {
                 if (!value || typeof value !== 'object') return undefined;
-                const pid = value.recordPid || value.recordId || value.pid;
+                const pid = value.recordPid || value.pid;
                 return typeof pid === 'string' ? pid : extractPid(value.data);
               };
               const savedPid = recordPid || extractPid(responseData);

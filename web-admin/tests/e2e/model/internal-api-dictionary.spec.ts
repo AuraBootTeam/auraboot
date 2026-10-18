@@ -72,9 +72,8 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
     true,
   );
   await expect(page).toHaveURL(/\/meta\/dict\/new$/);
-  // Native popup animations are outside DOM animation control. Keep the verified
-  // invalid field focused and dismiss the transient popup before the golden.
-  await codeInput.press('Escape');
+  await expect(page.getByText('请输入字典编码', { exact: true })).toBeVisible();
+  await expect(page.getByText('请输入字典名称', { exact: true })).toBeVisible();
   await expect(codeInput).toBeFocused();
   await capture('DICT-02', page, info);
 

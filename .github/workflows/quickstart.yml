@@ -48,7 +48,7 @@ jobs:
           head="${{ github.event.pull_request.head.sha }}"
 
           if git diff --name-only "$base" "$head" \
-            | grep -E '^(platform/src/|contracts/internal-web-admin/|scripts/internal-api/|docker-compose(\..*)?\.yml|platform/Dockerfile|web-admin/Dockerfile|web-admin/app/server/|web-admin/package\.json|pnpm-lock\.yaml|platform/build\.gradle|platform/gradle/wrapper/|plugins/|scripts/quickstart\.sh|scripts/docker-bootstrap\.sh|scripts/dev/plugin-import-profiles\.json|scripts/dev/verify-quickstart\.sh|\.github/workflows/quickstart\.yml)' >/dev/null; then
+            | grep -E '^(platform/src/|contracts/internal-web-admin/|scripts/internal-api/|docker-compose(\..*)?\.yml|platform/Dockerfile|web-admin/Dockerfile|web-admin/app/server/|web-admin/package\.json|pnpm-lock\.yaml|platform/build\.gradle|platform/gradle/wrapper/|plugins/|scripts/quickstart\.sh|scripts/prepare-quickstart-env(\.test)?\.py|\.env\.example|scripts/docker-bootstrap\.sh|scripts/dev/plugin-import-profiles\.json|scripts/dev/verify-quickstart\.sh|\.github/workflows/quickstart\.yml)' >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -58,6 +58,14 @@ jobs:
       - name: Set up Docker Buildx
         if: steps.changes.outputs.run == 'true'
         uses: docker/setup-buildx-action@v4
+
+      - name: Verify and prepare persistent signing material
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          python3 scripts/prepare-quickstart-env.test.py
+          python3 scripts/prepare-quickstart-env.py --file .env
+          FIELD_ENCRYPTION_KEY=quickstart-fallback-fixture OPEN_PLATFORM_PROTOCOL_SIGNING_KEY= \
+            docker compose config --format json | python3 -c 'import json,sys; value=json.load(sys.stdin)["services"]["backend"]["environment"]["OPEN_PLATFORM_PROTOCOL_SIGNING_KEY"]; assert value == "quickstart-fallback-fixture", "Protocol signing fallback changed"'
 
       - name: Build & start full stack
         if: steps.changes.outputs.run == 'true'
@@ -167,9 +175,7 @@ jobs:
           response=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
             -H "Content-Type: application/json" \
             -d '{"email":"admin@auraboot.com","password":"Test2026x"}')
-          echo "$response" | head -c 200
-          echo
-          echo "$response" | grep -q '"jwt"' || {
+          printf '%s' "$response" | python3 -c 'import json,sys; token=json.load(sys.stdin).get("data", {}).get("jwt"); assert isinstance(token, str) and token, "Login did not return a session token"' || {
             echo "login did not return a JWT"
             docker compose logs --tail 100 backend
             docker compose logs --tail 100 frontend

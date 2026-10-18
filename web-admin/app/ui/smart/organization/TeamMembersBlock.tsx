@@ -117,10 +117,10 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   const handleRemoveMember = async (member: TeamMember) => {
     if (!teamPid || !canManage) return;
     const name = member.userName || member.userEmail || l('该成员', 'this member');
-    if (!window.confirm(`确认将 ${name} 移出团队？`)) return;
+    if (!window.confirm(text('confirmRemove').replace('{name}', name))) return;
     try {
       await removeTeamMember(teamPid, member.pid);
-      showSuccessToast('成员已移出团队');
+      showSuccessToast(text('removed'));
       void loadMembers();
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : text('removeFailure'));
@@ -130,7 +130,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   if (!teamPid) {
     return (
       <div className="border-border bg-panel rounded-card text-text-3 border px-5 py-6 text-sm">
-        未找到团队记录，无法加载成员。
+        {text('missingTeam')}
       </div>
     );
   }
@@ -155,6 +155,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
+            disabled={loading || loadFailed}
             className="bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
             data-testid="team-members-add"
           >
@@ -165,7 +166,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
       </div>
 
       {loading ? (
-        <div className="flex justify-center px-6 py-10">
+        <div role="status" aria-label={text('loading')} className="flex justify-center px-6 py-10">
           <div className="border-accent h-7 w-7 animate-spin rounded-full border-2 border-b-transparent" />
         </div>
       ) : loadFailed ? (
@@ -175,7 +176,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
         </div>
       ) : members.length === 0 ? (
         <div className="px-6 py-10 text-center">
-          <p className="text-text-2 text-sm font-medium">暂无团队成员</p>
+          <p className="text-text-2 text-sm font-medium">{text('empty')}</p>
           <p className="text-text-3 mt-1 text-sm">
             {canManage
               ? l('添加成员后，他们会出现在这里。', 'Added members will appear here.')
@@ -187,10 +188,10 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
           <table className="divide-border min-w-full divide-y">
             <thead className="bg-subtle">
               <tr>
-                <HeaderCell>用户</HeaderCell>
-                <HeaderCell>邮箱</HeaderCell>
-                <HeaderCell>角色</HeaderCell>
-                <HeaderCell>加入时间</HeaderCell>
+                <HeaderCell>{text('user')}</HeaderCell>
+                <HeaderCell>{text('email')}</HeaderCell>
+                <HeaderCell>{text('role')}</HeaderCell>
+                <HeaderCell>{text('joined')}</HeaderCell>
                 {canManage && <HeaderCell align="right">{l('操作', 'Actions')}</HeaderCell>}
               </tr>
             </thead>
@@ -328,7 +329,7 @@ function AddMemberModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="bg-panel border-border rounded-card w-full max-w-lg overflow-hidden border shadow-xl">
+      <div role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} className="bg-panel border-border rounded-card w-full max-w-lg overflow-hidden border shadow-xl">
         <div className="border-border border-b px-6 py-4">
           <h3 id={dialogTitleId} className="text-text text-base font-semibold">{text('modalTitle')}</h3>
         </div>

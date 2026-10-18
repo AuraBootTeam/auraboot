@@ -1,3 +1,4 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** Real query provenance, published commands, immutable dynamic records and outbox facts. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -592,7 +593,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       const jwt = (await login.json()).data.jwt;
       expect(jwt).toBeTruthy();
       const other = await requestFactory.newContext({
-        baseURL: process.env.BACKEND_URL,
+        baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       try {

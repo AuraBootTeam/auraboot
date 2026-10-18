@@ -16,8 +16,8 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('should have 42 definitions', () => {
-    expect(Object.keys(defs).length).toBe(42);
+  it('contains the complete supported definition catalog', () => {
+    expect(Object.keys(defs).sort()).toEqual(["ActionDef", "BlockConfig", "BlockLayoutConfig", "ButtonConfig", "CardImageViewport", "ColumnConfig", "CommandInputFieldConfig", "CrossFieldRule", "CrossRowValidationRule", "DataSourceConfig", "DefaultSortConfig", "DetailTabConfig", "DslSchema", "EventConfig", "FieldConfig", "FlowStep", "HandlerConfig", "LayoutConfig", "LinkageAction", "LinkageDataSourceConfig", "LinkageRule", "LinkageTrigger", "LinkageTriggerEvent", "LinkageValidationRule", "ListTabConfig", "LocalizedText", "MonthlyGridConfig", "MonthlyGridMetricConfig", "PageDataSourceConfig", "PaginationConfig", "ResolveViaConfig", "RuleAssert", "RuleCondition", "RuleOverride", "SelectionConfig", "SubTableConfig", "SummaryConfig", "SummaryFieldConfig", "TabFilterExpression", "TableConfig", "ThemeConfig", "TreeConfig", "ValidationRule"]);
   });
 
   it('should have DslSchema definition', () => {

@@ -1,3 +1,4 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../../helpers/environments';
 /** Real role grants and revocation through the existing AuraBot analysis card. */
 import { test, expect } from '../../fixtures';
 import { request as requestFactory } from '@playwright/test';
@@ -651,7 +652,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         expect(String(tenant.tenantId)).not.toBe(String(currentUser.tenantId));
         expect(tenant.jwt).toBeTruthy();
         const foreign = await requestFactory.newContext({
-          baseURL: process.env.BACKEND_URL,
+          baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
           extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
         });
         try {

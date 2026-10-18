@@ -121,6 +121,11 @@ function envValue(primary: string, alias: string, fallback: string): string {
   return process.env[primary] ?? process.env[alias] ?? fallback;
 }
 
+/** Explicit targets stay optional so fixture-owning specs can reject missing runtime admission. */
+export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
+export const EXPLICIT_BACKEND_URL = process.env.BACKEND_URL;
+export const EXPLICIT_SPRING_BOOT_URL = process.env.SPRING_BOOT_URL;
+
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;

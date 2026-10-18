@@ -1,3 +1,4 @@
+import { EXPLICIT_BASE_URL as CONTRACT_EXPLICIT_BASE_URL } from '../../helpers/environments';
 /**
  * Material library page — browser golden.
  *
@@ -106,7 +107,7 @@ test.describe('BOM material library page @smoke', () => {
   });
 
   test('a terminated fixture creator resumes cleanup from its persisted journal', async ({ page }) => {
-    const origin = process.env.PLAYWRIGHT_BASE_URL!;
+    const origin = CONTRACT_EXPLICIT_BASE_URL!;
     const file = test.info().outputPath('interrupted-material-fixture.json');
     const code = `PIPEINT-${uid}`;
     const beforeResponse = await page.request.get('/api/dynamic/bom_material_master/list?pageNum=1&pageSize=1');

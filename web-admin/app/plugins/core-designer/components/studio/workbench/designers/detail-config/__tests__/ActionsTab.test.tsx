@@ -58,7 +58,7 @@ describe('ActionsTab', () => {
       target: { value: 'Approve' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: /选择命令|Approve Record/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /关联命令|Linked command/i }));
     fireEvent.click(await screen.findByRole('button', { name: /showcase:approve_record/i }));
 
     expect(screen.getByTestId('detail-custom-button-0')).toHaveTextContent('Approve');

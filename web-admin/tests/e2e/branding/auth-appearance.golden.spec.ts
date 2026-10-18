@@ -1,3 +1,4 @@
+import { EXPLICIT_BASE_URL as CONTRACT_EXPLICIT_BASE_URL } from '../../helpers/environments';
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -22,9 +23,9 @@ async function publish(page: Page) {
 }
 
 test('menu → draft → preview → publish → anonymous SSR → rollback', async ({ page, browser }, testInfo) => {
-  expect(process.env.PLAYWRIGHT_BASE_URL, 'Dedicated runtime URL must be explicit').toBeTruthy();
+  expect(CONTRACT_EXPLICIT_BASE_URL, 'Dedicated runtime URL must be explicit').toBeTruthy();
   expect(process.env.PW_ADMIN_STORAGE_STATE, 'Dedicated platform administrator session must be explicit').toBeTruthy();
-  await page.context().addCookies([{ name: 'locale', value: 'en-US', url: process.env.PLAYWRIGHT_BASE_URL! }]);
+  await page.context().addCookies([{ name: 'locale', value: 'en-US', url: CONTRACT_EXPLICIT_BASE_URL! }]);
   await page.goto('/');
   const navigation = page.getByRole('navigation');
   // The platform sidebar opens its only top-level group by default.
@@ -52,9 +53,9 @@ test('menu → draft → preview → publish → anonymous SSR → rollback', as
   await expect(preview.locator('[data-auth-template]')).toHaveAttribute('data-auth-template', 'split');
   await expect(preview.locator('.auth-brand-headline')).toHaveCount(0);
 
-  const anonymous = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL, storageState: { cookies: [], origins: [] }, locale: 'en-US' });
+  const anonymous = await browser.newContext({ baseURL: CONTRACT_EXPLICIT_BASE_URL, storageState: { cookies: [], origins: [] }, locale: 'en-US' });
   try {
-    await anonymous.addCookies([{ name: 'locale', value: 'en-US', url: process.env.PLAYWRIGHT_BASE_URL! }]);
+    await anonymous.addCookies([{ name: 'locale', value: 'en-US', url: CONTRACT_EXPLICIT_BASE_URL! }]);
     const login = await anonymous.newPage();
     await login.goto('/login');
     await expect(login.locator('[data-auth-template]')).toHaveAttribute('data-auth-template', 'split');
@@ -99,7 +100,7 @@ test('menu → draft → preview → publish → anonymous SSR → rollback', as
 });
 
 test('invalid draft, concurrent editor conflict, multilingual live copy and failed assets preserve usable authentication', async ({ page, browser }, testInfo) => {
-  await page.context().addCookies([{ name: 'locale', value: 'en-US', url: process.env.PLAYWRIGHT_BASE_URL! }]);
+  await page.context().addCookies([{ name: 'locale', value: 'en-US', url: CONTRACT_EXPLICIT_BASE_URL! }]);
   const openEditor = async (editor: Page) => {
     await editor.goto('/');
     await editor.getByRole('navigation').getByRole('link', { name: /Brand and Authentication Appearance|品牌与登录外观/ }).click();
@@ -136,7 +137,7 @@ test('invalid draft, concurrent editor conflict, multilingual live copy and fail
   await expect(second.getByRole('combobox', { name: 'Corners', exact: true })).toHaveValue(stable.data.draft.theme?.radius ?? 'soft');
   await second.close();
   await publish(page);
-  const anonymous = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL, storageState: { cookies: [], origins: [] }, viewport: { width: 1440, height: 900 } });
+  const anonymous = await browser.newContext({ baseURL: CONTRACT_EXPLICIT_BASE_URL, storageState: { cookies: [], origins: [] }, viewport: { width: 1440, height: 900 } });
   try {
     const login = await anonymous.newPage();
     await login.goto('/login');
@@ -182,12 +183,12 @@ test('HTTP permission boundaries reject tenant administrators, members and anony
   expect(roles.data.some((role: { code: string }) => role.code === 'tenant_admin')).toBe(true);
   const rows: unknown[] = [];
   for (const role of ['anonymous', 'tenant_admin', 'member']) {
-    const context = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL, extraHTTPHeaders: { Origin: process.env.PLAYWRIGHT_BASE_URL! }, storageState: { cookies: [], origins: [] } });
+    const context = await browser.newContext({ baseURL: CONTRACT_EXPLICIT_BASE_URL, extraHTTPHeaders: { Origin: CONTRACT_EXPLICIT_BASE_URL! }, storageState: { cookies: [], origins: [] } });
     try {
       const user = await context.newPage();
       if (role !== 'anonymous') {
         const email = `appearance-${role}-${randomUUID().slice(0, 12)}@e2e.local`;
-        const create = await page.request.post('/api/admin/users', { headers: { Origin: process.env.PLAYWRIGHT_BASE_URL! }, data: { email, displayName: `Appearance ${role}`, initialPassword: DEFAULT_TEST_ACCOUNT.password, roleCodes: role === 'tenant_admin' ? ['tenant_admin'] : [], roleAssignmentMode: role === 'member' ? 'NONE' : 'EXPLICIT', sendInviteEmail: false } });
+        const create = await page.request.post('/api/admin/users', { headers: { Origin: CONTRACT_EXPLICIT_BASE_URL! }, data: { email, displayName: `Appearance ${role}`, initialPassword: DEFAULT_TEST_ACCOUNT.password, roleCodes: role === 'tenant_admin' ? ['tenant_admin'] : [], roleAssignmentMode: role === 'member' ? 'NONE' : 'EXPLICIT', sendInviteEmail: false } });
         const body = await create.json();
         expect(String(body.code), JSON.stringify(body)).toBe('0');
         expect(body.data.assignedRoles).toEqual(role === 'tenant_admin' ? ['tenant_admin'] : []);
@@ -231,7 +232,7 @@ test('three templates, light and dark themes, desktop and mobile with uploaded a
   test.setTimeout(240_000);
   const assetRoot = process.env.PW_APPEARANCE_FIXTURE_ROOT;
   expect(assetRoot, 'Owned asset fixtures must be explicit').toBeTruthy();
-  await page.context().addCookies([{ name: 'locale', value: 'en-US', url: process.env.PLAYWRIGHT_BASE_URL! }]);
+  await page.context().addCookies([{ name: 'locale', value: 'en-US', url: CONTRACT_EXPLICIT_BASE_URL! }]);
   await page.goto('/');
   await page.getByRole('navigation').getByRole('link', { name: /Brand and Authentication Appearance|品牌与登录外观/ }).click();
   await expect(page.getByTestId('auth-appearance-editor')).toBeVisible();
@@ -249,7 +250,7 @@ test('three templates, light and dark themes, desktop and mobile with uploaded a
     expect(String(result.code), JSON.stringify(result)).toBe('0');
     uploaded[key] = result.data.url;
   }
-  const anonymous = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL, storageState: { cookies: [], origins: [] } });
+  const anonymous = await browser.newContext({ baseURL: CONTRACT_EXPLICIT_BASE_URL, storageState: { cookies: [], origins: [] } });
   const rows: unknown[] = [];
   try {
     const login = await anonymous.newPage();

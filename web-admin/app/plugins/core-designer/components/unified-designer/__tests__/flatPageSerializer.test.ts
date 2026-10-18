@@ -439,7 +439,7 @@ describe('flatPageSerializer designer-authored trees', () => {
 });
 
 describe('flatPageSerializer fail-fast boundaries', () => {
-  it('rejects composite/dashboard kinds — they have no flat runtime representation', () => {
+  it('rejects composite pages without a flat runtime representation', () => {
     expect(() =>
       serializePageTreeToFlat({
         schemaVersion: 3,
@@ -448,14 +448,15 @@ describe('flatPageSerializer fail-fast boundaries', () => {
         blocks: [],
       }),
     ).toThrow(FlatSerializationError);
-    expect(() =>
-      serializePageTreeToFlat({
-        schemaVersion: 3,
-        kind: 'dashboard',
-        id: 'dash',
-        blocks: [],
-      }),
-    ).toThrow(FlatSerializationError);
+  });
+
+  it('serializes supported dashboard pages to the flat runtime format', () => {
+    expect(serializePageTreeToFlat({
+      schemaVersion: 3,
+      kind: 'dashboard',
+      id: 'dash',
+      blocks: [],
+    })).toEqual({ schemaVersion: 4, kind: 'dashboard', blocks: [], rootBlockId: undefined });
   });
 
   it('serializes repeater and subform as passthrough blocks (D2)', () => {
