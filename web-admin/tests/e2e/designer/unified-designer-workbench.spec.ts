@@ -6,9 +6,8 @@
  */
 
 import { expect, test } from '../../fixtures';
-import { createCookieSessionStorage } from 'react-router';
-import type { Browser, BrowserContext, Locator, Page, Request } from '@playwright/test';
-import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import type { Locator, Page, Request } from '@playwright/test';
+import { grantRolePermissionByCode, createAuthenticatedRoleContext, collectPermissionCodes } from '../../helpers/designer-role-fixtures';
 import { migratePageSchemaV2ToV3 } from '../../../app/plugins/core-designer/components/unified-designer/migration/migrateToV3';
 import { uniqueId } from '../helpers';
 
@@ -225,7 +224,6 @@ const ADMIN_STORAGE_STATE =
   (process.env.PW_STORAGE_DIR
     ? `${process.env.PW_STORAGE_DIR}/admin.json`
     : './tests/storage/admin.json');
-const JWT_TOKEN_KEY = 'jwtToken';
 const LOCAL_DESIGNER_STORAGE_KEY = 'auraboot.unified-designer.sample';
 // Must be a permission the `e2et_operator` fixture role HAS and `e2et_viewer` LACKS,
 // so the role matrix below actually discriminates. Source of truth:
@@ -234,16 +232,6 @@ const LOCAL_DESIGNER_STORAGE_KEY = 'auraboot.unified-designer.sample';
 // (The previous value `dashboard.manage` was never granted to either fixture role,
 // so the operator "allowed" leg could never hold.)
 const ROLE_MATRIX_PERMISSION_CODE = 'e2et.order.manage';
-const authSessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: '__session',
-    httpOnly: true,
-    path: '/',
-    sameSite: 'lax',
-    secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
-    secure: (process.env.NODE_ENV ?? 'development') === 'production',
-  },
-});
 
 interface PageSchemaDto {
   pid: string;
@@ -2784,8 +2772,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
   });
 
   test('UDW-055: configures field, filter, and column permission codes and gates runtime data', async ({
-    page,
-  }) => {
+    page, browser, baseURL,
+  }, info) => {
     const missingPermissionCode = `meta.unified-designer.field-missing.${uid}`;
     const visibleTitle = `Permission visible row ${uid}`;
     const secretStatus = `Permission secret status ${uid}`;
@@ -2845,25 +2833,57 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByRole('textbox', { name: /Customer name/i }).first(),
     ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('runtime-field-field_customer_phone')).toHaveAttribute(
-      'data-permission-code',
-      missingPermissionCode,
-    );
-    await expect(page.getByTestId('runtime-field-permission-field_customer_phone')).toContainText(
-      `Requires permission: ${missingPermissionCode}`,
-    );
-    await expect(page.getByTestId('runtime-input-field_customer_phone')).toHaveCount(0);
-    await expect(page.getByTestId('runtime-field-permission-filter_status')).toContainText(
-      `Requires permission: ${missingPermissionCode}`,
-    );
-    await expect(page.getByTestId('runtime-filter-input-filter_status')).toHaveCount(0);
+    const adminResponse = await page.request.get('/api/auth/me');
+    expect(adminResponse.status()).toBe(200);
+    const admin = await adminResponse.json();
+    expect(String(admin.code)).toBe('0');
+    expect(collectPermissionCodes(admin.data.permissions)).toContain('*');
+    await expect(page.getByTestId('runtime-field-field_customer_phone').getByRole('textbox')).toBeVisible();
+    await page.screenshot({ path: info.outputPath('UDW-055-wildcard-allowed.png'), fullPage: true });
+    for (const permission of ['meta.designer.read', 'page.page.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const roleContext = await createAuthenticatedRoleContext(browser, baseURL ?? new URL(page.url()).origin, 'viewer');
+    try {
+      const rolePage = await roleContext.newPage();
+      const identityResponse = await rolePage.request.get('/api/auth/me');
+      expect(identityResponse.status()).toBe(200);
+      const identity = await identityResponse.json();
+      expect(String(identity.code)).toBe('0');
+      const codes = collectPermissionCodes(identity.data.permissions);
+      expect(codes).not.toContain('*');
+      expect(codes).not.toContain(missingPermissionCode);
+      await rolePage.addInitScript(({ key, document }) => {
+        window.localStorage.setItem(key, JSON.stringify(document));
+      }, { key: LOCAL_DESIGNER_STORAGE_KEY, document: localDocument });
+      await rolePage.goto('/unified-designer', { waitUntil: 'domcontentloaded' });
+      await expect(rolePage.locator('header[data-hydrated="true"]')).toBeVisible();
+      await expect(rolePage.getByTestId('unified-designer-workbench')).toBeVisible();
+      await rolePage.getByTestId('designer-mode-preview').click();
+      await expect(rolePage.getByTestId('unified-runtime-preview')).toBeVisible();
+      await expect(rolePage.getByTestId('runtime-field-field_customer_phone')).toHaveAttribute(
+        'data-permission-code',
+        missingPermissionCode,
+      );
+      await expect(rolePage.getByTestId('runtime-field-permission-field_customer_phone')).toContainText(
+        `Requires permission: ${missingPermissionCode}`,
+      );
+      await expect(rolePage.getByTestId('runtime-input-field_customer_phone')).toHaveCount(0);
+      await expect(rolePage.getByTestId('runtime-field-permission-filter_status')).toContainText(
+        `Requires permission: ${missingPermissionCode}`,
+      );
+      await expect(rolePage.getByTestId('runtime-filter-input-filter_status')).toHaveCount(0);
 
-    const runtimeTable = page.getByTestId('runtime-table-table_customers');
-    await expect(page.getByTestId('runtime-column-column_title')).toBeVisible();
-    await expect(page.getByTestId('runtime-column-column_status')).toHaveCount(0);
-    await expect(runtimeTable).toContainText(visibleTitle);
-    await expect(runtimeTable).not.toContainText(secretStatus);
-    await expect(page.getByTestId('runtime-table-cell-table_customers-0-status')).toHaveCount(0);
+      const runtimeTable = rolePage.getByTestId('runtime-table-table_customers');
+      await expect(rolePage.getByTestId('runtime-column-column_title')).toBeVisible();
+      await expect(rolePage.getByTestId('runtime-column-column_status')).toHaveCount(0);
+      await expect(runtimeTable).toContainText(visibleTitle);
+      await expect(runtimeTable).not.toContainText(secretStatus);
+      await expect(rolePage.getByTestId('runtime-table-cell-table_customers-0-status')).toHaveCount(0);
+      await rolePage.screenshot({ path: info.outputPath('UDW-055-scoped-denied.png'), fullPage: true });
+    } finally {
+      await roleContext.close();
+    }
   });
 
   test('UDW-056: configures row action visible and disabled rules from current row data', async ({
@@ -6935,50 +6955,6 @@ async function pickCurrentPermissionCode(page: Page): Promise<string> {
   return codes[0];
 }
 
-/**
- * Grant a permission code to a role through the permission-matrix API:
- * resolve the permission id from the full matrix, the role pid from /api/roles,
- * then PUT the batch grant. Used by journeys whose fixture roles need platform
- * permissions (e.g. meta.designer.read) that no setup phase assigns.
- */
-async function grantRolePermissionByCode(
-  page: Page,
-  roleCode: string,
-  permissionCode: string,
-): Promise<void> {
-  const matrixResp = await page.request.get('/api/permissions/matrix');
-  expect(matrixResp.ok(), 'permission matrix fetch failed').toBeTruthy();
-  const matrixBody = await matrixResp.json();
-  let permissionId: number | undefined;
-  for (const module of matrixBody?.data?.modules ?? []) {
-    for (const resource of module?.resources ?? []) {
-      for (const action of resource?.actions ?? []) {
-        if (action?.code === permissionCode) {
-          permissionId = action.permissionId;
-          break;
-        }
-      }
-      if (permissionId !== undefined) break;
-    }
-    if (permissionId !== undefined) break;
-  }
-  expect(permissionId, `permission not found in matrix: ${permissionCode}`).toBeTruthy();
-
-  // Keyword-scoped: the roles list is paginated and full-gate runs create
-  // hundreds of e2e roles, pushing fixture roles past page 1.
-  const rolesResp = await page.request.get(`/api/roles?keyword=${encodeURIComponent(roleCode)}`);
-  expect(rolesResp.ok(), 'roles fetch failed').toBeTruthy();
-  const rolesBody = await rolesResp.json();
-  const records = rolesBody?.data?.records ?? [];
-  const role = records.find((entry: { code?: string }) => entry?.code === roleCode);
-  expect(role?.pid, `role not found: ${roleCode}`).toBeTruthy();
-
-  const grantResp = await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {
-    data: [{ permissionId, granted: true }],
-  });
-  expect(grantResp.ok(), `grant failed for ${roleCode}: ${grantResp.status()}`).toBeTruthy();
-}
-
 async function expectCurrentUserPermission(
   page: Page,
   permissionCode: string,
@@ -7104,93 +7080,6 @@ function toLocalDesignerDocument(
 }
 
 const FLAT_KIND_ROOT_BLOCK_TYPES = new Set(['list', 'detail', 'form', 'dashboard']);
-
-async function createAuthenticatedRoleContext(
-  browser: Browser,
-  baseURL: string,
-  role: 'operator' | 'viewer',
-): Promise<BrowserContext> {
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-  const page = await context.newPage();
-  const email = `e2e-${role}@test.com`;
-  const loginResp = await page.request.post(`${baseURL}/api/auth/login`, {
-    data: { email, password: DEFAULT_TEST_ACCOUNT.password },
-  });
-  expect(loginResp.ok(), await loginResp.text()).toBe(true);
-  const loginBody = await loginResp.json();
-  expect(loginBody.code).toBe('0');
-  const jwt = String(loginBody.data?.jwt ?? '');
-  expect(jwt).toBeTruthy();
-  await addSessionCookie(context, baseURL, jwt);
-  if (!loginBody.data?.tenantId) {
-    await selectBusinessSpace(page, context, baseURL);
-  }
-  await page.close();
-  return context;
-}
-
-async function selectBusinessSpace(
-  page: Page,
-  context: BrowserContext,
-  baseURL: string,
-): Promise<void> {
-  const spacesResp = await page.request.get(`${baseURL}/api/tenant-selection/my-spaces`);
-  expect(spacesResp.ok(), await spacesResp.text()).toBe(true);
-  const spacesBody = await spacesResp.json();
-  const spaces = Array.isArray(spacesBody.data) ? spacesBody.data : [];
-  const businessSpace =
-    spaces.find(
-      (space: { spaceType?: string; tenantName?: string }) =>
-        space.spaceType === 'business' && space.tenantName === 'AuraBoot Demo',
-    ) ?? spaces.find((space: { spaceType?: string }) => space.spaceType === 'business');
-  expect(businessSpace?.tenantId).toBeTruthy();
-
-  const selectResp = await page.request.post(`${baseURL}/api/tenant-selection/process`, {
-    data: { action: 'select', tenantId: businessSpace.tenantId },
-  });
-  expect(selectResp.ok(), await selectResp.text()).toBe(true);
-  const selectBody = await selectResp.json();
-  expect(selectBody.code).toBe('0');
-  const jwt = String(selectBody.data?.jwt ?? '');
-  expect(jwt).toBeTruthy();
-  await addSessionCookie(context, baseURL, jwt);
-}
-
-async function addSessionCookie(
-  context: BrowserContext,
-  baseURL: string,
-  jwt: string,
-): Promise<void> {
-  const session = await authSessionStorage.getSession();
-  session.set(JWT_TOKEN_KEY, jwt);
-  const setCookie = await authSessionStorage.commitSession(session, {
-    maxAge: 60 * 60 * 24 * 7,
-  });
-  const cookieValue = setCookie.match(/__session=([^;]+)/)?.[1] ?? '';
-  expect(cookieValue).toBeTruthy();
-  await context.addCookies([
-    {
-      name: '__session',
-      value: cookieValue,
-      url: baseURL,
-      httpOnly: true,
-      sameSite: 'Lax',
-      expires: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
-    },
-  ]);
-}
-
-function collectPermissionCodes(permissions: Record<string, unknown>): string[] {
-  const objectCodes = Array.isArray(permissions.permissions)
-    ? permissions.permissions
-        .map((permission: { code?: unknown }) => permission.code)
-        .filter((code: unknown): code is string => typeof code === 'string' && code.length > 0)
-    : [];
-  return [
-    ...(Array.isArray(permissions.permissionCodes) ? permissions.permissionCodes : []),
-    ...objectCodes,
-  ].filter((code: unknown): code is string => typeof code === 'string' && code.length > 0);
-}
 
 const FLAT_ENTRY_STRUCTURAL_KEYS = new Set([
   'id',
