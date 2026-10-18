@@ -1,6 +1,6 @@
+import { BASE_URL } from '../../helpers/environments';
 /** Real-provider customer analysis. Missing external prerequisites fail; this suite never substitutes a model. */
 import { test, expect } from '@playwright/test';
-import { explicitBaseURL } from '../../helpers/environments';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -36,7 +36,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   expect(model, 'blocked: name the expected real model').toBeTruthy();
   expect(provider).not.toMatch(/stub|fake|mock/i);
   expect(model).not.toMatch(/stub|fake|mock/i);
-  const origin = new URL(explicitBaseURL() || '');
+  const origin = new URL(BASE_URL || '');
   expect(['localhost', '127.0.0.1']).toContain(origin.hostname);
   const evidence = process.env.AURA_EVIDENCE_DIR;
   expect(evidence, 'blocked: bind this run to its registered evidence directory').toBeTruthy();

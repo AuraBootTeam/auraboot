@@ -1,9 +1,9 @@
+import { BASE_URL } from '../../helpers/environments';
 /**
  * Hand-authored SC05 template + current tenant data. No LLM invocation or substitute.
  * This proves report persistence and real exports, never AI interpretation/integration.
  */
 import { test, expect, type Request } from '@playwright/test';
-import { explicitBaseURL } from '../../helpers/environments';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -29,7 +29,7 @@ test('SC06-FORMATS manual customer template persists and exports real Chinese da
   page,
 }, info) => {
   test.setTimeout(180_000);
-  const origin = new URL(explicitBaseURL() || '');
+  const origin = new URL(BASE_URL || '');
   expect(['localhost', '127.0.0.1']).toContain(origin.hostname);
   const evidence = process.env.AURA_EVIDENCE_DIR;
   expect(evidence, 'bind artifacts to the registered runtime evidence run').toBeTruthy();

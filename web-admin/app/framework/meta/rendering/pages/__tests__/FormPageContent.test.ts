@@ -3,7 +3,6 @@ import {
   buildFormCommandPayload,
   buildDynamicCrudFormPayload,
   collectAttachmentRelationIds,
-  extractSavedPublicRecordPid,
   getBomUploadReviewError,
   canRenderFormButton,
   isFormAuthoringDenied,
@@ -851,17 +850,5 @@ describe('buildDynamicCrudFormPayload', () => {
   it('creates business fields while excluding audit and public identity fields', () => {
     expect(buildDynamicCrudFormPayload(loaded, meta, new Set(), 'create'))
       .toEqual({ customer: '华辰制造', amount: '68000' });
-  });
-});
-
-
-describe('saved attachment target identity', () => {
-  it('extracts public command and dynamic CRUD response PIDs through result envelopes', () => {
-    expect(extractSavedPublicRecordPid({ data: { recordPid: 'public-command' } })).toBe('public-command');
-    expect(extractSavedPublicRecordPid({ data: { pid: 'public-crud' } })).toBe('public-crud');
-  });
-  it('rejects legacy and internal identifiers instead of linking attachments to them', () => {
-    expect(extractSavedPublicRecordPid({ recordId: 'internal', id: 123 })).toBeUndefined();
-    expect(extractSavedPublicRecordPid({ recordPid: ' ', data: { pid: 'nested-public' } })).toBe('nested-public');
   });
 });

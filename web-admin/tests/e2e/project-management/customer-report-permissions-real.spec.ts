@@ -1,3 +1,4 @@
+import { BASE_URL } from '../../helpers/environments';
 /**
  * Real enterprise report authorization, using the existing project-management data.
  * API calls only provision the report/roles and independently probe authorization.
@@ -5,7 +6,6 @@
  * intercepted responses, internal test plugin, injected JWT, or default setup.
  */
 import { test, expect, type APIResponse } from '@playwright/test';
-import { explicitBaseURL } from '../../helpers/environments';
 import { randomUUID, createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -29,7 +29,7 @@ async function assertSourceDenied(response: APIResponse, exposePermissionCode = 
 
 test('SC06-PERMISSIONS report artifact grants do not bypass customer source read permission', async ({ page, browser }, info) => {
   test.setTimeout(240_000);
-  const origin = new URL(explicitBaseURL() || '').origin;
+  const origin = new URL(BASE_URL || '').origin;
   expect(new URL(origin).hostname).toBe('localhost');
   expect(process.env.PW_ADMIN_STORAGE_STATE, 'reuse the real administrator UI login').toBeTruthy();
   const evidence = process.env.AURA_EVIDENCE_DIR;

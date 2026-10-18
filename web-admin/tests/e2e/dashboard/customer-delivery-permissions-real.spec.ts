@@ -1,5 +1,5 @@
+import { EXPLICIT_BASE_URL } from '../../helpers/environments';
 import fs from 'node:fs';
-import { explicitBaseURL } from '../../helpers/environments';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -15,7 +15,7 @@ const template = JSON.parse(fs.readFileSync(path.join(root, 'examples/dashboard-
 const references: unknown[][] = JSON.parse(fs.readFileSync(path.join(root, 'scripts/reference-projects.json'), 'utf8'));
 
 test('SC04-PERMISSIONS global dashboard viewing does not grant customer-project source access', async ({ page, browser }, info) => {
-  const origin = new URL(explicitBaseURL() || '').origin;
+  const origin = new URL(EXPLICIT_BASE_URL || '').origin;
   expect(new URL(origin).hostname).toBe('localhost');
   expect(process.env.PW_ADMIN_STORAGE_STATE).toBeTruthy();
   expect(process.env.DELIVERY_FIXTURE_PATH, 'reuse the retained shared project fixture').toBeTruthy();

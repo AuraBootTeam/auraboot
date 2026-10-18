@@ -100,12 +100,15 @@ describe('RuntimeFieldRenderer required vs read-only', () => {
         }
       };
       collect(page);
-      expect(fields).toHaveLength(24);
-      const localized = fields.filter((field) => field.props.placeholder.startsWith('$i18n:'));
-      expect(localized).toHaveLength(20);
+      expect(fields).toHaveLength(30);
+      const localized = fields.filter((field) => typeof field.props.placeholder === 'string' && field.props.placeholder.startsWith('$i18n:'));
+      expect(localized).toHaveLength(19);
       for (const field of fields) {
         const key = `model.showcase_all_fields.${field.field}.placeholder`;
-        const expected = translations[key] ?? field.props.placeholder;
+        const placeholder = field.props.placeholder;
+        const expected = typeof placeholder === 'object'
+          ? placeholder[locale]
+          : translations[key] ?? placeholder;
         expect(expected).toBeTruthy();
         expect(expected).not.toMatch(/^\$i18n:/);
         if (locale === 'en-US') expect(expected).not.toMatch(/[\u4e00-\u9fff]/);

@@ -27,3 +27,14 @@ export function buildCommandTargetParams(target: unknown): Record<string, string
   const pid = toPublicRecordPid(target);
   return pid ? { targetRecordPid: pid } : {};
 }
+
+/** Read a public PID from synchronous or nested command results. */
+export function getCommandResultRecordPid(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  for (const key of ['recordPid', 'pid']) {
+    const pid = record[key];
+    if (typeof pid === 'string' && pid.trim()) return pid;
+  }
+  return getCommandResultRecordPid(record.data);
+}

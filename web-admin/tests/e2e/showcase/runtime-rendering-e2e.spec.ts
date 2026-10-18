@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 /**
  * Phase 6 — Runtime rendering E2E for the `showcase_all_fields` plugin pages.
  *
@@ -130,10 +131,8 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
     timeout: 15_000,
   });
 
-  // Dismiss any HMR overlay that might intercept clicks.
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  // A development error must fail the journey.
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,18 +350,20 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     await createBtn.click();
     await expect(page).toHaveURL(FORM_NEW_URL_RE, { timeout: 10_000 });
 
-    // Dismiss HMR overlay.
-    await page.evaluate(() => {
-      document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-    });
+    // Development errors must remain visible to the test.
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 
-    // Assert all 8 form-section containers rendered (FormSectionBlockRenderer
+    // Assert all four form-section containers rendered (FormSectionBlockRenderer
     // emits .form-section className per section — the only stable selector).
-    // showcase_all_fields_form.json defines 8 form-section blocks.
+    // showcase_all_fields_form.json defines four form-section blocks.
     const sections = page.locator('.form-section');
     await expect(sections.first()).toBeVisible({ timeout: 10_000 });
     const sectionCount = await sections.count();
-    expect(sectionCount, 'form must render exactly 8 form-section blocks').toBe(8);
+    expect(sectionCount, 'form must render all four canonical form-section blocks').toBe(4);
+    for (const id of ['record_info', 'state_plan', 'related_contact', 'content_notes']) {
+      await expect(page.getByTestId(`form-section-${id}`)).toBeAttached();
+    }
+    await expandFormSections(page);
 
     // Spot-check several widget categories actually mounted: text, number,
     // enum (select), boolean, date.
@@ -630,9 +631,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     }
 
     await expect(page).toHaveURL(DETAIL_URL_RE, { timeout: 10_000 });
-    await page.evaluate(() => {
-      document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-    });
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 
     // Tabs: detail page declares 3 tabs (overview / selectors_people / rich_content).
     // Match accessible role="tab" elements directly (the runtime renders a

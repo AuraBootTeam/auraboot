@@ -506,6 +506,17 @@ export async function ensureFilterFormOpen(page: Page, timeout = 5000): Promise<
   }
 }
 
+/** Expand only the form sections the caller intends to edit; preserve default-state tests. */
+export async function expandFormSections(page: Page): Promise<void> {
+  const sections = page.locator('details[data-testid^="form-section-"]');
+  for (const section of await sections.all()) {
+    if (!(await section.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await section.locator(':scope > summary').click();
+    }
+    await expect(section).toHaveAttribute('open', '');
+  }
+}
+
 /**
  * Wait for a dynamic form to be fully ready (schema loaded + fields rendered).
  *

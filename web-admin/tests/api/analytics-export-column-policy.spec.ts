@@ -1,6 +1,6 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** Stored artifacts must reauthorize their source before streaming bytes. */
 import { test, expect, request as requestFactory } from '@playwright/test';
-import { BACKEND_URL as ENV_BACKEND_URL } from '../helpers/environments';
 import { randomUUID } from 'node:crypto';
 import * as XLSX from 'xlsx';
 
@@ -97,7 +97,7 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
     const jwt = (await login.json()).data.jwt;
     expect(jwt).toBeTruthy();
     const owner = await requestFactory.newContext({
-      baseURL: ENV_BACKEND_URL,
+      baseURL: BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
     });
     try {

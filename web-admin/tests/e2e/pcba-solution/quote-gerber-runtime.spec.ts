@@ -1,5 +1,5 @@
+import { PG_CONN } from '../../helpers/environments';
 import { execFileSync } from 'node:child_process';
-import { PG_CONN as ENV_PG_CONN, PG_ENV as ENV_PG_ENV } from '../../helpers/environments';
 import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
@@ -267,14 +267,14 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
 
     // 仅接受自动链对本次唯一文件写出的审计；历史行或显式手动解析都不能满足它。
     const auditCountForUpload = () => Number(execFileSync('psql', [
-        '-h', String(ENV_PG_CONN.host),
-        '-p', String(ENV_PG_CONN.port),
-        '-U', String(ENV_PG_CONN.user),
-        '-d', String(ENV_PG_CONN.database),
+        '-h', PG_CONN.host,
+        '-p', String(PG_CONN.port),
+        '-U', PG_CONN.user,
+        '-d', PG_CONN.database,
         '-tAc',
         `SELECT count(*) FROM ab_command_audit_log WHERE command_code = 'qo_quote_line_common:parse_gerber' AND request_payload->>'gerber_archive_file_id' = '${gerberFileId}'`,
       ], {
-        env: ENV_PG_ENV,
+        env: { ...process.env, PGPASSWORD: process.env.POSTGRES_PASSWORD || 'auraboot' },
         timeout: 30_000,
       }).toString().trim());
     await expect.poll(auditCountForUpload, {

@@ -1,5 +1,5 @@
+import { BASE_URL } from '../../helpers/environments';
 import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
-import { explicitBaseURL } from '../../helpers/environments';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
@@ -161,7 +161,7 @@ test('a least privilege viewer cannot forge verification results or execute the 
   const grants=['tdv.check.read','model.tdv_check.read','tpm.acceptance.read','model.tpm_acceptance.read'];
   await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>{expect(ids.has(code),code).toBe(true);return{permissionId:ids.get(code),granted:true};})}));
   const email=`${code}@e2e.local`;await data(await page.request.post('/api/admin/users',{data:{email,displayName:'交付核验只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
-  const context=await browser.newContext({baseURL:explicitBaseURL(),storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+  const context=await browser.newContext({baseURL:BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
   try {
     const actor=await context.newPage();await login(actor,email,String(admin.tenantId));await open(actor,'交付核验',target.tdv_ck_name);
     await expect(actor.getByTestId('toolbar-btn-verify_delivery')).toHaveCount(0);await shot(actor,'v07');
@@ -171,7 +171,7 @@ test('a least privilege viewer cannot forge verification results or execute the 
   } finally {await context.close();}
   const managerEmail=`${code}_manager@e2e.local`;
   await data(await page.request.post('/api/admin/users',{data:{email:managerEmail,displayName:'交付核验负责人',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:['tdv_manager'],sendInviteEmail:false}}));
-  const managerContext=await browser.newContext({baseURL:explicitBaseURL(),storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+  const managerContext=await browser.newContext({baseURL:BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
   try {
     const actor=await managerContext.newPage();await login(actor,managerEmail,String(admin.tenantId));
     const identity=await data(await actor.request.get('/api/auth/me'));expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
@@ -186,7 +186,7 @@ test('a least privilege viewer cannot forge verification results or execute the 
 test('another business space cannot read or execute an existing verification target @critical',async({page,browser})=>{
   const original=await login(page);const list=await data(await page.request.get('/api/dynamic/tdv_check/list',{params:{pageSize:500}}));
   const target=list.records[0];expect(target).toBeTruthy();
-  const context=await browser.newContext({baseURL:explicitBaseURL(),storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+  const context=await browser.newContext({baseURL:BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
   try {
     const actor=await context.newPage();await login(actor,process.env.ADMIN_EMAIL!,String(original.tenantId));
     const created=await data(await actor.request.post('/api/tenant-selection/process',{data:{action:'create',tenantName:prefix+'隔离空间',displayName:'核验隔离验证'}}));

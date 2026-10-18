@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useSearchParams } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import UnifiedDesignerPage from '../../../pages/unified-designer';
@@ -1392,7 +1392,9 @@ describe('UnifiedDesignerPage', () => {
     fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
       target: { value: 'payment' },
     });
-    fireEvent.click(screen.getByTestId('designer-save'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('designer-save'));
+    });
 
     expect(await screen.findByTestId('designer-save-error')).toHaveTextContent(
       '保存未完成；应用设计中心高级配置权限已收回，本地未保存变更已保留且未重放',
