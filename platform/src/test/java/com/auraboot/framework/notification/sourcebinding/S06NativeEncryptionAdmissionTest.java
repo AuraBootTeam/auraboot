@@ -220,7 +220,9 @@ class S06NativeEncryptionAdmissionTest {
         ObjectMapper json = new ObjectMapper();
         ObjectNode proof = privateProof();
         ObjectNode runtime = json.createObjectNode();
-        runtime.putObject("backend").putObject("expected").put("pid",1234);
+        ObjectNode backend = runtime.putArray("processes").addObject().put("key","backend").put("status","ok");
+        backend.putObject("expected").put("pid",1234);
+        backend.putObject("actual").put("alive",true);
         ObjectNode env = json.createObjectNode().put("backendPid",1234);
         ObjectNode profiles = json.createObjectNode().put("backendPid",1234);
         S06NativeEncryptionAdmission.privateBackend(proof,runtime,env,profiles);
@@ -228,7 +230,7 @@ class S06NativeEncryptionAdmissionTest {
             assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(invalid,runtime,env,profiles))
                     .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
         }
-        ObjectNode missing = runtime.deepCopy(); ((ObjectNode)missing.path("backend").path("expected")).remove("pid");
+        ObjectNode missing = runtime.deepCopy(); ((ObjectNode)missing.path("processes").get(0).path("expected")).remove("pid");
         assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,missing,env,profiles))
                 .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
         for (ObjectNode invalid : java.util.List.of(json.createObjectNode().put("backendPid",9999),json.createObjectNode().put("backendPid","1234"))) {
@@ -237,7 +239,17 @@ class S06NativeEncryptionAdmissionTest {
             assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,runtime,env,invalid))
                     .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
         }
-        ObjectNode other = runtime.deepCopy(); ((ObjectNode)other.path("backend").path("expected")).put("pid",9999);
+        ObjectNode noBackend = json.createObjectNode();noBackend.putArray("processes");
+        ObjectNode duplicate = runtime.deepCopy();((com.fasterxml.jackson.databind.node.ArrayNode)duplicate.path("processes")).add(backend.deepCopy());
+        ObjectNode dead = runtime.deepCopy();((ObjectNode)dead.path("processes").get(0).path("actual")).put("alive",false);
+        ObjectNode fakeAlive = runtime.deepCopy();((ObjectNode)fakeAlive.path("processes").get(0).path("actual")).put("alive","true");
+        ObjectNode badStatus = runtime.deepCopy();((ObjectNode)badStatus.path("processes").get(0)).put("status","missing");
+        ObjectNode noProcesses = json.createObjectNode();noProcesses.putObject("backend").putObject("expected").put("pid",1234);
+        for(ObjectNode invalid : java.util.List.of(noBackend,duplicate,dead,fakeAlive,badStatus,noProcesses)) {
+            assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,invalid,env,profiles))
+                    .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        }
+        ObjectNode other = runtime.deepCopy(); ((ObjectNode)other.path("processes").get(0).path("expected")).put("pid",9999);
         assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateBackend(proof,other,env,profiles))
                 .hasMessage("S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
     }

@@ -125,7 +125,13 @@ final class S06NativeEncryptionAdmission {
 
     static void privateBackend(JsonNode proof, JsonNode runtime, JsonNode environment, JsonNode profiles) {
         JsonNode pid = proof.path("backendPid");
-        JsonNode actual = runtime.path("backend").path("expected").path("pid");
+        require(runtime.path("processes").isArray(), "S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        var backends = java.util.stream.StreamSupport.stream(runtime.path("processes").spliterator(), false)
+                .filter(row -> row.path("key").asText().equals("backend")).toList();
+        require(backends.size() == 1 && backends.getFirst().path("status").asText().equals("ok")
+                && backends.getFirst().path("actual").path("alive").isBoolean()
+                && backends.getFirst().path("actual").path("alive").booleanValue(), "S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
+        JsonNode actual = backends.getFirst().path("expected").path("pid");
         require(pid.isIntegralNumber() && pid.canConvertToLong() && pid.longValue() > 0
                 && actual.isIntegralNumber() && actual.canConvertToLong() && pid.longValue() == actual.longValue(),
                 "S06_PRIVATE_SOURCE_BACKEND_MISMATCH");
