@@ -329,7 +329,10 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
   let approvalPid2 = '';
 
   // ---- Run state ----
-  let firstTaskPid = '';
+  let runTaskPid = '';
+  let rejectedTaskPid = '';
+  let rejectedRunPid = '';
+  let dispatchTaskPid = '';
   let runPid = '';
 
   // =========================================================================
@@ -409,7 +412,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
         undefined,
         'create',
       );
-      firstTaskPid = taskRes.recordId;
+      expect(taskRes.recordId).toBeTruthy();
 
       // 5) Task in in_progress (for block test)
       await executeCommandViaApi(
@@ -460,7 +463,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
       );
 
       // 8) Task for dispatch (assignee_type=AGENT, status=TODO)
-      await executeCommandViaApi(
+      const dispatchTask = await executeCommandViaApi(
         page,
         CMDS.createTask,
         {
@@ -475,6 +478,9 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
         undefined,
         'create',
       );
+
+      dispatchTaskPid = dispatchTask.recordId;
+      expect(dispatchTaskPid).toBeTruthy();
 
       // 9) Schedule (active)
       const sRes = await executeCommandViaApi(
@@ -500,6 +506,25 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
       schedulePid = sRes.recordId;
       expect(schedulePid, 'Schedule should be created').toBeTruthy();
 
+      // Keep the rejected approval's pending pair independent from the running cancel fixture.
+      const approvalTask = await executeCommandViaApi(page, CMDS.createTask, {
+        title: `Approval_Task_${uid}`, task_status: 'in_progress', task_priority: 'high',
+        assignee_type: 'agent', assignee_id: agentCode, mission_id: missionPidForTask,
+      }, undefined, 'create');
+      rejectedTaskPid = approvalTask.recordId;
+      const approvalRun = await executeCommandViaApi(page, CMDS.createRun, {
+        run_status: 'pending', run_model: 'claude-sonnet-4-6', agent_id: agentCode, task_id: rejectedTaskPid,
+      }, undefined, 'create');
+      rejectedRunPid = approvalRun.recordId;
+      expect(rejectedTaskPid).toBeTruthy();
+      expect(rejectedRunPid).toBeTruthy();
+      const runningTask = await executeCommandViaApi(page, CMDS.createTask, {
+        title: `Running_Task_${uid}`, task_status: 'in_progress', task_priority: 'medium',
+        assignee_type: 'agent', assignee_id: agentCode, mission_id: missionPidForTask,
+      }, undefined, 'create');
+      runTaskPid = runningTask.recordId;
+      expect(runTaskPid).toBeTruthy();
+
       // 10) Run in running status
       const runRes = await executeCommandViaApi(
         page,
@@ -508,7 +533,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
           run_status: 'running',
           run_model: 'claude-sonnet-4-6',
           agent_id: agentCode,
-          task_id: firstTaskPid,
+          task_id: runTaskPid,
         },
         undefined,
         'create',
@@ -543,6 +568,7 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
         ...approvalContext,
         approval_type: 'tool_call',
         approval_title: approvalTitle1,
+        task_id: runTaskPid,
         approval_description: 'Approve this action for lifecycle test',
         approval_status: 'pending',
         run_id: runPid,
@@ -552,9 +578,10 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
         ...approvalContext,
         approval_type: 'tool_call',
         approval_title: approvalTitle2,
+        task_id: rejectedTaskPid,
         approval_description: 'Reject this action for lifecycle test',
         approval_status: 'pending',
-        run_id: runPid,
+        run_id: rejectedRunPid,
       });
 
       // Note: if dynamic approval create fails (no permission), tests will use
@@ -888,40 +915,11 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
 
     let row = await findRow(page, approvalTitle2);
 
-    // If a rejection reason modal appears, handle it
-    const responsePromise = page.waitForResponse(
-      (r) => r.url().includes('/commands/execute/') && r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
-
-    await clickRowActionBtn(page, row, BTN.rejectRequest);
-
-    // Handle possible rejection reason dialog
-    const reasonInput = page.locator('[data-testid="rejection-reason"], .ant-modal textarea, .ant-modal input[type="text"]').first();
-    const hasReasonInput = await reasonInput.isVisible({ timeout: 2_000 }).catch(() => false);
-    if (hasReasonInput) {
-      await reasonInput.fill('E2E lifecycle test rejection');
-      const confirmBtn = page.locator('.ant-modal button.ant-btn-primary, [data-testid="confirm-ok"], button:has-text("确定")').first();
-      if (await confirmBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
-        await confirmBtn.click();
-      }
-    }
-
-    // Also handle simple confirm dialog
-    const simpleConfirm = page.locator('[data-testid="confirm-ok"], button:has-text("确定")').first();
-    const hasSimpleConfirm = await simpleConfirm.isVisible({ timeout: 1_500 }).catch(() => false);
-    if (hasSimpleConfirm) {
-      await simpleConfirm.click();
-    }
-
-    await responsePromise;
-    await expect.poll(
-      async () => page.locator('table tbody tr', { hasText: approvalTitle2 }).count(),
-      { timeout: 5_000 },
-    ).toBeGreaterThan(0);
-
-    row = await findRow(page, approvalTitle2);
+    row = await clickActionAndWaitForTransition(page, row, BTN.rejectRequest, approvalTitle2);
     await assertRowStatus(row, 'rejected', 'acp_approval_status');
+    expect((await fetchRecordByPid(page, 'agent-run', rejectedRunPid))?.run_status).toBe('failed');
+    expect((await fetchRecordByPid(page, 'agent-task', rejectedTaskPid))?.task_status).toBe('blocked');
+    expect((await fetchRecordByPid(page, 'agent-run', runPid))?.run_status).toBe('running');
 
     // Buttons hidden after rejection (terminal)
     await assertBtnHidden(row, BTN.approveRequest);
@@ -986,31 +984,23 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
     const row = await findRow(page, taskDispTitle);
     await expect(row).toBeVisible({ timeout: 8_000 });
 
-    // Click dispatch and wait for any API response (may use /commands/execute/ or /agent/dispatch)
-    const dispatchResponse = page.waitForResponse(
-      (r) => (r.url().includes('/commands/execute/') || r.url().includes('/api/')) && r.request().method().toLowerCase() === 'post' && r.status() < 500,
-      { timeout: 20_000 },
-    ).catch(() => null);
-
+    const before = await queryFilteredList(page, 'agent-run', 'task_id', dispatchTaskPid, { operator: 'EQ' });
+    expect(before).toEqual([]);
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/agent/dispatch' && r.request().method() === 'POST');
     await clickRowActionBtn(page, row, BTN.dispatchTask);
-
-    // Handle confirm dialog if present
-    const confirmBtn = page.locator('[data-testid="confirm-ok"], .ant-modal-confirm-btns button.ant-btn-primary, button:has-text("确定"), button:has-text("OK")').first();
-    const hasConfirm = await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false);
-    if (hasConfirm) {
-      await confirmBtn.click();
-    }
-
-    const dispatchResp = await dispatchResponse;
-    // Dispatch may not produce a command response if confirmation was needed or command routing differs
-    // Either way, verify the result by checking run list
-
-    // Navigate to run list and verify runs exist (seeded + any newly dispatched)
+    const confirm = page.getByTestId('confirm-ok');
+    if (await confirm.isVisible()) await confirm.click();
+    const result = await response;
+    expect(result.request().postDataJSON()).toEqual({ taskPid: dispatchTaskPid, agentCode });
+    const body = await result.json();
+    expect(result.ok(), JSON.stringify(body)).toBe(true);
+    expect(String(body.code)).toBe('0');
+    await expect.poll(async () => (await queryFilteredList(page, 'agent-run', 'task_id', dispatchTaskPid, { operator: 'EQ' })).length).toBe(1);
+    const runs = await queryFilteredList(page, 'agent-run', 'task_id', dispatchTaskPid, { operator: 'EQ' });
+    expect(runs[0].pid).not.toBe(runPid);
+    expect(runs[0].agent_id).toBe(agentCode);
     await navigateToAcpPage(page, '/dynamic/agent-run');
-
-    // There should be at least one run in the list (from LIFE-17/18 seed data)
-    const runCount = await page.locator('table tbody tr').count();
-    expect(runCount, 'At least one run should exist').toBeGreaterThan(0);
+    await expect(await findRow(page, agentCode)).toBeVisible();
   });
 
   // =========================================================================

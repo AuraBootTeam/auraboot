@@ -20,6 +20,7 @@ import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_CUSTOMER_CONFIG } from '../../helpers/configs/e2et-customer.config';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import * as XLSX from 'xlsx';
+import { BASE_URL } from '../../helpers/environments';
 
 async function downloadExportRows(
   page: Page,
@@ -88,6 +89,7 @@ async function importDocumentWorkbook(page: Page, buffer: Buffer) {
 }
 
 test.describe('E2E Test Order — Excel Import/Export', () => {
+  test.use({ locale: 'zh-CN' });
   /**
    * EX-001: Download customer Excel template
    */
@@ -223,7 +225,9 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
   /**
    * EX-004: Selected and filtered exports preserve their explicit scope.
    */
-  test('EX-004: should export only selected or filtered order rows @critical', async ({ page }, testInfo) => {
+  test('EX-004: should export only selected or filtered order rows @critical', async ({ page, context }, testInfo) => {
+    await context.addCookies([{ name: 'locale', value: 'zh-CN', url: BASE_URL }]);
+    await page.setViewportSize({ width: 1280, height: 720 });
     const helper = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     const selectedTitle = `E2E Export Selected ${uniqueId('S')}`;
     const controlTitle = `E2E Export Control ${uniqueId('C')}`;
@@ -262,6 +266,7 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
       await expect(page).toHaveURL(/\/p\/c\/exchange_job_center/);
       await expect(page.getByRole('heading', { name: '数据交换任务', exact: true })).toBeVisible();
       await expect(page.getByText(/已处理 1 \/ 1/).first()).toBeVisible();
+      await expect(page.getByText('已完成', { exact: true }).first()).toBeVisible();
       await expect(page.getByRole('link', { name: /下载/ }).first()).toBeVisible();
       const refresh = page.getByRole('button', { name: /刷新任务/ });
       await expect(refresh).toBeVisible();
