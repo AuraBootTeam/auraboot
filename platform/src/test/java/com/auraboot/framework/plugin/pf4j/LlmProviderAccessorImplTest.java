@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.agent.integration.plugin.LlmProviderAccessorImpl;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;

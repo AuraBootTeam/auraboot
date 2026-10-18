@@ -30,7 +30,7 @@ import java.util.Map;
 public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
 
     @org.springframework.beans.factory.annotation.Autowired
-    private org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore> analyticsTasks;
+    private org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.agent.integration.behavior.AnalyticsConversationTaskStore> analyticsTasks;
     private final AgentRunService agentRunService;
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
@@ -94,7 +94,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         return new TurnOutcome.Failed(msg, null);
     }
 
-    private com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Stored createConversationTaskRow(TurnContext ctx, ChatRequest legacyRequest) {
+    private com.auraboot.framework.agent.integration.behavior.AnalyticsConversationTaskStore.Stored createConversationTaskRow(TurnContext ctx, ChatRequest legacyRequest) {
         String taskPid = UniqueIdGenerator.generate();
         Map<String, Object> task = new HashMap<>();
         task.put("pid", taskPid);
@@ -141,7 +141,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         }
 
         dynamicDataMapper.insert("ab_agent_task", task);
-        return new com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Stored(taskPid, true);
+        return new com.auraboot.framework.agent.integration.behavior.AnalyticsConversationTaskStore.Stored(taskPid, true);
     }
 
     private static String buildTaskTitle(ChatRequest legacyRequest) {

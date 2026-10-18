@@ -41,7 +41,7 @@ class ConversationFaqExtractionRedactionTest {
 
     @BeforeEach
     void setUp() {
-        service = new ConversationFaqExtractionService(factory);
+        service = new ConversationFaqExtractionService(new com.auraboot.framework.agent.integration.faq.LlmFaqCandidateExtractor(factory));
     }
 
     @Test

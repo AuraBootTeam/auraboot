@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent.service;
 
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.auraboot.framework.agent.mapper.AbCapabilityEvalRunMapper;
 import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.agent.provider.ToolDefinition;

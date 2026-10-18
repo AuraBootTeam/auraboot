@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.executor.impl;
 
+import com.auraboot.framework.agent.integration.automation.LlmCallExecutor;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
@@ -301,5 +302,52 @@ class LlmCallExecutorTest {
                 .inputTokens(10)
                 .outputTokens(5)
                 .build();
+    }
+
+    @Test
+    void projectedChunksPreserveSseWireShapeAndOnlyCommitOutputAfterTerminalAggregation() throws Exception {
+        var context = new HashMap<String, Object>();
+        context.put("runPid", "stream-boundary-run");
+        var response = LlmChatResponse.builder().inputTokens(7).outputTokens(4).stopReason("end_turn")
+                .content(List.of(LlmChatResponse.ContentBlock.builder().type("text").text("Final answer").build())).build();
+        var chunks = reactor.core.publisher.Flux.just(
+                com.auraboot.framework.agent.dto.LlmChunk.thinking(0, "Reasoning"),
+                com.auraboot.framework.agent.dto.LlmChunk.delta(1, "Final "),
+                com.auraboot.framework.agent.dto.LlmChunk.delta(2, "answer"),
+                com.auraboot.framework.agent.dto.LlmChunk.done(3, response))
+                .doOnNext(chunk -> assertThat(context).doesNotContainKey("llmOutput"));
+        when(llmProvider.streamChat(any(), any(), any())).thenReturn(chunks);
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var publisher = new AutomationRunStreamPublisher(registry, Runnable::run);
+        var controller = new com.auraboot.framework.automation.controller.AutomationRunStreamController(
+                publisher, new com.fasterxml.jackson.databind.ObjectMapper());
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        var pending = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/admin/automation-runs/stream-boundary-run/llm-stream").param("nodeId", "summary"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.request().asyncStarted()).andReturn();
+        var action = AutomationAction.builder().type("llm_call").label("summary")
+                .config(Map.of("model", "model-capable", "userPromptTemplate", "Summarize the record")).build();
+        var result = new LlmCallExecutor(llmProviderFactory, publisher).execute(action, context);
+        assertThat(context).containsEntry("llmOutput", "Final answer");
+        assertThat(((Map<?, ?>) result).get("inputTokens")).isEqualTo(7);
+        String body = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch(pending))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).contains("event:chunk", "event:done", "\"thinkingDelta\":\"Reasoning\"", "\"seq\":3",
+                "\"delta\":\"Final \"", "\"done\":true", "\"droppedCount\":0")
+                .doesNotContain("aggregateResponse", "inputTokens", "apiKey");
+
+        var rejected = new AutomationRunStreamPublisher(registry, task -> {
+            throw new java.util.concurrent.RejectedExecutionException("bounded queue full");
+        });
+        var droppedContext = new HashMap<String, Object>();
+        droppedContext.put("runPid", "stream-boundary-run");
+        // A second subscription must not assert against the first run's completed output.
+        when(llmProvider.streamChat(any(), any(), any())).thenReturn(reactor.core.publisher.Flux.just(
+                com.auraboot.framework.agent.dto.LlmChunk.delta(0, "Final answer"),
+                com.auraboot.framework.agent.dto.LlmChunk.done(1, response)));
+        new LlmCallExecutor(llmProviderFactory, rejected).execute(action, droppedContext);
+        assertThat(droppedContext).containsEntry("llmOutput", "Final answer");
+        assertThat(rejected.getDroppedCount("stream-boundary-run", "summary")).isEqualTo(2);
     }
 }

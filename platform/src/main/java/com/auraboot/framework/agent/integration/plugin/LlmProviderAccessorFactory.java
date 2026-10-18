@@ -3,7 +3,6 @@ package com.auraboot.framework.agent.integration.plugin;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.plugin.extension.AiProviderAccessor;
 import com.auraboot.framework.plugin.extension.AiProviderAccessorFactory;
-import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -1,6 +1,6 @@
 package com.auraboot.framework.automation.controller;
 
-import com.auraboot.framework.agent.dto.LlmChunk;
+import com.auraboot.framework.automation.event.AutomationStreamChunk;
 import com.auraboot.framework.automation.event.AutomationRunStreamPublisher;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -94,7 +94,7 @@ public class AutomationRunStreamController {
         return emitter;
     }
 
-    private void sendChunkEvent(SseEmitter emitter, LlmChunk chunk, long seq) throws IOException {
+    private void sendChunkEvent(SseEmitter emitter, AutomationStreamChunk chunk, long seq) throws IOException {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("seq", seq);
         payload.put("delta", chunk.delta() == null ? "" : chunk.delta());
