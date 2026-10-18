@@ -383,4 +383,173 @@ class QueryAuditServiceImplTest {
             assertThat(service.archiveAuditLogs(42L, Instant.EPOCH)).isEqualTo(5);
         }
     }
+
+    @Nested
+    @DisplayName("用户统计 / 报告 / 导出")
+    class ReportsAndExports {
+
+        private void stubAllLists() {
+            when(queryAuditLogMapper.countByQueryType(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countByModel(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countByUser(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countByErrorType(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countByHour(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countByDate(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.getExecutionTimeDistribution(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countUserByQueryType(any(), any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countUserByModel(any(), any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.findByUserId(any(), any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.findAbnormallySlowQueries(any(), any(), any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.findLargeResultSetQueries(any(), any(), any(), any(), any())).thenReturn(List.of());
+        }
+
+        private void stubCoreCounters() {
+            when(queryAuditLogMapper.countByTenantAndTimeRange(any(), any(), any())).thenReturn(100L);
+            when(queryAuditLogMapper.countSuccessfulQueries(any(), any(), any())).thenReturn(95L);
+            when(queryAuditLogMapper.countFailedQueries(any(), any(), any())).thenReturn(5L);
+            when(queryAuditLogMapper.countSlowQueries(any(), any(), any(), any())).thenReturn(3L);
+            when(queryAuditLogMapper.countCacheHits(any(), any(), any())).thenReturn(40L);
+            when(queryAuditLogMapper.countDataMaskingApplications(any(), any(), any())).thenReturn(4L);
+            when(queryAuditLogMapper.countUniqueUsers(any(), any(), any())).thenReturn(6L);
+            when(queryAuditLogMapper.countUniqueModels(any(), any(), any())).thenReturn(4L);
+            when(queryAuditLogMapper.sumTotalRecordsReturned(any(), any(), any())).thenReturn(500L);
+        }
+
+        @Test
+        @DisplayName("用户统计：计数/最近查询/最活跃小时")
+        void userStatisticsAggregated() {
+            stubAllLists();
+            when(queryAuditLogMapper.countByTenantUserAndTimeRange(any(), any(), any(), any())).thenReturn(50L);
+            when(queryAuditLogMapper.countUserSuccessfulQueries(any(), any(), any(), any())).thenReturn(45L);
+            when(queryAuditLogMapper.countUserFailedQueries(any(), any(), any(), any())).thenReturn(5L);
+            when(queryAuditLogMapper.countUserAccessedModels(any(), any(), any(), any())).thenReturn(3L);
+            when(queryAuditLogMapper.getUserLastQueryTime(any(), any(), any(), any()))
+                    .thenReturn(Instant.parse("2026-02-01T10:00:00Z"));
+            when(queryAuditLogMapper.getUserMostActiveHour(any(), any(), any(), any())).thenReturn(14);
+            QueryAuditLog recent = new QueryAuditLog();
+            recent.setId(9L);
+            when(queryAuditLogMapper.findByUserId(any(), any(), any(), any())).thenReturn(List.of(recent));
+
+            var stats = service.getUserQueryStatistics(7L, 42L, Instant.EPOCH, Instant.now());
+
+            assertThat(stats.getTotalQueries()).isEqualTo(50);
+            assertThat(stats.getSuccessRate()).isEqualTo(90.0);
+            assertThat(stats.getAccessedModelCount()).isEqualTo(3);
+            assertThat(stats.getMostActiveHour()).isEqualTo(14);
+            assertThat(stats.getRecentQueries()).hasSize(1);
+        }
+
+        private QueryAuditStatisticsRequest reportRequest(String type) {
+            QueryAuditStatisticsRequest request = new QueryAuditStatisticsRequest();
+            request.setTenantId(42L);
+            request.setSlowQueryThreshold(2500);
+            return request;
+        }
+
+        @Test
+        @DisplayName("报告最小生成：默认标题与配置元数据")
+        void reportMinimalDefaults() {
+            stubAllLists();
+            stubCoreCounters();
+            com.auraboot.framework.meta.dto.QueryAuditReportRequest request =
+                    new com.auraboot.framework.meta.dto.QueryAuditReportRequest();
+            request.setTenantId(42L);
+            request.setReportType("SECURITY");
+            request.setReportFormat("json");
+            request.setDetailLevel("standard");
+
+            var report = service.generateAuditReport(request);
+
+            assertThat(report.getReportId()).isNotBlank();
+            assertThat(report.getTenantId()).isEqualTo(42L);
+            assertThat(report.getTitle()).contains("SECURITY");
+            assertThat(report.getConfiguration().getReportFormat()).isEqualTo("json");
+            assertThat(report.getConfiguration().getDetailLevel()).isEqualTo("standard");
+            assertThat(report.getQueryActivityOverview()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("报告全开关：七个分析节全部产出")
+        void reportFullSections() {
+            stubAllLists();
+            stubCoreCounters();
+            when(queryAuditLogMapper.countByHour(any(), any(), any())).thenReturn(List.of());
+            when(queryAuditLogMapper.countByDate(any(), any(), any())).thenReturn(List.of());
+            com.auraboot.framework.meta.dto.QueryAuditReportRequest request =
+                    new com.auraboot.framework.meta.dto.QueryAuditReportRequest();
+            request.setTenantId(42L);
+            request.setReportType("FULL");
+            request.setIncludeExecutiveSummary(true);
+            request.setIncludePerformanceAnalysis(true);
+            request.setIncludeSecurityAnalysis(true);
+            request.setIncludeUserActivityAnalysis(true);
+            request.setIncludeModelUsageAnalysis(true);
+            request.setIncludeRecommendations(true);
+
+            var report = service.generateAuditReport(request);
+
+            assertThat(report.getExecutiveSummary()).isNotNull();
+            assertThat(report.getPerformanceAnalysis()).isNotNull();
+            assertThat(report.getSecurityAnalysis()).isNotNull();
+            assertThat(report.getUserActivityAnalysis()).isNotNull();
+            assertThat(report.getModelUsageAnalysis()).isNotNull();
+            assertThat(report.getRecommendations()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("导出：批次统计/慢查询计数/分布与完成态")
+        void exportAggregatesBatches() {
+            stubAllLists();
+            var dynamicStub = when(queryAuditLogMapper.countForExport(any(), any(), any(), any(), any()))
+                    .thenReturn(2L);
+            QueryAuditLog ok = new QueryAuditLog();
+            ok.setSuccess(true);
+            ok.setExecutionTimeMs(100);
+            ok.setQueryType("SELECT_PAGE");
+            ok.setModelCode("crm_customer");
+            ok.setCreatedAt(Instant.parse("2026-02-01T08:00:00Z"));
+            QueryAuditLog slow = new QueryAuditLog();
+            slow.setSuccess(true);
+            slow.setExecutionTimeMs(6000);
+            slow.setQueryType("SELECT_PAGE");
+            slow.setModelCode("crm_customer");
+            slow.setCreatedAt(Instant.parse("2026-02-01T09:00:00Z"));
+            when(queryAuditLogMapper.fetchBatchForExport(any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(List.of(ok, slow));
+
+            com.auraboot.framework.meta.dto.QueryAuditExportRequest request =
+                    new com.auraboot.framework.meta.dto.QueryAuditExportRequest();
+            request.setTenantId(42L);
+            request.setModelCodes(List.of("crm_customer"));
+            request.setSuccessfulQueriesOnly(true);
+
+            var result = service.exportAuditLogs(request);
+
+            assertThat(Boolean.TRUE.equals(result.getSuccess())).isTrue();
+            assertThat(result.getStatus()).isEqualTo(com.auraboot.framework.common.constant.StatusConstants.COMPLETED);
+            assertThat(result.getProgress()).isEqualTo(100.0);
+            assertThat(result.getExportedRecords()).isEqualTo(2);
+            assertThat(result.getStatistics().getSlowQueries()).isEqualTo(1);
+            assertThat(result.getStatistics().getAverageExecutionTime()).isEqualTo(3050.0);
+            assertThat(result.getStatistics().getQueryTypeDistribution()).containsEntry("SELECT_PAGE", 2L);
+            assertThat(result.getExecutionInfo().getTotalBatches()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("导出空集：零记录完成态")
+        void exportEmptyCompletes() {
+            stubAllLists();
+            when(queryAuditLogMapper.countForExport(any(), any(), any(), any(), any())).thenReturn(0L);
+
+            com.auraboot.framework.meta.dto.QueryAuditExportRequest request =
+                    new com.auraboot.framework.meta.dto.QueryAuditExportRequest();
+            request.setTenantId(42L);
+
+            var result = service.exportAuditLogs(request);
+
+            assertThat(result.getExportedRecords()).isZero();
+            assertThat(result.getStatistics().getMinExecutionTime()).isZero();
+            assertThat(Boolean.TRUE.equals(result.getSuccess())).isTrue();
+        }
+    }
 }
