@@ -422,7 +422,8 @@ test('SLA policies use business summaries and save fixed durations through the e
     await expect(page.getByTestId('sla-timing-config')).toBeVisible();
     await expect(page.getByTestId('select-trigger-target_type')).toContainText('节点');
     await expect(page.getByTestId('custom-section-sla_rule_binding')).not.toHaveAttribute('open','');
-    await expect(page.getByTestId('sla-deadline-input').getByRole('combobox')).toHaveValue('tpm_acceptance_deadline');await shot(page,'S09');
+    const deadlineRule=page.getByTestId('sla-deadline-input').getByRole('combobox');
+    await expect(deadlineRule).toHaveValue('tpm_acceptance_deadline');await expect(deadlineRule).toBeEnabled();await expect(deadlineRule).toContainText('交付验收 · 处理时限');await shot(page,'S09');
     await page.getByTestId('custom-section-sla_rule_binding').locator('summary').first().click();
     const mappingTab=page.getByTestId('decision-rule-section-tab-decision');
     if(await mappingTab.isVisible()) await mappingTab.click();
@@ -430,8 +431,12 @@ test('SLA policies use business summaries and save fixed durations through the e
     await expect(page.getByLabel('mapping-input-0',{exact:true})).toHaveValue(config.ruleBinding.decisionBinding.inputMappings[0].input);
     const mappedField=await page.getByLabel('mapping-field-0',{exact:true}).inputValue();
     expect(mappedField).not.toBe('');await page.getByLabel('mapping-field-0',{exact:true}).selectOption(mappedField);
+    await expect(deadlineRule).toBeEnabled();await expect(deadlineRule).toContainText('交付验收 · 处理时限');
     await shot(page,'S12');
-    await page.getByTestId('custom-section-sla_rule_binding').locator('summary').first().click();
+    const cataloguePath='**/api/decision/definitions?size=1000';
+    await page.route(cataloguePath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：时限规则目录暂不可用'})}));
+    await page.reload();await expect(page.getByTestId('sla-deadline-input').getByRole('alert')).toBeVisible();await expect(deadlineRule).toBeDisabled();await shot(page,'S09-catalog-error');
+    await page.unroute(cataloguePath);await page.reload();await expect(deadlineRule).toBeEnabled();await expect(deadlineRule).toContainText('交付验收 · 处理时限');
     await page.getByRole('radio',{name:'固定时长',exact:true}).click();
     await page.getByLabel('时长单位',{exact:true}).selectOption('minutes');await page.getByLabel('时长数值',{exact:true}).fill('15');await shot(page,'S10');
     const saved=page.waitForResponse(response=>response.url().includes('/execute/admin:update_sla_config')&&response.request().method()==='POST');
