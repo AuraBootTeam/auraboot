@@ -124,8 +124,7 @@ public class CompletionPhase implements CommandPhase {
 
         // Save idempotency record
         if (StringUtils.hasText(ctx.getRequest().getClientRequestId())) {
-            var resultData = new HashMap<>(ctx.getFieldMapResults());
-            resultData.putAll(ctx.getHandlerResults());
+            var resultData = ctx.resultData();
             if (ctx.getIdempotencyIntent() == null) {
                 throw new IllegalStateException("Command idempotency intent was not claimed");
             }
