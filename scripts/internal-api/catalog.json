@@ -16,7 +16,8 @@
         "discover.test.mjs",
         "export.test.mjs",
         "foundation.test.mjs",
-        "drift.test.mjs"
+        "drift.test.mjs",
+        "response-shape.test.mjs"
       ],
       "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json",
       "unitTests": [
@@ -37,7 +38,10 @@
         "foundation audit accepts each registered passing test exactly once",
         "CLI entrypoints reject missing arguments when invoked through a symlink",
         "captured drift compares semantic contracts and refuses receipt reuse",
-        "captured drift never creates success evidence for an empty or changed producer document"
+        "captured drift never creates success evidence for an empty or changed producer document",
+        "response shape validates nested references required fields nullability arrays and scalar types",
+        "response shape refuses undeclared operations statuses media and validates error response references",
+        "response shape detects stale nullable metadata without claiming format or business acceptance"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },
@@ -47,7 +51,8 @@
       "tests": [
         "generated dictionary operations preserve the UI journey",
         "anonymous dictionary navigation and API access are refused",
-        "generated dictionary data supplies labels to the real DSL team list"
+        "generated dictionary data supplies labels to the real DSL team list",
+        "dictionary batch feedback uses actual counts and an empty tree remains editable"
       ],
       "operations": [
         {
@@ -84,7 +89,7 @@
         },
         {
           "method": "get",
-          "path": "/api/meta/dict/{code}/validate"
+          "path": "/api/meta/dict/{pid}/validate"
         },
         {
           "method": "get",
@@ -126,6 +131,13 @@
           "method": "post",
           "path": "/api/meta/dict/{pid}/unpublish"
         }
+      ]
+    },
+    "dictionaryWire": {
+      "purpose": "Real dictionary response structures and listed business invariants; API driver, not UI or full format acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-dictionary-wire.spec.ts",
+      "tests": [
+        "all registered dictionary operations satisfy their real JSON response structures"
       ]
     }
   },
@@ -268,6 +280,45 @@
       "expected": "The actual organization menu displays a fresh owned team with the generated dictionary label and semantic color instead of its raw stored status code",
       "test": "generated dictionary data supplies labels to the real DSL team list",
       "screenshot": "DICT-11-dsl-team-label.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-12",
+      "feature": "dictionary",
+      "action": "batch-protected",
+      "branch": "sad",
+      "expected": "Published dictionary batch delete returns zero, reports no deletion, retains selection and persisted published state",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-12-batch-zero.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-13",
+      "feature": "dictionary",
+      "action": "batch-deprecated",
+      "branch": "happy",
+      "expected": "After UI unpublish batch delete reports exactly one, clears selection and persists disabled state",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-13-batch-one.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-14",
+      "feature": "dictionary",
+      "action": "empty-tree-detail",
+      "branch": "empty",
+      "expected": "An owned empty tree opens its item editor with a valid empty state and enabled root creation action",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-14-empty-tree.png",
       "surface": "journey",
       "dependencies": "real-stack",
       "authority": "regression",

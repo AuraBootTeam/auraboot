@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ public class DictDataResult {
     /**
      * 错误信息
      */
+    @Schema(nullable = true)
     private String errorMessage;
 
     /**
@@ -64,6 +66,7 @@ public class DictDataResult {
     /**
      * 缓存信息
      */
+    @Schema(nullable = true)
     private CacheInfo cacheInfo;
 
     /**
@@ -78,9 +81,11 @@ public class DictDataResult {
     public static class DictItemData {
         private String value;
         private String label;
+        @Schema(nullable = true)
         private String description;
         private Integer sortOrder;
         private Boolean enabled;
+        @Schema(nullable = true)
         private String parentValue;
         private Object extension;
     }

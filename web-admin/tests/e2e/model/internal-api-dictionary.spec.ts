@@ -294,3 +294,115 @@ test('generated dictionary data supplies labels to the real DSL team list', asyn
     expect((await removed.json()).code).toBe('0');
   }
 });
+
+test('dictionary batch feedback uses actual counts and an empty tree remains editable', async ({
+  page,
+}, info) => {
+  test.setTimeout(90_000);
+  const login = new LoginPage(page);
+  await login.gotoRoot();
+  await login.waitForFormReady();
+  await login.login(DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await login.expectLoggedIn();
+  const headers = { Origin: new URL(page.url()).origin };
+  const owned: { pid: string; code: string }[] = [];
+  async function create(dictType: string) {
+    const code = uniqueId(`e2e_contract_${dictType}`);
+    const response = await page.request.post('/api/meta/dict', {
+      headers,
+      data: { code, name: `契约边界 ${code.slice(-6)}`, dictType, sourceType: 'static', items: [] },
+    });
+    const body = await response.json();
+    if (body.code === '0' && typeof body.data?.pid === 'string')
+      owned.push({ pid: body.data.pid, code });
+    expect(body.code).toBe('0');
+    return { pid: body.data.pid as string, code };
+  }
+  async function find(code: string) {
+    await page.locator('nav a[href="/meta/dict"]').click();
+    await expect(page.getByTestId('filter-code')).toBeEnabled();
+    await page.getByTestId('filter-code').fill(code);
+    await page.getByTestId('filter-search').click();
+    await expect(page).toHaveURL(
+      (url) => url.pathname === '/meta/dict' && url.searchParams.get('code') === code,
+    );
+    return page.locator('tbody tr').filter({ hasText: code });
+  }
+  async function batch() {
+    await page.getByTestId('toolbar-btn-batch-delete').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    const deleted = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/meta/dict/batch' &&
+        response.request().method() === 'DELETE',
+    );
+    await page.getByTestId('confirm-ok').click();
+    const response = await deleted;
+    expect(response.status()).toBe(200);
+    return response.json();
+  }
+  try {
+    const simple = await create('simple');
+    let row = await find(simple.code);
+    await row.getByRole('checkbox').check();
+    expect((await batch()).data).toBe(0);
+    await expect(
+      page.getByText('未删除任何字典，请检查字典状态或权限。', { exact: true }),
+    ).toBeVisible();
+    await expect(row).toContainText('已发布');
+    await expect(row.getByRole('checkbox')).toBeChecked();
+    expect(
+      (await (await page.request.get(`/api/meta/dict/${simple.pid}`)).json()).data.status,
+    ).toBe('published');
+    await capture('DICT-12', page, info);
+    await row.getByRole('link', { name: '查看', exact: true }).click();
+    const unpublished = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === `/api/meta/dict/${simple.pid}/unpublish`,
+    );
+    await page.getByRole('button', { name: '取消发布', exact: true }).click();
+    expect((await (await unpublished).json()).data.status).toBe('deprecated');
+    row = await find(simple.code);
+    await row.getByRole('checkbox').check();
+    expect((await batch()).data).toBe(1);
+    await expect(page.getByText('成功删除 1 个字典', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('toolbar-btn-batch-delete')).toHaveCount(0);
+    expect(
+      (await (await page.request.get(`/api/meta/dict/${simple.pid}`)).json()).data.status,
+    ).toBe('disabled');
+    await capture('DICT-13', page, info);
+    const empty = await create('tree');
+    const emptyRow = await find(empty.code);
+    await emptyRow.getByRole('link', { name: '查看', exact: true }).click();
+    await page.getByRole('button', { name: '字典项 (0)', exact: true }).click();
+    await expect(page.getByText('暂无字典项，请新增根节点', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '新增根节点', exact: true })).toBeEnabled();
+    await capture('DICT-14', page, info);
+  } finally {
+    const errors: string[] = [];
+    for (const item of owned) {
+      try {
+        const current = await (await page.request.get(`/api/meta/dict/${item.pid}`)).json();
+        expect(current.code).toBe('0');
+        if (current.data.status === 'disabled') continue;
+        if (current.data.status === 'published')
+          expect(
+            (
+              await (
+                await page.request.post(`/api/meta/dict/${item.pid}/unpublish`, { headers })
+              ).json()
+            ).code,
+          ).toBe('0');
+        expect(
+          (await (await page.request.delete(`/api/meta/dict/${item.pid}`, { headers })).json())
+            .code,
+        ).toBe('0');
+        expect(
+          (await (await page.request.get(`/api/meta/dict/${item.pid}`)).json()).data.status,
+        ).toBe('disabled');
+      } catch (error) {
+        errors.push(`${item.pid}: ${String(error)}`);
+      }
+    }
+    expect(errors, 'Own fixture cleanup').toEqual([]);
+  }
+});

@@ -154,9 +154,9 @@ export const dictService = {
       'Failed to fetch statistics',
     );
   },
-  async validateConfig(code: string, request?: Request) {
+  async validateConfig(pid: string, request?: Request) {
     return data(
-      await internalRequest('get', '/api/meta/dict/{code}/validate', { path: { code }, request }),
+      await internalRequest('get', '/api/meta/dict/{pid}/validate', { path: { pid }, request }),
       'Failed to validate dictionary',
     );
   },

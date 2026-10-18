@@ -16,6 +16,9 @@ import com.auraboot.framework.plugin.service.PluginResourceTracker;
 import com.auraboot.framework.meta.service.DictVersionService;
 import com.auraboot.framework.meta.service.DictCascadeService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -47,6 +50,15 @@ import java.util.List;
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "字典管理", description = "字典数据的增删改查、版本管理和级联查询")
+@ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Authentication required", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permission denied", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Resource not found", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version conflict", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "Invalid business configuration", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class)))
+})
 @AuthenticatedAccess("render-time dict data and cascade reads for form dropdowns are baseline-readable application structure for any authenticated user")
 public class DictController {
 
@@ -407,14 +419,14 @@ public class DictController {
         return ApiResponse.success(result);
     }
 
-    @GetMapping("/{code}/validate")
+    @GetMapping("/{pid}/validate")
     @Operation(summary = "验证字典配置", description = "验证字典配置的正确性")
     @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<DictValidationResult> validateDictConfig(
-            @Parameter(description = "字典PID") @PathVariable @NotBlank String code) {
-        log.info("验证字典配置: code={}", logSafe(code));
+            @Parameter(description = "Dictionary PID") @PathVariable @NotBlank String pid) {
+        log.info("Validating dictionary configuration: pid={}", logSafe(pid));
         
-        DictValidationResult result = dictService.validateConfig(code);
+        DictValidationResult result = dictService.validateConfig(pid);
         return ApiResponse.success(result);
     }
 

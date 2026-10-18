@@ -59,9 +59,24 @@ export function dictionaryData(value: components['schemas']['DictDataResult']): 
   return { ...data, items: data.items.map(dictionaryItem) };
 }
 
-export function dictionaryTree(value: components['schemas']['DictTreeNode']): DictTreeNode {
+function dictionaryTreeNode(value: components['schemas']['DictTreeNode']): DictTreeNode {
   const node = requireFields(value, ['value', 'label']);
-  return { ...node, children: node.children?.map(dictionaryTree) };
+  return { ...node, children: node.children?.map(dictionaryTreeNode) };
+}
+
+/** The producer represents an empty cascade with an empty root node. */
+export function dictionaryTree(
+  value: components['schemas']['DictTreeNode'],
+): DictTreeNode | undefined {
+  if (
+    value.value === null &&
+    value.label === null &&
+    Array.isArray(value.children) &&
+    value.children.length === 0
+  ) {
+    return undefined;
+  }
+  return dictionaryTreeNode(value);
 }
 
 export function dictionaryItems(values: components['schemas']['DictItemData'][]): DictItemData[] {

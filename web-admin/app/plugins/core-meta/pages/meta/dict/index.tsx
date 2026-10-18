@@ -4,6 +4,8 @@
  * Displays a paginated list of dictionaries with search and filter capabilities
  */
 
+import { useLocalizedText } from '~/utils/i18n';
+import BATCH_TEXT from './batchFeedback.i18n.json';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
@@ -52,6 +54,7 @@ export default function DictListPage() {
   const navigate = useNavigate();
   const { result: initialResult, query: initialQuery } = useLoaderData<typeof loader>();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const lt = useLocalizedText();
   const { timezone, formats } = useTimezone();
 
   const [result, setResult] = useState<DictPageResult<DictDTO>>(initialResult);
@@ -154,9 +157,20 @@ export default function DictListPage() {
 
     setLoading(true);
     try {
-      await dictService.batchDelete(Array.from(selectedDicts));
-      showSuccessToast(`成功删除 ${selectedDicts.size} 个字典`);
-      setSelectedDicts(new Set());
+      const deleted = await dictService.batchDelete(Array.from(selectedDicts));
+      if (!Number.isInteger(deleted) || deleted < 0 || deleted > selectedDicts.size) {
+        throw new Error('Invalid dictionary deletion count');
+      }
+      if (deleted === selectedDicts.size) {
+        showSuccessToast(lt(BATCH_TEXT.complete).replace('{deleted}', String(deleted)));
+      } else if (deleted === 0) {
+        showErrorToast(lt(BATCH_TEXT.none));
+      } else {
+        showErrorToast(lt(BATCH_TEXT.partial)
+          .replace('{deleted}', String(deleted))
+          .replace('{selected}', String(selectedDicts.size)));
+      }
+      if (deleted > 0) setSelectedDicts(new Set());
 
       // Reload current page
       await handlePageChange(result.current);
@@ -166,7 +180,7 @@ export default function DictListPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDicts, result.current, handlePageChange, showSuccessToast, showErrorToast]);
+  }, [selectedDicts, result.current, handlePageChange, showSuccessToast, showErrorToast, lt]);
 
   /**
    * Handle select all

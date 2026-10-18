@@ -107,3 +107,14 @@ archives: the caller owns the frozen archive and image provenance, while the run
 checks its scoped input bytes remain unchanged. This update does not independently
 qualify a release; the complete existing image gate must execute successfully on the
 admitted Linux CI host.
+
+## JSON response structure evidence
+
+`response-shape.mjs` checks an observed JSON response against its declared
+operation, HTTP status, media type and local-reference schema using the locked
+JSON Schema 2020-12 validator. It rejects missing required fields, incorrect
+scalar/array types and nulls that the producer did not declare. Error responses
+are checked against their own status declaration. Its claim is
+`json-response-structure-only`: format validation and business invariants need
+separate assertions. A permissive or optional producer schema remains a producer
+contract gap; a passing structural check cannot prove a complete API contract.

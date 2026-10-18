@@ -141,10 +141,10 @@ const cases = [
   },
   {
     name: 'validate config',
-    invoke: () => dictService.validateConfig('STATUS'),
+    invoke: () => dictService.validateConfig('dict-pid'),
     method: 'get',
-    path: '/api/meta/dict/{code}/validate',
-    input: { path: { code: 'STATUS' }, request: undefined },
+    path: '/api/meta/dict/{pid}/validate',
+    input: { path: { pid: 'dict-pid' }, request: undefined },
     data: { valid: false, errors: ['invalid'], warnings: [] },
   },
   {
@@ -209,6 +209,17 @@ describe('generated dictionary operations', () => {
 });
 
 describe('dictionary wire to editor projections', () => {
+  it('accepts only the producer empty root while refusing malformed children', () => {
+    expect(dictionaryTree({ value: null, label: null, children: [] })).toBeUndefined();
+    expect(() =>
+      dictionaryTree({
+        value: 'root',
+        label: 'Root',
+        children: [{ value: null, label: null, children: [] }],
+      }),
+    ).toThrow('value');
+    expect(() => dictionaryTree({ children: [] })).toThrow('value');
+  });
   it('rejects missing identity/display and pagination fields rather than inventing defaults', () => {
     expect(() => dictionaryView({ pid: 'dict-pid' })).toThrow('code');
     expect(() => dictionaryPage({ records: [] })).toThrow('total');
