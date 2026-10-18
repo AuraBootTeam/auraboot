@@ -27,7 +27,7 @@ async function capture(id: string, page: Page, info: TestInfo) {
   expect(scenario!.test).toBe(info.title);
   await expect(page.locator('body')).not.toContainText('Page Unavailable');
   const file = info.outputPath(scenario!.screenshot);
-  await page.screenshot({ path: file, fullPage: true });
+  await page.screenshot({ path: file, fullPage: true, animations: 'disabled' });
   await info.attach(id, { path: file, contentType: 'image/png' });
   info.annotations.push({ type: 'internal-api-scenario', description: id });
 }
@@ -346,9 +346,11 @@ test('dictionary batch feedback uses actual counts and an empty tree remains edi
     let row = await find(simple.code);
     await row.getByRole('checkbox').check();
     expect((await batch()).data).toBe(0);
-    await expect(
-      page.getByText('未删除任何字典，请检查字典状态或权限。', { exact: true }),
-    ).toBeVisible();
+    const noneFeedback = page
+      .getByRole('alert')
+      .filter({ hasText: '未删除任何字典，请检查字典状态或权限。' });
+    await expect(noneFeedback).toBeVisible();
+    await expect(noneFeedback).toHaveCSS('opacity', '1');
     await expect(row).toContainText('已发布');
     await expect(row.getByRole('checkbox')).toBeChecked();
     expect(
@@ -364,7 +366,9 @@ test('dictionary batch feedback uses actual counts and an empty tree remains edi
     row = await find(simple.code);
     await row.getByRole('checkbox').check();
     expect((await batch()).data).toBe(1);
-    await expect(page.getByText('成功删除 1 个字典', { exact: true })).toBeVisible();
+    const deletedFeedback = page.getByRole('alert').filter({ hasText: '成功删除 1 个字典' });
+    await expect(deletedFeedback).toBeVisible();
+    await expect(deletedFeedback).toHaveCSS('opacity', '1');
     await expect(page.getByTestId('toolbar-btn-batch-delete')).toHaveCount(0);
     expect(
       (await (await page.request.get(`/api/meta/dict/${simple.pid}`)).json()).data.status,
