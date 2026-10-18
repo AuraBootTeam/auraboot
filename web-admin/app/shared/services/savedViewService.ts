@@ -1,3 +1,4 @@
+import { searchTenantMembers } from './tenantMemberSearchService';
 /** SavedView HTTP operations use generated contracts; editor/display projections are explicit. */
 import {
   internalRequest,
@@ -164,20 +165,16 @@ export class SavedViewService {
     });
   }
   async searchUsers(keyword: string, size = 10, request?: Request): Promise<SavedViewUserOption[]> {
-    const data = responseData(
-      await internalRequest('post', '/api/tenant/members/search', {
-        body: {
-          pageNum: 1,
-          pageSize: size,
-          status: 'active',
-          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-        },
-        request,
-      }),
-      'Failed to search users',
+    const records = await searchTenantMembers(
+      {
+        pageNum: 1,
+        pageSize: size,
+        status: 'active',
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      },
+      request,
     );
-    if (!Array.isArray(data.records)) throw new Error('Invalid collaborator search pagination');
-    return data.records.flatMap((record) => {
+    return records.flatMap((record) => {
       const user = record.user;
       if (user == null) return [];
       if (typeof user.pid !== 'string' || !user.pid)

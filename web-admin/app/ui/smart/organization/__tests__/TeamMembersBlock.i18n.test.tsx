@@ -30,7 +30,10 @@ vi.mock('~/shared/services/teamService', () => ({
   addTeamMember: f.add,
   removeTeamMember: f.remove,
 }));
-vi.mock('~/shared/services/http-client', () => ({ post: f.post }));
+vi.mock('~/shared/services/http-client/internal-api', () => ({
+  internalRequest: (_method: string, path: string, input: { body: unknown }) =>
+    f.post(path, input.body),
+}));
 const member = {
   pid: 'row-1',
   memberPid: 'member-1',
@@ -43,7 +46,7 @@ const member = {
 const candidate = {
   pid: 'member-2',
   userId: 'user-2',
-  user: { username: 'Bea', email: 'bea@example.test' },
+  user: { pid: 'user-2', username: 'Bea', email: 'bea@example.test' },
 };
 const candidateResult = {
   code: '0',
@@ -186,15 +189,15 @@ describe('team-member DSL title, localized states and API payloads', () => {
         pageSize: 100,
       });
     });
-    it(`${locale} supports the existing candidate response shapes and distinguishes a successful empty list`, async () => {
+    it(`${locale} uses canonical records and distinguishes a successful empty list`, async () => {
       f.locale = locale;
-      const withoutEmail = { ...candidate, user: { username: 'Bea' } };
-      for (const data of [[withoutEmail], { content: [withoutEmail] }, { records: [] }]) {
+      const withoutEmail = { ...candidate, user: { pid: 'user-2', username: 'Bea' } };
+      for (const data of [{ records: [withoutEmail] }, { records: [] }]) {
         f.post.mockResolvedValueOnce({ code: '0', data });
         const v = view();
         await screen.findByText('Aaron');
         fireEvent.click(screen.getByTestId('team-members-add'));
-        if (Array.isArray(data) || 'content' in data) {
+        if (data.records.length) {
           const select = (await screen.findByTestId('team-members-select')) as HTMLSelectElement;
           expect(Array.from(select.options).map((o) => o.value)).toEqual(['', 'member-2']);
           expect(select.options[1].textContent).toBe(
@@ -214,7 +217,7 @@ describe('team-member DSL title, localized states and API payloads', () => {
         expect(f.add).not.toHaveBeenCalled();
         v.unmount();
       }
-      expect(f.post).toHaveBeenCalledTimes(3);
+      expect(f.post).toHaveBeenCalledTimes(2);
     });
     it(`${locale} preserves selection after denied add and localizes the non-Error fallback`, async () => {
       f.locale = locale;

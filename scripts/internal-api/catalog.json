@@ -363,6 +363,19 @@
         "comments strings and non-rendering conditions cannot declare table capabilities",
         "empty and malformed page inputs fail without producing a green gate"
       ]
+    },
+    "memberSearchWire": {
+      "purpose": "Tenant scoped member search structure, public identities and nullable email-only username; not cross-tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/tenant-member-search.spec.ts",
+      "tests": [
+        "generated tenant member search preserves scoped public identities and email-only null usernames"
+      ],
+      "operations": [
+        {
+          "method": "post",
+          "path": "/api/tenant/members/search"
+        }
+      ]
     }
   },
   "scenarios": [

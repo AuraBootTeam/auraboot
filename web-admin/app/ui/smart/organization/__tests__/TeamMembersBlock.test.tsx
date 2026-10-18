@@ -18,7 +18,10 @@ const toast = vi.hoisted(() => ({
 }));
 
 vi.mock('~/shared/services/teamService', () => teamService);
-vi.mock('~/shared/services/http-client', () => httpClient);
+vi.mock('~/shared/services/http-client/internal-api', () => ({
+  internalRequest: (_method: string, path: string, input: { body: unknown }) =>
+    httpClient.post(path, input.body),
+}));
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => toast,
 }));
@@ -67,12 +70,12 @@ describe('TeamMembersBlock', () => {
           {
             pid: 'member-pid-1',
             userId: '1001',
-            user: { username: '张三', email: 'zhang@example.com' },
+            user: { pid: 'user-pid-1', username: '张三', email: 'zhang@example.com' },
           },
           {
             pid: 'member-pid-2',
             userId: '1002',
-            user: { username: '李四', email: 'li@example.com' },
+            user: { pid: 'user-pid-2', username: '李四', email: 'li@example.com' },
           },
         ],
       },
@@ -148,9 +151,18 @@ describe('TeamMembersBlock', () => {
     );
   });
   it('does not expose a legacy numeric ID or public PID as an unnamed candidate label', async () => {
-    httpClient.post.mockResolvedValue({ code: '0', data: { records: [{
-      pid: 'unnamed-member-pid', userPid: 'unnamed-user-pid', userId: Number.MAX_SAFE_INTEGER + 1,
-    }] } });
+    httpClient.post.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [
+          {
+            pid: 'unnamed-member-pid',
+            user: { pid: 'unnamed-user-pid', username: null, email: null, realName: null },
+            userId: Number.MAX_SAFE_INTEGER + 1,
+          },
+        ],
+      },
+    });
     renderBlock();
     await screen.findByText('张三');
     fireEvent.click(screen.getByTestId('team-members-add'));
@@ -158,9 +170,15 @@ describe('TeamMembersBlock', () => {
     expect(option).not.toHaveTextContent('unnamed-member-pid');
     expect(option).not.toHaveTextContent('unnamed-user-pid');
     expect(option).not.toHaveTextContent(String(Number.MAX_SAFE_INTEGER + 1));
-    fireEvent.change(screen.getByTestId('team-members-select'), { target: { value: 'unnamed-member-pid' } });
+    fireEvent.change(screen.getByTestId('team-members-select'), {
+      target: { value: 'unnamed-member-pid' },
+    });
     fireEvent.click(screen.getByTestId('team-members-confirm'));
-    await waitFor(() => expect(teamService.addTeamMember).toHaveBeenCalledWith('team-pid-1', { memberPid: 'unnamed-member-pid', role: 'member' }));
+    await waitFor(() =>
+      expect(teamService.addTeamMember).toHaveBeenCalledWith('team-pid-1', {
+        memberPid: 'unnamed-member-pid',
+        role: 'member',
+      }),
+    );
   });
-
 });
