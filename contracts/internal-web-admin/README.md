@@ -80,3 +80,13 @@ This JSON-envelope client does not model a file or an event stream as JSON.
 Binary, multipart, streaming and configured dynamic transports need their own
 operation-specific boundary and runtime evidence. Type generation does not
 replace serialization, permission, persistence or browser journey tests.
+
+## Datetime formats
+
+`date-time` identifies offset-bearing timestamps such as `Instant`. Default Jackson
+`LocalDateTime` properties use the custom `local-date-time` format: ISO local date
+and time, with optional fractional seconds and no offset. Explicit field serializers
+and custom patterns retain their own contract. A local datetime does not itself
+identify a timezone. UTC metadata fields converted by the platform's UTC mapper
+must be displayed through the shared timezone formatter rather than interpreted as
+browser-local wall time.

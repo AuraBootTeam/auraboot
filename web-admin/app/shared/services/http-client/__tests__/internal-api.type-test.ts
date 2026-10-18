@@ -10,9 +10,9 @@ function consumer() {
   });
   // @ts-expect-error a path parameter cannot be omitted
   internalRequest('get', '/api/views/{pid}');
-  // @ts-expect-error the server does not accept a legacy size query key
   internalRequest('get', '/api/dynamic/{pageKey}/list', {
     path: { pageKey: 'example' },
+    // @ts-expect-error the server does not accept a legacy size query key
     query: { size: 20 },
   });
   // @ts-expect-error the path is not a backend operation
@@ -21,13 +21,13 @@ function consumer() {
   internalRequest('post', '/api/meta/dict');
   // @ts-expect-error GET-only endpoints cannot be requested with POST
   internalRequest('post', '/api/views/{pid}', { path: { pid: 'view-pid' } });
-  // @ts-expect-error a file is not a JSON node
   internalRequest('post', '/api/meta/dict', {
     body: {
       code: 'code',
       name: 'Name',
       dictType: 'simple',
       sourceType: 'STATIC',
+      // @ts-expect-error a file is not a JSON node
       sourceConfig: new File([], 'file'),
     },
   });

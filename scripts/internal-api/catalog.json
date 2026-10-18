@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "scope": "Internal API contract delivery; initial foundation and dictionary scenarios",
+  "completionRequires": ["all-consumers-reconciled", "all-domains-migrated", "real-stack-evidence", "release-gate-qualified"],
+  "profiles": {
+    "foundation": {
+      "purpose": "Offline contract and generated type checks only",
+      "unitFiles": ["codegen.test.mjs", "contract.test.mjs", "discover.test.mjs", "export.test.mjs"],
+      "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json"
+    },
+    "dictionary": {
+      "purpose": "Dictionary JSON operation browser regression; not full migration acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-dictionary.spec.ts",
+      "tests": ["generated dictionary operations preserve the UI journey", "anonymous dictionary navigation and API access are refused"]
+    }
+  },
+  "scenarios": [
+    {"id":"DICT-01","feature":"dictionary","action":"menu-list","branch":"happy","expected":"The real dictionary menu displays controlled imported metadata and usable actions","test":"generated dictionary operations preserve the UI journey","screenshot":"DICT-01-menu-list.png","surface":"journey","dependencies":"real-stack","authority":"regression","driver":"browser"},
+    {"id":"DICT-02","feature":"dictionary","action":"create-validation","branch":"sad","expected":"Missing required dictionary identity prevents a write and leaves the form usable","test":"generated dictionary operations preserve the UI journey","screenshot":"DICT-02-required-validation.png","surface":"journey","dependencies":"real-stack","authority":"regression","driver":"browser"},
+    {"id":"DICT-03","feature":"dictionary","action":"create-detail","branch":"happy","expected":"UI create sends the declared payload, persists a new owned dictionary and opens its detail","test":"generated dictionary operations preserve the UI journey","screenshot":"DICT-03-created-detail.png","surface":"journey","dependencies":"real-stack","authority":"regression","driver":"browser"},
+    {"id":"DICT-04","feature":"dictionary","action":"edit-reload","branch":"happy","expected":"UI edit sends only the intended changes and the new name survives reload","test":"generated dictionary operations preserve the UI journey","screenshot":"DICT-04-edited-reload.png","surface":"journey","dependencies":"real-stack","authority":"regression","driver":"browser"},
+    {"id":"DICT-05","feature":"dictionary","action":"search-empty","branch":"empty","expected":"A nonmatching filter uses generated query names and displays a valid empty state","test":"generated dictionary operations preserve the UI journey","screenshot":"DICT-05-search-empty.png","surface":"journey","dependencies":"real-stack","authority":"regression","driver":"browser"},
+    {"id":"DICT-06","feature":"dictionary","action":"anonymous-denial","branch":"permission","expected":"Anonymous dictionary navigation requires login and the API denies unauthenticated access","test":"anonymous dictionary navigation and API access are refused","screenshot":"DICT-06-anonymous-login.png","surface":"journey","dependencies":"real-stack","authority":"regression","driver":"browser"}
+  ]
+}

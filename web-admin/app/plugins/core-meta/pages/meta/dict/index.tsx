@@ -12,6 +12,8 @@ import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { DictDTO, DictQueryRequest, DictPageResult } from '~/types/dict';
 import { StatusBadge } from '~/ui/common/StatusBadge';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 
 /**
  * Loader function
@@ -50,6 +52,7 @@ export default function DictListPage() {
   const navigate = useNavigate();
   const { result: initialResult, query: initialQuery } = useLoaderData<typeof loader>();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const { timezone, formats } = useTimezone();
 
   const [result, setResult] = useState<DictPageResult<DictDTO>>(initialResult);
   const [loading, setLoading] = useState(false);
@@ -443,7 +446,9 @@ export default function DictListPage() {
                     v{dict.version}
                   </td>
                   <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {new Date(dict.updatedAt).toLocaleString()}
+                    <time dateTime={dict.updatedAt} data-testid={`dict-updated-at-${dict.pid}`}>
+                      {formatInTimezone(dict.updatedAt, formats.datetime, timezone)}
+                    </time>
                   </td>
                   <td className="px-6 py-4 text-sm whitespace-nowrap">
                     <Link
