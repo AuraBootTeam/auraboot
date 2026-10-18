@@ -98,20 +98,33 @@ async function deleteEnvironmentViaUi(page: Page, code: string) {
       r.url().includes('/api/admin/environments/') && r.request().method() === 'DELETE',
     { timeout: 10_000 },
   );
+  // Consume the UI's delete-triggered refresh before replacing its document.
+  const refreshedList = page.waitForResponse(r =>
+    new URL(r.url()).pathname === '/api/admin/environments' && r.request().method() === 'GET');
   await dialog.accept();
   await clickPromise;
   const response = await responsePromise;
   expect(response.status()).toBe(200);
   expect(String((await response.json()).code)).toBe('0');
+  const refreshed = await refreshedList;
+  expect(refreshed.status()).toBe(200);
+  const refreshedBody = await refreshed.json();
+  expect(String(refreshedBody.code)).toBe('0');
+  expect(refreshedBody.data.some((env: { code: string }) => env.code === code)).toBe(false);
+  await expect(envCard(page, code)).toHaveCount(0);
   const remaining = await page.request.get('/api/admin/environments');
   expect(remaining.status()).toBe(200);
   const persisted = await remaining.json();
   expect(String(persisted.code)).toBe('0');
   expect(persisted.data.some((env: { code: string }) => env.code === code)).toBe(false);
   const reloadedList = page.waitForResponse(r =>
-    new URL(r.url()).pathname === '/api/admin/environments' && r.request().method() === 'GET');
+    new URL(r.url()).pathname === '/api/admin/environments' && r.request().method() === 'GET')
+    .then(async r => ({ status: r.status(), body: await r.json() }));
   await page.reload({ waitUntil: 'domcontentloaded' });
-  expect(String((await (await reloadedList).json()).code)).toBe('0');
+  const reloaded = await reloadedList;
+  expect(reloaded.status).toBe(200);
+  expect(String(reloaded.body.code)).toBe('0');
+  expect(reloaded.body.data.some((env: { code: string }) => env.code === code)).toBe(false);
   await expect(page.getByTestId('env-list-grid')).toBeVisible();
   await expect(envCard(page, code)).toHaveCount(0);
 }
