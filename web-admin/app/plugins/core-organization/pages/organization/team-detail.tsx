@@ -249,7 +249,7 @@ function AddMemberModal({
                 m.user?.realName ||
                 m.user?.username ||
                 m.user?.email ||
-                getLocalizedText(TEAM_TEXT.member, locale),
+                '',
               userEmail: m.email || m.user?.email || '',
             }))
             .filter((m) => m.memberPid);
@@ -262,7 +262,7 @@ function AddMemberModal({
       }
     };
     loadMembers();
-  }, [existingMemberUserIds, locale]);
+  }, [existingMemberUserIds]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,7 +297,7 @@ function AddMemberModal({
                 <option value="">请选择用户</option>
                 {tenantMembers.map((m) => (
                   <option key={m.memberPid} value={m.memberPid}>
-                    {m.userName} ({m.userEmail})
+                    {m.userName || getLocalizedText(TEAM_TEXT.member, locale)} ({m.userEmail})
                   </option>
                 ))}
               </select>

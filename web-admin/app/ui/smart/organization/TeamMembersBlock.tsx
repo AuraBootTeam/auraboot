@@ -302,7 +302,7 @@ function AddMemberModal({
               member.user?.realName ||
               member.user?.username ||
               member.user?.email ||
-              text('member'),
+              '',
             userEmail: member.email || member.user?.email || '',
           }))
           .filter((member) => member.memberPid);
@@ -318,7 +318,7 @@ function AddMemberModal({
     return () => {
       cancelled = true;
     };
-  }, [existingMemberKeys, retryAttempt, text]);
+  }, [existingMemberKeys, retryAttempt]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -354,7 +354,7 @@ function AddMemberModal({
                 <option value="">{text('selectPlaceholder')}</option>
                 {tenantMembers.map((member) => (
                   <option key={member.memberPid} value={member.memberPid}>
-                    {member.userName} ({member.userEmail || text('noEmail')})
+                    {member.userName || text('member')} ({member.userEmail || text('noEmail')})
                   </option>
                 ))}
               </select>
