@@ -14,6 +14,7 @@ import {
 import { context as traceContext, propagation as tracePropagation } from '@opentelemetry/api';
 import React, { useEffect, useState } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
+import { startActiveSessionRenewal } from '~/shared/services/active-session';
 
 import { I18nProvider, useI18n } from '~/contexts/I18nContext';
 import { ThemeProvider } from '~/contexts/ThemeContext';
@@ -469,6 +470,19 @@ export default function App() {
   const onError = (error: Error) => setLive({ source, data, error });
   const setFederationRuntimeProfile = useFederationStore((state) => state.setRuntimeProfile);
   const bootCoreRuntime = shouldBootCorePlugins(data.runtimeProfile);
+  const authenticated = Boolean(data.user);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    return startActiveSessionRenewal(window, document, async () => {
+      const response = await fetch('/api/auth/session-renew', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!response.ok) throw new Error('Active session renewal failed');
+    });
+  }, [authenticated]);
+
 
   useEffect(() => {
     setFederationRuntimeProfile(data.runtimeProfile);
