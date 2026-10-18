@@ -528,6 +528,9 @@ dependencies {
     testImplementation 'org.apache.avro:avro:1.12.2'
 
     // JUnit 5 Platform
+    // Keep the declared platform aligned with the existing locked JUnit 5.12.2 graph.
+    // Otherwise Gradle rejects testCompileClasspath because the locked BOM is never requested.
+    testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'
     testImplementation 'org.junit.platform:junit-platform-launcher'

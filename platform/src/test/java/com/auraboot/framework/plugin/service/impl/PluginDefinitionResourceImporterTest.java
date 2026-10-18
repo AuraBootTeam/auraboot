@@ -23,6 +23,23 @@ class PluginDefinitionResourceImporterTest {
     final PluginDefinitionResourceImporter.CaptureImportSnapshotOperation snapshot = mock(PluginDefinitionResourceImporter.CaptureImportSnapshotOperation.class);
     final PluginDefinitionResourceImporter importer = new PluginDefinitionResourceImporter(resources,generator,automations,save,snapshot);
     final ObjectMapper json = new ObjectMapper();
+
+    @Test void fieldDefinitionsShareOneSchemaBoundary() throws Exception {
+        var manifest=json.readValue("{\"fields\":[{\"code\":\"longitude\",\"dataType\":\"decimal\"},{\"code\":\"latitude\",\"dataType\":\"decimal\"}]}",PluginManifestExtended.class);
+        importer.importFields(manifest,new ImportRequest(),new ImportExecuteResult(),"p","i",42L);
+        var order=inOrder(resources);
+        order.verify(resources).beginFieldImportBatch();
+        order.verify(resources).importField(eq(manifest.getFields().get(0)),eq("p"),eq("i"),eq(42L),any(),any());
+        order.verify(resources).importField(eq(manifest.getFields().get(1)),eq("p"),eq("i"),eq(42L),any(),any());
+        order.verify(resources).endFieldImportBatch(true);
+    }
+
+    @Test void failedFieldImportClosesTheSchemaBoundaryWithoutPublishingPartialDefinitions() throws Exception {
+        var manifest=json.readValue("{\"fields\":[{\"code\":\"longitude\",\"dataType\":\"decimal\"}]}",PluginManifestExtended.class);
+        when(resources.importField(any(),any(),any(),any(),any(),any())).thenThrow(new PluginException("field unavailable"));
+        assertThatThrownBy(()->importer.importFields(manifest,new ImportRequest(),new ImportExecuteResult(),"p","i",42L)).isInstanceOf(PluginException.class);
+        verify(resources).endFieldImportBatch(false);
+    }
     @ParameterizedTest @ValueSource(strings = {"CREATE", "UPDATE", "SKIP", "NULL"})
     void everyDefinitionTypeHonorsResourceOutcomeAndTenantBoundAccounting(String action) throws Exception {
         var manifest = json.readValue("""

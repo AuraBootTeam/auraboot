@@ -10,6 +10,12 @@ import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
  */
 public interface PluginResourceImporter {
 
+    /** Defer published-model DDL until every field definition in this batch is current. */
+    default void beginFieldImportBatch() { }
+
+    /** Discard deferred work on failure; the enclosing import transaction owns rollback. */
+    default void endFieldImportBatch(boolean completed) { }
+
     // ==================== Existence Checks ====================
 
     boolean checkModelExists(Long tenantId, String code);
