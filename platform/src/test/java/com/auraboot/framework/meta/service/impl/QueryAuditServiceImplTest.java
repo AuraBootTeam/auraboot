@@ -425,7 +425,7 @@ class QueryAuditServiceImplTest {
             when(queryAuditLogMapper.countUserAccessedModels(any(), any(), any(), any())).thenReturn(3L);
             when(queryAuditLogMapper.getUserLastQueryTime(any(), any(), any(), any()))
                     .thenReturn(Instant.parse("2026-02-01T10:00:00Z"));
-            when(queryAuditLogMapper.getUserMostActiveHour(any(), any(), any(), any())).thenReturn("14");
+            when(queryAuditLogMapper.getUserMostActiveHour(any(), any(), any(), any())).thenReturn(14);
             QueryAuditLog recent = new QueryAuditLog();
             recent.setId(9L);
             when(queryAuditLogMapper.findByUserId(any(), any(), any(), any())).thenReturn(List.of(recent));
@@ -435,7 +435,7 @@ class QueryAuditServiceImplTest {
             assertThat(stats.getTotalQueries()).isEqualTo(50);
             assertThat(stats.getSuccessRate()).isEqualTo(90.0);
             assertThat(stats.getAccessedModelCount()).isEqualTo(3);
-            assertThat(stats.getMostActiveHour()).isEqualTo("14");
+            assertThat(stats.getMostActiveHour()).isEqualTo(14);
             assertThat(stats.getRecentQueries()).hasSize(1);
         }
 
@@ -455,16 +455,16 @@ class QueryAuditServiceImplTest {
                     new com.auraboot.framework.meta.dto.QueryAuditReportRequest();
             request.setTenantId(42L);
             request.setReportType("SECURITY");
-            request.setReportFormat("JSON");
-            request.setDetailLevel("SUMMARY");
+            request.setReportFormat("json");
+            request.setDetailLevel("standard");
 
             var report = service.generateAuditReport(request);
 
             assertThat(report.getReportId()).isNotBlank();
             assertThat(report.getTenantId()).isEqualTo(42L);
             assertThat(report.getTitle()).contains("SECURITY");
-            assertThat(report.getConfiguration().getReportFormat()).isEqualTo("JSON");
-            assertThat(report.getConfiguration().getDetailLevel()).isEqualTo("SUMMARY");
+            assertThat(report.getConfiguration().getReportFormat()).isEqualTo("json");
+            assertThat(report.getConfiguration().getDetailLevel()).isEqualTo("standard");
             assertThat(report.getQueryActivityOverview()).isNotNull();
         }
 
@@ -525,8 +525,8 @@ class QueryAuditServiceImplTest {
 
             var result = service.exportAuditLogs(request);
 
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.getStatus()).isEqualTo("COMPLETED");
+            assertThat(Boolean.TRUE.equals(result.getSuccess())).isTrue();
+            assertThat(result.getStatus()).isEqualTo(com.auraboot.framework.common.constant.StatusConstants.COMPLETED);
             assertThat(result.getProgress()).isEqualTo(100.0);
             assertThat(result.getExportedRecords()).isEqualTo(2);
             assertThat(result.getStatistics().getSlowQueries()).isEqualTo(1);
@@ -549,7 +549,7 @@ class QueryAuditServiceImplTest {
 
             assertThat(result.getExportedRecords()).isZero();
             assertThat(result.getStatistics().getMinExecutionTime()).isZero();
-            assertThat(result.isSuccess()).isTrue();
+            assertThat(Boolean.TRUE.equals(result.getSuccess())).isTrue();
         }
     }
 }
