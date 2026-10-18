@@ -36,11 +36,13 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -283,6 +285,108 @@ class PluginPackageServiceImplTest {
             PackageStatusDTO status = service.getStatus("plg-1");
             assertThat(status).isNotNull();
             assertThat(status.getPluginId()).isEqualTo("demo-plugin");
+        }
+    }
+
+    @Nested
+    @DisplayName("组件卸载内部")
+    class ComponentUninstall {
+
+        @org.junit.jupiter.api.io.TempDir
+        Path pluginDirs;
+
+        @BeforeEach
+        void injectDirs() {
+            org.springframework.test.util.ReflectionTestUtils.setField(
+                    service, "pluginsDir", pluginDirs.resolve("plugins").toString());
+            org.springframework.test.util.ReflectionTestUtils.setField(
+                    service, "frontendPluginsDir", pluginDirs.resolve("frontend").toString());
+        }
+
+        private PluginRecord frontendPlugin() {
+            PluginRecord record = pluginRecord(true);
+            record.setFrontendRemoteUrl("https://cdn.example.com/demo.zip");
+            return record;
+        }
+
+        @Test
+        @DisplayName("前端组件：删除部署树并记录移除文件")
+        void frontendRemovesDeployTree() throws Exception {
+            Path deploy = pluginDirs.resolve("frontend").resolve("demo");
+            Files.createDirectories(deploy);
+            Files.writeString(deploy.resolve("index.html"), "<html></html>");
+
+            when(pluginRecordMapper.findByPid("plg-1")).thenReturn(frontendPlugin());
+
+            PackageUninstallResult result = service.uninstall("plg-1",
+                    com.auraboot.framework.plugin.dto.packages.PackageUninstallOptions.builder()
+                            .removeFrontendAssets(true).build());
+
+            assertThat(result.getFrontendResult().getStatus())
+                    .isEqualTo(PackageUninstallResult.ComponentStatus.SUCCESS);
+            assertThat(result.getFrontendResult().getRemovedFiles()).isNotEmpty();
+            assertThat(Files.exists(deploy)).isFalse();
+            verify(pluginRecordMapper).softDelete("plg-1");
+        }
+
+        @Test
+        @DisplayName("后端组件：热卸载后删除 JAR")
+        void backendUnloadsAndDeletesJar() throws Exception {
+            PluginRecord record = pluginRecord(true);
+            record.setBackendPluginId("demo-plugin");
+            when(pluginRecordMapper.findByPid("plg-1")).thenReturn(record);
+            when(auraPluginManager.hotUnloadPlugin("demo-plugin")).thenReturn(true);
+            Path jar = pluginDirs.resolve("plugins").resolve("demo-plugin.jar");
+            Files.createDirectories(jar.getParent());
+            Files.writeString(jar, "jar-bytes");
+
+            PackageUninstallResult result = service.uninstall("plg-1",
+                    com.auraboot.framework.plugin.dto.packages.PackageUninstallOptions.builder()
+                            .removeBackendJar(true).build());
+
+            assertThat(result.getBackendResult().getStatus())
+                    .isEqualTo(PackageUninstallResult.ComponentStatus.SUCCESS);
+            assertThat(Files.exists(jar)).isFalse();
+            verify(auraPluginManager).hotUnloadPlugin("demo-plugin");
+        }
+
+        @Test
+        @DisplayName("配置组件：资源转换与失败捕获")
+        void configComponentResources() {
+            PluginRecord record = pluginRecord(true);
+            record.setPid("plg-res");
+            when(pluginRecordMapper.findByPid("plg-res")).thenReturn(record);
+            var uninstallResult = com.auraboot.framework.plugin.dto.uninstall.UninstallResult.builder()
+                    .success(true)
+                    .deletedResources(List.of("dict_demo", "page_demo"))
+                    .detachedResources(List.of("model_shared"))
+                    .build();
+            when(pluginResourceService.executeUninstall(eq("plg-res"), eq(42L), any()))
+                    .thenReturn(uninstallResult);
+
+            PackageUninstallResult result = service.uninstall("plg-res",
+                    com.auraboot.framework.plugin.dto.packages.PackageUninstallOptions.builder()
+                            .removeAllData(true).build());
+
+            assertThat(result.getConfigResult().getStatus())
+                    .isEqualTo(PackageUninstallResult.ComponentStatus.SUCCESS);
+            assertThat(result.getConfigResult().getDeletedResources()).hasSize(2);
+            assertThat(result.getConfigResult().getDetachedResources()).hasSize(1);
+            assertThat(result.isSuccess()).isTrue();
+
+            // 失败路径：资源卸载报错 → 组件 FAILED,错误带出
+            var failed = com.auraboot.framework.plugin.dto.uninstall.UninstallResult.builder()
+                    .success(false)
+                    .errorMessage("resource locked")
+                    .build();
+            when(pluginResourceService.executeUninstall(eq("plg-res"), eq(42L), any())).thenReturn(failed);
+            when(pluginRecordMapper.findByPid("plg-res")).thenReturn(record);
+            PackageUninstallResult second = service.uninstall("plg-res",
+                    com.auraboot.framework.plugin.dto.packages.PackageUninstallOptions.builder()
+                            .removeAllData(true).build());
+            assertThat(second.getConfigResult().getStatus())
+                    .isEqualTo(PackageUninstallResult.ComponentStatus.FAILED);
+            assertThat(second.getConfigResult().getError()).contains("resource locked");
         }
     }
 }
