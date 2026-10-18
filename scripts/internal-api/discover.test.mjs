@@ -235,6 +235,7 @@ test('inventory binds clean source and tool input hashes and refuses dirty snaps
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
   const { execFileSync } = await import('node:child_process');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'internal-api-inventory-'));
+  const artifacts = fs.mkdtempSync(path.join(os.tmpdir(), 'internal-api-inventory-output-'));
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
   try {
     fs.mkdirSync(path.join(root, 'web-admin/app'), { recursive: true });
@@ -253,7 +254,23 @@ test('inventory binds clean source and tool input hashes and refuses dirty snaps
     assert.equal(Object.keys(result.sourceInputs).length,6);
     assert.ok(result.sourceInputs['web-admin/app/root.tsx'] && result.sourceInputs['web-admin/tsconfig.json']);
     assert.ok(Object.values(result.toolInputHashes).every(value => /^[a-f0-9]{64}$/.test(value)));
+    const catalogPath=path.join(artifacts,'catalog.json'),inventoryPath=path.join(artifacts,'inventory.json');
+    fs.writeFileSync(catalogPath,JSON.stringify(document));fs.writeFileSync(inventoryPath,JSON.stringify(result));
+    const { fileURLToPath }=await import('node:url');
+    for (const [script,input] of [['discover.mjs',catalogPath],['type-origins.mjs',inventoryPath]]) {
+      const invoke=output=>execFileSync(process.execPath,[fileURLToPath(new URL(script,import.meta.url)),root,input,output],{stdio:'pipe'});
+      const output=path.join(artifacts,script+'.json'), target=path.join(artifacts,script+'.target');
+      fs.writeFileSync(output,'existing evidence');
+      assert.throws(()=>invoke(output),error=>error.status===1);
+      assert.equal(fs.readFileSync(output,'utf8'),'existing evidence');
+      fs.unlinkSync(output);fs.writeFileSync(target,'protected symlink target');fs.symlinkSync(target,output);
+      assert.throws(()=>invoke(output),error=>error.status===1);
+      assert.equal(fs.readFileSync(target,'utf8'),'protected symlink target');assert.ok(fs.lstatSync(output).isSymbolicLink());
+      fs.unlinkSync(output);invoke(output);
+      assert.equal(JSON.parse(fs.readFileSync(output,'utf8')).sourceCommit,result.sourceCommit);
+      if(process.platform!=='win32')assert.equal(fs.statSync(output).mode&0o777,0o600);
+    }
     fs.appendFileSync(file,'\n// uncommitted edit');
     assert.throws(() => inventory(root,document), /clean source checkout/);
-  } finally { fs.rmSync(root,{recursive:true,force:true}); }
+  } finally { fs.rmSync(root,{recursive:true,force:true});fs.rmSync(artifacts,{recursive:true,force:true}); }
 });

@@ -378,10 +378,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process
   try {
     const [root, input, output] = process.argv.slice(2);
     requireCondition(process.argv.slice(2).length === 3 && root && input && output, 'Usage: node discover.mjs <repo> <catalog.json> <manifest.json>');
-    requireCondition(!fs.existsSync(output), 'Inventory output exists; use a fresh attempt path');
     const result = inventory(root, JSON.parse(fs.readFileSync(input, 'utf8')));
     fs.mkdirSync(path.dirname(output), { recursive: true });
-    fs.writeFileSync(output, canonicalJson(result), { flag: 'wx' });
+    fs.writeFileSync(output, canonicalJson(result), { flag: 'wx', mode: 0o600 });
     console.log(JSON.stringify(result.summary));
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
