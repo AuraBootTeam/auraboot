@@ -365,6 +365,7 @@ class DecisionEvaluationServiceImplTest {
             request.setContentJson(objectMapper.valueToTree(Map.of("rules", List.of())));
             DecisionResult expected = DecisionResult.builder("__test__")
                     .status(DecisionStatus.MATCHED).matched(true).build();
+            when(decisionRuntime.validate(any())).thenReturn(DecisionValidateResult.ok(List.of(), List.of()));
             when(decisionRuntime.testRun(any(), any(), any())).thenReturn(expected);
 
             DecisionResult result = service.testRun(request);
@@ -373,8 +374,26 @@ class DecisionEvaluationServiceImplTest {
             ArgumentCaptor<ResolvedDecision> captor = ArgumentCaptor.forClass(ResolvedDecision.class);
             verify(decisionRuntime).testRun(captor.capture(), any(), any());
             assertThat(captor.getValue().decisionCode()).isEqualTo("__test__");
+            verify(decisionRuntime).validate(captor.getValue());
             verify(logMapper, org.mockito.Mockito.never())
                     .insert(any(DrtLogEntity.class));
+        }
+
+        @Test
+        void invalidDraftDoesNotRunOrWriteLogs() {
+            DrtTestRunRequest request = new DrtTestRunRequest();
+            request.setKind(DecisionKind.SIMPLE_CONDITION.name());
+            request.setRuntimeAdapter(RuntimeAdapter.AST_EVALUATOR.name());
+            request.setContentJson(objectMapper.valueToTree(Map.of("type", "group", "children", List.of())));
+            when(decisionRuntime.validate(any())).thenReturn(DecisionValidateResult.invalid(
+                    List.of(new DecisionValidateResult.Issue("EMPTY_GROUP", "A condition is required"))));
+
+            DecisionResult result = service.testRun(request);
+
+            assertThat(result.status()).isEqualTo(DecisionStatus.ERROR);
+            assertThat(result.errors()).containsExactly("A condition is required");
+            verify(decisionRuntime, org.mockito.Mockito.never()).testRun(any(), any(), any());
+            verify(logMapper, org.mockito.Mockito.never()).insert(any(DrtLogEntity.class));
         }
 
         @Test
