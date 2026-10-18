@@ -1000,7 +1000,7 @@ export default function ModelDetailPage() {
               </div>
               <h1 className="break-words text-2xl font-bold text-gray-900">{model.displayName}</h1>
               <p className="mt-1 break-words text-sm text-gray-500">
-                模型编码: <span className="break-all font-mono text-blue-600">{model.code}</span>
+                {text('modelCodePrefix')} <span className="break-all font-mono text-blue-600">{model.code}</span>
                 {model.description && ` · ${model.description}`}
               </p>
             </div>
@@ -1033,7 +1033,7 @@ export default function ModelDetailPage() {
               onClick={handlePrimaryPageAction}
               className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
+              {hasGeneratedPages ? text('actionOpenPageDesign') : text('actionGenerateCrud')}
             </button></PermissionGuard>
             {hasGeneratedPages && (
               <button
@@ -1051,7 +1051,7 @@ export default function ModelDetailPage() {
                 className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
                 disabled={loading}
               >
-                编辑模型
+                {text('actionEditModel')}
               </button>
               <details className="group relative">
                 <summary
@@ -1101,7 +1101,7 @@ export default function ModelDetailPage() {
                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
                     disabled={loading}
                   >
-                    删除模型
+                    {text('actionDeleteModel')}
                   </button>
                 </div>
               </details>
@@ -1290,7 +1290,7 @@ export default function ModelDetailPage() {
                         onClick={handlePrimaryPageAction}
                         className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
                       >
-                        {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
+                        {hasGeneratedPages ? text('actionOpenPageDesign') : text('actionGenerateCrud')}
                       </button></PermissionGuard>
                       <button
                         data-testid="overview-page-workbench-link"
@@ -1413,7 +1413,7 @@ export default function ModelDetailPage() {
                                 onClick={() => handleRollbackToVersion(version.version)}
                                 className="text-sm text-orange-600 hover:text-orange-900"
                               >
-                                回滚
+                                {text('actionRollback')}
                               </button>
                             </PermissionGuard>
                           )}

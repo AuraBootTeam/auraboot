@@ -6,6 +6,8 @@ import teamPage from '../../../../../../plugins/org-management/config/pages/ab_t
 
 const f = vi.hoisted(() => ({ locale: 'en-US', fetch: vi.fn(), add: vi.fn(), remove: vi.fn(), post: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: f.locale, t: (key: string) => key }) }));
+// Locale fixtures exercise the authorized manager; denial is covered by the access suite.
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (permission: string) => permission === 'org.team.manage' }) }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showSuccessToast: f.success, showErrorToast: f.error }) }));
 vi.mock('~/shared/services/teamService', () => ({ fetchTeamMembers: f.fetch, addTeamMember: f.add, removeTeamMember: f.remove }));
 vi.mock('~/shared/services/http-client', () => ({ post: f.post }));
@@ -29,7 +31,7 @@ describe('team-member DSL title, localized states and API payloads', () => {
       expect(screen.getByRole('button', { name: english ? 'Add member' : '\u6dfb\u52a0\u6210\u5458' })).toBeEnabled();
       expect(screen.getByText(english ? 'Leader' : '\u8d1f\u8d23\u4eba')).toBeTruthy();
       expect(screen.getAllByRole('columnheader').map((e: HTMLElement) => e.textContent)).toEqual(english ? ['User', 'Email', 'Role', 'Joined', 'Actions'] : ['\u7528\u6237', '\u90ae\u7bb1', '\u89d2\u8272', '\u52a0\u5165\u65f6\u95f4', '\u64cd\u4f5c']);
-      expect(screen.getByTestId('team-members-remove-member-1')).toHaveAttribute('title', english ? 'Remove member' : '\u79fb\u9664\u6210\u5458');
+      expect(screen.getByTestId('team-members-remove-row-1')).toHaveAttribute('title', english ? 'Remove member' : '\u79fb\u9664\u6210\u5458');
       expect(f.fetch).toHaveBeenCalledExactlyOnceWith('team-1');
     });
     it(`${locale} distinguishes pending, successful empty and missing team states`, async () => {
@@ -80,11 +82,11 @@ describe('team-member DSL title, localized states and API payloads', () => {
     });
     it(`${locale} localizes confirmation and cancel/denied remove never produce successful side effects`, async () => {
       f.locale = locale; view(); await screen.findByText('Aaron'); vi.mocked(window.confirm).mockReturnValue(false);
-      fireEvent.click(screen.getByTestId('team-members-remove-member-1'));
+      fireEvent.click(screen.getByTestId('team-members-remove-row-1'));
       expect(window.confirm).toHaveBeenLastCalledWith(english ? 'Remove Aaron from the team?' : '\u786e\u8ba4\u5c06 Aaron \u79fb\u51fa\u56e2\u961f？'); expect(f.remove).not.toHaveBeenCalled();
-      vi.mocked(window.confirm).mockReturnValue(true); f.remove.mockRejectedValue('denied'); fireEvent.click(screen.getByTestId('team-members-remove-member-1'));
+      vi.mocked(window.confirm).mockReturnValue(true); f.remove.mockRejectedValue('denied'); fireEvent.click(screen.getByTestId('team-members-remove-row-1'));
       await waitFor(() => expect(f.error).toHaveBeenCalledWith(english ? 'Unable to remove member' : '\u79fb\u9664\u6210\u5458\u5931\u8d25'));
-      expect(f.remove).toHaveBeenCalledExactlyOnceWith('team-1', 'member-1'); expect(f.success).not.toHaveBeenCalled(); expect(screen.getByText('Aaron')).toBeTruthy(); expect(f.fetch).toHaveBeenCalledTimes(1);
+      expect(f.remove).toHaveBeenCalledExactlyOnceWith('team-1', 'row-1'); expect(f.success).not.toHaveBeenCalled(); expect(screen.getByText('Aaron')).toBeTruthy(); expect(f.fetch).toHaveBeenCalledTimes(1);
     });
     it(`${locale} main-list failure is visible and one explicit retry recovers without reporting empty success`, async () => {
       f.locale = locale; f.fetch.mockRejectedValueOnce(new Error('network unavailable')); view();
