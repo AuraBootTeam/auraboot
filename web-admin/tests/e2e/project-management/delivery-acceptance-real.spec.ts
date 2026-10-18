@@ -207,6 +207,12 @@ test('professional event policy publish, execution failure and recovery preserve
   await shot(page, 'R10');
   await page.getByTestId('epd-step-rules').click();
   await expect(page.getByTestId('policy-rules-editor')).toBeVisible();
+  await page.getByLabel('rule-name-0',{exact:true}).fill('交付金额触发提醒');
+  await page.getByTestId('cb-add').click();
+  await page.getByLabel('model-0',{exact:true}).selectOption('record:record');
+  await page.getByLabel('field-0',{exact:true}).selectOption('record:data.amount');
+  await page.getByLabel('operator-0',{exact:true}).selectOption('GTE');
+  await page.getByLabel('value-0',{exact:true}).fill('1000');
   await shot(page, 'R11');
   await page.getByTestId('epd-step-actions').click();
   await page.getByTestId('epd-add-action').click();
