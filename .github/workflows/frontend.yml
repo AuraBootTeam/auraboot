@@ -68,7 +68,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install locked internal API toolchain
-        run: npm ci --prefix scripts/internal-api/toolchain --ignore-scripts --no-audit --no-fund
+        run: npm ci --prefix scripts/internal-api/toolchain --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/ --replace-registry-host=registry.npmmirror.com
 
       - name: Internal API snapshot and generated type gate
         run: node scripts/internal-api/foundation.mjs --evidence "$RUNNER_TEMP/internal-api-foundation"

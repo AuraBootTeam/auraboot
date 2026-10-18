@@ -90,7 +90,7 @@ jobs:
           cache-dependency-path: scripts/internal-api/toolchain/package-lock.json
 
       - name: Install pinned static parser
-        run: npm ci --prefix scripts/internal-api/toolchain --ignore-scripts --no-audit --no-fund
+        run: npm ci --prefix scripts/internal-api/toolchain --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/ --replace-registry-host=registry.npmmirror.com
 
       - name: Verify fixed renderer gate fixtures
         run: node scripts/check-dsl-render-types.mjs --self-test

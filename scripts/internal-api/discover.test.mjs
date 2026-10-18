@@ -259,16 +259,17 @@ test('inventory binds clean source and tool input hashes and refuses dirty snaps
     const { fileURLToPath }=await import('node:url');
     for (const [script,input] of [['discover.mjs',catalogPath],['type-origins.mjs',inventoryPath]]) {
       const invoke=output=>execFileSync(process.execPath,[fileURLToPath(new URL(script,import.meta.url)),root,input,output],{stdio:'pipe'});
-      const output=path.join(artifacts,script+'.json'), target=path.join(artifacts,script+'.target');
-      fs.writeFileSync(output,'existing evidence');
-      assert.throws(()=>invoke(output),error=>error.status===1);
-      assert.equal(fs.readFileSync(output,'utf8'),'existing evidence');
-      fs.unlinkSync(output);fs.writeFileSync(target,'protected symlink target');fs.symlinkSync(target,output);
-      assert.throws(()=>invoke(output),error=>error.status===1);
-      assert.equal(fs.readFileSync(target,'utf8'),'protected symlink target');assert.ok(fs.lstatSync(output).isSymbolicLink());
-      fs.unlinkSync(output);invoke(output);
-      assert.equal(JSON.parse(fs.readFileSync(output,'utf8')).sourceCommit,result.sourceCommit);
-      if(process.platform!=='win32')assert.equal(fs.statSync(output).mode&0o777,0o600);
+      const existing=path.join(artifacts,script+'.existing.json'),target=path.join(artifacts,script+'.target');
+      const linked=path.join(artifacts,script+'.link.json'),fresh=path.join(artifacts,script+'.fresh.json');
+      fs.writeFileSync(existing,'existing evidence');
+      assert.throws(()=>invoke(existing),error=>error.status===1);
+      assert.equal(fs.readFileSync(existing,'utf8'),'existing evidence');
+      fs.writeFileSync(target,'protected symlink target');fs.symlinkSync(target,linked);
+      assert.throws(()=>invoke(linked),error=>error.status===1);
+      assert.equal(fs.readFileSync(target,'utf8'),'protected symlink target');assert.ok(fs.lstatSync(linked).isSymbolicLink());
+      invoke(fresh);
+      assert.equal(JSON.parse(fs.readFileSync(fresh,'utf8')).sourceCommit,result.sourceCommit);
+      if(process.platform!=='win32')assert.equal(fs.statSync(fresh).mode&0o777,0o600);
     }
     fs.appendFileSync(file,'\n// uncommitted edit');
     assert.throws(() => inventory(root,document), /clean source checkout/);
