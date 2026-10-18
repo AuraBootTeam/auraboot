@@ -553,16 +553,4 @@ public class MybatisPlusConfigTest {
         assertFalse(tenant.getTenantLineHandler().ignoreTable("se_execution_instance"));
     }
 
-    @Test
-    @DisplayName("MySQL preserves the existing numeric tenant expression")
-    void mysqlRetainsNumericTenantLiteral() {
-        when(mockDialect.getType()).thenReturn(DatabaseType.MYSQL);
-        MetaContext.setSystemTenantContext(12345L);
-        TenantLineInnerInterceptor tenant = findTenantInterceptor(
-                config.mybatisPlusInterceptor(mockDialect, null, envMock));
-        Expression expression = tenant.getTenantLineHandler().getTenantId();
-        assertInstanceOf(LongValue.class, expression);
-        assertEquals(12345L, ((LongValue) expression).getValue());
-    }
-
 }

@@ -39,7 +39,7 @@ public class QueryHintsRequest {
     private String hintPosition;
 
     /**
-     * 提示格式（ORACLE, MYSQL, POSTGRESQL等）
+     * 提示格式（POSTGRESQL 等）
      */
     private String hintFormat;
 

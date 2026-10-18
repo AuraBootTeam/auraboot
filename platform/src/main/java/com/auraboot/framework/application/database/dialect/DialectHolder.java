@@ -34,13 +34,6 @@ public class DialectHolder {
     }
 
     /**
-     * Check whether the active database is MySQL.
-     */
-    public static boolean isMySql() {
-        return get().getType() == DatabaseType.MYSQL;
-    }
-
-    /**
      * Check whether the active database is PostgreSQL.
      */
     public static boolean isPostgres() {
