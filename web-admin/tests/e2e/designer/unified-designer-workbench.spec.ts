@@ -1422,7 +1422,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     expect(persistedSection).toMatchObject({
       blockType: 'form-section',
-      title: nestedSectionTitle,
+      title: { en: 'New section', 'zh-CN': nestedSectionTitle },
       // Section flags persist as flat top-level keys (v4 section convention).
       collapsible: true,
       props: expect.objectContaining({

@@ -240,41 +240,21 @@ export class NamedQueryPage extends BasePage {
     }
   }
 
-  /** Click submit and wait for create response (or URL transition fallback). */
-  async submitCreate(): Promise<PWResponse | null> {
-    const responsePromise = this.page
-      .waitForResponse(
-        (res) =>
-          res.url().includes('/api/meta/named-queries') &&
-          res.request().method().toLowerCase() === 'post',
-        { timeout: 15000 },
-      )
-      .catch(() => null);
-
+  /** Observe the create endpoint itself; validation responses are not creation evidence. */
+  async submitCreate(): Promise<PWResponse> {
+    const responsePromise = this.page.waitForResponse(
+      (res) => new URL(res.url()).pathname === '/api/meta/named-queries' &&
+        res.request().method() === 'POST',
+      { timeout: 15000 },
+    );
     const submitBtn = this.submitButton.or(
-      this.page
-        .locator(
-          'button[data-testid="form-btn-save"], button:has-text("创建"), button:has-text("Create"), button:has-text("保存"), button:has-text("Save")',
-        )
-        .first(),
+      this.page.locator(
+        'button[data-testid="form-btn-save"], button:has-text("创建"), button:has-text("Create"), button:has-text("保存"), button:has-text("Save")',
+      ).first(),
     );
     await expect(submitBtn).toBeVisible({ timeout: 5000 });
     await submitBtn.click();
-
-    const resp = await responsePromise;
-    if (resp) return resp;
-
-    const movedToEdit = await this.page
-      .waitForURL(
-        (url) =>
-          /\/meta\/named-queries\/[^/]+/.test(url.toString()) && !url.toString().includes('/new'),
-        {
-          timeout: 8000,
-        },
-      )
-      .then(() => true)
-      .catch(() => false);
-    return movedToEdit ? null : null;
+    return responsePromise;
   }
 
   /** Click a tab button on the edit page */

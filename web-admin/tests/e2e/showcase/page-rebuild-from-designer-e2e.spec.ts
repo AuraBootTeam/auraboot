@@ -745,25 +745,25 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
       return (section.fields ?? []).find((f: any) => f.field === fieldCode);
     };
 
-    // D8: readOnly preserved (sc_code in section_basic).
-    const scCode = findField('section_basic', 'sc_code');
-    expect(scCode, 'sc_code field must exist in section_basic').toBeDefined();
+    // D8: readOnly preserved (sc_code in record_info).
+    const scCode = findField('record_info', 'sc_code');
+    expect(scCode, 'sc_code field must exist in record_info').toBeDefined();
     expect(scCode?.readonly, 'sc_code.readonly must be true').toBe(true);
 
-    // D8: readOnly preserved (sc_created_at in section_dates).
-    const scCreatedAt = findField('section_dates', 'sc_created_at');
+    // D8: readOnly preserved (sc_created_at in state_plan).
+    const scCreatedAt = findField('state_plan', 'sc_created_at');
     expect(scCreatedAt, 'sc_created_at field must exist').toBeDefined();
     expect(scCreatedAt?.readonly, 'sc_created_at.readonly must be true').toBe(true);
 
     // D11: visibleWhen expression preserved verbatim.
-    const scAdvanced = findField('section_enums', 'sc_advanced_settings');
+    const scAdvanced = findField('state_plan', 'sc_advanced_settings');
     expect(scAdvanced, 'sc_advanced_settings field must exist').toBeDefined();
     expect(scAdvanced?.visible, 'sc_advanced_settings.visible expression must match').toBe(
       "record.sc_status === 'active'",
     );
 
     // colSpan/span normalisation: sc_name colSpan=6 → span=6.
-    const scName = findField('section_basic', 'sc_name');
+    const scName = findField('record_info', 'sc_name');
     expect(scName?.span, 'sc_name.span must be 6').toBe(6);
 
     // form-buttons: submit primary + command action descriptor preserved.

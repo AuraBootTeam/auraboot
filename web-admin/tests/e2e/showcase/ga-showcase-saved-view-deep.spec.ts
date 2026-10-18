@@ -9,8 +9,8 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { openSavedViewManagePanel, viewSelectorTrigger } from '../helpers';
 
 const MODEL_CODE = 'showcase_all_fields';
-// Runtime ListPageContent scopes SavedViews by route tableName, not DSL pageKey.
-const PAGE_KEY = 'showcase_all_fields';
+// SavedViews use the published schema pageKey.
+const PAGE_KEY = 'showcase_all_fields_list';
 const LIST_URL = '/p/showcase_all_fields';
 
 let createdViewPids: string[] = [];

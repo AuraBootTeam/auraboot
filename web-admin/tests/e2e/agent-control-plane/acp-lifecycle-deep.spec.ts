@@ -466,6 +466,10 @@ test.describe('ACP Lifecycle — Deep UI State Transitions', () => {
         CMDS.createSchedule,
         {
           title: schedTitle,
+          agent_code: agentCode,
+          daily_run_budget: 24,
+          concurrency_limit: 1,
+          missed_run_policy: 'skip',
           description: 'Deep lifecycle test schedule',
           schedule_type: 'cron',
           cron_expression: '0 0 10 * * MON-FRI',
