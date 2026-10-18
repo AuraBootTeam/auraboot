@@ -293,7 +293,8 @@ export function discoverCalls(sources, document) {
             : [`route:${branch.route ?? canonicalJson(syntaxIdentity(targetNode, sf))}`]))].sort();
           calls.push({ legacyId: sha256(`${source.file}:${n.getStart(sf)}:${callee}:${target}`).slice(0, 20),
             identityVersion: 2, identityAnchor: { file: source.file.replaceAll('\\', '/'), scope: lexicalScope(n, sf), method, targets: identityTargets },
-            file: source.file, line: line(), callee, method, target, route: route ?? null,
+            file: source.file, line: line(), sourceStart: n.getStart(sf), sourceEnd: n.end,
+            callSha256: sha256(n.getText(sf)), callee, method, target, route: route ?? null,
             transportResolution: resolvedTransport ?? 'name-heuristic-candidate', routeInputEvidence,
             typeArguments: (n.typeArguments ?? []).map(t => t.getText(sf)), classification, matches, branches,
             migration: exclusion ? 'not-applicable' : generated ? 'generated-operation' : 'not-migrated',

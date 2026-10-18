@@ -53,6 +53,8 @@ node scripts/internal-api/export.mjs \
   --receipt ABSOLUTE_EVIDENCE_DIRECTORY/live-drift.json --source .
 node scripts/internal-api/discover.mjs . contracts/internal-web-admin/openapi.json \
   ABSOLUTE_EVIDENCE_DIRECTORY/client-inventory.json
+node scripts/internal-api/type-origins.mjs . ABSOLUTE_EVIDENCE_DIRECTORY/client-inventory.json \
+  ABSOLUTE_EVIDENCE_DIRECTORY/client-type-origins.json
 pnpm --dir web-admin typecheck
 ```
 
@@ -74,6 +76,18 @@ Inventory requires a clean checkout before and after scanning and a fresh output
 path. It records and rechecks source/config/package and scanner input digests,
 along with Node/TypeScript versions. `sourceCommit` and `sourceDigest` retain
 their separate roles: commit identity and observed production source bytes.
+
+Type provenance uses the pinned compiler with the real Web Admin compiler options,
+application imports and library declarations. It binds each exact call span/hash
+to explicit type arguments, inferred argument/result types, signatures and input
+assertions. A shared declaration graph follows named aliases, reexports, nested
+type references and cycles. Generated and dependency declarations are terminal
+provenance nodes; their presence never proves that a legacy transport is migrated.
+Compiler reads, including package metadata and external declarations, are hashed
+and rechecked. Unknown/any, unresolved symbols and expansion limits stay visible.
+This report does not track downstream `Response.json()` or property data flow,
+run application semantic diagnostics, validate serialization, or close the full
+consumer denominator. Keep those reconciliation tasks open.
 
 
 

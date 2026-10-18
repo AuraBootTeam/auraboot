@@ -344,6 +344,7 @@ These local measurement helpers require an explicitly configured runtime and cre
 |---|---|---|
 | `internal-api/contract.mjs` | contract | Validate, normalize and select explicit internal OpenAPI operations without removing schema constraints. |
 | `internal-api/discover.mjs` | contract | Reconcile frontend network-call candidates with a captured runtime catalog; retain unresolved and unmigrated entries. |
+| `internal-api/type-origins.mjs` | contract | Associate bound inventory calls with actual compiler types and declaration origins; retain casts, unknowns and unresolved symbols without claiming wire compatibility. |
 | `internal-api/source-graph.mjs` | contract | Trace Web Admin entries, router resources, source aliases and workspace package exports; retain dynamic/data boundaries and unproven candidates. |
 | `internal-api/export.mjs` | contract | Export or compare the internal OpenAPI group and create a fresh source-bound export receipt. |
 | `internal-api/toolchain/generate.mjs` | codegen | Generate or check TypeScript declarations using the isolated, locked OpenAPI toolchain. |
