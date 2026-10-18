@@ -39,7 +39,7 @@ test('all registered dictionary operations satisfy their real JSON response stru
     method: 'get' | 'post' | 'put' | 'delete',
     path: string,
     url: string,
-    options: { body?: unknown; negative?: boolean; cleanup?: boolean } = {},
+    options: { body?: unknown; negative?: boolean; status?: number; cleanup?: boolean } = {},
   ) {
     const response = await page.request.fetch(url, {
       method: method.toUpperCase(),
@@ -56,6 +56,15 @@ test('all registered dictionary operations satisfy their real JSON response stru
     ) {
       owned.push({ pid: payload.data.pid, code: payload.data.code });
     }
+    const observation: Record<string, unknown> = {
+      method,
+      path,
+      status: response.status(),
+      payload,
+      cleanup: Boolean(options.cleanup),
+    };
+    rows.push(observation);
+    expect(response.status()).toBe(options.status ?? 200);
     const shape = validate({
       method,
       path,
@@ -63,14 +72,7 @@ test('all registered dictionary operations satisfy their real JSON response stru
       contentType: response.headers()['content-type'],
       payload,
     });
-    rows.push({
-      method,
-      path,
-      status: response.status(),
-      payload,
-      shape,
-      cleanup: Boolean(options.cleanup),
-    });
+    observation.shape = shape;
     expect(shape.errors, `${method} ${path} HTTP ${response.status()}`).toEqual([]);
     expect(shape.valid).toBe(true);
     if (options.negative) expect(payload.code).not.toBe('0');
@@ -149,7 +151,18 @@ test('all registered dictionary operations satisfy their real JSON response stru
     ).toBe(true);
     await call('get', '/api/meta/dict/{pid}/validate', `/api/meta/dict/${code}/validate`, {
       negative: true,
+      status: 422,
     });
+    await call('get', '/api/meta/dict/{pid}/cascade/tree', `/api/meta/dict/${pid}/cascade/tree`, {
+      negative: true,
+      status: 422,
+    });
+    await call(
+      'get',
+      '/api/meta/dict/{pid}/cascade/tree',
+      `/api/meta/dict/${uniqueId('missing_tree')}/cascade/tree`,
+      { negative: true, status: 422 },
+    );
     // Published resources are protected: count zero must not be mistaken for full deletion.
     expect(await call('delete', '/api/meta/dict/batch', `/api/meta/dict/batch?pids=${pid}`)).toBe(
       0,
@@ -206,6 +219,7 @@ test('all registered dictionary operations satisfy their real JSON response stru
     await call('post', '/api/meta/dict', '/api/meta/dict', {
       body: { code: uniqueId('e2e_rejected'), name: 'Invalid', dictType: 'simple' },
       negative: true,
+      status: 400,
     });
     const registered = catalog.profiles.dictionary.operations.map(
       (row: { method: string; path: string }) => `${row.method} ${row.path}`,

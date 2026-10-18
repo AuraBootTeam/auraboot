@@ -66,7 +66,7 @@ public class DictDataResult {
     /**
      * 缓存信息
      */
-    @Schema(nullable = true)
+    @Schema(nullable = true, schemaResolution = Schema.SchemaResolution.INLINE)
     private CacheInfo cacheInfo;
 
     /**

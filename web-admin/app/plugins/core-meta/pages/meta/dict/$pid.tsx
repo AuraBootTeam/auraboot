@@ -91,28 +91,16 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   try {
     const dict = await dictService.findByPid(pid, request);
-    const versions = await dictService.getVersionHistory(dict.code, request).catch((error) => {
-      console.warn('Failed to load dictionary version history:', error);
-      return [];
-    });
-    const data = await dictService.loadData(pid, 'latest', undefined, request).catch((error) => {
-      console.warn('Failed to load dictionary data:', error);
-      return { items: [] } as { items: DictItemData[] };
-    });
+    const versions = await dictService.getVersionHistory(dict.code, request);
+    const data = await dictService.loadData(pid, 'latest', undefined, request);
     if (dict.dictType === 'tree') {
-      const tree = await dictService.buildCascadeTree(pid, request).catch((error) => {
-        console.warn('Failed to build dictionary tree:', error);
-        return undefined;
-      });
-      if (tree) {
-        data.items = flattenTreeNodes(tree);
-      }
+      data.items = flattenTreeNodes(await dictService.buildCascadeTree(pid, request));
     }
 
     return { dict, versions, data };
   } catch (error) {
     console.error('Failed to load dictionary:', error);
-    throw new Response('Dictionary not found', { status: 404 });
+    throw new Response('Failed to load dictionary', { status: 500 });
   }
 };
 

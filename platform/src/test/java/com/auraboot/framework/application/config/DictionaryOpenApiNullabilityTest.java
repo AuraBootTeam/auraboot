@@ -27,6 +27,7 @@ class DictionaryOpenApiNullabilityTest {
         assertThat(dict.at("/properties/description/type").toString()).contains("null");
         assertThat(dict.at("/properties/items/type").toString()).contains("null");
         var data = Json31.mapper().valueToTree(new ModelConverters(true).readAll(DictDataResult.class).get("DictDataResult"));
-        assertThat(data.at("/properties/cacheInfo").toString()).contains("null");
+        assertThat(data.at("/properties/cacheInfo/type").toString()).contains("object", "null");
+        assertThat(data.at("/properties/cacheInfo/$ref").isMissingNode()).isTrue();
     }
 }
