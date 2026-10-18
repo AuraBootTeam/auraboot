@@ -69,3 +69,8 @@ commits = ['322ed0c49cf2d04fe95642a20e6f6f594d211d22']
 [[allowlists]]
 description = "Historical local observability acceptance stack (commit 742eb6d397): fixed Grafana basic auth was scoped to a disposable 127.0.0.1 CI container and has since been replaced with environment-derived credentials."
 commits = ['742eb6d3974f2a46b3fbd7e7992bedb7fefef90e']
+
+[[allowlists]]
+description = "RealDb IT fixtures: JDBC config strings embed the *test* field-encryption key name (local fixture value, not a credential). The paths only exist on merged branch history, not on main."
+paths = ['''^platform/src/test/.*\.java$''']
+regexes = ['''security\.field-encryption\.key\s*=''']

@@ -512,13 +512,12 @@ dependencies {
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:mysql'
-    // Testcontainers' MySQL integration tests need the JDBC driver; it remains
-    // test-only and is not added to the production runtime archive.
-    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
-    // MySQL container readiness uses MariaDB's compatible driver only in tests.
-    // Production JDBC drivers remain deployer-supplied; the Oracle driver stays excluded.
+    // MySQL container fixtures connect through the permissive MariaDB driver
+    // (MySqlTestContainer pins org.mariadb.jdbc.Driver); the GPL-family MySQL
+    // driver stays out of the build entirely (license tripwire) — tests that
+    // specifically need it supply the artifact locally, deployer-style.
     testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
