@@ -12,7 +12,7 @@ test.use({
   viewport: { width: 1440, height: 1000 },
   locale: 'zh-CN',
 });
-async function payload(response: Response) {
+async function payload(response: Pick<Response, 'status' | 'json'>) {
   const body = await response.json();
   expect(response.status(), JSON.stringify(body)).toBe(200);
   expect(String(body.code)).toBe('0');
@@ -81,7 +81,7 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
     .fill('delivery_expression_' + randomUUID().replaceAll('-', '').slice(0, 12));
   const code = await page.getByTestId('fragment-code').inputValue();
   await page.getByTestId('fragment-name').fill('交付异常审核 · 组合条件');
-  await page.getByTestId('fragment-scope-type').selectOption('GLOBAL');
+  await page.getByTestId('fragment-scope-type').selectOption('WORKFLOW');
   await page
     .getByTestId('fragment-description')
     .fill('交付金额与项目预算比较，结合风险等级和验收终态排除。');
@@ -89,7 +89,7 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
   await field(page, '0', 'tpm_acceptance', amount, 'GTE', '100000');
   await page.getByTestId('cb-add').click();
   await field(page, '1', 'tpm_project', budget, 'GTE', '100000');
-  await expect(page.getByLabel('model-0', { exact: true })).toHaveDisplayValue(/交付验收/);
+  await expect(page.getByLabel('model-0', { exact: true })).toHaveValue('record:tpm_acceptance');
   await shot(page, 'E01');
   await page.getByLabel('select-0', { exact: true }).check();
   await page.getByLabel('select-1', { exact: true }).check();
@@ -108,13 +108,15 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
   await page.getByLabel('value-kind-1-1', { exact: true }).selectOption('field');
   await page.getByLabel('right-model-1-1', { exact: true }).selectOption('record:tpm_project');
   await page.getByLabel('right-field-1-1', { exact: true }).selectOption(budget);
-  await expect(page.getByLabel('right-field-1-1', { exact: true })).toHaveDisplayValue(/预算/);
+  await expect(page.getByLabel('right-field-1-1', { exact: true })).toHaveValue(budget);
   await shot(page, 'E05');
   await page.getByTestId('cb-add-group').click();
   await field(page, '2-0', 'tpm_acceptance', status, 'IN');
+  await page.locator('.ce-enum-values summary').click();
   await page.getByLabel('value-2-0-accepted', { exact: true }).check();
   await page.getByLabel('value-2-0-returned', { exact: true }).check();
   await shot(page, 'E02');
+  await page.locator('.ce-enum-values summary').click();
   await page.getByLabel('group-not-2', { exact: true }).check();
   await expect(page.getByTestId('cb-not-2')).toBeVisible();
   await shot(page, 'E03');
@@ -136,9 +138,12 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
   await page.reload();
   await page.getByTestId(`cfl-row-${code}`).click();
   await page.getByTestId('cfl-open-edit').click();
-  await expect(page.getByLabel('value-0-0', { exact: true })).toHaveValue(100000);
+  await expect(page.getByLabel('value-0-0', { exact: true })).toHaveValue('100000');
   await expect(page.getByLabel('right-field-1-1', { exact: true })).toHaveValue(budget);
   await shot(page, 'E09');
+  const logsBefore = await payload(
+    await page.request.get('/api/decision/logs/recent?decisionCode=__test__&page=0&size=1'),
+  );
   await page.getByTestId('condition-trial-toggle').click();
   await page.getByLabel(`trial-${amount}`, { exact: true }).fill('128000');
   await page.getByLabel(`trial-${budget}`, { exact: true }).fill('150000');
@@ -162,6 +167,9 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
   expect(matched.conditionTrace.nodeResults['root.1.0']).toBe('TRUE');
   expect(matched.conditionTrace.nodeResults['root.1.1']).toBe('FALSE');
   await shot(page, 'E06');
+  await page.getByTestId('cb-not-2').scrollIntoViewIfNeeded();
+  await shot(page, 'E06-details');
+  await page.getByTestId('condition-server-result').scrollIntoViewIfNeeded();
   await page.getByLabel(`trial-${risk}`, { exact: true }).selectOption('normal');
   await expect(page.getByTestId('condition-server-result')).toContainText('旧结果已失效');
   await shot(page, 'E07');
@@ -177,7 +185,7 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
   await page.getByLabel('delete-group-1', { exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await shot(page, 'E08');
-  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
   await page.getByLabel(`trial-${budget}`, { exact: true }).fill('110000');
   await trial('TRUE');
   const update = page.waitForResponse(
@@ -187,7 +195,66 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
   );
   await page.getByTestId('cfl-save-fragment').click();
   expect((await payload(await update)).pid).toBe(saved.pid);
-  const anonymous = await browser.newContext({ baseURL: new URL(page.url()).origin });
+  const logsAfter = await payload(
+    await page.request.get('/api/decision/logs/recent?decisionCode=__test__&page=0&size=1'),
+  );
+  expect(typeof logsBefore.total).toBe('number');
+  expect(logsAfter.total).toBe(logsBefore.total);
+  const invalid = await payload(
+    await page.request.post('/api/decision/test-run', {
+      data: {
+        kind: 'SIMPLE_CONDITION',
+        runtimeAdapter: 'AST_EVALUATOR',
+        contentJson: { type: 'group', op: 'AND', children: [] },
+        context: {},
+        explain: true,
+      },
+    }),
+  );
+  expect(invalid.status).toBe('ERROR');
+  expect(invalid.errors.length).toBeGreaterThan(0);
+  expect(invalid.conditionTrace).toBeNull();
+  expect(matched.actionPlans).toEqual([]);
+  // Prepare only this test-owned fragment as an immutable version. Publishing UX is outside this editor journey.
+  await payload(
+    await page.request.post(`/api/decision/condition-fragment-versions/${saved.pid}/validate`),
+  );
+  await payload(
+    await page.request.post(`/api/decision/condition-fragment-versions/${saved.pid}/publish`, {
+      data: { impactAcknowledged: true },
+    }),
+  );
+  await page.reload();
+  await page.getByTestId(`cfl-row-${code}`).click();
+  await expect(page.getByTestId('cfl-open-edit')).toHaveCount(0);
+  await page.getByTestId('cfl-open-version').click();
+  await page.getByLabel('value-0-0', { exact: true }).fill('120000');
+  const nextVersion = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/condition-fragments/${code}/versions`) &&
+      response.request().method() === 'POST',
+  );
+  await page.getByTestId('cfl-save-fragment').click();
+  const version2 = await payload(await nextVersion);
+  const versions = await payload(
+    await page.request.get(`/api/decision/condition-fragments/${code}/versions`),
+  );
+  expect(
+    versions.find((version: { pid: string }) => version.pid === saved.pid).conditionSpec.root,
+  ).toEqual(ast);
+  expect(version2.conditionSpec.root.children[0].children[0].right.value).toBe(120000);
+  await page.reload();
+  await page.getByTestId(`cfl-row-${code}`).click();
+  await page.getByTestId('cfl-open-edit').click();
+  await expect(page.getByLabel('value-0-0', { exact: true })).toHaveValue('120000');
+  await shot(page, 'E09-version');
+  const anonymous = await browser.newContext({
+    baseURL: new URL(page.url()).origin,
+    extraHTTPHeaders: {
+      Origin: new URL(page.url()).origin,
+      Referer: new URL('/', page.url()).href,
+    },
+  });
   const denied = await anonymous.request.post('/api/decision/test-run', {
     data: {
       kind: 'SIMPLE_CONDITION',
@@ -209,8 +276,12 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
         matched,
         fieldMatched,
         anonymousStatus: denied.status(),
+        logsBefore: logsBefore.total,
+        logsAfter: logsAfter.total,
+        immutableVersionPid: saved.pid,
+        nextDraftPid: version2.pid,
         ui: 'menu-driven authoring and persisted draft trial',
-        sideEffectClaim: 'only stateless test-run used; no publish/run-and-execute',
+        sideEffectClaim: 'trial uses stateless test-run with unchanged logs; test-owned fragment is separately published as an immutable-version fixture; no run-and-execute',
       },
       null,
       2,

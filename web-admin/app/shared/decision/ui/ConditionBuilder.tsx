@@ -1162,7 +1162,7 @@ function GroupEditor({
           <label className="ce-negate">
             <input
               type="checkbox"
-              aria-label={`group-not${suffix}`}
+              aria-label={`group-not${idFor(selectionPath)}`}
               checked={negated}
               onChange={() => (onNegate ? onNegate() : edit.toggleNot(selectionPath))}
             />

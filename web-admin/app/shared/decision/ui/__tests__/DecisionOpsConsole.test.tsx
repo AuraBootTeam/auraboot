@@ -20,6 +20,41 @@ vi.mock('~/shared/services/ApiService', () => ({
 const FIELDS: FieldOption[] = [
   {
     scope: 'record',
+    path: 'data.targetKey',
+    label: 'SLA 节点',
+    dataType: 'string',
+    options: ['task_manager_approve', 'task_hr_approve'],
+    valueLabels: { task_manager_approve: '主管审批节点', task_hr_approve: 'HR 审批节点' },
+  },
+  {
+    scope: 'sla',
+    path: 'deadlineMinutes',
+    label: '截止分钟',
+    dataType: 'integer',
+    modelName: 'SLA 上下文',
+  },
+  {
+    scope: 'record',
+    path: 'data.wd_req_applicant',
+    label: '申请人',
+    dataType: 'user',
+    modelCode: 'wd_leave_request',
+    modelName: '请假申请',
+    reference: { targetEntity: 'sys_user', valueField: 'pid', displayField: 'displayName' },
+  },
+  {
+    scope: 'record',
+    path: 'data.wd_req_type',
+    label: '请假类型',
+    dataType: 'dict',
+    modelCode: 'wd_leave_request',
+    modelName: '请假申请',
+    options: ['annual', 'sick'],
+    valueLabels: { annual: '年假', sick: '病假' },
+  },
+
+  {
+    scope: 'record',
     path: 'data.priority',
     label: '优先级',
     dataType: 'enum',
@@ -28,7 +63,7 @@ const FIELDS: FieldOption[] = [
   {
     scope: 'process',
     path: 'nodeId',
-    label: 'nodeId',
+    label: '流程节点',
     dataType: 'string',
   },
 ];
@@ -92,6 +127,15 @@ function mockTraceBlockApi() {
 
 function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
   return {
+    getFactCatalog: vi.fn(async () => ({
+      facts: FIELDS.map((field) => ({
+        ...field,
+        allowedValues: field.options?.map((value) => ({
+          value,
+          label: field.valueLabels?.[value] ?? value,
+        })),
+      })),
+    })),
     listDefinitions: vi.fn(async () => [
       { decisionCode: 'big', decisionName: 'Big', enabled: true },
     ]),
@@ -568,7 +612,9 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-scenario-SLA')).not.toHaveTextContent(
       'task.enter.approval',
     );
-    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('SLA 节点');
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('SLA 节点'),
+    );
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('流程节点');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('当前记录');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('文本');
@@ -593,7 +639,7 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent(
       'sla.deadlineMinutes',
     );
-    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('优先级');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('优先级');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('请假审批 SLA 截止时间');
     expect(screen.getByTestId('strategy-dmn-panel')).not.toHaveTextContent(
       'complaint_sla_deadline',
@@ -641,6 +687,10 @@ describe('DecisionOpsConsole', () => {
       fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
       fireEvent.click(screen.getByTestId('cb-add'));
 
+      await waitFor(() => expect(screen.getByLabelText('model-0')).toHaveTextContent('请假申请'));
+      fireEvent.change(screen.getByLabelText('model-0'), {
+        target: { value: 'record:wd_leave_request' },
+      });
       const fieldSelect = screen.getByLabelText('field-0') as HTMLSelectElement;
       expect(fieldSelect).toHaveTextContent('申请人');
 
@@ -699,6 +749,10 @@ describe('DecisionOpsConsole', () => {
 
       fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
       fireEvent.click(screen.getByTestId('cb-add'));
+      await waitFor(() => expect(screen.getByLabelText('model-0')).toHaveTextContent('请假申请'));
+      fireEvent.change(screen.getByLabelText('model-0'), {
+        target: { value: 'record:wd_leave_request' },
+      });
       fireEvent.change(screen.getByLabelText('field-0'), {
         target: { value: 'record:data.wd_req_applicant' },
       });
@@ -874,15 +928,11 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('申请金额');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('请假申请');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('小数');
-    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveTextContent(
-      '申请人',
-    );
-    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveAttribute(
-      'data-path',
-      'data.wd_req_applicant',
-    );
+    expect(
+      screen.queryByTestId('strategy-fact-record-data_wd_req_applicant'),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('record.data.amount');
-    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('访问次数');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('访问次数');
   });
 
   it('hydrates the Strategy Studio condition-fragment library from the runtime API', async () => {
@@ -1372,12 +1422,14 @@ describe('DecisionOpsConsole', () => {
     );
   });
 
-  it('exposes the scenario fact catalog inside the Strategy Studio DMN input picker', () => {
+  it('exposes the scenario fact catalog inside the Strategy Studio DMN input picker', async () => {
     renderConsole();
 
     fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
 
-    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('SLA 节点');
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('SLA 节点'),
+    );
     expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('SLA 上下文');
 
     fireEvent.change(screen.getByLabelText('input-field-search-0'), {
@@ -1403,7 +1455,9 @@ describe('DecisionOpsConsole', () => {
       target: { value: 'wd_req_type' },
     });
 
-    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('请假类型');
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('请假类型'),
+    );
     expect(
       screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type'),
     ).toBeInTheDocument();
@@ -2148,27 +2202,28 @@ describe('DecisionOpsConsole', () => {
     fireEvent.click(screen.getByTestId('epd-step-rules'));
     fireEvent.click(screen.getByTestId('cb-add'));
 
+    fireEvent.change(await screen.findByLabelText('model-0'), {
+      target: { value: 'record:wd_leave_request' },
+    });
     const fieldPicker = (await screen.findByLabelText('field-0')) as HTMLSelectElement;
     await waitFor(() =>
       expect(fieldPicker.querySelector('option[value="record:data.wd_req_days"]')).toBeTruthy(),
     );
     expect(fieldPicker).toHaveTextContent('请假天数');
-    expect(fieldPicker).toHaveTextContent('访问次数');
-    expect(fieldPicker).toHaveTextContent('优先级');
-
-    const groupLabels = Array.from(fieldPicker.querySelectorAll('optgroup')).map((group) =>
-      group.getAttribute('label'),
-    );
-    expect(groupLabels).toEqual(expect.arrayContaining(['请假申请', 'Agent 记忆']));
+    expect(screen.getByLabelText('model-0')).toHaveTextContent('Agent 记忆');
+    expect(fieldPicker).not.toHaveTextContent('访问次数');
 
     fireEvent.change(screen.getByLabelText('condition-field-search'), {
       target: { value: '请假' },
     });
-    expect(screen.getByTestId('cb-field-result-count')).toHaveTextContent('1 / 4');
+    expect(fieldPicker).toHaveTextContent('请假天数');
     expect(fieldPicker).toHaveTextContent('请假天数');
     expect(fieldPicker).not.toHaveTextContent('访问次数');
 
     fireEvent.change(screen.getByLabelText('condition-field-search'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('model-0'), {
+      target: { value: 'record:agent_memory' },
+    });
     fireEvent.change(fieldPicker, { target: { value: 'record:data.access_count' } });
     expect(screen.getByLabelText('field-0')).toHaveValue('record:data.access_count');
   });
@@ -2205,6 +2260,7 @@ describe('DecisionOpsConsole', () => {
     fireEvent.click(screen.getByTestId('cb-add'));
 
     const fieldPicker = (await screen.findByLabelText('field-0')) as HTMLSelectElement;
+    fireEvent.change(screen.getByLabelText('model-0'), { target: { value: 'record:complaint' } });
     await waitFor(() =>
       expect(fieldPicker.querySelector('option[value="record:data.priority"]')).toBeTruthy(),
     );

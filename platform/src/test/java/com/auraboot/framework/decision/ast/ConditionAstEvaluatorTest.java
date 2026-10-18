@@ -68,6 +68,36 @@ class ConditionAstEvaluatorTest {
         assertThat(trace.steps().get(2).right()).isEqualTo(100000);
     }
 
+    @Test
+    void explainsTextFieldComparisonsAndPresenceWithoutInventingMissingValues() {
+        var context = ctxOf(Map.of("name", "delivery-Q4", "prefix", "delivery", "suffix", "Q4"));
+        for (var operator : List.of(Operator.STARTS_WITH, Operator.CONTAINS_TEXT)) {
+            var trace = evaluator.evaluate(cmp(recPath("name", DataType.STRING), operator,
+                    recPath("prefix", DataType.STRING)), context);
+            assertThat(trace.result()).isEqualTo(Truth.TRUE);
+            assertThat(trace.steps().getFirst().right()).isEqualTo("delivery");
+        }
+        assertThat(evaluator.evaluate(cmp(recPath("name", DataType.STRING), Operator.ENDS_WITH,
+                recPath("suffix", DataType.STRING)), context).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(cmp(recPath("name", DataType.STRING), Operator.NE,
+                recPath("prefix", DataType.STRING)), context).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(cmp(recPath("name", DataType.STRING), Operator.IS_NOT_NULL, null), context).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(cmp(recPath("name", DataType.STRING), Operator.IS_NOT_EMPTY, null), context).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(new GroupNode(BoolOp.AND, List.of()), context).result()).isEqualTo(Truth.UNKNOWN);
+    }
+
+    @Test
+    void comparesTemporalFieldsUsingTheirDeclaredTypesAndReportsInvalidInputAsUnknown() {
+        var date = cmp(recPath("actual", DataType.DATE), Operator.GTE, recPath("planned", DataType.DATE));
+        var time = cmp(recPath("actual", DataType.TIME), Operator.GT, recPath("planned", DataType.TIME));
+        var timestamp = cmp(recPath("actual", DataType.DATETIME), Operator.GTE, recPath("planned", DataType.DATETIME));
+        assertThat(evaluator.evaluate(date, ctxOf(Map.of("actual","2026-10-18T10:00:00Z","planned","2026-10-17"))).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(time, ctxOf(Map.of("actual","10:30:00","planned","09:00:00"))).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(time, ctxOf(Map.of("actual","invalid","planned","09:00:00"))).result()).isEqualTo(Truth.UNKNOWN);
+        assertThat(evaluator.evaluate(timestamp, ctxOf(Map.of("actual","2026-10-18T10:30:00","planned","2026-10-18"))).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(timestamp, ctxOf(Map.of("actual","invalid","planned","2026-10-18"))).result()).isEqualTo(Truth.UNKNOWN);
+    }
+
     // ── happy ──────────────────────────────────────────────────────────────
 
     @Test

@@ -527,3 +527,13 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.condition-expression button.ce-primary:hover,
+.condition-expression button.ce-primary:focus-visible {
+  background: var(--primary, #1d4ed8);
+  color: var(--primary-foreground, #fff);
+}
+.condition-expression button.ce-primary:disabled {
+  background: var(--primary, #2563eb);
+  color: var(--primary-foreground, #fff);
+}
