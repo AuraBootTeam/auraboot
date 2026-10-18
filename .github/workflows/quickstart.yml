@@ -59,6 +59,15 @@ jobs:
         if: steps.changes.outputs.run == 'true'
         uses: docker/setup-buildx-action@v4
 
+      - name: Configure ephemeral protocol signing key
+        if: steps.changes.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          protocol_key="$(openssl rand -hex 32)"
+          echo "::add-mask::$protocol_key"
+          printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$protocol_key" >> "$GITHUB_ENV"
+
       - name: Build & start full stack
         if: steps.changes.outputs.run == 'true'
         run: docker compose --profile full up --build -d
@@ -162,10 +171,9 @@ jobs:
       - name: Authenticated API smoke (real endpoints)
         if: steps.changes.outputs.run == 'true'
         run: |
-          token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
-            -H "Content-Type: application/json" \
-            -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
-            | sed -n 's/.*"jwt":"\([^"]*\)".*/\1/p')
+          token=$(AURA_CORE_BASE_URL=http://localhost:3000 \
+            ADMIN_EMAIL=admin@auraboot.com ADMIN_PASSWORD=Test2026x \
+            python3 scripts/application/core-admin-session.py)
           [ -n "$token" ] || { echo "no token"; exit 1; }
           # Stick to endpoints that any authenticated user can hit without
           # specific permission grants — the smoke test asserts BFF proxy +

@@ -27,3 +27,11 @@ export function buildCommandTargetParams(target: unknown): Record<string, string
   const pid = toPublicRecordPid(target);
   return pid ? { targetRecordPid: pid } : {};
 }
+
+/** Resolve canonical command identities through API response envelopes. */
+export function getCommandResultRecordPid(result: unknown): string | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+  const value = result as Record<string, unknown>;
+  const pid = value.recordPid || value.pid;
+  return typeof pid === 'string' ? pid : getCommandResultRecordPid(value.data);
+}

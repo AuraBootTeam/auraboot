@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCommandTargetParams,
+  getCommandResultRecordPid,
   getLegacyCompatibleRecordPid,
   getPublicRecordKey,
   getPublicRecordPid,
@@ -33,5 +34,14 @@ describe('publicRecordId utilities', () => {
   it('builds command params with only targetRecordPid', () => {
     expect(buildCommandTargetParams(' public-pid ')).toEqual({ targetRecordPid: 'public-pid' });
     expect(buildCommandTargetParams('')).toEqual({});
+  });
+
+  it('resolves public command identities through nested API envelopes', () => {
+    expect(getCommandResultRecordPid({ recordPid: 'created-pid', pid: 'other-pid' })).toBe('created-pid');
+    expect(getCommandResultRecordPid({ pid: 'direct-pid' })).toBe('direct-pid');
+    expect(getCommandResultRecordPid({ data: { data: { recordPid: 'nested-pid' } } })).toBe('nested-pid');
+    expect(getCommandResultRecordPid(null)).toBeUndefined();
+    expect(getCommandResultRecordPid({ recordId: 'legacy-alias', id: 42 })).toBeUndefined();
+    expect(getCommandResultRecordPid({ recordPid: 42 })).toBeUndefined();
   });
 });
