@@ -1185,7 +1185,7 @@ describe('UnifiedDesignerWorkbench', () => {
     const subformBlock = findBlockById(savedDocument.blocks, 'subform_new_subform')?.block;
     expect(subformBlock).toMatchObject({
       blockType: 'subform',
-      title: 'Team members',
+      title: expect.objectContaining({ 'zh-CN': 'Team members', en: 'New subform' }),
       props: {
         rows: [{ name: 'Ada' }],
       },
