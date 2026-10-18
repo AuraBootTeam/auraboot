@@ -24,14 +24,14 @@ function sessionTree(value) {
     else sessionProof(row);
   }
 }
-function auditObservation(name, value) {
+function auditObservation(name, value, fixtures = []) {
   if (name === 'current-session-cleanup') { sessionProof(value); return 0; }
   requireCondition(value && Array.isArray(value.cleanupErrors) && value.cleanupErrors.length === 0
     && !value.journeyError && (!value.pageErrors || Array.isArray(value.pageErrors) && !value.pageErrors.length), `Failed journey/cleanup: ${name}`);
   if (value.sessionCleanup) sessionTree(value.sessionCleanup);
   const sessionRequired = ['profile-wire-observations','profile-email-only-observations','saved-view-wire-observations',
     'saved-view-browser-observations','team-wire-observations','team-browser-observations','team-role-observations',
-    'session-operation-observations','tenant-member-search-observations','session-compatibility-evidence','department-tree-observations','role-member-browser-observations'];
+    'session-operation-observations','tenant-member-search-observations','session-compatibility-evidence','department-tree-observations','role-member-browser-observations','capability-browser-observations'];
   if (sessionRequired.includes(name)) requireCondition(Array.isArray(value.sessionCleanup) && value.sessionCleanup.length > 0, `Missing owned session cleanup: ${name}`);
   const rows = value.rows ?? value.reads ?? value.checks;
   requireCondition(Array.isArray(rows) && rows.length > 0, `Empty operation observations: ${name}`);
@@ -62,6 +62,25 @@ function auditObservation(name, value) {
       {phase:'removed-reload',memberPids:[],total:0},
       {phase:'after-denials',memberPids:[],total:0},
     ]), 'Missing role member persisted transitions');
+  }
+  if (name === 'capability-browser-observations') {
+    const fixture = fixtures.find(row => row.profile === 'capabilityBrowser');
+    requireCondition(fixture && typeof fixture.code === 'string' && /^[a-f0-9]{64}$/.test(fixture.sha256)
+      && Array.isArray(fixture.includes) && fixture.includes.length > 0, 'Missing source-bound capability fixture');
+    const code = fixture.code, codes = fixture.includes;
+    requireCondition(isDeepStrictEqual(value.writes, [
+      { method: 'post', path: '/api/permission/capabilities/preview', body: [code] },
+      { method: 'put', path: '/api/permission/capabilities', body: [code] },
+      { method: 'post', path: '/api/permission/capabilities/preview', body: [] },
+      { method: 'put', path: '/api/permission/capabilities', body: [] },
+    ]), 'Invalid capability browser write payloads');
+    requireCondition(isDeepStrictEqual(value.storageProofs, [
+      { phase: 'initial', codes: [] }, { phase: 'granted-reload', codes },
+      { phase: 'revoked-reload', codes: [] }, { phase: 'after-denials', codes: [] },
+    ]), 'Missing capability persisted atomic transitions');
+    const expected = ['anonymous', 'no-role'].flatMap(actor => [['get', ''], ['post', '/preview'], ['put', '']]
+      .map(([method, suffix]) => ({ actor, method, suffix, status: actor === 'anonymous' ? 401 : 403 })));
+    requireCondition(isDeepStrictEqual(value.denials, expected), 'Missing capability refusal probes');
   }
   return rows.length;
 }
@@ -113,7 +132,7 @@ export function auditBrowserEvidence({ registry, catalog, report, reportBytes, b
     for (const required of registered.requiredEvidence) {
       const attachment = result.attachments.find(row => row.name === required.name);
       const bytes = attachment.body ? Buffer.from(attachment.body, 'base64') : readEvidenceFile(root, attachment.path);
-      responses += auditObservation(required.name, JSON.parse(String(bytes)));
+      responses += auditObservation(required.name, JSON.parse(String(bytes)), registry.fixtures);
     }
   }
   requireCondition(Array.isArray(originals) && originals.length === catalog.scenarios.length, 'Missing original images');

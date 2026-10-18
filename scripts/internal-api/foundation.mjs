@@ -37,11 +37,12 @@ export async function main(args) {
       .filter(file => !file.includes('node_modules') && fs.statSync(path.join(root, 'scripts/internal-api', file)).isFile())
       .map(file => `scripts/internal-api/${file}`)
       .concat(['contracts/internal-web-admin/openapi.json', 'web-admin/app/generated/internal-api/schema.d.ts', 'scripts/gates/hifi-golden-results.mjs']);
-    const inputDigest = () => sha256([...new Set([...scopedFiles, ...listBrowserSpecFiles(root)])].sort().map(file => `${file}\n${sha256(fs.readFileSync(path.join(root,file)))}`).join('\n'));
-    result.inputSha256 = inputDigest();
     const catalog = JSON.parse(fs.readFileSync(path.join(root, 'scripts/internal-api/catalog.json'), 'utf8'));
-    const profile = catalog.profiles.foundation;
     const browserCatalog = loadBrowserCatalog(root, catalog);
+    const fixtureFiles = browserCatalog.fixtures.map(fixture => fixture.file);
+    const inputDigest = () => sha256([...new Set([...scopedFiles, ...listBrowserSpecFiles(root), ...fixtureFiles])].sort().map(file => `${file}\n${sha256(fs.readFileSync(path.join(root,file)))}`).join('\n'));
+    result.inputSha256 = inputDigest();
+    const profile = catalog.profiles.foundation;
     result.checks.push({ name: 'browser-catalog-source-denominator', verdict: 'pass', tests: browserCatalog.tests.length, scenarios: browserCatalog.scenarios.length });
     const file = 'contracts/internal-web-admin/openapi.json';
     const raw = fs.readFileSync(path.join(root, file), 'utf8');

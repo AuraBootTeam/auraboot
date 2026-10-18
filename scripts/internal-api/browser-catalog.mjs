@@ -116,5 +116,21 @@ export function listBrowserSpecFiles(root) {
 }
 
 export function loadBrowserCatalog(root, catalog) {
-  return auditBrowserCatalog(listBrowserSpecFiles(root).map(file => ({ file, text: fs.readFileSync(path.join(root, file), 'utf8') })), catalog);
+  const fixtures = [];
+  for (const [profile, value] of Object.entries(catalog.profiles)) {
+    const fixture = value.capabilityFixture;
+    if (!fixture) continue;
+    requireCondition(typeof fixture.file === 'string' && /^plugins\/[a-z0-9-]+\/config\/capabilities\.json$/.test(fixture.file), 'Invalid capability fixture path');
+    const target = fs.realpathSync(path.join(root, fixture.file));
+    requireCondition(target.startsWith(fs.realpathSync(root) + path.sep), 'Capability fixture escapes source root');
+    const bytes = fs.readFileSync(target), declarations = JSON.parse(bytes);
+    requireCondition(Array.isArray(declarations), 'Invalid capability fixture declarations');
+    const found = declarations.filter(row => row.code === fixture.code);
+    requireCondition(found.length === 1 && Array.isArray(found[0].includes) && found[0].includes.length > 0
+      && found[0].includes.every(code => typeof code === 'string' && code.length > 0)
+      && new Set(found[0].includes).size === found[0].includes.length, 'Missing or invalid capability fixture');
+    equal([...found[0].includes].sort(), fixture.includes, 'Capability fixture and catalog grant denominator differ');
+    fixtures.push({ profile, file: fixture.file, code: fixture.code, includes: fixture.includes, sha256: sha256(bytes) });
+  }
+  return { ...auditBrowserCatalog(listBrowserSpecFiles(root).map(file => ({ file, text: fs.readFileSync(path.join(root, file), 'utf8') })), catalog), fixtures };
 }

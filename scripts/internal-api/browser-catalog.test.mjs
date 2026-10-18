@@ -31,6 +31,15 @@ test('browser catalog reconciles independent spec tests scenes and mandatory JSO
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const actual = loadBrowserCatalog(root, JSON.parse(fs.readFileSync(new URL('./catalog.json', import.meta.url))));
   assert.ok(actual.tests.length > 0 && actual.scenarios.length > 0);
+  const actualCatalog = JSON.parse(fs.readFileSync(new URL('./catalog.json', import.meta.url)));
+  if (actualCatalog.profiles.capabilityBrowser) {
+    assert.equal(actual.fixtures.length, 1);
+    const changed = structuredClone(actualCatalog);
+    changed.profiles.capabilityBrowser.capabilityFixture.includes = [];
+    assert.throws(() => loadBrowserCatalog(root, changed), /grant denominator differ/);
+    changed.profiles.capabilityBrowser.capabilityFixture.file = '../outside.json';
+    assert.throws(() => loadBrowserCatalog(root, changed), /fixture path/);
+  }
 });
 
 test('browser catalog rejects missing empty skipped shadowed dynamic duplicated or unregistered evidence', () => {

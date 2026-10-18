@@ -456,6 +456,38 @@
           "path": "/api/roles/{rolePid}/members/remove"
         }
       ]
+    },
+    "capabilityBrowser": {
+      "purpose": "Three generated capability operations through the Roles menu with exact owned atomic-grant persistence; partial, read-only and cross-tenant branches remain pending",
+      "spec": "web-admin/tests/e2e/model/internal-api-capabilities.spec.ts",
+      "tests": [
+        "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/permission/capabilities"
+        },
+        {
+          "method": "post",
+          "path": "/api/permission/capabilities/preview"
+        },
+        {
+          "method": "put",
+          "path": "/api/permission/capabilities"
+        }
+      ],
+      "capabilityFixture": {
+        "file": "plugins/org-management/config/capabilities.json",
+        "code": "org.cap.hr_view",
+        "includes": [
+          "model.org_department.read",
+          "model.org_employee.read",
+          "model.org_position.read",
+          "org.hr.read",
+          "org_management"
+        ]
+      }
     }
   },
   "scenarios": [
@@ -1001,6 +1033,58 @@
       "expected": "Removal submits the public member PID array and reload shows an empty role",
       "test": "generated role memberships preserve public PID selection assignment reload and removal",
       "screenshot": "ROLEMEM-04-removal-reload.png"
+    },
+    {
+      "id": "CAP-01",
+      "feature": "capabilities",
+      "action": "selection-draft",
+      "branch": "happy",
+      "expected": "Selecting the owned role capability opens a pending draft through the actual menu",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-01-selection-draft.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "CAP-02",
+      "feature": "capabilities",
+      "action": "grant-preview",
+      "branch": "happy",
+      "expected": "Preview shows the exact fixed capability grant before saving",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-02-grant-preview.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "CAP-03",
+      "feature": "capabilities",
+      "action": "grant-reload",
+      "branch": "happy",
+      "expected": "Reload retains the selected capability and the exact persisted atomic grant set",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-03-grant-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "CAP-04",
+      "feature": "capabilities",
+      "action": "revoke-reload",
+      "branch": "happy",
+      "expected": "Revoke saves a true empty selection array and reload retains zero owned grants",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-04-revoke-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
     }
   ]
 }

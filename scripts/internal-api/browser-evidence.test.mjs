@@ -44,9 +44,31 @@ function roleMemberObservation(f, denials) {
 }
 const roleMemberDenials=['anonymous','no-role'].flatMap(actor=>[['get',''],['get','/candidates'],['post','/assign'],['post','/remove']]
   .map(([method,suffix])=>({actor,method,suffix,status:actor==='anonymous'?401:403})));
+function capabilityObservation(f, mutate = () => {}) {
+  const name = 'capability-browser-observations', code = 'fixture.cap.read', codes = ['fixture.resource.read'];
+  f.registry.fixtures = [{ profile: 'capabilityBrowser', code, includes: codes, sha256: 'f'.repeat(64) }];
+  f.registry.tests[0].requiredEvidence[0].name = name;
+  const payload = { cleanupErrors: [], journeyError: null, rows: [{ status: 200, shape: { valid: true, errors: [] } }],
+    sessionCleanup: [{ context: 'actor', beforeStatus: 200, afterStatus: 401, revoked: true }],
+    writes: [{ method: 'post', path: '/api/permission/capabilities/preview', body: [code] },
+      { method: 'put', path: '/api/permission/capabilities', body: [code] },
+      { method: 'post', path: '/api/permission/capabilities/preview', body: [] },
+      { method: 'put', path: '/api/permission/capabilities', body: [] }],
+    storageProofs: [{ phase: 'initial', codes: [] }, { phase: 'granted-reload', codes },
+      { phase: 'revoked-reload', codes: [] }, { phase: 'after-denials', codes: [] }],
+    denials: ['anonymous', 'no-role'].flatMap(actor => [['get', ''], ['post', '/preview'], ['put', '']]
+      .map(([method, suffix]) => ({ actor, method, suffix, status: actor === 'anonymous' ? 401 : 403 }))),
+  };
+  mutate(payload, f.registry);
+  f.expected.registrySha256 = sha256(canonicalJson(f.registry));
+  f.before.identity.registrySha256 = f.after.identity.registrySha256 = f.expected.registrySha256;
+  const attachment = f.report.suites[0].specs[0].tests[0].results[0].attachments[0];
+  attachment.name = name; attachment.body = Buffer.from(JSON.stringify(payload)).toString('base64'); rebindReport(f);
+}
 
 test('browser evidence separates functional execution from exact original review and source runtime identity', () => withFixture(f => {
   const accepted = auditBrowserEvidence(f); assert.equal(accepted.counts.passed, 1); assert.equal(accepted.responses, 1); assert.equal(accepted.visualVerdict, 'pass');
+  capabilityObservation(f); assert.equal(auditBrowserEvidence(f).responses, 1);
   roleMemberObservation(f,roleMemberDenials);assert.equal(auditBrowserEvidence(f).responses,1);
   // Distinct journeys may legitimately land on the same login/settings screen.
   const second = path.join(f.root, 'SAMPLE-02.png'); fs.copyFileSync(f.originals[0].path, second);
@@ -70,6 +92,11 @@ test('browser evidence rejects stale failed skipped retried missing mismatched o
     f => { roleMemberObservation(f,[roleMemberDenials[1],...roleMemberDenials.slice(1)]); },
     f => { roleMemberObservation(f,roleMemberDenials); const a=f.report.suites[0].specs[0].tests[0].results[0].attachments[0];const p=JSON.parse(Buffer.from(a.body,'base64'));p.writes[1].body={memberPids:['public-member-pid']};a.body=Buffer.from(JSON.stringify(p)).toString('base64');rebindReport(f); },
     f => { roleMemberObservation(f,roleMemberDenials); const a=f.report.suites[0].specs[0].tests[0].results[0].attachments[0];const p=JSON.parse(Buffer.from(a.body,'base64'));p.membershipProofs[2].memberPids=['public-member-pid'];a.body=Buffer.from(JSON.stringify(p)).toString('base64');rebindReport(f); },
+    f => { capabilityObservation(f, p => { p.writes[3].body = { codes: [] }; }); },
+    f => { capabilityObservation(f, p => { p.storageProofs[2].codes = ['residual.grant']; }); },
+    f => { capabilityObservation(f, p => { p.denials.pop(); }); },
+    f => { capabilityObservation(f, p => { delete p.sessionCleanup; }); },
+    f => { capabilityObservation(f, (_p, registry) => { registry.fixtures = []; }); },
     f => { f.after.identity.runtimeManifestSha256 = 'f'.repeat(64); }, f => { f.after.sourceUnchanged = false; },
     f => { f.before.runtimeVerified = false; }, f => { f.after.exitCode = 1; },
     f => { f.after.reportSha256 = 'f'.repeat(64); }, f => { f.before.startedAt = '2026-10-19T00:00:02Z'; },
