@@ -570,6 +570,8 @@ public class AutomationServiceImpl implements AutomationService {
                 .automationId(entity.getAutomationId())
                 .triggerType(entity.getTriggerType())
                 .triggerRecordPid(entity.getTriggerRecordPid())
+                .traceId(entity.getTriggerPayload() != null
+                        && entity.getTriggerPayload().get("runtimeTraceId") instanceof String traceId ? traceId : null)
                 .triggerPayload(entity.getTriggerPayload())
                 .status(entity.getStatus())
                 .startedAt(entity.getStartedAt())

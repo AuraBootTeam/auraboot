@@ -20,6 +20,7 @@
  */
 
 import { useState, useCallback, useRef, useMemo } from 'react';
+import { canonicalizePageSchemaDto } from '~/framework/meta/utils/canonicalizePageDsl';
 import { useSchemaLoader, type UseSchemaLoaderOptions } from './useSchemaLoader';
 import type { PageContentProps } from '@auraboot/runtime-kernel';
 
@@ -35,6 +36,8 @@ export type PermissionMergeMode = 'merge' | 'override';
 
 /** Input options for useDslForm */
 export interface UseDslFormOptions {
+  /** Server-owned frozen page DTO; never reload the current page when supplied. */
+  schemaSnapshot?: any;
   /** Page key to load schema for (e.g. "order_new") */
   pageKey?: string;
   /** Alternative: model table name + type will be combined into pageKey */
@@ -202,8 +205,8 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
 
   // --- Schema loading (skipped when disabled or no pageKey) ---
   const schemaLoaderOpts: UseSchemaLoaderOptions = useMemo(
-    () => (enabled && pageKey ? { pageKey, token } : { pageKey: '__disabled__', token }),
-    [enabled, pageKey, token],
+    () => (enabled && pageKey && !options.schemaSnapshot ? { pageKey, token } : { pageKey: '__disabled__', token }),
+    [enabled, pageKey, token, options.schemaSnapshot],
   );
 
   const {
@@ -214,9 +217,10 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
   } = useSchemaLoader(schemaLoaderOpts);
 
   // When disabled, override loading/error to idle state
-  const schema = enabled ? rawSchema : null;
-  const loading = enabled ? schemaLoading : false;
-  const error = enabled ? schemaError : null;
+  const frozenSchema = useMemo(() => options.schemaSnapshot ? canonicalizePageSchemaDto(options.schemaSnapshot) : null, [options.schemaSnapshot]);
+  const schema = enabled ? frozenSchema || rawSchema : null;
+  const loading = enabled && !frozenSchema ? schemaLoading : false;
+  const error = enabled && !frozenSchema ? schemaError : null;
 
   // --- Form state ---
   const [values, setValues] = useState<Record<string, any>>(() => ({ ...initialValues }));
@@ -229,18 +233,24 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
   const effectivePermissions = useMemo(() => {
     // Extract schema-level field permissions if available
     const schemaPerms: Record<string, FieldPermission> = {};
-    const schemaFields = (schema as any)?.fields as any[] | undefined;
-    if (schemaFields) {
-      for (const field of schemaFields) {
-        if (field.readonly || field.feature?.readonly) {
-          schemaPerms[field.fieldCode || field.code] = 'readonly';
-        }
-        if (field.hidden) {
-          schemaPerms[field.fieldCode || field.code] = 'hidden';
-        }
+    const visit = (value: any, parentReadonly = false, parentHidden = false) => {
+      if (Array.isArray(value)) { value.forEach(item => visit(item, parentReadonly, parentHidden)); return; }
+      if (!value || typeof value !== 'object') return;
+      const readonly = parentReadonly || value.readOnly || value.readonly || value.feature?.readonly;
+      const hidden = parentHidden || value.hidden;
+      const code = value.field || value.fieldCode || value.code;
+      if (code) {
+        if (readonly) schemaPerms[code] = 'readonly';
+        if (hidden) schemaPerms[code] = 'hidden';
       }
-    }
-    return mergePermissions(schemaPerms, callerPermissions, permissionMode);
+      for (const key of ['fields', 'blocks', 'tabs', 'children']) visit(value[key], readonly, hidden);
+    };
+    visit(schema);
+    const normalized = Object.fromEntries(Object.entries(callerPermissions).map(([key, value]) => {
+      const permission = String(value).toLowerCase();
+      return [key, permission in PERMISSION_RANK ? permission : 'hidden'];
+    })) as Record<string, FieldPermission>;
+    return mergePermissions(schemaPerms, normalized, permissionMode);
   }, [schema, callerPermissions, permissionMode]);
 
   // --- Form methods ---

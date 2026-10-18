@@ -107,7 +107,7 @@ describe('Decision condition locale contracts', () => {
     fireEvent.change(screen.getByLabelText('value-0'), { target: { value: '125' } });
     expect(onChange).toHaveBeenCalledWith(
       group('AND', [
-        cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('125', 'decimal')),
+        cmp(path('record', 'data.amount', 'decimal'), 'GT', lit(125, 'decimal')),
         not(cmp(path('record', 'data.amount', 'decimal'), 'LT', lit(0, 'decimal'))),
       ]),
     );

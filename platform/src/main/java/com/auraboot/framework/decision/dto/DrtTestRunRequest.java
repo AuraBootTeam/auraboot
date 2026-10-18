@@ -26,6 +26,9 @@ public class DrtTestRunRequest {
     @NotNull
     private JsonNode contentJson;
 
+    /** Return the condition explanation for an explicit draft test-run only. */
+    private boolean explain;
+
     /** Context data keyed by Scope name. */
     private Map<String, Map<String, Object>> context;
 }

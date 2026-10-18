@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -29,6 +30,7 @@ class ViewShareServiceTest {
 
     @Mock private SavedViewMapper savedViewMapper;
     @Mock private SavedViewService savedViewService;
+    @Mock private PasswordEncoder passwordEncoder;
     @InjectMocks private ViewShareService service;
 
     @Test
@@ -48,14 +50,15 @@ class ViewShareServiceTest {
     }
 
     @Test
-    void createShareLink_withPasswordSetsHash() {
+    void createShareLink_withPasswordStoresBcryptHash() {
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
+        when(passwordEncoder.encode("secret")).thenReturn("$2a$10$storedhashvalue");
 
         Map<String, Object> result = service.createShareLink("v1", "secret", null);
 
         assertEquals(true, result.get("passwordProtected"));
         assertNull(result.get("expiresAt"));
-        verify(savedViewMapper).updateViewConfigJson(eq("v1"), contains("passwordHash"));
+        verify(savedViewMapper).updateViewConfigJson(eq("v1"), contains("$2a$10$storedhashvalue"));
     }
 
     @Test
@@ -181,12 +184,34 @@ class ViewShareServiceTest {
     }
 
     @Test
-    void accessSharedView_correctPasswordSucceeds() {
+    void accessSharedView_bcryptPasswordVerified() {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("viewconfigraw", "{\"__share\":{\"active\":true,\"passwordHash\":\"$2a$10$stored\"}}");
+        when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(meta);
+        when(passwordEncoder.matches("pw", "$2a$10$stored")).thenReturn(true);
+
+        assertNotNull(service.accessSharedView("t", "pw"));
+    }
+
+    @Test
+    void accessSharedView_bcryptPasswordMismatchThrows() {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("viewconfigraw", "{\"__share\":{\"active\":true,\"passwordHash\":\"$2a$10$stored\"}}");
+        when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(meta);
+        when(passwordEncoder.matches("wrong", "$2a$10$stored")).thenReturn(false);
+
+        RuntimeException e = assertThrows(RuntimeException.class, () -> service.accessSharedView("t", "wrong"));
+        assertTrue(e.getMessage().contains("Invalid password"));
+    }
+
+    @Test
+    void accessSharedView_legacyHexHashStillAccepted() {
         Map<String, Object> meta = new HashMap<>();
         meta.put("viewconfigraw", "{\"__share\":{\"active\":true,\"passwordHash\":\"" + Integer.toHexString("pw".hashCode()) + "\"}}");
         when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(meta);
-        Map<String, Object> r = service.accessSharedView("t", "pw");
-        assertNotNull(r);
+
+        assertNotNull(service.accessSharedView("t", "pw"));
+        verifyNoInteractions(passwordEncoder);
     }
 
     @Test

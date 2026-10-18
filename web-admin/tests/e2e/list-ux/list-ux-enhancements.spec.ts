@@ -58,13 +58,13 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     page,
   }) => {
     // Navigate to Page Designer for the test page
-    await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
-
-    // Wait for the designer to finish loading
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/pages/') && resp.status() === 200,
-      { timeout: 15000 },
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (resp) => resp.url().includes('/api/pages/') && resp.status() === 200,
+        { timeout: 15000 },
+      ),
+      page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' }),
+    ]);
 
     // Click the Settings button (gear icon)
     const settingsBtn = page.getByTestId('toolbar-settings').or(page.locator('button[title="设置"], button[title="Settings"]')).first();
@@ -82,21 +82,20 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     const toggleButton = page.locator('[data-testid="settings-toggle-enableMultiView"]');
     await expect(toggleButton).toBeVisible({ timeout: 5000 });
 
-    // Check the toggle is OFF: bg-gray-200 class present (not bg-blue-600)
-    const toggleClasses = await toggleButton.getAttribute('class');
-    expect(toggleClasses, 'Toggle should be OFF (gray background)').toContain('bg-gray-200');
-    expect(toggleClasses, 'Toggle should NOT be ON (blue background)').not.toContain('bg-blue-600');
+    await expect(toggleButton).toHaveAttribute('aria-checked', 'false');
   });
 
   test('LUX-02: Toggle enableMultiView ON and save → DSL contains enableMultiView: true', async ({
     page,
   }) => {
     // Navigate to Page Designer
-    await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/pages/') && resp.status() === 200,
-      { timeout: 15000 },
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (resp) => resp.url().includes('/api/pages/') && resp.status() === 200,
+        { timeout: 15000 },
+      ),
+      page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' }),
+    ]);
 
     // Open Settings
     const settingsBtn = page.getByTestId('toolbar-settings').or(page.locator('button[title="设置"], button[title="Settings"]')).first();
@@ -111,8 +110,8 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     await expect(toggleButton).toBeVisible({ timeout: 5000 });
     await toggleButton.click();
 
-    // Verify toggle is now ON (blue background)
-    await expect(toggleButton).toHaveClass(/bg-blue-600/, { timeout: 3000 });
+    // Verify the accessible switch state is now ON.
+    await expect(toggleButton).toHaveAttribute('aria-checked', 'true');
 
     // Click "Save changes" button in the settings panel footer
     const saveChangesBtn = page.locator('[data-testid="settings-panel-save"]');
@@ -146,11 +145,13 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
 
   test('LUX-03: Re-open settings → toggle reflects saved state (ON)', async ({ page }) => {
     // Navigate to Page Designer (fresh load to verify persistence)
-    await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/pages/') && resp.status() === 200,
-      { timeout: 15000 },
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (resp) => resp.url().includes('/api/pages/') && resp.status() === 200,
+        { timeout: 15000 },
+      ),
+      page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' }),
+    ]);
 
     // Open Settings
     const settingsBtn = page.getByTestId('toolbar-settings').or(page.locator('button[title="设置"], button[title="Settings"]')).first();
@@ -164,8 +165,8 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     const toggleButton = page.locator('[data-testid="settings-toggle-enableMultiView"]');
     await expect(toggleButton).toBeVisible({ timeout: 5000 });
 
-    // Verify toggle is ON (blue) — reflecting the saved state from LUX-02
-    await expect(toggleButton).toHaveClass(/bg-blue-600/, { timeout: 5000 });
+    // Verify persisted switch state from LUX-02.
+    await expect(toggleButton).toHaveAttribute('aria-checked', 'true');
 
     // Also verify inner knob is translated (translate-x-5 = ON position)
     const knob = toggleButton.locator('span[class*="rounded-full"]');

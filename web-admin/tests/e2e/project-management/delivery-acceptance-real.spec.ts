@@ -1,3 +1,4 @@
+import { BASE_URL } from '../../helpers/environments';
 import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
 import {mkdir, writeFile, readFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -30,7 +31,7 @@ async function menu(page: Page, name: string) {
 async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), {recursive:true});
   if (['d01','d02','d03','d04','d02-published','d02-compact'].includes(id)) await page.getByTestId('decisionops-console').evaluate(el=>el.scrollIntoView({block:'start'}));
-  if (['d13','d13-assigned'].includes(id)) await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  if (['d13','d13-assigned'].includes(id)) await page.getByTestId('detail-pdf-target').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
   await page.screenshot({path:join(evidence!, 'screenshots', `${id}.png`),fullPage:true});
 }
@@ -99,31 +100,52 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   expect((Date.parse(sla[0].deadlineTime)-Date.parse(sla[0].startTime))/60000).toBe(minutes);
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
-  await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
-  const traceDetails=page.getByTestId('bpm-panel').locator('details').filter({has:page.getByText('规则执行追踪',{exact:true})});
-  if(await traceDetails.getAttribute('open')===null) await traceDetails.getByText('规则执行追踪',{exact:true}).click();
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await expect(page.getByRole('tab',{name:'验收详情',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
+  await expect(page.getByTestId('bpm-history-container')).toHaveCount(0);
+  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+  await expect(page.getByRole('tab',{name:'变更历史',exact:true})).toHaveCount(0);
+  await expect(page.getByTestId('bpm-status-instance-id')).toHaveCount(0);
+  await page.getByRole('tab',{name:'运行记录',exact:true}).click();
   await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
-  await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-operations-approve')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('tab',{name:'运行记录',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
+  await page.getByTestId('detail-pdf-target').scrollIntoViewIfNeeded();
   return sla[0];
 }
 async function decide(page: Page, pid: string, action: 'approve'|'reject', observer: Page = page) {
   const pending = await row(page,pid);
-  const sent = page.waitForResponse(r => new URL(r.url()).pathname.match(new RegExp(`/api/bpm/tasks/[^/]+/${action}$`))!==null && r.request().method()==='POST');
+  const sent = page.waitForResponse(r => (new URL(r.url()).pathname.match(new RegExp(`/api/bpm/tasks/[^/]+/${action}$`))!==null || /\/api\/bpm\/forms\/task\/[^/]+\/submit$/.test(new URL(r.url()).pathname)) && r.request().method()==='POST');
   await page.getByTestId(`bpm-operations-${action}`).click();
-  await page.getByTestId(`bpm-${action}-comment`).fill(action==='approve'?'交付范围、完成标准和材料一致，批准验收。':'缺少培训签到记录，请补正后重新提交。');
-  await page.getByTestId(`bpm-${action}-confirm`).click();
+  const comment = action==='approve'?'交付范围、完成标准和材料一致，批准验收。':'缺少培训签到记录，请补正后重新提交。';
+  await expect(page.getByTestId('bpm-task-drawer').or(page.getByTestId(`bpm-${action}-comment`))).toBeVisible();
+  if (await page.getByTestId('bpm-task-drawer').count()) {
+    await page.getByTestId('approval-comment-textarea').fill(comment);
+    await page.getByTestId(`bpm-drawer-${action}-btn`).click();
+  } else {
+    await page.getByTestId(`bpm-${action}-comment`).fill(comment);
+    await page.getByTestId(`bpm-${action}-confirm`).click();
+  }
   await data(await sent);
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
   const expected = action==='approve'?'accepted':'returned';
   await expect.poll(async ()=>(await row(page,pid)).tpm_ac_status).toBe(expected);
   // The detail must update through the contributed block callback, without manual reload.
-  await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await expect(page.getByTestId('detail-persistent-header')).toHaveCount(0);
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
   const sla = await data(await observer.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));
   expect(sla.every((item:any)=>item.status==='completed' && !item.active)).toBe(true);
   await page.reload();
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
-  await page.getByTestId('bpm-panel').scrollIntoViewIfNeeded();
+  await page.getByTestId('detail-pdf-target').scrollIntoViewIfNeeded();
+  await page.getByRole('tab',{name:'审批记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-history-container')).toBeVisible();
   await expect(page.getByTestId('bpm-history-container')).not.toContainText('Access forbidden');
+  await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
   return sla;
 }
 
@@ -259,11 +281,13 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
     await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>{expect(ids.has(code),code).toBe(true);return {permissionId:ids.get(code),granted:true};})}));
     const email=`${code}@e2e.local`;
     await data(await page.request.post('/api/admin/users',{data:{email,displayName:reviewer?'验收协作成员':'交付只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
-    const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
+    const context=await browser.newContext({baseURL:BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
     try {
       const actor=await context.newPage();const actorUser=await login(actor,email,String(admin.tenantId));
       const identity=await data(await actor.request.get('/api/auth/me'));expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
       await openRecord(actor,name);
+      await expect(actor.getByRole('tab',{name:'运行记录',exact:true})).toHaveCount(0);
+      await expect(actor.getByRole('tab',{name:'核验结果',exact:true})).toHaveCount(0);
       if(reviewer) {
         await expect(actor.getByTestId('bpm-operations-approve')).toBeDisabled();
         const refused=await actor.request.post(`/api/bpm/tasks/${sla.taskId}/approve`,{data:{comment:'An unassigned reviewer must be refused',variables:{}}});expect(refused.status()).toBe(403);
@@ -279,6 +303,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
         const assignedPid=await create(page,actorUser,assignedName,68000,'普通',true);
         await submit(page,assignedPid,480,'tpm_standard_review');
         await openRecord(actor,assignedName);await expect(actor.getByTestId('bpm-operations-approve')).toBeEnabled();
+        await actor.getByRole('tab',{name:'审批记录',exact:true}).click();
         await decide(actor,assignedPid,'approve',page);await shot(actor,'d13-assigned');
       }
     } finally {await context.close();}
@@ -323,4 +348,148 @@ test('accepted project list form and detail remain available through their exist
   await expect(page.getByTestId('ai-fill-banner')).toHaveCount(0);await shot(page,'d15-form');await page.getByTestId('form-btn-cancel').click();
   await page.getByRole('row').filter({hasText:'华辰制造 · 供应链协同平台'}).getByRole('button',{name:/查看|详情/}).click();
   await expect(page.getByTestId('object-summary')).toContainText('林晓');await expect(page.getByRole('main')).toContainText('华辰制造');await expect(page.getByTestId('collection-completion')).toBeVisible();await shot(page,'d15');
+});
+
+test('acceptance detail tabs keep business facts primary and maintenance evidence secondary @critical',async({page})=>{
+  const user=await login(page);
+  const pid=await create(page,user,'华辰制造 · 第二阶段交付验收',68000,'高风险',true);
+  await submit(page,pid,120,'tpm_enhanced_review');
+  await expect(page.getByRole('tab')).toHaveCount(4);
+  await shot(page,'tabs-overview-1440');
+  await page.setViewportSize({width:1280,height:1000});
+  await expect(page.getByTestId('bpm-operations-approve')).toBeVisible();
+  await shot(page,'tabs-overview-1280');
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('tab',{name:'审批记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-history-container')).toContainText('提交业务审批');
+  await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
+  await shot(page,'tabs-approvals');
+  await page.getByRole('tab',{name:'核验结果',exact:true}).click();
+  await expect(page.getByTestId('subtable-empty-state')).toContainText('暂未核验');
+  await shot(page,'tabs-verification-empty');
+  await page.getByRole('tab',{name:'运行记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
+  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+  await shot(page,'tabs-execution');
+  await page.getByTestId('bpm-section-audit-report').locator('summary').click();
+  await expect(page.getByTestId('approval-chain-entry').first()).toBeVisible();
+  const downloading=page.waitForEvent('download');
+  await page.getByTestId('approval-chain-download').click();
+  const download=await downloading;
+  const destination=join(evidence!,'approval-chain-report.json');
+  await download.saveAs(destination);
+  const report=JSON.parse(await readFile(destination,'utf8'));
+  expect(report.processInstanceId).toBe((await row(page,pid)).tpm_ac_process);
+  expect(report.totalSteps).toBe(report.chain.length);expect(report.totalSteps).toBeGreaterThan(0);
+  await shot(page,'tabs-audit-expanded');
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
+  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+});
+
+
+test('associated DSL form freezes structure, denies node writes and keeps the business layout @critical', async ({page}) => {
+  const user = await login(page, process.env.ADMIN_EMAIL!, process.env.AURA_ADMIN_TENANT_ID);
+  const imported = await page.request.post('/api/plugins/import/import-directory-sync', {data:{
+    path:join(process.env.AURA_CORE_PROJECT_ROOT!, 'plugins/project-management'), conflictStrategy:'OVERWRITE',deferReferenceValidation:true
+  }});
+  expect(imported.ok()).toBe(true);
+  expect((await imported.json()).success).toBe(true);
+  // Explicit fixture update affects new submissions only; existing instance snapshots stay untouched.
+  const definitions = await data(await page.request.get('/api/bpm/process-definitions?size=1000'));
+  const definition = definitions.records.find((row:any) => row.processKey === 'tpm_delivery_acceptance');
+  expect(definition?.pid).toBeTruthy();
+  const bundle = JSON.parse(await readFile(join(process.env.AURA_CORE_PROJECT_ROOT!, 'plugins/project-management/examples/acceptance-workflow.bpm-package.json'), 'utf8'));
+  await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:bundle.processDefinition.formBindings}));
+  const before = await data(await page.request.get('/api/dynamic/tpm_acceptance/list'));
+  const name = `华辰制造 · 第${before.total+1}批交付验收`;
+  const pid = await create(page, user, name, 68000, '高风险', true);
+  const bound = page.getByTestId('bpm-bound-form');
+  await expect(bound).toHaveAttribute('data-version-source', 'current');
+  await expect(bound.getByTestId('dsl-form-readonly')).toBeVisible();
+  await expect(bound).toContainText('会员迁移、权限配置和培训交付完成');
+  await expect(bound.locator('input,textarea,button[type=submit]')).toHaveCount(0);
+  await shot(page, 'form-draft-readonly');
+  await submit(page, pid, 120, 'tpm_enhanced_review');
+  await expect(bound).toHaveAttribute('data-version-source', 'frozen');
+  await expect(bound.getByTestId('dsl-form-readonly')).toBeVisible();
+  const record = await row(page, pid);
+  const instanceId = String(record.tpm_ac_process);
+  const frozen = await data(await page.request.get(`/api/bpm/forms/instance/${instanceId}?formRef=tpm_acceptance_form`));
+  expect(frozen.snapshotStatus).toBe('FROZEN');
+  expect(frozen.schemaSnapshot.pageKey).toBe('tpm_acceptance_form');
+  expect(frozen.record.pid).toBe(pid);
+  const tasks = await data(await page.request.get(`/api/bpm/tasks/by-process/${instanceId}`));
+  const taskId = tasks[0]?.instanceId;
+  expect(taskId).toBeTruthy();
+  const taskForm = await data(await page.request.get(`/api/bpm/forms/task/${taskId}`));
+  expect(taskForm.formBinding.schemaSnapshot).toEqual(frozen.schemaSnapshot);
+  // Direct requests here are negative security probes, not a substitute for the UI approval below.
+  for (const forged of [{businessData:{tpm_ac_amount:1}}, {saveStrategy:'business_only'}, {variables:{decision:'approve',data:{tpm_ac_amount:1}}}]) {
+    const denied = await page.request.post(`/api/bpm/forms/task/${taskId}/submit`, {data:{variables:{decision:'approve'},...forged}});
+    expect(denied.ok()).toBe(false);
+    expect((await row(page,pid)).tpm_ac_status).toBe('submitted');
+    expect((await row(page,pid)).tpm_ac_amount).toBe(68000);
+  }
+  await shot(page, 'form-submitted-frozen');
+  // Republish setup via the public API; the frozen form is verified through a real browser reload.
+  const current = await data(await page.request.get('/api/pages/key/tpm_acceptance_form'));
+  const changedBlocks = structuredClone(current.blocks);
+  changedBlocks.find((block:any) => block.id==='identity').title = {'zh-CN':'新版验收范围','en':'Updated acceptance scope'};
+  changedBlocks.find((block:any) => block.id==='risk').title = {'zh-CN':'新版风险与审批','en':'Updated risk and review'};
+  const publishBlocks = async (blocks:any[]) => {
+    let managed = await data(await page.request.get(`/api/pages/${current.pid}`));
+    if (String(managed.status).toLowerCase()==='published') {
+      await data(await page.request.post(`/api/pages/${current.pid}/unpublish`, {data:{}}));
+      managed = await data(await page.request.get(`/api/pages/${current.pid}`));
+    }
+    await data(await page.request.put(`/api/pages/${current.pid}`, {data:{blocks,rowVersion:managed.rowVersion}}));
+    await data(await page.request.post(`/api/pages/${current.pid}/publish`, {data:{}}));
+  };
+  try {
+    await publishBlocks(changedBlocks);
+    const changedBinding = structuredClone(bundle.processDefinition.formBindings);
+    for (const binding of Object.values(changedBinding) as any[]) binding.fieldPermissions.tpm_ac_scope = 'hidden';
+    await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:changedBinding}));
+    await page.reload();
+    await expect(bound).toHaveAttribute('data-version-source','frozen');
+    await expect(bound.getByTestId('object-section-identity')).toContainText('验收范围');
+    await expect(bound).toContainText('会员迁移、权限配置和培训交付完成');
+    await expect(bound).not.toContainText('新版验收范围');
+    const after = await data(await page.request.get(`/api/bpm/forms/instance/${instanceId}?formRef=tpm_acceptance_form`));
+    expect(after.schemaSnapshot).toEqual(frozen.schemaSnapshot);
+    await shot(page,'form-republished-old-instance');
+    const nextPid = await create(page, user, `华辰制造 · 第${before.total+2}批交付验收`, 68000, '高风险', true);
+    await submit(page, nextPid, 120, 'tpm_enhanced_review');
+    await expect(bound).toHaveAttribute('data-version-source','frozen');
+    await expect(bound).toContainText('新版风险与审批');
+    await expect(bound).not.toContainText('会员迁移、权限配置和培训交付完成');
+    const nextRecord = await row(page, nextPid);
+    const fresh = await data(await page.request.get(`/api/bpm/forms/instance/${nextRecord.tpm_ac_process}?formRef=tpm_acceptance_form`));
+    expect(fresh.schemaSnapshot.blocks.find((block:any)=>block.id==='identity').title['zh-CN']).toBe('新版验收范围');
+    expect(fresh.record).not.toHaveProperty('tpm_ac_scope');
+    expect(fresh.fieldPermissions.tpm_ac_scope).toBe('hidden');
+    const newTasks = await data(await page.request.get(`/api/bpm/tasks/by-process/${nextRecord.tpm_ac_process}`));
+    const hiddenTask = await data(await page.request.get(`/api/bpm/forms/task/${newTasks[0].instanceId}`));
+    expect(hiddenTask.processVariables).toEqual({});
+    const hiddenDenied = await page.request.post(`/api/bpm/forms/task/${newTasks[0].instanceId}/submit`, {data:{businessData:{tpm_ac_scope:'forged hidden field'},variables:{decision:'approve'}}});
+    expect(hiddenDenied.status()).toBe(403);
+    expect((await row(page,nextPid)).tpm_ac_status).toBe('submitted');
+    await shot(page,'form-new-submission-hidden');
+    await writeFile(join(evidence!, 'associated-form-receipt.json'), JSON.stringify({pid,instanceId,taskId,frozen,after,nextPid,fresh,hiddenDeniedStatus:hiddenDenied.status()}, null,2));
+  } finally {
+    await publishBlocks(current.blocks);
+    await data(await page.request.put(`/api/bpm/process-definitions/${definition.pid}/form-bindings`, {data:bundle.processDefinition.formBindings}));
+  }
+  await openRecord(page,name);
+  await decide(page,pid,'approve');
+  await page.getByRole('tab',{name:'审批记录',exact:true}).click();
+  await expect(page.getByTestId('bpm-history-container')).toContainText('审批通过');
+  await expect(page.getByTestId('bpm-history-container')).toContainText('交付范围、完成标准和材料一致，批准验收。');
+  await expect(page.getByTestId('bpm-history-container')).not.toContainText('task_complete');
+  await shot(page,'form-approved-history');
+  await page.getByRole('tab',{name:'验收详情',exact:true}).click();
+  await expect(page.getByTestId('bpm-bound-form')).toHaveAttribute('data-version-source','frozen');
+  await page.reload();
+  await expect(page.getByTestId('bpm-bound-form').getByTestId('dsl-form-readonly')).toBeVisible();
+  await shot(page,'form-approved-readonly');
 });

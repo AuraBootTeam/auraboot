@@ -40,6 +40,22 @@ class ToolMetadataRegistryTest {
     }
 
     @Test
+    void referenceResolutionIsReadOnlyWithoutAllowingUnknownPlatformWrites() {
+        for (String name : java.util.List.of("platform.resolve_reference", "platform_resolve_reference")) {
+            var metadata = registry.from(ToolDefinition.builder().toolCode(name).toolType("platform")
+                    .riskLevel("L0").build(), ToolMetadataTrustLevel.VERIFIED);
+            assertThat(metadata.getEffectType()).isEqualTo(ToolEffectType.INTERNAL_READ);
+            assertThat(metadata.getApprovalRequirement()).isEqualTo(ApprovalRequirement.NONE);
+            assertThat(registry.from(com.auraboot.framework.agent.dto.AgentToolDefinition.builder()
+                    .name(name).toolType("platform").riskLevel("L0").build(), ToolMetadataTrustLevel.VERIFIED)
+                    .getEffectType()).isEqualTo(ToolEffectType.INTERNAL_READ);
+        }
+        assertThat(registry.from(ToolDefinition.builder().toolCode("platform.resolve_reference_and_update")
+                .toolType("platform").riskLevel("L0").build(), ToolMetadataTrustLevel.VERIFIED).getEffectType())
+                .isEqualTo(ToolEffectType.INTERNAL_WRITE);
+    }
+
+    @Test
     @DisplayName("maps platform-owned query tools to verified read metadata")
     void mapsVerifiedReadToolMetadata() {
         ToolDefinition query = ToolDefinition.builder()

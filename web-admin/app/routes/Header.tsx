@@ -222,8 +222,8 @@ export default function Header({
             {/* Global search Cmd+K */}
             {!simplified && <CommandPalette />}
 
-            {/* AuraBot toggle */}
-            {!workspace && !simplified && (
+            {/* AuraBot remains explicitly accessible on business workspaces. */}
+            {!simplified && (
               <button
                 onClick={toggleAI}
                 data-testid="ai-panel-toggle"

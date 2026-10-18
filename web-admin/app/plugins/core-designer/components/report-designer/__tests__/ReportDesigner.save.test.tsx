@@ -1,9 +1,11 @@
+import { renderToString } from 'react-dom/server';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReportDesigner } from '../ReportDesigner';
+import { createEmptyReport } from '../types';
 import { useReportStore } from '../store/useReportStore';
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), error: vi.fn(), canManage: true }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), load: vi.fn(), error: vi.fn(), canManage: true }));
 vi.mock('~/utils/i18n', () => ({ useSmartText: () => (value: { en: string }) => value.en }));
 vi.mock('~/contexts/AuthContext', () => ({ usePermission: () => mocks.canManage }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showErrorToast: mocks.error }) }));
@@ -11,7 +13,7 @@ vi.mock('~/shared/versioning', () => ({
   useVersioning: () => ({ versions: [] }), VersionHistoryPanel: () => null,
 }));
 vi.mock('~/shared/versioning/versionService', () => ({ reportVersionService: {} }));
-vi.mock('../services/reportDesignerService', () => ({ reportDesignerService: { save: mocks.save } }));
+vi.mock('../services/reportDesignerService', () => ({ reportDesignerService: { save: mocks.save, loadByPid: mocks.load } }));
 vi.mock('../services/useReportQuery', () => ({ useReportQuery: () => ({ data: {}, canExport: false }) }));
 vi.mock('../components/BlockPalette', () => ({ BlockPalette: () => null }));
 vi.mock('../components/BlockPropertyPanel', () => ({ BlockPropertyPanel: () => null }));
@@ -39,6 +41,38 @@ describe('report save completion (hermetic component)', () => {
     mocks.save.mockResolvedValue('saved-report-pid');
   });
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it('does not expose an editable server placeholder before the requested report loads', () => {
+    const html=renderToString(<ReportDesigner reportId="requested-report" />);
+    expect(html).toContain('Loading report...');
+    expect(html).not.toContain('aria-label="Title"');
+  });
+
+  it('blocks saving a placeholder until the requested report has loaded', async () => {
+    let resolve!: (value:any)=>void;
+    mocks.load.mockReturnValue(new Promise(done=>{resolve=done;}));
+    render(<ReportDesigner reportId="requested-report" />);
+    expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
+    await act(async()=>{fireEvent.keyDown(window,{key:'s',ctrlKey:true});});
+    expect(mocks.save).not.toHaveBeenCalled();
+    await act(async()=>{resolve({pid:'requested-report',dsl:createEmptyReport('Loaded report')});});
+    fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Reviewed report'}});
+    await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Save'}));});
+    expect(mocks.save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({title:'Reviewed report'}),'requested-report');
+  });
+
+  it('ignores a late result from the previously selected report', async () => {
+    let first!: (value:any)=>void, second!: (value:any)=>void;
+    mocks.load.mockReturnValueOnce(new Promise(done=>{first=done;}))
+      .mockReturnValueOnce(new Promise(done=>{second=done;}));
+    const host=render(<ReportDesigner reportId="first" />);
+    host.rerender(<ReportDesigner reportId="second" />);
+    await act(async()=>{second({pid:'second',dsl:createEmptyReport('Current report')});});
+    expect(screen.getByLabelText('Title')).toHaveValue('Current report');
+    await act(async()=>{first({pid:'first',dsl:createEmptyReport('Stale report')});});
+    expect(screen.getByLabelText('Title')).toHaveValue('Current report');
+    expect(useReportStore.getState().pageId).toBe('second');
+  });
 
   it.each(['button', 'keyboard', 'auto-save'])('notifies the host after a successful %s save', async trigger => {
     const completed = vi.fn();

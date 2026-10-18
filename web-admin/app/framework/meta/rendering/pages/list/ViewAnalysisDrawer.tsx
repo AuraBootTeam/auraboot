@@ -10,7 +10,7 @@ import type { ChartDataSource, FilterConfig } from '~/framework/smart/types/char
 import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
 import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 import { useI18n } from '~/contexts/I18nContext';
-import type { ListFilterFieldMetadata } from '../ListPageContent';
+import type { ListFilterFieldMetadata } from './listFieldMetadata';
 import {
   analysisGroupFields,
   analysisMetricFields,

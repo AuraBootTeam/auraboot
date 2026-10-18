@@ -6,6 +6,7 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -28,6 +29,7 @@ public class ViewShareService {
 
     private final SavedViewMapper savedViewMapper;
     private final SavedViewService savedViewService;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Create a public share link for a view.
@@ -48,7 +50,7 @@ public class ViewShareService {
         shareMeta.put("token", token);
         shareMeta.put("createdAt", Instant.now().toString());
         if (password != null && !password.isBlank()) {
-            shareMeta.put("passwordHash", hashPassword(password));
+            shareMeta.put("passwordHash", passwordEncoder.encode(password));
         }
         if (expiresAt != null) {
             shareMeta.put("expiresAt", expiresAt.toString());
@@ -133,7 +135,7 @@ public class ViewShareService {
         // Check password
         String storedHash = (String) share.get("passwordHash");
         if (storedHash != null) {
-            if (password == null || !hashPassword(password).equals(storedHash)) {
+            if (password == null || !passwordMatches(password, storedHash)) {
                 throw new ValidationException(ResponseCode.BadParam, "Invalid password");
             }
         }
@@ -168,8 +170,17 @@ public class ViewShareService {
         }
     }
 
-    private String hashPassword(String password) {
-        // Simple hash — in production use BCrypt
+    private boolean passwordMatches(String rawPassword, String storedHash) {
+        if (storedHash.startsWith("$2")) {
+            return passwordEncoder.matches(rawPassword, storedHash);
+        }
+        // Shares created before BCrypt stored Integer.toHexString(hashCode()); keep verifying
+        // them — this public endpoint stays read-only, so no in-place rewrite. Recreating the
+        // share link rotates the stored hash to BCrypt.
+        return legacyHash(rawPassword).equals(storedHash);
+    }
+
+    private String legacyHash(String password) {
         return Integer.toHexString(password.hashCode());
     }
 }

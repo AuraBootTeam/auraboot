@@ -1,3 +1,4 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** Real seed/collect/read APIs. No direct SQL writes or forged tokens. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -16,7 +17,7 @@ test('behavior rollups isolate populated tenants even with colliding event and s
   const identity = await seed.json();
   expect(identity.jwt).toBeTruthy();
   const other = await requestFactory.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: BACKEND_URL,
     extraHTTPHeaders: { Authorization: `Bearer ${identity.jwt}` },
   });
   try {

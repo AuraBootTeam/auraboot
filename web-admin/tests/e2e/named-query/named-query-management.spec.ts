@@ -19,34 +19,6 @@ function generateCode(prefix: string = 'nq'): string {
   return `${prefix}_e2e_${timestamp}_${random}`;
 }
 
-function pickStatus(input: any): string | undefined {
-  if (!input || typeof input !== 'object') return undefined;
-  if (typeof input.status === 'string') return input.status;
-  if (typeof input.lifecycleStatus === 'string') return input.lifecycleStatus;
-  if (typeof input.lifecycle_status === 'string') return input.lifecycle_status;
-  if (typeof input.state === 'string') return input.state;
-  for (const value of Object.values(input)) {
-    if (value && typeof value === 'object') {
-      const nested = pickStatus(value);
-      if (nested) return nested;
-    }
-  }
-  return undefined;
-}
-
-function pickPid(input: any): string | undefined {
-  if (!input || typeof input !== 'object') return undefined;
-  if (typeof input.pid === 'string') return input.pid;
-  if (typeof input.id === 'string') return input.id;
-  for (const value of Object.values(input)) {
-    if (value && typeof value === 'object') {
-      const nested = pickPid(value);
-      if (nested) return nested;
-    }
-  }
-  return undefined;
-}
-
 function normalizeStatus(status: string | undefined): string {
   return String(status ?? '').trim().toLowerCase();
 }
@@ -58,26 +30,20 @@ test.describe('Named Query Management', () => {
   let queryCode: string | null = null;
   const testCode = generateCode();
   const testTitle = 'E2E Lifecycle Test';
-  const testFromSql = 'ab_meta_model';
+  const fixtureTitle = generateCode('nq_source');
+  const testFromSql = `SELECT pid FROM mt_e2et_order WHERE e2et_order_title = '${fixtureTitle}'`;
+  let fixturePid: string;
 
-  async function resolveExecutableQueryCode(
-    page: import('@playwright/test').Page,
-  ): Promise<string> {
-    if (queryCode) return queryCode;
-
-    const listResp = await page.request.get(
-      '/api/meta/named-queries?pageSize=20&sortBy=createdAt&sortOrder=desc',
-    );
-    expect(listResp.ok()).toBe(true);
-    const listBody = await listResp.json();
-    const records = listBody.data?.data || listBody.data?.records || [];
-    const found = records.find((r: any) => r.code === testCode);
-    if (found?.code) {
-      return String(found.code);
-    }
-
-    return 'crm_dashboard_kpi';
-  }
+  test.beforeAll(async ({ request }) => {
+    const response = await request.post('/api/dynamic/e2et_order/create', {
+      data: { e2et_order_title: fixtureTitle, e2et_order_type: 'normal', e2et_order_status: 'draft', e2et_order_urgent: false },
+    });
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    fixturePid = body.data.pid;
+    expect(fixturePid).toEqual(expect.any(String));
+  });
 
   // =====================================================================
   // List page
@@ -116,93 +82,21 @@ test.describe('Named Query Management', () => {
     await nq.fillCreateForm(testCode, testTitle, 'E2E lifecycle test query', testFromSql);
 
     const apiResponse = await nq.submitCreate();
-    const createBody = apiResponse?.ok() ? await apiResponse.json().catch(() => ({})) : {};
-
-    if (apiResponse?.ok()) {
-      await page.waitForURL(
-        (url) =>
-          /\/meta\/named-queries\/[^/]+/.test(url.toString()) && !url.toString().includes('/new'),
-        { timeout: 10000 },
-      );
-    }
-    await page.waitForLoadState('domcontentloaded');
-
-    // Extract pid from URL
-    const url = page.url();
-    const match = url.match(/\/meta\/named-queries\/([^/?#]+)/);
-    if (match) {
-      queryPid = match[1];
-      queryCode = testCode;
-    }
-    if (!queryPid) {
-      const createdPid = pickPid(createBody);
-      if (createdPid) {
-        queryPid = createdPid;
-        queryCode = testCode;
-      }
-    }
-
-    // API fallback: if URL-based extraction failed, query the API to find the just-created named query
-    if (!queryPid) {
-      const listResp = await page.request.get(
-        '/api/meta/named-queries?pageSize=10&sortBy=createdAt&sortOrder=desc',
-      );
-      if (listResp.ok()) {
-        const listData = await listResp.json();
-        const records = listData.data?.data || listData.data?.records || [];
-        const found = records.find((r: any) => r.code === testCode);
-        if (found) {
-          queryPid = found.pid;
-          queryCode = testCode;
-        }
-      }
-    }
-
-    expect(queryPid).not.toBeNull();
-
-    // Verify draft status via API. Newer detail payloads may omit a top-level
-    // status field even though list/batch-status still exposes the lifecycle
-    // state, so poll detail/create/list shapes before failing.
-    await expect
-      .poll(
-        async () => {
-          const fromCreate = normalizeStatus(pickStatus(createBody));
-          if (fromCreate) return fromCreate;
-
-          const resp = await page.request.get(`/api/meta/named-queries/${queryPid}`);
-          const result = await resp.json().catch(() => ({}));
-          const fromDetail = normalizeStatus(pickStatus(result));
-          if (fromDetail) return fromDetail;
-
-          const byCodeResp = await page.request.get(
-            `/api/meta/named-queries/by-code/${encodeURIComponent(queryCode || testCode)}`,
-          );
-          if (byCodeResp.ok()) {
-            const byCode = await byCodeResp.json().catch(() => ({}));
-            const fromByCode = normalizeStatus(pickStatus(byCode));
-            if (fromByCode) return fromByCode;
-          }
-
-          const listResp = await page.request.get(
-            `/api/meta/named-queries?pageSize=20&sortBy=createdAt&sortOrder=desc&keyword=${encodeURIComponent(testCode)}`,
-          );
-          if (listResp.ok()) {
-            const listData = await listResp.json().catch(() => ({}));
-            const records =
-              listData.data?.data?.records ||
-              listData.data?.records ||
-              listData.data?.data ||
-              listData.records ||
-              [];
-            const found = records.find((r: any) => r.code === queryCode || r.pid === queryPid);
-            const fromList = normalizeStatus(pickStatus(found));
-            if (fromList) return fromList;
-          }
-          return '';
-        },
-        { timeout: 10000, intervals: [500, 1000, 1500] },
-      )
-      .toBe('draft');
+    expect(apiResponse.ok()).toBe(true);
+    const createBody = await apiResponse.json();
+    expect(String(createBody.code)).toBe('0');
+    expect(createBody.data.pid).toEqual(expect.any(String));
+    expect(createBody.data.code).toBe(testCode);
+    expect(normalizeStatus(createBody.data.status)).toBe('draft');
+    queryPid = createBody.data.pid;
+    queryCode = testCode;
+    await expect(page).toHaveURL(new RegExp(`/meta/named-queries/${queryPid}(?:[?#]|$)`));
+    const detail = await page.request.get(`/api/meta/named-queries/${queryPid}`);
+    expect(detail.ok()).toBe(true);
+    const persisted = await detail.json();
+    expect(String(persisted.code)).toBe('0');
+    expect(persisted.data.code).toBe(testCode);
+    expect(normalizeStatus(persisted.data.status)).toBe('draft');
   });
 
   // =====================================================================
@@ -264,24 +158,18 @@ test.describe('Named Query Management', () => {
     }
 
     // Add field via API
-    await page.request
-      .post(`/api/meta/named-queries/${queryCode}/fields`, {
-        data: {
-          fieldCode: 'code',
-          columnExpr: 'code',
-          dataType: 'string',
-          sortable: true,
-          searchable: true,
-        },
-      })
-      .catch(() => {}); // ignore if exists
+    const added = await page.request.post(`/api/meta/named-queries/${queryCode}/fields`, {
+      data: { fieldCode: 'pid', columnExpr: 'pid', dataType: 'string', sortable: true, searchable: true },
+    });
+    expect(added.ok()).toBe(true);
+    expect(String((await added.json()).code)).toBe('0');
 
     // View in UI
     const nq = new NamedQueryPage(page);
     await nq.gotoEditTab(queryPid!, 'fields');
 
     // Verify field is shown
-    await expect(page.getByText('code').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('table tbody tr').filter({ hasText: 'pid' })).toBeVisible({ timeout: 5000 });
   });
 
   // =====================================================================
@@ -485,7 +373,8 @@ test.describe('Named Query Management', () => {
    * NQ-E14: Test query execution via API (published state)
    */
   test('NQ-E14: Test query execution', async ({ page }) => {
-    const codeToExecute = await resolveExecutableQueryCode(page);
+    expect(queryCode).toBeTruthy();
+    const codeToExecute = queryCode;
 
     const resp = await page.request.post(`/api/meta/named-queries/${codeToExecute}/execute`, {
       data: {
@@ -496,8 +385,9 @@ test.describe('Named Query Management', () => {
 
     expect(resp.ok()).toBe(true);
     const result = await resp.json();
-    expect(result.data.total).toBeGreaterThan(0);
-    expect((result.data.records ?? result.data.data ?? []).length).toBeGreaterThan(0);
+    expect(String(result.code)).toBe('0');
+    expect(result.data.total).toBe(1);
+    expect(result.data.records).toEqual([expect.objectContaining({ pid: fixturePid })]);
   });
 
   // =====================================================================
@@ -512,10 +402,12 @@ test.describe('Named Query Management', () => {
       throw new Error(String('Named query not created - NQ-E02 failed'));
     }
 
-    const resp = await page.request.get(`/api/datasource/list?datasourceId=nq:${queryCode}`);
+    const resp = await page.request.get('/api/datasource/list', {
+      params: { datasourceId: `nq:${queryCode}`, valueField: 'pid', labelField: 'pid' },
+    });
     expect(resp.ok()).toBe(true);
     const result = await resp.json();
-    expect(result.data.length).toBeGreaterThan(0);
+    expect(result.data).toEqual([expect.objectContaining({ value: fixturePid, label: fixturePid })]);
   });
 
   // =====================================================================
@@ -606,7 +498,7 @@ test.describe('Named Query Management', () => {
           .catch(() => {});
 
         if (queryCode) {
-          await request.delete(`/api/meta/named-queries/${queryCode}/fields/code`);
+          await request.delete(`/api/meta/named-queries/${queryCode}/fields/pid`);
         }
         await request.delete(`/api/meta/named-queries/${queryPid}`);
       } catch (error) {

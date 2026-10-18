@@ -1136,7 +1136,7 @@ describe('DecisionRuleBindingBlock', () => {
     });
 
     fireEvent.click(screen.getByTestId('cb-add-group'));
-    fireEvent.click(screen.getByTestId('op-or-1'));
+    fireEvent.change(screen.getByLabelText('group-op-1'), { target: { value: 'OR' } });
     fireEvent.change(screen.getByLabelText('field-1-0'), {
       target: { value: 'record:data.amount' },
     });
@@ -1180,7 +1180,7 @@ describe('DecisionRuleBindingBlock', () => {
                   type: 'compare',
                   operator: 'GT',
                   left: { scope: 'record', path: 'data.amount' },
-                  right: { value: '5000' },
+                  right: { value: 5000 },
                 },
               ],
             },

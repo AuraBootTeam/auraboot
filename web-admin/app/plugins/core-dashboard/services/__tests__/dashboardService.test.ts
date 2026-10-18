@@ -57,6 +57,19 @@ describe('dashboardService.normalizeDashboard', () => {
     expect(dashboard.widgets[0].config.dataSource).toBeUndefined();
   });
 
+  it.each([
+    { dataSource: { type: 'namedQuery', queryCode: 'delivery_facts' } },
+    { modelCode: 'delivery', table: { columns: [{ field: 'name' }] } },
+    { columns: ['name'], data: [] },
+  ])('preserves localized empty guidance for table configuration %j', (source) => {
+    const emptyMessage = { 'zh-CN': '先创建验收记录', 'en-US': 'Create an acceptance first' };
+    const dashboard = normalizeDashboard(baseDashboard([{
+      id: 'delivery', type: 'smart-table-chart', x: 0, y: 0, w: 12, h: 4,
+      config: { title: 'Delivery', ...source, emptyMessage },
+    }]));
+    expect(dashboard.widgets[0].config.emptyMessage).toEqual(emptyMessage);
+  });
+
   it('still normalizes inline static table data to a static dataSource', () => {
     const dashboard = normalizeDashboard(
       baseDashboard([

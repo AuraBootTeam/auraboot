@@ -160,6 +160,9 @@ export interface WidgetConfig {
   title: DashboardText;
   dataSource?: DataSourceConfig;
   visualization?: Record<string, unknown>;
+  /** Legacy chart presentation flags, overridden by visualization when supplied. */
+  ring?: boolean;
+  showLabel?: boolean;
   style?: StyleSettings;
   linkage?: LinkageConfig;
   /** Filter bar field definitions (smart-filter-bar only) */
@@ -184,6 +187,8 @@ export interface WidgetConfig {
   showPagination?: boolean;
   sortable?: boolean;
   striped?: boolean;
+  /** Localized guidance for an empty table data source. */
+  emptyMessage?: DashboardText;
   /**
    * Multi-KPI configuration for `smart-number-card`. Each entry binds one column from
    * the data source row to a labelled tile; `label` carries the human-readable eyebrow

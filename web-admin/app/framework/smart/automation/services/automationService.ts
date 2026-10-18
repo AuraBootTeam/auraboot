@@ -52,6 +52,8 @@ export interface ActionResult {
  * Automation execution log entry
  */
 export interface AutomationLog {
+  /** Persisted distributed trace for this particular run, when collected. */
+  traceId?: string;
   id?: number;
   pid: string;
   automationId: string;

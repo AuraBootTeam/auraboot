@@ -3,6 +3,8 @@ package com.auraboot.framework.aurabot.service;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.trace.AiTraceService;
+import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
@@ -26,6 +28,7 @@ class AuraBotChatToolRuntimeAdapterFactory {
     private final ChatToolExecutor chatToolExecutor;
     private final ObjectMapper objectMapper;
     private final ReadOnlyProfilePolicy readOnlyProfilePolicy;
+    private final AiTraceService aiTraceService;
 
     TurnOutcome run(TurnContext ctx,
                     String providerCode,
@@ -44,7 +47,7 @@ class AuraBotChatToolRuntimeAdapterFactory {
                     UserPermissionService userPermissionService,
                     PendingToolStore pendingToolStore,
                     PendingToolSnapshotFactory pendingToolSnapshotFactory,
-                    int maxToolRounds) {
+                    int maxToolRounds, TraceContext trace) {
         return new AuraBotChatToolRuntimeAdapter(
                 chatTurnRuntime,
                 llmProviderFactory,
@@ -55,7 +58,7 @@ class AuraBotChatToolRuntimeAdapterFactory {
                 pendingToolSnapshotFactory,
                 objectMapper,
                 readOnlyProfilePolicy,
-                maxToolRounds)
+                maxToolRounds, aiTraceService, trace)
                 .run(ctx, providerCode, config, model, systemPrompt,
                         history, userMessage, maxTokens, tools, resolved,
                         modelCode, sessionId, contextBundle, sink);

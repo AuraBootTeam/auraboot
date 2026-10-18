@@ -27,6 +27,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { loginAdmin } from './_helpers';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BACKEND_URL } from '../../helpers/environments';
 
@@ -182,17 +183,7 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
     'com.auraboot.test-fixtures',
   );
 
-  // Acquire a JWT against the live backend.
-  const loginRes = await request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: {
-      email: DEFAULT_TEST_ACCOUNT.email,
-      password: DEFAULT_TEST_ACCOUNT.password,
-    },
-  });
-  expect(loginRes.ok(), `login failed: ${loginRes.status()}`).toBe(true);
-  const loginBody = (await loginRes.json()) as { data?: { jwt?: string } };
-  const token = loginBody?.data?.jwt ?? '';
-  expect(token, 'login response missing jwt').toBeTruthy();
+  const token = await loginAdmin(request);
 
   const existingCommandsRes = await request.get(
     `${BACKEND_URL}/api/meta/commands?modelCode=e2et_order`,

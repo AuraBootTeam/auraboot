@@ -100,7 +100,8 @@ public class ToolMetadataRegistry {
         if ("dsl_command".equals(type) || "aurabot_skill".equals(type)) return ToolEffectType.INTERNAL_WRITE;
         if ("dsl_query".equals(type)) return ToolEffectType.INTERNAL_READ;
         if ("platform".equals(type)) {
-            if ("platform_execute_sql".equals(name) || "platform.execute_sql".equals(name)) {
+            if ("platform_execute_sql".equals(name) || "platform.execute_sql".equals(name)
+                    || "platform_resolve_reference".equals(name) || "platform.resolve_reference".equals(name)) {
                 return ToolEffectType.INTERNAL_READ;
             }
             return ToolEffectType.INTERNAL_WRITE;

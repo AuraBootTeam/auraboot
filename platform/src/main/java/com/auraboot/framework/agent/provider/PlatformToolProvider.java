@@ -46,6 +46,7 @@ public class PlatformToolProvider implements ToolProvider {
 
     private static final int MAX_QUERY_ROWS = 100;
 
+    private final com.auraboot.framework.meta.service.ModelReferenceLookupService referenceLookup;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
     private final AiModelSuggestionService aiModelSuggestionService;
@@ -56,6 +57,11 @@ public class PlatformToolProvider implements ToolProvider {
     private final com.auraboot.framework.meta.service.SecureSqlRewriter sqlRewriter;
 
     private static final List<ToolDefinition> PLATFORM_TOOLS = List.of(
+        ToolDefinition.builder().toolCode("platform.resolve_reference").toolName("Resolve reference label")
+            .description("Resolve an exact business label to its declared stored reference value. Call before filtering a reference by customer name; never infer customer membership from project names. Missing, ambiguous or denied labels fail closed.")
+            .providerCode("platform").toolType("platform").sourceCode("platform.resolve_reference")
+            .operationKind("query").riskLevel("L0").confirmationPolicy("none")
+            .parameterSchema(com.auraboot.framework.meta.service.ModelReferenceLookupService.inputSchema()).build(),
         ToolDefinition.builder()
             .toolCode("platform.execute_sql")
             .toolName("Execute SQL Query")
@@ -193,6 +199,8 @@ public class PlatformToolProvider implements ToolProvider {
             Map<String, Object> result = switch (toolCode) {
                 case "platform.execute_sql"    -> executeSql(params, tenantId);
                 case "platform.list_models"    -> listModels(params);
+                case "platform.resolve_reference" -> referenceLookup.resolve(getStringParam(params, "modelCode"),
+                        getStringParam(params, "fieldCode"), getStringParam(params, "displayValue"));
                 case "platform.model_suggest"  -> modelSuggest(params);
                 case "platform.create_model"   -> createModel(params);
                 case "platform.fill_form"     -> fillForm(params);

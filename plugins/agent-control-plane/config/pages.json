@@ -697,13 +697,13 @@
               "type": "flow",
               "steps": [
                 {
+                  "action": "api.request",
                   "endpoint": "/api/agent/dispatch",
                   "method": "post",
-                  "bodyTemplate": {
-                    "taskPid": "{pid}",
-                    "agentCode": "{assignee_id}"
-                  },
-                  "successMessage": "Task dispatched successfully"
+                  "body": {
+                    "taskPid": "${record.pid}",
+                    "agentCode": "${record.assignee_id}"
+                  }
                 }
               ]
             },

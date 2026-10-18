@@ -86,6 +86,7 @@ services:
       DATABASE_USERNAME: ${POSTGRES_USER:-auraboot}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
       JWT_SECRET: ${JWT_SECRET:-docker-eval-secret-change-in-production-min-32-chars}
+      OPEN_PLATFORM_PROTOCOL_SIGNING_KEY: ${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:-}
       FRONTEND_BASE_URL: http://localhost:${AURABOOT_PORT:-3000}
       SPRING_PROFILES_ACTIVE: community
       AURA_BUILTIN_PLUGINS_DIR: /app/plugins
@@ -94,7 +95,8 @@ services:
       # shipped deny since the authz flip; ops can override to shadow/allow
       # per deployment without an image rebuild. See aura.security.authz.unannotated-mode.
       AURA_AUTHZ_UNANNOTATED_MODE: ${AURA_AUTHZ_UNANNOTATED_MODE:-deny}
-      MANAGEMENT_TRACING_ENABLED: "false"
+      MANAGEMENT_TRACING_ENABLED: ${MANAGEMENT_TRACING_ENABLED:-true}
+      AURA_TRACE_LOG_DIR: /app/data/traces
       # Docker Desktop/overlay filesystems can report 0 bytes available for
       # /app, which makes actuator health flap DOWN even when DB/app are OK.
       # Disk capacity is monitored separately by scripts/dev/doctor-disk.sh.
@@ -128,6 +130,7 @@ services:
       - "${AURABOOT_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
+      AURA_TRACE_LOG_DIR: /app/logs/traces
       BFF_PORT: "3000"
       SPRING_BOOT_URL: http://backend:6443
       # SSR data loaders (root.tsx getUserInfo/getUserMenus/fetchSpaces, form.ts,
@@ -140,6 +143,8 @@ services:
       ICP_COMPLIANCE_ENABLED: ${ICP_COMPLIANCE_ENABLED:-0}
       ICP_SITE_TITLE: ${ICP_SITE_TITLE:-}
       ICP_RECORD_NUMBER: ${ICP_RECORD_NUMBER:-}
+    volumes:
+      - frontend_traces:/app/logs/traces
     depends_on:
       backend:
         condition: service_healthy
@@ -184,6 +189,7 @@ services:
       - prometheus
 
 volumes:
+  frontend_traces:
   postgres_data:
     driver: local
   redis_data:

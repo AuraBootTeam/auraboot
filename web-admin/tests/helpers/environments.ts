@@ -125,13 +125,16 @@ function envValue(primary: string, alias: string, fallback: string): string {
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;
 
+/** Explicit URL for tests that require an owned runtime rather than host defaults. */
+export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
+
 /** Vite-served base — what `page.goto` and `page.request` use by default. */
 export const BASE_URL =
-  process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
+  EXPLICIT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
 
 /** Require an explicit target for fixture writes and cleanup; never use a host fallback. */
 export function requireExplicitBaseUrl(): string {
-  const origin = process.env.PLAYWRIGHT_BASE_URL;
+  const origin = EXPLICIT_BASE_URL;
   if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
   return origin;
 }

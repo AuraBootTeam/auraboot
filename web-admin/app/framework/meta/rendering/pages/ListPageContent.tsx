@@ -83,7 +83,6 @@ import { ViewAnalysisDrawer } from './list/ViewAnalysisDrawer';
 import {
   buildColumnSettingsRows,
   serializeColumnSettings,
-  type ColumnSettingsDefinition,
   type ColumnSettingsSavePayload,
 } from '~/framework/smart/components/view/ColumnSettingsPanel';
 import { ListTable } from './list/ListTable';
@@ -158,6 +157,111 @@ import {
 } from '~/framework/smart/utils/savedViewPersistence';
 import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
 
+import {
+  getListFieldValueWithAlias,
+  resolveFieldMetaDisplayName,
+  resolveFieldMetaDataType,
+  resolveFieldMetaRenderComponent,
+  renderComponentToValueType,
+  resolveColumnCapabilityDataType,
+  buildListFilterFieldMetadata,
+  buildViewManageFieldOptions,
+  buildListColumnSettingsDefinitions,
+  getSystemFieldI18nKey,
+  translateOrFallback,
+} from './list/listFieldMetadata';
+import {
+  buildListReferenceDisplayCacheKey,
+  resolveListSystemReferenceDisplayConfig,
+  shouldResolveListSystemReferenceValue,
+  pickSystemReferenceLabel,
+  collectListReferenceDisplayConfigs,
+  collectListReferenceValues,
+  resolveListReferenceFilterLabel,
+} from './list/listReferenceDisplay';
+import {
+  resolveSavedViewFilterExpressions,
+  collectListSchemaFieldNames,
+  collectListBareParamFilters,
+  type ListQueryFilterCondition,
+  resolveUserFilterCondition,
+  viewFilterToQueryCondition,
+  tabFilterToQueryCondition,
+  queryConditionToExportCondition,
+} from './list/listFilterConditions';
+import {
+  type ListSortFilterQuery,
+  findPersonalPresetSavedView,
+  areListSortFilterQueriesEqual,
+  isListQuerySettled,
+  pruneNoopViewConfigPatch,
+  resolveListSavedViewPageKey,
+  resolveUrlStateSyncAction,
+} from './list/listViewConfig';
+import {
+  buildBulkFieldCommandPayload,
+  resolveInitialListTabKey,
+  resolveTableBlockRowActions,
+  buildToolbarConditionContext,
+  shouldSkipListData,
+  shouldSkipModelFieldMeta,
+  resolveListMiscBlocksPosition,
+} from './list/listSchemaPolicy';
+
+export {
+  getListFieldValueWithAlias,
+  resolveFieldMetaDisplayName,
+  resolveFieldMetaDataType,
+  resolveFieldMetaRenderComponent,
+  renderComponentToValueType,
+  resolveColumnCapabilityDataType,
+  type ListFilterFieldMetadata,
+  buildListFilterFieldMetadata,
+  type ViewManageFieldOption,
+  buildViewManageFieldOptions,
+  buildListColumnSettingsDefinitions,
+  getSystemFieldI18nKey,
+} from './list/listFieldMetadata';
+export {
+  type ListReferenceDisplayConfig,
+  buildListReferenceDisplayCacheKey,
+  resolveListSystemReferenceDisplayConfig,
+  shouldResolveListSystemReferenceValue,
+  collectListReferenceDisplayConfigs,
+  collectListReferenceValues,
+  resolveListReferenceFilterLabel,
+} from './list/listReferenceDisplay';
+export {
+  viewConfigFiltersToRuntimeFilters,
+  type SavedViewFilterExpressionContext,
+  resolveSavedViewFilterExpressions,
+  collectListSchemaFieldNames,
+  collectListBareParamFilters,
+  type ListQueryFilterCondition,
+  resolveUserFilterCondition,
+  viewFilterToQueryCondition,
+  tabFilterToQueryCondition,
+  queryConditionToExportCondition,
+} from './list/listFilterConditions';
+export {
+  findPersonalPresetSavedView,
+  areListSortFilterQueriesEqual,
+  isListQuerySettled,
+  pruneNoopViewConfigPatch,
+  resolveListSavedViewPageKey,
+  resolveUrlStateSyncAction,
+} from './list/listViewConfig';
+export {
+  buildBulkFieldCommandPayload,
+  resolveInitialListTabKey,
+  resolveTableBlockRowActions,
+  buildToolbarConditionContext,
+  shouldSkipListData,
+  shouldSkipModelFieldMeta,
+  type ListMiscBlocksPosition,
+  resolveListMiscBlocksPosition,
+} from './list/listSchemaPolicy';
+
 // Dict data item type
 interface DictItem {
   value: string;
@@ -188,141 +292,6 @@ interface BulkFieldCommandState {
   operationType: 'UPDATE' | 'DELETE';
 }
 
-export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown) {
-  return { [field.field]: value };
-}
-
-export function resolveInitialListTabKey(blocks: unknown): string {
-  if (!Array.isArray(blocks)) return 'all';
-  const tabsBlock = blocks.find(
-    (block): block is { blockType: string; tabs?: Array<{ key?: unknown }> } =>
-      Boolean(block && typeof block === 'object' && (block as any).blockType === 'tabs'),
-  );
-  const tabs = Array.isArray(tabsBlock?.tabs) ? tabsBlock.tabs : [];
-  const allTab = tabs.find((tab) => tab?.key === 'all');
-  const initialKey = allTab?.key ?? tabs[0]?.key;
-  return typeof initialKey === 'string' && initialKey.length > 0 ? initialKey : 'all';
-}
-
-export interface ListReferenceDisplayConfig {
-  field: string;
-  modelCode: string;
-  valueField: string;
-  displayField: string;
-  displayKey: string;
-}
-
-export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayConfig): string {
-  return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
-}
-
-interface ListSystemReferenceDisplayConfig {
-  detailEndpoint: string;
-  labelFields: string[];
-}
-
-const LIST_SYSTEM_REFERENCE_DISPLAY_MODELS: Record<string, ListSystemReferenceDisplayConfig> = {
-  sys_user: {
-    detailEndpoint: '/api/admin/users',
-    labelFields: ['displayName', 'realName', 'username', 'email'],
-  },
-};
-
-export function resolveListSystemReferenceDisplayConfig(
-  modelCode: string,
-): ListSystemReferenceDisplayConfig | undefined {
-  return LIST_SYSTEM_REFERENCE_DISPLAY_MODELS[modelCode];
-}
-
-/**
- * System-reference detail endpoints accept public identifiers, not projected
- * display labels. Some list APIs already return a label in the raw reference
- * field; whitespace cannot occur in a path-style public PID, so such values
- * should render directly instead of generating guaranteed 404 lookups.
- */
-export function shouldResolveListSystemReferenceValue(value: string): boolean {
-  const normalized = value.trim();
-  return normalized.length > 0 && !/\s/u.test(normalized);
-}
-
-function pickSystemReferenceLabel(
-  row: Record<string, any>,
-  configuredDisplayField: string,
-  labelFields: string[],
-): string | undefined {
-  for (const field of [configuredDisplayField, ...labelFields]) {
-    const value = row[field];
-    if (value === null || value === undefined) continue;
-    const text = String(value).trim();
-    if (text) return text;
-  }
-  return undefined;
-}
-
-export function findPersonalPresetSavedView(
-  savedViews: Array<Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'>>,
-  presetKey: QuickFilterPresetKey,
-): Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'> | undefined {
-  return savedViews.find(
-    (view) =>
-      String(view.scope).toLowerCase() === 'personal' &&
-      view.viewConfig?.meta?.originPresetKey === presetKey,
-  );
-}
-
-export function viewConfigFiltersToRuntimeFilters(
-  filters: ViewFilterConfig[] | undefined,
-): Record<string, any> {
-  const restoredFilters: Record<string, any> = {};
-  for (const filter of filters ?? []) {
-    restoredFilters[filter.fieldCode] = filter.value;
-  }
-  return restoredFilters;
-}
-
-export interface SavedViewFilterExpressionContext {
-  /** Public user PID used by reference fields such as an opportunity owner. */
-  currentUserPid?: string;
-}
-
-const CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = {
-  $currentDepartmentOwnerPids: { includeSubDepartments: true },
-} as const;
-
-const CURRENT_SHARED_RECORD_PIDS_RESOLVER = {
-  $currentSharedRecordPids: { action: 'read' },
-} as const;
-
-/**
- * Resolve the deliberately small, documented set of SavedView filter expressions.
- *
- * SavedView expressions are convenience filters, not an authorization boundary;
- * backend data-scope policies remain authoritative. Unknown expressions are left
- * inactive instead of accidentally reusing a stale static value.
- */
-export function resolveSavedViewFilterExpressions(
-  filters: ViewFilterConfig[] | undefined,
-  context: SavedViewFilterExpressionContext,
-): ViewFilterConfig[] {
-  return (filters ?? []).map((filter) => {
-    if (!filter.isExpression) return filter;
-
-    const expression = String(filter.expression ?? '').trim();
-    const resolvedValue =
-      expression === '#currentUser' || expression === '${system.currentUser}'
-        ? context.currentUserPid?.trim() || undefined
-        : expression === '#currentDepartmentOwners' ||
-            expression === '${system.currentDepartmentOwners}'
-          ? CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER
-          : expression === '#currentSharedRecords' ||
-              expression === '${system.currentSharedRecords}'
-            ? CURRENT_SHARED_RECORD_PIDS_RESOLVER
-            : undefined;
-
-    return { ...filter, value: resolvedValue };
-  });
-}
-
 function clearTransientViewSearchParams(
   params: URLSearchParams,
   knownFieldNames?: ReadonlySet<string>,
@@ -343,120 +312,6 @@ function clearTransientViewSearchParams(
 }
 
 /**
- * URL params owned by the list runtime itself. A bare param with one of these
- * names is never promoted to a row filter, even when the schema declares a
- * field of the same name.
- */
-const LIST_RESERVED_URL_PARAM_KEYS: ReadonlySet<string> = new Set([
-  'sort',
-  'keyword',
-  'filters',
-  'preset',
-  'view',
-  'tab',
-  'pageNum',
-  'pageSize',
-  'locale',
-]);
-
-/**
- * Model data types that tolerate a SQL LIKE '%…%' predicate. Everything else
- * (date/datetime/time, numeric, boolean, ...) must use EQ: a LIKE against a
- * DATE or numeric column is rejected by the backend, which is exactly what
- * happened to drill-down params like /p/fin_cash_forecast_week?fin_cfw_week_start=…
- * when they were converted with the search field's default LIKE operator.
- */
-const TEXT_LIKE_FILTER_DATA_TYPES: ReadonlySet<string> = new Set([
-  'string',
-  'text',
-  'char',
-  'varchar',
-  'enum',
-  'json',
-  'jsonb',
-  'uuid',
-]);
-/**
- * Field names declared by the list page schema: table columns (action columns
- * excluded), table search fields and filter-block fields. Drill-down bare URL
- * params are only promoted to row filters when they match one of these, so
- * foreign params can never leak into the query.
- */
-export function collectListSchemaFieldNames(schema: unknown): string[] {
-  const names = new Set<string>();
-  const blocks = (schema as { blocks?: unknown })?.blocks;
-  if (!Array.isArray(blocks)) return [];
-  for (const block of blocks) {
-    const record = block as {
-      blockType?: unknown;
-      columns?: unknown;
-      searchFields?: unknown;
-      fields?: unknown;
-      table?: { columns?: unknown; searchFields?: unknown };
-    };
-    if (record.blockType === 'table') {
-      const columns = Array.isArray(record.table?.columns) ? record.table?.columns : record.columns;
-      if (Array.isArray(columns)) {
-        for (const column of columns) {
-          const col = column as { field?: unknown; isActionColumn?: unknown };
-          if (typeof col?.field === 'string' && col.field && !col.isActionColumn) {
-            names.add(col.field);
-          }
-        }
-      }
-      const searchFields = Array.isArray(record.table?.searchFields)
-        ? record.table?.searchFields
-        : record.searchFields;
-      if (Array.isArray(searchFields)) {
-        for (const field of searchFields) {
-          if (typeof field === 'string' && field) names.add(field);
-        }
-      }
-    }
-    if (record.blockType === 'filters' || record.blockType === 'filter') {
-      if (Array.isArray(record.fields)) {
-        for (const field of record.fields) {
-          const f = field as { field?: unknown };
-          if (typeof f?.field === 'string' && f.field) names.add(f.field);
-        }
-      }
-    }
-  }
-  return [...names];
-}
-
-/**
- * Collect drill-down bare URL params as row filters.
- *
- * Dashboard drill-down navigation writes mapped param names bare — e.g.
- * /p/fin_cash_forecast_week?fin_cfw_week_start=… via the widget drillDown
- * paramMapping — while the list runtime only consumed filter_* and filters=,
- * so the bare form was silently dropped and the target list rendered unfiltered.
- * A bare param becomes a row filter only when its name matches a field declared
- * by the page schema and is not a reserved runtime param; filter_* params keep
- * precedence over a bare param for the same field.
- */
-export function collectListBareParamFilters(
-  searchParams: URLSearchParams,
-  fieldNames: Iterable<string>,
-): Record<string, any> {
-  const known = new Set(fieldNames);
-  if (known.size === 0) return {};
-  const filters: Record<string, any> = {};
-  searchParams.forEach((value, key) => {
-    if (!key || key.startsWith('filter_') || LIST_RESERVED_URL_PARAM_KEYS.has(key)) return;
-    if (known.has(key) && value != null && value !== '') {
-      filters[key] = value;
-    }
-  });
-  return filters;
-}
-
-function stableConfigString(value: unknown): string {
-  return JSON.stringify(value ?? null);
-}
-
-/**
  * Claim the next list-data request and return a guard for state commits.
  *
  * List pages can start several requests during mount while a user immediately
@@ -464,104 +319,9 @@ function stableConfigString(value: unknown): string {
  * only the most recently started request may update data, pagination, errors,
  * or loading state.
  */
-type ListSortFilterQuery = { activeSorts: SortConfig[]; chipFilters: ViewFilterConfig[] };
-
-export function areListSortFilterQueriesEqual(
-  left: ListSortFilterQuery,
-  right: ListSortFilterQuery | undefined,
-): boolean {
-  return Boolean(right && areSortsEqual(left.activeSorts, right.activeSorts)
-    && areFiltersEqual(left.chipFilters, right.chipFilters));
-}
-
-export function isListQuerySettled(
-  current: ListSortFilterQuery,
-  debounced: ListSortFilterQuery,
-  scheduled: ListSortFilterQuery | undefined,
-): boolean {
-  return areListSortFilterQueriesEqual(current, debounced)
-    && areListSortFilterQueriesEqual(current, scheduled);
-}
-
 export function beginLatestListRequest(sequenceRef: { current: number }): () => boolean {
   const requestSequence = ++sequenceRef.current;
   return () => requestSequence === sequenceRef.current;
-}
-
-function isNoopViewConfigPatchEntry(
-  key: keyof ViewConfig,
-  value: unknown,
-  baseValue: unknown,
-): boolean {
-  if (value === undefined) {
-    return true;
-  }
-  if (key === 'sorts') {
-    return areSortsEqual(
-      Array.isArray(baseValue) ? (baseValue as SortConfig[]) : [],
-      Array.isArray(value) ? (value as SortConfig[]) : [],
-    );
-  }
-  if (Array.isArray(value)) {
-    const normalizedBase = Array.isArray(baseValue) ? baseValue : [];
-    return stableConfigString(value) === stableConfigString(normalizedBase);
-  }
-  return stableConfigString(value) === stableConfigString(baseValue);
-}
-
-export function pruneNoopViewConfigPatch(
-  base: ViewConfig | Partial<ViewConfig> | null | undefined,
-  patch: Partial<ViewConfig> | null | undefined,
-): Partial<ViewConfig> | null {
-  if (!patch) {
-    return null;
-  }
-
-  const pruned: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(patch) as Array<[keyof ViewConfig, unknown]>) {
-    if (!isNoopViewConfigPatchEntry(key, value, base?.[key])) {
-      pruned[key] = value;
-    }
-  }
-
-  return Object.keys(pruned).length > 0 ? (pruned as Partial<ViewConfig>) : null;
-}
-
-export function resolveListSavedViewPageKey(
-  schema: { pageKey?: string | null } | null | undefined,
-  routeTableName: string,
-): string {
-  return schema?.pageKey || routeTableName;
-}
-
-function snakeToCamel(value: string): string {
-  return value.replace(/_([a-zA-Z0-9])/g, (_, char: string) => char.toUpperCase());
-}
-
-function camelToSnake(value: string): string {
-  return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
-}
-
-export function getListFieldValueWithAlias(
-  record: Record<string, any>,
-  fieldCode: string | undefined,
-): unknown {
-  // A bare-string column shorthand (e.g. `columns: ['name', 'pageKey']`) reaches the
-  // legacy list runtime without a resolved `field`, so `column.field` can be undefined.
-  // Guard the alias lookup here so such a column renders empty instead of throwing
-  // `Cannot read properties of undefined (reading 'includes')`, which would blank the
-  // whole page behind the render error boundary ("Oops!").
-  if (!record || typeof fieldCode !== 'string' || fieldCode.length === 0) {
-    return undefined;
-  }
-  if (Object.prototype.hasOwnProperty.call(record, fieldCode)) {
-    return record[fieldCode];
-  }
-  const alias = fieldCode.includes('_') ? snakeToCamel(fieldCode) : camelToSnake(fieldCode);
-  if (alias !== fieldCode && Object.prototype.hasOwnProperty.call(record, alias)) {
-    return record[alias];
-  }
-  return undefined;
 }
 
 export function useRestoreSavedViewFromUrl({
@@ -630,294 +390,6 @@ export function useSerializedSearchParamsUpdater(
   );
 }
 
-export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
-  const blockRowActions = Array.isArray(tableBlock?.rowActions) ? tableBlock.rowActions : [];
-  const tableRowActions = Array.isArray(tableBlock?.table?.rowActions)
-    ? tableBlock.table.rowActions
-    : [];
-  const rowActions = [...blockRowActions];
-  for (const action of tableRowActions) {
-    if (!rowActions.some((existing: any) => existing.code === action.code)) {
-      rowActions.push(action);
-    }
-  }
-  return rowActions;
-}
-
-function readRefTargetConfig(
-  column: ColumnConfig,
-  meta?: Record<string, any>,
-): Record<string, any> {
-  return {
-    ...(meta?.extension?.refTarget || {}),
-    ...(meta?.refTarget || {}),
-    ...((column as any).extension?.refTarget || {}),
-    ...((column as any).props?.refTarget || {}),
-    ...((column as any).refTarget || {}),
-  };
-}
-
-/**
- * Resolve a header/filter label from the model field metadata (field-meta API).
- * The importer denormalises the field's effective displayName (zh-CN first)
- * into the field extension, so dynamic pages can label columns even when the
- * page config carries no explicit label and no i18n resource exists. Returns
- * undefined when metadata is missing so callers keep their own fallbacks.
- */
-export function resolveFieldMetaDisplayName(
-  fieldCode: string,
-  modelFieldMap: Map<string, any> | undefined,
-): string | undefined {
-  if (!fieldCode || !modelFieldMap) return undefined;
-  const meta = modelFieldMap.get(fieldCode);
-  if (!meta) return undefined;
-  const candidate = meta.displayName ?? meta.extension?.displayName;
-  if (typeof candidate !== 'string') return undefined;
-  const trimmed = candidate.trim();
-  return trimmed && trimmed !== fieldCode ? trimmed : undefined;
-}
-
-function normalizeFieldDataType(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed ? trimmed.toLowerCase() : undefined;
-}
-
-export function resolveFieldMetaDataType(
-  fieldCode: string,
-  modelFieldMap: Map<string, any> | undefined,
-): string | undefined {
-  if (!fieldCode || !modelFieldMap) return undefined;
-  const meta = modelFieldMap.get(fieldCode);
-  if (!meta) return undefined;
-  return (
-    normalizeFieldDataType(meta.dataType) ??
-    normalizeFieldDataType(meta.fieldType) ??
-    normalizeFieldDataType(meta.extension?.dataType) ??
-    normalizeFieldDataType(meta.extension?.fieldType)
-  );
-}
-
-/**
- * A field's visual control lives in `extension.renderComponent` (colorpicker / progress /
- * rating / moneyinput / ...), NOT in its dataType. List cell-type resolution used to ignore
- * it, so those columns fell back to raw text/number. Surface it so the cell renderer can
- * pick the right presentation. Mirrors the designer's `platformTablePreview.inferColumnValueType`.
- */
-export function resolveFieldMetaRenderComponent(
-  fieldCode: string,
-  modelFieldMap: Map<string, any> | undefined,
-): string | undefined {
-  if (!fieldCode || !modelFieldMap) return undefined;
-  const meta = modelFieldMap.get(fieldCode);
-  if (!meta) return undefined;
-  const raw =
-    meta.extension?.renderComponent ??
-    meta.renderComponent ??
-    meta.extension?.component ??
-    meta.uiSchema?.component;
-  return typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : undefined;
-}
-
-/** Map a renderComponent / DSL renderType to a list cell valueType (undefined = no override). */
-export function renderComponentToValueType(
-  component: string | undefined,
-): ColumnConfig['valueType'] | undefined {
-  switch (component) {
-    case 'colorpicker':
-    case 'color':
-      return 'color';
-    case 'progress':
-    case 'progressfield':
-      return 'progress';
-    case 'rating':
-    case 'ratingfield':
-      return 'rating';
-    case 'moneyinput':
-    case 'money':
-      return 'currency';
-    default:
-      return undefined;
-  }
-}
-
-export function resolveColumnCapabilityDataType(
-  column: { field?: string; dataType?: unknown; valueType?: unknown; sorter?: unknown },
-  modelFieldMap: Map<string, any> | undefined,
-): string {
-  return (
-    resolveFieldMetaDataType(column.field ?? '', modelFieldMap) ??
-    normalizeFieldDataType(column.dataType) ??
-    normalizeFieldDataType(column.valueType) ??
-    normalizeFieldDataType(column.sorter) ??
-    'text'
-  );
-}
-
-export interface ListFilterFieldMetadata {
-  fieldCode: string;
-  label: string;
-  fieldType: string;
-  dictCode?: string;
-  referenceModelCode?: string;
-  referenceValueField?: string;
-  referenceDisplayField?: string;
-}
-
-/**
- * Build the typed metadata shared by the filter picker, filter chips and value editor.
- *
- * A table column is primarily a presentation contract, so many DSL pages omit its
- * data type. The model field metadata remains the source of truth for filter
- * operators and editors (money must expose numeric comparisons, enums their dict,
- * and references their target model).
- */
-export function buildListFilterFieldMetadata(
-  tableColumns: ColumnConfig[],
-  modelFieldMap: Map<string, any> | undefined,
-  resolveLabel: (column: ColumnConfig) => string,
-): ListFilterFieldMetadata[] {
-  return tableColumns
-    .filter((column) => !column.isActionColumn && Boolean(column.field))
-    .map((column) => {
-      const meta = modelFieldMap?.get(column.field);
-      const refTarget = readRefTargetConfig(column, meta);
-      const referenceModelCode = String(
-        refTarget.modelCode ||
-          refTarget.targetModel ||
-          refTarget.targetEntity ||
-          meta?.referenceModelCode ||
-          meta?.extension?.referenceModelCode ||
-          '',
-      ).trim();
-      return {
-        fieldCode: column.field,
-        label: resolveLabel(column),
-        fieldType: resolveColumnCapabilityDataType(column, modelFieldMap),
-        dictCode: column.dictCode || meta?.dictCode || meta?.extension?.dictCode || undefined,
-        referenceModelCode: referenceModelCode || undefined,
-        referenceValueField: String(
-          refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
-        ),
-        referenceDisplayField:
-          String(
-            refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
-          ).trim() || undefined,
-      };
-    });
-}
-
-export interface ListQueryFilterCondition {
-  fieldName: string;
-  operator: string;
-  value?: unknown;
-  values?: unknown[];
-}
-
-/**
- * Convert one user filter (key -> raw value, sourced from URL filter_* params,
- * drill-down bare params or the quick filter bar) into its query conditions.
- *
- * SmartInput search fields default to LIKE, but a LIKE '%..%' against a
- * date/number column is a guaranteed backend error, and drill-down URL params
- * (e.g. /p/fin_cash_forecast_week?fin_cfw_week_start=...) flow through here with
- * the field's real model type. When the model metadata types the field as a
- * non-text scalar the operator therefore falls back to EQ; unknown types keep
- * the legacy heuristic (explicit operator > SmartInput LIKE > EQ).
- */
-export function resolveUserFilterCondition(
-  key: string,
-  value: unknown,
-  filterFields: FieldConfig[] | undefined,
-  filterFieldMap?: Map<string, any>,
-): ListQueryFilterCondition[] {
-  if (value == null || value === '') return [];
-  // Date range objects { start, end }
-  if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-    const range = value as { start?: unknown; end?: unknown };
-    const conditions: ListQueryFilterCondition[] = [];
-    if (range.start) conditions.push({ fieldName: key, operator: 'gte', value: String(range.start) });
-    if (range.end) conditions.push({ fieldName: key, operator: 'lte', value: String(range.end) });
-    return conditions;
-  }
-  const fieldConfig = (filterFields || []).find((field) => field.field === key);
-  const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
-  const dataType = resolveFieldMetaDataType(key, filterFieldMap);
-  const supportsLike =
-    dataType == null || TEXT_LIKE_FILTER_DATA_TYPES.has(dataType.split('(')[0].trim());
-  const operator =
-    !supportsLike && !explicitOperator
-      ? 'EQ'
-      : typeof explicitOperator === 'string' && explicitOperator.trim()
-        ? explicitOperator.trim().toUpperCase()
-        : fieldConfig?.component === 'SmartInput'
-          ? 'LIKE'
-          : 'EQ';
-  const textValue = String(value);
-  return [
-    {
-      fieldName: key,
-      operator,
-      value: operator === 'LIKE' ? `%${textValue}%` : textValue,
-    },
-  ];
-}
-
-/** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
-export function viewFilterToQueryCondition(
-  filter: ViewFilterConfig,
-): ListQueryFilterCondition | null {
-  if (!filter.fieldCode) return null;
-  const operator = (filter.operator || 'eq').toUpperCase();
-  if (operator === 'ISNULL' || operator === 'ISNOTNULL') {
-    return { fieldName: filter.fieldCode, operator, value: null };
-  }
-  if (filter.value == null || filter.value === '') return null;
-  if (operator === 'IN' || operator === 'BETWEEN') {
-    const values = Array.isArray(filter.value) ? filter.value : [filter.value];
-    if (values.length === 0) return null;
-    return { fieldName: filter.fieldCode, operator, values };
-  }
-  return {
-    fieldName: filter.fieldCode,
-    operator,
-    value: operator === 'LIKE' ? `%${String(filter.value)}%` : filter.value,
-  };
-}
-
-/** Normalize a DSL list-tab filter through the same array-aware query contract as saved views. */
-export function tabFilterToQueryCondition(filter: any, currentUserPid?: string): ListQueryFilterCondition | null {
-  if (!filter || typeof filter !== 'object') return null;
-  const fieldCode = filter.fieldName || filter.field;
-  if (!fieldCode) return null;
-  return viewFilterToQueryCondition({
-    fieldCode,
-    operator: String(filter.operator || 'EQ').toLowerCase() as ViewFilterConfig['operator'],
-    value: filter.value === '$currentUser' ? currentUserPid : filter.value,
-  });
-}
-
-/** Convert the dynamic-list condition shape to the export endpoint shape. */
-export function queryConditionToExportCondition(condition: ListQueryFilterCondition): {
-  field: string;
-  operator: string;
-  value: unknown;
-} {
-  return {
-    field: condition.fieldName,
-    operator: condition.operator,
-    value: condition.values ?? condition.value ?? null,
-  };
-}
-
-export function resolveUrlStateSyncAction(
-  pendingLocalEncoding: string | null | undefined,
-  currentUrlEncoding: string | null,
-): 'apply-url' | 'ack-local' | 'wait-for-local' {
-  if (pendingLocalEncoding === undefined) return 'apply-url';
-  return pendingLocalEncoding === currentUrlEncoding ? 'ack-local' : 'wait-for-local';
-}
-
 export function applyLocalSortUpdate(
   previous: SortConfig[],
   update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[]),
@@ -928,259 +400,12 @@ export function applyLocalSortUpdate(
   return next;
 }
 
-export interface ViewManageFieldOption {
-  code: string;
-  name: string;
-  dataType: string;
-}
-
-export function buildViewManageFieldOptions(
-  tableColumns: ColumnConfig[],
-  modelFieldMap: Map<string, any> | undefined,
-): ViewManageFieldOption[] {
-  const byCode = new Map<string, ViewManageFieldOption>();
-
-  for (const [fieldCode] of modelFieldMap?.entries() ?? []) {
-    if (!fieldCode) continue;
-    byCode.set(fieldCode, {
-      code: fieldCode,
-      name: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
-      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'string',
-    });
-  }
-
-  for (const column of tableColumns) {
-    if (!column.field || column.isActionColumn) continue;
-    const fallbackName =
-      typeof column.label === 'string'
-        ? column.label
-        : (byCode.get(column.field)?.name ?? column.field);
-    byCode.set(column.field, {
-      code: column.field,
-      name: fallbackName,
-      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
-    });
-  }
-
-  return Array.from(byCode.values());
-}
-
-export function buildListColumnSettingsDefinitions(
-  baseColumns: ColumnConfig[],
-  modelFieldMap: Map<string, any> | undefined,
-  systemColumns: ColumnConfig[],
-  resolveLabel: (column: ColumnConfig) => string,
-): ColumnSettingsDefinition[] {
-  const definitions = new Map<string, ColumnSettingsDefinition>();
-
-  for (const column of baseColumns) {
-    if (!column.field || column.isActionColumn) continue;
-    definitions.set(column.field, {
-      field: column.field,
-      label: resolveLabel(column),
-      ...(column.mandatory === true ? { mandatory: true } : {}),
-      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
-      group: 'business',
-      defaultVisible: true,
-      defaultWidth:
-        typeof column.width === 'number'
-          ? column.width
-          : typeof column.width === 'string'
-            ? Number.parseInt(column.width, 10) || undefined
-            : undefined,
-      defaultFrozenPosition: column.fixed,
-    });
-  }
-
-  for (const [fieldCode, meta] of modelFieldMap?.entries() ?? []) {
-    if (!fieldCode || meta?.visible === false || definitions.has(fieldCode)) continue;
-    definitions.set(fieldCode, {
-      field: fieldCode,
-      label: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
-      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'text',
-      group: 'business',
-      defaultVisible: false,
-    });
-  }
-
-  for (const column of systemColumns) {
-    if (!column.field || definitions.has(column.field)) continue;
-    definitions.set(column.field, {
-      field: column.field,
-      label: resolveLabel(column),
-      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
-      group: 'system',
-      defaultVisible: false,
-    });
-  }
-
-  return Array.from(definitions.values());
-}
-
-export function collectListReferenceDisplayConfigs(
-  columns: ColumnConfig[],
-  modelFieldMap: Map<string, any>,
-): ListReferenceDisplayConfig[] {
-  const configs: ListReferenceDisplayConfig[] = [];
-  const seen = new Set<string>();
-
-  for (const column of columns) {
-    if (!column.field || column.isActionColumn) continue;
-    const meta = modelFieldMap.get(column.field);
-    const refTarget = readRefTargetConfig(column, meta);
-    const dataType = String(
-      (column as any).dataType ||
-        column.valueType ||
-        meta?.dataType ||
-        meta?.extension?.dataType ||
-        '',
-    ).toLowerCase();
-    const hasReferenceShape =
-      dataType === 'reference' ||
-      column.valueType === 'reference' ||
-      column.field.endsWith('_id') ||
-      Object.keys(refTarget).length > 0;
-    if (!hasReferenceShape) continue;
-
-    const modelCode = String(
-      refTarget.modelCode ||
-        refTarget.targetModel ||
-        refTarget.targetEntity ||
-        meta?.referenceModelCode ||
-        meta?.extension?.referenceModelCode ||
-        '',
-    ).trim();
-    const displayField = String(
-      refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
-    ).trim();
-    const valueField = String(
-      refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
-    ).trim();
-    if (!modelCode || !displayField || !valueField) continue;
-
-    const config: ListReferenceDisplayConfig = {
-      field: column.field,
-      modelCode,
-      valueField,
-      displayField,
-      displayKey: `${column.field}_display`,
-    };
-    const key = buildListReferenceDisplayCacheKey(config);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    configs.push(config);
-  }
-
-  return configs;
-}
-
-export function collectListReferenceValues(
-  config: ListReferenceDisplayConfig,
-  records: Record<string, any>[],
-  filters: ViewFilterConfig[],
-  cached: Record<string, string>,
-): string[] {
-  const rowValues = records
-    .filter((record) => !record[config.displayKey])
-    .map((record) => record[config.field]);
-  const filterValues = filters
-    .filter((filter) => filter.fieldCode === config.field && !filter.isExpression)
-    .flatMap((filter) => (Array.isArray(filter.value) ? filter.value : [filter.value]));
-  return Array.from(
-    new Set(
-      [...rowValues, ...filterValues]
-        .filter((value) => value !== null && value !== undefined && value !== '')
-        .map(String),
-    ),
-  ).filter((value) => cached[value] === undefined);
-}
-
-export function resolveListReferenceFilterLabel(
-  filter: ViewFilterConfig,
-  configs: ListReferenceDisplayConfig[],
-  cache: Record<string, Record<string, string>>,
-  fallback: string,
-): string | undefined {
-  const config = configs.find((candidate) => candidate.field === filter.fieldCode);
-  if (!config || filter.operator === 'isNull' || filter.operator === 'isNotNull') return undefined;
-  const labels = cache[buildListReferenceDisplayCacheKey(config)] || {};
-  const values = Array.isArray(filter.value) ? filter.value : [filter.value];
-  return values
-    .filter((value) => value !== null && value !== undefined && value !== '')
-    .map((value) => labels[String(value)] || fallback)
-    .join('、');
-}
-
 interface PaginationResult<T> {
   records: T[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
-}
-
-const SYSTEM_FIELD_I18N_KEYS: Record<string, string> = {
-  created_at: 'common.created_at',
-  updated_at: 'common.updated_at',
-  created_by: 'common.creator',
-  updated_by: 'common.modifier',
-};
-
-export function getSystemFieldI18nKey(fieldCode: string): string | undefined {
-  return SYSTEM_FIELD_I18N_KEYS[fieldCode];
-}
-
-function translateOrFallback(t: (key: string) => string, key: string, fallback: string): string {
-  const resolved = t(key);
-  return resolved && resolved !== key ? resolved : fallback;
-}
-
-/**
- * Build the expression context exposed to toolbar `visibleWhen` conditions.
- * Adds the loaded list's `recordCount` (length of currently loaded rows) and
- * `total` (server total), so conditions like `visibleWhen: "recordCount == 0"`
- * (e.g. a singleton "新建" button that hides once a record exists) evaluate.
- */
-export function buildToolbarConditionContext(
-  list: { total: number; records: unknown[] },
-  base: Record<string, any>,
-): Record<string, any> {
-  return { ...base, recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
-}
-
-export function shouldSkipListData(
-  schema: { blocks?: BlockConfig[]; extension?: Record<string, any> } | null | undefined,
-): boolean {
-  if (!schema) return false;
-  const extension = schema.extension ?? {};
-  if (extension.skipListData === true || extension.customOnly === true) {
-    return true;
-  }
-  const blocks = Array.isArray(schema.blocks) ? schema.blocks : [];
-  if (blocks.length === 0) return false;
-  const hasTableBlock = blocks.some((block: any) => block.blockType === 'table');
-  const hasCustomBlock = blocks.some((block: any) => block.blockType === 'custom');
-  return hasCustomBlock && !hasTableBlock;
-}
-
-export function shouldSkipModelFieldMeta(
-  schema:
-    | { blocks?: BlockConfig[]; extension?: Record<string, any>; dataSource?: Record<string, any> }
-    | null
-    | undefined,
-  skipListData = shouldSkipListData(schema),
-): boolean {
-  if (skipListData) return true;
-  const extension = schema?.extension ?? {};
-  return extension.skipFieldMeta === true || extension.skipDynamicFieldMeta === true;
-}
-
-export type ListMiscBlocksPosition = 'beforeTable' | 'afterTable';
-
-export function resolveListMiscBlocksPosition(
-  schema: { extension?: Record<string, any> } | null | undefined,
-): ListMiscBlocksPosition {
-  return schema?.extension?.miscBlocksPosition === 'beforeTable' ? 'beforeTable' : 'afterTable';
 }
 
 const INVITE_LABELS = {

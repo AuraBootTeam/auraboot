@@ -8,6 +8,12 @@ import type { DecisionApi } from '../../api/decisionApi';
 // The locale contract under test: every chrome string must come from the
 // strategyStudio catalog via useI18n().locale, while the built-in zh-CN demo
 // data (field labels, value labels, payload names) keeps its source values.
+const metadataFields: import('../ConditionBuilder').FieldOption[] = [
+  {scope:'record',path:'data.targetKey',label:'SLA 节点',dataType:'string'},
+  {scope:'record',path:'data.wd_req_applicant',label:'申请人',dataType:'user'},
+  {scope:'sla',path:'deadlineMinutes',label:'截止分钟',dataType:'integer'},
+];
+
 const language = vi.hoisted(() => ({ locale: 'zh-CN' }));
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
@@ -95,7 +101,7 @@ function createApi(): DecisionApi {
 }
 
 function renderWorkbench() {
-  return render(<StrategyStudioWorkbench api={createApi()} fields={[]} />);
+  return render(<StrategyStudioWorkbench api={createApi()} fields={metadataFields} />);
 }
 
 describe('StrategyStudioWorkbench locale contracts', () => {
@@ -201,7 +207,7 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     language.locale = 'zh-CN';
     const api = createApi();
     const evaluate = api.testRun as ReturnType<typeof vi.fn>;
-    const view = render(<StrategyStudioWorkbench api={api} fields={[]} />);
+    const view = render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
 
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
     expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
@@ -219,7 +225,7 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(screen.getByText('trace-locale').closest('details')).not.toHaveAttribute('open');
 
     language.locale = 'en-US';
-    view.rerender(<StrategyStudioWorkbench api={api} fields={[]} />);
+    view.rerender(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
 
     expect(
       screen.getByTestId('strategy-studio').querySelector('.strategy-studio-header h3'),
@@ -301,7 +307,7 @@ describe('strategyStudio catalog contract', () => {
 describe('Strategy Studio truthful readiness', () => {
   it('starts unchecked, checks through the backend, and invalidates checks after an edit', async () => {
     const api = createApi();
-    render(<StrategyStudioWorkbench api={api} fields={[]} />);
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
     expect(screen.getByTestId('strategy-studio')).toHaveTextContent('草稿尚未验证或已修改');
     fireEvent.click(screen.getByTestId('strategy-check-readiness'));
     await waitFor(() => expect(api.getDecisionImpact).toHaveBeenCalledOnce());
@@ -313,7 +319,7 @@ describe('Strategy Studio truthful readiness', () => {
   it('keeps impact unchecked after failure and blocks publication', async () => {
     const api = createApi();
     vi.mocked(api.getDecisionImpact).mockRejectedValue(new Error('Save the decision first'));
-    render(<StrategyStudioWorkbench api={api} fields={[]} />);
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
     fireEvent.click(screen.getByTestId('strategy-check-readiness'));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Save the decision first'));
     expect(screen.getByRole('alert')).toHaveAttribute('data-tone', 'error');
@@ -324,7 +330,7 @@ describe('Strategy Studio truthful readiness', () => {
   it('tests unsaved content and reports evaluator failure as an error', async () => {
     const api = createApi();
     vi.mocked(api.testRun).mockResolvedValue({ status: 'ERROR', matched: false, errors: ['Invalid decision input'] } as never);
-    render(<StrategyStudioWorkbench api={api} fields={[]} />);
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
     fireEvent.click(screen.getByTestId('strategy-run-test'));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid decision input'));
     expect(screen.getByRole('alert')).toHaveAttribute('data-tone', 'error');
@@ -336,7 +342,7 @@ describe('Strategy Studio saved decision load failures', () => {
   it('never evaluates a template in place of an unreadable business decision', async () => {
     const api = createApi();
     vi.mocked(api.listVersions).mockRejectedValue(new Error('Decision access denied'));
-    render(<StrategyStudioWorkbench api={api} fields={[]} decisions={[{code: 'owned_business_rule', name: 'Delivery review', scopeType: 'BPM'}]} />);
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} decisions={[{code: 'owned_business_rule', name: 'Delivery review', scopeType: 'BPM'}]} />);
     fireEvent.change(screen.getByTestId('strategy-business-decision'), {target: {value: 'owned_business_rule'}});
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Decision access denied'));
     expect(screen.queryByTestId('strategy-run-test')).not.toBeInTheDocument();

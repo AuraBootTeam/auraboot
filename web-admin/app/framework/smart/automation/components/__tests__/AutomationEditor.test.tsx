@@ -46,7 +46,12 @@ vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
 }));
 
 vi.mock('~/utils/i18n', () => ({
-  useSmartText: () => (key: string) => key,
+  useSmartText: () => (key: any) => (typeof key === 'object' ? key.en : key),
+}));
+
+const access = vi.hoisted(() => ({ troubleshoot: true }));
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => access.troubleshoot }),
 }));
 
 vi.mock('~/contexts/ToastContext', () => ({
@@ -171,15 +176,11 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
       flowData: buildFlowData('b'),
     };
 
-    const { rerender } = render(
-      <AutomationEditor automationId="auto-1" initialData={initialA} />,
-    );
+    const { rerender } = render(<AutomationEditor automationId="auto-1" initialData={initialA} />);
     const refsAfterMount = [...receivedInitialData];
     expect(refsAfterMount[0]).toBe(initialA.flowData);
 
-    rerender(
-      <AutomationEditor automationId="auto-1" initialData={initialB} />,
-    );
+    rerender(<AutomationEditor automationId="auto-1" initialData={initialB} />);
 
     // After the parent supplies a *new* initialData object (e.g. reload from
     // server), FlowDesigner SHOULD see the new reference so it imports the
@@ -245,7 +246,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
       />,
     );
 
-    await waitFor(() => expect(apiMocks.get).toHaveBeenCalledWith('/decision/actions/catalog', undefined));
+    await waitFor(() =>
+      expect(apiMocks.get).toHaveBeenCalledWith('/decision/actions/catalog', undefined),
+    );
     await waitFor(() => {
       const smsNode = receivedFlowDesignerProps
         .at(-1)
@@ -353,10 +356,14 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
 
     fireEvent.click(screen.getByTestId('btn-test-run'));
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     expect(screen.getByTestId('automation-run-status')).toHaveTextContent('Success');
     expect(screen.getByTestId('automation-run-status')).not.toHaveTextContent('success');
-    expect(screen.getByTestId('automation-test-run-result')).toHaveTextContent('REQ-LONG-LEAVE-SAMPLE');
+    expect(screen.getByTestId('automation-test-run-result')).toHaveTextContent(
+      'REQ-LONG-LEAVE-SAMPLE',
+    );
     const actionResult = screen.getByTestId('automation-action-result-1');
     expect(actionResult).toHaveTextContent('Send Notification');
     expect(screen.getByTestId('automation-action-status-1')).toHaveTextContent('Success');
@@ -364,7 +371,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
     expect(actionResult).toHaveTextContent('Sent');
     expect(actionResult).toHaveTextContent('Recipients');
     expect(actionResult).toHaveTextContent('Recipient List');
-    expect(screen.getByTestId('automation-action-evidence-type')).toHaveTextContent('In-app notification');
+    expect(screen.getByTestId('automation-action-evidence-type')).toHaveTextContent(
+      'In-app notification',
+    );
     expect(screen.getByTestId('automation-action-evidence-type')).not.toHaveTextContent('in_app');
     expect(actionResult).toHaveTextContent('ROLE:wd_manager');
     expect(actionResult).toHaveTextContent('Raw result');
@@ -426,7 +435,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
 
     fireEvent.click(screen.getByTestId('btn-test-run'));
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     const decisionTrace = screen.getByTestId('automation-decision-trace');
     expect(decisionTrace).toHaveTextContent('Rule Decision Trace');
     expect(decisionTrace).toHaveTextContent('Matched');
@@ -437,7 +448,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
     expect(decisionTrace).toHaveTextContent('message');
     expect(decisionTrace).toHaveTextContent('High value order');
 
-    const unifiedTraceLink = screen.getByTestId('automation-unified-trace-link') as HTMLAnchorElement;
+    const unifiedTraceLink = screen.getByTestId(
+      'automation-unified-trace-link',
+    ) as HTMLAnchorElement;
     expect(unifiedTraceLink).toHaveTextContent('Open Unified Trace');
     expect(unifiedTraceLink.getAttribute('href')).toBe(
       '/p/decisionops_execution_logs?traceId=trace-route-1&decisionCode=auto_notify_route&callerType=AUTOMATION&callerRef=auto-1',
@@ -495,7 +508,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
 
     fireEvent.click(screen.getByTestId('btn-test-run'));
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     const actionResult = screen.getByTestId('automation-action-result-2');
     expect(actionResult).toHaveTextContent('Send Sms');
     expect(actionResult).toHaveTextContent('Channel');
@@ -556,7 +571,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     const actionResult = screen.getByTestId('automation-action-result-1');
     expect(actionResult).toHaveTextContent('Send Sms');
     expect(actionResult).toHaveTextContent('Failed');
@@ -621,7 +638,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
 
     fireEvent.click(screen.getByTestId('btn-test-run'));
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     const actionResult = screen.getByTestId('automation-action-result-3');
     expect(actionResult).toHaveTextContent('Send Webhook');
     expect(actionResult).toHaveTextContent('Delivery Mode');
@@ -676,7 +695,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     const actionResult = screen.getByTestId('automation-action-result-1');
     expect(actionResult).toHaveTextContent('Send Webhook');
     expect(actionResult).toHaveTextContent('Delivery Mode');
@@ -743,7 +764,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     const actionResult = screen.getByTestId('automation-action-result-1');
     expect(actionResult).toHaveTextContent('Send Webhook');
     expect(actionResult).toHaveTextContent('https://hooks.example/async');
@@ -845,7 +868,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
 
     const imResult = screen.getByTestId('automation-action-result-1');
     expect(imResult).toHaveTextContent('Channel');
@@ -882,12 +907,16 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
     const commentResult = screen.getByTestId('automation-action-result-4');
     expect(commentResult).toHaveTextContent('Comment');
     expect(commentResult).toHaveTextContent('Mentions');
-    expect(commentResult.querySelector('[data-testid="automation-action-evidence"]')).not.toHaveTextContent('commentPid');
+    expect(
+      commentResult.querySelector('[data-testid="automation-action-evidence"]'),
+    ).not.toHaveTextContent('commentPid');
 
     const auditResult = screen.getByTestId('automation-action-result-5');
     expect(auditResult).toHaveTextContent('Audit Entry');
     expect(auditResult).toHaveTextContent('Rule / Automation');
-    expect(auditResult.querySelector('[data-testid="automation-action-evidence"]')).not.toHaveTextContent('auditPid');
+    expect(
+      auditResult.querySelector('[data-testid="automation-action-evidence"]'),
+    ).not.toHaveTextContent('auditPid');
   });
 
   it('falls back to the configured action chain when the runtime log has no actionResults', async () => {
@@ -936,12 +965,64 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
 
     fireEvent.click(screen.getByTestId('btn-test-run'));
 
-    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument(),
+    );
     const declaredAction = screen.getByTestId('automation-declared-action-0');
     expect(declaredAction).toHaveTextContent('通知主管 · Send Notification');
     expect(declaredAction).toHaveTextContent('Recipient List');
     expect(declaredAction).toHaveTextContent('ROLE:wd_manager');
     expect(declaredAction).not.toHaveTextContent('send_notification');
-    expect(screen.getByTestId('automation-test-run-result')).toHaveTextContent('actionResultsMissing');
+    expect(screen.getByTestId('automation-test-run-result')).toHaveTextContent(
+      'actionResultsMissing',
+    );
+  });
+});
+
+describe('Automation run diagnostic presentation', () => {
+  const traceId = '0123456789abcdef0123456789abcdef';
+  it('retains the raw cause in closed details and exposes a real correlation link only with permission', async () => {
+    access.troubleshoot = true;
+    const props = {
+      automationId: 'auto-diagnostic',
+      initialData: {
+        name: 'Delivery recovery',
+        flowData: buildFlowData('diagnostic'),
+      },
+      initialRunLog: {
+        id: 73,
+        pid: 'run-73',
+        automationId: 'auto-diagnostic',
+        status: 'failed' as const,
+        traceId,
+        triggerRecordPid: 'business-record',
+        errorMessage: 'Command permission denied: required one of example.manage',
+        actionResults: [
+          {
+            sequence: 1,
+            actionType: 'execute_command',
+            status: 'failed' as const,
+            errorMessage: 'Command permission denied: required one of example.manage',
+          },
+        ],
+      },
+    };
+    const { rerender } = render(<AutomationEditor {...props} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('automation-distributed-trace-link')).toHaveAttribute(
+        'href',
+        `/ops/troubleshooting?traceId=${traceId}`,
+      ),
+    );
+    const panel = screen.getByTestId('automation-test-run-result');
+    expect(panel).toHaveTextContent('This role cannot execute the business action.');
+    const details = [...panel.querySelectorAll('details')];
+    expect(details.length).toBeGreaterThan(0);
+    expect(details.every((item) => !item.open)).toBe(true);
+    expect(details.some((item) => item.textContent?.includes('example.manage'))).toBe(true);
+    access.troubleshoot = false;
+    rerender(<AutomationEditor {...props} />);
+    expect(screen.queryByTestId('automation-distributed-trace-link')).not.toBeInTheDocument();
+    access.troubleshoot = true;
   });
 });

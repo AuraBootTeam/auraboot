@@ -298,7 +298,7 @@ test.describe('Permission Depth — Toolbar & Row Action Filtering', () => {
 
       // Click on Draft tab
       const draftTab = page
-        .locator('nav[aria-label="Tabs"] button')
+        .locator('nav[aria-label="状态筛选"] button')
         .filter({ hasText: /草稿|Draft/i })
         .first();
       const hasDraftTab = await draftTab.isVisible({ timeout: 5000 }).catch(() => false);

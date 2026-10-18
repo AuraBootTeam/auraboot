@@ -331,7 +331,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {widgetDef.configSchema?.filter(isPropertyVisible).map((schema) => (
+        {widgetDef.configSchema?.filter(schema => !schema.key.startsWith('dataSource.')).filter(isPropertyVisible).map((schema) => (
           <PropertyField
             key={schema.key}
             schema={schema}

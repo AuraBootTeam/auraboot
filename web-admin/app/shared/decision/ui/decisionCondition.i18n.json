@@ -270,5 +270,201 @@
   "scopeSLA": {
     "zh-CN": "SLA",
     "en": "SLA"
+  },
+  "modelSelect": {
+    "zh-CN": "选择模型",
+    "en": "Select model"
+  },
+  "fieldSelect": {
+    "zh-CN": "选择属性",
+    "en": "Select property"
+  },
+  "literalKind": {
+    "zh-CN": "固定值",
+    "en": "Fixed value"
+  },
+  "fieldKind": {
+    "zh-CN": "字段值",
+    "en": "Field value"
+  },
+  "wrapSelected": {
+    "zh-CN": "加括号",
+    "en": "Wrap in parentheses"
+  },
+  "wrapHint": {
+    "zh-CN": "勾选同层连续项后加括号",
+    "en": "Select consecutive siblings to group"
+  },
+  "wrapError": {
+    "zh-CN": "请选择至少两项同层连续条件",
+    "en": "Select at least two consecutive siblings"
+  },
+  "undo": {
+    "zh-CN": "撤销",
+    "en": "Undo"
+  },
+  "redo": {
+    "zh-CN": "重做",
+    "en": "Redo"
+  },
+  "negateGroup": {
+    "zh-CN": "NOT 取反",
+    "en": "NOT negate"
+  },
+  "visualEdit": {
+    "zh-CN": "可视化编辑",
+    "en": "Visual editor"
+  },
+  "expressionPreview": {
+    "zh-CN": "表达式预览",
+    "en": "Expression preview"
+  },
+  "groupItems": {
+    "zh-CN": "{n} 项",
+    "en": "{n} items"
+  },
+  "deleteGroupTitle": {
+    "zh-CN": "移除这组括号",
+    "en": "Remove this group"
+  },
+  "deleteGroupHint": {
+    "zh-CN": "去括号可能改变 AND／OR 或 NOT 的含义，请确认处理方式。",
+    "en": "Removing parentheses may change AND/OR or NOT semantics. Choose how to proceed."
+  },
+  "unwrapGroup": {
+    "zh-CN": "去括号，保留条件",
+    "en": "Ungroup, keep conditions"
+  },
+  "deleteWholeGroup": {
+    "zh-CN": "删除整组及内部条件",
+    "en": "Delete group and conditions"
+  },
+  "cancelEdit": {
+    "zh-CN": "取消",
+    "en": "Cancel"
+  },
+  "openTrial": {
+    "zh-CN": "打开试算",
+    "en": "Open trial"
+  },
+  "closeTrial": {
+    "zh-CN": "收起试算",
+    "en": "Close trial"
+  },
+  "serverTrial": {
+    "zh-CN": "样例试算",
+    "en": "Sample trial"
+  },
+  "noSideEffects": {
+    "zh-CN": "不执行动作",
+    "en": "No actions executed"
+  },
+  "runTrial": {
+    "zh-CN": "运行试算",
+    "en": "Run trial"
+  },
+  "trialPending": {
+    "zh-CN": "正在求值…",
+    "en": "Evaluating…"
+  },
+  "trialEmpty": {
+    "zh-CN": "尚未运行。请填写输入后试算。",
+    "en": "Not run. Enter input values to try the condition."
+  },
+  "trialStale": {
+    "zh-CN": "编辑已改变，旧结果已失效，请重新试算。",
+    "en": "Inputs changed. Run again for a current result."
+  },
+  "missingInput": {
+    "zh-CN": "未提供",
+    "en": "Not provided"
+  },
+  "trueValue": {
+    "zh-CN": "是",
+    "en": "Yes"
+  },
+  "falseValue": {
+    "zh-CN": "否",
+    "en": "No"
+  },
+  "trialMatched": {
+    "zh-CN": "条件成立",
+    "en": "Condition satisfied"
+  },
+  "trialNotMatched": {
+    "zh-CN": "条件不成立",
+    "en": "Condition not satisfied"
+  },
+  "trialUnknown": {
+    "zh-CN": "无法判断",
+    "en": "Unknown"
+  },
+  "serverEvidence": {
+    "zh-CN": "后端判断依据",
+    "en": "Server evaluation evidence"
+  },
+  "invalidCondition": {
+    "zh-CN": "请补齐模型、属性及有效比较值，再进行试算。",
+    "en": "Select a model, property and valid comparison value before trial."
+  },
+  "incompatibleOperand": {
+    "zh-CN": "字段不兼容或不可用，请重新选择。",
+    "en": "The field is incompatible or unavailable. Select another field."
+  },
+  "emptyGroupError": {
+    "zh-CN": "括号内至少需要一条条件",
+    "en": "Add at least one condition to the group"
+  },
+  "trialFailure": {
+    "zh-CN": "试算失败：{message}",
+    "en": "Trial failed: {message}"
+  },
+  "rangeStart": {
+    "zh-CN": "区间起点",
+    "en": "Range start"
+  },
+  "rangeEnd": {
+    "zh-CN": "区间终点",
+    "en": "Range end"
+  },
+  "readOnlyCondition": {
+    "zh-CN": "当前条件只读",
+    "en": "This condition is read-only"
+  },
+  "noTrace": {
+    "zh-CN": "后端未返回条件解释，请检查运行构件。",
+    "en": "The server did not return condition evidence. Check the runtime build."
+  },
+  "allMatchExpression": {
+    "zh-CN": "AND · 全部满足",
+    "en": "AND · All match"
+  },
+  "anyMatchExpression": {
+    "zh-CN": "OR · 任一满足",
+    "en": "OR · Any match"
+  },
+  "conditionCount": {
+    "zh-CN": "{n} 条条件",
+    "en": "{n} conditions"
+  },
+  "groupNegatedResult": {
+    "zh-CN": "整组结果取反",
+    "en": "Negate this group"
+  },
+  "trialScopeHint": {
+    "zh-CN": "仅试算当前条件，不发布、不写执行记录、不触发审批或通知。",
+    "en": "Tests this condition only. Does not publish, write execution logs, approve or notify."
+  },
+  "chooseValue": {
+    "zh-CN": "选择值",
+    "en": "Select value"
+  },
+  "editDraft": {
+    "zh-CN": "编辑草稿",
+    "en": "Edit draft"
+  },
+  "draftSaved": {
+    "zh-CN": "草稿已保存",
+    "en": "Draft saved"
   }
 }

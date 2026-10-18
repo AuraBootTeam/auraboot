@@ -181,10 +181,10 @@ test.describe('Command Palette Document Search', () => {
     if (count > 1) {
       // Arrow down should move highlight
       await page.keyboard.press('ArrowDown');
-      // Second item should now be active (has blue bg class)
+      // Second item should now use the active design token.
       const secondItem = buttons.nth(1);
       const classes = await secondItem.getAttribute('class');
-      expect(classes).toContain('bg-blue-50');
+      expect(classes).toContain('bg-accent-weak');
     }
 
     await page.keyboard.press('Escape');

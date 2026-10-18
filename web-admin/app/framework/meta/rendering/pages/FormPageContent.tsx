@@ -61,6 +61,7 @@ import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
 import {
   buildCommandTargetParams,
+  getCommandResultRecordPid,
   getPublicRecordPid,
 } from '~/framework/meta/utils/publicRecordId';
 
@@ -2145,12 +2146,7 @@ export function FormPageContent(props: PageContentProps) {
                 })()
               : result.data;
             if (schema.extension?.linkFileAttachments === true) {
-              const extractPid = (value: any): string | undefined => {
-                if (!value || typeof value !== 'object') return undefined;
-                const pid = value.recordPid || value.recordId || value.pid;
-                return typeof pid === 'string' ? pid : extractPid(value.data);
-              };
-              const savedPid = recordPid || extractPid(responseData);
+              const savedPid = recordPid || getCommandResultRecordPid(responseData);
               if (!savedPid) throw new Error(getLocalizedText({ 'zh-CN': '项目已保存，但未取得附件关联目标。请重新打开项目检查。', en: 'Saved, but attachment target is missing. Reopen the record to check.' }, locale, t));
               for (const [field, meta] of Object.entries(modelFields)) {
                 if (!schema.extension?.attachmentFields?.includes(field) || commandPayload[field] === undefined) continue;

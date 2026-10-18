@@ -38,6 +38,22 @@ const role = (code: string, name: string) => ({ id: 1, code, name, type: 'role' 
 // ── hasPermission ─────────────────────────────────────────────────────────────
 
 describe('hasPermission', () => {
+  it.each(['codes', 'legacy'])('honors an explicitly granted wildcard in %s snapshots', (format) => {
+    const perms: UserPermissions = {
+      roles: [],
+      permissions: format === 'legacy' ? [permission('*', 'All permissions')] : [],
+      permissionCodes: format === 'codes' ? ['*'] : undefined,
+    };
+    expect(hasPermission(perms, 'model.tenant_member.suspend')).toBe(true);
+  });
+
+  it('does not infer a wildcard grant from a role name', () => {
+    const perms: UserPermissions = {
+      roles: [role('tenant_admin', 'Administrator')], permissions: [], permissionCodes: [],
+    };
+    expect(hasPermission(perms, 'model.tenant_member.suspend')).toBe(false);
+  });
+
   it('returns false when permissions is undefined', () => {
     expect(hasPermission(undefined, 'some.code')).toBe(false);
   });
@@ -191,6 +207,7 @@ describe('fetchUserInfo', () => {
       expect.stringContaining('/api/auth/me'),
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
+        signal: expect.any(AbortSignal),
       }),
     );
     expect(result!.user).toEqual({ id: 42, name: 'Alice' });

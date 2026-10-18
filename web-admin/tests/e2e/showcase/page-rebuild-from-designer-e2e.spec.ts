@@ -9,7 +9,7 @@
  * Flow:
  *   1. API-create an empty form page_schema (kind=form, blocks=placeholder).
  *   2. Sidebar → Metadata Management → page_schema list → click row → designer.
- *   3. For each of 9 reference form-section blocks:
+ *   3. For each reference form-section block:
  *        - add block via palette
  *        - set section title (i18n LocalizedText zh-CN + en)
  *        - for each field in the reference: add field code, set colSpan,
@@ -37,7 +37,7 @@
  *     the hand-authored reference.
  */
 
-import { test, expect, type Page } from '../../fixtures';
+import { test, expect, type Page, type Locator } from '../../fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -72,7 +72,15 @@ interface RefBlock {
   id?: string;
   blockType: string;
   title?: any;
-  fields?: Array<{ field: string; colSpan?: number; readOnly?: boolean; visibleWhen?: string }>;
+  fields?: Array<{
+    field: string;
+    colSpan?: number;
+    readOnly?: boolean;
+    required?: boolean;
+    visibleWhen?: string;
+    props?: { placeholder?: string | Record<string, string>; helpText?: string | Record<string, string> };
+  }>;
+  extension?: { collapsible?: boolean; defaultCollapsed?: boolean };
   buttons?: any[];
 }
 
@@ -177,27 +185,16 @@ function normalizeFieldRef(f: any): any {
     const canonical = FIELD_KEY_ALIASES[k] ?? k;
     out[canonical] = v;
   }
-  // Placeholder is excluded from the structural-rebuild comparison. #1195
-  // ("polish all-fields form + localize CascadeSelect placeholders") enriched
-  // the reference page config with per-field `props.placeholder` hints, but the
-  // designer-rebuild flow does not (and structurally cannot) reproduce them: the
-  // studio FieldsEditor stores a placeholder at the field's top level
-  // (DslFieldOverride.placeholder), not under `props`, and configureFieldOverride
-  // only drives span/readonly/required/visible/label — it never authors a
-  // placeholder. So the rebuilt page can never carry the reference's
-  // `props.placeholder`. Normalise it out of BOTH sides (the same way the block
-  // key aliases / empty-`actions` above reconcile reference-vs-designer shape
-  // differences) so the diff stays focused on structural rebuild equivalence,
-  // not on placeholder polish that this flow does not author.
-  delete out.placeholder;
+  // The field editor stores placeholders flat; DSL props use the same value.
   if (out.props && typeof out.props === 'object') {
     const props = { ...(out.props as Record<string, unknown>) };
-    delete props.placeholder;
-    if (Object.keys(props).length === 0) {
-      delete out.props;
-    } else {
-      out.props = props;
+    if (props.placeholder !== undefined) {
+      if (out.placeholder !== undefined) expect(out.placeholder).toEqual(props.placeholder);
+      out.placeholder = props.placeholder;
+      delete props.placeholder;
     }
+    if (Object.keys(props).length === 0) delete out.props;
+    else out.props = props;
   }
   return out;
 }
@@ -225,6 +222,18 @@ function normalizeBlockForCompare(b: any): any {
     } else {
       copy[k] = v;
     }
+  }
+  if (copy.blockType === 'form-section') {
+    const extension = { ...((copy.extension ?? {}) as Record<string, unknown>) };
+    for (const key of ['collapsible', 'defaultCollapsed']) {
+      if (copy[key] !== undefined && extension[key] !== undefined) {
+        expect(copy[key]).toBe(extension[key]);
+      }
+      copy[key] = copy[key] ?? extension[key] ?? false;
+      delete extension[key];
+    }
+    if (Object.keys(extension).length === 0) delete copy.extension;
+    else copy.extension = extension;
   }
   return stripEmptyBlockKeys(copy);
 }
@@ -459,6 +468,18 @@ async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promi
   }
 }
 
+async function setLocalizedFieldText(panel: Locator, prefix: string, value: string | Record<string, string>): Promise<void> {
+  const zh = typeof value === 'string' ? value : value['zh-CN'];
+  const en = typeof value === 'string' ? undefined : value['en-US'];
+  if (en) await panel.getByTestId(`${prefix}-toggle`).click();
+  await panel.getByTestId(`${prefix}-zh`).fill(zh);
+  await expect(panel.getByTestId(`${prefix}-zh`)).toHaveValue(zh);
+  if (en) {
+    await panel.getByTestId(`${prefix}-en`).fill(en);
+    await expect(panel.getByTestId(`${prefix}-en`)).toHaveValue(en);
+  }
+}
+
 /**
  * Configure per-field overrides via the in-panel FieldsEditor. Each FieldItem
  * exposes data-testid-keyed controls so we don't have to fish through the
@@ -470,13 +491,7 @@ async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promi
 async function configureFieldOverride(
   page: Page,
   _blockId: string,
-  field: {
-    field: string;
-    colSpan?: number;
-    readOnly?: boolean;
-    required?: boolean;
-    visibleWhen?: string;
-  },
+  field: NonNullable<RefBlock['fields']>[number],
 ): Promise<void> {
   const panel = page.getByTestId('designer-properties-panel');
 
@@ -520,6 +535,19 @@ async function configureFieldOverride(
       await input.click();
       await input.fill(field.visibleWhen);
       await input.press('Tab').catch(() => null);
+    }
+  }
+
+  if (field.props?.placeholder !== undefined) {
+    await setLocalizedFieldText(panel, `field-item-placeholder-${field.field}`, field.props.placeholder);
+    if (field.field === 'sc_owner_user') {
+      await panel.screenshot({ path: test.info().outputPath('rebuild-field-placeholder-zh-CN.png') });
+    }
+  }
+  if (field.props?.helpText !== undefined) {
+    await setLocalizedFieldText(panel, `field-item-help-${field.field}`, field.props.helpText);
+    if (field.field === 'sc_name') {
+      await panel.screenshot({ path: test.info().outputPath('rebuild-field-help-zh-CN.png') });
     }
   }
 
@@ -614,27 +642,16 @@ async function configureFormButtons(page: Page, buttons: any[]): Promise<void> {
 
 async function clickSaveAndWait(page: Page, pid: string): Promise<void> {
   const saveBtn = page.getByTestId('toolbar-save');
-  await expect(saveBtn).toBeVisible({ timeout: 5_000 });
-
-  const putResp = page
-    .waitForResponse(
-      (r) =>
-        r.url().includes(`/api/pages/${pid}`) &&
-        r.request().method() === 'PUT' &&
-        r.status() < 400,
-      { timeout: 5_000 },
-    )
-    .catch(() => null);
-
-  const enabled = await saveBtn.isEnabled().catch(() => false);
-  if (enabled) {
-    await saveBtn.click().catch(() => null);
-  }
-
-  const result = await putResp;
-  if (!result) {
-    await expect(page.locator('text=/Saved|已保存/').first()).toBeVisible({ timeout: 5_000 });
-  }
+  await expect(saveBtn).toBeEnabled();
+  const response = page.waitForResponse(r =>
+    new URL(r.url()).pathname === `/api/pages/${pid}` && r.request().method() === 'PUT',
+  );
+  await saveBtn.click();
+  const saved = await response;
+  const body = await saved.json();
+  expect(saved.ok(), JSON.stringify(body)).toBe(true);
+  expect(String(body.code)).toBe('0');
+  await expect(page.getByTestId('toolbar-draft-state')).toHaveText(/Synced|已同步/);
 }
 
 // ---------------------------------------------------------------------------
@@ -686,6 +703,26 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
 
       await selectBlockById(page, blockId);
       await setSectionTitle(page, refSection.title);
+      const panel = page.getByTestId('designer-properties-panel');
+      await panel.getByTestId('property-group-behavior').click();
+      const collapsible = Boolean(refSection.extension?.collapsible);
+      const collapseSwitch = panel.getByTestId('section-collapsible-switch');
+      if ((await collapseSwitch.getAttribute('aria-checked')) !== String(collapsible)) {
+        await collapseSwitch.click();
+      }
+      await expect(collapseSwitch).toHaveAttribute('aria-checked', String(collapsible));
+      if (collapsible) {
+        const initialCollapsed = Boolean(refSection.extension?.defaultCollapsed);
+        const initialSwitch = panel.getByTestId('section-default-collapsed-switch');
+        if ((await initialSwitch.getAttribute('aria-checked')) !== String(initialCollapsed)) {
+          await initialSwitch.click();
+        }
+        await expect(initialSwitch).toHaveAttribute('aria-checked', String(initialCollapsed));
+        if (refSection.id === 'state_plan') {
+          await panel.screenshot({ path: test.info().outputPath('rebuild-section-behavior-zh-CN.png') });
+        }
+      }
+      await panel.getByTestId('property-group-basic').click();
 
       const codes = (refSection.fields ?? []).map((f) => f.field);
       await addFieldsToSelectedBlock(page, codes);
@@ -745,25 +782,25 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
       return (section.fields ?? []).find((f: any) => f.field === fieldCode);
     };
 
-    // D8: readOnly preserved (sc_code in section_basic).
-    const scCode = findField('section_basic', 'sc_code');
-    expect(scCode, 'sc_code field must exist in section_basic').toBeDefined();
+    // D8: readOnly preserved (sc_code in record_info).
+    const scCode = findField('record_info', 'sc_code');
+    expect(scCode, 'sc_code field must exist in record_info').toBeDefined();
     expect(scCode?.readonly, 'sc_code.readonly must be true').toBe(true);
 
-    // D8: readOnly preserved (sc_created_at in section_dates).
-    const scCreatedAt = findField('section_dates', 'sc_created_at');
+    // D8: readOnly preserved (sc_created_at in state_plan).
+    const scCreatedAt = findField('state_plan', 'sc_created_at');
     expect(scCreatedAt, 'sc_created_at field must exist').toBeDefined();
     expect(scCreatedAt?.readonly, 'sc_created_at.readonly must be true').toBe(true);
 
     // D11: visibleWhen expression preserved verbatim.
-    const scAdvanced = findField('section_enums', 'sc_advanced_settings');
+    const scAdvanced = findField('state_plan', 'sc_advanced_settings');
     expect(scAdvanced, 'sc_advanced_settings field must exist').toBeDefined();
     expect(scAdvanced?.visible, 'sc_advanced_settings.visible expression must match').toBe(
       "record.sc_status === 'active'",
     );
 
     // colSpan/span normalisation: sc_name colSpan=6 → span=6.
-    const scName = findField('section_basic', 'sc_name');
+    const scName = findField('record_info', 'sc_name');
     expect(scName?.span, 'sc_name.span must be 6').toBe(6);
 
     // form-buttons: submit primary + command action descriptor preserved.
@@ -811,20 +848,8 @@ test.describe('Task C — Rebuild showcase form from Designer UI', () => {
       console.log('[Task C] SUCCESS: designer-rebuilt blocks deep-equal the reference.');
     }
 
-    // Hard byte-equality assertion. As of 2026-04-19 the designer can rebuild
-    // the hand-authored showcase form with zero diffs after:
-    //   - FormSectionPreview wrapper no longer swallows block-select clicks
-    //   - FieldsEditor span dropdown extended to 1/2/3/4/6/8/12
-    //   - FieldItem exposes data-testid for span/required/readonly/visible
-    //   - Spec drives FieldsEditor (in-panel) instead of canvas chip clicks
-    //   - LocalizedTextInput multi-locale toggle clicked before fill so the
-    //     emitted DSL is object-form (matches reference)
-    // No threshold cushion: any divergence indicates a real designer-UI gap
-    // and must be diagnosed (BlocksDesigner / FieldsEditor / button editor)
-    // rather than absorbed by raising the baseline. (The only shape reconciled
-    // in normalizeFieldRef is per-field `props.placeholder`, a #1195 reference
-    // enrichment the rebuild flow structurally cannot author — see that helper.
-    // This is a targeted exclusion, not a diff-count cushion.)
+    // Compare every authored value, reconciling only system keys, aliases and defaults.
+    // Missing help text, placeholders or section behavior must remain failures.
     expect(diffs, 'designer-rebuilt blocks must deep-equal the reference').toEqual([]);
   });
 });

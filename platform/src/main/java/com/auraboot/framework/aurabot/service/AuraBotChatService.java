@@ -194,7 +194,7 @@ public class AuraBotChatService {
                         chatToolResolver,
                         chatToolExecutor,
                         objectMapper,
-                        new ReadOnlyProfilePolicy()));
+                        new ReadOnlyProfilePolicy(), aiTraceService));
     }
 
     public AuraBotChatService(LlmProviderFactory llmProviderFactory,
@@ -305,6 +305,7 @@ public class AuraBotChatService {
         hint.append("\n\nYou have access to tools. Follow this strategy:\n");
 
         if (resolved.isReadOnly()) {
+            hint.append("- For a named customer or another reference label, call platform_resolve_reference on the declared reference field first. Filter with its returned storedValue. Never substitute legacy text or project-name prefixes for a relationship. If resolution fails, ask for clarification.\n");
             boolean sqlAvailable = LlmChatRuntimeSupport.isToolOffered(resolved.tools(), "platform_execute_sql");
             hint.append("- The user wants to QUERY data. Prefer nq_* (named query) tools — they are pre-built and optimized.\n");
             if (sqlAvailable) {
@@ -575,7 +576,7 @@ public class AuraBotChatService {
                         ctx, providerCode, config, model, systemPrompt,
                         request.getHistory(), request.getMessage(), maxTokens, tools,
                         effectiveResolved, effectiveModelCode, request.getSessionId(), contextBundle, sink,
-                        userPermissionService, pendingToolStore, pendingToolSnapshotFactory, maxToolRounds);
+                        userPermissionService, pendingToolStore, pendingToolSnapshotFactory, maxToolRounds, trace);
             } else {
                 streamOutcome = streamProvider(providerCode, config, model, systemPrompt,
                         request.getHistory(), request.getMessage(), maxTokens, sink,
@@ -771,6 +772,14 @@ public class AuraBotChatService {
                 String col = f.getColumnName() != null ? f.getColumnName() : f.getCode();
                 schema.append(col).append(" (").append(f.getDataType());
                 if (f.getDisplayName() != null) schema.append(", ").append(f.getDisplayName());
+                if (f.getDescription() != null && !f.getDescription().isBlank()) {
+                    schema.append("; ").append(f.getDescription());
+                }
+                if (f.getRefTarget() != null) {
+                    schema.append("; reference target=").append(f.getRefTarget().getTargetEntity())
+                            .append("; stored value=").append(f.getRefTarget().getValueField())
+                            .append("; display field=").append(f.getRefTarget().getTargetField());
+                }
                 schema.append("), ");
             }
             return schema.length() > 2 ? schema.substring(0, schema.length() - 2) : "";

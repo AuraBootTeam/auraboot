@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * Covers:
  * - handles() routing logic
- * - discover() returns all 3 platform tools
+ * - discover() returns the supported platform tools
  * - execute() for platform.list_models returns a valid model list
  * - execute() for platform.execute_sql rejects invalid SQL (DML guard)
  * - execute() for unknown tool code returns error without throwing
@@ -59,13 +59,14 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
     // ========== discover() ==========
 
     @Test
-    void discover_returnsAllThreePlatformTools() {
+    void discover_returnsSupportedPlatformTools() {
         var ctx = ToolDiscoveryContext.builder().tenantId(testTenant.getId()).build();
         var tools = provider.discover(ctx);
 
-        assertThat(tools).hasSize(5);
+        assertThat(tools).hasSize(6);
         assertThat(tools.stream().map(ToolDefinition::getToolCode))
                 .containsExactlyInAnyOrder(
+                        "platform.resolve_reference",
                         "platform.execute_sql",
                         "platform.list_models",
                         "platform.model_suggest",

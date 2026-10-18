@@ -293,7 +293,7 @@ export async function maybeRenewSession(request: Request): Promise<SessionRenewa
   const result = await post<{ jwt?: string }>(
     '/api/auth/renew',
     {},
-    { token, timeout: 10_000 },
+    { token, timeout: 10_000, signal: request.signal },
     request,
   );
   const renewedJwt = result.data?.jwt;

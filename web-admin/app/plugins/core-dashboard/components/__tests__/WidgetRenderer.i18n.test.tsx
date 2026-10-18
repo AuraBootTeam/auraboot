@@ -15,7 +15,7 @@ vi.mock('~/contexts/I18nContext', () => ({
 }));
 
 vi.mock('~/framework/smart/charts/SharedChartFactory', () => ({
-  normalizeChartType: (type: string) => type,
+  normalizeChartType: (type: string) => type.replace(/^smart-/, '').replace(/-chart$/, ''),
   getChartComponent: () => (props: Record<string, unknown>) => {
     chartMock.props.push(props);
     return null;
@@ -54,5 +54,27 @@ describe('WidgetRenderer i18n config resolution', () => {
     expect(chartMock.props[0]?.drillDown).toMatchObject({
       paramMapping: { revenue_id: 'pid' },
     });
+  });
+});
+
+
+describe('Persisted pie designer presentation', () => {
+  beforeEach(() => { chartMock.props = []; });
+  it.each([true, false])('applies donut and label switches (%s) instead of silently ignoring them', value => {
+    const widget = { id: 'status', type: 'smart-pie-chart', config: {
+      ring: !value, showLabel: !value,
+      visualization: { donut: value, showLabels: value },
+      dataSource: { type: 'namedQuery', queryCode: 'delivery_status' },
+    } } as unknown as Widget;
+    render(<>{renderWidget({ widget })}</>);
+    expect(chartMock.props[0]?.ring).toBe(value);
+    expect(chartMock.props[0]?.showLabel).toBe(value);
+    expect(chartMock.props[0]?.dataSource).toEqual(widget.config.dataSource);
+  });
+  it('keeps existing direct chart settings when no designer switch is stored', () => {
+    const widget = { id: 'status', type: 'smart-pie-chart', config: { ring: true, showLabel: false } } as unknown as Widget;
+    render(<>{renderWidget({ widget })}</>);
+    expect(chartMock.props[0]?.ring).toBe(true);
+    expect(chartMock.props[0]?.showLabel).toBe(false);
   });
 });

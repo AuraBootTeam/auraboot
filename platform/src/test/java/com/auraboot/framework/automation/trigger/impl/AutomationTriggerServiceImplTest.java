@@ -70,6 +70,32 @@ class AutomationTriggerServiceImplTest {
         org.slf4j.MDC.remove("requestId");
     }
 
+    @Test
+    void executeAutomation_stampsTrustedTraceAndRejectsCallerSuppliedTrace() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "operator", "operator");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
+        com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId("0123456789abcdef0123456789abcdef");
+        Automation automation = new Automation();
+        automation.setPid("AUTO-TRACE");
+        automation.setTenantId(7L);
+        automation.setTriggerType("webhook");
+        AutomationLog result = service.executeAutomation(automation, "record", Map.of("runtimeTraceId", "forged", "manualTrigger", true));
+        assertThat(result.getTriggerPayload()).containsEntry("runtimeTraceId", "0123456789abcdef0123456789abcdef");
+        assertThat(result.getTriggerPayload()).containsEntry("manualTrigger", true);
+    }
+
+    @Test
+    void executeAutomation_withoutTraceDoesNotPersistForgedCorrelation() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "operator", "operator");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
+        Automation automation = new Automation();
+        automation.setPid("AUTO-NO-TRACE");
+        automation.setTenantId(7L);
+        automation.setTriggerType("webhook");
+        AutomationLog result = service.executeAutomation(automation, "record", Map.of("runtimeTraceId", "forged"));
+        assertThat(result.getTriggerPayload()).doesNotContainKey("runtimeTraceId");
+    }
+
     // =========================================================
     // evaluateCondition — blank / null
     // =========================================================

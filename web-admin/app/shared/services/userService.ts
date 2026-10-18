@@ -13,6 +13,7 @@ import { ErrorCodes } from '~/shared/services/http-client/types';
 import { ResultHelper, type User, type UserPermissions, type Preferences } from '~/utils/type';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
+import { SSR_LOADER_FETCH_TIMEOUT_MS } from '~/utils/fetchTimeout';
 
 export class UserInfoUnavailableError extends Error {
   readonly code: string;
@@ -53,7 +54,11 @@ export async function fetchUserInfo(request: Request): Promise<{
       user: User;
       permissions?: UserPermissions;
       preferences?: Preferences | null;
-    }>('/api/auth/me', { token }, request);
+    }>(
+      '/api/auth/me',
+      { token, timeout: SSR_LOADER_FETCH_TIMEOUT_MS, signal: request.signal },
+      request,
+    );
 
     // 后端返回格式: { code: "0", data: { user: {...}, permissions: {...} } }
     if (!ResultHelper.isSuccess(result) || !result.data) {
@@ -138,11 +143,11 @@ export function hasPermission(
     return false;
   }
 
-  if (permissions.permissionCodes?.includes(permissionCode)) {
+  if (permissions.permissionCodes?.includes('*') || permissions.permissionCodes?.includes(permissionCode)) {
     return true;
   }
 
-  return permissions.permissions?.some((p) => p.code === permissionCode) ?? false;
+  return permissions.permissions?.some((p) => p.code === '*' || p.code === permissionCode) ?? false;
 }
 
 /**

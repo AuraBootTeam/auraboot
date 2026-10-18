@@ -875,9 +875,9 @@ function buildScenarioTable(scenario: StrategyScenario): DecisionTable {
 function studioTableKey(scenario: StrategyScenario): string { return `${scenario.key}:${scenario.decisionCode}` }
 
 function initialScenarioTables(): Record<string, DecisionTable> {
-  return Object.fromEntries(
-    SCENARIOS.map((scenario) => [studioTableKey(scenario), buildScenarioTable(scenario)]),
-  ) as Record<string, DecisionTable>
+  // Scenario templates are render-time defaults, not evidence of a server load.
+  // A populated cache here prevents listVersions from restoring persisted rules.
+  return {}
 }
 
 function isDecisionTable(value: unknown): value is DecisionTable {
@@ -1101,10 +1101,9 @@ export function StrategyStudioWorkbench({
   )
   const scenarioFields = useMemo(() => {
     const fragmentFields = fieldsFromFragment(selectedFragment)
-    const catalogBackedFields = mergeFields(
-      selectedDecisionCode ? [] : activeScenario.fields,
-      selectedDecisionCode ? fields : filterScenarioFields(activeScenario, fragmentFields, fields),
-    )
+    // The editor uses the real catalog, including related models; scenario samples
+    // must never replace metadata types, dictionary labels, or permission flags.
+    const catalogBackedFields = fields
     return mergeFields(catalogBackedFields, fragmentFields)
   }, [activeScenario, fields, selectedFragment, selectedDecisionCode])
   const scenarioTable = tableDrafts[studioTableKey(activeScenario)] ?? buildScenarioTable(activeScenario)
@@ -1689,6 +1688,7 @@ export function StrategyStudioWorkbench({
           <button
             type="button"
             data-testid="strategy-publish"
+            disabled={!publishReady || checkingReadiness}
             className="strategy-studio-primary"
             onClick={() => void publish()}
           >
