@@ -4,10 +4,11 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { canonicalJson, operations, requireCondition, sha256, validateDocument } from './contract.mjs';
+import { traceSourceGraph } from './source-graph.mjs';
 const ts = createRequire(new URL('./toolchain/package.json', import.meta.url))('typescript');
 const NETWORK_MODULE = /(?:^|\/)(?:http-client|HttpClient|ApiService|internal-api)(?:\/|$)|^axios$/;
 const HTTP_NAMES = new Set(['get', 'post', 'put', 'patch', 'del', 'delete', 'head', 'options', 'fetchResult', 'fetchData', 'request', 'internalRequest', 'internalFormRequest']);
-const PRODUCTION = p => !/(^|\/)(__tests__|tests|fixtures|__fixtures__|generated)(\/|$)|\.(test|spec)\./.test(p);
+const PRODUCTION = p => !/(^|\/)(__tests__|tests)(\/|$)|\.(test|spec)\.|\.d\.[cm]?ts$/.test(p);
 const httpMethod = name => name === 'del' ? 'delete' : ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(name) ? name : undefined;
 
 export function matchOperation(route, method, document) {
@@ -35,7 +36,7 @@ export function matchOperation(route, method, document) {
 export function discoverCalls(sources, document) {
   validateDocument(document);
   const virtual = new Map(sources.map(s => [path.resolve('/source', s.file), s.text]));
-  const options = { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.Preserve, noResolve: true, noLib: true };
+  const options = { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.Preserve, allowJs: true, noResolve: true, noLib: true };
   const host = ts.createCompilerHost(options);
   host.getSourceFile = (file, version) => virtual.has(file)
     ? ts.createSourceFile(file, virtual.get(file), version, true) : undefined;
@@ -158,12 +159,32 @@ export function inventory(root, document) {
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
   const commit = git('rev-parse', 'HEAD');
   const files = git('ls-files', '--cached', '--others', '--exclude-standard').split('\n');
-  const sources = files.filter(p => /^web-admin\/app\//.test(p) && /\.tsx?$/.test(p) && PRODUCTION(p))
+  const sources = files.filter(p => /^(?:web-admin\/(?:app|packages)\/|packages\/)/.test(p) && /\.[cm]?[jt]sx?$/.test(p) && PRODUCTION(p))
     .map(file => ({ file, text: fs.readFileSync(path.join(root, file), 'utf8') }));
+  const packages = files.filter(p => /^(?:packages|web-admin\/packages)\/[^/]+\/package\.json$/.test(p))
+    .map(file => ({ root: path.posix.dirname(file), manifest: JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) }));
+  const configFile = 'web-admin/tsconfig.json';
+  const configText = fs.readFileSync(path.join(root, configFile), 'utf8');
+  const config = ts.parseConfigFileTextToJson(configFile, configText);
+  requireCondition(!config.error && config.config?.compilerOptions, 'Cannot read Web Admin source graph compiler options');
+  requireCondition(!config.config.extends, 'Inherited source graph aliases require explicit resolution');
+  const base = path.posix.join(path.posix.dirname(configFile), config.config.compilerOptions.baseUrl ?? '.');
+  const aliases = Object.fromEntries(Object.entries(config.config.compilerOptions.paths ?? {})
+    .map(([pattern, targets]) => [pattern, targets.map(target => path.posix.join(base, target))]));
+  const entries = ['root.tsx', 'routes.ts', 'entry.client.tsx', 'entry.server.tsx', 'server/bff.server.ts']
+    .map(file => `web-admin/app/${file}`);
+  const sourceGraph = traceSourceGraph({ sources, entries, packages, aliases });
+  const reachability = new Map(sourceGraph.files.map(row => [row.file, row]));
   const result = discoverCalls(sources, document);
+  for (const row of [...result.calls, ...result.declarations]) {
+    const file = reachability.get(row.file);
+    row.entryReachability = file.reachable ? 'static-entry-linked' : 'not-proven-entry-linked';
+    row.reachedBy = file.reachedBy;
+  }
   requireCondition(git('rev-parse', 'HEAD') === commit, 'Source commit changed during inventory');
   return { sourceCommit: commit, sourceDigest: sha256(sources.map(s => s.file + '\n' + sha256(s.text)).join('\n')),
-    catalogDigest: sha256(canonicalJson(document)), ...result };
+    sourceGraphInputsSha256: sha256(canonicalJson({ packages, entries, aliases, configSha256: sha256(configText) })),
+    catalogDigest: sha256(canonicalJson(document)), ...result, sourceGraph };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

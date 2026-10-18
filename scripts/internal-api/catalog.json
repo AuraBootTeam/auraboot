@@ -17,7 +17,8 @@
         "export.test.mjs",
         "foundation.test.mjs",
         "drift.test.mjs",
-        "response-shape.test.mjs"
+        "response-shape.test.mjs",
+        "source-graph.test.mjs"
       ],
       "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json",
       "unitTests": [
@@ -42,7 +43,10 @@
         "response shape validates nested references required fields nullability arrays and scalar types",
         "response shape refuses undeclared operations statuses media and validates error response references",
         "response shape detects stale nullable metadata without claiming format or business acceptance",
-        "generates binary multipart fields as Blob while preserving nullable parts"
+        "generates binary multipart fields as Blob while preserving nullable parts",
+        "source graph follows router resources and workspace exports while retaining type-only candidates",
+        "source graph keeps missing imports dynamic modules and indirect route files unresolved",
+        "source graph respects package export boundaries and rejects ambiguous source identities"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },
