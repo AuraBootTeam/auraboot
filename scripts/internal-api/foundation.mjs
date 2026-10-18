@@ -76,6 +76,6 @@ export async function main(args) {
   console.log(`Offline internal API consistency verified: ${result.counts.passed} registered tests; not migration or release acceptance`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   main(process.argv.slice(2)).catch(error => { console.error(error.message); process.exitCode = 1; });
 }

@@ -20,6 +20,6 @@ export function main(args) {
   const expected = fileURLToPath(new URL('../../contracts/internal-web-admin/openapi.json', import.meta.url));
   console.log(canonicalJson(compareCaptured({expected, observed:args[0], receipt:args[1]})).trim());
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   try { main(process.argv.slice(2)); } catch(error) { console.error(error.message); process.exitCode=1; }
 }

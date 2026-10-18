@@ -146,7 +146,7 @@ export function inventory(root, document) {
     catalogDigest: sha256(canonicalJson(document)), ...result };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   try {
     const [root, input, output] = process.argv.slice(2);
     requireCondition(root && input && output, 'Usage: node discover.mjs <repo> <catalog.json> <manifest.json>');

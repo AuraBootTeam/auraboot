@@ -35,6 +35,7 @@
         "requires a fresh receipt and never writes success when the live catalog drifts",
         "foundation audit rejects empty missing repeated skipped failed and unexpected test evidence",
         "foundation audit accepts each registered passing test exactly once",
+        "CLI entrypoints reject missing arguments when invoked through a symlink",
         "captured drift compares semantic contracts and refuses receipt reuse",
         "captured drift never creates success evidence for an empty or changed producer document"
       ],
