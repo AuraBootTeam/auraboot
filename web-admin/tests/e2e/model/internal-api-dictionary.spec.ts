@@ -161,8 +161,11 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
       response.request().method() === 'POST',
   );
   await page.getByRole('button', { name: '取消发布', exact: true }).click();
-  expect((await (await unpublishResponse).json()).data.status).toBe('draft');
+  expect((await (await unpublishResponse).json()).data.status).toBe('deprecated');
   await expect(page.getByRole('button', { name: '发布', exact: true })).toBeVisible();
+  await page.getByTestId('dict-tab-basic').click();
+  await expect(page.locator('main')).toContainText('已废弃');
+  await capture('DICT-10', page, info);
   const publishResponse = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === `/api/meta/dict/${pid}/publish` &&
@@ -191,8 +194,15 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await expect(page.locator('tbody')).toContainText('暂无数据');
   await capture('DICT-05', page, info);
 
-  // Delete only this attempt's own record through the UI and prove its absence.
+  // Delete only this attempt's own record; dictionary deletion is a soft disable.
   await page.goto(`/meta/dict/${pid}`);
+  const deprecateBeforeDelete = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === `/api/meta/dict/${pid}/unpublish` &&
+      response.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: '取消发布', exact: true }).click();
+  expect((await (await deprecateBeforeDelete).json()).data.status).toBe('deprecated');
   await page.getByRole('button', { name: '删除', exact: true }).click();
   await expect(page.getByTestId('confirm-dialog')).toContainText(updatedName);
   await capture('DICT-09', page, info);
@@ -206,7 +216,9 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await expect(page).toHaveURL((url) => url.pathname === '/meta/dict');
   const removed = await page.request.get(`/api/meta/dict/${pid}`);
   const removedBody = await removed.json();
-  expect(removedBody.code).not.toBe('0');
+  expect(removedBody.code).toBe('0');
+  expect(removedBody.data.status).toBe('disabled');
+  expect(removedBody.data.pid).toBe(pid);
 });
 
 test('anonymous dictionary navigation and API access are refused', async ({ page }, info) => {

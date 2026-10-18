@@ -17,6 +17,7 @@ import { dictService } from '~/shared/services/dictService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useTimezone } from '~/contexts/TimezoneContext';
+import { StatusBadge } from '~/ui/common/StatusBadge';
 import type { DictDTO, DictItemData, DictTreeNode } from '~/types/dict';
 
 type TabType = 'basic' | 'items' | 'versions';
@@ -439,28 +440,6 @@ export default function DictDetailPage() {
     }
   };
 
-  /**
-   * Get status badge
-   */
-  const getStatusBadge = (status: string) => {
-    const colors = {
-      published: 'bg-green-100 text-green-800',
-      draft: 'bg-yellow-100 text-yellow-800',
-      archived: 'bg-gray-100 text-gray-800',
-    };
-    const labels = {
-      published: '已发布',
-      draft: '草稿',
-      archived: '已归档',
-    };
-    return (
-      <span
-        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${colors[status as keyof typeof colors] || colors.draft}`}
-      >
-        {labels[status as keyof typeof labels] || status}
-      </span>
-    );
-  };
 
   return (
     <div className="mx-auto max-w-7xl p-6">
@@ -475,7 +454,7 @@ export default function DictDetailPage() {
         </div>
 
         <div className="flex gap-2">
-          {dict.status === 'draft' && (
+          {(dict.status === 'draft' || dict.status === 'deprecated') && (
             <button
               onClick={handlePublish}
               className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
@@ -570,7 +549,7 @@ export default function DictDetailPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">状态</label>
-                  <div className="text-sm">{getStatusBadge(dict.status)}</div>
+                  <div className="text-sm"><StatusBadge status={dict.status} /></div>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">版本号</label>
@@ -782,7 +761,7 @@ export default function DictDetailPage() {
                                 当前版本
                               </span>
                             )}
-                            {getStatusBadge(version.status)}
+                            <StatusBadge status={version.status} />
                           </div>
                           <p className="mt-1 text-xs text-gray-400">
                             {formatInTimezone(version.createdAt, formats.datetime, userTimezone)}
