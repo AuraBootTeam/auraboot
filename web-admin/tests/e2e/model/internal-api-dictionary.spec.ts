@@ -41,6 +41,10 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await login.expectLoggedIn();
   await page.locator('nav a[href="/meta/dict"]').click();
   await expect(page.getByTestId('dictionary-list')).toBeVisible();
+  await page.getByTestId('filter-code').fill('org_team_status');
+  await page.getByTestId('filter-search').click();
+  await expect(page).toHaveURL(/[?&]code=org_team_status(?:&|$)/);
+  await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.locator('tbody')).toContainText('org_team_status');
   const controlledRow = page.locator('tbody tr').filter({ hasText: 'org_team_status' });
   await expect(controlledRow.getByRole('link', { name: '查看', exact: true })).toBeInViewport();
