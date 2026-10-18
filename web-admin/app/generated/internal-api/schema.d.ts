@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 319b1ae2adcb10206668a65d1cab458b589630aa40cd0af537f5600663996076
+ * Contract SHA-256: c26e13f3c8880b6042ed01f5a884020f8faf514d10919e498924f463543349cb
  */
 export interface paths {
     "/api/activities": {
@@ -39500,7 +39500,7 @@ export interface components {
             nickName?: string | null;
             pid?: string;
             signature?: string | null;
-            userName?: string;
+            userName?: string | null;
         };
         UserProjectBinding: {
             bindingRole?: string;

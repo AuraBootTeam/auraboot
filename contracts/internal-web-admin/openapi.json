@@ -49852,7 +49852,10 @@
             ]
           },
           "userName": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
