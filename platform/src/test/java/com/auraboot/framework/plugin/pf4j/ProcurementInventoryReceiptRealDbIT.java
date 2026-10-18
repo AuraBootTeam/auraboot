@@ -506,7 +506,8 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         void clear(){current.remove();}
         @org.aspectj.lang.annotation.AfterReturning(pointcut="execution(* com.auraboot.framework.plugin.pf4j.AuraPluginManager.getExtensionsOfType(java.lang.Class)) && args(type)",returning="result",argNames="type,result")
         public void returned(Class<?> type,Object result){
-            var capture=current.get();if(capture==null)return;
+            var capture=current.get();
+            if(capture==null || type!=com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class)return;
             assertSame(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,type);
             assertInstanceOf(List.class,result);capture.calls++;
             var instances=new ArrayList<com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension>();

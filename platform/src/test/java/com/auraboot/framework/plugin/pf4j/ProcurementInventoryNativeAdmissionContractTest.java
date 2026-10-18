@@ -224,8 +224,15 @@ class ProcurementInventoryNativeAdmissionContractTest {
     }
     static class FreshDiscoveryManager extends AuraPluginManager {
         final org.pf4j.DefaultExtensionFactory factory=new org.pf4j.DefaultExtensionFactory();int calls;
+        final java.util.List<Class<?>> lookupTypes=new java.util.ArrayList<>();
+        com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension nestedConsumer;
         FreshDiscoveryManager(){super("unused-hermetic-plugin-directory");}
-        @Override public <T> List<T> getExtensionsOfType(Class<T> type){calls++;return List.of(type.cast(factory.create(FreshDiscoveryConsumer.class)));}
+        @Override public <T> List<T> getExtensionsOfType(Class<T> type){
+            calls++;lookupTypes.add(type);
+            if(type==com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.class)return List.of();
+            assertSame(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,type);
+            return List.of(type.cast(nestedConsumer!=null?nestedConsumer:factory.create(FreshDiscoveryConsumer.class)));
+        }
     }
     @Test void realRegistryObservationPreservesFirstFactoryInstanceAndDoesNotRediscover(){
         var target=new FreshDiscoveryManager();var observer=new ProcurementInventoryReceiptRealDbIT.ReceiptDiscoveryObservation();
@@ -241,6 +248,30 @@ class ProcurementInventoryNativeAdmissionContractTest {
         observer.begin();manager.getExtensionsOfType(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class);manager.getExtensionsOfType(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class);
         assertThrows(AssertionError.class,observer::finish);
     }
+    @Test void registryDiscoveryIgnoresNestedIngressLookupsButStillRequiresOneReliableDiscovery() {
+        var managerRef=new java.util.concurrent.atomic.AtomicReference<AuraPluginManager>();
+        var consumer=new com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension() {
+            public String consumerCode(){return "nested-observation-consumer";}
+            public java.util.Set<String> subscribedEventTypes(){
+                managerRef.get().getExtensionsOfType(com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.class);
+                return java.util.Set.of("nested-observation-event");
+            }
+            public void consume(com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope event){fail("Discovery cannot consume");}
+        };
+        var target=new FreshDiscoveryManager();target.nestedConsumer=consumer;var lookupTypes=target.lookupTypes;
+        var observer=new ProcurementInventoryReceiptRealDbIT.ReceiptDiscoveryObservation();
+        var proxyFactory=new AspectJProxyFactory(target);proxyFactory.setProxyTargetClass(true);proxyFactory.addAspect(observer);
+        AuraPluginManager manager=proxyFactory.getProxy();managerRef.set(manager);
+        var core=new org.springframework.beans.factory.support.DefaultListableBeanFactory();
+        var registry=new com.auraboot.framework.integration.ReliableEventConsumerRegistry(manager,core.getBeanProvider(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class));
+        observer.begin();var registered=registry.consumersFor("nested-observation-event");var original=observer.finish();
+        assertEquals(List.of(com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension.class,
+                com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.class),lookupTypes);
+        assertEquals(1,registered.size());assertSame(consumer,registered.getFirst());assertSame(consumer,original.getFirst());
+        observer.begin();manager.getExtensionsOfType(com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.class);
+        assertThrows(AssertionError.class,observer::finish);
+    }
+
     private static Path consumerFixtureJar(Path root,Map<String,List<String>> definitions) throws Exception {
         java.nio.file.Files.createDirectories(root);var sources=new java.util.ArrayList<String>();
         for(var entry:definitions.entrySet()){
