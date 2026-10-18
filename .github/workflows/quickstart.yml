@@ -93,17 +93,6 @@ jobs:
           docker compose logs --tail 200 backend
           exit 1
 
-      - name: Internal API contract drift from the built backend
-        if: steps.changes.outputs.run == 'true'
-        run: |
-          set -euo pipefail
-          mkdir "$RUNNER_TEMP/internal-api-live"
-          docker compose exec -T backend wget -q -O - \
-            http://localhost:6443/v3/api-docs/internal-web-admin \
-            > "$RUNNER_TEMP/internal-api-live/openapi.json"
-          node scripts/internal-api/drift.mjs "$RUNNER_TEMP/internal-api-live/openapi.json" \
-            "$RUNNER_TEMP/internal-api-live/drift-receipt.json"
-
       - name: Frontend reachable on host port 3000
         if: steps.changes.outputs.run == 'true'
         # The README sends users to localhost:3000; assert it serves something
@@ -145,6 +134,25 @@ jobs:
         # Run what we ship. If scripts/quickstart.sh breaks, the quickstart breaks,
         # and this goes red.
         run: ./scripts/quickstart.sh
+
+      - name: Internal API contract drift from the built backend
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/internal-api-live"
+          # Community keeps documentation authenticated; use the just-provisioned admin.
+          token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
+            | python3 -c 'import json,re,sys; token=json.load(sys.stdin).get("data", {}).get("jwt"); assert isinstance(token,str) and re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",token), "Missing session token"; print(token)')
+          echo "::add-mask::$token"
+          printf '%s\n' "$token" | docker compose exec -T backend sh -c '
+            IFS= read -r token
+            exec wget -q -O - --header="Authorization: Bearer $token" \
+              http://localhost:6443/v3/api-docs/internal-web-admin
+          ' > "$RUNNER_TEMP/internal-api-live/openapi.json"
+          node scripts/internal-api/drift.mjs "$RUNNER_TEMP/internal-api-live/openapi.json" \
+            "$RUNNER_TEMP/internal-api-live/drift-receipt.json"
 
       - name: The platform is not empty
         if: steps.changes.outputs.run == 'true'

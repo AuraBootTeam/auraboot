@@ -50,6 +50,14 @@ class SavedViewOpenApiContractTest {
     }
 
     @Test
+    void editorCapabilityReasonsSurviveThePersistedConfigurationRoundTrip() throws Exception {
+        var mapper = Json31.mapper();
+        var config = mapper.readValue("{\"meta\":{\"capabilityStatus\":\"degraded\",\"capabilityReasonCodes\":[\"UNKNOWN_FIELD\"]}}", ViewConfig.class);
+        assertThat(config.getMeta().getCapabilityReasonCodes()).containsExactly("UNKNOWN_FIELD");
+        assertThat(mapper.valueToTree(config).at("/meta/capabilityReasonCodes/0").asText()).isEqualTo("UNKNOWN_FIELD");
+    }
+
+    @Test
     void publicSharingExposesConfigurationAndLinkMetadataWithoutInventedRecordPayloads() throws Exception {
         var response = new PublicSharedViewResponse("Owned view", "ab_team", "table", Map.of("custom", Map.of("value", 1)));
         var json = Json31.mapper().valueToTree(response);

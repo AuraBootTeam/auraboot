@@ -405,6 +405,9 @@ public class ViewConfig {
         private String originPresetKey;
         @Schema(nullable = true)
         private String capabilityStatus;
+        /** Stable reason codes already submitted by the view configuration editor. */
+        @Schema(nullable = true)
+        private List<String> capabilityReasonCodes;
         /** Runtime overlay replay state: CURRENT, REBASED, STALE, or UNTRACKED. */
         @Schema(nullable = true)
         private String overlayStatus;
