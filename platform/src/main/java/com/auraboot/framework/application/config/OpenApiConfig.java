@@ -45,6 +45,25 @@ public class OpenApiConfig {
                                         .description("JWT token obtained from POST /api/auth/login → data.jwt")));
     }
 
+    /** Internal transport catalog; frontend consumers select explicit operations from this group. */
+    @Bean
+    public GroupedOpenApi internalWebAdminApi() {
+        return GroupedOpenApi.builder()
+                .group("internal-web-admin")
+                .packagesToScan("com.auraboot.framework", "com.auraboot.module")
+                .pathsToMatch("/api/**")
+                .pathsToExclude("/api/open/v1/**", "/api/test/**", "/api/mobile/**")
+                .addOpenApiCustomizer(api -> {
+                    api.setServers(java.util.List.of(new Server().url("/")));
+                    api.setInfo(new Info().title("AuraBoot Internal Web Admin API")
+                            .version("1.0.0")
+                            .description("Internal session-authenticated transport catalog. "
+                                    + "Operation authorization is enforced by the platform; "
+                                    + "this document does not grant external integration access."));
+                })
+                .build();
+    }
+
     /** Separate developer contract; internal controllers never enter this document by default. */
     @Bean
     public GroupedOpenApi openPlatformApi() {

@@ -336,3 +336,10 @@ These local measurement helpers require an explicitly configured runtime and cre
 |---|---|---|
 | `dev/start-web-stack.sh` | tooling | Start the governed development or production Web/BFF entrypoint. |
 | `performance/home-readiness.mjs` | tooling | Observe browser readiness marks for the home performance runner. |
+
+## Internal Web Admin API contracts
+
+| script | category | purpose |
+|---|---|---|
+| `internal-api/contract.mjs` | contract | Validate, normalize and select explicit internal OpenAPI operations without removing schema constraints. |
+| `internal-api/toolchain/generate.mjs` | codegen | Generate or check TypeScript declarations using the isolated, locked OpenAPI toolchain. |
