@@ -105,7 +105,7 @@
               "zh-CN": "完成进度，范围为 0–100%。",
               "en-US": "Completion percentage from 0 to 100."
             },
-            "placeholder": "0–100"
+            "placeholder": { "zh-CN": "0–100", "en-US": "0–100" }
           }
         },
         {
@@ -116,7 +116,7 @@
               "zh-CN": "评分范围为 0–5，按实际情况选择。",
               "en-US": "Choose a rating from 0 to 5."
             },
-            "placeholder": "0–5"
+            "placeholder": { "zh-CN": "0–5", "en-US": "0–5" }
           }
         },
         {
@@ -199,7 +199,7 @@
               "zh-CN": "选择开始和结束日期。",
               "en-US": "Choose the start and end dates."
             },
-            "placeholder": "2026/10/14 – 2026/10/28"
+            "placeholder": { "zh-CN": "2026/10/14 – 2026/10/28", "en-US": "2026/10/14 – 2026/10/28" }
           }
         },
         {
@@ -210,7 +210,7 @@
               "zh-CN": "选择一天内的工作时间范围。",
               "en-US": "Choose a working-hours time range."
             },
-            "placeholder": "09:00 – 18:00"
+            "placeholder": { "zh-CN": "09:00 – 18:00", "en-US": "09:00 – 18:00" }
           }
         }
       ],

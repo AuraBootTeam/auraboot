@@ -97,6 +97,42 @@ class SavedViewOverlayPolicyTest {
     }
 
     @Test
+    void listBuiltinActionsPersistAndReplayWithoutAuthorizingUnknownCodes() {
+        PageSchemaDTO list = page("release-1", 1, "checksum-1", true, true);
+        list.setKind("list");
+        when(pageSchemaService.findByPageKey("orders")).thenReturn(list);
+        ViewConfig requested = new ViewConfig();
+        requested.setToolbarActions(List.of(action("_import", false),
+                action("_export_excel", true), action("_export_csv", false), action("_print", true)));
+
+        ViewConfig stored = policy.validateAndStamp("orders", requested);
+        assertThat(stored.getMeta().getBaseActionCodes())
+                .contains("_import", "_export_excel", "_export_csv", "_print");
+        ViewConfig replayed = policy.replay("orders", stored);
+        assertThat(replayed.getMeta().getOverlayStatus()).isEqualTo("CURRENT");
+        assertThat(replayed.getToolbarActions()).extracting(ToolbarActionConfig::getCode)
+                .containsExactly("_import", "_export_excel", "_export_csv", "_print");
+        assertThat(replayed.getToolbarActions().get(2).getVisible()).isFalse();
+
+        requested.setToolbarActions(List.of(action("_export_unknown", true)));
+        assertThatThrownBy(() -> policy.validateAndStamp("orders", requested))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("view.overlay.unknown-action:_export_unknown");
+    }
+
+    @Test
+    void listBuiltinActionsDoNotBecomeGlobalPageActions() {
+        PageSchemaDTO detail = page("release-1", 1, "checksum-1", true, true);
+        detail.setKind("detail");
+        when(pageSchemaService.findByPageKey("orders")).thenReturn(detail);
+        ViewConfig requested = new ViewConfig();
+        requested.setToolbarActions(List.of(action("_export_csv", false)));
+        assertThatThrownBy(() -> policy.validateAndStamp("orders", requested))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("view.overlay.unknown-action:_export_csv");
+    }
+
+    @Test
     void staleReplayDropsDeletedReferencesAndRestoresMandatoryElements() {
         when(pageSchemaService.findByPageKey("orders"))
                 .thenReturn(page("release-1", 1, "checksum-1", true, true));

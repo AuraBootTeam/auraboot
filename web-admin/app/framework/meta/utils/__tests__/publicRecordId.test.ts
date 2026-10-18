@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCommandTargetParams,
+  getCommandResultRecordPid,
   getLegacyCompatibleRecordPid,
   getPublicRecordKey,
   getPublicRecordPid,
@@ -28,6 +29,19 @@ describe('publicRecordId utilities', () => {
     expect(getPublicRecordKey({ code: 'tree-1', pid: 'pid-1' }, undefined, 'code')).toBe('tree-1');
     expect(getPublicRecordKey({ pid: 'pid-1' }, 'fallback', 'code')).toBe('pid-1');
     expect(getPublicRecordKey({}, 'fallback', 'code')).toBeUndefined();
+  });
+
+  it('reads canonical PIDs from synchronous and nested command results', () => {
+    expect(getCommandResultRecordPid({ recordPid: 'record-pid', pid: 'other-pid' })).toBe('record-pid');
+    expect(getCommandResultRecordPid({ pid: 'public-pid' })).toBe('public-pid');
+    expect(getCommandResultRecordPid({ data: { data: { recordPid: 'nested-pid' } } })).toBe('nested-pid');
+  });
+
+  it('rejects legacy command identity aliases and numeric internal identities', () => {
+    expect(getCommandResultRecordPid({ recordId: 'legacy-alias', id: 1001 })).toBeUndefined();
+    expect(getCommandResultRecordPid({ recordPid: 1001 })).toBeUndefined();
+    expect(getCommandResultRecordPid(null)).toBeUndefined();
+    expect(getCommandResultRecordPid({ data: { id: 1001 } })).toBeUndefined();
   });
 
   it('builds command params with only targetRecordPid', () => {

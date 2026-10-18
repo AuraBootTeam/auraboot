@@ -1,3 +1,4 @@
+import { BACKEND_URL } from '../../helpers/environments';
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Page } from '../../fixtures';
@@ -258,7 +259,7 @@ test.describe.serial('PAR-25 dashboard routes + edit-pos parity', () => {
     const anonymous = await browser.newContext();
     const page = await anonymous.newPage();
     const denied = await page.request.put(
-      'http://127.0.0.1:6479/api/user-preferences/dashboard_tab_order',
+      `${BACKEND_URL}/api/user-preferences/dashboard_tab_order`,
       {
         headers: { 'Content-Type': 'application/json' },
         data: { value: [titleA, titleB] },
