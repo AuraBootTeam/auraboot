@@ -33,9 +33,12 @@ def capture(request, email, password, output, receipt):
         if status != 200:
             raise RuntimeError("Internal contract capture session revocation failed")
         bootstrap.response_data(body, "internal contract capture session revocation")
+        status, _, _ = request("/api/auth/me", headers=admin)
+        if status != 401:
+            raise RuntimeError("Internal contract capture session remained authorized after revocation")
     result = {"schemaVersion": 1, "claim": "authenticated-internal-document-capture-only",
               "verdict": "pass", "documentSha256": sha256(output.read_bytes()).hexdigest(),
-              "sessionRevoked": True, "bootstrapExecuted": False}
+              "sessionRevoked": True, "identityAfterRevocation": 401, "bootstrapExecuted": False}
     with receipt.open("x", encoding="utf-8") as stream:
         json.dump(result, stream, indent=2, sort_keys=True)
         stream.write("\n")

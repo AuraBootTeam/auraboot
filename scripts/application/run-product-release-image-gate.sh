@@ -686,6 +686,7 @@ contract = json.load(open(os.path.join(evidence_root, "internal-api/core-drift.j
 document_hash = digest("internal-api/openapi.json").removeprefix("sha256:")
 assert capture["verdict"] == contract["verdict"] == "pass"
 assert capture["sessionRevoked"] is True and capture["bootstrapExecuted"] is False
+assert capture["identityAfterRevocation"] == 401
 assert capture["documentSha256"] == contract["observedSha256"] == document_hash
 assert contract["claim"] == "captured-core-operation-closure-drift-only" and contract["coreOperations"] > 0
 receipt["internalCoreContract"] = {
