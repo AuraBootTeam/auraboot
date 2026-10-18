@@ -61,8 +61,8 @@
   "nodeHooks": [],
   "slaConfigs": [
     {
-      "name": "交付验收 · 常规验收 · 8小时",
-      "targetType": "NODE",
+      "name": "交付验收 · 常规验收",
+      "targetType": "node",
       "targetKey": "tpm_standard_review",
       "deadlineMode": "RULE",
       "deadlineValue": "tpm_acceptance_deadline",
@@ -135,8 +135,8 @@
       }
     },
     {
-      "name": "交付验收 · 加强审核 · 2小时",
-      "targetType": "NODE",
+      "name": "交付验收 · 加强审核",
+      "targetType": "node",
       "targetKey": "tpm_enhanced_review",
       "deadlineMode": "RULE",
       "deadlineValue": "tpm_acceptance_deadline",

@@ -182,6 +182,46 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   return sla;
 }
 
+test('SLA policies use business summaries and save fixed durations through the existing DSL command @critical',async({page})=>{
+  const user=await login(page);
+  const configs=await data(await page.request.get('/api/bpm/sla-configs'));
+  const config=configs.find((item:any)=>item.targetKey==='tpm_standard_review');expect(config).toBeTruthy();
+  try {
+    await menu(page,'SLA 配置');
+    await expect(page.getByTestId('sla-policy-workspace')).toBeVisible();
+    await expect(page.getByTestId('sla-policy-workspace')).not.toContainText(/tpm_standard_review|PT2H/);
+    await shot(page,'S07');
+    await page.getByTestId('sla-policy-row').filter({hasText:config.name}).getByRole('button',{name:'查看策略',exact:true}).click();
+    await expect(page.getByTestId('sla-policy-summary')).toContainText('交付负责人 · 常规验收');
+    await expect(page.getByTestId('sla-policy-summary')).toContainText('交付验收 · 处理时限');await shot(page,'S08');
+    await page.getByRole('tab',{name:'专业配置',exact:true}).click();await shot(page,'S12');
+    await page.getByRole('button',{name:'编辑配置',exact:true}).click();
+    await expect(page.getByTestId('sla-timing-config')).toBeVisible();
+    await expect(page.getByTestId('select-trigger-target_type')).toContainText('节点');
+    await expect(page.getByTestId('custom-section-sla_rule_binding')).not.toHaveAttribute('open','');
+    await expect(page.getByTestId('sla-deadline-input').getByRole('combobox')).toHaveValue('tpm_acceptance_deadline');await shot(page,'S09');
+    await page.getByRole('radio',{name:'固定时长',exact:true}).click();
+    await page.getByLabel('时长单位',{exact:true}).selectOption('minutes');await page.getByLabel('时长数值',{exact:true}).fill('15');await shot(page,'S10');
+    const saved=page.waitForResponse(response=>response.url().includes('/execute/admin:update_sla_config')&&response.request().method()==='POST');
+    await page.getByRole('button',{name:'保存',exact:true}).click();const response=await saved;await data(response);
+    const payload=response.request().postDataJSON().payload;expect(payload).toMatchObject({deadline_mode:'FIXED',deadline_value:'PT900S'});const binding=typeof payload.rule_binding==='string'?JSON.parse(payload.rule_binding):payload.rule_binding;expect(binding).toMatchObject({enabled:false,decisionBinding:{enabled:false}});expect(Object.keys(binding)).not.toContain('0');
+    const actual=await data(await page.request.get(`/api/bpm/sla-configs/${config.pid}`));expect(actual.deadlineMode).toBe('FIXED');expect(actual.deadlineValue).toBe('PT900S');expect(actual.ruleBinding.enabled).toBe(false);
+    await menu(page,'SLA 配置');await expect(page.getByTestId('sla-policy-row').filter({hasText:config.name})).toContainText('15 分钟');await shot(page,'S11');
+    await page.getByTestId('sla-policy-row').filter({hasText:config.name}).getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByLabel('时长数值',{exact:true})).toHaveValue('15');await expect(page.getByLabel('时长单位',{exact:true})).toHaveValue('minutes');
+    const refused=await page.request.post('/api/meta/commands/execute/admin:update_sla_config',{data:{targetRecordPid:config.pid,payload:{deadline_mode:'FIXED',deadline_value:'invalid',business_calendar:false,rule_binding:{enabled:false}},clientRequestId:`invalid-duration:${config.pid}`}});
+    expect(refused.ok()).toBe(false);expect((await data(await page.request.get(`/api/bpm/sla-configs/${config.pid}`))).deadlineValue).toBe('PT900S');
+    const pid=await create(page,user,'华辰制造 · 固定时限配置联动验证',68000,'普通',true);await submit(page,pid,15,'tpm_standard_review');await decide(page,pid,'approve');
+    await menu(page,'SLA 配置');await page.getByRole('button',{name:'新建策略',exact:true}).click();
+    const temporaryName='配置保存验证 · 流程级时限';await page.locator('#name').fill(temporaryName);await page.getByTestId('select-trigger-target_type').click();await page.getByRole('option',{name:'流程',exact:true}).click();await page.locator('#target_key').fill('tpm_delivery_acceptance');
+    await page.getByRole('radio',{name:'固定时长',exact:true}).click();await page.getByLabel('时长单位',{exact:true}).selectOption('hours');await page.getByLabel('时长数值',{exact:true}).fill('1');
+    const created=page.waitForResponse(response=>response.url().includes('/execute/admin:create_sla_config')&&response.request().method()==='POST',{timeout:15000});await page.getByRole('button',{name:'保存',exact:true}).click();const createdResult=await data(await created);const temporaryPid=createdResult.data.recordPid;expect(temporaryPid).toBeTruthy();
+    await menu(page,'SLA 配置');await page.getByTestId('sla-policy-row').filter({hasText:temporaryName}).getByRole('button',{name:'查看策略',exact:true}).click();await page.getByRole('tab',{name:'专业配置',exact:true}).click();
+    const deleted=page.waitForResponse(response=>response.url().includes('/execute/admin:delete_sla_config')&&response.request().method()==='POST');await page.getByRole('button',{name:'删除策略',exact:true}).click();await expect(page.getByTestId('confirm-dialog')).toBeVisible();await page.getByTestId('confirm-ok').click();await data(await deleted);
+    expect((await data(await page.request.get('/api/bpm/sla-configs'))).some((row:any)=>row.pid===temporaryPid)).toBe(false);
+
+  } finally {await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:config}));}
+});
+
 test('real decision drafts, readiness and boundary outputs from the rule workbench @critical', async({page})=>{
   await login(page);
   await menu(page,'策略工作台');
@@ -332,6 +372,11 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
         await expect(actor.getByTestId('strategy-publish')).toBeDisabled();
         await expect(actor.getByRole('status').filter({hasText:'只读查看'})).toBeVisible();
         await shot(actor,'A01');
+        const configs=await data(await page.request.get('/api/bpm/sla-configs'));const ownedConfig=configs.find((item:any)=>item.targetKey==='tpm_standard_review');expect(ownedConfig).toBeTruthy();
+        expect((await actor.request.get('/api/bpm/sla-configs')).status()).toBe(403);
+        expect((await actor.request.put(`/api/bpm/sla-configs/${ownedConfig.pid}`,{data:{...ownedConfig,deadlineMode:'FIXED',deadlineValue:'PT1M'}})).status()).toBe(403);
+        expect((await actor.request.post('/api/meta/commands/execute/admin:update_sla_config',{data:{targetRecordPid:ownedConfig.pid,payload:{deadline_mode:'FIXED',deadline_value:'PT1M'}}})).status()).toBe(403);
+        expect((await data(await page.request.get(`/api/bpm/sla-configs/${ownedConfig.pid}`))).deadlineValue).toBe(ownedConfig.deadlineValue);
         await openRecord(actor,name);
       }
       expect((await row(page,pid)).tpm_ac_status).toBe('submitted');await shot(actor,reviewer?'d13':'d13-readonly');
@@ -565,44 +610,7 @@ test('model actions select real metadata, save typed references and reopen the s
 });
 
 
-test('SLA policies use business summaries and save fixed durations through the existing DSL command @critical',async({page})=>{
-  const user=await login(page);
-  const configs=await data(await page.request.get('/api/bpm/sla-configs'));
-  const config=configs.find((item:any)=>item.targetKey==='tpm_standard_review');expect(config).toBeTruthy();
-  try {
-    await menu(page,'SLA 配置');
-    await expect(page.getByTestId('sla-policy-workspace')).toBeVisible();
-    await expect(page.getByTestId('sla-policy-workspace')).not.toContainText(/tpm_standard_review|PT2H/);
-    await shot(page,'S07');
-    await page.getByTestId('sla-policy-row').filter({hasText:config.name}).getByRole('button',{name:'查看策略',exact:true}).click();
-    await expect(page.getByTestId('sla-policy-summary')).toContainText('交付负责人 · 常规验收');
-    await expect(page.getByTestId('sla-policy-summary')).toContainText('交付验收 · 处理时限');await shot(page,'S08');
-    await page.getByRole('tab',{name:'专业配置',exact:true}).click();await shot(page,'S12');
-    await page.getByRole('button',{name:'编辑配置',exact:true}).click();
-    await expect(page.getByTestId('sla-timing-config')).toBeVisible();
-    await expect(page.getByTestId('custom-section-sla_rule_binding')).not.toHaveAttribute('open','');
-    await expect(page.getByTestId('sla-deadline-input').getByRole('combobox')).toHaveValue('tpm_acceptance_deadline');await shot(page,'S09');
-    await page.getByRole('radio',{name:'固定时长',exact:true}).click();
-    await page.getByLabel('时长单位',{exact:true}).selectOption('minutes');await page.getByLabel('时长数值',{exact:true}).fill('15');await shot(page,'S10');
-    const saved=page.waitForResponse(response=>response.url().includes('/execute/admin:update_sla_config')&&response.request().method()==='POST');
-    await page.getByRole('button',{name:'保存',exact:true}).click();const response=await saved;await data(response);
-    const payload=response.request().postDataJSON().payload;expect(payload).toMatchObject({deadline_mode:'FIXED',deadline_value:'PT900S'});const binding=typeof payload.rule_binding==='string'?JSON.parse(payload.rule_binding):payload.rule_binding;expect(binding).toMatchObject({enabled:false,decisionBinding:{enabled:false}});expect(Object.keys(binding)).not.toContain('0');
-    const actual=await data(await page.request.get(`/api/bpm/sla-configs/${config.pid}`));expect(actual.deadlineMode).toBe('FIXED');expect(actual.deadlineValue).toBe('PT900S');expect(actual.ruleBinding.enabled).toBe(false);
-    await menu(page,'SLA 配置');await expect(page.getByTestId('sla-policy-row').filter({hasText:config.name})).toContainText('15 分钟');await shot(page,'S11');
-    await page.getByTestId('sla-policy-row').filter({hasText:config.name}).getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByLabel('时长数值',{exact:true})).toHaveValue('15');await expect(page.getByLabel('时长单位',{exact:true})).toHaveValue('minutes');
-    const refused=await page.request.post('/api/meta/commands/execute/admin:update_sla_config',{data:{targetRecordPid:config.pid,payload:{deadline_mode:'FIXED',deadline_value:'invalid',business_calendar:false,rule_binding:{enabled:false}},clientRequestId:`invalid-duration:${config.pid}`}});
-    expect(refused.ok()).toBe(false);expect((await data(await page.request.get(`/api/bpm/sla-configs/${config.pid}`))).deadlineValue).toBe('PT900S');
-    const pid=await create(page,user,'华辰制造 · 固定时限配置联动验证',68000,'普通',true);await submit(page,pid,15,'tpm_standard_review');await decide(page,pid,'approve');
-    await menu(page,'SLA 配置');await page.getByRole('button',{name:'新建策略',exact:true}).click();
-    const temporaryName='配置保存验证 · 流程级时限';await page.locator('#name').fill(temporaryName);await page.getByTestId('select-trigger-target_type').click();await page.getByRole('option',{name:'流程',exact:true}).click();await page.locator('#target_key').fill('tpm_delivery_acceptance');
-    await page.getByRole('radio',{name:'固定时长',exact:true}).click();await page.getByLabel('时长单位',{exact:true}).selectOption('hours');await page.getByLabel('时长数值',{exact:true}).fill('1');
-    const created=page.waitForResponse(response=>response.url().includes('/execute/admin:create_sla_config')&&response.request().method()==='POST');await page.getByRole('button',{name:'保存',exact:true}).click();const createdResult=await data(await created);const temporaryPid=createdResult.data.recordPid;expect(temporaryPid).toBeTruthy();
-    await menu(page,'SLA 配置');await page.getByTestId('sla-policy-row').filter({hasText:temporaryName}).getByRole('button',{name:'查看策略',exact:true}).click();await page.getByRole('tab',{name:'专业配置',exact:true}).click();
-    const deleted=page.waitForResponse(response=>response.url().includes('/execute/admin:delete_sla_config')&&response.request().method()==='POST');await page.getByRole('button',{name:'删除策略',exact:true}).click();await expect(page.getByTestId('confirm-dialog')).toBeVisible();await page.getByTestId('confirm-ok').click();await data(await deleted);
-    expect((await data(await page.request.get('/api/bpm/sla-configs'))).some((row:any)=>row.pid===temporaryPid)).toBe(false);
 
-  } finally {await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:config}));}
-});
 
 
 test('rule center primary and professional views remain reachable through their own entries @critical',async({page})=>{
