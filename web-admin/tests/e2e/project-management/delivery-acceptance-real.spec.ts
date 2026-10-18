@@ -216,7 +216,8 @@ test('SLA policies use business summaries and save fixed durations through the e
     await page.getByRole('radio',{name:'固定时长',exact:true}).click();await page.getByLabel('时长单位',{exact:true}).selectOption('hours');await page.getByLabel('时长数值',{exact:true}).fill('1');
     const created=page.waitForResponse(response=>response.url().includes('/execute/admin:create_sla_config')&&response.request().method()==='POST',{timeout:15000});await page.getByRole('button',{name:'保存',exact:true}).click();const createdResult=await data(await created);const temporaryPid=createdResult.data.recordPid;expect(temporaryPid).toBeTruthy();
     await menu(page,'SLA 配置');await page.getByTestId('sla-policy-row').filter({hasText:temporaryName}).getByRole('button',{name:'查看策略',exact:true}).click();await page.getByRole('tab',{name:'专业配置',exact:true}).click();
-    const deleted=page.waitForResponse(response=>response.url().includes('/execute/admin:delete_sla_config')&&response.request().method()==='POST');await page.getByRole('button',{name:'删除策略',exact:true}).click();await expect(page.getByTestId('confirm-dialog')).toBeVisible();await page.getByTestId('confirm-ok').click();await data(await deleted);
+    const deleted=page.waitForResponse(response=>response.url().includes('/execute/admin:delete_sla_config')&&response.request().method()==='POST',{timeout:15000});await page.getByRole('button',{name:'删除策略',exact:true}).click();await expect(page.getByTestId('confirm-dialog')).toBeVisible();await shot(page,'S12-delete-confirm');await page.getByTestId('confirm-ok').click();await data(await deleted);
+    await expect(page).toHaveURL(/\/p\/sla_config(?:[?#].*)?$/);await expect(page.getByTestId('sla-policy-workspace')).toBeVisible();await expect(page.getByTestId('sla-policy-row').filter({hasText:temporaryName})).toHaveCount(0);await shot(page,'S11-policy-creation-closed');
     expect((await data(await page.request.get('/api/bpm/sla-configs'))).some((row:any)=>row.pid===temporaryPid)).toBe(false);
 
   } finally {await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:config}));}
@@ -606,7 +607,7 @@ test('model actions select real metadata, save typed references and reopen the s
   await page.getByTestId('epd-step-actions').click();
   await expect(page.getByTestId('epd-action-0').getByRole('textbox',{name:'业务操作',exact:true})).toHaveValue('登记验收通过');
   await expect(page.getByTestId('epd-action-0')).toContainText('所属项目');
-  await shot(page,'R12');
+  await page.getByTestId('epd-action-0').scrollIntoViewIfNeeded();await shot(page,'R12');
 });
 
 

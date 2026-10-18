@@ -175,6 +175,8 @@ export function resolveCommandTargetRecordId(
   return (
     toNonBlankString(explicitTarget) ||
     getLegacyCompatibleRecordPid(record) ||
+    getLegacyCompatibleRecordPid(context.record) ||
+    getLegacyCompatibleRecordPid(context.row) ||
     getLegacyCompatibleRecordPid(context.data)
   );
 }
