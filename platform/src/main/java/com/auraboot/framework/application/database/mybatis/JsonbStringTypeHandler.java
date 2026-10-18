@@ -11,10 +11,10 @@ import java.sql.SQLException;
 /**
  * Database-agnostic JSON/JSONB type handler.
  * <p>
- * Handles JSONB (PostgreSQL) and JSON (MySQL) columns transparently.
+ * Handles JSONB columns (PostgreSQL) transparently.
  * <ul>
  *   <li>PostgreSQL: Uses PGobject with type "jsonb" when the PG driver is available</li>
- *   <li>MySQL: Uses setString() directly, since MySQL JSON columns accept plain strings</li>
+ 
  * </ul>
  */
 public class JsonbStringTypeHandler extends BaseTypeHandler<String> {
@@ -41,7 +41,7 @@ public class JsonbStringTypeHandler extends BaseTypeHandler<String> {
             jsonObject.setValue(parameter);
             ps.setObject(i, jsonObject);
         } else {
-            // MySQL and other databases: plain string works for JSON columns
+            // Defensive fallback for non-PG connections: plain string
             ps.setString(i, parameter);
         }
     }

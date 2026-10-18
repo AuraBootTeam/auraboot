@@ -304,10 +304,7 @@ public class MybatisPlusConfig {
         interceptor.addInnerInterceptor(envInterceptor);
 
         // Configure pagination with the correct database type
-        DbType dbType = databaseDialect.getType() == DatabaseType.MYSQL
-                ? DbType.MYSQL
-                : DbType.POSTGRE_SQL;
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(dbType));
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.POSTGRE_SQL));
 
         return interceptor;
     }

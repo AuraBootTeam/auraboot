@@ -28,7 +28,7 @@ public class JdbcConnectorAdapter extends AbstractConnectorAdapter {
 
     private static final ConnectorDescriptor DESCRIPTOR = new ConnectorDescriptor(
             "jdbc",
-            "JDBC database connector (MySQL/PostgreSQL) with HikariCP pooling",
+            "JDBC database connector (PostgreSQL) with HikariCP pooling",
             List.of("query", "update"));
 
     private final JdbcConnectorService jdbcConnectorService;

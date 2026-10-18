@@ -11,7 +11,7 @@ import java.util.Map;
  * a new field per source flavour.
  *
  * @param connectorPid          owning {@code ab_connector.pid}
- * @param sourceType            source flavour, e.g. {@code mysql}, {@code postgres}
+ * @param sourceType            source flavour, e.g. {@code postgres}
  * @param hostname              source DB hostname
  * @param port                  source DB port; may be {@code null} to use driver default
  * @param database              source DB name
