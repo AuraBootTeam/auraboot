@@ -55,13 +55,33 @@ const SIGNUP_PASSWORD = 'TestPass2026!';
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function loginViaUI(page: Page, email: string, password: string) {
-  // The dev server serves the login module graph after DOMContentLoaded. Wait
-  // for that document's scripts before checking React hydration.
-  await page.goto('/login', { waitUntil: 'load' });
+async function openHydratedLogin(page: Page) {
+  const budget = test.info().project.use.navigationTimeout ?? test.info().timeout;
+  if (!Number.isFinite(budget) || budget <= 0)
+    throw new Error('A finite login navigation budget is required');
+  const started = performance.now(),
+    deadline = started + budget;
+  await page.goto('/login', { waitUntil: 'load', timeout: budget });
+  const remaining = Math.floor(deadline - performance.now());
+  expect(remaining, 'Login document exhausted its navigation budget').toBeGreaterThan(0);
+  // Loading the document does not complete React Router's asynchronous hydration.
+  // Dev-server reloads share the original navigation deadline, never a fresh retry.
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
-    timeout: 5000,
+    timeout: remaining,
   });
+  test
+    .info()
+    .annotations.push({
+      type: 'login-bootstrap',
+      description: JSON.stringify({
+        budgetMs: budget,
+        readyMs: Math.round(performance.now() - started),
+      }),
+    });
+}
+
+async function loginViaUI(page: Page, email: string, password: string) {
+  await openHydratedLogin(page);
   const emailInput = page.locator('input#identifier, input#email').first();
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
   const pwd = page.locator('input#password');
@@ -398,8 +418,7 @@ test.describe('Registration Policy — Self-registration disabled', () => {
   test('REG-DISABLED-002: login page hides signup link and direct /signup returns to login', async ({
     page,
   }) => {
-    await page.goto('/login', { waitUntil: 'load' });
-    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+    await openHydratedLogin(page);
     const signupLink = page.locator('a[href*="signup"]').first();
     const hasSignupLink = await signupLink.isVisible({ timeout: 2000 }).catch(() => false);
     test.skip(hasSignupLink, 'Self-registration is enabled in this environment');
