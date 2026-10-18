@@ -94,7 +94,7 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
   return <div className="rule-action-model" data-testid="rule-action-model-parameters">
     {render({ key: 'modelCode', label: text('model'), type: !isCommand && currentModelCode ? 'select' : 'model-select', required: true,
       ...(!isCommand && currentModelCode ? { options: [{ label: fields.find(field => field.modelCode === currentModelCode)?.modelName ?? currentModelCode, value: currentModelCode }] } : {}) }, modelCode, value => {
-      if (!readOnly) onChange({ ...payload, modelCode: value, commandCode: '', params: {}, fields: {} });
+      if (!readOnly) onChange(isCommand ? { modelCode: value, commandCode: '', params: {} } : { modelCode: value, fields: {} });
     })}
     {isCommand && render({ key: 'commandCode', label: text('command'), type: 'command-select', required: true }, commandCode, value => {
       if (!readOnly) onChange({ ...payload, commandCode: value, params: {} });
@@ -104,7 +104,7 @@ export function ActionModelParameters({ actionType, payload, fields, onChange, c
     {loading && <p role="status">{text('loading')}</p>}
     {error && <p role="alert" className="text-red-700">{text('loadError')} · {error}</p>}
     {!isCommand && modelCode && render({ key: 'field', label: text('field'), type: 'select',
-      options: modelFields.map(field => ({ label: field.label, value: field.value })) }, selectedField, value => {
+      options: modelFields.filter(field => !field.readOnly).map(field => ({ label: field.label, value: field.value })) }, selectedField, value => {
         const key = String(value);
         setSelectedField(key);
         if (key && !Object.hasOwn(values, key)) updateValue(key, '');

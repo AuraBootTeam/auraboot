@@ -692,13 +692,14 @@ export function EventPolicyDesignerWorkflow({
                   selectedPolicy?.policyCode ??
                   copy('no_policy_selected')}
               </strong>
-              <div className="epd-context-meta">
+              <details className="epd-context-meta"><summary>{copy('technical_identifiers')}</summary>
                 <span>{selectedPolicy?.policyCode ?? '-'}</span>
                 <span>{selectedPolicy?.eventType ?? '-'}</span>
                 <span>
                   {selectedPolicy?.targetType ?? '-'} / {selectedPolicy?.targetKey ?? '-'}
                 </span>
-              </div>
+              </details>
+              <p className="text-sm text-slate-500">{selectedPolicy?.eventType === 'COMMAND_COMPLETED' ? copy('business_operation_committed') : copy('event_driven_policy')}</p>
             </div>
             <span className={`epd-status epd-status-${String(publishStatus).toLowerCase()}`}>
               {policyStatusLabel(publishStatus)}
@@ -723,8 +724,8 @@ export function EventPolicyDesignerWorkflow({
 
         <div className="epd-command-card" data-testid="epd-abnormal-actions">
           <span>{copy('abnormal_actions')}</span>
-          <strong>{abnormalSummary}</strong>
-          <small>{abnormalDetail}</small>
+          <strong>{runResult ? abnormalSummary : copy('awaiting_execution_verification')}</strong>
+          <small>{runResult ? abnormalDetail : copy('not_executed_no_delivery_claim')}</small>
           <button type="button" onClick={() => setStep('actions')}>
             {copy('inspect_actions')}
           </button>
@@ -979,7 +980,7 @@ export function EventPolicyDesignerWorkflow({
                     </div>
                     <div className="epd-payload-summary">
                       <span>{copy('payload_summary')}</span>
-                      <strong>{payloadTitle(action.payloadJson)}</strong>
+                      <strong>{action.type === 'EXECUTE_COMMAND' && payload.commandCode ? copy('business_command_configured') : payloadTitle(action.payloadJson)}</strong>
                     </div>
                   </div>
                   <div className="epd-action-schema" data-testid={`epd-action-schema-${idx}`}>

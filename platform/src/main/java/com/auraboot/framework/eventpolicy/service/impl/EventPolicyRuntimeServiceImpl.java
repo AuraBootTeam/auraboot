@@ -128,8 +128,13 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
                 rules
         );
 
-        // 5. Build DecisionContext from context map (mirroring DecisionEvaluationServiceImpl.buildContext)
-        DecisionContext ctx = buildContext(context);
+        // Server-owned policy identity must not be supplied by a browser/event payload.
+        Map<String, Map<String,Object>> resolvedContext = new java.util.LinkedHashMap<>();
+        if (context != null) resolvedContext.putAll(context);
+        Map<String,Object> metadata = new java.util.LinkedHashMap<>(resolvedContext.getOrDefault("meta", Map.of()));
+        metadata.put("policyCode", def.getPolicyCode());metadata.put("policyVersion", ver.getVersion());
+        resolvedContext.put("meta", metadata);
+        DecisionContext ctx = buildContext(resolvedContext);
 
         // 6. Evaluate
         String correlationId = "ep-" + UniqueIdGenerator.generate();

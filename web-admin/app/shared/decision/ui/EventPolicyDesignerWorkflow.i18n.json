@@ -882,5 +882,37 @@
   "read_only_policy": {
     "zh-CN": "当前为只读权限，可查看规则和历史；修改需策略管理权限。",
     "en": "Read-only access: view rules and history. Editing requires policy management permission."
+  },
+  "technical_identifiers": {
+    "zh-CN": "技术标识",
+    "en": "Technical identifiers"
+  },
+  "business_operation_committed": {
+    "zh-CN": "业务操作提交成功后",
+    "en": "After a business operation commits"
+  },
+  "event_driven_policy": {
+    "zh-CN": "条件满足时执行已配置的后续动作",
+    "en": "Run the configured follow-up actions when conditions match"
+  },
+  "not_executed_no_delivery_claim": {
+    "zh-CN": "尚未执行本次试算；动作可用不代表业务已处理或通知已送达。",
+    "en": "Not executed in this trial. Available handlers do not confirm business completion or delivery."
+  },
+  "awaiting_execution_verification": {
+    "zh-CN": "待执行核验",
+    "en": "Awaiting execution verification"
+  },
+  "business_command_configured": {
+    "zh-CN": "业务操作及目标记录已配置",
+    "en": "Business operation and target configured"
+  },
+  "all_events": {
+    "zh-CN": "全部触发事件",
+    "en": "All trigger events"
+  },
+  "all_statuses": {
+    "zh-CN": "全部状态",
+    "en": "All statuses"
   }
 }

@@ -10,6 +10,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { getKernel } from '~/framework/bootstrap';
 
 export interface ResourceOption {
+  readOnly?: boolean;
   label: string;
   value: string;
   description?: string;
@@ -64,6 +65,7 @@ interface FieldRecord {
   dataType: string;
   extension?: {
     displayName?: string;
+    readOnly?: boolean;
   };
   dictCode?: string;
 }
@@ -123,7 +125,7 @@ export async function fetchCommandOptions(modelCode?: string): Promise<ResourceO
   const result = await fetchResult<CommandItem[]>(modelCode
     ? `/api/meta/commands?modelCode=${encodeURIComponent(modelCode)}` : '/api/meta/commands');
   return (result?.data || []).map((c) => ({
-    label: `${c.displayName || c.code} (${c.code})`,
+    label: c.displayName || c.code,
     value: c.code,
     description: c.type,
   }));
@@ -152,6 +154,7 @@ export async function fetchFieldOptions(modelCode: string): Promise<ResourceOpti
     label: f.extension?.displayName || f.code,
     value: f.code,
     description: f.dataType,
+    ...(f.extension?.readOnly ? { readOnly: true } : {}),
     ...(f.dictCode ? { dictCode: f.dictCode } : {}),
   }));
 }

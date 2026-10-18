@@ -60,4 +60,18 @@ class ActionPlanResolverTest {
         assertThat(result.conflict()).isTrue();
         assertThat(result.conflicts()).containsExactly("record update requires non-empty payload.fields");
     }
+    @Test void automaticIdentitySeparatesPolicyEventRecordAndActionAndRemainsStableOnReplay() {
+        var action = new PolicyAction("NOTIFY", "USER:reviewer", 1, Map.of("title","Review"), null);
+        var rule = new PolicyRule("r", "r", 1, true, null, List.of(action));
+        var matched = List.of(new ActionPlanResolver.MatchedRuleActions(rule, rule.actions()));
+        var first = DecisionContext.builder().scope(com.auraboot.framework.decision.ast.Scope.EVENT,Map.of("eventId","event1"))
+                .scope(com.auraboot.framework.decision.ast.Scope.RECORD,Map.of("entityCode","acceptance","recordPid","a1")).build();
+        var second = DecisionContext.builder().scope(com.auraboot.framework.decision.ast.Scope.EVENT,Map.of("eventId","event2"))
+                .scope(com.auraboot.framework.decision.ast.Scope.RECORD,Map.of("entityCode","acceptance","recordPid","a2")).build();
+        String key = resolver.resolve(matched,first,DedupStrategy.BY_IDEMPOTENCY_KEY,ConflictStrategy.REJECT_ON_CONFLICT,"policy1").plans().getFirst().idempotencyKey();
+        assertThat(resolver.resolve(matched,first,DedupStrategy.BY_IDEMPOTENCY_KEY,ConflictStrategy.REJECT_ON_CONFLICT,"policy1").plans().getFirst().idempotencyKey()).isEqualTo(key);
+        assertThat(resolver.resolve(matched,second,DedupStrategy.BY_IDEMPOTENCY_KEY,ConflictStrategy.REJECT_ON_CONFLICT,"policy1").plans().getFirst().idempotencyKey()).isNotEqualTo(key);
+        assertThat(resolver.resolve(matched,first,DedupStrategy.BY_IDEMPOTENCY_KEY,ConflictStrategy.REJECT_ON_CONFLICT,"policy2").plans().getFirst().idempotencyKey()).isNotEqualTo(key);
+    }
+
 }

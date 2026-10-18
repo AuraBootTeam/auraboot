@@ -123,7 +123,9 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   await expect(page.getByTestId('bpm-task-drawer').or(page.getByTestId(`bpm-${action}-comment`))).toBeVisible();
   if (await page.getByTestId('bpm-task-drawer').count()) {
     await page.getByTestId('approval-comment-textarea').fill(comment);
-    await page.getByTestId(`bpm-drawer-${action}-btn`).click();
+    const footer=await page.getByTestId('bpm-drawer-footer').boundingBox();
+    expect(footer).toBeTruthy();expect(footer!.y).toBeGreaterThanOrEqual(0);expect(footer!.y+footer!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+    await page.getByTestId(`bpm-drawer-${action}-btn`).click({timeout:10000});
   } else {
     await page.getByTestId(`bpm-${action}-comment`).fill(comment);
     await page.getByTestId(`bpm-${action}-confirm`).click();
@@ -155,6 +157,14 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
     expect(Number(project.tpm_pj_accepted_total)).toBe(sum);
     const checks=await data(await observer.request.get('/api/dynamic/tdv_check/list?size=100'));
     expect(checks.records.filter((r:any)=>r.tdv_ck_acceptance===pid)).toHaveLength(1);
+    const replayRequest={targetRecordPid:project.pid,payload:{acceptancePid:pid},clientRequestId:`registration-replay:${pid}`};
+    await data(await observer.request.post('/api/meta/commands/execute/tdv:register_acceptance',{data:replayRequest}));
+    const replay=await data(await observer.request.post('/api/meta/commands/execute/tdv:register_acceptance',{data:replayRequest}));
+    expect(replay.idempotentReplay).toBe(true);
+    const afterReplay=await data(await observer.request.get('/api/dynamic/tdv_check/list?size=100'));
+    expect(afterReplay.records.filter((r:any)=>r.tdv_ck_acceptance===pid)).toHaveLength(1);
+    const projectsAfterReplay=await data(await observer.request.get('/api/dynamic/tpm_project/list?size=100'));
+    expect(Number(projectsAfterReplay.records.find((r:any)=>r.pid===project.pid).tpm_pj_accepted_total)).toBe(sum);
     receipts.push({case:'C02',acceptancePid:pid,projectPid:project.pid,acceptedTotal:sum,checkCount:1});
     await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   }
@@ -168,7 +178,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
   await shot(page,'R01');
   await page.getByRole('button',{name:'交付验收 · 审批分级',exact:true}).click();
   await expect(page.getByTestId('strategy-dmn-panel')).toBeVisible();
-  await shot(page,'R02');
+  await shot(page,'R03');
   await page.getByTestId('strategy-workspace-tab-test').click();
   const inputs=page.getByTestId('strategy-test-inputs');
   for(const [amount,risk,issues,materials,route] of [
@@ -187,7 +197,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     expect(response.request().postDataJSON().context.record.data).toMatchObject({tpm_ac_amount:Number(amount),tpm_ac_open_issues:Number(issues),tpm_ac_materials_complete:materials==='true'});
     await expect(page.getByTestId('strategy-test-outputs')).toContainText(route==='standard'?'常规审核':'加强审核');
   }
-  await shot(page,'R05');
+  await shot(page,'R04');
   for(const width of [1280,1440]) {
     await page.setViewportSize({width,height:1000});
     await page.getByTestId('strategy-workspace-tab-dmn').click();
@@ -195,7 +205,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
     expect(editor!.width).toBeGreaterThan(width-540);
     expect(editor!.x+editor!.width).toBeLessThanOrEqual(width);
     await expect(page.getByTestId('strategy-test-panel')).not.toBeVisible();
-    await shot(page,`R02-${width}`);
+    await shot(page,`R03-${width}`);
   }
   await page.getByText('字段与输出配置',{exact:true}).click();
   await page.getByLabel('input-label-0').fill('交付金额（草稿修改）');
@@ -209,7 +219,7 @@ test('real decision drafts, readiness and boundary outputs from the rule workben
   await page.getByTestId('strategy-workspace-tab-dmn').click();
   await page.getByText('字段与输出配置',{exact:true}).click();
   await expect(page.getByLabel('input-label-0',{exact:true})).toHaveValue('交付金额（草稿修改）');
-  await shot(page,'R06');
+  await shot(page,'rule-published-roundtrip');
 });
 
 test('standard delivery enforces materials, blocks forged outcomes, approves and closes SLA @critical',async({page})=>{
@@ -310,7 +320,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
         await expect(actor.getByTestId('strategy-save-draft')).toBeDisabled();
         await expect(actor.getByTestId('strategy-publish')).toBeDisabled();
         await expect(actor.getByRole('status').filter({hasText:'只读查看'})).toBeVisible();
-        await shot(actor,'R15-readonly');
+        await shot(actor,'A01');
         await openRecord(actor,name);
       }
       expect((await row(page,pid)).tpm_ac_status).toBe('submitted');await shot(actor,reviewer?'d13':'d13-readonly');
@@ -508,4 +518,36 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   await page.reload();
   await expect(page.getByTestId('bpm-bound-form').getByTestId('dsl-form-readonly')).toBeVisible();
   await shot(page,'form-approved-readonly');
+});
+
+test('model actions select real metadata, save typed references and reopen the same policy @critical', async({page})=>{
+  await login(page);await menu(page,'事件策略');
+  await page.getByTestId('epl-open-designer-tpm_acceptance_registered').click();
+  await expect(page).toHaveURL(/policy=tpm_acceptance_registered/);
+  await page.getByTestId('epd-step-actions').click();
+  const action=page.getByTestId('epd-action-0');
+  await action.getByRole('textbox',{name:'目标模型',exact:true}).fill('项目');
+  await action.getByRole('button',{name:/^项目(?:\s|$)/}).click();
+  await action.getByRole('textbox',{name:'业务操作',exact:true}).fill('登记验收通过');
+  await action.getByRole('button',{name:/^登记验收通过/}).click();
+  await action.getByRole('combobox',{name:'目标记录来源',exact:true}).click();
+  await page.getByRole('option',{name:'交付验收 · 所属项目',exact:true}).click();
+  await action.getByRole('combobox',{name:'取值方式',exact:true}).click();
+  await page.getByRole('option',{name:'业务字段',exact:true}).click();
+  await action.getByRole('combobox',{name:/^设置为/}).click();
+  await page.getByRole('option',{name:'当前业务记录',exact:true}).click();
+  await expect(action).toContainText('验收记录');
+  await shot(page,'AC01');
+  await page.getByTestId('epd-step-publish').click();
+  const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/event-policy/definitions/tpm_acceptance_registered/versions'&&r.request().method()==='POST');
+  await page.getByTestId('epd-save-draft').click();
+  const response=await saved;const version=await data(response);
+  const payload=response.request().postDataJSON().rulesJson[0].actions[0].payload;
+  expect(payload).toEqual({modelCode:'tpm_project',commandCode:'tdv:register_acceptance',targetRecordPid:'${record.data.tpm_ac_project}',params:{acceptancePid:'${record.recordPid}'}});
+  expect(version.status).toBe('DRAFT');
+  await page.reload();
+  await page.getByTestId('epd-step-actions').click();
+  await expect(page.getByTestId('epd-action-0').getByRole('textbox',{name:'业务操作',exact:true})).toHaveValue('登记验收通过');
+  await expect(page.getByTestId('epd-action-0')).toContainText('所属项目');
+  await shot(page,'R12');
 });

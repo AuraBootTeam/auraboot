@@ -72,6 +72,9 @@
       "tpm_acceptance",
       "tdv_check"
     ],
-    "concurrencyKey": "delivery-registration:${payload.acceptancePid}"
+    "concurrencyKey": "delivery-registration:${payload.acceptancePid}",
+    "handlerParams": {
+      "dslPersistence": false
+    }
   }
 ]

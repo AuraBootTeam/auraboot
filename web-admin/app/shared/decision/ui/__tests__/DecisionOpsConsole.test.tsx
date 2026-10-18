@@ -811,7 +811,7 @@ describe('DecisionOpsConsole', () => {
     renderConsole();
     expect(screen.getByRole('link', { name: '进入工作区' })).toHaveAttribute(
       'href',
-      '#strategy-workbench',
+      '?tab=studio',
     );
     expect(screen.getByTestId('strategy-studio')).toHaveAttribute('id', 'strategy-workbench');
   });

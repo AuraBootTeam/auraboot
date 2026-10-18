@@ -96,3 +96,13 @@
 .decisionops-shell .strategy-test-panel select { min-height:38px; padding:7px 10px; border:1px solid var(--color-border); border-radius:6px; background:var(--color-panel); }
 .decisionops-shell .strategy-studio-grid:has(~ .strategy-test-panel[data-active=true]) { display:none; }
 @media(max-width:800px){ .decisionops-shell .strategy-test-panel [data-testid=strategy-test-inputs]{grid-template-columns:1fr;} }
+
+.decisionops-shell [data-testid=decision-definition-list] td:nth-child(2) { white-space:normal;line-height:1.7;max-width:none;overflow:visible;text-overflow:clip; }
+.decisionops-shell .epd-context-meta[open] { display:block; }
+.decisionops-shell .epd-context-meta summary { cursor:pointer;font-size:11px;color:var(--color-text-2); }
+
+.decisionops-shell .epl-table td { white-space:normal;max-width:none;overflow:visible; }
+.decisionops-shell .epl-table .decisionops-switch-button { margin-left:8px; }
+.decisionops-shell .epl-table td:first-child { width:30%; }
+.decisionops-shell .epl-table td:last-child { width:20%; }
+.decisionops-shell .epl-table .decisionops-row-actions { flex-wrap:wrap; }

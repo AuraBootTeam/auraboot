@@ -115,6 +115,7 @@ export interface StrategyStudioWorkbenchProps {
   readOnly?: boolean
   canPublish?: boolean
   canRun?: boolean
+  onDecisionChange?: (code: string) => void
   initialDecisionCode?: string
   fields: FieldOption[]
   decisions?: DecisionOption[]
@@ -1008,6 +1009,7 @@ function sampleContext() {
 }
 
 export function StrategyStudioWorkbench({
+  onDecisionChange,
   readOnly = false,
   canPublish = true,
   canRun = true,
@@ -1681,7 +1683,7 @@ export function StrategyStudioWorkbench({
         <div>
           <p>{studioEyebrow}</p>
           <h3>{selectedDecisionCode ? decisionDisplayName(decisions, selectedDecisionCode, selectedDecisionCode) : text(SCENARIO_TEXT[activeScenario.key].title)}</h3>
-          <label>{text('selectBusinessDecision')}<select data-testid="strategy-business-decision" value={selectedDecisionCode} onChange={(event) => { const code = event.target.value; setSelectedDecisionCode(code); setSelectedFragmentCode(null); setStatus(null); setTestOutputs(null); const scope = decisions.find((decision) => decision.code === code)?.scopeType; if (SCENARIOS.some((candidate) => candidate.key === scope)) setScenarioKey(scope as StrategyScenarioKey) }}><option value="">{text('scenarioTemplate')}</option>{decisions.map((decision) => <option key={decision.code} value={decision.code}>{decision.name || decision.code}</option>)}</select></label>
+          <label>{text('selectBusinessDecision')}<select data-testid="strategy-business-decision" value={selectedDecisionCode} onChange={(event) => { const code = event.target.value; setSelectedDecisionCode(code); onDecisionChange?.(code); setSelectedFragmentCode(null); setStatus(null); setTestOutputs(null); const scope = decisions.find((decision) => decision.code === code)?.scopeType; if (SCENARIOS.some((candidate) => candidate.key === scope)) setScenarioKey(scope as StrategyScenarioKey) }}><option value="">{text('scenarioTemplate')}</option>{decisions.map((decision) => <option key={decision.code} value={decision.code}>{decision.name || decision.code}</option>)}</select></label>
         </div>
         <div className="strategy-studio-actions">
           <button

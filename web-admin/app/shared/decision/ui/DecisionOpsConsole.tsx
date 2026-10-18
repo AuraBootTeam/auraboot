@@ -61,7 +61,9 @@ export interface DecisionOpsConsoleProps {
   permissionGrants?: RoleGrants[];
   dashboard?: { summary: DashboardSummary; exceptions: ExceptionItem[] };
   initialTab?: ConsoleTab;
-  onTabChange?: (tab: ConsoleTab) => void;
+  initialDecisionCode?: string;
+  initialPolicyCode?: string;
+  onTabChange?: (tab: ConsoleTab, selection?: {decisionCode?: string; policyCode?: string}) => void;
 }
 
 const TABS: { key: ConsoleTab; label: string; description: string }[] = [
@@ -137,11 +139,22 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     initialTab = 'studio',
   } = props;
   const st = useSmartText();
-  const [selectedDecisionCode, setSelectedDecisionCode] = useState('');
+  const [selectedDecisionCode, setSelectedDecisionCode] = useState(props.initialDecisionCode ?? '');
+  useEffect(() => { if (props.initialDecisionCode != null) setSelectedDecisionCode(props.initialDecisionCode); }, [props.initialDecisionCode]);
   const [tab, setTab] = useState<ConsoleTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
-  const selectTab = (next: ConsoleTab) => { setTab(next); props.onTabChange?.(next); };
+  const selectTab = (next: ConsoleTab, selection?: {decisionCode?: string;policyCode?: string}) => { setTab(next); props.onTabChange?.(next,selection); };
   const [selectedPolicy, setSelectedPolicy] = useState<EventPolicySummary | null>(null);
+  const selectedPolicyQuery = useQuery({
+    queryKey:['event-policies'],queryFn:()=>api.listPolicies({}),
+    enabled:Boolean(props.initialPolicyCode) && tab==='designer',
+  });
+  useEffect(() => {
+    if (!props.initialPolicyCode || !selectedPolicyQuery.data) return;
+    const data = selectedPolicyQuery.data as unknown;
+    const rows = Array.isArray(data) ? data : (data as {records?: EventPolicySummary[]}).records ?? [];
+    setSelectedPolicy(rows.find((item: EventPolicySummary)=>item.policyCode===props.initialPolicyCode) ?? null);
+  },[props.initialPolicyCode,selectedPolicyQuery.data]);
   const [tableDraft, setTableDraft] = useState<DecisionTable>(DEFAULT_TABLE);
   const [tableAnalysis, setTableAnalysis] = useState<DecisionTableAnalysis | null>(null);
   const [tableAnalyzing, setTableAnalyzing] = useState(false);
@@ -336,7 +349,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           <span>
             {todayLabel} {dashboardData.summary.evaluationsToday}
           </span>
-          <a className="decisionops-workbench-jump" href="#strategy-workbench">
+          <a className="decisionops-workbench-jump" href="?tab=studio" onClick={event => {event.preventDefault();selectTab('studio');}}>
             {openWorkbenchLabel}
           </a>
         </div>
@@ -345,7 +358,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
       <div className="decisionops-layout">
         <nav className="doc-tabs decisionops-nav" role="tablist" aria-label="Rule Center modules">
           {TABS.filter((item) => ['definitions', 'policies', 'logs'].includes(item.key)
-            || item.key === tab).map((t) => (
+            || item.key === tab).sort((a,b) => ['definitions','policies','logs'].indexOf(a.key)-['definitions','policies','logs'].indexOf(b.key)).map((t) => (
             <a
               key={t.key}
               href={`?tab=${t.key}`}
@@ -385,6 +398,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                 canRun={hasPermission('decision.runtime.evaluate')}
                 api={api}
                 initialDecisionCode={selectedDecisionCode}
+                onDecisionChange={code => {setSelectedDecisionCode(code);selectTab('studio',{decisionCode:code});}}
                 fields={strategyFields}
                 decisions={strategyDecisions}
                 conditionFragments={asConditionFragmentList(conditionFragmentQuery.data)}
@@ -418,13 +432,13 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                 api={api}
                 onOpenDesigner={(policy) => {
                   setSelectedPolicy(policy);
-                  selectTab('designer');
+                  selectTab('designer',{policyCode:policy.policyCode});
                 }}
                 onOpenLogs={() => selectTab('logs')}
               />
             )}
             {tab === 'definitions' && <DecisionDefinitionListPage api={api} onOpen={definition => {
-              setSelectedDecisionCode(definition.decisionCode); selectTab('studio');
+              setSelectedDecisionCode(definition.decisionCode); selectTab('studio',{decisionCode:definition.decisionCode});
             }} />}
             {tab === 'designer' && (
               <EventPolicyDesignerWorkflow

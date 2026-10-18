@@ -89,7 +89,7 @@ public final class EventPolicyEvaluator {
         }
 
         ActionPlanResolver.Resolution res =
-                resolver.resolve(matched, context, policy.dedupStrategy(), policy.conflictStrategy());
+                resolver.resolve(matched, context, policy.dedupStrategy(), policy.conflictStrategy(), policy.policyCode());
         if (res.conflict()) {
             return new EventPolicyResult(policy.policyCode(), EventPolicyResult.Status.CONFLICT,
                     matchedCodes, skipped, List.of(), res.conflicts());

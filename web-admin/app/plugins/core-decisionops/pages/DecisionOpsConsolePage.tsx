@@ -66,7 +66,15 @@ export default function DecisionOpsConsolePage() {
       api={api}
       fields={DEFAULT_FIELDS}
       initialTab={tabFromSearch(searchParams.get('tab'))}
-      onTabChange={tab => navigate(`/decision-ops?tab=${tab}`, {replace: true})}
+      initialDecisionCode={searchParams.get('decision') ?? undefined}
+      initialPolicyCode={searchParams.get('policy') ?? undefined}
+      onTabChange={(tab, selection) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('tab',tab);
+        if(selection?.decisionCode != null) next.set('decision',selection.decisionCode);
+        if(selection?.policyCode != null) next.set('policy',selection.policyCode);
+        navigate(`/decision-ops?${next}`, {replace:true});
+      }}
     />
   )
 }

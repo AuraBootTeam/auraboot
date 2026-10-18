@@ -43,10 +43,16 @@ public final class ActionPlanResolver {
     @SuppressWarnings("unchecked")
     public Resolution resolve(List<MatchedRuleActions> matched, DecisionContext context,
                               DedupStrategy dedup, ConflictStrategy conflictStrategy) {
+        return resolve(matched, context, dedup, conflictStrategy, "");
+    }
+
+    @SuppressWarnings("unchecked")
+    public Resolution resolve(List<MatchedRuleActions> matched, DecisionContext context,
+                              DedupStrategy dedup, ConflictStrategy conflictStrategy, String policyCode) {
         List<ResolvedActionPlan> all = new ArrayList<>();
         for (MatchedRuleActions m : matched) {
             for (PolicyAction action : m.actions()) {
-                String key = renderTemplate(action.idempotencyKeyTemplate(), context, m.rule(), action);
+                String key = renderTemplate(action.idempotencyKeyTemplate(), context, m.rule(), action, policyCode);
                 all.add(new ResolvedActionPlan(m.rule().ruleCode(), action.type(), action.target() == null ? null : String.valueOf(ActionValueResolver.resolve(action.target(), context)),
                         action.order(), (Map<String, Object>) ActionValueResolver.resolve(action.payload(), context), key));
             }
@@ -140,10 +146,26 @@ public final class ActionPlanResolver {
         return result;
     }
 
-    private String renderTemplate(String template, DecisionContext context, PolicyRule rule, PolicyAction action) {
+    private String renderTemplate(String template, DecisionContext context, PolicyRule rule, PolicyAction action, String policyCode) {
         if (template == null || template.isEmpty()) {
-            // default idempotency key: rule + action type
-            return rule.ruleCode() + ":" + action.type();
+            // The same rule may serve many records and events. Never let one successful
+            // record suppress all later deliveries, or collide with another policy.
+            Map<String,Object> identity = new LinkedHashMap<>();
+            identity.put("policy", policyCode);
+            identity.put("version", context.resolve(Scope.META, "policyVersion").value());
+            identity.put("event", context.scope(Scope.EVENT));
+            identity.put("record", context.scope(Scope.RECORD));
+            identity.put("rule", rule.ruleCode());identity.put("type", action.type());
+            identity.put("order", action.order());identity.put("target", action.target());
+            identity.put("payload", action.payload());
+            try {
+                byte[] serialized = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                        .writeValueAsBytes(identity);
+                return "auto:" + java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(serialized));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException | java.security.NoSuchAlgorithmException exception) {
+                throw new IllegalArgumentException("Cannot derive a stable action identity", exception);
+            }
         }
         Matcher m = TOKEN.matcher(template);
         StringBuilder sb = new StringBuilder();

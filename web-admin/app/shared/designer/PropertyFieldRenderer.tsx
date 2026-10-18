@@ -881,6 +881,8 @@ function ResourceSelectField({
       )}
       <div className={hasError ? 'rounded-md ring-1 ring-red-500' : undefined}>
         <BaseResourceSelect
+          ariaLabel={label}
+          disabled={adapter.disabled || adapter.readOnly}
           value={(adapter.value as string) || ''}
           onChange={adapter.setValue as any}
           fetchOptions={fetchOptions}
