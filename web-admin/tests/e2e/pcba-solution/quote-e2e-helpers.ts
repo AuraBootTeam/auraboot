@@ -6,6 +6,7 @@ import { utils as XLSXUtils, write } from 'xlsx';
 import { expect, test } from '../../fixtures';
 import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, type FixtureRow } from './fixture-cleanup';
 import { loginViaUI } from '../../helpers/auth-fixtures';
+import { requireExplicitBaseUrl } from '../../helpers/environments';
 import {
   clickRowActionByLocator,
   ensureSidebarExpanded,
@@ -24,8 +25,7 @@ const fixtureJournals = new WeakMap<Page, FixtureCleanupJournal>();
 export function fixtureJournal(page: Page): FixtureCleanupJournal {
   let journal = fixtureJournals.get(page);
   if (!journal) {
-    const origin = process.env.PLAYWRIGHT_BASE_URL;
-    if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
+    const origin = requireExplicitBaseUrl();
     if (page.url().startsWith('http') && new URL(page.url()).origin !== new URL(origin).origin) {
       throw new Error('Fixture page belongs to a different runtime origin');
     }
@@ -208,11 +208,13 @@ export async function openQuoteDetailFromList(page: Page, created: CreatedRows):
     page
       .waitForURL((url) => url.pathname === `/p/qo_quote_common/view/${created.quoteId}`, {
         timeout: 20_000,
-      })
-      .catch(() => null),
+      }),
     clickRowActionByLocator(page, row, 'view', '查看'),
   ]);
   await waitForDynamicPageLoad(page, 20_000);
+  // Header metadata loads independently from the detail shell. Its arrival can
+  // move the tabs after a pointer target was measured, so await this record's header.
+  await expect(page.locator('main')).toContainText(created.quoteCode, { timeout: 20_000 });
 }
 
 export async function openQuoteCreateFormFromList(page: Page): Promise<void> {

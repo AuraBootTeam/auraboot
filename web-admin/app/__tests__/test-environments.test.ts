@@ -44,6 +44,21 @@ describe('Playwright test environment helpers', () => {
     vi.resetModules();
   });
 
+  it('refuses fixture writes without an explicit base URL even when a host fallback exists', async () => {
+    delete process.env.PLAYWRIGHT_BASE_URL;
+    const env = await loadEnvironments();
+    expect(env.BASE_URL).toBeTruthy();
+    expect(() => env.requireExplicitBaseUrl()).toThrow(
+      'PLAYWRIGHT_BASE_URL is required before fixture creation',
+    );
+  });
+
+  it('preserves the explicitly configured fixture origin', async () => {
+    process.env.PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:5173';
+    const env = await loadEnvironments();
+    expect(env.requireExplicitBaseUrl()).toBe('http://127.0.0.1:5173');
+  });
+
   it('uses libpq PG* aliases when Aura PG_* aliases are absent', async () => {
     resetEnv();
     delete process.env.PG_HOST;

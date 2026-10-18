@@ -129,6 +129,13 @@ export const BACKEND_URL =
 export const BASE_URL =
   process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
 
+/** Require an explicit target for fixture writes and cleanup; never use a host fallback. */
+export function requireExplicitBaseUrl(): string {
+  const origin = process.env.PLAYWRIGHT_BASE_URL;
+  if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
+  return origin;
+}
+
 /** Remix BFF base — for specs that need to drive `/login` or BFF-specific endpoints directly. */
 export const BFF_URL =
   process.env.BFF_URL ?? `http://localhost:${BFF_PORT}`;
