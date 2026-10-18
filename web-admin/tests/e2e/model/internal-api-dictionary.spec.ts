@@ -246,7 +246,11 @@ test('generated dictionary data supplies labels to the real DSL team list', asyn
   await login.expectLoggedIn();
   const code = uniqueId('e2e_contract_team');
   const name = `契约标签 ${code.split('_').at(-1)}`;
-  const created = await page.request.post('/api/org/teams', { data: { code, name } });
+  const sameOrigin = { Origin: new URL(page.url()).origin };
+  const created = await page.request.post('/api/org/teams', {
+    headers: sameOrigin,
+    data: { code, name },
+  });
   expect(created.status()).toBe(200);
   const fixture = await created.json();
   expect(fixture.code).toBe('0');
@@ -285,7 +289,7 @@ test('generated dictionary data supplies labels to the real DSL team list', asyn
     await expect(row).not.toContainText(/\bactive\b/);
     await capture('DICT-11', page, info);
   } finally {
-    const removed = await page.request.delete(`/api/org/teams/${pid}`);
+    const removed = await page.request.delete(`/api/org/teams/${pid}`, { headers: sameOrigin });
     expect(removed.status()).toBe(200);
     expect((await removed.json()).code).toBe('0');
   }
