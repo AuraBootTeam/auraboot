@@ -149,10 +149,43 @@ test('plugin page import API publishes only explicitly imported source revisions
     await importPage();
     await expectRevision('explicit-reimport', 'b');
   } finally {
-    await testInfo.attach('page-import-api-boundary', {
-      body: JSON.stringify({ fixture, pageKey, runtime, evidence }, null, 2), contentType: 'application/json',
-    });
-    await context.close();
+    try {
+      const pluginsResponse = await context.request.get('/api/plugins');
+      expect(pluginsResponse.status()).toBe(200);
+      const plugins = await pluginsResponse.json();
+      expect(String(plugins.code)).toBe('0');
+      const owned = plugins.data.filter((plugin: { pluginId: string }) => (
+        plugin.pluginId === `com.auraboot.test.${namespace}`
+      ));
+      expect(owned.length, 'the unique import fixture must never resolve to multiple plugins').toBeLessThanOrEqual(1);
+      if (owned.length === 1) {
+        const pluginPid = owned[0].pid;
+        const uninstall = await context.request.post(`/api/plugins/${pluginPid}/uninstall`, {
+          data: { removeData: false, force: false, decisions: { [pageKey]: 'DELETE' } },
+        });
+        const uninstalled = await uninstall.json();
+        evidence.push({ operation: 'withdraw-owned-fixture', status: uninstall.status(), body: uninstalled });
+        expect(uninstall.status()).toBe(200);
+        expect(uninstalled.success).toBe(true);
+        expect(uninstalled.deletedResources).toEqual([pageKey]);
+        const disable = await context.request.post(`/api/plugins/${pluginPid}/disable`);
+        const disabled = await disable.json();
+        expect(disable.status()).toBe(200);
+        expect(String(disabled.code)).toBe('0');
+        const reread = await context.request.get(`/api/plugins/${pluginPid}`);
+        const persisted = await reread.json();
+        evidence.push({ operation: 'reread-retired-fixture', status: reread.status(), body: persisted });
+        expect(reread.status()).toBe(200);
+        expect(persisted.data.pluginId).toBe(`com.auraboot.test.${namespace}`);
+        expect(persisted.data.status).toBe('stopped');
+      }
+    } finally {
+      await testInfo.attach('page-import-api-boundary', {
+        body: JSON.stringify({ fixture, pageKey, runtime, evidence }, null, 2), contentType: 'application/json',
+      });
+      await context.close();
+      fs.rmSync(fixture, { recursive: true });
+    }
   }
 });
 
