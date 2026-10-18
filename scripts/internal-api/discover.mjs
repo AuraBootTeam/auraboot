@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { canonicalJson, operations, requireCondition, sha256, validateDocument } from './contract.mjs';
 const ts = createRequire(new URL('./toolchain/package.json', import.meta.url))('typescript');
 const NETWORK_MODULE = /(?:^|\/)(?:http-client|HttpClient|ApiService|internal-api)(?:\/|$)|^axios$/;
-const HTTP_NAMES = new Set(['get', 'post', 'put', 'patch', 'del', 'delete', 'head', 'options', 'fetchResult', 'fetchData', 'request', 'internalRequest']);
+const HTTP_NAMES = new Set(['get', 'post', 'put', 'patch', 'del', 'delete', 'head', 'options', 'fetchResult', 'fetchData', 'request', 'internalRequest', 'internalFormRequest']);
 const PRODUCTION = p => !/(^|\/)(__tests__|tests|fixtures|__fixtures__|generated)(\/|$)|\.(test|spec)\./.test(p);
 const httpMethod = name => name === 'del' ? 'delete' : ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(name) ? name : undefined;
 
@@ -96,7 +96,7 @@ export function discoverCalls(sources, document) {
         const isFetch = callee === 'fetch' || callee === 'globalThis.fetch';
         const isClient = property && (HTTP_NAMES.has(property) || property === 'fetch') && /api|http|client|axios|service/i.test(callee);
         if (imported || isFetch || isClient) {
-          const generated = imported === 'internalRequest';
+          const generated = imported === 'internalRequest' || imported === 'internalFormRequest';
           const targetNode = n.arguments[generated ? 1 : 0];
           let method = generated ? evaluate(n.arguments[0]) : httpMethod(imported ?? property) ?? 'get';
           const config = n.arguments[generated ? 2 : 1];

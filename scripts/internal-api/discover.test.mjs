@@ -7,6 +7,7 @@ const document = { openapi: '3.1.0', info: { title: 'Test', version: '1' }, path
   '/api/views': { post: { operationId: 'create', responses: response } },
   '/api/views/{pid}': { parameters: [parameter], get: { operationId: 'read', responses: response } },
   '/api/views/accessible': { get: { operationId: 'accessible', responses: response } },
+  '/api/upload': { post: { operationId: 'upload', responses: response } },
 } };
 
 test('resolves imported aliases, local constants, class base URLs and encoded templates', () => {
@@ -51,11 +52,16 @@ test('retains missing, external and indirect calls rather than silently excludin
 test('counts generated operations without mistaking request headers or request caches for HTTP calls', () => {
   const result = discoverCalls([{ file: 'web-admin/app/client.ts', text: `
     import {internalRequest as call} from '~/shared/services/http-client/internal-api';
+    import {internalFormRequest as upload} from '~/shared/services/http-client/internal-api';
     request.headers.get('Cookie');
     failedRequests.current.delete('key');
     call('get', '/api/views/{pid}', {path:{pid:'view-pid'}});
+    upload('post', '/api/upload', {body:{file}});
   ` }], document);
-  assert.equal(result.calls.length, 1);
+  assert.equal(result.calls.length, 2);
   assert.equal(result.calls[0].matches[0].operationId, 'read');
   assert.equal(result.calls[0].migration, 'generated-operation');
+  assert.equal(result.calls[1].matches[0].operationId, 'upload');
+  assert.equal(result.calls[1].method, 'post');
+  assert.equal(result.calls[1].migration, 'generated-operation');
 });

@@ -72,6 +72,7 @@ function AvatarUpload({
   onUploadSuccess: (fileId: string) => void;
 }) {
   const { showSuccessToast, showErrorToast } = useToast();
+  const { t, locale } = useI18n();
   const showToast = (message: string, type: 'success' | 'error') => {
     if (type === 'success') {
       showSuccessToast(message);
@@ -159,7 +160,23 @@ function AvatarUpload({
           </div>
         )}
       </div>
-      <p className="mt-4 text-sm text-gray-600">点击头像更换图片</p>
+      <p className="mt-4 text-sm text-gray-600">
+        {isEditing
+          ? t(
+              'profile.avatarEditingHelp',
+              undefined,
+              locale.startsWith('zh')
+                ? '上传新头像后请保存资料'
+                : 'Save your profile after uploading a new avatar.',
+            )
+          : t(
+              'profile.avatarViewHelp',
+              undefined,
+              locale.startsWith('zh')
+                ? '点击编辑资料后可更换头像'
+                : 'Choose Edit profile to change your avatar.',
+            )}
+      </p>
       <p className="text-xs text-gray-500">支持 JPG、PNG 格式，文件大小不超过 5MB</p>
     </div>
   );

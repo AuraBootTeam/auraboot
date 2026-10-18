@@ -313,10 +313,9 @@ test('generated profile operations persist an owned avatar and no-email profile'
         );
         expect(user.rowCount).toBe(1);
         expect(user.rows[0]).toMatchObject({ is_enabled: false, deleted_flag: true });
-        await db.query(
-          "UPDATE ab_tenant_member SET deleted_flag=true, status='removed' WHERE user_id=$1",
-          [user.rows[0].id],
-        );
+        await db.query('UPDATE ab_tenant_member SET deleted_flag=true WHERE user_id=$1', [
+          user.rows[0].id,
+        ]);
         const active = await db.query(
           'SELECT count(*)::int AS count FROM ab_tenant_member WHERE user_id=$1 AND deleted_flag=false',
           [user.rows[0].id],
@@ -335,6 +334,7 @@ test('generated profile operations persist an owned avatar and no-email profile'
           userPid,
           operations: [...observed],
           rows,
+          journeyError: journeyError ? String(journeyError) : null,
           cleanupErrors: cleanupErrors.map(String),
           imageSha256: hash(imageBytes),
         },
@@ -347,7 +347,7 @@ test('generated profile operations persist an owned avatar and no-email profile'
   if (journeyError || cleanupErrors.length)
     throw new AggregateError(
       [...(journeyError ? [journeyError] : []), ...cleanupErrors],
-      'Profile journey or owned fixture cleanup failed',
+      `Profile journey or cleanup failed: ${[journeyError, ...cleanupErrors].filter(Boolean).map(String).join(' | ')}`,
     );
 });
 
