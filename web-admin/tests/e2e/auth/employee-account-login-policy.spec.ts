@@ -131,6 +131,9 @@ test.describe.serial('Employee Account Login Policy @auth @critical', () => {
   test('EAL-004: self-service password APIs and pages are disabled', async ({ browser }) => {
     const page = await newPublicPage(browser);
     try {
+      // SSR defaults to Chinese without the product locale cookie, independently of
+      // the browser's language. This assertion deliberately verifies English copy.
+      await page.context().addCookies([{ name: 'locale', value: 'en-US', url: BASE_URL }]);
       await page.goto('/forgot-password', { waitUntil: 'domcontentloaded' });
       await expect(page.locator('[data-testid="forgot-password-disabled"]')).toBeVisible();
       await expect(page.getByText(/tenant administrator/i)).toBeVisible();
