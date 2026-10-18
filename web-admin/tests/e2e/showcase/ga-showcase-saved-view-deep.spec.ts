@@ -7,6 +7,7 @@
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { openSavedViewManagePanel, viewSelectorTrigger } from '../helpers';
+import { getCommandResultRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 const MODEL_CODE = 'showcase_all_fields';
 // SavedViews use the published schema pageKey.
@@ -27,41 +28,34 @@ type SeededShowcaseRecord = {
   scName: string;
 };
 
+let currentSeed: SeededShowcaseRecord;
+
+function seededRow(page: Page) {
+  return page.locator('[data-testid="dynamic-list"] table tbody tr')
+    .filter({ hasText: currentSeed.scName });
+}
+
 test.describe.configure({ mode: 'serial' });
 
 async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
   await page.addInitScript(() => localStorage.removeItem('sidebar-collapsed'));
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
 
-  const listResponse = page
-    .waitForResponse(
-      (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
-      { timeout: 15_000 },
-    )
-    .catch(() => null);
-  const firstRow = page.locator('[data-testid="dynamic-list"] table tbody tr').first();
-
-  const parent = page
+  const parent = page.locator('nav')
     .locator('button, [role="menuitem"]', {
       hasText: /字段展示|能力展示|Field Showcase|Showcase|menu\.sc_root/i,
     })
     .first();
   await parent.waitFor({ state: 'visible', timeout: 10_000 });
-  await parent.evaluate((el: HTMLElement) => el.click());
+  await parent.click();
 
-  const leaf = page.locator(`a[href="${LIST_URL}"], a[href*="${LIST_URL}"]`).first();
+  const leaf = page.locator('nav').locator(`a[href="${LIST_URL}"], a[href*="${LIST_URL}"]`);
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
-  await leaf.evaluate((el: HTMLElement) => el.click());
+  await leaf.click();
 
   await expect(page).toHaveURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 10_000 });
-  await Promise.race([
-    listResponse,
-    firstRow.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => null),
-  ]);
-  await expect(firstRow).toBeVisible({ timeout: 15_000 });
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  await expect(seededRow(page)).toHaveCount(1, { timeout: 15_000 });
+  await expect(seededRow(page)).toBeVisible();
 }
 
 async function openViewManagePanel(page: Page) {
@@ -221,8 +215,8 @@ async function seedShowcaseRecord(
   const body = await resp.json().catch(async () => resp.text().catch(() => null));
   expect(resp.ok(), `Create showcase seed failed: ${resp.status()} ${JSON.stringify(body)}`).toBe(true);
   expect((body as { code?: string })?.code, `Create showcase seed non-zero: ${JSON.stringify(body)}`).toBe('0');
-  const pid = (body as { data?: { data?: { recordId?: string } } })?.data?.data?.recordId;
-  expect(pid, `Created showcase seed missing recordId: ${JSON.stringify(body)}`).toBeTruthy();
+  const pid = getCommandResultRecordPid(body);
+  expect(pid, 'Created showcase seed must return a canonical public PID').toMatch(/^[0-9A-Z]{26}$/);
   return { pid: pid!, scName };
 }
 
@@ -241,6 +235,10 @@ async function cleanupCreatedViews(request: APIRequestContext): Promise<void> {
 
 test.describe('GA showcase SavedView deep persistence', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  test.beforeEach(async ({ request }) => {
+    currentSeed = await seedShowcaseRecord(request, 'View');
+  });
 
   test.afterEach(async ({ request }) => {
     await cleanupCreatedViews(request);
@@ -385,7 +383,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
       .toEqual({ fieldCode: 'sc_code', direction: 'asc', priority: 0 });
 
     await page.reload({ waitUntil: 'load' });
-    await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toBeVisible({
+    await expect(seededRow(page)).toBeVisible({
       timeout: 15_000,
     });
     await expect(viewSelectorTrigger(page)).toContainText(name, {
@@ -408,7 +406,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
-    await expect(page.getByTestId('table-cell-0-sc_price')).toBeVisible({ timeout: 5_000 });
+    await expect(seededRow(page).locator('td[data-testid$="-sc_price"]')).toBeVisible({ timeout: 5_000 });
 
     await page.getByTestId('column-settings-btn').click();
     const panel = page.getByTestId('column-settings-panel');
@@ -457,14 +455,14 @@ test.describe('GA showcase SavedView deep persistence', () => {
       .toEqual({ priceVisible: false, nameWidth: 260 });
 
     await page.reload({ waitUntil: 'load' });
-    await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toBeVisible({
+    await expect(seededRow(page)).toBeVisible({
       timeout: 15_000,
     });
     await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
-    await expect(page.getByTestId('table-cell-0-sc_name')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByTestId('table-cell-0-sc_price')).toHaveCount(0);
+    await expect(seededRow(page).locator('td[data-testid$="-sc_name"]')).toBeVisible({ timeout: 5_000 });
+    await expect(seededRow(page).locator('td[data-testid$="-sc_price"]')).toHaveCount(0);
   });
 
   test('Table toolbar action config persists through SavedView API and reload renderer', async ({
@@ -551,7 +549,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(page.getByTestId('more-menu-export-csv')).toHaveCount(0);
 
     await page.reload({ waitUntil: 'load' });
-    await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toBeVisible({
+    await expect(seededRow(page)).toBeVisible({
       timeout: 15_000,
     });
     await expect(viewSelectorTrigger(page)).toContainText(name, {
@@ -570,7 +568,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     test.setTimeout(90_000);
 
     const { pid, name } = await createDefaultTableView(request, 'Filters');
-    const seed = await seedShowcaseRecord(request, 'Filters');
+    const seed = currentSeed;
 
     await navigateToShowcaseListViaMenu(page);
     await expect(viewSelectorTrigger(page)).toContainText(name, {
@@ -596,7 +594,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     );
     await page.getByTestId('filter-search').click();
     expect((await filteredList).ok()).toBe(true);
-    await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toContainText(
+    await expect(seededRow(page)).toContainText(
       seed.scName,
       { timeout: 10_000 },
     );
@@ -651,7 +649,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(viewSelectorTrigger(page)).toContainText(name, {
       timeout: 10_000,
     });
-    await expect(page.locator('[data-testid="dynamic-list"] table tbody tr').first()).toContainText(
+    await expect(seededRow(page)).toContainText(
       seed.scName,
       { timeout: 10_000 },
     );
