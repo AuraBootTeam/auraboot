@@ -117,8 +117,13 @@ final class ProcurementLinkedForeignNativeAdmission {
         assertEquals(app.toRealPath(),Path.of(environment.get("S06_NATIVE_APPLICATION_ROOT")).toRealPath());
         assertEquals(proofPath.toRealPath(),Path.of(environment.get("S06_NATIVE_ENCRYPTION_PROOF_PATH")).toRealPath());
         assertEquals(input.path("encryptionConfigProofSha256").asText(),environment.get("S06_NATIVE_ENCRYPTION_PROOF_SHA256"));
-        assertEquals(matchingKey,environment.get("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY"));
-        assertEquals(matchingKey,com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission.requiredKey(environment));
+        assertNotNull(matchingKey,"FOREIGN_MATCHING_KEY_REQUIRED");
+        assertTrue(java.security.MessageDigest.isEqual(matchingKey.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                environment.get("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY").getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                "FOREIGN_HOST_KEY_ALIAS_DRIFT");
+        assertTrue(java.security.MessageDigest.isEqual(matchingKey.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                com.auraboot.framework.notification.sourcebinding.S06NativeEncryptionAdmission.requiredKey(environment)
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8)),"FOREIGN_S06_KEY_ALIAS_DRIFT");
     }
     static void validateClassRoster(JsonNode declared,Path classes) throws Exception {
         validateClassRoster(declared,classes,SOURCES);

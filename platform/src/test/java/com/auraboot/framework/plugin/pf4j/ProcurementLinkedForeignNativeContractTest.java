@@ -54,7 +54,9 @@ class ProcurementLinkedForeignNativeContractTest {
                 Map.entry("S06_NATIVE_FIELD_ENCRYPTION_KEY","wrong-key"),
                 Map.entry("PROCUREMENT_HOST_FIELD_ENCRYPTION_KEY","wrong-key"))) {
             var bad=new LinkedHashMap<>(env);bad.put(drift.getKey(),drift.getValue());
-            assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input,proof,app,proofPath,"synthetic-key",bad));
+            var rejection=assertThrows(AssertionError.class,()->ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input,proof,app,proofPath,"synthetic-key",bad));
+            assertFalse(rejection.getMessage().contains("synthetic-key") || rejection.getMessage().contains("wrong-key"),
+                    "Matching key material must never enter assertion diagnostics");
         }
         var absent=new LinkedHashMap<>(env);absent.remove("S06_NATIVE_FIELD_ENCRYPTION_KEY");
         assertThrows(IllegalStateException.class,()->ProcurementLinkedForeignNativeAdmission.validatePrivateCryptoBindings(input,proof,app,proofPath,"synthetic-key",absent));
