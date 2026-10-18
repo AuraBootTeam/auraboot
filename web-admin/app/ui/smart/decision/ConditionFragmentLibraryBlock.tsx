@@ -1209,7 +1209,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
         </div>
       )}
 
-      <div className="cfl-grid">
+      <div className={`cfl-grid${canManage ? '' : ' cfl-grid--readonly'}`}>
         <div className="decisionops-table-frame cfl-table-frame">
           <table className="decisionops-table cfl-table">
             <thead>

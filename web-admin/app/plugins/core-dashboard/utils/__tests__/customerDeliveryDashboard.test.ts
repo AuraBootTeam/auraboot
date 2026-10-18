@@ -6,6 +6,7 @@ import { parseDashboardDocument } from '../dashboardDocument';
 const root = path.resolve(process.cwd(), fs.existsSync(path.join(process.cwd(), 'plugins/project-management')) ? 'plugins/project-management' : '../plugins/project-management');
 const document = JSON.parse(fs.readFileSync(path.join(root, 'examples/dashboard-customer-delivery.json'), 'utf8'));
 const fields = JSON.parse(fs.readFileSync(path.join(root, 'config/fields/tpm_project.json'), 'utf8'));
+const queries = JSON.parse(fs.readFileSync(path.join(root, 'config/named-queries.json'), 'utf8'));
 const dictionaries = JSON.parse(fs.readFileSync(path.join(root, 'config/dicts.json'), 'utf8'));
 
 describe('portable customer delivery dashboard', () => {
@@ -23,7 +24,17 @@ describe('portable customer delivery dashboard', () => {
     const statuses = dictionaries.find((d: { code: string }) => d.code === 'tpm_project_status');
     for (const widget of document.dashboard.widgets) {
       const source = widget.config.dataSource;
-      expect(source?.modelCode || widget.config.modelCode).toBe('tpm_project');
+      const query = source?.type === 'namedQuery' ? queries.find((q: {code: string}) => q.code === source.queryCode) : undefined;
+      if (source?.type === 'namedQuery') {
+        expect(source.queryCode).toBe('tpm_delivery_brief');
+        expect(query?.resourceCode).toBe('tpm_project');
+        expect(query?.actionCode).toBe('read');
+        expect(query?.fromSql).toContain('LEFT JOIN mt_tpm_customer');
+        expect(query?.fromSql).toContain('p.tenant_id = #{params.tenantId}');
+      } else {
+        expect(source?.modelCode || widget.config.modelCode).toBe('tpm_project');
+      }
+      const columnCodes = query ? new Set(query.outputFields.map((f: {code: string}) => f.code)) : fieldCodes;
       for (const metric of source?.metrics || []) {
         expect(metric.field === 'id' || fieldCodes.has(metric.field)).toBe(true);
         expect(['count', 'sum']).toContain(metric.aggregation);
@@ -35,7 +46,7 @@ describe('portable customer delivery dashboard', () => {
       expect(widget.config.title['zh-CN']).toBeTruthy();
       expect(widget.config.title['en-US']).toBeTruthy();
       for (const column of widget.config.table?.columns || []) {
-        expect(fieldCodes.has(column.field)).toBe(true);
+        expect(columnCodes.has(column.field)).toBe(true);
         expect(column.label['zh-CN']).toBeTruthy();
         expect(column.label['en-US']).toBeTruthy();
       }

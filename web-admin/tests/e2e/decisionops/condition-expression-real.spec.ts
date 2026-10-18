@@ -509,7 +509,11 @@ test('E10 a real reader can inspect nested conditions but cannot edit, publish o
     await reader.reload();
     await expect(reader.getByTestId('cfl-readonly-condition')).toBeVisible();
     await expect(reader.getByTestId('cfl-open-create')).toBeDisabled();
+    await reader.getByPlaceholder('搜索片段编码、名称').fill(key);
+    await expect(reader.getByTestId('cfl-count')).toHaveText('1');
     await shot(reader, 'E10-readonly');
+    await reader.getByLabel('group-not-2', {exact:true}).scrollIntoViewIfNeeded();
+    await shot(reader, 'E10-readonly-details');
     await writeFile(
       join(evidence!, 'readonly-receipt.json'),
       JSON.stringify(
