@@ -9,12 +9,18 @@
 #   TAG               — e.g. latest, v1.0.0, main, or a commit sha
 #   POSTGRES_PASSWORD — PostgreSQL password (no default in prod)
 #   JWT_SECRET        — JWT signing secret, min 32 chars (openssl rand -hex 32)
+#
+# Resource limits below are conservative defaults for a small single host
+# (backend heap is capped at -Xmx1024m); tune per deployment.
 
 services:
   backend:
     image: ${REGISTRY:-ghcr.io/aurabootteam}/auraboot:${TAG:-latest}
     container_name: auraboot-backend
     restart: unless-stopped
+    # 2g for a 1g heap: metaspace, thread stacks, direct/mapped buffers headroom.
+    mem_limit: 2g
+    cpus: "2"
     ports:
       - "6443:6443"
     environment:
@@ -44,10 +50,22 @@ services:
       start_period: 60s
       retries: 3
 
+  # Base services, overridden here only to add resource limits (compose merges
+  # the rest — image, healthcheck, volumes, ports — from docker-compose.yml).
+  postgres:
+    mem_limit: 1g
+    cpus: "2"
+
+  redis:
+    mem_limit: 512m
+    cpus: "1"
+
   frontend:
     image: ${REGISTRY:-ghcr.io/aurabootteam}/auraboot-frontend:${TAG:-latest}
     container_name: auraboot-frontend
     restart: unless-stopped
+    mem_limit: 1g
+    cpus: "1"
     ports:
       - "3000:3000"
     environment:
