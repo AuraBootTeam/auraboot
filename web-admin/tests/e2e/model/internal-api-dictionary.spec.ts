@@ -373,10 +373,36 @@ test('dictionary batch feedback uses actual counts and an empty tree remains edi
     const empty = await create('tree');
     const emptyRow = await find(empty.code);
     await emptyRow.getByRole('link', { name: '查看', exact: true }).click();
-    await page.getByRole('button', { name: '字典项 (0)', exact: true }).click();
+    await page.getByTestId('dict-tab-items').click();
     await expect(page.getByText('暂无字典项，请新增根节点', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '新增根节点', exact: true })).toBeEnabled();
     await capture('DICT-14', page, info);
+    await page.getByTestId('dict-add-root-item').click();
+    const rootRow = page.getByTestId('dict-item-row-0');
+    await rootRow.locator('input').nth(0).fill('north');
+    await rootRow.locator('input').nth(1).fill('华北');
+    const savedResponse = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/meta/dict/${empty.pid}/items` &&
+        response.request().method() === 'PUT',
+    );
+    await page.getByTestId('dict-save-items').click();
+    const saved = await savedResponse;
+    expect(saved.request().postDataJSON()).toEqual([
+      { value: 'north', label: '华北', sortOrder: 0, disabled: false },
+    ]);
+    expect((await saved.json()).code).toBe('0');
+    await expect(page.getByTestId('dict-save-items')).toBeDisabled();
+    await page.reload();
+    await page.getByTestId('dict-tab-items').click();
+    await expect(page.getByTestId('dict-item-row-0').locator('input').nth(0)).toHaveValue('north');
+    await expect(page.getByTestId('dict-item-row-0').locator('input').nth(1)).toHaveValue('华北');
+    const persistedTree = await (
+      await page.request.get(`/api/meta/dict/${empty.pid}/cascade/tree`)
+    ).json();
+    expect(persistedTree.code).toBe('0');
+    expect(persistedTree.data).toMatchObject({ value: 'north', label: '华北', children: [] });
+    await capture('DICT-15', page, info);
   } finally {
     const errors: string[] = [];
     for (const item of owned) {

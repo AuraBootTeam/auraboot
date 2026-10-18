@@ -323,6 +323,19 @@
       "dependencies": "real-stack",
       "authority": "regression",
       "driver": "browser"
+    },
+    {
+      "id": "DICT-15",
+      "feature": "dictionary",
+      "action": "empty-tree-root-save-reload",
+      "branch": "state-transition",
+      "expected": "A real empty tree accepts a root through its item editor, sends the declared PUT payload and retains the root after reload and cascade API read",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-15-tree-root-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
     }
   ]
 }
