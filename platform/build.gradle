@@ -470,6 +470,17 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Anchor the JUnit BOM as an explicit node: whether the BOM imported by
+    // spring-boot-dependencies materializes as a resolved node differs between
+    // resolution environments (macOS vs Linux CI), and dependency locking
+    // requires an identical node set everywhere. See CONTRIBUTING lock notes.
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    // Same anchoring for the test-runtime XML validation trio: their presence
+    // in the resolved graph is also environment-dependent, and the lockfile
+    // lists them for testRuntimeClasspath.
+    testRuntimeOnly 'jaxen:jaxen:2.0.6'
+    testRuntimeOnly 'net.java.dev.msv:xsdlib:2013.6.1'
+    testRuntimeOnly 'relaxngDatatype:relaxngDatatype:20020414'
 
     // Swagger/OpenAPI 3
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
