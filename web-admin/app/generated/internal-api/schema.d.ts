@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 808e5f78897c64f560b1bf8cd227e74c5c988dac39c74b4703f5911c9982e7ec
+ * Contract SHA-256: 84dc0843ffe0e048c8f521ca09c919cf804b5d8a9dc24bfe15578b9987974dac
  */
 export interface paths {
     "/api/activities": {
@@ -22574,6 +22574,15 @@ export interface components {
             expectedVersion?: number;
             operationId?: string;
         };
+        ActiveSessionResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            deviceInfo: string;
+            ipAddress: string;
+            /** Format: date-time */
+            lastActiveAt: string;
+            pid: string;
+        };
         ActiveTurnDTO: {
             /** Format: int64 */
             agentId?: number;
@@ -24761,6 +24770,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["AbSemanticPreagg"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseListActiveSessionResponse: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ActiveSessionResponse"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -76750,7 +76767,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseListMapStringObject"];
+                    "*/*": components["schemas"]["ApiResponseListActiveSessionResponse"];
                 };
             };
         };

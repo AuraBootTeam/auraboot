@@ -34,6 +34,21 @@ export async function provisionInternalApiUser(
     timezoneId: 'Asia/Shanghai',
     viewport: { width: 1440, height: 1000 },
   });
+  const additionalSessions: Array<{ context: typeof context; page: Page }> = [];
+  async function createAdditionalSession() {
+    const additional = await browser.newContext({
+      baseURL: origin,
+      storageState: { cookies: [], origins: [] },
+      locale: 'en-US',
+      timezoneId: 'Asia/Shanghai',
+      viewport: { width: 1440, height: 1000 },
+    });
+    const page = await additional.newPage();
+    const owned = { context: additional, page };
+    additionalSessions.push(owned);
+    await loginInternalApiUser(page, username, password);
+    return owned;
+  }
   let userPid: string | undefined;
   const sessionCleanup: Array<{
     context: string;
@@ -48,6 +63,9 @@ export async function provisionInternalApiUser(
     for (const [label, client] of [
       ['owned-user', context],
       ['provisioner', admin],
+      ...additionalSessions.map(
+        (session, index) => [`additional-${index + 1}`, session.context] as const,
+      ),
     ] as const) {
       try {
         const before = await client.request.get('/api/auth/me');
@@ -103,7 +121,11 @@ export async function provisionInternalApiUser(
     } catch (error) {
       errors.push(error);
     }
-    for (const client of [context, admin]) {
+    for (const client of [
+      context,
+      admin,
+      ...additionalSessions.map((session) => session.context),
+    ]) {
       try {
         await client.close();
       } catch (error) {
@@ -152,6 +174,7 @@ export async function provisionInternalApiUser(
       role,
       origin,
       sessionCleanup,
+      createAdditionalSession,
       dispose,
     };
   } catch (error) {

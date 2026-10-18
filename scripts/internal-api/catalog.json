@@ -376,6 +376,31 @@
           "path": "/api/tenant/members/search"
         }
       ]
+    },
+    "sessionsWire": {
+      "purpose": "Own active session metadata and exact current/specific/all revocation; API-driven, not security page browser acceptance",
+      "spec": "web-admin/tests/api/internal-api/sessions.spec.ts",
+      "tests": [
+        "generated session operations revoke only owned sessions and preserve other users"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/user/sessions"
+        },
+        {
+          "method": "delete",
+          "path": "/api/user/sessions"
+        },
+        {
+          "method": "delete",
+          "path": "/api/user/sessions/current"
+        },
+        {
+          "method": "delete",
+          "path": "/api/user/sessions/{sessionPid}"
+        }
+      ]
     }
   },
   "scenarios": [

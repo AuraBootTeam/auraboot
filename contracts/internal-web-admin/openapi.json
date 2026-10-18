@@ -397,6 +397,35 @@
         },
         "type": "object"
       },
+      "ActiveSessionResponse": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deviceInfo": {
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": "string"
+          },
+          "lastActiveAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "deviceInfo",
+          "ipAddress",
+          "lastActiveAt",
+          "pid"
+        ],
+        "type": "object"
+      },
       "ActiveTurnDTO": {
         "properties": {
           "agentId": {
@@ -7037,6 +7066,31 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/AbSemanticPreagg"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListActiveSessionResponse": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ActiveSessionResponse"
             },
             "type": [
               "array",
@@ -104824,7 +104878,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListMapStringObject"
+                  "$ref": "#/components/schemas/ApiResponseListActiveSessionResponse"
                 }
               }
             },

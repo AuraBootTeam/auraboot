@@ -2886,3 +2886,20 @@ list_sample:
 
 report:
   generate: "报告"
+
+session_security:
+  title: "账号安全"
+  active: "活跃会话"
+  loading: "正在加载会话…"
+  empty: "暂无活跃会话。"
+  load_failed: "无法加载活跃会话。"
+  retry: "重试"
+  logout_all: "退出所有设备"
+  revoke: "撤销"
+  revoked: "会话已撤销"
+  revoke_failed: "无法撤销会话"
+  all_revoked: "所有会话已撤销，即将退出登录。"
+  revoke_all_failed: "无法撤销会话"
+  ip: "IP"
+  last_active: "最近活跃"
+  created: "创建时间"

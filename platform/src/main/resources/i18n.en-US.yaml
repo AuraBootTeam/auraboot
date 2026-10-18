@@ -2695,3 +2695,20 @@ list_sample:
 
 report:
   generate: "Report"
+
+session_security:
+  title: "Security Settings"
+  active: "Active Sessions"
+  loading: "Loading sessions…"
+  empty: "No active sessions found."
+  load_failed: "Unable to load active sessions."
+  retry: "Try again"
+  logout_all: "Logout All Devices"
+  revoke: "Revoke"
+  revoked: "Session revoked"
+  revoke_failed: "Failed to revoke session"
+  all_revoked: "All sessions revoked. You will be logged out."
+  revoke_all_failed: "Failed to revoke sessions"
+  ip: "IP"
+  last_active: "Last active"
+  created: "Created"
