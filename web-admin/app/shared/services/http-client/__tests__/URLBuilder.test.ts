@@ -7,6 +7,36 @@ import {
 } from '../URLBuilder';
 import type { RequestContext, FetchOptions } from '../types';
 
+describe('explicit JSON body', () => {
+  const context: RequestContext = { isServer: false };
+
+  it.each([{}, [], null, false, 0, 'value'])(
+    'preserves JSON body %j without moving it into a query',
+    (body) => {
+      const result = buildRequest('/api/example', { method: 'post', body }, context, undefined);
+      expect(result.init.body).toBe(JSON.stringify(body));
+      expect(result.url).not.toContain('?');
+    },
+  );
+
+  it('preserves an explicit DELETE object body', () => {
+    const result = buildRequest(
+      '/api/example',
+      { method: 'delete', body: { pid: 'record-pid' } },
+      context,
+      undefined,
+    );
+    expect(result.init.body).toBe('{"pid":"record-pid"}');
+    expect(result.url).not.toContain('?');
+  });
+
+  it('rejects a GET body before issuing a request', () => {
+    expect(() =>
+      buildRequest('/api/example', { method: 'get', body: {} }, context, undefined),
+    ).toThrow('GET and HEAD requests cannot carry a JSON body');
+  });
+});
+
 describe('replacePathVariables', () => {
   it('should replace single path variable', () => {
     const result = replacePathVariables('/api/user/{userId}', { userId: 123 });

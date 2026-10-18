@@ -50,6 +50,9 @@ export interface RequestContext {
  * authentication, parameters, timeouts, and API configuration.
  */
 export interface FetchOptions {
+  /** Explicit JSON body. Unlike legacy params, preserves empty objects and scalar/null bodies. */
+  body?: unknown;
+
   /**
    * HTTP method
    * @default 'get'

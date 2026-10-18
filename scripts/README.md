@@ -342,4 +342,6 @@ These local measurement helpers require an explicitly configured runtime and cre
 | script | category | purpose |
 |---|---|---|
 | `internal-api/contract.mjs` | contract | Validate, normalize and select explicit internal OpenAPI operations without removing schema constraints. |
+| `internal-api/discover.mjs` | contract | Reconcile frontend network-call candidates with a captured runtime catalog; retain unresolved and unmigrated entries. |
+| `internal-api/export.mjs` | contract | Export or compare the internal OpenAPI group and create a fresh source-bound export receipt. |
 | `internal-api/toolchain/generate.mjs` | codegen | Generate or check TypeScript declarations using the isolated, locked OpenAPI toolchain. |

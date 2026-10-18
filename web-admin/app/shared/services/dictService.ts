@@ -1,292 +1,189 @@
-/**
- * Dictionary Service
- * Handles all dictionary-related API calls
- */
+import { internalRequest } from './http-client/internal-api';
+import type { InternalRequestInput } from './http-client/internal-api';
+import type { Result } from './http-client/types';
+import type { DictCreateRequest, DictDTO, DictQueryRequest, DictUpdateRequest } from '~/types/dict';
+import {
+  dictionaryData,
+  dictionaryItems,
+  dictionaryPage,
+  dictionaryTree,
+  dictionaryView,
+} from './dict-adapter';
 
-import { get, post, put, del } from './http-client';
-import type {
-  DictDTO,
-  DictCreateRequest,
-  DictUpdateRequest,
-  DictQueryRequest,
-  DictDataResult,
-  DictStatistics,
-  DictValidationResult,
-  DictTreeNode,
-  DictItemData,
-  DictPageResult,
-} from '~/types/dict';
-
-const BASE_URL = '/api/meta/dict';
-
-/**
- * Handle API response
- */
-function handleResponse<T>(result: any, errorMessage: string): T {
-  if (!result.success) {
-    throw new Error(result.message || errorMessage);
-  }
+function data<T>(result: Result<T>, message: string): T {
+  if (result.code !== '0') throw new Error(result.message || result.desc || message);
+  if (result.data === null) throw new Error(message);
   return result.data;
+}
+function success(result: Result<unknown>, message: string): void {
+  if (result.code !== '0') throw new Error(result.message || result.desc || message);
 }
 
 export const dictService = {
-  /**
-   * Create a new dictionary
-   */
-  async create(request: DictCreateRequest, httpRequest?: Request): Promise<DictDTO> {
-    const result = await post<DictDTO>(BASE_URL, request, undefined, httpRequest);
-    return handleResponse(result, 'Failed to create dictionary');
+  async create(body: DictCreateRequest, request?: Request) {
+    return dictionaryView(
+      data(
+        await internalRequest('post', '/api/meta/dict', { body, request }),
+        'Failed to create dictionary',
+      ),
+    );
   },
-
-  /**
-   * Update dictionary
-   */
-  async update(pid: string, request: DictUpdateRequest, httpRequest?: Request): Promise<DictDTO> {
-    const result = await put<DictDTO>(`${BASE_URL}/${pid}`, request, undefined, httpRequest);
-    return handleResponse(result, 'Failed to update dictionary');
+  async update(pid: string, body: DictUpdateRequest, request?: Request) {
+    return dictionaryView(
+      data(
+        await internalRequest('put', '/api/meta/dict/{pid}', { path: { pid }, body, request }),
+        'Failed to update dictionary',
+      ),
+    );
   },
-
-  /**
-   * Replace dictionary items
-   */
   async replaceItems(
     pid: string,
-    items: Array<{
-      value: string;
-      label: string;
-      sortOrder?: number;
-      parentValue?: string;
-      disabled?: boolean;
-      extension?: Record<string, any>;
-    }>,
-    httpRequest?: Request,
-  ): Promise<DictDTO> {
-    const result = await put<DictDTO>(`${BASE_URL}/${pid}/items`, items, undefined, httpRequest);
-    return handleResponse(result, 'Failed to replace dictionary items');
-  },
-
-  /**
-   * Delete dictionary
-   */
-  async delete(pid: string, httpRequest?: Request): Promise<void> {
-    const result = await del<void>(`${BASE_URL}/${pid}`, undefined, undefined, httpRequest);
-    handleResponse(result, 'Failed to delete dictionary');
-  },
-
-  /**
-   * Get dictionary by PID
-   */
-  async findByPid(pid: string, httpRequest?: Request): Promise<DictDTO> {
-    const result = await get<DictDTO>(`${BASE_URL}/${pid}`, undefined, undefined, httpRequest);
-    return handleResponse(result, 'Failed to fetch dictionary');
-  },
-
-  /**
-   * Get dictionary by code
-   */
-  async findByCode(code: string, httpRequest?: Request): Promise<DictDTO> {
-    const result = await get<DictDTO>(
-      `${BASE_URL}/by-code/${code}`,
-      undefined,
-      undefined,
-      httpRequest,
+    body: InternalRequestInput<'put', '/api/meta/dict/{pid}/items'>['body'],
+    request?: Request,
+  ) {
+    return dictionaryView(
+      data(
+        await internalRequest('put', '/api/meta/dict/{pid}/items', {
+          path: { pid },
+          body,
+          request,
+        }),
+        'Failed to replace dictionary items',
+      ),
     );
-    return handleResponse(result, 'Failed to fetch dictionary');
   },
-
-  /**
-   * Query dictionaries with pagination
-   */
-  async query(request: DictQueryRequest, httpRequest?: Request): Promise<DictPageResult<DictDTO>> {
-    const params = new URLSearchParams();
-    if (request.pageNum) params.append('pageNum', request.pageNum.toString());
-    if (request.pageSize) params.append('pageSize', request.pageSize.toString());
-    if (request.code) params.append('code', request.code);
-    if (request.name) params.append('name', request.name);
-    if (request.dictType) params.append('dictType', request.dictType);
-    if (request.status) params.append('status', request.status);
-
-    const result = await get<DictPageResult<DictDTO>>(
-      `${BASE_URL}?${params.toString()}`,
-      undefined,
-      undefined,
-      httpRequest,
+  async delete(pid: string, request?: Request): Promise<void> {
+    success(
+      await internalRequest('delete', '/api/meta/dict/{pid}', { path: { pid }, request }),
+      'Failed to delete dictionary',
     );
-    return handleResponse(result, 'Failed to query dictionaries');
   },
-
-  /**
-   * Load dictionary data
-   */
+  async findByPid(pid: string, request?: Request) {
+    return dictionaryView(
+      data(
+        await internalRequest('get', '/api/meta/dict/{pid}', { path: { pid }, request }),
+        'Failed to fetch dictionary',
+      ),
+    );
+  },
+  async findByCode(code: string, request?: Request) {
+    return dictionaryView(
+      data(
+        await internalRequest('get', '/api/meta/dict/by-code/{code}', { path: { code }, request }),
+        'Failed to fetch dictionary',
+      ),
+    );
+  },
+  async query(query: DictQueryRequest, request?: Request) {
+    return dictionaryPage(
+      data(
+        await internalRequest('get', '/api/meta/dict', { query, request }),
+        'Failed to query dictionaries',
+      ),
+    );
+  },
   async loadData(
     pid: string,
-    versionStrategy: string = 'latest',
+    versionStrategy = 'latest',
     pinnedVersion?: string,
-    httpRequest?: Request,
-  ): Promise<DictDataResult> {
-    const params = new URLSearchParams({ versionStrategy });
-    if (pinnedVersion) params.append('pinnedVersion', pinnedVersion);
-
-    const result = await get<DictDataResult>(
-      `${BASE_URL}/${pid}/data?${params.toString()}`,
-      undefined,
-      undefined,
-      httpRequest,
+    request?: Request,
+  ) {
+    return dictionaryData(
+      data(
+        await internalRequest('get', '/api/meta/dict/{pid}/data', {
+          path: { pid },
+          query: { versionStrategy, pinnedVersion },
+          request,
+        }),
+        'Failed to load dictionary data',
+      ),
     );
-    return handleResponse(result, 'Failed to load dictionary data');
   },
-
-  /**
-   * Publish dictionary
-   */
-  async publish(pid: string, versionNote?: string, httpRequest?: Request): Promise<DictDTO> {
-    const params = versionNote ? new URLSearchParams({ versionNote }) : undefined;
-    const url = params
-      ? `${BASE_URL}/${pid}/publish?${params.toString()}`
-      : `${BASE_URL}/${pid}/publish`;
-
-    const result = await post<DictDTO>(url, undefined, undefined, httpRequest);
-    return handleResponse(result, 'Failed to publish dictionary');
-  },
-
-  /**
-   * Unpublish dictionary
-   */
-  async unpublish(pid: string, httpRequest?: Request): Promise<DictDTO> {
-    const result = await post<DictDTO>(
-      `${BASE_URL}/${pid}/unpublish`,
-      undefined,
-      undefined,
-      httpRequest,
+  async publish(pid: string, versionNote?: string, request?: Request) {
+    return dictionaryView(
+      data(
+        await internalRequest('post', '/api/meta/dict/{pid}/publish', {
+          path: { pid },
+          query: { versionNote },
+          request,
+        }),
+        'Failed to publish dictionary',
+      ),
     );
-    return handleResponse(result, 'Failed to unpublish dictionary');
   },
-
-  /**
-   * Get version history
-   */
-  async getVersionHistory(code: string, httpRequest?: Request): Promise<DictDTO[]> {
-    const result = await get<DictDTO[]>(
-      `${BASE_URL}/${code}/versions`,
-      undefined,
-      undefined,
-      httpRequest,
+  async unpublish(pid: string, request?: Request) {
+    return dictionaryView(
+      data(
+        await internalRequest('post', '/api/meta/dict/{pid}/unpublish', { path: { pid }, request }),
+        'Failed to unpublish dictionary',
+      ),
     );
-    return handleResponse(result, 'Failed to fetch version history');
   },
-
-  /**
-   * Get cascade children
-   */
-  async getCascadeChildren(
-    pid: string,
-    parentValue?: string,
-    httpRequest?: Request,
-  ): Promise<DictItemData[]> {
-    const params = parentValue ? new URLSearchParams({ parentValue }) : undefined;
-    const url = params
-      ? `${BASE_URL}/${pid}/cascade/children?${params.toString()}`
-      : `${BASE_URL}/${pid}/cascade/children`;
-
-    const result = await get<DictItemData[]>(url, undefined, undefined, httpRequest);
-    return handleResponse(result, 'Failed to fetch cascade children');
+  async getVersionHistory(code: string, request?: Request) {
+    return data(
+      await internalRequest('get', '/api/meta/dict/{code}/versions', { path: { code }, request }),
+      'Failed to fetch version history',
+    ).map(dictionaryView);
   },
-
-  /**
-   * Build cascade tree
-   */
-  async buildCascadeTree(pid: string, httpRequest?: Request): Promise<DictTreeNode> {
-    const result = await get<DictTreeNode>(
-      `${BASE_URL}/${pid}/cascade/tree`,
-      undefined,
-      undefined,
-      httpRequest,
+  async getCascadeChildren(pid: string, parentValue?: string, request?: Request) {
+    return dictionaryItems(
+      data(
+        await internalRequest('get', '/api/meta/dict/{pid}/cascade/children', {
+          path: { pid },
+          query: { parentValue },
+          request,
+        }),
+        'Failed to fetch cascade children',
+      ),
     );
-    return handleResponse(result, 'Failed to build cascade tree');
   },
-
-  /**
-   * Get statistics
-   */
-  async getStatistics(httpRequest?: Request): Promise<DictStatistics> {
-    const result = await get<DictStatistics>(
-      `${BASE_URL}/statistics`,
-      undefined,
-      undefined,
-      httpRequest,
+  async buildCascadeTree(pid: string, request?: Request) {
+    return dictionaryTree(
+      data(
+        await internalRequest('get', '/api/meta/dict/{pid}/cascade/tree', {
+          path: { pid },
+          request,
+        }),
+        'Failed to build cascade tree',
+      ),
     );
-    return handleResponse(result, 'Failed to fetch statistics');
   },
-
-  /**
-   * Validate dictionary config
-   */
-  async validateConfig(code: string, httpRequest?: Request): Promise<DictValidationResult> {
-    const result = await get<DictValidationResult>(
-      `${BASE_URL}/${code}/validate`,
-      undefined,
-      undefined,
-      httpRequest,
+  async getStatistics(request?: Request) {
+    return data(
+      await internalRequest('get', '/api/meta/dict/statistics', { request }),
+      'Failed to fetch statistics',
     );
-    return handleResponse(result, 'Failed to validate dictionary');
   },
-
-  /**
-   * Check code uniqueness
-   */
-  async checkCodeUnique(
-    code: string,
-    excludePid?: string,
-    httpRequest?: Request,
-  ): Promise<boolean> {
-    const params = excludePid ? new URLSearchParams({ excludePid }) : undefined;
-    const url = params
-      ? `${BASE_URL}/code/${code}/unique?${params.toString()}`
-      : `${BASE_URL}/code/${code}/unique`;
-
-    const result = await get<boolean>(url, undefined, undefined, httpRequest);
-    return handleResponse(result, 'Failed to check code uniqueness');
-  },
-
-  /**
-   * Batch delete dictionaries
-   */
-  async batchDelete(pids: string[], httpRequest?: Request): Promise<number> {
-    const params = new URLSearchParams();
-    pids.forEach((pid) => params.append('pids', pid));
-
-    const result = await del<number>(
-      `${BASE_URL}/batch?${params.toString()}`,
-      undefined,
-      undefined,
-      httpRequest,
+  async validateConfig(code: string, request?: Request) {
+    return data(
+      await internalRequest('get', '/api/meta/dict/{code}/validate', { path: { code }, request }),
+      'Failed to validate dictionary',
     );
-    return handleResponse(result, 'Failed to batch delete dictionaries');
   },
-
-  /**
-   * Search dictionaries
-   */
-  async search(keyword: string, httpRequest?: Request): Promise<DictDTO[]> {
-    const params = new URLSearchParams({ keyword });
-    const result = await get<DictDTO[]>(
-      `${BASE_URL}/search?${params.toString()}`,
-      undefined,
-      undefined,
-      httpRequest,
+  async checkCodeUnique(code: string, excludePid?: string, request?: Request) {
+    return data(
+      await internalRequest('get', '/api/meta/dict/code/{code}/unique', {
+        path: { code },
+        query: { excludePid },
+        request,
+      }),
+      'Failed to check code uniqueness',
     );
-    return handleResponse(result, 'Failed to search dictionaries');
   },
-
-  /**
-   * Load all published dictionaries (convenience wrapper over query).
-   * Used by dict-select property fields in the designer.
-   */
-  async findAll(httpRequest?: Request): Promise<DictDTO[]> {
-    const result = await dictService.query(
-      { pageNum: 1, pageSize: 1000, status: 'published' },
-      httpRequest,
+  async batchDelete(pids: string[], request?: Request) {
+    return data(
+      await internalRequest('delete', '/api/meta/dict/batch', { query: { pids }, request }),
+      'Failed to batch delete dictionaries',
     );
-    return result.records ?? [];
+  },
+  async search(keyword: string, request?: Request) {
+    return data(
+      await internalRequest('get', '/api/meta/dict/search', { query: { keyword }, request }),
+      'Failed to search dictionaries',
+    ).map(dictionaryView);
+  },
+  async findAll(request?: Request): Promise<DictDTO[]> {
+    return (await dictService.query({ pageNum: 1, pageSize: 1000, status: 'published' }, request))
+      .records;
   },
 };

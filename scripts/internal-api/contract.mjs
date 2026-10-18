@@ -36,7 +36,7 @@ export function operations(document) {
   return rows.sort((a, b) => `${a.path} ${a.method}`.localeCompare(`${b.path} ${b.method}`, 'en'));
 }
 
-function resolvePointer(document, reference) {
+export function resolvePointer(document, reference) {
   requireCondition(reference.startsWith('#/'), `Only bundled local references are allowed: ${reference}`);
   let value = document;
   for (const token of reference.slice(2).split('/')) {

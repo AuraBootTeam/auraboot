@@ -3,10 +3,18 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
-import { canonicalJson, normalizeDocument, sha256 } from '../contract.mjs';
+import { canonicalJson, normalizeDocument, operations, requireCondition, resolvePointer, sha256 } from '../contract.mjs';
 
 export async function generateTypes(document) {
   const normalized = normalizeDocument(document);
+  for (const row of operations(normalized)) {
+    for (const raw of [...(row.pathItem.parameters ?? []), ...(row.operation.parameters ?? [])]) {
+      const parameter = raw.$ref ? resolvePointer(normalized, raw.$ref) : raw;
+      if (parameter.in !== 'query') continue;
+      requireCondition((parameter.style ?? 'form') === 'form' && (parameter.explode ?? true) === true,
+        `Internal query serializer does not support ${parameter.style}/${parameter.explode}: ${row.method} ${row.path}`);
+    }
+  }
   const nodes = await openapiTS(normalized, {
     alphabetize: true,
     // A bare object must not silently become an unrestricted record.

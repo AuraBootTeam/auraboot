@@ -52,7 +52,19 @@ export function buildRequest(
   url: string;
   init: RequestInit;
 } {
-  const { method = 'get', params = {}, timeout, apiConfig, signal, keepalive, headers } = options;
+  const {
+    method = 'get',
+    params = {},
+    body,
+    timeout,
+    apiConfig,
+    signal,
+    keepalive,
+    headers,
+  } = options;
+  if (body !== undefined && ['get', 'head'].includes(method.toLowerCase())) {
+    throw new Error('GET and HEAD requests cannot carry a JSON body');
+  }
   const paramsAreArray = Array.isArray(params);
 
   // Step 1: Replace PathVariables and separate params
@@ -106,7 +118,9 @@ export function buildRequest(
 
   // Step 6: Add request body for non-GET requests. DELETE object params remain
   // query params for legacy endpoints; array params are JSON bodies for batch APIs.
-  if (method === 'delete' && paramsAreArray) {
+  if (body !== undefined) {
+    init.body = JSON.stringify(body);
+  } else if (method === 'delete' && paramsAreArray) {
     init.body = JSON.stringify(params);
   } else if (method === 'delete' && Object.keys(remainingParams).length > 0) {
     const deleteSearchParams = new URLSearchParams();
