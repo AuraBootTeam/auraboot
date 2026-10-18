@@ -2,7 +2,7 @@
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { PG_CONN } from '../../helpers/environments';
+import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 function events(text: string): Array<{ event: string; data: any }> {
   let event = '';
@@ -112,7 +112,7 @@ for (const mode of ['approve', 'deny', 'concurrent']) {
       expect(claims.sub).toBe(users[0].pid);
       expect(String(users[0].id)).not.toBe(String(agentRows[0].created_by));
       const foreign = await requestFactory.newContext({
-        baseURL: process.env.BACKEND_URL,
+        baseURL: BACKEND_URL,
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       try {
