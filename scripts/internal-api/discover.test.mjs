@@ -178,6 +178,13 @@ test('keeps replaceable route defaults and mutable bases outside proven source l
     get(fixed + '/accessible');
   ` }], document);
   assert.equal(result.calls.length, 5);
+  assert.equal(result.summary.sourceLinkedOperations, 1);
+  assert.equal(result.summary.candidateOperations, 1);
+  const defaultsOnly = discoverCalls([{ file: 'web-admin/app/default-only.ts', text: `
+    function configured(base = '/api/views') { fetch(base + '/accessible'); }
+  ` }], document);
+  assert.equal(defaultsOnly.summary.sourceLinkedOperations, 0);
+  assert.equal(defaultsOnly.summary.candidateOperations, 1);
   for (const row of result.calls.slice(0, 4)) {
     assert.equal(row.classification, 'route-input-needs-review');
     assert.equal(row.matches[0].operationId, 'accessible', 'Default match remains candidate evidence');

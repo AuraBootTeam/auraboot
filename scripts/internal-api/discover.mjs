@@ -257,10 +257,14 @@ export function discoverCalls(sources, document) {
   }
   const summary = Object.fromEntries([...new Set(calls.map(c => c.classification))].sort()
     .map(key => [key, calls.filter(c => c.classification === key).length]));
-  const selected = new Map();
-  for (const call of calls) for (const match of call.matches) selected.set(`${match.method} ${match.path}`, match);
+  const selected = new Map(), linked = new Set();
+  for (const call of calls) for (const match of call.matches) {
+    const key = `${match.method} ${match.path}`;
+    selected.set(key, match);
+    if (call.classification === 'source-linked') linked.add(key);
+  }
   return { summary: { files: sources.length, calls: calls.length, declarations: declarations.length,
-    sourceLinkedOperations: selected.size, classifications: summary },
+    sourceLinkedOperations: linked.size, candidateOperations: selected.size, classifications: summary },
     calls, declarations, operations: [...selected.values()].sort((a, b) => `${a.path} ${a.method}`.localeCompare(`${b.path} ${b.method}`, 'en')) };
 }
 
