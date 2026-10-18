@@ -4,7 +4,7 @@ package com.auraboot.framework.application.database.dialect;
  * Abstraction layer for database-specific SQL syntax.
  * <p>
  * Each method returns a SQL fragment that is valid for the target database.
- * Implementations exist for PostgreSQL and MySQL.
+ * Implementation: PostgreSQL (the platform database).
  */
 public interface DatabaseDialect {
 
@@ -19,7 +19,6 @@ public interface DatabaseDialect {
      * Extract a text value from a JSON/JSONB column.
      * <p>
      * PostgreSQL: {@code column ->> 'key'}
-     * MySQL:      {@code JSON_UNQUOTE(JSON_EXTRACT(column, '$.key'))}
      */
     String jsonExtractText(String column, String key);
 
@@ -27,7 +26,6 @@ public interface DatabaseDialect {
      * Test whether a JSON/JSONB column contains a key-value pair.
      * <p>
      * PostgreSQL: {@code column @> '{"key":"value"}'::jsonb}
-     * MySQL:      {@code JSON_CONTAINS(column, '"value"', '$.key')}
      */
     String jsonContains(String column, String key, String value);
 
@@ -37,7 +35,6 @@ public interface DatabaseDialect {
      * Cast an expression to a target SQL type.
      * <p>
      * PostgreSQL: {@code expression::targetType}
-     * MySQL:      {@code CAST(expression AS targetType)}
      *
      * @param expression SQL expression
      * @param targetType target type name (e.g. TEXT, INTEGER, BIGINT, BOOLEAN, TIMESTAMP)
@@ -50,7 +47,6 @@ public interface DatabaseDialect {
      * Case-insensitive LIKE condition.
      * <p>
      * PostgreSQL: {@code column ILIKE pattern}
-     * MySQL:      {@code LOWER(column) LIKE LOWER(pattern)}
      *
      * @param column  column name
      * @param pattern LIKE pattern (caller must include % wildcards)
@@ -63,7 +59,6 @@ public interface DatabaseDialect {
      * Build an upsert (insert-or-update) statement.
      * <p>
      * PostgreSQL: {@code INSERT INTO ... ON CONFLICT (keys) DO UPDATE SET ...}
-     * MySQL:      {@code INSERT INTO ... ON DUPLICATE KEY UPDATE ...}
      *
      * @param table        table name
      * @param columns      all columns to insert
@@ -77,7 +72,6 @@ public interface DatabaseDialect {
      * Database-native UUID generation function.
      * <p>
      * PostgreSQL: {@code gen_random_uuid()}
-     * MySQL:      {@code UUID()}
      */
     String generateUuid();
 
@@ -87,7 +81,6 @@ public interface DatabaseDialect {
      * Boolean literal for use in SQL.
      * <p>
      * PostgreSQL: {@code TRUE / FALSE}
-     * MySQL:      {@code TRUE / FALSE} (or 1/0 for older versions)
      */
     String booleanLiteral(boolean value);
 
@@ -96,7 +89,7 @@ public interface DatabaseDialect {
     /**
      * Pagination clause.
      * <p>
-     * Both PostgreSQL and MySQL support {@code LIMIT n OFFSET m},
+     ** PostgreSQL supports {@code LIMIT n OFFSET m},
      * but this method exists for future extensibility.
      */
     String paginationClause(int limit, int offset);
@@ -107,7 +100,6 @@ public interface DatabaseDialect {
      * Expression that returns the current timestamp.
      * <p>
      * PostgreSQL: {@code now()}
-     * MySQL:      {@code NOW()}
      */
     String currentTimestamp();
 }

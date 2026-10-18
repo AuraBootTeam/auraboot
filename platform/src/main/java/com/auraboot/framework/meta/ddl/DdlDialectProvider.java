@@ -44,9 +44,6 @@ public class DdlDialectProvider {
         if (name.contains("postgres")) {
             return new PostgresDdlDialect();
         }
-        if (name.contains("mysql")) {
-            return new MySqlDdlDialect();
-        }
 
         log.warn("Unsupported database {}, defaulting to PostgreSQL dialect", productName);
         return new PostgresDdlDialect();

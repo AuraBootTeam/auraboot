@@ -1,9 +1,9 @@
 # Flyway schema gate (OSS core): validate + fresh migrate + snapshot drift on
 # PostgreSQL + pgvector. End-state spec §3.6 / P3 CI.
 #
-# NOTE: GitHub Actions is currently DISABLED for this org (billing). This
-# workflow is the end-state gate, ready for when CI is re-enabled. It has NOT
-# been run in CI — verified locally instead via:
+# NOTE: GitHub Actions is enabled for this repository (2026-10-18). This gate
+# runs on demand via workflow_dispatch; local verification remains available
+# via:
 #   scripts/db/flyway-validate.sh --edition oss
 #   scripts/db/check-schema-drift.sh --edition oss
 name: schema-flyway

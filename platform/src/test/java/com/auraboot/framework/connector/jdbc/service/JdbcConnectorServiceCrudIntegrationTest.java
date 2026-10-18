@@ -29,8 +29,8 @@ class JdbcConnectorServiceCrudIntegrationTest extends BaseIntegrationTest {
 
     private JdbcConnectorCreateRequest req() {
         JdbcConnectorCreateRequest r = new JdbcConnectorCreateRequest();
-        r.setName("test-mysql");
-        r.setJdbcUrl("jdbc:mysql://localhost:3306/test");
+        r.setName("test-connector");
+        r.setJdbcUrl("jdbc:postgresql://localhost:5432/test");
         r.setUsername("root");
         r.setPassword("secret");
         r.setMaxPoolSize(3);
@@ -79,7 +79,7 @@ class JdbcConnectorServiceCrudIntegrationTest extends BaseIntegrationTest {
         assertThat(found).isNotNull();
         assertThat(found.getPid()).isEqualTo(created.getPid());
         assertThat(found.getName()).isEqualTo("roundtrip");
-        assertThat(found.getJdbcUrl()).isEqualTo("jdbc:mysql://localhost:3306/test");
+        assertThat(found.getJdbcUrl()).isEqualTo("jdbc:postgresql://localhost:5432/test");
     }
 
     @Test

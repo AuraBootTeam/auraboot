@@ -128,13 +128,14 @@ chore: upgrade Spring Boot to 3.5.1
 
 ### CI & Validation
 
-> **GitHub Actions are disabled for this repository.** Pull requests will not
-> show CI checks, and that is expected. Validation runs through the
-> repository's self-contained local gates instead: the `scripts/check-*.sh`
-> suite (boundary, scope, schema, docs), the Gradle test gates
+> **GitHub Actions runs on this repository** (public repo — Actions are free).
+> Pull requests show the repository's workflow gates as checks, and pushes to
+> `main` run them too. For fast local feedback before pushing, the
+> self-contained gates remain available: the `scripts/check-*.sh` suite
+> (boundary, scope, schema, docs), the Gradle test gates
 > (`./gradlew test` / `check`), and the Playwright suites under `tests/e2e`.
-> Please run the relevant gates locally before submitting — the review
-> process re-runs them on the maintainer side.
+> If a CI check fails, fix the workflow or the code — either is a normal pull
+> request change.
 
 ### Workflow
 
