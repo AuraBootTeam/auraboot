@@ -168,7 +168,7 @@ test('generated team memberships preserve the menu add reload and remove journey
         rows,
         pageErrors,
         journeyError: journeyError ? String(journeyError) : null,
-        cleanupErrors: cleanupErrors.map(String),
+        sessionCleanup: actor.sessionCleanup, cleanupErrors: cleanupErrors.map(String),
       }),
       contentType: 'application/json',
     });

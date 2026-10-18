@@ -91,7 +91,7 @@ test('dashboard usage and account logout survive missing randomUUID', async ({ b
     await info.attach('session-compatibility-evidence', { body: JSON.stringify({
       claim: 'owned-browser-capability-and-session-journey; no response-schema acceptance',
       userPid: actor.userPid, checks, widgetResults, pageErrors,
-      journeyError: journeyError ? String(journeyError) : null, cleanupErrors: cleanupErrors.map(String),
+      journeyError: journeyError ? String(journeyError) : null, sessionCleanup: actor.sessionCleanup, cleanupErrors: cleanupErrors.map(String),
     }), contentType: 'application/json' });
   }
   if (journeyError || cleanupErrors.length) throw new AggregateError(

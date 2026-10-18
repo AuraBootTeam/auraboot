@@ -162,3 +162,53 @@ versions remain excluded from the normal management list. Version, status and
 PID identify the selected record; unpublish changes status to `deprecated` and
 clears its current-version flag. A batch deletion response is the actual number
 deleted and may be zero for protected published records.
+
+## Registered browser evidence
+
+The offline foundation independently enumerates `tests/e2e/**/internal-api-*.spec.ts`
+and `tests/api/internal-api/*.spec.ts`. It parses their Playwright test declarations,
+literal scene captures and mandatory JSON attachments, then reconciles that source
+registry with `scripts/internal-api/catalog.json`. Missing tests, empty evidence
+bodies, duplicate scenes, dynamic titles and skip/only declarations fail. The
+registry is the denominator for these registered journeys, not for all Web Admin
+APIs. Archive-mode foundation also includes the spec input bytes in its digest.
+
+After the exact committed runtime is fully started and verified, load its managed
+environment and run a fresh attempt outside the source checkout:
+
+```sh
+eval "$(scripts/oss-golden-stack.sh env RUNTIME_NAME)"
+node scripts/internal-api/browser.mjs run \
+  --evidence ABSOLUTE_FRESH_ATTEMPT_DIRECTORY \
+  --manifest ABSOLUTE_RUNTIME_PRODUCT_MANIFEST \
+  --runtime-command ABSOLUTE_WORKSPACE_AURA_COMMAND --runtime RUNTIME_NAME
+```
+
+The runner requires a clean checkout, matching Web/BFF/backend/database bindings,
+and successful managed runtime verification before and after execution. It saves
+source/tree, contract/type/toolchain/catalog/registry digests and the exact runtime
+manifest before running all registered tests without dependencies, retries or skips.
+The attempt directory and credentials-bearing traces remain private. Its explicit
+owned-fixture mode disables the broad shared-data teardown only for the contract
+profile; each journey remains responsible for its owned records and fresh sessions.
+
+`functional-catalog-receipt.json` requires every registered test exactly once,
+mandatory nonempty observations, passing response structures, no recorded journey
+or cleanup errors, and each scene's annotation, attachment and original PNG bytes.
+It retains `visualVerdict: pending`. It is not a release-qualification receipt.
+
+Individually open every original, then supply a review with `sourceCommit`,
+`reportSha256`, `catalogSha256`, and one `rows` entry per scene containing `id`,
+`screenshotSha256`, `verdict: pass`, `reviewMethod: individual-original-image-opened`
+and a concrete `finding`. Collect it separately:
+
+```sh
+node scripts/internal-api/browser.mjs collect \
+  --evidence ABSOLUTE_ATTEMPT_DIRECTORY --review ABSOLUTE_ORIGINAL_REVIEW_JSON
+```
+
+A missing, duplicate, stale, mismatched or unreviewed image prevents a reviewed
+receipt. Evidence paths must remain inside the attempt, including symlink targets.
+Functional and visual receipts preserve the actual executed commit. They do not
+certify unregistered domain branches, global absence of session residue, JSON
+formats, or the separate admitted Linux release-image gate.

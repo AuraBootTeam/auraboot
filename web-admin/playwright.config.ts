@@ -47,6 +47,9 @@ const enterpriseQuoteOpsGatePattern = new RegExp(
 
 const enableRoleProjects = process.env.PW_ROLE_PROJECTS === '1';
 const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
+const internalApiOwnedFixturesOnly = process.env.PW_INTERNAL_API_OWNED_FIXTURES_ONLY === '1';
+if (internalApiOwnedFixturesOnly && runProfile !== 'contract')
+  throw new Error('Owned internal API fixtures require PW_PROFILE=contract');
 const storageDir = process.env.PW_STORAGE_DIR;
 const storageStatePath = (envName: string, fileName: string, fallback: string) =>
   process.env[envName] || (storageDir ? `${storageDir}/${fileName}` : fallback);
@@ -229,7 +232,7 @@ export default defineConfig({
   outputDir: artifactDir,
 
   // Global teardown only (login moved to 'auth' setup project)
-  globalTeardown: './tests/global-teardown.ts',
+  globalTeardown: internalApiOwnedFixturesOnly ? undefined : './tests/global-teardown.ts',
 
   // Test execution settings
   fullyParallel: false,

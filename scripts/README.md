@@ -348,6 +348,9 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `internal-api/export.mjs` | contract | Export or compare the internal OpenAPI group and create a fresh source-bound export receipt. |
 | `internal-api/toolchain/generate.mjs` | codegen | Generate or check TypeScript declarations using the isolated, locked OpenAPI toolchain. |
 
+| `internal-api/browser-catalog.mjs` | contract | Reconcile independently enumerated spec tests, scene captures and JSON evidence declarations with the fixed catalog. |
+| `internal-api/browser-evidence.mjs` | contract | Validate source/runtime/report identity, mandatory observations and exact original-image review; retain functional and visual verdicts separately. |
+| `internal-api/browser.mjs` | contract | Run owned catalog journeys against a verified managed stack and collect fresh source-bound functional or reviewed evidence. |
 | `internal-api/foundation.mjs` | contract | Verify canonical spec, generated declarations and the exact registered offline unit denominator; emit a fresh source-bound consistency receipt. |
 | `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
 | `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |

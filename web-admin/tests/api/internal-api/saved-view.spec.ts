@@ -355,7 +355,7 @@ test('generated SavedView operations preserve owned configuration and public sha
           observed: [...observed].sort(),
           owned: [...owned],
           rows,
-          cleanupErrors: cleanupErrors.map(String),
+          sessionCleanup: actor.sessionCleanup, cleanupErrors: cleanupErrors.map(String),
           journeyError: journeyError ? String(journeyError) : null,
         },
         null,

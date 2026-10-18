@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { loadBrowserCatalog, listBrowserSpecFiles } from './browser-catalog.mjs';
 import path from 'node:path';
 import { run } from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -36,10 +37,12 @@ export async function main(args) {
       .filter(file => !file.includes('node_modules') && fs.statSync(path.join(root, 'scripts/internal-api', file)).isFile())
       .map(file => `scripts/internal-api/${file}`)
       .concat(['contracts/internal-web-admin/openapi.json', 'web-admin/app/generated/internal-api/schema.d.ts']);
-    const inputDigest = () => sha256(scopedFiles.sort().map(file => `${file}\n${sha256(fs.readFileSync(path.join(root,file)))}`).join('\n'));
+    const inputDigest = () => sha256([...new Set([...scopedFiles, ...listBrowserSpecFiles(root)])].sort().map(file => `${file}\n${sha256(fs.readFileSync(path.join(root,file)))}`).join('\n'));
     result.inputSha256 = inputDigest();
     const catalog = JSON.parse(fs.readFileSync(path.join(root, 'scripts/internal-api/catalog.json'), 'utf8'));
     const profile = catalog.profiles.foundation;
+    const browserCatalog = loadBrowserCatalog(root, catalog);
+    result.checks.push({ name: 'browser-catalog-source-denominator', verdict: 'pass', tests: browserCatalog.tests.length, scenarios: browserCatalog.scenarios.length });
     const file = 'contracts/internal-web-admin/openapi.json';
     const raw = fs.readFileSync(path.join(root, file), 'utf8');
     const document = normalizeDocument(JSON.parse(raw));

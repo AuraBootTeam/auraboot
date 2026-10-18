@@ -268,7 +268,7 @@ test('generated SavedView sharing preserves the owner and anonymous browser jour
           rows,
           owned: { userPid: actor.userPid, viewPid: pid, teamPid },
           journeyError: journeyError ? String(journeyError) : null,
-          cleanupErrors: cleanupErrors.map(String),
+          sessionCleanup: actor.sessionCleanup, cleanupErrors: cleanupErrors.map(String),
         },
         null,
         2,

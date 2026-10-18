@@ -27,7 +27,7 @@ test('CLI entrypoints reject missing arguments when invoked through a symlink', 
   const {spawnSync} = await import('node:child_process');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'internal-api-cli-'));
   try {
-    for (const script of ['foundation.mjs','drift.mjs','export.mjs','discover.mjs','toolchain/generate.mjs']) {
+    for (const script of ['foundation.mjs','browser.mjs','drift.mjs','export.mjs','discover.mjs','toolchain/generate.mjs']) {
       const link = path.join(directory, script.replaceAll('/','-'));
       fs.symlinkSync(fileURLToPath(new URL(script, import.meta.url)), link);
       const child = spawnSync(process.execPath,[link],{encoding:'utf8',timeout:20000});

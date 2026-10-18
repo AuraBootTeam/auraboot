@@ -195,7 +195,7 @@ test('generated team operations preserve owned memberships and nullable response
           'listed-team-json-structure-and-owned-membership-invariants; no tenant/role or format acceptance',
         rows,
         journeyError: journeyError ? String(journeyError) : null,
-        cleanupErrors: cleanupErrors.map(String),
+        sessionCleanup: actor.sessionCleanup, cleanupErrors: cleanupErrors.map(String),
       }),
       contentType: 'application/json',
     });

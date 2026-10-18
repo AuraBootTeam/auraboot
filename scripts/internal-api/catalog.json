@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "scope": "Internal API contract delivery; initial foundation and dictionary scenarios",
+  "scope": "Registered internal API offline guards and owned real-stack journeys; not complete domain migration or release qualification",
   "completionRequires": [
     "all-consumers-reconciled",
     "all-domains-migrated",
@@ -18,7 +18,9 @@
         "foundation.test.mjs",
         "drift.test.mjs",
         "response-shape.test.mjs",
-        "source-graph.test.mjs"
+        "source-graph.test.mjs",
+        "browser-catalog.test.mjs",
+        "browser-evidence.test.mjs"
       ],
       "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json",
       "unitTests": [
@@ -50,7 +52,11 @@
         "core release projection permits product additions but rejects core schema parameter and security drift",
         "enumerates finite route branches and retains every missing external or unbounded alternative",
         "retains aliased bound and injected network transports without marking shadowed generated calls migrated",
-        "keeps replaceable route defaults and mutable bases outside proven source links"
+        "keeps replaceable route defaults and mutable bases outside proven source links",
+        "browser catalog reconciles independent spec tests scenes and mandatory JSON evidence",
+        "browser catalog rejects missing empty skipped shadowed dynamic duplicated or unregistered evidence",
+        "browser evidence separates functional execution from exact original review and source runtime identity",
+        "browser evidence rejects stale failed skipped retried missing mismatched or unreviewed attempts"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },
