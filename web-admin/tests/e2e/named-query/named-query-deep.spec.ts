@@ -36,6 +36,8 @@ async function createThroughUi(page: Page, code: string, sql: string): Promise<Q
 async function tab(page: Page, query: Query, name: 'basic' | 'fields' | 'test' | 'policy' | 'versions') {
   const nq = new NamedQueryPage(page);
   await nq.gotoEdit(query.pid);
+  // Monaco is created by this route's client effect, unlike its SSR tab buttons.
+  await expect(page.locator('.monaco-editor').first()).toBeVisible();
   await nq.clickTab(name);
   return nq;
 }
@@ -166,7 +168,6 @@ test.describe('Named Query Deep', () => {
     await nq.savePolicyButton.click();
     expect((await success(await response)).policy.maxRows).toBe(2000);
     await page.reload();
-    await new NamedQueryPage(page).clickTab('policy');
     await expect(nq.policyMaxRows).toHaveValue('2000');
     expect((await success(await page.request.get(`/api/meta/named-queries/${base.pid}`))).policy.maxRows).toBe(2000);
     await capture(page, info, 'NQ-D07-policy-reloaded');
@@ -191,7 +192,6 @@ test.describe('Named Query Deep', () => {
     await page.getByRole('button', { name: '添加', exact: true }).click();
     expect(await success(await response)).toMatchObject({ fieldCode: 'customer_name', columnExpr: 'customer_name' });
     await page.reload();
-    await new NamedQueryPage(page).clickTab('fields');
     await expect(page.locator('table tbody tr').filter({ hasText: 'customer_name' })).toHaveCount(1);
     const fields = await success(await page.request.get(`/api/meta/named-queries/${base.code}/fields`));
     expect(fields.map((f: { fieldCode: string }) => f.fieldCode).sort()).toEqual(['customer_name', 'pid', 'title']);
@@ -234,6 +234,7 @@ test.describe('Named Query Deep', () => {
     await status(page.request, base, 'archived');
     const nq = new NamedQueryPage(page);
     await nq.gotoList();
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     await page.locator('select').first().selectOption('archived');
     const row = nq.queryTable.locator('tbody tr').filter({ hasText: base.code });
     await expect(row).toBeVisible();
