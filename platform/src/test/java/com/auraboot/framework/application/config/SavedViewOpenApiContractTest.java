@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.config;
 
 import com.auraboot.framework.view.dto.PublicSharedViewResponse;
+import com.auraboot.framework.tenant.dto.MemberSearchOption;
 import com.auraboot.framework.view.dto.SavedViewAuditEventDTO;
 import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.ViewShareResponse;
@@ -47,6 +48,14 @@ class SavedViewOpenApiContractTest {
         assertThat(metadata.isObject()).isTrue();
         assertThat(metadata.path("$ref").isMissingNode()).isTrue();
         assertThat(metadata.path("properties").isMissingNode()).isTrue();
+    }
+
+    @Test
+    void collaboratorSearchPreservesNoEmailAccountsAndMissingOptionalIdentityMetadata() {
+        var node = schema(MemberSearchOption.UserIdentity.class);
+        for (var field : new String[]{"email", "realName", "avatar"}) {
+            assertThat(node.at("/properties/" + field + "/type").toString()).contains("null");
+        }
     }
 
     @Test

@@ -334,20 +334,8 @@ python3 "$STAGE/scripts/ci/open_platform_quick_ui.py" verify --archive "$OPEN_PL
   --root "$STAGE" --expected-ref "$REF_SHA" > "$ARTIFACTS/quick-ui-receipt.json" \
   2> "$ARTIFACTS/logs/quick-ui.log" || fail "quick-access UI evidence incomplete or from another candidate"
 
-info "verifying the internal Web Admin contract from this release container"
 INTERNAL_API_ARTIFACTS="$ARTIFACTS/internal-api"
 mkdir "$INTERNAL_API_ARTIFACTS"
-docker exec "$APP" wget -q -O - http://localhost:6443/v3/api-docs/internal-web-admin \
-  > "$INTERNAL_API_ARTIFACTS/openapi.json" || fail "internal API release-container export failed"
-node "$STAGE/scripts/internal-api/drift.mjs" "$INTERNAL_API_ARTIFACTS/openapi.json" \
-  "$INTERNAL_API_ARTIFACTS/drift-receipt.json" \
-  > "$ARTIFACTS/logs/internal-api-drift.log" 2>&1 || fail "internal API release-container contract drift"
-npm_config_cache="$WORK_ROOT/internal-api-npm-cache" timeout 300 npm ci \
-  --prefix "$STAGE/scripts/internal-api/toolchain" --ignore-scripts --no-audit --no-fund \
-  > "$ARTIFACTS/logs/internal-api-toolchain.log" 2>&1 || fail "locked internal API toolchain unavailable"
-node "$STAGE/scripts/internal-api/foundation.mjs" --evidence "$INTERNAL_API_ARTIFACTS/foundation" \
-  --archive-source "$REF_SHA" \
-  > "$ARTIFACTS/logs/internal-api-foundation.log" 2>&1 || fail "internal API offline consistency gate failed"
 
 info "running two-domain HTTP protocol probe"
 # Create the secret handoff as the unprivileged host runner before the rootful helper container
@@ -358,6 +346,7 @@ chmod 0600 "$CREDENTIAL_ARTIFACT"
 APP_BIND="$(docker port "$APP" 6443/tcp)"
 [[ "$APP_BIND" =~ ^127\.0\.0\.1:[0-9]+$ ]] || fatal "release app protocol binding is not loopback-only"
 BASE_URL="http://$APP_BIND" CREDENTIAL_ARTIFACT="$CREDENTIAL_ARTIFACT" \
+INTERNAL_API_DOCUMENT="$INTERNAL_API_ARTIFACTS/openapi.json" \
 SDK_RUNNER_USER="$RUNNER_UID:$RUNNER_GID" SDK_NETWORK="$NET" SDK_CONSUMER_ROOT="$SDK_ROOT/consumer" \
 SDK_NODE_IMAGE="$SDK_NODE_IMAGE" SDK_BASE_URL="http://app:6443" \
 MODEL_APP="$APP" MODEL_POSTGRES="$PG" MODEL_SOURCE_REF="$REF_SHA" MODEL_IMAGE_DIGEST="$DIGEST" \
@@ -367,6 +356,17 @@ MODEL_EVENT_SECRET_FILE="$MODEL_EVENT_SECRET_FILE" SLO_FIXTURE_ARTIFACT="$SLO_FI
 python3 "$STAGE/scripts/ci/open-platform-release-probe.py" \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
+info "verifying the internal Web Admin contract from this release container"
+node "$STAGE/scripts/internal-api/drift.mjs" "$INTERNAL_API_ARTIFACTS/openapi.json" \
+  "$INTERNAL_API_ARTIFACTS/drift-receipt.json" \
+  > "$ARTIFACTS/logs/internal-api-drift.log" 2>&1 || fail "internal API release-container contract drift"
+npm_config_cache="$WORK_ROOT/internal-api-npm-cache" timeout 300 npm ci \
+  --prefix "$STAGE/scripts/internal-api/toolchain" --ignore-scripts --no-audit --no-fund \
+  > "$ARTIFACTS/logs/internal-api-toolchain.log" 2>&1 || fail "locked internal API toolchain unavailable"
+node "$STAGE/scripts/internal-api/foundation.mjs" --evidence "$INTERNAL_API_ARTIFACTS/foundation" \
+  --archive-source "$REF_SHA" \
+  > "$ARTIFACTS/logs/internal-api-foundation.log" 2>&1 || fail "internal API offline consistency gate failed"
+
 python3 "$STAGE/scripts/ci/open_platform_dynamic_probe.py" --verify-release-report "$ARTIFACTS/protocol-probe.json" \
   --model-event-secret-file "$MODEL_EVENT_SECRET_FILE" \
   || fail "dynamic business case reconciliation failed"
