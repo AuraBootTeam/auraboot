@@ -663,4 +663,163 @@ class DecisionEvaluationServiceImplTest {
             assertThat(snapshot).doesNotContain("factMetadata");
         }
     }
+
+    @Nested
+    @DisplayName("引用值标签解析")
+    class ReferenceValueLabels {
+
+        private DecisionFactDTO referenceFact(String dataType, Map<String, Object> reference) {
+            DecisionFactDTO fact = new DecisionFactDTO();
+            fact.setFactKey("owner_ref");
+            fact.setScope("record");
+            fact.setPath("data.owner");
+            fact.setLabel("负责人");
+            fact.setDataType(dataType);
+            if (reference != null) {
+                fact.setReference(reference);
+            }
+            fact.setMasked(false);
+            return fact;
+        }
+
+        private DrtLogEntity evaluateWithFact(DecisionFactDTO fact) {
+            DrtVersionEntity entity = version(2, VersionStatus.PUBLISHED.name());
+            entity.setContentJson(objectMapper.valueToTree(Map.of("rules", List.of())));
+            DecisionResult runtimeResult = DecisionResult.builder("sla_auto_approve")
+                    .traceId("tr-ref")
+                    .status(DecisionStatus.NOT_MATCHED)
+                    .matched(false)
+                    .build();
+            when(versionMapper.findAllByCode(42L, "sla_auto_approve")).thenReturn(List.of(entity));
+            when(decisionRuntime.evaluate(any(), any(), any())).thenReturn(runtimeResult);
+            // 目录里登记同一个 fact:loose-alias 命中后才产出元数据快照
+            DecisionFactEntityDTO catalogEntity = new DecisionFactEntityDTO();
+            catalogEntity.setModelCode("crm_customer");
+            catalogEntity.setSourceRef("crm.customer");
+            catalogEntity.setFacts(List.of(fact));
+            DecisionFactCatalogDTO catalog = new DecisionFactCatalogDTO();
+            catalog.setEntities(List.of(catalogEntity));
+            when(decisionModelFieldService.getFactCatalog(org.mockito.ArgumentMatchers.nullable(String.class)))
+                    .thenReturn(catalog);
+
+            DrtEvaluateRequest request = request();
+            request.setContext(Map.of(
+                    "record", Map.of("data", Map.of("owner", "rec-9")),
+                    "meta", Map.of()));
+            service.evaluate(request);
+            ArgumentCaptor<DrtLogEntity> captor = ArgumentCaptor.forClass(DrtLogEntity.class);
+            verify(logMapper).insert(captor.capture());
+            return captor.getValue();
+        }
+
+        private com.auraboot.framework.meta.service.DynamicDataService stubDynamicData() {
+            com.auraboot.framework.meta.service.DynamicDataService dynamicData =
+                    org.mockito.Mockito.mock(com.auraboot.framework.meta.service.DynamicDataService.class);
+            when(dynamicDataServiceProvider.getIfAvailable()).thenReturn(dynamicData);
+            return dynamicData;
+        }
+
+        @Test
+        @DisplayName("模型引用：按 displayField 从动态数据解析展示标签")
+        void modelReferenceResolvesDisplayLabel() {
+            var dynamicData = stubDynamicData();
+            when(dynamicData.getById("crm_customer", "rec-9"))
+                    .thenReturn(Map.of("displayName", "Acme Corp", "code", "acme"));
+
+            DrtLogEntity logEntry = evaluateWithFact(referenceFact(
+                    "reference", Map.of("targetEntity", "crm_customer", "displayField", "displayName")));
+
+            String snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).contains("valueLabels");
+            assertThat(snapshot).contains("Acme Corp");
+        }
+
+        @Test
+        @DisplayName("user 引用走租户内用户查询，displayName 优先")
+        void userReferenceResolvesDisplayName() {
+            com.auraboot.framework.user.dto.UserSearchDTO user = new com.auraboot.framework.user.dto.UserSearchDTO();
+            user.setPid("rec-9");
+            user.setDisplayName("张三");
+            user.setEmail("zhang@example.com");
+            when(userService.findInTenantByPid(eq(42L), anyString())).thenReturn(user);
+
+            // dataType=user 即用户引用,无需 reference map
+            DrtLogEntity logEntry = evaluateWithFact(referenceFact("user", null));
+
+            String snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).contains("张三");
+        }
+
+        @Test
+        @DisplayName("动态数据服务不可用或查询异常时不出标签也不炸评估")
+        void serviceUnavailableAndFailureFailSoft() {
+            // 服务缺失:标签解析静默跳过
+            when(dynamicDataServiceProvider.getIfAvailable()).thenReturn(null);
+            DrtLogEntity logEntry = evaluateWithFact(referenceFact(
+                    "reference", Map.of("targetEntity", "crm_customer", "displayField", "displayName")));
+            String snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).contains("owner_ref");
+
+            // 服务查询异常:同样 fail-soft
+            var dynamicData = stubDynamicData();
+            when(dynamicData.getById(anyString(), anyString()))
+                    .thenThrow(new IllegalStateException("lookup down"));
+            org.mockito.Mockito.reset(logMapper);
+            logEntry = evaluateWithFact(referenceFact(
+                    "reference", Map.of("targetEntity", "crm_customer", "displayField", "displayName")));
+            snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).contains("owner_ref");
+        }
+
+        @Test
+        @DisplayName("非引用类型或上下文缺值时短路")
+        void nonReferenceAndMissingValueShortCircuit() {
+            // 非引用类型且无 targetEntity → 不进解析
+            DrtLogEntity logEntry = evaluateWithFact(referenceFact("STRING", null));
+            String snapshot = String.valueOf(logEntry.getTraceSnapshot());
+            assertThat(snapshot).doesNotContain("valueLabels");
+
+            // 引用类型但上下文无该路径 → 无值可解析
+            DrtEvaluateRequest request = request();
+            request.setContext(Map.of("record", Map.of("data", Map.of("other", 1))));
+            when(versionMapper.findAllByCode(42L, "sla_auto_approve"))
+                    .thenReturn(List.of(version(2, VersionStatus.PUBLISHED.name())));
+            when(decisionRuntime.evaluate(any(), any(), any())).thenReturn(
+                    DecisionResult.builder("sla_auto_approve").traceId("tr-ref")
+                            .status(DecisionStatus.NOT_MATCHED).matched(false).build());
+            stubDynamicData();
+            service.evaluate(request);
+        }
+
+        @Test
+        @DisplayName("集合值取 pid 标量并逐个解析")
+        void collectionValuesResolveEach() {
+            var dynamicData = stubDynamicData();
+            when(dynamicData.getById("crm_customer", "rec-9")).thenReturn(Map.of("name", "Acme"));
+            when(dynamicData.getById("crm_customer", "rec-B")).thenReturn(Map.of("name", "Globex"));
+
+            DrtEvaluateRequest request = request();
+            request.setContext(Map.of("record", Map.of("data",
+                    Map.of("owner", List.of(Map.of("pid", "rec-9"), Map.of("pid", "rec-B"))))));
+            when(versionMapper.findAllByCode(42L, "sla_auto_approve"))
+                    .thenReturn(List.of(version(2, VersionStatus.PUBLISHED.name())));
+            when(decisionRuntime.evaluate(any(), any(), any())).thenReturn(
+                    DecisionResult.builder("sla_auto_approve").traceId("tr-ref")
+                            .status(DecisionStatus.NOT_MATCHED).matched(false).build());
+            DecisionFactEntityDTO catalogEntity = new DecisionFactEntityDTO();
+            catalogEntity.setModelCode("crm_customer");
+            catalogEntity.setFacts(List.of(referenceFact(
+                    "reference", Map.of("targetEntity", "crm_customer", "displayField", "name"))));
+            DecisionFactCatalogDTO catalog = new DecisionFactCatalogDTO();
+            catalog.setEntities(List.of(catalogEntity));
+            when(decisionModelFieldService.getFactCatalog(org.mockito.ArgumentMatchers.nullable(String.class)))
+                    .thenReturn(catalog);
+            service.evaluate(request);
+
+            ArgumentCaptor<DrtLogEntity> captor = ArgumentCaptor.forClass(DrtLogEntity.class);
+            verify(logMapper).insert(captor.capture());
+            String snapshot = String.valueOf(captor.getValue().getTraceSnapshot());
+            assertThat(snapshot).contains("Acme").contains("Globex");
+        }
+    }
 }
