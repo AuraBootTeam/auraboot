@@ -28,6 +28,8 @@ test('response shape validates nested references required fields nullability arr
 });
 
 test('response shape refuses undeclared operations statuses media and validates error response references', () => {
+  const legacy = fixture(); legacy.openapi = '3.0.3';
+  assert.throws(() => createResponseShapeValidator(legacy), /requires OpenAPI 3.1/);
   const validate = createResponseShapeValidator(fixture());
   assert.throws(() => validate({ ...response({}), path: '/api/unknown' }), /Undeclared response operation/);
   assert.throws(() => validate({ ...response({}), status: 500 }), /Undeclared response status/);

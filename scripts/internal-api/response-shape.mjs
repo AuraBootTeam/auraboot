@@ -7,6 +7,7 @@ const Ajv = require('@redocly/ajv/dist/2020.js').default;
 /** Validate JSON response structure. Formats and business invariants require separate assertions. */
 export function createResponseShapeValidator(document) {
   validateDocument(document);
+  requireCondition(/^3\.1\./.test(document.openapi), 'Response shape validation requires OpenAPI 3.1 JSON Schema semantics');
   const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false });
   const compiled = new Map();
   const dereference = value => value?.$ref ? resolvePointer(document, value.$ref) : value;
