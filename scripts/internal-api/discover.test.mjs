@@ -92,3 +92,32 @@ test('counts generated operations without mistaking request headers or request c
   assert.equal(shadowed.calls[0].classification, 'source-linked');
   assert.equal(shadowed.calls[0].matches[0].operationId, 'accessible');
 });
+
+
+test('enumerates finite route branches and retains every missing external or unbounded alternative', () => {
+  const result = discoverCalls([{ file: 'web-admin/app/branches.ts', text: `
+    import {get} from './http-client';
+    const query = enabled ? '?q=one' : '';
+    get(\`/api/views/accessible\${query}\`);
+    get(enabled ? '/api/views/accessible' : '/api/views/other');
+    get(enabled ? '/api/views/accessible' : '/api/missing');
+    get(enabled ? '/api/views/accessible' : 'https://external.invalid/api/views');
+    get(enabled ? '/api/views/accessible' : computeRoute());
+    const bit = enabled ? 'a' : 'b';
+    get('/api/' + bit + bit + bit + bit + bit + bit);
+  ` }], document);
+  assert.equal(result.calls.length, 6);
+  assert.equal(result.calls[0].classification, 'source-linked');
+  assert.deepEqual(result.calls[0].branches.map(b => b.route), ['/api/views/accessible?q=one', '/api/views/accessible']);
+  assert.equal(result.calls[0].matches.length, 1);
+  assert.equal(result.calls[1].classification, 'source-linked');
+  assert.deepEqual(result.calls[1].matches.map(m => m.operationId), ['accessible', 'read']);
+  assert.equal(result.calls[2].classification, 'unresolved-route-branches');
+  assert.deepEqual(result.calls[2].branches.map(b => b.classification), ['source-linked', 'unmatched-operation']);
+  assert.equal(result.calls[3].classification, 'unresolved-route-branches');
+  assert.equal(result.calls[3].branches[1].classification, 'absolute-origin-needs-review');
+  assert.equal(result.calls[4].classification, 'unresolved-route-branches');
+  assert.equal(result.calls[4].branches[1].classification, 'unresolved-route');
+  assert.equal(result.calls[5].classification, 'unresolved-route');
+  assert.equal(result.calls[5].branches[0].route, null);
+});

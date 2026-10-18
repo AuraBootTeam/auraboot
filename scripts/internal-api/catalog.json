@@ -47,7 +47,8 @@
         "source graph follows router resources and workspace exports while retaining type-only candidates",
         "source graph keeps missing imports dynamic modules and indirect route files unresolved",
         "source graph respects package export boundaries and rejects ambiguous source identities",
-        "core release projection permits product additions but rejects core schema parameter and security drift"
+        "core release projection permits product additions but rejects core schema parameter and security drift",
+        "enumerates finite route branches and retains every missing external or unbounded alternative"
       ],
       "runner": "scripts/internal-api/foundation.mjs"
     },

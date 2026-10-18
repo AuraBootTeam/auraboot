@@ -80,6 +80,40 @@ export function discoverCalls(sources, document) {
       if (ts.isIdentifier(n) || ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n)) return `{${placeholder(n)}}`;
       return undefined;
     }
+    // Enumerate syntactic finite alternatives without selecting a runtime branch.
+    // A cap preserves pathological expressions as unresolved rather than truncating.
+    function routeAlternatives(n, visited = new Set()) {
+      if (!n) return [undefined];
+      const unique = values => [...new Set(values)];
+      const product = (left, right) => {
+        if (left.length * right.length > 32) return [undefined];
+        return unique(left.flatMap(a => right.map(b => a === undefined || b === undefined ? undefined : a + b)));
+      };
+      if (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isNonNullExpression(n))
+        return routeAlternatives(n.expression, visited);
+      if (ts.isConditionalExpression(n)) {
+        const values = unique([...routeAlternatives(n.whenTrue, visited), ...routeAlternatives(n.whenFalse, visited)]);
+        return values.length > 32 ? [undefined] : values;
+      }
+      if (ts.isTemplateExpression(n)) {
+        let values = [n.head.text];
+        for (const span of n.templateSpans) {
+          values = product(values, routeAlternatives(span.expression, visited));
+          values = product(values, [span.literal.text]);
+        }
+        return values;
+      }
+      if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken)
+        return product(routeAlternatives(n.left, visited), routeAlternatives(n.right, visited));
+      if (ts.isCallExpression(n) && /^(encodeURIComponent|String)$/.test(n.expression.getText(sf)))
+        return routeAlternatives(n.arguments[0], visited);
+      const symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(n) ? n.name : n);
+      if (symbol && !visited.has(symbol) && symbol.valueDeclaration?.initializer) {
+        const next = new Set(visited); next.add(symbol);
+        return routeAlternatives(symbol.valueDeclaration.initializer, next);
+      }
+      return [evaluate(n, visited)];
+    }
     function placeholder(n) {
       if (ts.isCallExpression(n) && n.arguments[0]) return placeholder(n.arguments[0]);
       return n.getText(sf).replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 100) || 'value';
@@ -125,19 +159,27 @@ export function discoverCalls(sources, document) {
             else if (!generated && !httpMethod(imported ?? property) && config.properties.some(p => ts.isSpreadAssignment(p))) method = 'unresolved';
           } else if (!generated && !httpMethod(imported ?? property) && config) method = 'unresolved';
           if (!method || !httpMethod(method)) method = 'unresolved';
-          const route = evaluate(targetNode);
+          const routes = routeAlternatives(targetNode);
+          const route = routes.length === 1 ? routes[0] : undefined;
           const target = targetNode?.getText(sf) ?? '';
           const plumbing = /\/http-client\/|\/ApiService\.ts$|\/server\/services\/BffProxyService\.ts$/.test(source.file);
           const exclusion = ts.isPropertyAccessExpression(n.expression) ? localCollection(n.expression.expression) : undefined;
-          let classification = exclusion ? 'excluded-local-collection' : plumbing ? 'transport-plumbing' : !route ? 'unresolved-route'
-            : /^https?:\/\//.test(route) ? 'absolute-origin-needs-review'
-            : !route.startsWith('/api/') ? 'non-api-or-unresolved-base' : 'internal';
-          const matches = classification === 'internal' ? matchOperation(route, method, document) : [];
-          if (classification === 'internal') classification = matches.length === 1 ? 'source-linked'
-            : matches.length > 1 ? 'ambiguous-operation' : 'unmatched-operation';
+          const branches = routes.map(route => {
+            let classification = exclusion ? 'excluded-local-collection' : plumbing ? 'transport-plumbing' : !route ? 'unresolved-route'
+              : /^https?:\/\//.test(route) ? 'absolute-origin-needs-review'
+              : !route.startsWith('/api/') ? 'non-api-or-unresolved-base' : 'internal';
+            const matches = classification === 'internal' ? matchOperation(route, method, document) : [];
+            if (classification === 'internal') classification = matches.length === 1 ? 'source-linked'
+              : matches.length > 1 ? 'ambiguous-operation' : 'unmatched-operation';
+            return { route: route ?? null, classification, matches };
+          });
+          const classifications = new Set(branches.map(branch => branch.classification));
+          const classification = classifications.size === 1 ? branches[0].classification : 'unresolved-route-branches';
+          const matches = [...new Map(branches.flatMap(branch => branch.matches)
+            .map(match => [`${match.method} ${match.path}`, match])).values()];
           calls.push({ id: sha256(`${source.file}:${n.getStart(sf)}:${callee}:${target}`).slice(0, 20),
             file: source.file, line: line(), callee, method, target, route: route ?? null,
-            typeArguments: (n.typeArguments ?? []).map(t => t.getText(sf)), classification, matches,
+            typeArguments: (n.typeArguments ?? []).map(t => t.getText(sf)), classification, matches, branches,
             migration: exclusion ? 'not-applicable' : generated ? 'generated-operation' : 'not-migrated',
             evidence: exclusion ? [exclusion] : [] });
         }
