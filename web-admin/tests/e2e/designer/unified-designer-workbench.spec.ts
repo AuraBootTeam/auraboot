@@ -3267,7 +3267,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-023: adds a form sub-table, configures columns, and renders preview rows', async ({
     page,
-  }) => {
+  }, info) => {
     expect(pagePid).toBeTruthy();
     expect(fieldCode).toBeTruthy();
 
@@ -3305,13 +3305,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     // (sections only carry field entries); the save must refuse loudly instead
     // of silently dropping the sub-table subtree.
     await page.getByTestId('designer-save').click();
-    await expect(page.getByTestId('designer-save-error')).toContainText(
-      'sub_table_new_sub_table',
-      { timeout: 10000 },
-    );
-    await expect(page.getByTestId('designer-save-error')).toContainText(
-      'flat v4 runtime dialect',
-    );
+    await expect(page.getByTestId('designer-save-error')).toContainText('sub_table_new_sub_table', {
+      timeout: 10000,
+    });
+    await expect(page.getByTestId('designer-save-error')).toContainText('flat v4 runtime dialect');
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
@@ -3321,6 +3318,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-table-cell-sub_table_new_sub_table-0-${fieldCode}`),
     ).toHaveText(subTablePreviewValue);
+
+    await page.screenshot({ path: info.outputPath('UDW-023-preview.png'), fullPage: true });
 
     // Nothing was persisted (save refused): the stored page has no sub-table.
     const persisted = await readPage(page, pagePid);
@@ -4361,7 +4360,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-034: configures action permission code and blocks preview execution when missing', async ({
     page,
-  }) => {
+    browser,
+    baseURL,
+  }, info) => {
     expect(listPagePid).toBeTruthy();
 
     const permissionActionLabel = `Permission blocked action ${uid}`;
@@ -4377,7 +4378,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
+    await page
+      .getByTestId('inspector-field-props.permissionCode-manual')
+      .fill(missingPermissionCode);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
@@ -4391,14 +4394,57 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
-    const action = page.getByTestId('runtime-action-action_seed_export');
-    await expect(action).toBeDisabled();
-    await expect(action).toHaveAttribute('data-permission-code', missingPermissionCode);
-    await expect(action).toHaveAttribute('data-permission-allowed', 'false');
-    await expect(page.getByTestId('runtime-action-permission-action_seed_export')).toContainText(
-      `Requires permission: ${missingPermissionCode}`,
+    const adminResponse = await page.request.get('/api/auth/me');
+    expect(adminResponse.status()).toBe(200);
+    const admin = await adminResponse.json();
+    expect(String(admin.code)).toBe('0');
+    expect(collectPermissionCodes(admin.data.permissions)).toContain('*');
+    await expect(page.getByTestId('runtime-action-action_seed_export')).toBeEnabled();
+    await expect(page.getByTestId('runtime-action-action_seed_export')).toHaveAttribute(
+      'data-permission-allowed',
+      'true',
     );
-    await expect(page.getByTestId('runtime-action-error-action_seed_export')).toHaveCount(0);
+    for (const permission of ['meta.designer.read', 'page.page.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const roleContext = await createAuthenticatedRoleContext(
+      browser,
+      baseURL ?? new URL(page.url()).origin,
+      'viewer',
+    );
+    try {
+      const rolePage = await roleContext.newPage();
+      const identityResponse = await rolePage.request.get('/api/auth/me');
+      expect(identityResponse.status()).toBe(200);
+      const identity = await identityResponse.json();
+      expect(String(identity.code)).toBe('0');
+      const codes = collectPermissionCodes(identity.data.permissions);
+      expect(codes).not.toContain('*');
+      expect(codes).not.toContain(missingPermissionCode);
+      await rolePage.goto(`/unified-designer?pageId=${listPagePid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(rolePage.getByTestId('unified-designer-workbench')).toBeVisible({
+        timeout: 15000,
+      });
+      await rolePage.getByTestId('designer-mode-preview').click();
+      await expect(rolePage.getByTestId('unified-runtime-preview')).toBeVisible();
+      const action = rolePage.getByTestId('runtime-action-action_seed_export');
+      await expect(action).toBeDisabled();
+      await expect(action).toHaveAttribute('data-permission-code', missingPermissionCode);
+      await expect(action).toHaveAttribute('data-permission-allowed', 'false');
+      await expect(
+        rolePage.getByTestId('runtime-action-permission-action_seed_export'),
+      ).toContainText(`Requires permission: ${missingPermissionCode}`);
+      await expect(rolePage.getByTestId('runtime-action-error-action_seed_export')).toHaveCount(0);
+
+      await rolePage.screenshot({
+        path: info.outputPath('UDW-034-scoped-denied.png'),
+        fullPage: true,
+      });
+    } finally {
+      await roleContext.close();
+    }
 
     const persisted = await readPage(page, listPagePid);
     const persistedCommand = findBlockById(persisted.blocks ?? [], 'action_seed_export');
