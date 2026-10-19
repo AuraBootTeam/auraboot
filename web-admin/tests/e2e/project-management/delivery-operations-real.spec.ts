@@ -1,9 +1,10 @@
+import { requireRuntimeUrl } from '../../helpers/environments';
 import {test,expect,type Page,type APIResponse,type Response} from '@playwright/test';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {navigateToMenuByClick} from '../helpers';
-import { BASE_URL } from '../../helpers/environments';
+
 const root=process.env.AURA_ENTERPRISE_PROJECT_ROOT;
 const evidence=process.env.AURA_EVIDENCE_DIR;
 if(!root||!evidence||!process.env.ADMIN_EMAIL||!process.env.ADMIN_PASSWORD)throw Error('Bind the owned enterprise source, evidence and real local login.');
@@ -110,7 +111,7 @@ test('OP source grants independently protect native SLA and verification facts i
  for(const code of grants)expect(ids.has(code),code).toBe(true);
  const grant=async(missing:string|null)=>{await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>({permissionId:ids.get(code),granted:code!==missing}))}));};
  await grant(null);const email=`${code}@e2e.local`;await data(await page.request.post('/api/admin/users',{data:{email,displayName:'交付复盘审阅员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
- const context=await browser.newContext({baseURL:BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});const actor=await context.newPage();
+ const context=await browser.newContext({baseURL:requireRuntimeUrl('base'),storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});const actor=await context.newPage();
  try{
   const identity=await login(actor,email,tenant);expect(identity.permissions.roles.map((r:any)=>r.code)).not.toContain('tenant_admin');
   for(const missing of [null,'bpm.monitor.read','model.tdv_check.read',null]){

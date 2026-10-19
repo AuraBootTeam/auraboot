@@ -2203,7 +2203,7 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
 
     const explicitError = await page
       .locator(
-        '.field-error, .text-destructive, .text-red-500, .ant-form-item-explain-error, [role="alert"]',
+        '.controlled-field-renderer .text-status-red, .field-error, .text-destructive, .text-red-500, .ant-form-item-explain-error, [role="alert"]',
       )
       .count();
     return explicitError > 0;
@@ -2231,10 +2231,6 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
 
     await clickSaveButton(page);
 
-    // Give the form a beat to react (validation is synchronous in most
-    // renderers but may need one tick for the error surface to mount).
-    await page.waitForTimeout(500);
-
     // (1) URL must not have changed away from /new
     const afterUrl = new URL(page.url()).pathname;
     expect(
@@ -2254,11 +2250,9 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     ).toBeVisible({ timeout: 3_000 });
 
     // (3) At least one field-level error surface present
-    const hasError = await formHasFieldError(page);
-    expect(
-      hasError,
-      `${dynamicPath}: empty submit must surface at least one field-level error (aria-invalid / .ant-form-item-has-error / error text)`,
-    ).toBe(true);
+    await expect.poll(() => formHasFieldError(page), {
+      message: `${dynamicPath}: empty submit must surface a field-level validation error`,
+    }).toBe(true);
   }
 
   test('CRUD-29: Mission form — empty submit blocked, field error surfaced', async ({ page }) => {

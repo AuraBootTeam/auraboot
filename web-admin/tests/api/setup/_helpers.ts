@@ -9,7 +9,7 @@
 
 import type { APIRequestContext } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { BACKEND_URL, BOOTSTRAP_COMPANY_NAME } from '../../helpers/environments';
+import { BACKEND_URL, BOOTSTRAP_COMPANY_NAME, SETUP_TENANT_ID } from '../../helpers/environments';
 
 /**
  * Log in against the explicit backend and select the declared bootstrap business
@@ -46,15 +46,17 @@ export async function loginAdmin(
     headers: authHeaders(loginToken),
   });
   if (!spaces.ok()) throw new Error(`[setup] list spaces failed (${spaces.status()})`);
-  const space = resolveSetupBusinessSpace((await spaces.json()).data, companyName);
+  const space = resolveSetupBusinessSpace((await spaces.json()).data, companyName, SETUP_TENANT_ID);
   const selection = await request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
     headers: authHeaders(loginToken),
     data: { action: 'select', tenantId: space.tenantId },
   });
   if (!selection.ok()) throw new Error(`[setup] select business space failed (${selection.status()})`);
   const selected = await selection.json();
-  if (selected.code !== '0' || typeof selected.data?.jwt !== 'string' || !selected.data.jwt) {
-    throw new Error('[setup] business-space selection returned no usable JWT');
+  const selectedIdentity = toSetupTenantIdentity(selected.data?.tenantId);
+  if (selected.code !== '0' || typeof selected.data?.jwt !== 'string' || !selected.data.jwt
+      || selectedIdentity !== toSetupTenantIdentity(space.tenantId)) {
+    throw new Error('[setup] business-space selection returned no matching session');
   }
   return selected.data.jwt;
 }
@@ -74,21 +76,29 @@ export function authHeaders(jwt: string): Record<string, string> {
 export function resolveSetupBusinessSpace(
   spaces: unknown,
   companyName: string,
+  targetTenantId?: string,
 ): { tenantId: string | number } {
-  if (!companyName.trim() || !Array.isArray(spaces)) {
+  if ((!targetTenantId?.trim() && !companyName.trim()) || !Array.isArray(spaces)) {
     throw new Error('[setup] expected a named business space list');
   }
   const matches = spaces.filter((space) =>
     space && typeof space === 'object' && space.spaceType === 'business'
-    && space.tenantName === companyName,
+    && (targetTenantId?.trim()
+      ? toSetupTenantIdentity(space.tenantId) === targetTenantId.trim()
+      : space.tenantName === companyName),
   );
   if (matches.length !== 1) {
-    throw new Error(`[setup] expected exactly one business space named ${companyName}`);
+    throw new Error(`[setup] expected exactly one business space for the declared bootstrap target`);
   }
   const tenantId = matches[0].tenantId;
-  if (!(typeof tenantId === 'string' && tenantId.trim())
-      && !(typeof tenantId === 'number' && Number.isSafeInteger(tenantId) && tenantId > 0)) {
+  if (!toSetupTenantIdentity(tenantId)) {
     throw new Error('[setup] selected business space has no safe tenant identity');
   }
   return { tenantId };
+}
+
+function toSetupTenantIdentity(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return String(value);
+  return undefined;
 }

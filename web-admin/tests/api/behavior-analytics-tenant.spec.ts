@@ -1,7 +1,8 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** Real seed/collect/read APIs. No direct SQL writes or forged tokens. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { BACKEND_URL } from '../helpers/environments';
+
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 test('behavior rollups isolate populated tenants even with colliding event and session IDs', async ({

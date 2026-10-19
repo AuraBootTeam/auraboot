@@ -940,6 +940,23 @@ describe('useActionHandler - handlerParams.async polling', () => {
     openSpy.mockRestore();
   });
 
+  it('resolves a static card route without requiring a record PID', async () => {
+    const navigate = vi.fn();
+    const { result } = renderHook(() => useActionHandler({
+      runtime: makeRuntime({ record: { pid: 'PARENT-1' } }),
+      navigate: navigate as any,
+      tableName: 'settings',
+      locale: 'en-US',
+      t: key => key,
+    }));
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'open', action: { type: 'navigate', to: '{target}' },
+      } as unknown as ButtonConfig, { title: 'Providers', target: '/aurabot/providers' });
+    });
+    expect(navigate).toHaveBeenCalledWith('/aurabot/providers');
+  });
+
   it('opens a contextual command form in create mode and carries the source record pid', async () => {
     const navigate = vi.fn();
     const { result } = renderHook(() =>

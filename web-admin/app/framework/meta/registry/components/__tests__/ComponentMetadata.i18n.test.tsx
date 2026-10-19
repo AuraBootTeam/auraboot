@@ -29,7 +29,7 @@ function expectEnglish(value: any) { expect(english(value).trim()).not.toBe('');
 
 describe('Smart component metadata locale consumers', () => {
   it('provides English registry metadata without pruning supported component types', () => {
-    expect(ALL_COMPONENT_CONFIGS.map(config => config.type)).toEqual(["input", "textarea", "json-editor", "select", "checkbox", "radio", "datepicker", "formref", "timepicker", "switch", "numberinput", "upload", "display", "image", "table", "decisionrolloutmonitor", "decisionfieldimpact", "decisionintegrationimpact", "decisionrulebinding", "decisionactionplan", "button", "div", "form", "navigation", "container", "grid", "flex", "columns", "card", "date", "datetime", "smart-number-card", "smart-bar-chart", "smart-line-chart", "smart-pie-chart", "smart-kanban", "bar-chart", "line-chart", "pie-chart", "area-chart"]);
+    expect(ALL_COMPONENT_CONFIGS.map(config => config.type)).toEqual(["input", "textarea", "json-editor", "select", "checkbox", "radio", "datepicker", "formref", "timepicker", "switch", "numberinput", "upload", "display", "image", "table", "decisionrolloutmonitor", "decisionfieldimpact", "decisionintegrationimpact", "openapiquerypublicationeditor", "openapipublicationeditor", "decisionrulebinding", "decisionactionplan", "button", "div", "form", "navigation", "container", "grid", "flex", "columns", "card", "date", "datetime", "smart-number-card", "smart-bar-chart", "smart-line-chart", "smart-pie-chart", "smart-kanban", "bar-chart", "line-chart", "pie-chart", "area-chart"]);
     for (const config of ALL_COMPONENT_CONFIGS) {
       expectEnglish(config.name); expectEnglish(config.description);
       for (const property of config.propertySchema) {

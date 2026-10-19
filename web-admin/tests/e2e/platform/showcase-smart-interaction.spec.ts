@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 /**
  * Showcase Smart Component Fields — Deep Interaction E2E Tests
  *
@@ -85,6 +86,7 @@ async function openCreateForm(page: Page): Promise<void> {
     .waitForURL(/showcase.all.fields.*form|\/new|\/create/, { timeout: 15_000 })
     .catch(() => null);
   await waitForFormReady(page, 15_000);
+  await expandFormSections(page);
 }
 
 // ---------------------------------------------------------------------------

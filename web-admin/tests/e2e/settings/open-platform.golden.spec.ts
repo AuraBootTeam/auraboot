@@ -8,6 +8,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { verifyModelNotifications } from '../../helpers/open-platform-notifications';
+import { publishOfficeDeviceResourceFixture, createOfficeDeviceCallerFixture } from '../../helpers/open-platform-device-fixtures';
 
 // Secrets are captured only by explicit masked screenshots, never worker recordings.
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
@@ -2935,6 +2936,7 @@ test.describe('Public business API management journey', () => {
   for (const kind of ['command', 'handler'] as const) test(`publishes, grants, calls and withdraws a real ${kind} through management UI`, async ({ page }) => {
     await authenticate(page, publicationLocale);
     const code = `office.ui.${kind}.${Date.now()}`;
+    const { resourceCode, location } = await publishOfficeDeviceResourceFixture(page, `${code}.devices`);
     const evidence = path.join(EVIDENCE_DIR, `business-api-${publicationLocale}-${PUBLICATION_VIEWPORT}-${kind}`);
     await mkdir(evidence, { recursive: true });
     const captureAction = async (region: import('@playwright/test').Locator, name: string) => {
@@ -2964,7 +2966,7 @@ test.describe('Public business API management journey', () => {
     await editor.getByRole('button', { name: text('New business API'), exact: true }).click();
     const form = editor.getByTestId('action-publication-form');
     await form.getByLabel(text('Public API address'), { exact: true }).fill(code);
-    await form.getByLabel(text('Bound public resource'), { exact: true }).selectOption('office.devices');
+    await form.getByLabel(text('Bound public resource'), { exact: true }).selectOption(resourceCode);
     await expect(form.getByLabel(text('Registered implementation'), { exact: true })).toBeEnabled();
     await form.getByLabel(text('Registered implementation'), { exact: true }).selectOption(kind === 'command' ? 'command:tasset:assign_asset' : 'handler:core.visible-page');
     await form.getByLabel(text('Execution scope'), { exact: true }).fill(`${code}.execute`);
@@ -2972,7 +2974,7 @@ test.describe('Public business API management journey', () => {
     const save = page.waitForResponse(r => r.url().endsWith(`/action-publications/${code}/draft`) && r.request().method() === 'PUT');
     await form.getByRole('button', { name: text('Save and validate business draft'), exact: true }).click();
     const saved = await save; expect(saved.status()).toBe(200);
-    expect(saved.request().postDataJSON().definition).toMatchObject({ code, resourceCode: 'office.devices', sourceKind: kind, schemaVersion: 1 });
+    expect(saved.request().postDataJSON().definition).toMatchObject({ code, resourceCode: resourceCode, sourceKind: kind, schemaVersion: 1 });
     await form.getByRole('button', { name: text('Publish business API'), exact: true }).click();
     let confirmation = editor.getByRole('group', { name: text('Business API operation confirmation'), exact: true });
     await captureAction(confirmation, 'QAT-06-publish-confirmation');
@@ -2995,24 +2997,8 @@ test.describe('Public business API management journey', () => {
     await form.locator('div.sticky').scrollIntoViewIfNeeded();
     await expect(form.getByRole('button',{name:text('Download business types'),exact:true})).toBeEnabled();
     await page.screenshot({path:path.join(evidence,'QAT-06-downloads.png')});
-    // Provision the caller fixture through real administration APIs after UI publication.
-    const name = `Office business ${kind} ${Date.now()}`;
-    const appResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications`, { data: { name } });
-    expect(appResponse.status()).toBe(200); const app = (await appResponse.json()).data;
-    const installResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications/${app.pid}/installations`,
-      { data: { environment: 'development', scopes: ['office.devices.read','office.devices.write',`${code}.execute`], rateLimitPerMinute: 10000 } });
-    expect(installResponse.status()).toBe(200); const installation = (await installResponse.json()).data;
-    const root = `${WEB_BASE_URL}/api/open-platform/installations/${installation.pid}`;
-    const grantResponse = await page.request.put(`${root}/resources/office.devices`, { data: {
-      operations: ['list','get','create','update','delete'], readableFields: ['pid','assetCode','name','status','location','serialNumber','assignedTo'],
-      writableFields: ['assetCode','name','location','serialNumber','assignedTo'], rowConstraints: [{ field: 'location', values: ['HQ'] }],
-    } }); expect(grantResponse.status()).toBe(200);
-    const tokenResponse = await page.request.post(`${root}/integration-tokens`, { headers: { 'Idempotency-Key': `ui-${code}` }, data: { name: 'Business UI caller', expirationMode: 'never' } });
-    expect(tokenResponse.status()).toBe(200); const token = (await tokenResponse.json()).data.token;
-    const machine = { Authorization: `Bearer ${token}` };
-    const createdResponse = await page.request.post(`${BACKEND_URL}/api/open/v1/resources/office.devices`, { headers: { ...machine, 'Idempotency-Key': `create-${code}` },
-      data: { assetCode: `UI-${Date.now()}`, name: 'Business UI device', location: 'HQ' } });
-    expect(createdResponse.status()).toBe(201); const device = await createdResponse.json(); expect(device.status).toBe('available');
+    const { name, installation, root, machine, createdResponse, device } = await createOfficeDeviceCallerFixture(page,
+      { code, resourceCode, location, scope: `${code}.execute`, deviceName: 'Business UI device' });
     const requestData = kind === 'command' ? { targetPid: device.pid, input: { assignedTo: 'UI integration operator' } } : { input: { limit: 20 } };
     const headers = kind === 'command' ? { ...machine, 'If-Match': createdResponse.headers().etag, 'Idempotency-Key': `execute-${code}` } : machine;
     const invoke = () => page.request.post(`${BACKEND_URL}/api/open/v1/actions/${code}:execute`, { headers, data: requestData });
@@ -3029,7 +3015,7 @@ test.describe('Public business API management journey', () => {
     const call = await invoke(); expect(call.status()).toBe(200); const body = await call.json();
     if (kind === 'command') { expect(body.resource).toMatchObject({ pid: device.pid, status: 'in_use', assignedTo: 'UI integration operator' });
       const replay = await invoke(); expect(replay.status()).toBe(200); expect(replay.headers()['idempotent-replay']).toBe('true');
-    } else expect(body.countOnPage).toBeGreaterThan(0);
+    } else { expect(body.countOnPage).toBe(1); expect(body.hasMore).toBe(false); }
     await captureAction(grants, 'QAT-05-authorized');
     await page.reload(); await card.getByRole('button', { name: text('Data authority'), exact: true }).click();
     await grants.getByLabel(text('Authority contract'), { exact: true }).selectOption(`action:${code}`);
@@ -3065,6 +3051,7 @@ test.describe('Adapted Controller endpoint management journey', () => {
   test('publishes, grants, calls and withdraws an adapted Controller endpoint through management UI', async ({ page }) => {
     await authenticate(page, publicationLocale);
     const code = `office.ui.endpoint.${Date.now()}`;
+    const { resourceCode, location } = await publishOfficeDeviceResourceFixture(page, `${code}.devices`);
     const evidence = path.join(EVIDENCE_DIR, `controller-endpoint-${publicationLocale}-${PUBLICATION_VIEWPORT}`);
     await mkdir(evidence, { recursive: true });
     const capture = async (region: import('@playwright/test').Locator, name: string) => {
@@ -3084,7 +3071,7 @@ test.describe('Adapted Controller endpoint management journey', () => {
     const form = editor.getByTestId('endpoint-publication-form');
     await form.getByLabel(label('External endpoint code','外部接口编码'), { exact: true }).fill(code);
     await form.getByLabel(label('Internal source endpoint','内部来源接口'), { exact: true }).selectOption('dynamic.get');
-    await form.getByLabel(label('Bound public contract','绑定公开合同'), { exact: true }).selectOption('office.devices');
+    await form.getByLabel(label('Bound public contract','绑定公开合同'), { exact: true }).selectOption(resourceCode);
     await form.getByLabel(label('Endpoint invocation scope','接口调用 Scope'), { exact: true }).fill(`${code}.invoke`);
     await expect(button(form,'Save endpoint draft','保存接口草稿')).toBeDisabled();
     await button(form,'Close endpoint editor','关闭接口编辑').click();
@@ -3098,7 +3085,7 @@ test.describe('Adapted Controller endpoint management journey', () => {
     await expect(form.getByLabel(label('External endpoint code','外部接口编码'), {exact:true})).toHaveValue('');
     await form.getByLabel(label('External endpoint code','外部接口编码'),{exact:true}).fill(code);
     await form.getByLabel(label('Internal source endpoint','内部来源接口'),{exact:true}).selectOption('dynamic.get');
-    await form.getByLabel(label('Bound public contract','绑定公开合同'),{exact:true}).selectOption('office.devices');
+    await form.getByLabel(label('Bound public contract','绑定公开合同'),{exact:true}).selectOption(resourceCode);
     await form.getByLabel(label('Endpoint invocation scope','接口调用 Scope'),{exact:true}).fill(`${code}.invoke`);
     // Controlled failure responses test recovery UI only; successful configuration and calls still use the real server.
     const sourcePattern = '**/api/open-platform/endpoint-source?*';
@@ -3117,7 +3104,7 @@ test.describe('Adapted Controller endpoint management journey', () => {
     const saved = page.waitForResponse(r => r.url().endsWith(`/endpoint-publications/${code}/draft`) && r.request().method() === 'PUT');
     await button(form,'Save endpoint draft','保存接口草稿').click();
     const response = await saved; expect(response.status()).toBe(200);
-    expect(response.request().postDataJSON().definition).toMatchObject({ code, candidateCode:'dynamic.get',adapterCode:'resource.get',bindingCode:'office.devices' });
+    expect(response.request().postDataJSON().definition).toMatchObject({ code, candidateCode:'dynamic.get',adapterCode:'resource.get',bindingCode:resourceCode });
     await button(form,'Publish external endpoint','发布外部接口').click();
     await capture(confirmation, 'CEP-03-publish-confirmation');
     await button(confirmation,'Cancel','取消').click();
@@ -3131,24 +3118,14 @@ test.describe('Adapted Controller endpoint management journey', () => {
       expect(file.suggestedFilename()).toBe(filename); const target = path.join(evidence,filename); await file.saveAs(target);
       const content = await readFile(target,'utf-8'); expect(content).not.toContain('tasset_as_'); expect(content).not.toContain('/api/dynamic/');
       if (kind === 'openapi') { const doc = JSON.parse(content); expect(doc.openapi).toBe('3.1.0');
-        expect(doc.paths[`/api/open/v1/endpoints/${code}/{recordPid}`].get['x-required-scopes']).toEqual(expect.arrayContaining([`${code}.invoke`,'office.devices.read']));
+        expect(doc.paths[`/api/open/v1/endpoints/${code}/{recordPid}`].get['x-required-scopes']).toEqual(expect.arrayContaining([`${code}.invoke`,`${resourceCode}.read`]));
       } else expect(content).toContain('export type EndpointRequest');
     }
     await form.locator('div.sticky').scrollIntoViewIfNeeded();
     await expect(button(form,'Download endpoint types','下载接口类型')).toBeEnabled();
     await page.screenshot({path:path.join(evidence,'CEP-04-downloads.png')});
-    const name = `Office endpoint ${Date.now()}`;
-    const appResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications`,{ data:{name} }); expect(appResponse.status()).toBe(200);
-    const app = (await appResponse.json()).data;
-    const installResponse = await page.request.post(`${WEB_BASE_URL}/api/open-platform/applications/${app.pid}/installations`,{data:{environment:'development',scopes:['office.devices.read','office.devices.write',`${code}.invoke`],rateLimitPerMinute:10000}});
-    expect(installResponse.status()).toBe(200); const installation = (await installResponse.json()).data;
-    const root = `${WEB_BASE_URL}/api/open-platform/installations/${installation.pid}`;
-    const policy = {operations:['list','get','create','update','delete'],readableFields:['pid','assetCode','name','status','location','serialNumber','assignedTo'],writableFields:['assetCode','name','location','serialNumber','assignedTo'],rowConstraints:[{field:'location',values:['HQ']}]};
-    expect((await page.request.put(`${root}/resources/office.devices`,{data:policy})).status()).toBe(200);
-    const tokenResponse = await page.request.post(`${root}/integration-tokens`,{headers:{'Idempotency-Key':`ui-${code}`},data:{name:'Endpoint UI caller',expirationMode:'never'}});
-    expect(tokenResponse.status()).toBe(200); const machine = {Authorization:`Bearer ${(await tokenResponse.json()).data.token}`};
-    const created = await page.request.post(`${BACKEND_URL}/api/open/v1/resources/office.devices`,{headers:{...machine,'Idempotency-Key':`create-${code}`},data:{assetCode:`CEP-${Date.now()}`,name:'Endpoint UI device',location:'HQ'}});
-    expect(created.status()).toBe(201); const device = await created.json();
+    const { name, installation, root, machine, device } = await createOfficeDeviceCallerFixture(page,
+      { code, resourceCode, location, scope: `${code}.invoke`, deviceName: 'Endpoint UI device' });
     const invoke = () => page.request.get(`${BACKEND_URL}/api/open/v1/endpoints/${code}/${device.pid}`,{headers:machine});
     expect((await invoke()).status()).toBe(403);
     await button(editor,'Back to business APIs','返回业务接口').click();

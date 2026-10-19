@@ -31,9 +31,31 @@ describe('publicRecordId utilities', () => {
     expect(getPublicRecordKey({}, 'fallback', 'code')).toBeUndefined();
   });
 
+  it('reads canonical PIDs from synchronous and nested command results', () => {
+    expect(getCommandResultRecordPid({ recordPid: 'record-pid', pid: 'other-pid' })).toBe('record-pid');
+    expect(getCommandResultRecordPid({ pid: 'public-pid' })).toBe('public-pid');
+    expect(getCommandResultRecordPid({ data: { data: { recordPid: 'nested-pid' } } })).toBe('nested-pid');
+  });
+
+  it('rejects legacy command identity aliases and numeric internal identities', () => {
+    expect(getCommandResultRecordPid({ recordId: 'legacy-alias', id: 1001 })).toBeUndefined();
+    expect(getCommandResultRecordPid({ recordPid: 1001 })).toBeUndefined();
+    expect(getCommandResultRecordPid(null)).toBeUndefined();
+    expect(getCommandResultRecordPid({ data: { id: 1001 } })).toBeUndefined();
+  });
+
   it('builds command params with only targetRecordPid', () => {
     expect(buildCommandTargetParams(' public-pid ')).toEqual({ targetRecordPid: 'public-pid' });
     expect(buildCommandTargetParams('')).toEqual({});
+  });
+
+  it('resolves public command identities through nested API envelopes', () => {
+    expect(getCommandResultRecordPid({ recordPid: 'created-pid', pid: 'other-pid' })).toBe('created-pid');
+    expect(getCommandResultRecordPid({ pid: 'direct-pid' })).toBe('direct-pid');
+    expect(getCommandResultRecordPid({ data: { data: { recordPid: 'nested-pid' } } })).toBe('nested-pid');
+    expect(getCommandResultRecordPid(null)).toBeUndefined();
+    expect(getCommandResultRecordPid({ recordId: 'legacy-alias', id: 42 })).toBeUndefined();
+    expect(getCommandResultRecordPid({ recordPid: 42 })).toBeUndefined();
   });
 });
 

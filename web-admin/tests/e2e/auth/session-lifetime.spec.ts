@@ -1,7 +1,8 @@
+import { requireRuntimeUrl } from '../../helpers/environments';
 import { test, expect } from '@playwright/test';
 import { HeaderPage } from '../../pages';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { EXPLICIT_BACKEND_URL } from '../../helpers/environments';
+
 // Browser-driven login/logout plus real-backend renewal. Time travel belongs to
 // JwtSessionLifetimeTest; this test never changes production clocks or signs JWTs.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -11,10 +12,10 @@ test('seven-day login, active renewal endpoint and shared-session revocation', a
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
   await page.locator('input#identifier, input#email').first().fill(DEFAULT_TEST_ACCOUNT.email);
   await page.locator('input#password').fill(DEFAULT_TEST_ACCOUNT.password);
-  const activityCheck = page.waitForResponse(r => r.url().endsWith('/api/auth/session-renew') && r.request().method() === 'POST');
   await page.locator('form button[type="submit"]').first().click();
   await page.waitForURL(url => !url.pathname.includes('/login'));
-  const activityResponse = await activityCheck;
+  // Exercise the real BFF renewal endpoint with the browser's login cookie.
+  const activityResponse = await page.request.post('/api/auth/session-renew', { headers: { Origin: new URL(page.url()).origin } });
   expect(activityResponse.status()).toBe(200);
   expect(activityResponse.headers()['cache-control']).toBe('no-store');
   const cookie = (await context.cookies()).find(c => c.name === '__session');
@@ -25,7 +26,7 @@ test('seven-day login, active renewal endpoint and shared-session revocation', a
   expect(claims.exp - claims.iat).toBe(7 * 86400);
   expect(claims.session_exp - claims.auth_time).toBe(180 * 86400);
   expect(Number(session.tokenExpiry)).toBe(claims.exp);
-  const backend = process.env.SPRING_BOOT_URL || EXPLICIT_BACKEND_URL;
+  const backend = process.env.SPRING_BOOT_URL || requireRuntimeUrl('backend');
   expect(backend, 'Real backend URL is required').toBeTruthy();
   const renewedResponse = await request.post(`${backend}/api/auth/renew`, { headers: { Authorization: `Bearer ${token}` }, data: {} });
   expect(renewedResponse.ok()).toBe(true);

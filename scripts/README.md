@@ -19,6 +19,18 @@
 - **One-off migrations** (`migrate-*`, `*-split`, casing/backfill scripts) are **removed once the migration lands** — git history keeps them (`git log --all --full-history -- scripts/<name>`).
 - Before adding a script, check the tables below for an existing one to extend.
 
+### Owned OSS frontend restarts
+
+`oss-golden-stack.sh up` and retained `resume` launch a stable registered Node
+supervisor around the existing frontend command. Its inherited Node preload
+registers each actual Web/BFF entrypoint before it can listen, including children
+restarted by concurrently. pnpm/tsx helper processes never replace listener records.
+Registration requires the current supervisor generation, complete owned ancestry,
+the source cwd and runtime token; a still-live previous listener is not overwritten.
+Use Workspace `runtime suspend` / `runtime resume` for whole-stack lifecycle.
+Direct supervisor termination stops only its authenticated frontend tree and
+prevents further child restarts; runtime databases and evidence remain retained.
+
 ## gate (44)
 
 | script | refs | updated | purpose |
@@ -84,6 +96,8 @@
 | `gates/fixtures/workspace-control.mjs` | 0 | 2026-10-05 | Hermetic workspace-control fixture for gate tests. |
 | `lib/golden-new-database.sh` | 0 | 2026-10-05 | Create an absent owned golden database without replacement. |
 | `lib/golden-process-stop.mjs` | 0 | 2026-10-05 | Stop only identity-attested owned golden processes. |
+| `lib/golden-frontend-supervisor.mjs` | 1 | 2026-10-18 | Keep a stable owned frontend parent across automatic listener restarts. |
+| `lib/golden-frontend-registration.mjs` | 1 | 2026-10-18 | Register each authenticated Web/BFF generation before its entrypoint can listen. |
 | `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |
 | `lib/golden-resume-state.mjs` | 0 | 2026-10-05 | Validate saved golden state before resume. |
 | `lib/golden-runtime-identity.sh` | 0 | 2026-10-05 | Register declared golden source roots in workspace control. |

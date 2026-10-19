@@ -20,7 +20,9 @@ import static org.mockito.Mockito.*;
 class AutomationCommandEventBridgeContextTest {
     private final AutomationTriggerService triggers = mock(AutomationTriggerService.class);
     private final CommandStateCheckExecutor states = mock(CommandStateCheckExecutor.class);
-    private final AutomationCommandEventBridge bridge = new AutomationCommandEventBridge(triggers, states);
+    private final AutomationCommandEventBridge bridge = new AutomationCommandEventBridge(triggers, states,
+            new com.auraboot.framework.event.context.ThreadContextScopes(java.util.List.of(
+                new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor())));
     @AfterEach void cleanup() {
         MetaContext.clear();
         ExecutionPrincipalContext.clear();
@@ -112,7 +114,9 @@ class AutomationCommandEventBridgeContextTest {
                 "orders:complete", "state_transition");
         event.addMetadata("actorId", 11L);
         event.addMetadata("beforeSnapshot", Map.of("order_status", "in_review"));
-        new AutomationCommandEventBridge(triggers, states).onCommandCompleted(event);
+        new AutomationCommandEventBridge(triggers, states,
+            new com.auraboot.framework.event.context.ThreadContextScopes(java.util.List.of(
+                new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor()))).onCommandCompleted(event);
         verify(triggers).onStateChange("orders", "owned-record", "in_review", "done");
         verify(triggers).onRecordUpdate(eq("orders"), eq("owned-record"), any(), any());
         verifyNoMoreInteractions(triggers);

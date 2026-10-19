@@ -27,9 +27,9 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { loginAdmin } from './_helpers';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BACKEND_URL } from '../../helpers/environments';
-import { loginAdmin } from './_helpers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -183,7 +183,7 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
     'com.auraboot.test-fixtures',
   );
 
-  // Use the same explicit business tenant as account/page provisioning.
+  // Import and role writes require an explicitly selected business session.
   const token = await loginAdmin(request);
 
   const existingCommandsRes = await request.get(

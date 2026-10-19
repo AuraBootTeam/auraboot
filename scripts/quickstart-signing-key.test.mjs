@@ -13,7 +13,7 @@ test('both deployment paths pass an operator key without a shared secret default
   for (const name of ['docker-compose.yml', 'docker-compose.pull.yml']) {
     const backend = YAML.parse(read(name)).services.backend;
     assert.equal(backend.environment.OPEN_PLATFORM_PROTOCOL_SIGNING_KEY,
-      '${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:-}');
+      null);
     assert.equal(backend.environment.SPRING_PROFILES_ACTIVE, 'community');
   }
   assert.equal(YAML.parse(read('docker-compose.prod.yml')).services.backend.environment.OPEN_PLATFORM_PROTOCOL_SIGNING_KEY,

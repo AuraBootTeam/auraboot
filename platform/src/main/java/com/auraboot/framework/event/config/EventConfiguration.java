@@ -1,6 +1,7 @@
 package com.auraboot.framework.event.config;
 
 import com.auraboot.framework.event.transport.*;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -35,13 +36,13 @@ public class EventConfiguration {
      * 异步事件处理线程池
      */
     @Bean("eventTaskExecutor")
-    public Executor eventTaskExecutor() {
+    public Executor eventTaskExecutor(ThreadContextScopes contexts) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(4);
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("Event-");
-        executor.setTaskDecorator(new TenantAwareTaskDecorator());
+        executor.setTaskDecorator(new TenantAwareTaskDecorator(contexts));
         executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
@@ -51,13 +52,13 @@ public class EventConfiguration {
      * Async export task thread pool.
      */
     @Bean("exportTaskExecutor")
-    public Executor exportTaskExecutor() {
+    public Executor exportTaskExecutor(ThreadContextScopes contexts) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(20);
         executor.setThreadNamePrefix("Export-");
-        executor.setTaskDecorator(new TenantAwareTaskDecorator());
+        executor.setTaskDecorator(new TenantAwareTaskDecorator(contexts));
         executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
         executor.initialize();
         return executor;
@@ -68,13 +69,13 @@ public class EventConfiguration {
      * Used by scheduler, capability sync, and other async operations.
      */
     @Bean("taskExecutor")
-    public Executor taskExecutor() {
+    public Executor taskExecutor(ThreadContextScopes contexts) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(4);
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("task-");
-        executor.setTaskDecorator(new TenantAwareTaskDecorator());
+        executor.setTaskDecorator(new TenantAwareTaskDecorator(contexts));
         executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
@@ -85,13 +86,13 @@ public class EventConfiguration {
      * Handles background jobs: exports, batch operations, MRP calculations, etc.
      */
     @Bean("asyncTaskExecutor")
-    public Executor asyncTaskExecutor() {
+    public Executor asyncTaskExecutor(ThreadContextScopes contexts) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(4);
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("async-task-");
-        executor.setTaskDecorator(new TenantAwareTaskDecorator());
+        executor.setTaskDecorator(new TenantAwareTaskDecorator(contexts));
         executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;

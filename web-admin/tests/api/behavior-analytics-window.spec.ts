@@ -1,7 +1,8 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** Real collect-to-rollup coverage with isolated event-time fixtures. */
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { BACKEND_URL } from '../helpers/environments';
+
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 test('behavior rollups share half-open boundaries and deduplicate delivery', async ({

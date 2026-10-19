@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getSystemFieldI18nKey } from '../../ListPageContent';
+import { getSystemFieldI18nKey } from '../listFieldMetadata';
 
 describe('list page system field i18n keys', () => {
   it('maps snake_case audit fields to existing common keys before probing model keys', () => {

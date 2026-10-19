@@ -1,3 +1,4 @@
+import { requireRuntimeUrl } from '../../helpers/environments';
 /**
  * Real enterprise report authorization, using the existing project-management data.
  * API calls only provision the report/roles and independently probe authorization.
@@ -10,7 +11,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { navigateToMenuByClick } from '../helpers';
-import { EXPLICIT_BASE_URL } from '../../helpers/environments';
+
 const readPermission = 'model.tpm_customer.read';
 const compact = (value: string) => value.normalize('NFKC').replace(/\s+/g, '');
 test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
@@ -28,7 +29,7 @@ async function assertSourceDenied(response: APIResponse, exposePermissionCode = 
 
 test('SC06-PERMISSIONS report artifact grants do not bypass customer source read permission', async ({ page, browser }, info) => {
   test.setTimeout(240_000);
-  const origin = new URL(EXPLICIT_BASE_URL || '').origin;
+  const origin = new URL(requireRuntimeUrl('base')).origin;
   expect(new URL(origin).hostname).toBe('localhost');
   expect(process.env.PW_ADMIN_STORAGE_STATE, 'reuse the real administrator UI login').toBeTruthy();
   const evidence = process.env.AURA_EVIDENCE_DIR;

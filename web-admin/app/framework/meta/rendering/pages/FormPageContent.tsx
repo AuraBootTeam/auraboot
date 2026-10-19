@@ -61,8 +61,8 @@ import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
 import {
   buildCommandTargetParams,
-  getPublicRecordPid,
   getCommandResultRecordPid,
+  getPublicRecordPid,
 } from '~/framework/meta/utils/publicRecordId';
 
 /**

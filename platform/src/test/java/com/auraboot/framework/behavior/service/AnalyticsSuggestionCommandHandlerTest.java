@@ -25,7 +25,7 @@ class AnalyticsSuggestionCommandHandlerTest {
     private final ReportAggregateQueryService queries = mock(ReportAggregateQueryService.class);
     private final BehaviorOutcomePublisher outcomes = mock(BehaviorOutcomePublisher.class);
     private final AnalyticsSuggestionCommandHandler handler = new AnalyticsSuggestionCommandHandler(
-            data, locks, events, queries, outcomes, new ObjectMapper());
+            data, locks, events, queries, outcomes, new ObjectMapper(), new com.auraboot.framework.agent.integration.behavior.AgentAnalyticsExecutionContext());
     private CommandContext context(long tenant) {
         return new CommandContext(tenant, "com.auraboot.core-dashboard", "core_dashboard",
                 AnalyticsSuggestionCommandHandler.ADOPT, AnalyticsSuggestionCommandHandler.ADOPTION,

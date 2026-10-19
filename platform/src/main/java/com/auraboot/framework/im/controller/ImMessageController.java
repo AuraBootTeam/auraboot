@@ -1,6 +1,6 @@
 package com.auraboot.framework.im.controller;
 
-import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
+import com.auraboot.framework.im.event.ImMessageSentEvent;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;

@@ -209,6 +209,10 @@ class CommandHandlerAsyncTaskExecutorTest {
 
     @Test
     void injectsAuthenticatedUserAsServerOwnedPluginSetting() throws Exception {
+        var factory = mock(com.auraboot.framework.plugin.extension.AiProviderAccessorFactory.class);
+        var accessor = mock(com.auraboot.framework.plugin.extension.AiProviderAccessor.class);
+        when(factory.create(123L)).thenReturn(accessor);
+        ReflectionTestUtils.setField(executor, "aiProviderAccessorFactory", factory);
         AtomicReference<CommandHandlerExtension.CommandContext> captured = new AtomicReference<>();
         RecordShareAccessor recordShareAccessor = mock(RecordShareAccessor.class);
         ReflectionTestUtils.setField(executor, "recordShareAccessor", recordShareAccessor);
@@ -226,6 +230,8 @@ class CommandHandlerAsyncTaskExecutorTest {
         assertThat(captured.get().settings()).containsEntry("__currentUser", "45");
         assertThat(captured.get().currentUserPid()).isEqualTo("user-pid-45");
         assertThat(captured.get().recordShareAccessor()).isSameAs(recordShareAccessor);
+        assertThat(captured.get().aiProviderAccessor()).isSameAs(accessor);
+        verify(factory).create(123L);
         assertThat(captured.get().clientRequestId()).isEqualTo("client-request-async-1");
         assertThat(captured.get().expectedVersion()).isEqualTo(7L);
     }

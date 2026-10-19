@@ -1,7 +1,8 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** Tenant-scoped identities and colliding fixture values must remain isolated. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { BACKEND_URL } from '../helpers/environments';
+
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 for (const shape of ['select', 'cte', 'view'] as const) {

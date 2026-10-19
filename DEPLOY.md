@@ -31,11 +31,12 @@ runtime classpath or distribution.
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
 
-# Configure environment (protocol signing key is required)
+# Configure the installation environment
 cp .env.example .env
 chmod 600 .env
-# Set OPEN_PLATFORM_PROTOCOL_SIGNING_KEY using `openssl rand -hex 48`.
-# Retain this private file across restarts; change JWT_SECRET for production.
+# Generate once; keep this installation key in .env across restarts.
+printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
+# Edit .env with other settings (change JWT_SECRET for production).
 
 # Start the full stack (first run builds images — allow 5-10 min)
 docker compose --profile full up --build -d
@@ -85,9 +86,11 @@ boot needs is baked into the images (postgres schema, backend plugins), so you n
 curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/docker-compose.pull.yml
 curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/scripts/quickstart.sh
 
+# On first installation, create a persistent protocol signing key.
+# Keep .env across restarts; do not regenerate this key on every start.
+printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
+
 # Pull + start (backend + frontend + postgres, all prebuilt)
-# Create a private .env with OPEN_PLATFORM_PROTOCOL_SIGNING_KEY set to a value
-# generated once by `openssl rand -hex 48`. Keep it stable across restarts.
 docker compose -f docker-compose.pull.yml up -d
 
 # Bootstrap (NOT optional — creates the admin, imports the plugins)
@@ -206,6 +209,7 @@ Copy `.env.example` to `.env` and configure:
 | `POSTGRES_USER` | `auraboot` | No | Database user |
 | `POSTGRES_PASSWORD` | `auraboot_dev` | **Yes (prod)** | Database password |
 | `JWT_SECRET` | (weak default) | **Yes (prod)** | JWT signing secret (min 32 chars) |
+| `OPEN_PLATFORM_PROTOCOL_SIGNING_KEY` | — | **Yes (community/prod)** | Persistent Open Platform protocol signing secret; share across replicas and restarts |
 | `REDIS_HOST` | (empty) | No | Set to `redis` to enable Redis |
 | `ANTHROPIC_API_KEY` | — | No | Enable AI/AuraBot features |
 | `OPENAI_API_KEY` | — | No | OpenAI provider (alternative LLM) |

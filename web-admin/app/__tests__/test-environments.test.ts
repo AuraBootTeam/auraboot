@@ -13,7 +13,6 @@ const ENV_KEYS = [
   'PLAYWRIGHT_BASE_URL',
   'BACKEND_URL',
   'BE_PORT',
-  'VITE_PORT',
   'BFF_URL',
   'BFF_PORT',
   'PW_SKIP_WEBSERVER',
@@ -45,13 +44,22 @@ describe('Playwright test environment helpers', () => {
     vi.resetModules();
   });
 
-  it('keeps absent explicit targets distinct from resolved default origins', async () => {
-    for (const key of ['PLAYWRIGHT_BASE_URL', 'BACKEND_URL', 'BE_PORT', 'VITE_PORT']) delete process.env[key];
+  it('requires explicit runtime URLs even when host defaults are available', async () => {
+    delete process.env.PLAYWRIGHT_BASE_URL;
+    delete process.env.BACKEND_URL;
     const env = await loadEnvironments();
-    expect(env.EXPLICIT_BASE_URL).toBeUndefined();
-    expect(env.EXPLICIT_BACKEND_URL).toBeUndefined();
-    expect(env.BASE_URL).toBe('http://localhost:5173');
-    expect(env.BACKEND_URL).toBe('http://localhost:6443');
+    expect(env.BASE_URL).toBeTruthy();
+    expect(env.BACKEND_URL).toBeTruthy();
+    expect(() => env.requireRuntimeUrl('base')).toThrow(/PLAYWRIGHT_BASE_URL must explicitly/);
+    expect(() => env.requireRuntimeUrl('backend')).toThrow(/BACKEND_URL must explicitly/);
+  });
+
+  it('keeps explicitly configured runtime URLs unchanged', async () => {
+    process.env.PLAYWRIGHT_BASE_URL = 'https://test-web.example';
+    process.env.BACKEND_URL = 'https://test-api.example';
+    const env = await loadEnvironments();
+    expect(env.requireRuntimeUrl('base')).toBe('https://test-web.example');
+    expect(env.requireRuntimeUrl('backend')).toBe('https://test-api.example');
   });
 
   it('uses libpq PG* aliases when Aura PG_* aliases are absent', async () => {
@@ -101,6 +109,16 @@ describe('Playwright test environment helpers', () => {
     });
   });
 
+  it('does not treat the host default as an explicit owned runtime URL', async () => {
+    resetEnv();
+    delete process.env.PLAYWRIGHT_BASE_URL;
+
+    const env = await loadEnvironments();
+
+    expect(env.EXPLICIT_BASE_URL).toBeUndefined();
+    expect(env.BASE_URL).toBe(`http://localhost:${process.env.VITE_PORT ?? '5173'}`);
+  });
+
   it('fails fast when a targeted Docker run only sets PLAYWRIGHT_BASE_URL', async () => {
     resetEnv();
     process.env.PLAYWRIGHT_BASE_URL = 'http://localhost:5226';
@@ -134,7 +152,6 @@ describe('Playwright test environment helpers', () => {
     const env = await loadEnvironments();
 
     expect(env.EXPLICIT_BASE_URL).toBe('http://localhost:5226');
-    expect(env.EXPLICIT_BACKEND_URL).toBe('http://localhost:6496');
     expect(env.BASE_URL).toBe('http://localhost:5226');
     expect(env.BACKEND_URL).toBe('http://localhost:6496');
     expect(env.BFF_URL).toBe('http://localhost:3553');

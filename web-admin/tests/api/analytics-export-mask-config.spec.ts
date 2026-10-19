@@ -1,7 +1,8 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** Stored artifacts must reauthorize their source before streaming bytes. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { BACKEND_URL } from '../helpers/environments';
+
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 const boundary: string = 'inferred';

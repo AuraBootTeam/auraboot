@@ -251,7 +251,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.change(screen.getByTestId('designer-kind-switch'), {
       target: { value: 'detail' },
     });
-    expect(screen.getByTestId('canvas-block-stable-kind-root')).toHaveTextContent('detail');
+    expect(screen.getByTestId('canvas-block-stable-kind-root')).toHaveTextContent('详情');
     fireEvent.click(screen.getByTestId('designer-save'));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
@@ -588,7 +588,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
 
-    expect(screen.getByTestId('inspector-field-title')).toHaveValue('Basic Information');
+    expect(screen.getByTestId('inspector-field-title')).toHaveValue('基本信息');
   });
 
   it('writes advanced JSON inspector changes back to structured block fields', () => {
@@ -1062,7 +1062,7 @@ describe('UnifiedDesignerWorkbench', () => {
     const subTableBlock = findBlockById(savedDocument.blocks, 'sub_table_new_sub_table')?.block;
     expect(subTableBlock).toMatchObject({
       blockType: 'sub-table',
-      title: 'Line items',
+      title: { en: 'New sub table', 'zh-CN': 'Line items' },
       dataSource: {
         model: 'customer',
         parentField: 'id',
@@ -1121,7 +1121,7 @@ describe('UnifiedDesignerWorkbench', () => {
     const repeaterBlock = findBlockById(savedDocument.blocks, 'repeater_new_repeater')?.block;
     expect(repeaterBlock).toMatchObject({
       blockType: 'repeater',
-      title: 'Line items',
+      title: { en: 'New repeater', 'zh-CN': 'Line items' },
       props: {
         rows: [{ name: 'Ada' }],
       },
@@ -1185,7 +1185,7 @@ describe('UnifiedDesignerWorkbench', () => {
     const subformBlock = findBlockById(savedDocument.blocks, 'subform_new_subform')?.block;
     expect(subformBlock).toMatchObject({
       blockType: 'subform',
-      title: 'Team members',
+      title: { en: 'New subform', 'zh-CN': 'Team members' },
       props: {
         rows: [{ name: 'Ada' }],
       },
@@ -1193,7 +1193,7 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(subformBlock?.blocks?.[0]).toMatchObject({
       id: 'form_section_new_section',
       blockType: 'form-section',
-      title: 'Member details',
+      title: { en: 'New section', 'zh-CN': 'Member details' },
       blocks: [
         expect.objectContaining({
           blockType: 'field',

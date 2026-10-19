@@ -4,6 +4,7 @@ import com.auraboot.framework.application.security.MachineDataAccessContext;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.event.config.TenantAwareTaskDecorator;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.security.CsvSafetyUtils;
 import com.auraboot.framework.meta.service.DataDomainService;
@@ -120,6 +121,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
     private final FieldPermissionService fieldPermissionService;
     private final ExecutorRegistry executorRegistry;
+    private final ThreadContextScopes threadContexts;
     private static final Set<String> SYSTEM_COLUMNS = SystemFieldConstants.QUERY_TRANSPARENT;
 
     private static String logSafe(Object value) {
@@ -181,7 +183,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private void triggerAutomationAfterCommit(String description, Runnable trigger) {
         // Capture before the request scope ends; AFTER_COMMIT can run after identity cleanup.
-        Runnable scopedTrigger = new TenantAwareTaskDecorator().decorate(trigger);
+        Runnable scopedTrigger = new TenantAwareTaskDecorator(threadContexts).decorate(trigger);
         Runnable safeTrigger = () -> {
             try {
                 scopedTrigger.run();

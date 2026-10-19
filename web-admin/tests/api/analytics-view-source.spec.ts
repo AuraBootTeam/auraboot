@@ -1,7 +1,8 @@
+import { BACKEND_URL } from '../helpers/environments';
 /** A view must preserve its own authorization and every underlying source boundary. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { BACKEND_URL } from '../helpers/environments';
+
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 test('view aliases preserve underlying read, row and field protection', async ({ request }) => {

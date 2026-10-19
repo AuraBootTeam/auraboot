@@ -133,11 +133,11 @@ test.describe.serial('Employee Account Login Policy @auth @critical', () => {
     try {
       await page.goto('/forgot-password', { waitUntil: 'domcontentloaded' });
       await expect(page.locator('[data-testid="forgot-password-disabled"]')).toBeVisible();
-      await expect(page.getByText(/tenant administrator/i)).toBeVisible();
+      await expect(page.getByText('Contact your tenant administrator to set or reset your password.', { exact: true })).toBeVisible();
 
       await page.goto('/reset-password?token=e2e-disabled', { waitUntil: 'domcontentloaded' });
       await expect(page.locator('[data-testid="reset-password-disabled"]')).toBeVisible();
-      await expect(page.getByText(/tenant administrator/i)).toBeVisible();
+      await expect(page.getByText('Contact your tenant administrator to set or reset your password.', { exact: true })).toBeVisible();
 
       const forgotResp = await page.request.post('/api/auth/forgot-password', {
         data: { email: 'nobody@example.test' },
@@ -183,7 +183,9 @@ async function newPublicPage(browser: Browser): Promise<Page> {
   const context = await browser.newContext({
     storageState: { cookies: [], origins: [] },
     baseURL: BASE_URL,
+    locale: 'en-US',
   });
+  await context.addCookies([{ name: 'locale', value: 'en-US', url: BASE_URL }]);
   return context.newPage();
 }
 

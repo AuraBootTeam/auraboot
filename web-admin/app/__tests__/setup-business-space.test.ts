@@ -12,6 +12,13 @@ describe('setup business-space identity', () => {
     expect(resolveSetupBusinessSpace([...spaces].reverse(),'AuraBoot Dev')).toEqual({tenantId:'public-tenant'});
   });
 
+  it('honors an explicit declared tenant id and never falls back when it is missing', () => {
+    const spaces=[{tenantName:'Other business',spaceType:'business',tenantId:'tenant-other'},
+      {tenantName:'AuraBoot Dev',spaceType:'business',tenantId:'tenant-bootstrap'}];
+    expect(resolveSetupBusinessSpace(spaces,'AuraBoot Dev','tenant-other')).toEqual({tenantId:'tenant-other'});
+    expect(() => resolveSetupBusinessSpace(spaces,'AuraBoot Dev','absent')).toThrow(/exactly one/);
+  });
+
   it('accepts an exact safe numeric tenant identity without coercing it', () => {
     expect(resolveSetupBusinessSpace([{tenantName:'Owned',spaceType:'business',tenantId:42}],'Owned')).toEqual({tenantId:42});
   });

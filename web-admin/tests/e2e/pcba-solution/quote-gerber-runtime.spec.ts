@@ -1,3 +1,4 @@
+import { PG_CONN, PG_ENV } from '../../helpers/environments';
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import {
@@ -9,7 +10,7 @@ import {
   queryDynamicRecords,
   seedGerberRuntimeQuote,
 } from './quote-e2e-helpers';
-import { PG_CONN, PG_ENV } from '../../helpers/environments';
+
 const VIEWER_TOKEN = 'e2e-gerber-viewer-token';
 
 const boardSvg = (label: string) => `

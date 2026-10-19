@@ -1602,16 +1602,16 @@ describe('DecisionOpsConsole', () => {
 
     fireEvent.click(screen.getByTestId('dt-export-dmn'));
     await waitFor(() => expect(exportTableDmn).toHaveBeenCalledOnce());
-    expect(screen.getByLabelText('dmn-xml')).toHaveValue(
+    await waitFor(() => expect(screen.getByLabelText('dmn-xml')).toHaveValue(
       '<definitions id="strategy"><decisionTable /></definitions>',
-    );
+    ));
 
     fireEvent.click(screen.getByTestId('dt-roundtrip-dmn'));
     await waitFor(() => expect(roundTripTableDmn).toHaveBeenCalledOnce());
     await waitFor(() =>
       expect(screen.getByLabelText('feel-0-sla_deadlineMinutes')).toHaveValue('> 30'),
     );
-    expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过');
+    await waitFor(() => expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过'));
   });
 
   it('does not report Strategy Studio publish success when the runtime rejects the transition', async () => {
@@ -2546,7 +2546,7 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByLabelText('dmn-xml')).toHaveValue(
       '<definitions id="roundtrip"><decisionTable /></definitions>',
     );
-    expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过');
+    await waitFor(() => expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过'));
   });
 
   it('switches to Logs / Model / Permissions / Connectors tabs', () => {

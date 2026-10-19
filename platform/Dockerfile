@@ -23,6 +23,15 @@ FROM ${BUILD_JDK_IMAGE} AS builder
 
 WORKDIR /app
 
+# GitHub-hosted builders can opt into Maven Central before regional mirrors.
+# This init script exists only in the builder; default repository policy is unchanged.
+ARG MAVEN_CENTRAL_FIRST=false
+RUN if [ "$MAVEN_CENTRAL_FIRST" = "true" ]; then \
+      mkdir -p /root/.gradle/init.d && \
+      printf '%s\n' 'gradle.beforeProject { project -> project.repositories.mavenCentral() }' \
+        > /root/.gradle/init.d/maven-central-first.gradle; \
+    fi
+
 # Copy Gradle wrapper and config (cache dependencies layer)
 COPY platform/gradlew gradlew
 COPY platform/gradle gradle

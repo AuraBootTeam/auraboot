@@ -1,6 +1,5 @@
 package com.auraboot.framework.application.bootstrap;
 
-import com.auraboot.framework.application.bootstrap.seeder.AgentTemplateSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.CloudConfigSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.I18nBaseSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.MarketplaceCategorySeeder;
@@ -29,7 +28,7 @@ public class PlatformSeedService {
     private final I18nBaseSeeder i18nBaseSeeder;
     private final CloudConfigSeeder cloudConfigSeeder;
     private final MarketplaceCategorySeeder marketplaceCategorySeeder;
-    private final AgentTemplateSeeder agentTemplateSeeder;
+    private final List<PlatformSeedContributor> moduleSeeders;
     private final SolutionSeeder solutionSeeder;
     private final I18nOverrideAuditor i18nOverrideAuditor;
 
@@ -45,7 +44,7 @@ public class PlatformSeedService {
         auditI18nDrift();
         MetaContext.runWithoutTenantFilter(() -> cloudConfigSeeder.seed());
         marketplaceCategorySeeder.seed();
-        agentTemplateSeeder.seed();
+        moduleSeeders.forEach(PlatformSeedContributor::seed);
         solutionSeeder.seed();
         log.info("PlatformSeedService: explicit platform data initialization complete.");
     }

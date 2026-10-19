@@ -111,8 +111,8 @@ git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
 cp .env.example .env
 chmod 600 .env
-# Set OPEN_PLATFORM_PROTOCOL_SIGNING_KEY in .env using `openssl rand -hex 48`.
-# Generate once; retain this private file across restarts.
+# Generate once; keep this installation key in .env across restarts.
+printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose --profile full up --build -d   # 2–4 min cold start
 ./scripts/quickstart.sh                       # creates the admin, imports the plugins
 ```

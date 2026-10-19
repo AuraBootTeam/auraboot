@@ -78,7 +78,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     private final I18nResourceService i18nResourceService;
     private final I18nService i18nService;
     private final DynamicDataMapper dynamicDataMapper;
-    private final com.auraboot.framework.agent.service.SkillAutoGenerator skillAutoGenerator;
+    private final List<com.auraboot.framework.tenant.service.TenantSkillInitializer> skillInitializers;
     
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -100,7 +100,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             log.info("模板验证通过");
             
             // Built-in skills belong to explicit tenant initialization, never application startup.
-            skillAutoGenerator.syncSkills(tenantId);
+            skillInitializers.forEach(initializer -> initializer.initialize(tenantId));
 
             // 3. 创建角色
             List<Role> roles = createRoles(tenantId, template.getRoles(), userId);
@@ -834,40 +834,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
      * @param tenantId the tenant to seed
      */
     private void createAuraBotAgent(Long tenantId) {
-        // Check for existing AuraBot agent (idempotent guard)
-        String checkSql = "SELECT COUNT(*) AS cnt FROM ab_agent_definition " +
-            "WHERE tenant_id = #{params.tenantId} AND agent_code = #{params.agentCode} " +
-            "AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(
-            checkSql, Map.of("tenantId", tenantId, "agentCode", "aurabot"));
-        if (!rows.isEmpty() && ((Number) rows.get(0).get("cnt")).intValue() > 0) {
-            log.debug("AuraBot agent already exists for tenant {}, skipping creation", tenantId);
-            return;
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        Map<String, Object> agent = new LinkedHashMap<>();
-        agent.put("pid", "aurabot_" + tenantId);
-        agent.put("tenant_id", tenantId);
-        agent.put("agent_code", "aurabot");
-        agent.put("name", "AuraBot");
-        agent.put("description",
-            "Platform-native AI assistant with full access to all models, commands, and tools.");
-        agent.put("agent_type", "reactive");
-        agent.put("model", null); // resolved at runtime from the first enabled LLM provider
-        agent.put("system_prompt",
-            "You are AuraBot, the intelligent assistant for this platform. " +
-            "Help users accomplish their tasks efficiently.");
-        agent.put("max_tools", 20);
-        agent.put("max_concurrent_runs", 3);
-        agent.put("execution_timeout_seconds", 300);
-        agent.put("status", "active");
-        agent.put("deleted_flag", false);
-        agent.put("created_at", now);
-        agent.put("updated_at", now);
-
-        dynamicDataMapper.insert("ab_agent_definition", agent);
-        log.info("AuraBot agent created for tenant {}", tenantId);
+        skillInitializers.forEach(initializer -> initializer.initializeAssistant(tenantId));
     }
 
     /**

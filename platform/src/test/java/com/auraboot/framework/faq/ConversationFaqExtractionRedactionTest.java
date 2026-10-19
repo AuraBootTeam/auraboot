@@ -41,7 +41,7 @@ class ConversationFaqExtractionRedactionTest {
 
     @BeforeEach
     void setUp() {
-        service = new ConversationFaqExtractionService(factory);
+        service = new ConversationFaqExtractionService(new com.auraboot.framework.agent.integration.faq.LlmFaqCandidateExtractor(factory));
     }
 
     @Test
@@ -75,5 +75,38 @@ class ConversationFaqExtractionRedactionTest {
                 .contains("[邮箱]").doesNotContain("alice").doesNotContain("example.com");
         // The reusable part must survive — redaction removes the identifier, not the answer.
         assertThat(out.get(0).answer()).contains("账户设置");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("responsesWithoutFaqTool")
+    void responsesWithoutFaqToolPreserveTheExistingEmptyResult(LlmChatResponse response) throws Exception {
+        var config = LlmProviderFactory.ProviderConfig.builder().providerCode("deepseek")
+                .apiKey("k").baseUrl("u").defaultModel("m").build();
+        when(factory.resolveProvider(1L, null)).thenReturn(LlmProviderFactory.ProviderResolution.builder()
+                .effectiveProviderCode("deepseek").config(config).provider(provider).build());
+        when(provider.chat(any(LlmChatRequest.class), eq("k"), eq("u"))).thenReturn(response);
+        assertThat(service.extract(1L, "Customer asked a question but received no reusable answer")).isEmpty();
+    }
+
+    static java.util.stream.Stream<LlmChatResponse> responsesWithoutFaqTool() {
+        return java.util.stream.Stream.of(null, LlmChatResponse.builder().build(),
+                LlmChatResponse.builder().content(List.of()).build(),
+                LlmChatResponse.builder().content(List.of(LlmChatResponse.ContentBlock.builder()
+                        .type("text").text("No reusable FAQ").build())).build());
+    }
+
+    @Test
+    void blankTranscriptDoesNotInvokeTheModel() throws Exception {
+        assertThat(service.extract(1L, "  ")).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(factory, provider);
+    }
+
+    @Test
+    void oversizedTranscriptIsRejectedBeforeModelDispatch() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                service.extract(1L, "x".repeat(ConversationFaqExtractionService.MAX_TRANSCRIPT_CHARS + 1)))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                .hasMessageContaining("transcript is too long");
+        org.mockito.Mockito.verifyNoInteractions(factory, provider);
     }
 }
