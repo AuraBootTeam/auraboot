@@ -17,7 +17,11 @@ test('requires the real BPM application before automation execution tests', asyn
     matches,
     'Explicit workflow fixture setup must deploy exactly one current payment process',
   ).toHaveLength(1);
-  const definition = matches[0];
+  const detail = await request.get(`/api/bpm/process-definitions/${matches[0].pid}`);
+  expect(detail.status()).toBe(200);
+  const persisted = await detail.json();
+  expect(persisted.code).toBe('0');
+  const definition = persisted.data;
   expect(definition).toMatchObject({
     processName: fixture['name:zh-CN'],
     status: 'deployed',
