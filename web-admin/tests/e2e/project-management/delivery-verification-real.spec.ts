@@ -116,10 +116,12 @@ test('optional PF4J verifier reads stored evidence and recomputes after actual f
   await page.getByRole('tab',{name:'核验结果',exact:true}).click();
   await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(1);
   await expect(page.getByRole('row').filter({hasText:name})).toContainText('核验通过');
-  await shot(page,'v06-acceptance-tab');
   await page.reload();
   await expect(page.getByRole('tab',{name:'核验结果',exact:true})).toHaveAttribute('aria-selected','true');
-  await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(1);
+  const persistedRow=page.getByTestId('subtable-viewer').getByRole('row').filter({hasText:name});
+  await expect(persistedRow).toBeVisible();
+  await expect(persistedRow).toContainText('核验通过');
+  await shot(page,'v06-acceptance-tab');
   const activities=await data(await page.request.get('/api/activities',{params:{objectModel:'tdv_check',objectRecord:pid,limit:100}}));
   expect(activities.length).toBeGreaterThan(0);await writeFile(join(evidence!,'verification-activity.json'),JSON.stringify(activities,null,2));
   await menu(page,'交付核验');await expect(page.getByRole('row').filter({hasText:name})).toContainText('核验通过');
