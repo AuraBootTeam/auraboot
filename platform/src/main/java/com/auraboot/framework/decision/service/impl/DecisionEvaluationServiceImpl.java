@@ -745,17 +745,18 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
                 }
             }
         }
+        Map<String, DecisionFactCatalogDTO> catalogues = new HashMap<>();
         return logs.stream().map(log -> {
             if (!tenantId.equals(log.getTenantId())) {
                 throw new IllegalStateException("Decision log tenant identity is invalid");
             }
-            var dto = toLogDTO(log);
+            var dto = toLogDTO(log, catalogues);
             dto.setDecisionName(names.get(log.getDecisionCode()));
             return dto;
         }).toList();
     }
 
-    private DrtLogDTO toLogDTO(DrtLogEntity e) {
+    private DrtLogDTO toLogDTO(DrtLogEntity e, Map<String, DecisionFactCatalogDTO> catalogues) {
         if (e == null) return null;
         DrtLogDTO dto = new DrtLogDTO();
         dto.setId(e.getId());
@@ -782,7 +783,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         dto.setMatchedRulesJson(e.getMatchedRulesJson());
         dto.setOutputSnapshot(e.getOutputSnapshot());
         dto.setTraceSnapshot(DecisionInputSnapshot.project(
-                e.getTraceSnapshot(), objectMapper, model -> decisionModelFieldService.getFactCatalog(model)));
+                e.getTraceSnapshot(), objectMapper, model -> catalogues.computeIfAbsent(model == null ? "" : model,
+                        code -> decisionModelFieldService.getFactCatalog(code.isBlank() ? null : code))));
         dto.setDurationMs(e.getDurationMs());
         dto.setErrorCode(e.getErrorCode());
         dto.setErrorMessage(e.getErrorMessage());

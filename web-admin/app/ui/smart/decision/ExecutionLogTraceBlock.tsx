@@ -1,3 +1,4 @@
+import { createEventPolicyPresentation } from '~/shared/decision/ui/eventPolicyPresentation';
 import { decisionConditionOperatorLabel } from '~/shared/decision/ui/decisionConditionText';
 import type { Operator } from '~/shared/decision/ast/conditionAst';
 import { DecisionLoadError } from '~/shared/decision/ui/DecisionLoadError';
@@ -804,11 +805,13 @@ function ActionLogCard({
   const { timezone, formats } = useTimezone();
   const retryItems = actionRetryItems(action, timezone, formats.datetime);
   const payloadEntries = orderedPayloadEntries(action.resultPayload);
+  const presentation = createEventPolicyPresentation(locale);
+  const businessPayload = presentation.resultPayloadRows({resultPayload: action.resultPayload}).filter(row => ['sentCount','recipientCount','createdCount','ccCount','resolvedCount','fieldCount','failureReason','deliveryTraceStatus','dispatchAccepted'].includes(row.key));
   const key = actionLogKey(action);
   return (
     <article className="elta-action-card" data-testid={`elta-action-card-${key}`}>
       <div className="elta-action-card-head">
-        <strong>{display(action.ruleCode)}</strong>
+        <strong>{actionTypeLabel(action.actionType, locale)}</strong>
         <span className={`elta-status elta-status-${action.status ?? 'UNKNOWN'}`}>
           {decisionStatusLabel(action.status, locale)}
         </span>
@@ -838,6 +841,12 @@ function ActionLogCard({
           {replayingActionPid === action.pid ? '重放中' : '重放'}
         </button>
       ) : null}
+      {businessPayload.length ? <dl className="elta-action-payload" data-testid={`elta-action-business-${key}`}>
+        {businessPayload.map(row => <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+      </dl> : null}
+      <details className="mt-2 text-xs" data-testid={`elta-action-diagnostics-${key}`}>
+        <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
+        <p>{display(action.ruleCode)}</p>
       {payloadEntries.length ? (
         <dl className="elta-action-payload">
           {payloadEntries.map(([payloadKey, value]) => (
@@ -849,6 +858,7 @@ function ActionLogCard({
         </dl>
       ) : null}
       {action.errorMessage ? <div className="elta-chain-error">{action.errorMessage}</div> : null}
+      </details>
     </article>
   );
 }
