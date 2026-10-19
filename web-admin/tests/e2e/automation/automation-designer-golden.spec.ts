@@ -34,6 +34,7 @@ import { Client } from 'pg';
 import { executeCommandViaApi, uniqueId } from '../helpers';
 import { BACKEND_URL, BASE_URL, PG_CONN } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { AutomationListPage } from '../../pages/AutomationListPage';
 import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import {
   dragNodeToCanvas,
@@ -456,6 +457,35 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
 
   test.beforeEach(async ({ page, baseURL }) => {
     await loginAsAdmin(page, baseURL ?? 'http://127.0.0.1:5194');
+  });
+
+  const isolatedPids = new Set<string>();
+  let sharedH1Complete = false;
+  test.afterEach(async ({ page }, info) => {
+    // E5 is the last consumer of H1's enabled rule. Keep that shared journey intact,
+    // then retire every completed rule so later creates cannot trigger stale writes.
+    if (info.title.startsWith('E5:')) sharedH1Complete = true;
+    for (const pid of createdPids) {
+      if (isolatedPids.has(pid) || (pid === h1.pid && !sharedH1Complete)) continue;
+      const response = await page.request.get(`/api/automations/${pid}`);
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(String(body.code)).toBe('0');
+      expect(typeof body.data.enabled).toBe('boolean');
+      if (body.data.enabled) {
+        const list = new AutomationListPage(page);
+        await list.goto();
+        await list.toggle(pid);
+        await expect.poll(async () => {
+          const detail = await page.request.get(`/api/automations/${pid}`);
+          expect(detail.status()).toBe(200);
+          const value = await detail.json();
+          expect(String(value.code)).toBe('0');
+          return value.data.enabled;
+        }).toBe(false);
+      }
+      isolatedPids.add(pid);
+    }
   });
 
   test.afterAll(async ({ browser }) => {

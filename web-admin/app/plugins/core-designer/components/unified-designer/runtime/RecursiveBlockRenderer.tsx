@@ -393,6 +393,7 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
 }
 
 function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const locale = React.useContext(RuntimeLocaleContext);
   const t = useRuntimeText();
   const tabs = block.blocks?.filter((child) => child.blockType === 'tab') ?? [];
   const [activeTabId, setActiveTabId] = React.useState(() => tabs[0]?.id ?? null);
@@ -427,7 +428,7 @@ function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: Runtime
                   : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
               }`}
             >
-              {getBlockLabel(tab)}
+              {getBlockLabel(tab, locale)}
             </button>
           );
         })}

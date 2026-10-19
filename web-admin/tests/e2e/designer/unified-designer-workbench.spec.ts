@@ -4923,7 +4923,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-040: authors form tabs from palette blocks and renders them after save', async ({
     page,
-  }) => {
+  }, info) => {
     expect(pagePid).toBeTruthy();
 
     const tabsId = 'tabs_new_tabs';
@@ -5009,15 +5009,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persistedFreeField = findBlockById(persisted.blocks ?? [], freeFieldId);
     expect(persistedTabs).toMatchObject({
       blockType: 'tabs',
-      title: tabsTitle,
+      title: expect.objectContaining({ 'zh-CN': tabsTitle }),
     });
     expect(persistedTab).toMatchObject({
       blockType: 'tab',
-      title: tabTitle,
+      title: expect.objectContaining({ 'zh-CN': tabTitle }),
     });
     expect(persistedSection).toMatchObject({
       blockType: 'form-section',
-      title: sectionTitle,
+      title: expect.objectContaining({ 'zh-CN': sectionTitle }),
     });
     expect(persistedFreeField).toMatchObject({
       blockType: 'field',
@@ -5030,6 +5030,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`runtime-block-${tabsId}`)).toContainText(tabsTitle);
     await expect(page.getByTestId(`runtime-block-${tabId}`)).toContainText(tabTitle);
     await expect(page.getByTestId(`runtime-field-${freeFieldId}`)).toContainText(freeFieldLabel);
+    await page.screenshot({ path: info.outputPath('UDW-040-localized-tabs.png'), fullPage: true });
   });
 
   // FIXME(designer-v4): this journey authors blocks that have no flat v4
@@ -5924,15 +5925,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persisted = await readPage(page, detailTabsPid);
     expect(findBlockById(persisted.blocks ?? [], tabsId)).toMatchObject({
       blockType: 'tabs',
-      title: tabsTitle,
+      title: expect.objectContaining({ 'zh-CN': tabsTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], tabId)).toMatchObject({
       blockType: 'tab',
-      title: tabTitle,
+      title: expect.objectContaining({ 'zh-CN': tabTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], sectionId)).toMatchObject({
       blockType: 'detail-section',
-      title: sectionTitle,
+      title: expect.objectContaining({ 'zh-CN': sectionTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], fieldId)).toMatchObject({
       blockType: 'field',
@@ -5942,7 +5943,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     helperBlocks.forEach((helper, index) => {
       expect(findBlockById(persisted.blocks ?? [], helperIds[index])).toMatchObject({
         blockType: helper.blockType,
-        title: helper.title,
+        title: expect.objectContaining({ 'zh-CN': helper.title }),
         dataSource: expect.objectContaining({
           type: 'namedQuery',
           executionMode: 'preview',

@@ -1689,6 +1689,32 @@ describe('RecursiveBlockRenderer', () => {
     ).toHaveTextContent('80');
   });
 
+  it('renders authored localized tab labels and switches to the selected tab content', () => {
+    render(<RecursiveBlockRenderer schema={{
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'localized_tabs_form',
+      blocks: [{
+        id: 'localized_tabs', blockType: 'tabs',
+        title: { 'zh-CN': 'Authored tabs', en: 'New tabs' },
+        blocks: [
+          { id: 'localized_tab_first', blockType: 'tab', title: { 'zh-CN': 'First authored tab', en: 'New tab' }, blocks: [] },
+          { id: 'localized_tab_second', blockType: 'tab', title: { 'zh-CN': 'Second authored tab', en: 'New tab' }, blocks: [] },
+        ],
+      }],
+    }} />);
+    const first = screen.getByTestId('runtime-tab-trigger-localized_tab_first');
+    const second = screen.getByTestId('runtime-tab-trigger-localized_tab_second');
+    expect(first).toHaveTextContent('First authored tab');
+    expect(second).toHaveTextContent('Second authored tab');
+    expect(first).not.toHaveTextContent('New tab');
+    expect(first).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(second);
+    expect(second).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('runtime-tab-panel-localized_tab_second')).toBeVisible();
+    expect(screen.queryByTestId('runtime-tab-panel-localized_tab_first')).not.toBeInTheDocument();
+  });
+
   it.each(['table', 'sub-table'] as const)('renders the edited localized %s title instead of its English default', (blockType) => {
     render(<RecursiveBlockRenderer schema={{
       schemaVersion: 3,
