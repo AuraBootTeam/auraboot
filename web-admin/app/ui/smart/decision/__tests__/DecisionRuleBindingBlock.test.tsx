@@ -936,7 +936,9 @@ describe('DecisionRuleBindingBlock', () => {
     expect(api.getModelFields).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('cb-add'));
-    fireEvent.change(await screen.findByLabelText('field-0'), {
+    await waitFor(() => expect(screen.getByLabelText('field-0')
+      .querySelector('option[value="record:data.wd_leave_type"]')).toHaveTextContent('请假类型'));
+    fireEvent.change(screen.getByLabelText('field-0'), {
       target: { value: 'record:data.wd_leave_type' },
     });
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
