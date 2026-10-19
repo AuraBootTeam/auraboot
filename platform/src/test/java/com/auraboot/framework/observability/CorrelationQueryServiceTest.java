@@ -1,7 +1,6 @@
 package com.auraboot.framework.observability;
 
-import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
-import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
+import com.auraboot.framework.observability.dto.LlmUsageView;
 import com.auraboot.framework.application.security.AdminAuditService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.audit.entity.AdminEventLog;
@@ -42,7 +41,7 @@ class CorrelationQueryServiceTest {
     @Mock
     private CommandAuditLogMapper commandAuditLogMapper;
     @Mock
-    private GenAiUsageMapper genAiUsageMapper;
+    private LlmUsageQuery llmUsageQuery;
     @Mock
     private BehaviorEventMapper behaviorEventMapper;
     @Mock
@@ -87,7 +86,7 @@ class CorrelationQueryServiceTest {
         cmd.setCommandCode("demo.create");
         cmd.setTraceId("trace-abc");
         when(commandAuditLogMapper.findByTraceId(7L, "trace-abc")).thenReturn(List.of(cmd));
-        when(genAiUsageMapper.selectList(any())).thenReturn(List.of(new GenAiUsageRecord()));
+        when(llmUsageQuery.findByTrace(eq(7L), any())).thenReturn(List.of(new LlmUsageView()));
         when(behaviorEventMapper.selectList(any())).thenReturn(List.of(new BehaviorEvent()));
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of(new AdminEventLog()));
         when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("trace-abc"), anyInt()))
@@ -160,7 +159,7 @@ class CorrelationQueryServiceTest {
 
     private void stubEmptyBaseDomains() {
         when(commandAuditLogMapper.findByTraceId(any(), any())).thenReturn(List.of());
-        when(genAiUsageMapper.selectList(any())).thenReturn(List.of());
+        when(llmUsageQuery.findByTrace(eq(7L), any())).thenReturn(List.of());
         when(behaviorEventMapper.selectList(any())).thenReturn(List.of());
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of());
     }

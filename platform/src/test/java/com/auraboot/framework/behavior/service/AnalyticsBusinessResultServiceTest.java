@@ -24,7 +24,7 @@ class AnalyticsBusinessResultServiceTest {
     private final MetaModelService models = mock(MetaModelService.class);
     private final ObjectMapper json = new ObjectMapper();
     private final AnalyticsDeletedRecordAuthorization deletedRecords = mock(AnalyticsDeletedRecordAuthorization.class);
-    private final AnalyticsBusinessResultService service = new AnalyticsBusinessResultService(sources, jdbc, data, permissions, models, json, deletedRecords);
+    private final AnalyticsBusinessResultService service = new AnalyticsBusinessResultService(sources, new com.auraboot.framework.agent.integration.behavior.AgentAnalyticsExecutionReadModel(jdbc, null), data, permissions, models, json, deletedRecords);
     @BeforeEach void setup() { MetaContext.setContext(1L, 2L, "user", "user"); }
     @AfterEach void close() { MetaContext.clear(); }
     private void results(List<Map<String, Object>> rows) {

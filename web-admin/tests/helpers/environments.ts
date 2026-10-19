@@ -126,6 +126,16 @@ export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
 export const EXPLICIT_BACKEND_URL = process.env.BACKEND_URL;
 export const EXPLICIT_SPRING_BOOT_URL = process.env.SPRING_BOOT_URL;
 
+/** Require an explicitly owned runtime URL for tests that must never use host defaults. */
+export function requireRuntimeUrl(target: 'base' | 'backend'): string {
+  const key = target === 'base' ? 'PLAYWRIGHT_BASE_URL' : 'BACKEND_URL';
+  const value = process.env[key];
+  if (!value?.trim()) {
+    throw new Error(`[E2E env] ${key} must explicitly identify the owned test runtime`);
+  }
+  return value;
+}
+
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;

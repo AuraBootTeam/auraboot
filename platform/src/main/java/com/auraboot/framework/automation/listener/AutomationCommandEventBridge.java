@@ -2,8 +2,7 @@ package com.auraboot.framework.automation.listener;
 
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
-import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +40,7 @@ public class AutomationCommandEventBridge {
 
     private final AutomationTriggerService automationTriggerService;
     private final CommandStateCheckExecutor commandStateCheckExecutor;
+    private final ThreadContextScopes contexts;
 
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -61,19 +61,8 @@ public class AutomationCommandEventBridge {
         MetaContext.Snapshot identity = new MetaContext.Snapshot(event.getTenantId(), actorId,
                 metadataString(metadata, "actorPid"), metadataString(metadata, "actorName"),
                 java.util.Set.of(), null, null, null, null);
-        var previousPrincipal = ExecutionPrincipalContext.current().orElse(null);
-        var previousEnvelope = ContextEnvelopeContext.current().orElse(null);
-        MetaContext.runWithSnapshot(identity, () -> {
-            // Event identity cannot inherit another worker's runtime authority or envelope.
-            ExecutionPrincipalContext.clear();
-            ContextEnvelopeContext.clear();
-            try {
-                dispatch(event);
-            } finally {
-                ContextEnvelopeContext.restore(previousEnvelope);
-                ExecutionPrincipalContext.restore(previousPrincipal);
-            }
-        });
+        // Event identity must not inherit another worker's domain authority.
+        MetaContext.runWithSnapshot(identity, () -> contexts.runCleared(() -> dispatch(event)));
     }
 
     private static String metadataString(Map<String, Object> metadata, String key) {

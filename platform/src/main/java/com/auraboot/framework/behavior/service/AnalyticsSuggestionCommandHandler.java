@@ -1,8 +1,5 @@
 package com.auraboot.framework.behavior.service;
 
-import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
-import com.auraboot.framework.agent.service.StepContext;
-import com.auraboot.framework.conversation.TurnScopeContext;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.auraboot.framework.behavior.outcome.BehaviorOutcomeEvent;
@@ -38,6 +35,7 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
     private final ReportAggregateQueryService queries;
     private final BehaviorOutcomePublisher outcomes;
     private final ObjectMapper json;
+    private final AnalyticsExecutionContext executionContext;
 
     @Override public String getCommandType() { return PROPOSE; }
     @Override public boolean supports(String code) { return PROPOSE.equals(code) || ADOPT.equals(code); }
@@ -99,14 +97,14 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
             }
             version = ((Number) previous.get(PREFIX + "version")).intValue() + 1;
         }
-        String origin = ExecutionPrincipalContext.current().map(principal -> {
-            if (principal.type() == com.auraboot.framework.agent.identity.ExecutionPrincipal.Type.SANDBOX
+        String origin = executionContext.principal().map(principal -> {
+            if (principal.sandbox()
                     || principal.tenantId() != MetaContext.getCurrentTenantId()
                     || principal.actorUserId() != MetaContext.getCurrentUserId()) {
                 throw invalid("This execution principal cannot produce a formal suggestion");
             }
             return "agent_generated";
-        }).orElse(isAgentExecution() ? "agent_generated" : "human_authored");
+        }).orElse(executionContext.isAgentExecution() ? "agent_generated" : "human_authored");
         Map<String, Object> record = new LinkedHashMap<>();
         if (executionIntent != null) record.put(PREFIX + "execution_intent", executionIntent.toMap());
         record.put(PREFIX + "title", title); record.put(PREFIX + "content", content);
@@ -124,7 +122,7 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
 
     private Map<String, Object> adopt(Map<String, Object> payload) {
         allowed(payload, Set.of("versionPid", "requestId"));
-        if (isAgentExecution()) throw invalid("Agent execution cannot supply explicit user adoption");
+        if (executionContext.isAgentExecution()) throw invalid("Agent execution cannot supply explicit user adoption");
         String versionPid = text(payload, "versionPid", 26);
         Map<String, Object> version = ownedVersion(versionPid);
         String analysis = String.valueOf(version.get(PREFIX + "analysis_id"));
@@ -193,9 +191,6 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
         try { if (!UUID.fromString(request).toString().equals(request)) throw invalid("requestId must be a canonical UUID"); }
         catch (IllegalArgumentException error) { throw invalid("requestId must be a canonical UUID"); }
         return identity(action + ":" + request);
-    }
-    private static boolean isAgentExecution() {
-        return ExecutionPrincipalContext.current().isPresent() || TurnScopeContext.get() != null || StepContext.getRunPid() != null;
     }
     private String identity(String suffix) {
         return UUID.nameUUIDFromBytes((MetaContext.getCurrentTenantId() + ":" + MetaContext.getCurrentUserId() + ":" + suffix).getBytes(StandardCharsets.UTF_8)).toString();
