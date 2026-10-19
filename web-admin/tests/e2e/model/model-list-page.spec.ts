@@ -264,8 +264,20 @@ test.describe('Model List Page', () => {
         actionCode: 'read',
         fromSql: `${physical.data.tableName} a`,
         fields: [
-          { fieldCode: 'pid', columnExpr: 'a.pid', dataType: 'string', displayName: 'Record ID', sortable: true },
-          { fieldCode: 'name', columnExpr: `a.${publishedModel.fieldCode}`, dataType: 'string', displayName: 'Name', sortable: true },
+          {
+            fieldCode: 'pid',
+            columnExpr: 'a.pid',
+            dataType: 'string',
+            displayName: 'Record ID',
+            sortable: true,
+          },
+          {
+            fieldCode: 'name',
+            columnExpr: `a.${publishedModel.fieldCode}`,
+            dataType: 'string',
+            displayName: 'Name',
+            sortable: true,
+          },
         ],
       },
     });
@@ -273,7 +285,9 @@ test.describe('Model List Page', () => {
     const query = await queryResponse.json();
     expect(query.code).toBe('0');
     for (const status of ['testing', 'published']) {
-      const response = await request.put(`/api/meta/named-queries/${query.data.pid}/status`, { data: { status } });
+      const response = await request.put(`/api/meta/named-queries/${query.data.pid}/status`, {
+        data: { status },
+      });
       expect(response.status()).toBe(200);
       expect((await response.json()).code).toBe('0');
     }
@@ -286,7 +300,15 @@ test.describe('Model List Page', () => {
         sourceRef: queryCode,
         primaryKey: 'pid',
         capabilities: { list: true, detail: true, filter: true, sort: true, paginate: true },
-        fields: [{ code: 'name', displayName: 'Name', dataType: 'string', filterable: true, sortable: true }],
+        fields: [
+          {
+            code: 'name',
+            displayName: 'Name',
+            dataType: 'string',
+            filterable: true,
+            sortable: true,
+          },
+        ],
       },
     });
     expect(namedQueryResponse.status()).toBe(200);
@@ -319,7 +341,10 @@ test.describe('Model List Page', () => {
     await expect(getModelRow(page, draftModel.code)).toHaveCount(0);
     await expect(getModelRow(page, publishedModel.code)).toHaveCount(0);
     await expect(getModelRow(page, namedQueryRecord.code)).toBeVisible({ timeout: 10_000 });
-    await page.screenshot({ path: test.info().outputPath('ML-03-source-filter.png'), fullPage: true });
+    await page.screenshot({
+      path: test.info().outputPath('ML-03-source-filter.png'),
+      fullPage: true,
+    });
     await test.info().attach('owned-model-filter-fixture', {
       body: JSON.stringify({ draftModel, publishedModel, namedQueryRecord, query: query.data }),
       contentType: 'application/json',

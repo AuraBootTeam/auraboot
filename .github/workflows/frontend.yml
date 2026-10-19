@@ -9,6 +9,8 @@ on:
       - 'plugins/**/config/dashboards/**'
       - 'plugins/schemas/dashboards.schema.json'
       - 'scripts/validate-plugin-dashboards.mjs'
+      - 'scripts/oss-specialized-profiles.test.mjs'
+      - 'oss-scope.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -21,6 +23,8 @@ on:
       - 'plugins/**/config/dashboards/**'
       - 'plugins/schemas/dashboards.schema.json'
       - 'scripts/validate-plugin-dashboards.mjs'
+      - 'scripts/oss-specialized-profiles.test.mjs'
+      - 'oss-scope.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -78,3 +82,6 @@ jobs:
 
       - name: Validate dashboard contracts
         run: node scripts/validate-plugin-dashboards.mjs
+
+      - name: Validate E2E profile collection and prerequisites
+        run: node --test scripts/oss-specialized-profiles.test.mjs
