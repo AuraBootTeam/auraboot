@@ -1,3 +1,4 @@
+import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
 import {mkdir, writeFile, readFile} from 'node:fs/promises';
@@ -36,7 +37,7 @@ function canonicalInputMappings(mappings: any[]) {
     return {...mapping, source};
   });
 }
-async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant?: string) {
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
   await page.goto('/login');
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
   await page.locator('#identifier').fill(email);
@@ -144,21 +145,8 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
 }
 async function decide(page: Page, pid: string, action: 'approve'|'reject', observer: Page = page) {
   const pending = await row(page,pid);
-  const sent = page.waitForResponse(r => (new URL(r.url()).pathname.match(new RegExp(`/api/bpm/tasks/[^/]+/${action}$`))!==null || /\/api\/bpm\/forms\/task\/[^/]+\/submit$/.test(new URL(r.url()).pathname)) && r.request().method()==='POST');
-  await page.getByTestId(`bpm-operations-${action}`).click();
   const comment = action==='approve'?'交付范围、完成标准和材料一致，批准验收。':'缺少培训签到记录，请补正后重新提交。';
-  await expect(page.getByTestId('bpm-task-drawer').or(page.getByTestId(`bpm-${action}-comment`))).toBeVisible();
-  if (await page.getByTestId('bpm-task-drawer').count()) {
-    await page.getByTestId('approval-comment-textarea').fill(comment);
-    await page.getByTestId(`bpm-drawer-${action}-btn`).scrollIntoViewIfNeeded();
-    const footer=await page.getByTestId('bpm-drawer-footer').boundingBox();
-    expect(footer).toBeTruthy();expect(footer!.y).toBeGreaterThanOrEqual(0);expect(footer!.y+footer!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-    await page.getByTestId(`bpm-drawer-${action}-btn`).click({timeout:10000});
-  } else {
-    await page.getByTestId(`bpm-${action}-comment`).fill(comment);
-    await page.getByTestId(`bpm-${action}-confirm`).click();
-  }
-  await data(await sent);
+  await data(await completeDeliveryApproval(page, action, comment));
   await page.getByRole('tab',{name:'验收详情',exact:true}).click();
   const expected = action==='approve'?'accepted':'returned';
   await expect.poll(async ()=>(await row(page,pid)).tpm_ac_status).toBe(expected);

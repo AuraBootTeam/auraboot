@@ -1,3 +1,4 @@
+import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test,expect,type Page,type APIResponse,type Response} from '@playwright/test';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
@@ -38,7 +39,7 @@ async function prepareOperations(page:Page,user:any){
  const control=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:'500'}}));const example=control.records[0];expect(example).toBeTruthy();
  const tombstone=await data(await page.request.post('/api/meta/commands/execute/tpm:create_acceptance',{data:{operationType:'create',payload:{tpm_ac_name:'已撤销的统计对照',tpm_ac_project:example.tpm_ac_project,tpm_ac_scope:'Source exclusion control',tpm_ac_amount:1,tpm_ac_risk:'normal',tpm_ac_reviewer:user.pid}}}));await data(await page.request.delete(`/api/dynamic/tpm_acceptance/${tombstone.data.recordPid}`));
  const returned=await createAcceptance(page,user,'华辰制造 · 供应商联调补正');
- await page.getByTestId('bpm-operations-reject').click();await page.getByTestId('bpm-reject-comment').fill('缺少供应商对账差异说明，请补齐后重新提交。');const rejected=page.waitForResponse(r=>r.url().includes('/api/bpm/tasks/')&&r.url().endsWith('/reject')&&r.request().method()==='POST');await page.getByTestId('bpm-reject-confirm').click();await data(await rejected);await expect(page.getByRole('main')).toContainText('缺少供应商对账差异说明');
+ await data(await completeDeliveryApproval(page,'reject','缺少供应商对账差异说明，请补齐后重新提交。'));await expect(page.getByRole('main')).toContainText('缺少供应商对账差异说明');
  const configs=await data(await page.request.get('/api/bpm/sla-configs'));const config=configs.find((c:any)=>c.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
  await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:{...config,deadlineMode:'FIXED',deadlineValue:'PT30S',ruleBinding:{...config.ruleBinding,enabled:false}}}));
  let pending:any;
