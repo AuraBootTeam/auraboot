@@ -1080,9 +1080,9 @@ export function EventPolicyDesignerWorkflow({
               <span>{copy('run_result')}</span>
               <strong>{runStatus(runResult)}</strong>
               {runCorrelationId(runResult) ? (
-                <span className="epd-correlation" data-testid="epd-correlation-id">
+                <details className="epd-context-meta"><summary>{copy('technical_identifiers')}</summary><span className="epd-correlation" data-testid="epd-correlation-id">
                   Correlation {runCorrelationId(runResult)}
-                </span>
+                </span></details>
               ) : null}
               {eventPolicyTraceHref(runResult, selectedPolicy) ? (
                 <a

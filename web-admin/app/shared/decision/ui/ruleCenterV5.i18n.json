@@ -50,5 +50,13 @@
   "professional": {
     "zh-CN": "专业配置",
     "en": "Professional settings"
+  },
+  "allModels": {
+    "zh-CN": "全部模型",
+    "en": "All models"
+  },
+  "unscopedReference": {
+    "zh-CN": "规则上下文引用",
+    "en": "Rule context reference"
   }
 }

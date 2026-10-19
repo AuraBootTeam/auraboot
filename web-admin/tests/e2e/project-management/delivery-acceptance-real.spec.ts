@@ -12,6 +12,21 @@ async function data(response: APIResponse | Response) {
   expect(String(body.code)).toBe('0');
   return body.data;
 }
+async function dynamicRecords(page: Page, model: string) {
+  const records: any[] = [];
+  let total = 0;
+  do {
+    const result = await data(await page.request.get(`/api/dynamic/${model}/list?pageNum=${Math.floor(records.length / 100) + 1}&pageSize=100`));
+    total = Number(result.total);
+    expect(Number.isInteger(total)).toBe(true);
+    expect(Array.isArray(result.records)).toBe(true);
+    if (total > records.length) expect(result.records.length).toBeGreaterThan(0);
+    records.push(...result.records);
+  } while (records.length < total);
+  expect(records).toHaveLength(total);
+  expect(new Set(records.map(record => record.pid)).size).toBe(total);
+  return {records, total};
+}
 function canonicalInputMappings(mappings: any[]) {
   return mappings.map(mapping => {
     const source = {...mapping.source};
@@ -163,20 +178,20 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   if(action==='approve') {
     await expect.poll(async ()=>(await row(observer,pid)).tpm_ac_registered, {timeout:15000}).toBe(true);
     const accepted=await row(observer,pid);
-    const all=await data(await observer.request.get('/api/dynamic/tpm_acceptance/list?size=100'));
+    const all=await dynamicRecords(observer, 'tpm_acceptance');
     const sum=all.records.filter((r:any)=>r.tpm_ac_project===accepted.tpm_ac_project&&r.tpm_ac_status==='accepted').reduce((sum:number,r:any)=>sum+Number(r.tpm_ac_amount),0);
-    const projects=await data(await observer.request.get('/api/dynamic/tpm_project/list?size=100'));
+    const projects=await dynamicRecords(observer, 'tpm_project');
     const project=projects.records.find((r:any)=>r.pid===accepted.tpm_ac_project);
     expect(Number(project.tpm_pj_accepted_total)).toBe(sum);
-    const checks=await data(await observer.request.get('/api/dynamic/tdv_check/list?size=100'));
+    const checks=await dynamicRecords(observer, 'tdv_check');
     expect(checks.records.filter((r:any)=>r.tdv_ck_acceptance===pid)).toHaveLength(1);
     const replayRequest={targetRecordPid:project.pid,payload:{acceptancePid:pid},clientRequestId:`registration-replay:${pid}`};
     await data(await observer.request.post('/api/meta/commands/execute/tdv:register_acceptance',{data:replayRequest}));
     const replay=await data(await observer.request.post('/api/meta/commands/execute/tdv:register_acceptance',{data:replayRequest}));
     expect(replay.idempotentReplay).toBe(true);
-    const afterReplay=await data(await observer.request.get('/api/dynamic/tdv_check/list?size=100'));
+    const afterReplay=await dynamicRecords(observer, 'tdv_check');
     expect(afterReplay.records.filter((r:any)=>r.tdv_ck_acceptance===pid)).toHaveLength(1);
-    const projectsAfterReplay=await data(await observer.request.get('/api/dynamic/tpm_project/list?size=100'));
+    const projectsAfterReplay=await dynamicRecords(observer, 'tpm_project');
     expect(Number(projectsAfterReplay.records.find((r:any)=>r.pid===project.pid).tpm_pj_accepted_total)).toBe(sum);
     let actions:any[]=[];
     await expect.poll(async()=>{
@@ -265,7 +280,7 @@ test('professional event policy publish, execution failure and recovery preserve
   expect(success.execution.overallStatus).toBe('ALL_SUCCESS');
   expect(success.execution.actions).toHaveLength(1);
   expect(success.execution.actions[0].resultPayload.sentCount).toBe(1);
-  await expect(page.getByTestId('epd-action-execution-0')).toContainText('成功');await shot(page, 'R13');
+  await expect(page.getByTestId('epd-action-execution-0')).toContainText('成功');await page.getByTestId('epd-action-execution-0').scrollIntoViewIfNeeded();await shot(page, 'R13');
   // Real invalid recipient, not a fulfilled success response. This must fail at runtime.
   await page.getByTestId('epd-step-actions').click();
   await page.getByLabel('action-target-0', {exact:true}).fill('USER:missing_rule_sla_recipient');
@@ -276,7 +291,7 @@ test('professional event policy publish, execution failure and recovery preserve
   expect(failed.execution.overallStatus).not.toBe('ALL_SUCCESS');
   expect(failed.execution.actions[0].status).toBe('FAILED');
   expect(failed.execution.actions[0].error).toBeTruthy();
-  await expect(page.getByTestId('epd-action-execution-0')).toContainText('失败');await shot(page, 'R16');
+  await expect(page.getByTestId('epd-action-execution-0')).toContainText('失败');await page.getByTestId('epd-action-execution-0').scrollIntoViewIfNeeded();await shot(page, 'R16');
   const logs = await data(await page.request.get(`/api/event-policy/action-logs?policyCode=${policy}&size=100`));
   expect(logs.filter((l:any)=>l.status==='SUCCESS')).toHaveLength(1);
   expect(logs.filter((l:any)=>l.status==='FAILED')).toHaveLength(1);
@@ -308,6 +323,7 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   await expect(page.getByTestId('strategy-operation-status')).toHaveAttribute('data-tone','error');
   await expect(page.getByTestId('strategy-test-outputs')).toHaveCount(0);await shot(page,'R05');
   await professionalTab(page,'model');
+  await page.getByRole('combobox',{name:'model-filter',exact:true}).selectOption('tpm_acceptance');
   await page.getByRole('combobox',{name:'entity-filter',exact:true}).selectOption('record');
   await page.getByRole('textbox',{name:'field-search',exact:true}).fill('tpm_ac_amount');
   await expect(page.getByTestId('dmv-count')).toHaveText('1');

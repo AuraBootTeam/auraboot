@@ -106,3 +106,16 @@
 .decisionops-shell .epl-table td:first-child { width:30%; }
 .decisionops-shell .epl-table td:last-child { width:20%; }
 .decisionops-shell .epl-table .decisionops-row-actions { flex-wrap:wrap; }
+
+/* Secondary tools retain page context and avoid stretching sparse drawer rows. */
+.decisionops-shell .elta-drawer-backdrop,
+.decisionops-shell .elta-drawer-backdrop:hover { background:rgb(15 23 42 / .24); border:0; border-radius:0; padding:0; }
+.decisionops-shell .elta-drawer { align-content:start; }
+.decisionops-shell .ddl-impact-drawer,
+.decisionops-shell .dmv-impact-drawer { position:fixed; inset:56px 0 0 auto; z-index:70; width:min(820px,calc(100vw - 32px)); overflow:auto; background:var(--color-panel,#fff); border-left:1px solid var(--color-border,#e2e8f0); padding:24px; box-shadow:-12px 0 32px #0f172a12; font-size:13px; }
+.decisionops-shell .drawer-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.decisionops-shell .drawer-head h4 { font-size:18px; font-weight:600; }
+.decisionops-shell .dmv-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:16px; }
+.decisionops-shell .dmv-table { width:100%; border-collapse:collapse; font-size:12px; }
+.decisionops-shell .dmv-table th { padding:12px; text-align:left; background:var(--color-subtle,#f8fafc); color:var(--color-text-2,#64748b); font-weight:500; }
+.decisionops-shell .dmv-table td { padding:12px; border-bottom:1px solid var(--color-border,#e2e8f0); overflow-wrap:anywhere; }
