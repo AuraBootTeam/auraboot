@@ -1689,6 +1689,25 @@ describe('RecursiveBlockRenderer', () => {
     ).toHaveTextContent('80');
   });
 
+  it.each(['table', 'sub-table'] as const)('renders the edited localized %s title instead of its English default', (blockType) => {
+    render(<RecursiveBlockRenderer schema={{
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'localized_table_form',
+      blocks: [{
+        id: 'localized_line_items',
+        blockType,
+        title: { 'zh-CN': 'Authored line items', 'en-US': 'New sub table' },
+        props: { rows: [{ name: 'Owned preview row' }] },
+        blocks: [{ id: 'localized_name', blockType: 'column', field: 'name', props: { label: 'Name' } }],
+      }],
+    }} />);
+    const table = screen.getByTestId('runtime-block-localized_line_items');
+    expect(table).toHaveTextContent('Authored line items');
+    expect(table).not.toHaveTextContent('New sub table');
+    expect(table).toHaveTextContent('Owned preview row');
+  });
+
   it('renders editable repeater rows and passes row values to form actions', async () => {
     const runtimeServices: RuntimeExecutionServices = {
       executeAction: vi.fn().mockResolvedValue({ status: 'Submitted' }),
