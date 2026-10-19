@@ -24,7 +24,7 @@ describe('ImpactGraphPanel', () => {
 
     render(<ImpactGraphPanel impact={impact} />);
 
-    expect(screen.getByTestId('impact-blast-radius')).toHaveTextContent('Used by 1 automation + 1 SLA rule');
+    expect(screen.getByTestId('impact-blast-radius')).toHaveTextContent('此规则已被业务流程使用');
     expect(screen.getByTestId('impact-center')).toHaveTextContent('sla_deadline');
     expect(screen.getByTestId('impact-incoming')).toHaveTextContent('High Priority Automation');
     expect(screen.getByTestId('impact-incoming')).toHaveTextContent('High Priority SLA');

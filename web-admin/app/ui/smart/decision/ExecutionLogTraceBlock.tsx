@@ -1,3 +1,6 @@
+import { decisionConditionOperatorLabel } from '~/shared/decision/ui/decisionConditionText';
+import type { Operator } from '~/shared/decision/ast/conditionAst';
+import { DecisionLoadError } from '~/shared/decision/ui/DecisionLoadError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { getApiService } from '~/shared/services/ApiService';
@@ -439,6 +442,20 @@ function traceSnapshotRecord(raw: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function conditionRows(raw: unknown): Array<Record<string, unknown>> {
+  if (!raw || typeof raw !== 'object') return [];
+  const rows = (raw as Record<string, unknown>).conditionSnapshot;
+  return Array.isArray(rows) ? rows.filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object')) : [];
+}
+
+function inputRows(raw: unknown): Array<{ key: string; row: Record<string, unknown> }> {
+  if (!raw || typeof raw !== 'object') return [];
+  const input = (raw as Record<string, unknown>).inputSnapshot;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return [];
+  return Object.entries(input).filter(([, value]) => value && typeof value === 'object' && !Array.isArray(value))
+    .map(([key, row]) => ({ key, row: row as Record<string, unknown> }));
+}
+
 function factMetadataEntries(raw: unknown): Record<string, DecisionTraceFactMetadata> {
   const metadata = traceSnapshotRecord(raw)?.factMetadata;
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
@@ -864,6 +881,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
   const [linkedActionLogs, setLinkedActionLogs] = useState<EventPolicyActionLogRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [traceLoading, setTraceLoading] = useState(false);
+  const [traceError, setTraceError] = useState<unknown>(null);
   const [actionLogsLoading, setActionLogsLoading] = useState(false);
   const [linkedActionLogsLoading, setLinkedActionLogsLoading] = useState(false);
   const [replayingActionPid, setReplayingActionPid] = useState<string | null>(null);
@@ -881,6 +899,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
     async (log: DecisionLogRecord) => {
       setSelectedLog(log);
       setTraceLoading(true);
+      setTraceError(null);
+      setTraceRecords([]);
       setActionLogs([]);
       setActionLogsLoading(false);
       setError('');
@@ -898,8 +918,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
         setTraceRecords(chain.length ? sortedTrace(chain) : [log]);
         setActionLogs(actions);
       } catch (e) {
-        setError(errorMessage(e));
-        setTraceRecords([log]);
+        setTraceError(e);
+        setTraceRecords([]);
         setActionLogs([]);
       } finally {
         setTraceLoading(false);
@@ -1459,7 +1479,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
               ) : null}
             </div>
             {traceLoading ? <div data-testid="elta-trace-loading">Trace 加载中...</div> : null}
-            {isEventPolicyLog(selectedLog) ? (
+            {traceError ? <DecisionLoadError testId="elta-trace-error" error={traceError} onRetry={() => loadTrace(selectedLog)} busy={traceLoading} /> : null}
+            {!traceError && isEventPolicyLog(selectedLog) ? (
               <section className="elta-action-evidence" data-testid="elta-action-evidence">
                 <div className="elta-action-evidence-head">
                   <h4>{traceLabel('ui', 'actionEvidence', locale)}</h4>
@@ -1555,12 +1576,49 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   <div className="elta-chain-rules">
                     命中规则: {matchedRuleLabels(log.matchedRulesJson).join(', ') || '-'}
                   </div>
+                  <section className="elta-output-snapshot" data-testid={`elta-input-snapshot-${log.pid ?? index}`}>
+                    <h4>{traceLabel('ui', 'inputSnapshot', locale)}</h4>
+                    <p className="text-xs text-muted-foreground">{traceLabel('ui', 'inputNote', locale)}</p>
+                    {inputRows(log.traceSnapshot).length ? (
+                      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 mt-3">
+                        {inputRows(log.traceSnapshot).map(({ key, row }) => (
+                          <div key={key} className="border-b pb-2">
+                            <dt className="text-xs text-muted-foreground">{String(row.label || traceLabel('semantic', 'field', locale))}</dt>
+                            <dd className="font-medium mt-1 break-words">
+                              {row.state === 'VALUE' ? payloadDisplay(row.value, key, log.traceSnapshot, locale) : traceLabel('ui', String(row.state), locale)}
+                            </dd>
+                            <details className="mt-1 text-xs"><summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>{key}</details>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : <p className="mt-2">{traceLabel('ui', log.traceSnapshot && 'inputSnapshot' in log.traceSnapshot ? 'restrictedInput' : 'inputMissing', locale)}</p>}
+                  </section>
+                  <section className="elta-output-snapshot" data-testid={`elta-condition-snapshot-${log.pid ?? index}`}>
+                    <h4>{traceLabel('ui', 'conditions', locale)}</h4>
+                    {conditionRows(log.traceSnapshot).length ? <div className="mt-3 space-y-2">
+                      {conditionRows(log.traceSnapshot).map((condition, rowIndex) => {
+                        const left = inputRows(log.traceSnapshot).find(input => input.key === condition.leftKey)?.row;
+                        const right = inputRows(log.traceSnapshot).find(input => input.key === condition.rightKey)?.row;
+                        return <div key={rowIndex} className="flex justify-between gap-4 border-b pb-2 text-sm">
+                          <div>
+                            {left ? <>
+                              <strong>{String(left.label || traceLabel('ui', 'field', locale))}</strong>{' '}
+                              {decisionConditionOperatorLabel(condition.operator as Operator, locale)}{' '}
+                              {right ? String(right.label || traceLabel('ui', 'field', locale)) : payloadDisplay(condition.expected, String(condition.leftKey), log.traceSnapshot, locale)}
+                              <p className="text-xs text-muted-foreground mt-1">{traceLabel('ui', 'actual', locale)}：{payloadDisplay(left.value, String(condition.leftKey), log.traceSnapshot, locale)}{right ? ` / ${payloadDisplay(right.value, String(condition.rightKey), log.traceSnapshot, locale)}` : ''}</p>
+                            </> : traceLabel('ui', String(condition.group), locale)}
+                          </div>
+                          <span className="shrink-0 font-medium">{traceLabel('ui', String(condition.truth), locale)}</span>
+                        </div>;
+                      })}
+                    </div> : <p className="text-xs text-muted-foreground mt-2">{traceLabel('ui', 'noConditions', locale)}</p>}
+                  </section>
                   {factMetadataRows(log.traceSnapshot).length ? (
-                    <section
+                    <details
                       className="elta-output-snapshot elta-fact-metadata"
                       data-testid={`elta-fact-metadata-${log.pid ?? index}`}
                     >
-                      <h4>{traceLabel('ui', 'factSnapshot', locale)}</h4>
+                      <summary>{traceLabel('ui', 'fieldDefinitions', locale)}</summary>
                       <div className="elta-fact-list">
                         {factMetadataRows(log.traceSnapshot).map((row) => (
                           <article className="elta-fact-card" key={factMetadataPath(row)}>
@@ -1611,7 +1669,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                           </article>
                         ))}
                       </div>
-                    </section>
+                    </details>
                   ) : null}
                   {outputSnapshotEntries(log.outputSnapshot).length ? (
                     <section

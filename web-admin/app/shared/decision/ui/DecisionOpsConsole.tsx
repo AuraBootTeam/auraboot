@@ -1,5 +1,6 @@
 import { useI18n } from '~/contexts/I18nContext';
 import NAV from './decisionOpsNav.i18n.json';
+import { DecisionLoadError } from './DecisionLoadError';
 import { useAuth } from '~/contexts/AuthContext';
 import './decision-workbench.css';
 import { useEffect, useMemo, useState } from 'react';
@@ -419,9 +420,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                   </div>
                 )}
                 {!dashboard && dashboardQuery.isError && (
-                  <div className="decisionops-state is-error" data-testid="dd-error">
-                    加载失败
-                  </div>
+                  <DecisionLoadError testId="dd-error" error={dashboardQuery.error} onRetry={dashboardQuery.refetch} busy={dashboardQuery.isFetching} />
                 )}
                 {(!dashboardQuery.isLoading || dashboard) && !dashboardQuery.isError && (
                   <DecisionDashboard
@@ -493,9 +492,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                   </div>
                 )}
                 {modelFields == null && modelFieldQuery.isError && (
-                  <div className="decisionops-state is-error" data-testid="dmv-error">
-                    加载失败
-                  </div>
+                  <DecisionLoadError testId="dmv-error" error={modelFieldQuery.error} onRetry={modelFieldQuery.refetch} busy={modelFieldQuery.isFetching} />
                 )}
                 {(!modelFieldQuery.isLoading || modelFields != null) &&
                   !modelFieldQuery.isError && (
@@ -511,9 +508,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                   </div>
                 )}
                 {permissionGrants == null && permissionQuery.isError && (
-                  <div className="decisionops-state is-error" data-testid="pm-error">
-                    加载失败
-                  </div>
+                  <DecisionLoadError testId="pm-error" error={permissionQuery.error} onRetry={permissionQuery.refetch} busy={permissionQuery.isFetching} />
                 )}
                 {(!permissionQuery.isLoading || permissionGrants != null) &&
                   !permissionQuery.isError && (
@@ -529,9 +524,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                   </div>
                 )}
                 {connectors == null && connectorQuery.isError && (
-                  <div className="decisionops-state is-error" data-testid="cl-error">
-                    加载失败
-                  </div>
+                  <DecisionLoadError testId="cl-error" error={connectorQuery.error} onRetry={connectorQuery.refetch} busy={connectorQuery.isFetching} />
                 )}
                 {(!connectorQuery.isLoading || connectors != null) && !connectorQuery.isError && (
                   <ConnectorListView connectors={connectorData} />

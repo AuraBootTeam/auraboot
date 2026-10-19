@@ -118,7 +118,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         ResolvedDecision resolved = toResolved(versionEntity);
 
         long start = System.currentTimeMillis();
-        DecisionResult result = decisionRuntime.evaluate(resolved, ctx, DecisionEvaluateOptions.defaults());
+        DecisionResult result = decisionRuntime.evaluate(resolved, ctx, DecisionEvaluateOptions.explaining());
         long durationMs = System.currentTimeMillis() - start;
 
         Map<String, Object> factMetadata = buildFactMetadataSnapshot(
@@ -127,13 +127,14 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         // result.traceId() -> ab_drt_log (the §22 audit contract). Generating a separate id here
         // would orphan the log from the returned result.
         writelog(tid, result.traceId(), request, versionEntity, result, durationMs,
-                resolution.rollout(), contextBuild.virtualSourceTrace(), factMetadata);
+                resolution.rollout(), contextBuild.virtualSourceTrace(), factMetadata,
+                DecisionInputSnapshot.capture(ctx, factMetadata));
 
         log.info("Decision evaluated: code={}, version={}, matched={}, durationMs={}",
                 versionEntity.getDecisionCode(), versionEntity.getVersion(),
                 result.matched(), durationMs);
 
-        return result;
+        return result.withoutConditionTrace();
     }
 
     @Override
@@ -621,7 +622,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
                           long durationMs,
                           DecisionRolloutSelection rollout,
                           List<Map<String, Object>> virtualSourceTrace,
-                          Map<String, Object> factMetadata) {
+                          Map<String, Object> factMetadata,
+                          Map<String, Object> inputSnapshot) {
         String logStatus = mapStatus(result.status());
 
         DrtLogEntity logEntry = new DrtLogEntity();
@@ -659,6 +661,11 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         Map<String, Object> outputMetadata = buildOutputMetadataSnapshot(ver.getContentJson());
         Map<String, Object> traceSnapshot = buildTraceSnapshot(
                 result, virtualSourceTrace, factMetadata, outputMetadata);
+        traceSnapshot.put("inputSnapshot", inputSnapshot);
+        if (virtualSourceTrace != null && !virtualSourceTrace.isEmpty()) {
+            traceSnapshot.put("virtualSources", DecisionInputSnapshot.virtualSources(virtualSourceTrace, inputSnapshot));
+        }
+        traceSnapshot.put("conditionSnapshot", DecisionConditionSnapshot.capture(ver.getContentJson(), result, inputSnapshot));
         if (!traceSnapshot.isEmpty()) {
             logEntry.setTraceSnapshot(objectMapper.valueToTree(traceSnapshot));
         }
@@ -774,7 +781,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         dto.setStatus(e.getStatus());
         dto.setMatchedRulesJson(e.getMatchedRulesJson());
         dto.setOutputSnapshot(e.getOutputSnapshot());
-        dto.setTraceSnapshot(e.getTraceSnapshot());
+        dto.setTraceSnapshot(DecisionInputSnapshot.project(
+                e.getTraceSnapshot(), objectMapper, model -> decisionModelFieldService.getFactCatalog(model)));
         dto.setDurationMs(e.getDurationMs());
         dto.setErrorCode(e.getErrorCode());
         dto.setErrorMessage(e.getErrorMessage());
@@ -1092,7 +1100,9 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         }
         putText(metadata, "dictCode", fact.getDictCode());
         Map<String, String> valueLabels = new LinkedHashMap<>(valueLabels(fact.getAllowedValues()));
-        valueLabels.putAll(referenceValueLabels(fact, resolvedContext));
+        if (!Boolean.TRUE.equals(fact.getMasked())) {
+            valueLabels.putAll(referenceValueLabels(fact, resolvedContext));
+        }
         if (!valueLabels.isEmpty()) {
             metadata.put("valueLabels", valueLabels);
         }

@@ -801,6 +801,86 @@
     "unknownReasons": {
       "zh-CN": "未知原因",
       "en": "Unknown reasons"
+    },
+    "inputSnapshot": {
+      "zh-CN": "当次输入",
+      "en": "Inputs at execution"
+    },
+    "inputNote": {
+      "zh-CN": "仅展示执行时记录且当前有权查看的字段；不读取现时业务数据补写历史。",
+      "en": "Only captured fields currently visible to you are shown. Current records never replace historical inputs."
+    },
+    "inputMissing": {
+      "zh-CN": "该历史记录未保存当次输入",
+      "en": "Inputs were not captured for this historical record"
+    },
+    "fieldDefinitions": {
+      "zh-CN": "字段定义与字典说明",
+      "en": "Field definitions and dictionaries"
+    },
+    "VALUE": {
+      "zh-CN": "已记录",
+      "en": "Captured"
+    },
+    "NULL": {
+      "zh-CN": "空值",
+      "en": "Null"
+    },
+    "MISSING": {
+      "zh-CN": "未提供",
+      "en": "Not provided"
+    },
+    "REDACTED": {
+      "zh-CN": "敏感值已隐藏",
+      "en": "Sensitive value hidden"
+    },
+    "OMITTED": {
+      "zh-CN": "内容未记录（复合类型或超过长度限制）",
+      "en": "Not captured (complex value or length limit)"
+    },
+    "restrictedInput": {
+      "zh-CN": "没有可展示的输入字段",
+      "en": "No input fields available to display"
+    },
+    "conditions": {
+      "zh-CN": "当次判断依据",
+      "en": "Evaluation evidence"
+    },
+    "noConditions": {
+      "zh-CN": "未记录可展示的逐条件解释；结果以本次引擎求值为准。",
+      "en": "No visible condition explanation was captured. The recorded engine result is authoritative."
+    },
+    "AND": {
+      "zh-CN": "全部条件同时满足",
+      "en": "All conditions"
+    },
+    "OR": {
+      "zh-CN": "任一条件满足",
+      "en": "Any condition"
+    },
+    "NOT": {
+      "zh-CN": "条件取反",
+      "en": "Negated condition"
+    },
+    "actual": {
+      "zh-CN": "实际值",
+      "en": "Actual value"
+    },
+    "TRUE": {
+      "zh-CN": "满足",
+      "en": "True"
+    },
+    "FALSE": {
+      "zh-CN": "不满足",
+      "en": "False"
+    },
+    "UNKNOWN": {
+      "zh-CN": "无法确定",
+      "en": "Unknown"
+    },
+    "field": {
+      "zh-CN": "业务字段",
+      "en": "Business field"
     }
   }
 }

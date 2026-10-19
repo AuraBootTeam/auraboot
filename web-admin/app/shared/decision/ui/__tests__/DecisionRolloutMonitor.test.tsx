@@ -303,7 +303,7 @@ describe('DecisionRolloutMonitor', () => {
 
     await waitFor(() => expect(screen.getByTestId('rollout-row-rollout-1')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('rollout-promote-rollout-1'));
-    expect(screen.getByTestId('rollout-confirm-panel')).toHaveTextContent('promote');
+    expect(screen.getByTestId('rollout-confirm-panel')).toHaveTextContent('全量发布');
     fireEvent.change(screen.getByLabelText('rollout-action-note'), {
       target: { value: 'metrics accepted' },
     });

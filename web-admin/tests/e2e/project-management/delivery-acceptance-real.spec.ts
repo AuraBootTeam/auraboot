@@ -306,9 +306,17 @@ test('professional event policy publish, execution failure and recovery preserve
   const traceLogs=await data(await page.request.get(`/api/decision/logs?traceId=${encodeURIComponent(trace.traceId)}`));
   const ownedLogs=traceLogs.filter((log:any)=>log.decisionCode==='tpm_acceptance_route');expect(ownedLogs).toHaveLength(1);
   await menu(page,'执行日志');await expect(page.getByTestId('elta-business-results')).toBeVisible();
+  const tracePath=/\/api\/decision\/logs\?traceId=/;
+  await page.route(tracePath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：执行链路暂不可用'})}));
   await page.getByTestId(`elta-open-trace-${ownedLogs[0].pid ?? ownedLogs[0].traceId}`).click();
+  await expect(page.getByTestId('elta-trace-error')).toBeVisible();await shot(page,'R17-error');
+  await expect(page.getByTestId('elta-trace-chain').locator('li')).toHaveCount(0);
+  await page.unroute(tracePath);await page.getByTestId('elta-trace-error').getByRole('button',{name:'重新加载',exact:true}).click();
+
   await expect(page.getByTestId('elta-trace-drawer')).toBeVisible();
-  await expect(page.getByTestId('elta-trace-chain')).toBeVisible();await shot(page, 'R17');
+  await expect(page.getByTestId('elta-trace-chain')).toBeVisible();
+  const captured=page.getByTestId(`elta-input-snapshot-${ownedLogs[0].pid}`);await expect(captured).toContainText('当次输入');await expect(captured).toContainText('68000');
+  expect(ownedLogs[0].traceSnapshot.inputSnapshot['record.data.tpm_ac_amount'].value).toBe(68000);await shot(page, 'R17');
 });
 
 test('professional rule impact, metadata filters and load-error recovery remain usable @critical', async ({page}) => {
@@ -351,7 +359,7 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   const unavailable = page.waitForResponse(response => definitionPath.test(new URL(response.url()).pathname) && response.status() === 503);
   await page.reload();await unavailable;
   await expect(page.getByTestId('ddl-error')).toBeVisible({timeout:20000});await shot(page,'A02');
-  await page.unroute(definitionPath);await page.reload();
+  await page.unroute(definitionPath);await page.getByTestId('ddl-error').getByRole('button',{name:'重新加载',exact:true}).click();
   await expect(page.getByTestId('ddl-row-tpm_acceptance_route')).toBeVisible();await expect(page.getByTestId('ddl-error')).toHaveCount(0);await shot(page,'A02-recovered');
   await page.getByTestId('ddl-open-tpm_acceptance_deadline').click();
   await expect(page.getByTestId('strategy-business-decision')).toHaveValue('tpm_acceptance_deadline');
@@ -371,7 +379,13 @@ test('SLA paused completed and failed-action detail states use actual lifecycle 
   }
   await processAction('suspend');
   const paused=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));expect(paused.status).toBe('paused');
-  await menu(page,'流程监控');await page.getByTestId('sla-stat-paused').click();
+  const dashboardPath=/\/api\/bpm\/monitor\/dashboard(?:\?.*)?$/;
+  await page.route(dashboardPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：监控暂不可用'})}));
+  await menu(page,'流程监控');await expect(page.getByTestId('sla-dashboard-error')).toBeVisible();
+  await expect(page.getByTestId('sla-dashboard-active-records')).toHaveCount(0);await shot(page,'S00-load-error');
+  await page.unroute(dashboardPath);await page.getByTestId('sla-refresh').click();
+  await expect(page.getByTestId('sla-dashboard-active-records')).toBeVisible();await expect(page.getByTestId('sla-dashboard-error')).toHaveCount(0);
+  await page.getByTestId('sla-stat-paused').click();
   await page.getByTestId('sla-record-row').filter({hasText:name}).getByTestId('sla-record-detail').click();
   await expect(page.getByTestId('sla-item-detail')).toContainText('已暂停');await shot(page,'S05');
   await processAction('resume');expect((await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`))).status).toBe('running');
@@ -423,11 +437,11 @@ test('professional rollout compares exact versions and audits activation pause a
       await page.getByTestId('rollout-confirm-action').click();
     }
     expect((await data(await response)).status).toBe(expected);
-    await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText(expected);
+    await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText(({ACTIVE:'运行中',PAUSED:'已暂停',ROLLED_BACK:'已回滚'} as Record<string,string>)[expected]);
   }
   await transition('activate','ACTIVE');await transition('pause','PAUSED');await transition('activate','ACTIVE');await transition('rollback','ROLLED_BACK');
   await expect(page.getByTestId('rollout-audit-panel')).toContainText('本轮专属版本核验');await shot(page,'R06');
-  await page.reload();await page.getByLabel('rollout-decision-code',{exact:true}).fill(code);await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('ROLLED_BACK');
+  await page.reload();await page.getByLabel('rollout-decision-code',{exact:true}).fill(code);await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('已回滚');
   const actual=await data(await page.request.get(`/api/decision/definitions/${code}/rollouts`));
   expect(actual.find((r:any)=>r.pid===rollout.pid).status).toBe('ROLLED_BACK');
   await writeFile(join(evidence!,'professional-rollout-receipt.json'),JSON.stringify({versions,actual},null,2));

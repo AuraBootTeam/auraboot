@@ -5,6 +5,7 @@ import { getLocalizedText } from '~/utils/i18n';
 import COPY from './ruleCenterV5.i18n.json';
 import type { DecisionApi, DecisionVersionSummary } from '../api/decisionApi';
 import { ImpactGraphPanel } from './ImpactGraphPanel';
+import { DecisionLoadError } from './DecisionLoadError';
 
 /**
  * DecisionOps definition-center list page (mockup Decision Runtime / F5, docs/1.md §13): fetches the
@@ -92,7 +93,7 @@ export function DecisionDefinitionListPage({ api, onOpen }: DecisionDefinitionLi
   const [impactAcknowledged, setImpactAcknowledged] = useState(false);
   const [transitioningPid, setTransitioningPid] = useState<string | null>(null);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['drt-definitions'],
     queryFn: () => api.listDefinitions(),
   });
@@ -102,6 +103,17 @@ export function DecisionDefinitionListPage({ api, onOpen }: DecisionDefinitionLi
     queryFn: () => api.getDecisionImpact(impactCode ?? ''),
     enabled: Boolean(impactCode),
   });
+  const catalogueQuery = useQuery({
+    queryKey: ['drt-impact-field-labels'],
+    queryFn: () => api.getFactCatalog(),
+    enabled: Boolean(impactCode) && typeof api.getFactCatalog === 'function',
+  });
+  const fieldLabels: Record<string,string> = {};
+  for (const entity of catalogueQuery.data?.entities ?? []) {
+    for (const fact of entity.facts ?? []) {
+      if (fact.label) fieldLabels[`${fact.scope}.${fact.path}`] = fact.label;
+    }
+  }
   const versionsQuery = useQuery({
     queryKey: ['drt-definition-versions', impactCode],
     queryFn: () => api.listVersions(impactCode ?? ''),
@@ -115,7 +127,7 @@ export function DecisionDefinitionListPage({ api, onOpen }: DecisionDefinitionLi
   }, [impactCode]);
 
   if (isLoading) return <div data-testid="ddl-loading">加载中…</div>;
-  if (isError) return <div data-testid="ddl-error">加载失败</div>;
+  if (isError) return <DecisionLoadError testId="ddl-error" error={error} onRetry={refetch} busy={isFetching} />;
 
   const rows = asList(data);
   if (rows.length === 0)
@@ -293,13 +305,13 @@ export function DecisionDefinitionListPage({ api, onOpen }: DecisionDefinitionLi
             </button>
           </div>
           {impactQuery.isLoading && <div data-testid="ddl-impact-loading">加载影响分析…</div>}
-          {impactQuery.isError && <div data-testid="ddl-impact-error">影响分析加载失败</div>}
-          {impactQuery.data && <ImpactGraphPanel impact={impactQuery.data} />}
+          {impactQuery.isError && <DecisionLoadError testId="ddl-impact-error" error={impactQuery.error} onRetry={impactQuery.refetch} busy={impactQuery.isFetching} />}
+          {impactQuery.data && <ImpactGraphPanel impact={impactQuery.data} fieldLabels={fieldLabels} />}
           {canListVersions && (
             <section className="ddl-publish-guard" data-testid="ddl-publish-guard">
               <h4>版本生命周期</h4>
               {versionsQuery.isLoading && <div data-testid="ddl-versions-loading">加载版本…</div>}
-              {versionsQuery.isError && <div data-testid="ddl-versions-error">版本加载失败</div>}
+              {versionsQuery.isError && <DecisionLoadError testId="ddl-versions-error" error={versionsQuery.error} onRetry={versionsQuery.refetch} busy={versionsQuery.isFetching} />}
               {impactBlocking && (
                 <label className="ddl-impact-ack">
                   <input
