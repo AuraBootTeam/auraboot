@@ -34,13 +34,19 @@ test('quickstart CI creates a private fresh key before compose and never overwri
     assert.equal(first.status, 0, first.stderr);
     assert.equal(first.stdout, '');
     const file = path.join(directory, '.env');
-    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-    const before = fs.readFileSync(file, 'utf8');
-    assert.match(before, /^OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=[a-f0-9]{96}\n$/);
+    const readEnv = () => {
+      const fd = fs.openSync(file, 'r');
+      try {
+        return { mode: fs.fstatSync(fd).mode & 0o777, contents: fs.readFileSync(fd, 'utf8') };
+      } finally { fs.closeSync(fd); }
+    };
+    const before = readEnv();
+    assert.equal(before.mode, 0o600);
+    assert.match(before.contents, /^OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=[a-f0-9]{96}\n$/);
     assert.notEqual(generate().status, 0);
-    assert.equal(fs.readFileSync(file, 'utf8'), before);
+    assert.equal(readEnv().contents, before.contents);
     fs.unlinkSync(file);
     assert.equal(generate().status, 0);
-    assert.notEqual(fs.readFileSync(file, 'utf8'), before);
+    assert.notEqual(readEnv().contents, before.contents);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
