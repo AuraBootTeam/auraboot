@@ -51,7 +51,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
   const project = projects.find((p: any) => p.tpm_pj_name === '华辰制造 · 供应链协同平台');
   expect(project).toBeTruthy();
   const suffix = randomUUID().replaceAll('-', '').slice(0, 10),
-    taskName = `华辰制造 · 交付归档恢复 ${suffix}`;
+    taskName = '华辰制造 · 交付材料归档';
   const original = '验收材料已整理，等待交付归档。',
     recovered = '验收材料已核对，交付归档完成。';
   const created = await data(
@@ -132,7 +132,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
   const automation = await data(
     await page.request.post('/api/automations', {
       data: {
-        name: '华辰制造 · 交付归档与故障恢复 ' + suffix,
+        name: '华辰制造 · 交付归档与恢复',
         description: '仅更新专属交付任务的归档说明。权限不足时保留失败，修正后通过设计器再次执行。',
         modelCode: 'tpm_task',
         triggerType: 'webhook',
@@ -209,6 +209,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
         return (
           !!bounds &&
           nodes.length === 2 &&
+          (nodes[0].right + 16 <= nodes[1].x || nodes[1].right + 16 <= nodes[0].x) &&
           nodes.every(
             (node) =>
               node.x >= bounds.x &&
