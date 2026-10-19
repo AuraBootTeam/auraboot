@@ -610,6 +610,11 @@ Use an owned host-first stack composed by `scripts/oss-golden-stack.sh` with an
 explicit frozen BPM source, `--extra-plugin-root <bpm-root> --plugin plugin`, and
 `--product-migration-root <bpm-root>/migrations/bpm`. The launcher builds the BPM
 JAR against the exact Core plugin API and runtime artifacts before importing it.
+Pin a BPM commit compatible with that Core API. Explicit `--plugin` arguments
+replace the profile list: include the required Core plugins from
+`scripts/dev/plugin-import-profiles.json` in their declared order before the BPM
+`--plugin plugin` argument. Passing that argument alongside `--plugin-profile demo`
+does not append BPM to the demo profile.
 Run the normal setup, authentication and smoke phases against that same stack,
 then execute:
 
