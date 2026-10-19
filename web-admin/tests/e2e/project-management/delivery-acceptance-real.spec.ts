@@ -379,7 +379,7 @@ test('professional rule impact, metadata filters and load-error recovery remain 
 });
 
 test('SLA paused completed and failed-action detail states use actual lifecycle records @critical', async ({page}) => {
-  test.setTimeout(180000);const user=await login(page);const name='华辰制造 · 暂停恢复核验';
+  test.setTimeout(180000);const user=await login(page);const runLabel=new Date().toISOString().slice(11,23);const name=`华辰制造 · 暂停恢复核验 · ${runLabel}`;
   const pid=await create(page,user,name,68000,'普通',true);const sla=await submit(page,pid,480,'tpm_standard_review');
   async function processAction(action:'suspend'|'resume') {
     await menu(page,'任务中心');await page.getByRole('button',{name:'我发起的',exact:true}).click();
@@ -412,7 +412,7 @@ test('SLA paused completed and failed-action detail states use actual lifecycle 
   const configs=await data(await page.request.get('/api/bpm/sla-configs'));const config=configs.find((c:any)=>c.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
   await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:{...config,deadlineMode:'FIXED',deadlineValue:'PT5S',ruleBinding:{...config.ruleBinding,enabled:false},warningRules:[],actionPolicy:{trigger:'SLA_TIMEOUT',failureStrategy:'FAIL_FAST',actions:[{type:'NOTIFY',order:10,target:'USER:missing_rule_sla_recipient',payload:{title:'无效收件人失败核验',content:'必须失败，不能伪装已送达'}}]}}}));
   try {
-    const failName='华辰制造 · 催办失败诊断核验';const failedPid=await create(page,user,failName,100000,'高风险',true);const failedSla=await submit(page,failedPid,5/60,'tpm_enhanced_review');
+    const failName=`华辰制造 · 催办失败诊断核验 · ${runLabel}`;const failedPid=await create(page,user,failName,100000,'高风险',true);const failedSla=await submit(page,failedPid,5/60,'tpm_enhanced_review');
     let logs:any[]=[];await expect.poll(async()=>{logs=await data(await page.request.get(`/api/event-policy/action-logs?correlationId=sla:${failedSla.pid}&size=100`));return logs.length;},{timeout:45000,intervals:[2000]}).toBe(1);
     expect(logs[0].status).toBe('FAILED');expect(logs[0].errorMessage).toBeTruthy();
     await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();
