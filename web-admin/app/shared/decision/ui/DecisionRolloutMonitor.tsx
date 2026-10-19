@@ -1,3 +1,5 @@
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 import { useI18n } from '~/contexts/I18nContext';
 import { diagnosticText } from './diagnosticsCopy';
 import { DecisionLoadError } from './DecisionLoadError';
@@ -268,6 +270,7 @@ export function DecisionRolloutMonitor({
 }: DecisionRolloutMonitorProps) {
   const { hasPermission: hasContextPermission } = usePermissions();
   const { locale } = useI18n();
+  const { timezone, formats } = useTimezone();
   const text = (key: string) => diagnosticText(key, locale);
   const [decisionCode, setDecisionCode] = useState(initialDecisionCode);
   const [baselineVersion, setBaselineVersion] = useState(String(initialBaselineVersion));
@@ -284,6 +287,8 @@ export function DecisionRolloutMonitor({
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [selectedPid, setSelectedPid] = useState<string | null>(null);
   const [busyPid, setBusyPid] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const canManageRollouts =
     hasPermission?.(ROLLOUT_MANAGE_PERMISSION) ?? hasContextPermission(ROLLOUT_MANAGE_PERMISSION);
@@ -299,6 +304,16 @@ export function DecisionRolloutMonitor({
   ].filter(Boolean);
 
   const normalizedCode = decisionCode.trim();
+  const definitionsQuery = useQuery({
+    queryKey: ['decision-rollout-definition-choices'],
+    queryFn: () => api.listDefinitions(),
+    enabled: typeof api.listDefinitions === 'function',
+  });
+  const definitionData = definitionsQuery.data;
+  const definitionRows = Array.isArray(definitionData) ? definitionData : (definitionData as {records?:unknown[]})?.records ?? [];
+  const choices = definitionRows.filter((row): row is {decisionCode:string;decisionName?:string} => Boolean(row && typeof row === 'object' && typeof (row as {decisionCode?:unknown}).decisionCode === 'string'));
+  const ruleName = (code: string) => choices.find(row => row.decisionCode === code)?.decisionName || text('selectedRule');
+
   const rolloutsQuery = useQuery({
     queryKey: ['decision-rollouts', normalizedCode],
     queryFn: () => api.listRollouts(normalizedCode),
@@ -330,7 +345,8 @@ export function DecisionRolloutMonitor({
   };
 
   const createRollout = async () => {
-    setMessage(null);
+    setMessage(null); setOperationError(null);setCreating(true);
+    try {
     const request = {
       baselineVersion: asNumber(baselineVersion),
       candidateVersion: asNumber(candidateVersion),
@@ -348,6 +364,8 @@ export function DecisionRolloutMonitor({
     setSelectedPid(created.pid);
     setMessage('灰度策略已创建');
     await rolloutsQuery.refetch();
+    } catch (error) {setMessage(text('operationFailed'));setOperationError(error instanceof Error ? error.message : String(error));}
+    finally {setCreating(false);}
   };
 
   const runAction = async (
@@ -356,16 +374,16 @@ export function DecisionRolloutMonitor({
     action: (pid: string, req?: DecisionRolloutActionRequest) => Promise<DecisionRollout>,
   ) => {
     setBusyPid(pid);
-    setMessage(null);
+    setMessage(null); setOperationError(null);
     try {
       await action(pid, { note: note.trim() || undefined });
       setSelectedPid(pid);
       setPending(null);
       setNote('');
-      setMessage(`已执行 ${label}`);
+      setMessage(`${text('executed')} ${text(label)}`);
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : `执行 ${label} 失败`);
+      setMessage(text('operationFailed'));setOperationError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusyPid(null);
     }
@@ -382,19 +400,15 @@ export function DecisionRolloutMonitor({
       className="decisionops-list-page rollout-monitor"
       data-testid="decision-rollout-monitor"
     >
+      {definitionsQuery.isError && <DecisionLoadError testId="rollout-definitions-error" error={definitionsQuery.error} onRetry={definitionsQuery.refetch} busy={definitionsQuery.isFetching} />}
       <p className="text-sm text-muted-foreground mb-3">{text('rolloutHelp')}</p>
       <div className="decisionops-toolbar rollout-toolbar">
         <label>
-          决策编码
-          <input
-            className="decisionops-search-input"
-            aria-label="rollout-decision-code"
-            value={decisionCode}
-            onChange={(event) => {
-              setDecisionCode(event.target.value);
-              setSelectedPid(null);
-            }}
-          />
+          {text('ruleSelector')}
+          <select aria-label="rollout-decision-code" disabled={definitionsQuery.isFetching || definitionsQuery.isError} value={decisionCode} onChange={event => {setDecisionCode(event.target.value);setSelectedPid(null);}}>
+            {!choices.some(row => row.decisionCode === decisionCode) && <option value={decisionCode}>{text('selectedRule')}</option>}
+            {choices.map(row => <option key={row.decisionCode} value={row.decisionCode}>{row.decisionName || text('rule')}</option>)}
+          </select>
         </label>
         <label>
           {text('baseline')}
@@ -427,6 +441,9 @@ export function DecisionRolloutMonitor({
             onChange={(event) => setPercentage(event.target.value)}
           />
         </label>
+        <details className="rollout-advanced" data-testid="rollout-advanced">
+          <summary>{text('advanced')}</summary>
+          <div className="rollout-advanced-fields">
         <label>
           {text('routing')}
           <input
@@ -490,12 +507,14 @@ export function DecisionRolloutMonitor({
             onChange={(event) => setMetricsBucketMinutes(event.target.value)}
           />
         </label>
+          </div>
+        </details>
         <button
           className="decisionops-primary-button"
           data-testid="rollout-create"
           type="button"
           title={canManageRollouts ? undefined : '缺少灰度管理权限'}
-          disabled={!normalizedCode || !canManageRollouts}
+          disabled={!normalizedCode || !canManageRollouts || creating || definitionsQuery.isError || (typeof api.listDefinitions === 'function' && !choices.some(row => row.decisionCode === normalizedCode))}
           onClick={createRollout}
         >
           新建灰度
@@ -511,6 +530,7 @@ export function DecisionRolloutMonitor({
       {message && (
         <div className="decisionops-state rollout-message" data-testid="rollout-status-message">
           {message}
+          {operationError && <details className="mt-2 text-xs"><summary>{text('technical')}</summary>{operationError}</details>}
         </div>
       )}
 
@@ -537,7 +557,7 @@ export function DecisionRolloutMonitor({
                   <th>策略</th>
                   <th>版本</th>
                   <th>状态</th>
-                  <th>流量</th>
+                  <th>{text('configuredShare')}</th>
                   <th>{text('routing')}</th>
                   <th>操作</th>
                 </tr>
@@ -551,8 +571,8 @@ export function DecisionRolloutMonitor({
                     onClick={() => setSelectedPid(rollout.pid)}
                   >
                     <td>
-                      <strong>{rollout.decisionCode ?? normalizedCode}</strong>
-                      <details className="text-xs"><summary>{text('technical')}</summary>{rollout.pid}</details>
+                      <strong>{ruleName(rollout.decisionCode ?? normalizedCode)}</strong>
+                      <details className="text-xs"><summary>{text('technical')}</summary>{rollout.decisionCode} · {rollout.pid}</details>
                     </td>
                     <td>
                       {`v${rollout.baselineVersion ?? '-'} -> v${rollout.candidateVersion ?? '-'}`}
@@ -564,7 +584,7 @@ export function DecisionRolloutMonitor({
                     </td>
                     <td>{rollout.percentage ?? 0}%</td>
                     <td>
-                      <span>{rollout.percentage ?? 0}% → v{rollout.candidateVersion ?? '-'}</span>
+                      <span>{['ACTIVE','PROMOTED'].includes(rollout.status ?? '') ? `${rollout.percentage ?? 0}% → v${rollout.candidateVersion ?? '-'}` : text('inactiveRouting')}</span>
                       <details className="text-xs"><summary>{text('technical')}</summary>{rollout.routingKeyExpr ?? 'traceId'} · {rolloutAudienceSummary(rollout)}</details>
                     </td>
                     <td>
@@ -685,22 +705,23 @@ export function DecisionRolloutMonitor({
                   {selectedAuditEntries.map((entry, index) => (
                     <li key={`${entry.action ?? 'audit'}-${entry.at ?? index}`}>
                       <div className="rollout-audit-entry">
-                        <strong>{entry.action ?? 'AUDIT'}</strong>
+                        <strong>{text(entry.action?.toLowerCase() ?? 'audit')}</strong>
                         {entry.note && <p>{entry.note}</p>}
-                        <dl>
+                        <details><summary>{text('technical')}</summary><code>{entry.action}</code><dl>
                           {entry.by && (
                             <div>
-                              <dt>By</dt>
+                              <dt>{text('technical')}</dt>
                               <dd>{entry.by}</dd>
                             </div>
                           )}
                           {entry.at && (
                             <div>
-                              <dt>At</dt>
+                              <dt>{text('time')}</dt>
                               <dd>{entry.at}</dd>
                             </div>
                           )}
-                        </dl>
+                        </dl></details>
+                        {entry.at && <time>{formatInTimezone(entry.at, formats.datetime, timezone)}</time>}
                       </div>
                     </li>
                   ))}

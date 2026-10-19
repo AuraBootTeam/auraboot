@@ -385,6 +385,11 @@ test('SLA paused completed and failed-action detail states use actual lifecycle 
   await expect(page.getByTestId('sla-dashboard-active-records')).toHaveCount(0);await shot(page,'S00-load-error');
   await page.unroute(dashboardPath);await page.getByTestId('sla-refresh').click();
   await expect(page.getByTestId('sla-dashboard-active-records')).toBeVisible();await expect(page.getByTestId('sla-dashboard-error')).toHaveCount(0);
+  const policiesPath=/\/api\/bpm\/sla-configs(?:\?.*)?$/;
+  await page.route(policiesPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：SLA策略目录暂不可用'})}));
+  await page.getByTestId('sla-refresh').click();await expect(page.getByTestId('sla-strategy-error')).toBeVisible();await shot(page,'S00-policy-error');
+  await expect(page.getByTestId('sla-strategy-chain')).not.toContainText('暂无已启用的 SLA 策略');
+  await page.unroute(policiesPath);await page.getByTestId('sla-refresh').click();await expect(page.getByTestId('sla-strategy-error')).toHaveCount(0);
   await page.getByTestId('sla-stat-paused').click();
   await page.getByTestId('sla-record-row').filter({hasText:name}).getByTestId('sla-record-detail').click();
   await expect(page.getByTestId('sla-item-detail')).toContainText('已暂停');await shot(page,'S05');
@@ -420,7 +425,17 @@ test('professional rollout compares exact versions and audits activation pause a
     await data(await page.request.post(`/api/decision/versions/${version.pid}/publish`,{data:{impactAcknowledged:true,note:'Owned review versions'}}));versions.push(version);
   }
   await menu(page,'策略工作台');await professionalTab(page,'rollouts');
-  await page.getByLabel('rollout-decision-code',{exact:true}).fill(code);
+  const choicesPath=/\/api\/decision\/definitions(?:\?.*)?$/;
+  await page.route(choicesPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：发布规则目录暂不可用'})}));
+  await expect(page.getByTestId('decision-rollout-monitor')).toBeVisible();await page.reload();
+  await expect(page.getByTestId('rollout-definitions-error')).toBeVisible();await shot(page,'R06-catalog-error');
+  await page.unroute(choicesPath);await page.getByTestId('rollout-definitions-error').getByRole('button',{name:'重新加载',exact:true}).click();
+  await expect(page.getByTestId('rollout-definitions-error')).toHaveCount(0);
+  await page.getByLabel('rollout-decision-code',{exact:true}).selectOption(code);
+  await expect(page.getByTestId('rollout-advanced')).not.toHaveAttribute('open');
+  await page.getByTestId('rollout-advanced').locator('summary').click();await expect(page.getByLabel('rollout-routing-key',{exact:true})).toBeVisible();await shot(page,'R06-advanced');
+  await page.getByTestId('rollout-advanced').locator('summary').click();
+
   await page.getByLabel('rollout-baseline-version',{exact:true}).fill(String(versions[0].version));
   await page.getByLabel('rollout-candidate-version',{exact:true}).fill(String(versions[1].version));
   await page.getByLabel('rollout-percentage',{exact:true}).fill('100');
@@ -441,7 +456,7 @@ test('professional rollout compares exact versions and audits activation pause a
   }
   await transition('activate','ACTIVE');await transition('pause','PAUSED');await transition('activate','ACTIVE');await transition('rollback','ROLLED_BACK');
   await expect(page.getByTestId('rollout-audit-panel')).toContainText('本轮专属版本核验');await shot(page,'R06');
-  await page.reload();await page.getByLabel('rollout-decision-code',{exact:true}).fill(code);await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('已回滚');
+  await page.reload();await page.getByLabel('rollout-decision-code',{exact:true}).selectOption(code);await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('已回滚');
   const actual=await data(await page.request.get(`/api/decision/definitions/${code}/rollouts`));
   expect(actual.find((r:any)=>r.pid===rollout.pid).status).toBe('ROLLED_BACK');
   await writeFile(join(evidence!,'professional-rollout-receipt.json'),JSON.stringify({versions,actual},null,2));

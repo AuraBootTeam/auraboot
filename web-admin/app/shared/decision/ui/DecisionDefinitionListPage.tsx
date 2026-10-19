@@ -306,7 +306,7 @@ export function DecisionDefinitionListPage({ api, onOpen }: DecisionDefinitionLi
           </div>
           {impactQuery.isLoading && <div data-testid="ddl-impact-loading">加载影响分析…</div>}
           {impactQuery.isError && <DecisionLoadError testId="ddl-impact-error" error={impactQuery.error} onRetry={impactQuery.refetch} busy={impactQuery.isFetching} />}
-          {impactQuery.data && <ImpactGraphPanel impact={impactQuery.data} fieldLabels={fieldLabels} />}
+          {impactQuery.data && <ImpactGraphPanel impact={impactQuery.data} fieldLabels={fieldLabels} decisionName={rows.find(row => row.decisionCode === impactCode)?.decisionName} />}
           {canListVersions && (
             <section className="ddl-publish-guard" data-testid="ddl-publish-guard">
               <h4>版本生命周期</h4>

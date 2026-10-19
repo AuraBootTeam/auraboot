@@ -5,9 +5,10 @@ import type { DecisionImpact, DecisionImpactRef } from '../api/decisionApi';
 export interface ImpactGraphPanelProps {
   impact: DecisionImpact;
   fieldLabels?: Record<string, string>;
+  decisionName?: string;
 }
 
-export function ImpactGraphPanel({ impact, fieldLabels = {} }: ImpactGraphPanelProps) {
+export function ImpactGraphPanel({ impact, fieldLabels = {}, decisionName }: ImpactGraphPanelProps) {
   const { locale } = useI18n();
   const text = (key: string) => diagnosticText(key, locale);
   return (
@@ -39,7 +40,7 @@ export function ImpactGraphPanel({ impact, fieldLabels = {} }: ImpactGraphPanelP
         </div>
 
         <div className="impact-graph-center" data-testid="impact-center">
-          <h4>{text('rule')}</h4>
+          <h4>{text('rule')}</h4><strong>{decisionName || text('DECISION')}</strong>
           <details className="text-xs"><summary>{text('technical')}</summary>{impact.decisionCode}</details>
         </div>
 

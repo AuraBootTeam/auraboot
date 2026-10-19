@@ -218,5 +218,37 @@
   "DIRECT_RULE_BINDING": {
     "zh-CN": "业务规则绑定",
     "en": "Rule binding"
+  },
+  "ruleSelector": {
+    "zh-CN": "业务规则",
+    "en": "Business rule"
+  },
+  "selectedRule": {
+    "zh-CN": "当前所选规则",
+    "en": "Selected rule"
+  },
+  "configuredShare": {
+    "zh-CN": "配置比例",
+    "en": "Configured share"
+  },
+  "inactiveRouting": {
+    "zh-CN": "当前未在分流",
+    "en": "Routing is inactive"
+  },
+  "executed": {
+    "zh-CN": "已执行",
+    "en": "Executed"
+  },
+  "audit": {
+    "zh-CN": "操作记录",
+    "en": "Operation"
+  },
+  "time": {
+    "zh-CN": "操作时间",
+    "en": "Time"
+  },
+  "operationFailed": {
+    "zh-CN": "操作未完成，请检查配置后重试",
+    "en": "The operation did not complete. Check the configuration and retry."
   }
 }

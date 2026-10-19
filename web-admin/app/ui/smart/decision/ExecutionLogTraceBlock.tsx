@@ -1593,7 +1593,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 mt-3">
                         {inputRows(log.traceSnapshot).map(({ key, row }) => (
                           <div key={key} className="border-b pb-2">
-                            <dt className="text-xs text-muted-foreground">{String(row.label || traceLabel('semantic', 'field', locale))}</dt>
+                            <dt className="text-xs text-muted-foreground">{String(row.label || traceLabel('ui', 'field', locale))}</dt>
                             <dd className="font-medium mt-1 break-words">
                               {row.state === 'VALUE' ? payloadDisplay(row.value, key, log.traceSnapshot, locale) : traceLabel('ui', String(row.state), locale)}
                             </dd>
