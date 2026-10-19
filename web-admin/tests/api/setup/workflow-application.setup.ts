@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
-import processes from '../../../../plugins/test-fixtures/config/processes.json' with { type: 'json' };
+import { createRequire } from 'node:module';
+
+const processes = createRequire(import.meta.url)(
+  '../../../../plugins/test-fixtures/config/processes.json',
+) as typeof import('../../../../plugins/test-fixtures/config/processes.json');
 
 test('requires the real BPM application before automation execution tests', async ({ request }) => {
   const response = await request.get('/api/bpm/process-definitions/deployed');
