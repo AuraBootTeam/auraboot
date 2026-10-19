@@ -65,7 +65,16 @@ final class PluginImportAssessment {
         List<PluginResource> resources = pluginResourceMapper.findByTenantAndType(tenantId, resourceType.code());
         Map<String, T> byCode = new LinkedHashMap<>();
         for (PluginResource resource : resources) {
-            if (resource == null || resource.getImportSnapshot() == null || isBlank(resource.getResourceCode())) {
+            if (resource == null || isBlank(resource.getResourceCode())) {
+                continue;
+            }
+            // Audit snapshots may be retained after a soft delete. The latest
+            // tombstone retires the reference, including an older duplicate snapshot.
+            if (ResourceAction.DELETE.code().equalsIgnoreCase(resource.getAction())) {
+                byCode.remove(resource.getResourceCode());
+                continue;
+            }
+            if (resource.getImportSnapshot() == null) {
                 continue;
             }
             try {
