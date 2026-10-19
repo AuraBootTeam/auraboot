@@ -5030,7 +5030,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`runtime-block-${tabsId}`)).toContainText(tabsTitle);
     await expect(page.getByTestId(`runtime-block-${tabId}`)).toContainText(tabTitle);
     await expect(page.getByTestId(`runtime-field-${freeFieldId}`)).toContainText(freeFieldLabel);
-    await page.screenshot({ path: info.outputPath('UDW-040-localized-tabs.png'), fullPage: true });
+    await page.getByTestId(`runtime-block-${tabsId}`).screenshot({
+      path: info.outputPath('UDW-040-localized-tabs.png'),
+    });
   });
 
   // FIXME(designer-v4): this journey authors blocks that have no flat v4

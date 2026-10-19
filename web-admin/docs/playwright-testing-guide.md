@@ -1,6 +1,14 @@
+---
+type: system-reference
+status: stale
+---
+
 # Playwright E2E Testing Guide
 
-> AuraBoot E2E Testing Architecture and Best Practices
+> Historical guide: some profile, CI and lifecycle examples below are stale.
+> Current execution contracts live in `playwright.oss.config.ts`,
+> `playwright.workflow.config.ts` and `scripts/oss-golden-stack.sh`.
+> The workflow execution section below records its current prerequisites.
 
 ---
 
@@ -631,3 +639,11 @@ browser suites run. Preflight, executed cases, skips and dependent cases that di
 not run must be reported separately. The profile contract test compares every
 original automation case with the specialized collection; moving a case never
 counts as executing it.
+
+The model-notification and automation webhook journeys start owned loopback
+receivers. Launch their isolated test stack with the existing exact-host setting
+`AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1` and record it with the run. The validator
+continues to enforce its normal policy for other hosts. Reapply this setting on
+fresh bring-up; historical runtime receipts do not replay this optional variable
+on resume. Report an initial fixture-policy failure and its configured control
+separately rather than replacing the failed full-run result.

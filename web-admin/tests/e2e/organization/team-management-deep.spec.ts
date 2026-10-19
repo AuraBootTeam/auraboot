@@ -169,6 +169,7 @@ for (const locale of ['zh-CN', 'en-US'] as const) {
     test('TM-014: search teams on list page', async ({ page }) => {
       const team = await createTeam(page, 'search');
       await openList(page, locale);
+      await expect(page.getByTestId('filters-toggle')).toBeVisible();
       await ensureFilterFormOpen(page);
       const input = page.locator('[data-authoring-node-id="name"] input').first();
       await expect(input).toBeVisible();
