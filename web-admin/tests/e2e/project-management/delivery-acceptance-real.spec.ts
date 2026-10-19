@@ -221,7 +221,7 @@ test('professional event policy publish, execution failure and recovery preserve
   const policy = `sla_review_${Date.now()}`;
   await menu(page, '事件策略');
   await page.getByTestId('epl-new-policy').click();
-  for (const [field, value] of Object.entries({code:policy,name:'交付规则 · 专业配置核验', 'event-type':'SHOWCASE_REVIEW', 'target-type':'MODEL', 'target-key':'tpm_acceptance'})) {
+  for (const [field, value] of Object.entries({code:policy,name:'交付规则 · 专业配置核验', 'event-type':`SHOWCASE_REVIEW_${policy}`, 'target-type':'MODEL', 'target-key':'tpm_acceptance'})) {
     await page.getByTestId(`epl-policy-${field}`).fill(value);
   }
   const created = page.waitForResponse(r => new URL(r.url()).pathname === '/api/event-policy/definitions' && r.request().method() === 'POST');
