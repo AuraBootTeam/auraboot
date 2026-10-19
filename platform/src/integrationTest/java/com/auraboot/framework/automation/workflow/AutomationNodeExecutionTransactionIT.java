@@ -53,8 +53,12 @@ class AutomationNodeExecutionTransactionIT {
 
     @BeforeEach
     void setUp() throws Exception {
-        assertThat(required("AURA_RUNTIME_NAME")).isEqualTo("oss-serial-workflow");
-        assertThat(required("POSTGRES_DB")).isEqualTo("auraboot_19");
+        String runtime = required("AURA_RUNTIME_NAME");
+        assertThat(required("AURA_RUNTIME_REPO")).isEqualTo("auraboot");
+        String slot = required("AURA_WORKSPACE_SLOT");
+        assertThat(slot).matches("[0-9]+");
+        String database = "auraboot_" + slot;
+        assertThat(required("POSTGRES_DB")).isEqualTo(database);
         var ds = new PGSimpleDataSource();
         ds.setServerNames(new String[]{required("POSTGRES_HOST")});
         ds.setPortNumbers(new int[]{Integer.parseInt(required("POSTGRES_PORT"))});
@@ -65,12 +69,12 @@ class AutomationNodeExecutionTransactionIT {
         new JdbcTemplate(ds).execute("CREATE SCHEMA " + schema);
         ds.setCurrentSchema(schema);
         jdbc = new JdbcTemplate(ds);
-        assertThat(jdbc.queryForObject("SELECT current_database()", String.class)).isEqualTo("auraboot_19");
+        assertThat(jdbc.queryForObject("SELECT current_database()", String.class)).isEqualTo(database);
         assertThat(jdbc.queryForObject("SELECT current_schema()", String.class)).isEqualTo(schema);
         jdbc.execute(Files.readString(Path.of(
                 "src/main/resources/db/migration/core/V20260912010000__automation_node_execution.sql")));
         jdbc.execute("CREATE TABLE business_write (id int PRIMARY KEY)");
-        System.out.println("node-audit fixture database=auraboot_19 schema=" + schema);
+        System.out.println("node-audit fixture runtime=" + runtime + " database=" + database + " schema=" + schema);
 
         var config = new MybatisConfiguration();
         config.setEnvironment(new Environment("node-audit-it", new SpringManagedTransactionFactory(), ds));
