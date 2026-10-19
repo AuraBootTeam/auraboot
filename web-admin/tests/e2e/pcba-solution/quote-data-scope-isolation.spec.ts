@@ -6,6 +6,7 @@ import type { Page } from '@playwright/test';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 import { test, expect } from '../../fixtures';
+import { requireRuntimeUrl } from '../../helpers/environments';
 import { uniqueId } from '../helpers';
 import {
   makeQuoteRoleUser,
@@ -34,8 +35,8 @@ test('restored material snapshot exposes matching counts and sync state through 
   expect(manifestFile, 'The original release must bind its approved development material snapshot').toBeTruthy();
   expect(baseURL).toBeTruthy();
   expect(pluginsRoot).toBeTruthy();
-  expect(process.env.PLAYWRIGHT_BASE_URL).toBeTruthy();
-  expect(new URL(baseURL!).origin).toBe(new URL(process.env.PLAYWRIGHT_BASE_URL!).origin);
+  expect(requireRuntimeUrl('base')).toBeTruthy();
+  expect(new URL(baseURL!).origin).toBe(new URL(requireRuntimeUrl('base')!).origin);
   const bytes = fs.readFileSync(manifestFile!);
   const manifest = JSON.parse(bytes.toString('utf8'));
   expect(manifest.masterRows).toBeGreaterThan(0);
@@ -93,10 +94,10 @@ test('plugin page import API publishes only explicitly imported source revisions
   const pluginsRoot = process.env.AURA_PLUGINS_PROJECT_ROOT;
   const runtime = process.env.AURA_RUNTIME_NAME;
   const baseURL = testInfo.project.use.baseURL;
-  for (const value of [quoteRoot, pluginsRoot, runtime, baseURL, process.env.PLAYWRIGHT_BASE_URL]) {
+  for (const value of [quoteRoot, pluginsRoot, runtime, baseURL, requireRuntimeUrl('base')]) {
     expect(value, 'The original gate must supply its exact source roots, runtime and target').toBeTruthy();
   }
-  expect(new URL(baseURL!).origin).toBe(new URL(process.env.PLAYWRIGHT_BASE_URL!).origin);
+  expect(new URL(baseURL!).origin).toBe(new URL(requireRuntimeUrl('base')!).origin);
   const namespace = `x02${uniqueId('import').replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
   const pageKey = `${namespace}_runtime_list`;
   const fixture = path.join(quoteRoot!, '.workspace', 'e2e-fixtures', namespace);
