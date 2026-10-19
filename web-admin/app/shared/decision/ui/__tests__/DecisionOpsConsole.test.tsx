@@ -17,6 +17,8 @@ vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => traceHttp,
 }));
 
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }), usePermissions: () => ({ hasPermission: () => true }) }));
+
 const FIELDS: FieldOption[] = [
   {
     scope: 'record',
@@ -809,7 +811,7 @@ describe('DecisionOpsConsole', () => {
     renderConsole();
     expect(screen.getByRole('link', { name: '进入工作区' })).toHaveAttribute(
       'href',
-      '#strategy-workbench',
+      '?tab=studio',
     );
     expect(screen.getByTestId('strategy-studio')).toHaveAttribute('id', 'strategy-workbench');
   });
@@ -2158,8 +2160,10 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('doc-panel-designer')).toBeInTheDocument();
     expect(screen.getByTestId('epd-workflow')).toBeInTheDocument();
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('Policy One');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('p1');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('p1');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('p1');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('FORM_SUBMITTED');
   });
 
   it('switches to Designer (F3) tab and shows the workflow stepper', () => {
@@ -2576,6 +2580,8 @@ describe('DecisionOpsConsole', () => {
     expect(logRow).not.toHaveTextContent('MATCHED');
     expect(logRow).toHaveTextContent('18ms');
 
+    expect(screen.queryByTestId('elta-filters')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('elta-professional-toggle'));
     fireEvent.change(screen.getByTestId('log-keyword'), { target: { value: 'trace-live' } });
     fireEvent.click(screen.getByTestId('elta-apply'));
 

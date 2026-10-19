@@ -34,6 +34,8 @@ public class OutboxServiceImpl implements OutboxService {
     private final DrtOutboxMapper outboxMapper;
     private final EventPolicyRuntimeService runtimeService;
     private final ObjectMapper objectMapper;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+    private final com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper tenantMembers;
 
     @Transactional
     @Override
@@ -60,26 +62,67 @@ public class OutboxServiceImpl implements OutboxService {
     public int processPending(int limit) {
         Long tid = requireTenant();
         List<DrtOutboxEntity> pending = outboxMapper.findPending(tid, limit);
-        int processed = 0;
-        for (DrtOutboxEntity row : pending) {
-            try {
-                Map<String, Map<String, Object>> ctx = row.getContextJson() == null
-                        ? Map.of()
-                        : objectMapper.convertValue(row.getContextJson(),
-                                new TypeReference<Map<String, Map<String, Object>>>() {});
-                runtimeService.runAndExecute(row.getEventType(), row.getTargetType(), row.getTargetKey(), ctx);
-                row.setStatus("PROCESSED");
-                row.setProcessedAt(Instant.now());
-            } catch (RuntimeException e) {
-                row.setStatus("FAILED");
-                row.setLastError(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
-                log.warn("Outbox event {} failed: {}", row.getEventId(), row.getLastError());
+        // The exact-event method is also the after-commit dispatch entry. Runtime action
+        // transactions and durable outcomes are independent of a worker's ambient transaction.
+        for (DrtOutboxEntity row : pending) processEvent(row.getEventId());
+        return pending.size();
+    }
+
+    @Override
+    public void processEvent(String eventId) {
+        Long tenantId = requireTenant();
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transaction.executeWithoutResult(status -> {
+            DrtOutboxEntity row = outboxMapper.findByEventIdForUpdate(tenantId, eventId);
+            if (row != null && "PENDING".equals(row.getStatus())) processRow(row);
+        });
+    }
+
+    private void processRow(DrtOutboxEntity row) {
+        try {
+            Map<String, Map<String, Object>> ctx = row.getContextJson() == null
+                    ? Map.of() : objectMapper.convertValue(row.getContextJson(),
+                            new TypeReference<Map<String, Map<String, Object>>>() {});
+            var actor = ctx.getOrDefault("actor", Map.of());
+            Long actorId = actor.get("userId") instanceof Number number ? number.longValue() : null;
+            var member = actorId == null ? null : tenantMembers.findByTenantIdAndUserId(row.getTenantId(), actorId);
+            if (actorId != null && (member == null || !row.getTenantId().equals(member.getTenantId())
+                    || !actorId.equals(member.getUserId()) || Boolean.TRUE.equals(member.getDeletedFlag())
+                    || !"active".equalsIgnoreCase(member.getStatus()))) {
+                throw new IllegalStateException("The event actor is not an active member of this space");
             }
-            row.setAttempts((row.getAttempts() == null ? 0 : row.getAttempts()) + 1);
-            outboxMapper.updateById(row);
-            processed += 1;
+            MetaContext.Snapshot identity = new MetaContext.Snapshot(row.getTenantId(), actorId,
+                    actor.get("userPid") instanceof String pid ? pid : null,
+                    actor.get("username") instanceof String name ? name : null,
+                    java.util.Set.of(), member == null ? null : member.getId(), null, null, null);
+            var previousPrincipal = com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current().orElse(null);
+            var previousEnvelope = com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current().orElse(null);
+            com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear();
+            com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear();
+            try {
+            MetaContext.runWithSnapshot(identity, () -> {
+                var result = runtimeService.runAndExecute(row.getEventType(), row.getTargetType(), row.getTargetKey(), ctx);
+                var status = result.execution().overallStatus();
+                boolean failed = status == com.auraboot.framework.eventpolicy.executor.PolicyExecutionResult.OverallStatus.FAILED
+                        || status == com.auraboot.framework.eventpolicy.executor.PolicyExecutionResult.OverallStatus.PARTIAL_SUCCESS
+                        || result.policy().status() == com.auraboot.framework.eventpolicy.model.EventPolicyResult.Status.ERROR
+                        || result.policy().status() == com.auraboot.framework.eventpolicy.model.EventPolicyResult.Status.CONFLICT;
+                row.setStatus(failed ? "FAILED" : "PROCESSED");
+                row.setLastError(failed ? "Event policy execution requires attention" : null);
+            });
+            } finally {
+                com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.restore(previousEnvelope);
+                com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(previousPrincipal);
+            }
+            row.setProcessedAt(Instant.now());
+        } catch (RuntimeException exception) {
+            row.setStatus("FAILED");
+            row.setLastError(exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
+            log.warn("Outbox event {} failed: {}", row.getEventId(), row.getLastError());
         }
-        return processed;
+        row.setAttempts((row.getAttempts() == null ? 0 : row.getAttempts()) + 1);
+        outboxMapper.updateById(row);
     }
 
     private Long requireTenant() {

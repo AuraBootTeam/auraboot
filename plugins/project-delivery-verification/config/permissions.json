@@ -12,5 +12,12 @@
     "name:en": "Manage delivery verification",
     "resourceType": "operation",
     "module": "tdv"
+  },
+  {
+    "code": "tdv.delivery.register",
+    "name:zh-CN": "登记已通过验收",
+    "name:en": "Register approved delivery",
+    "resourceType": "operation",
+    "module": "tdv"
   }
 ]

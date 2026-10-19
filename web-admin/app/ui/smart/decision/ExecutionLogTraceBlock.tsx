@@ -16,7 +16,12 @@ import {
   type HttpClient,
 } from '~/shared/decision/api/decisionApi';
 import { decisionStatusLabel } from '~/shared/decision/ui/statusLabels';
-import { traceLabel, traceFieldValueLabels, traceSemanticValue, runtimeAdapterLabel } from '~/shared/decision/ui/tracePresentation';
+import {
+  traceLabel,
+  traceFieldValueLabels,
+  traceSemanticValue,
+  runtimeAdapterLabel,
+} from '~/shared/decision/ui/tracePresentation';
 import { valueLabel } from '~/shared/decision/ui/displayLabels';
 import { getKernel } from '~/framework/bootstrap';
 
@@ -35,6 +40,7 @@ interface ExecutionLogTraceBlockProps {
 }
 
 interface ExecutionLogTraceProps {
+  businessFirst?: boolean;
   mode?: 'list' | 'detail';
   initialDecisionCode?: string;
   initialKeyword?: string;
@@ -69,10 +75,6 @@ const CALLER_OPTIONS = [
   'TEST',
 ];
 const ROLLOUT_OPTIONS = ['ALL', 'BASELINE', 'CANDIDATE'];
-
-
-
-
 
 const ACTION_PAYLOAD_ORDER = [
   'sentCount',
@@ -129,8 +131,6 @@ const ACTION_PAYLOAD_ORDER = [
   'message',
   'notificationRef',
 ];
-
-
 
 const HIDDEN_TRACE_FIELDS = new Set(['id', 'tenant_id', 'tenantId', 'deleted_flag']);
 
@@ -232,7 +232,8 @@ function callerLabel(value: unknown, locale = 'zh-CN'): string {
 }
 
 function callerDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
-  if (String(log.callerType ?? '').toUpperCase() === 'SLA') return callerLabel(log.callerType, locale);
+  if (String(log.callerType ?? '').toUpperCase() === 'SLA')
+    return callerLabel(log.callerType, locale);
   return `${callerLabel(log.callerType, locale)} / ${display(log.callerRef)}`;
 }
 
@@ -310,7 +311,11 @@ function rolloutDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
   return `${rolloutLabel(log.rolloutArm, locale)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
 }
 
-function decisionLabel(logOrCode: DecisionLogRecord | string | undefined, locale = 'zh-CN', decisionName?: string): string {
+function decisionLabel(
+  logOrCode: DecisionLogRecord | string | undefined,
+  locale = 'zh-CN',
+  decisionName?: string,
+): string {
   if (logOrCode == null) return '-';
   if (typeof logOrCode === 'string') {
     const name = decisionName?.trim();
@@ -335,12 +340,17 @@ function decisionCell(log: DecisionLogRecord, locale = 'zh-CN') {
   );
 }
 
-function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown, locale = 'zh-CN'): string {
+function payloadDisplay(
+  value: unknown,
+  key = '',
+  traceSnapshot?: unknown,
+  locale = 'zh-CN',
+): string {
   const fieldLabels = traceValueLabels(key, traceSnapshot, locale);
   if (key === 'deliveryReceipts' && Array.isArray(value)) {
     return (
       value
-        .map(item => formatDeliveryReceipt(item, locale))
+        .map((item) => formatDeliveryReceipt(item, locale))
         .filter((item) => item !== '-')
         .join('; ') || '-'
     );
@@ -666,7 +676,8 @@ function payloadLabel(key: string, traceSnapshot?: unknown, locale = 'zh-CN'): s
     return outputLabel;
   }
   return ['matched', 'truth', 'conditionResult', 'decisionCode'].includes(key)
-    ? traceLabel('semantic', key, locale) : traceLabel('payload', key, locale);
+    ? traceLabel('semantic', key, locale)
+    : traceLabel('payload', key, locale);
 }
 
 function factMetadataLabel(row: FactMetadataRow): string {
@@ -707,7 +718,11 @@ function factMetadataValueLabelEntries(row: FactMetadataRow): Array<[string, str
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-function actionRetryItems(action: EventPolicyActionLogRecord, timezone: string, format: string): string[] {
+function actionRetryItems(
+  action: EventPolicyActionLogRecord,
+  timezone: string,
+  format: string,
+): string[] {
   const parts: string[] = [];
   const attempt = Number(action.attemptCount ?? 0);
   const maxAttempts = Number(action.maxAttempts ?? 0);
@@ -726,7 +741,8 @@ function actionRetryItems(action: EventPolicyActionLogRecord, timezone: string, 
   if (retryState) {
     if (action.lastRetryAt) parts.push(`上次 ${formatDate(action.lastRetryAt, timezone, format)}`);
     if (action.nextRetryAt) parts.push(`下次 ${formatDate(action.nextRetryAt, timezone, format)}`);
-    if (action.deadLetteredAt) parts.push(`死信 ${formatDate(action.deadLetteredAt, timezone, format)}`);
+    if (action.deadLetteredAt)
+      parts.push(`死信 ${formatDate(action.deadLetteredAt, timezone, format)}`);
     if (action.resultPayload?.retryExhausted === true) parts.push('重试已耗尽');
   }
   return parts;
@@ -829,6 +845,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
   const params = useParams();
   const props = block?.props ?? {};
   const mode = props.mode ?? block?.mode ?? 'list';
+  const [professional, setProfessional] = useState(false);
+  const businessView = props.businessFirst === true && !professional;
   const pageSize = props.pageSize ?? 50;
   const record = useMemo(() => recordFromRuntime(runtime), [runtime]);
   const routePid =
@@ -1030,7 +1048,32 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
 
   return (
     <section className="execution-log-trace-block" data-testid="execution-log-trace-block">
-      {mode === 'list' && (
+      {mode === 'list' && props.businessFirst && (
+        <div className="elta-summary">
+          <strong>
+            {t(
+              'decision.executionLog.resultsTitle',
+              undefined,
+              locale.startsWith('zh') ? '规则执行结果' : 'Rule outcomes',
+            )}
+          </strong>
+          <button
+            type="button"
+            data-testid="elta-professional-toggle"
+            aria-pressed={professional}
+            onClick={() => setProfessional((value) => !value)}
+          >
+            {professional
+              ? locale.startsWith('zh')
+                ? '返回业务结果'
+                : 'Business outcomes'
+              : locale.startsWith('zh')
+                ? '专业诊断'
+                : 'Diagnostics'}
+          </button>
+        </div>
+      )}
+      {mode === 'list' && !businessView && (
         <div className="elta-filters" data-testid="elta-filters">
           <label>
             <span>{traceLabel('ui', 'keyword', locale)}</span>
@@ -1199,7 +1242,72 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
         </section>
       ) : null}
 
-      {mode === 'list' && (
+      {mode === 'list' && businessView && (
+        <div className="elta-table-wrap" data-testid="elta-business-results">
+          <table className="elta-table" style={{ tableLayout: 'auto' }}>
+            <thead>
+              <tr>
+                <th>{traceLabel('ui', 'decision', locale)}</th>
+                <th>{locale.startsWith('zh') ? '业务结果' : 'Outcome'}</th>
+                <th>{traceLabel('ui', 'status', locale)}</th>
+                <th>{traceLabel('ui', 'caller', locale)}</th>
+                <th>{traceLabel('ui', 'time', locale)}</th>
+                <th>{traceLabel('ui', 'actions', locale)}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((log) => (
+                <tr key={log.pid ?? log.traceId} data-testid={`elta-row-${log.pid ?? log.traceId}`}>
+                  <td>{decisionCell(log, locale)}</td>
+                  <td>
+                    {outputSnapshotEntries(log.outputSnapshot).length
+                      ? outputSnapshotEntries(log.outputSnapshot)
+                          .slice(0, 3)
+                          .map(([key, value]) => (
+                            <div key={key}>
+                              {payloadLabel(key, log.traceSnapshot, locale)}：
+                              {value !== null && typeof value === 'object'
+                                ? locale.startsWith('zh')
+                                  ? '结构化结果，查看依据'
+                                  : 'Structured result; view evidence'
+                                : payloadDisplay(value, key, log.traceSnapshot, locale)}
+                            </div>
+                          ))
+                      : '—'}
+                  </td>
+                  <td>
+                    <span className={`elta-status elta-status-${log.status ?? 'UNKNOWN'}`}>
+                      {decisionStatusLabel(log.status, locale)}
+                    </span>
+                  </td>
+                  <td>{callerLabel(log.callerType, locale)}</td>
+                  <td>
+                    {formatDate(log.createdAt, timezone, formats.datetime)}
+                    <div>{log.durationMs != null ? `${log.durationMs}ms` : '—'}</div>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      data-testid={`elta-open-trace-${log.pid ?? log.traceId}`}
+                      onClick={() => void loadTrace(log)}
+                    >
+                      {locale.startsWith('zh') ? '查看依据' : 'View evidence'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!records.length && !loading && (
+                <tr>
+                  <td colSpan={6} data-testid="elta-empty">
+                    {locale.startsWith('zh') ? '暂无执行结果' : 'No outcomes'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {mode === 'list' && !businessView && (
         <div className="elta-table-wrap">
           <table className="elta-table">
             <colgroup>
@@ -1358,7 +1466,9 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   <span>{actionLogsLoading ? '加载中...' : `${actionLogs.length} 条`}</span>
                 </div>
                 {!actionLogsLoading && !actionLogs.length ? (
-                  <div className="elta-action-empty">{traceLabel('ui', 'noActionRecords', locale)}</div>
+                  <div className="elta-action-empty">
+                    {traceLabel('ui', 'noActionRecords', locale)}
+                  </div>
                 ) : null}
                 <div className="elta-action-list">
                   {actionLogs.map((action) => (
@@ -1380,9 +1490,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   data-testid={`elta-chain-node-${log.pid ?? index}`}
                 >
                   <div className="elta-chain-main">
-                    <strong title={decisionTitle(log)}>
-                      {decisionLabel(log, locale)}
-                    </strong>
+                    <strong title={decisionTitle(log)}>{decisionLabel(log, locale)}</strong>
                     <span
                       className={`elta-status elta-status-${log.status ?? 'UNKNOWN'}`}
                       title={display(log.status)}
@@ -1399,29 +1507,51 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       {callerDisplay(log, locale)}
                     </span>
                     <span>v{display(log.selectedVersion ?? log.decisionVersion)}</span>
-                    <span title={log.runtimeAdapter}>{runtimeAdapterLabel(log.runtimeAdapter, locale)}</span>
+                    <span title={log.runtimeAdapter}>
+                      {runtimeAdapterLabel(log.runtimeAdapter, locale)}
+                    </span>
                     <span>{log.durationMs != null ? `${log.durationMs}ms` : '-'}</span>
                     <span>{formatDate(log.createdAt, timezone, formats.datetime)}</span>
                   </div>
-                  {(log.traceId || log.callerRef || log.runtimeAdapter || (log.decisionCode &&
-                    traceLabel('decision', log.decisionCode, locale) === log.decisionCode)) &&
-                    <details className="mt-2 text-xs" data-testid={'elta-chain-technical-' + (log.pid ?? index)}>
+                  {(log.traceId ||
+                    log.callerRef ||
+                    log.runtimeAdapter ||
+                    (log.decisionCode &&
+                      traceLabel('decision', log.decisionCode, locale) === log.decisionCode)) && (
+                    <details
+                      className="mt-2 text-xs"
+                      data-testid={'elta-chain-technical-' + (log.pid ?? index)}
+                    >
                       <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
                       <dl className="mt-1 break-all">
-                        {log.traceId && <>
-                          <dt>{traceLabel('semantic', 'traceIdentifier', locale)}</dt><dd>{log.traceId}</dd>
-                        </>}
-                        {log.callerRef && <>
-                          <dt>{traceLabel('semantic', 'callerIdentifier', locale)}</dt><dd>{log.callerRef}</dd>
-                        </>}
-                        {log.decisionCode && traceLabel('decision', log.decisionCode, locale) === log.decisionCode && <>
-                          <dt>{traceLabel('semantic', 'decisionCode', locale)}</dt><dd>{log.decisionCode}</dd>
-                        </>}
-                        {log.runtimeAdapter && <>
-                          <dt>{runtimeAdapterLabel(log.runtimeAdapter, locale)}</dt><dd>{log.runtimeAdapter}</dd>
-                        </>}
+                        {log.traceId && (
+                          <>
+                            <dt>{traceLabel('semantic', 'traceIdentifier', locale)}</dt>
+                            <dd>{log.traceId}</dd>
+                          </>
+                        )}
+                        {log.callerRef && (
+                          <>
+                            <dt>{traceLabel('semantic', 'callerIdentifier', locale)}</dt>
+                            <dd>{log.callerRef}</dd>
+                          </>
+                        )}
+                        {log.decisionCode &&
+                          traceLabel('decision', log.decisionCode, locale) === log.decisionCode && (
+                            <>
+                              <dt>{traceLabel('semantic', 'decisionCode', locale)}</dt>
+                              <dd>{log.decisionCode}</dd>
+                            </>
+                          )}
+                        {log.runtimeAdapter && (
+                          <>
+                            <dt>{runtimeAdapterLabel(log.runtimeAdapter, locale)}</dt>
+                            <dd>{log.runtimeAdapter}</dd>
+                          </>
+                        )}
                       </dl>
-                    </details>}
+                    </details>
+                  )}
                   <div className="elta-chain-rules">
                     命中规则: {matchedRuleLabels(log.matchedRulesJson).join(', ') || '-'}
                   </div>
@@ -1449,22 +1579,35 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                               <div className="elta-fact-values">
                                 {factMetadataValueLabelEntries(row).map(([value, label]) => (
                                   <span key={value}>
-                                    {!['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && <code>{value}</code>}
+                                    {!['reference', 'user'].includes(
+                                      String(row.metadata.dataType).toLowerCase(),
+                                    ) && <code>{value}</code>}
                                     {label}
                                   </span>
                                 ))}
                               </div>
                             ) : null}
-                            {['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && factMetadataValueLabelEntries(row).length > 0 && (
-                              <details className="mt-2 text-xs" data-testid="elta-reference-identifiers">
-                                <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
-                                <dl className="mt-1 break-all">
-                                  {factMetadataValueLabelEntries(row).map(([value, label]) => (
-                                    <div key={value}><dt>{label}</dt><dd>{value}</dd></div>
-                                  ))}
-                                </dl>
-                              </details>
-                            )}
+                            {['reference', 'user'].includes(
+                              String(row.metadata.dataType).toLowerCase(),
+                            ) &&
+                              factMetadataValueLabelEntries(row).length > 0 && (
+                                <details
+                                  className="mt-2 text-xs"
+                                  data-testid="elta-reference-identifiers"
+                                >
+                                  <summary>
+                                    {traceLabel('semantic', 'technicalDetails', locale)}
+                                  </summary>
+                                  <dl className="mt-1 break-all">
+                                    {factMetadataValueLabelEntries(row).map(([value, label]) => (
+                                      <div key={value}>
+                                        <dt>{label}</dt>
+                                        <dd>{value}</dd>
+                                      </div>
+                                    ))}
+                                  </dl>
+                                </details>
+                              )}
                           </article>
                         ))}
                       </div>

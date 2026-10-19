@@ -22,6 +22,10 @@ import java.util.List;
 @Mapper
 public interface DrtPolicyExecLogMapper extends BaseMapper<DrtPolicyExecLogEntity> {
 
+    @Select("SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(#{key}, 0))) held")
+    @InterceptorIgnore(tenantLine = "true")
+    Integer lockAction(@Param("key") String key);
+
     @Select("SELECT * FROM ab_drt_policy_exec_log WHERE tenant_id = #{tenantId} AND idempotency_key = #{key}")
     @Results(id = "policyExecLogMap", value = {
             @Result(column = "id", property = "id"),

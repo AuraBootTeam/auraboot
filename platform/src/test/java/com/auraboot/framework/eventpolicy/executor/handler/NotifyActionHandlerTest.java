@@ -6,6 +6,9 @@ import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
 import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
 import com.auraboot.framework.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -26,11 +29,16 @@ class NotifyActionHandlerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock private IdentityDirectoryAccessor identities;
     private NotifyActionHandler handler;
+    @AfterEach void clearActor() { MetaContext.clear(); }
 
     @BeforeEach
     void setUp() {
-        handler = new NotifyActionHandler(notificationService);
+        MetaContext.setContext(7L, 42L, "u42", "Reviewer");
+        handler = new NotifyActionHandler(notificationService, identities);
+        org.mockito.Mockito.lenient().when(identities.findActiveTenantUser(7L, "42"))
+                .thenReturn(new IdentityDirectoryAccessor.UserIdentity(42L,"u42","reviewer","Reviewer"));
     }
 
     @Test
@@ -136,6 +144,17 @@ class NotifyActionHandlerTest {
                 .containsEntry("recipientType", "USER")
                 .containsEntry("recipientId", "42")
                 .containsEntry("errorMessage", "notification down");
+    }
+
+    @Test void acceptsPublicUserPidAndRefusesAnUnresolvedOrForeignRecipient() {
+        when(identities.findActiveTenantUser(7L,"public-user"))
+                .thenReturn(new IdentityDirectoryAccessor.UserIdentity(42L,"public-user","reviewer","Reviewer"));
+        handler.executeWithResult(new ResolvedActionPlan("R","NOTIFY","USER:public-user",1,Map.of(),"one"),decisionContext());
+        verify(notificationService).sendInApp(42L,"Policy notification","","EVENT_POLICY","EVENT_POLICY","R");
+        var denied=assertThrows(ActionExecutionException.class,()->handler.executeWithResult(
+                new ResolvedActionPlan("R","NOTIFY","USER:foreign-user",1,Map.of(),"two"),decisionContext()));
+        assertThat(denied.resultPayload()).containsEntry("failureReason","recipient_unavailable");
+        org.mockito.Mockito.verifyNoMoreInteractions(notificationService);
     }
 
     private static DecisionContext decisionContext() {

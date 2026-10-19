@@ -1,0 +1,112 @@
+{
+  "studio": {
+    "zh-CN": {
+      "label": "规则工作区",
+      "description": "判断逻辑、试算与发布"
+    },
+    "en": {
+      "label": "Rule workspace",
+      "description": "Logic, trial and publication"
+    }
+  },
+  "dashboard": {
+    "zh-CN": {
+      "label": "概览",
+      "description": "运行态总览"
+    },
+    "en": {
+      "label": "Overview",
+      "description": "Runtime overview"
+    }
+  },
+  "policies": {
+    "zh-CN": {
+      "label": "事件策略",
+      "description": "事件触发策略"
+    },
+    "en": {
+      "label": "Event policies",
+      "description": "Event-triggered policies"
+    }
+  },
+  "definitions": {
+    "zh-CN": {
+      "label": "业务规则",
+      "description": "业务用途、判断逻辑与处理结果"
+    },
+    "en": {
+      "label": "Business rules",
+      "description": "Purpose, logic and outcomes"
+    }
+  },
+  "designer": {
+    "zh-CN": {
+      "label": "事件策略工作区",
+      "description": "触发条件与后续动作"
+    },
+    "en": {
+      "label": "Policy workspace",
+      "description": "Trigger conditions and actions"
+    }
+  },
+  "tables": {
+    "zh-CN": {
+      "label": "DMN 互操作",
+      "description": "专业导入、导出与互操作验证"
+    },
+    "en": {
+      "label": "DMN interoperability",
+      "description": "Import, export and interoperability validation"
+    }
+  },
+  "rollouts": {
+    "zh-CN": {
+      "label": "发布治理",
+      "description": "灰度与回滚"
+    },
+    "en": {
+      "label": "Release governance",
+      "description": "Rollouts and rollback"
+    }
+  },
+  "logs": {
+    "zh-CN": {
+      "label": "执行日志",
+      "description": "业务结果与诊断"
+    },
+    "en": {
+      "label": "Execution history",
+      "description": "Business results and diagnostics"
+    }
+  },
+  "model": {
+    "zh-CN": {
+      "label": "数据模型",
+      "description": "字段引用"
+    },
+    "en": {
+      "label": "Data models",
+      "description": "Field references"
+    }
+  },
+  "permissions": {
+    "zh-CN": {
+      "label": "权限治理",
+      "description": "角色能力"
+    },
+    "en": {
+      "label": "Permissions",
+      "description": "Role capabilities"
+    }
+  },
+  "connectors": {
+    "zh-CN": {
+      "label": "集成",
+      "description": "外部连接"
+    },
+    "en": {
+      "label": "Integrations",
+      "description": "External connections"
+    }
+  }
+}

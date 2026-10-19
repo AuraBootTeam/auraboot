@@ -1,5 +1,8 @@
+import { useI18n } from '~/contexts/I18nContext';
+import NAV from './decisionOpsNav.i18n.json';
+import { useAuth } from '~/contexts/AuthContext';
 import './decision-workbench.css';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DecisionDefinitionListPage, type DefinitionSummary } from './DecisionDefinitionListPage';
 import { DecisionTableEditor } from './DecisionTableEditor';
@@ -60,15 +63,18 @@ export interface DecisionOpsConsoleProps {
   permissionGrants?: RoleGrants[];
   dashboard?: { summary: DashboardSummary; exceptions: ExceptionItem[] };
   initialTab?: ConsoleTab;
+  initialDecisionCode?: string;
+  initialPolicyCode?: string;
+  onTabChange?: (tab: ConsoleTab, selection?: {decisionCode?: string; policyCode?: string}) => void;
 }
 
 const TABS: { key: ConsoleTab; label: string; description: string }[] = [
-  { key: 'studio', label: '策略编排器', description: '跨模块规则复用' },
+  { key: 'studio', label: '规则工作区', description: '判断逻辑、试算与发布' },
   { key: 'dashboard', label: '概览', description: '运行态总览' },
   { key: 'policies', label: '事件策略', description: '事件触发策略' },
-  { key: 'definitions', label: '决策定义', description: '版本与影响面' },
-  { key: 'designer', label: '策略设计器', description: '规则编排' },
-  { key: 'tables', label: '决策表', description: 'DMN 表格' },
+  { key: 'definitions', label: '业务规则', description: '业务用途、判断逻辑与处理结果' },
+  { key: 'designer', label: '事件策略工作区', description: '触发条件与后续动作' },
+  { key: 'tables', label: 'DMN 互操作', description: '专业导入、导出与互操作验证' },
   { key: 'rollouts', label: '发布治理', description: '灰度与回滚' },
   { key: 'logs', label: '执行日志', description: 'Trace 查询' },
   { key: 'model', label: '数据模型', description: '字段引用' },
@@ -123,6 +129,7 @@ function asConditionFragmentList(raw: unknown): ConditionFragment[] {
 }
 
 export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
+  const { hasPermission } = useAuth();
   const {
     api,
     fields,
@@ -134,8 +141,24 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     initialTab = 'studio',
   } = props;
   const st = useSmartText();
+  const {locale}=useI18n();
+  const tabs = TABS.map(item => ({...item, ...NAV[item.key][locale.startsWith('zh')?'zh-CN':'en']}));
+  const [selectedDecisionCode, setSelectedDecisionCode] = useState(props.initialDecisionCode ?? '');
+  useEffect(() => { if (props.initialDecisionCode != null) setSelectedDecisionCode(props.initialDecisionCode); }, [props.initialDecisionCode]);
   const [tab, setTab] = useState<ConsoleTab>(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
+  const selectTab = (next: ConsoleTab, selection?: {decisionCode?: string;policyCode?: string}) => { setTab(next); props.onTabChange?.(next,selection); };
   const [selectedPolicy, setSelectedPolicy] = useState<EventPolicySummary | null>(null);
+  const selectedPolicyQuery = useQuery({
+    queryKey:['event-policies'],queryFn:()=>api.listPolicies({}),
+    enabled:Boolean(props.initialPolicyCode) && tab==='designer',
+  });
+  useEffect(() => {
+    if (!props.initialPolicyCode || !selectedPolicyQuery.data) return;
+    const data = selectedPolicyQuery.data as unknown;
+    const rows = Array.isArray(data) ? data : (data as {records?: EventPolicySummary[]}).records ?? [];
+    setSelectedPolicy(rows.find((item: EventPolicySummary)=>item.policyCode===props.initialPolicyCode) ?? null);
+  },[props.initialPolicyCode,selectedPolicyQuery.data]);
   const [tableDraft, setTableDraft] = useState<DecisionTable>(DEFAULT_TABLE);
   const [tableAnalysis, setTableAnalysis] = useState<DecisionTableAnalysis | null>(null);
   const [tableAnalyzing, setTableAnalyzing] = useState(false);
@@ -213,7 +236,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     enabled: permissionGrants == null && tab === 'permissions',
   });
   const permissionGrantData = permissionGrants ?? permissionQuery.data?.roles ?? [];
-  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+  const activeTab = tabs.find((t) => t.key === tab) ?? tabs[0];
   const headerEyebrow = st('$i18n:decisionops.header.eyebrow', 'Strategy Studio');
   const definitionsLabel = st('$i18n:decisionops.header.definitions', 'Definitions');
   const policiesLabel = st('$i18n:decisionops.header.policies', 'Policies');
@@ -330,7 +353,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           <span>
             {todayLabel} {dashboardData.summary.evaluationsToday}
           </span>
-          <a className="decisionops-workbench-jump" href="#strategy-workbench">
+          <a className="decisionops-workbench-jump" href="?tab=studio" onClick={event => {event.preventDefault();selectTab('studio');}}>
             {openWorkbenchLabel}
           </a>
         </div>
@@ -338,7 +361,8 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
 
       <div className="decisionops-layout">
         <nav className="doc-tabs decisionops-nav" role="tablist" aria-label="Rule Center modules">
-          {TABS.map((t) => (
+          {tabs.filter((item) => ['definitions', 'policies', 'logs'].includes(item.key)
+            || item.key === tab).sort((a,b) => ['definitions','policies','logs'].indexOf(a.key)-['definitions','policies','logs'].indexOf(b.key)).map((t) => (
             <a
               key={t.key}
               href={`?tab=${t.key}`}
@@ -347,16 +371,23 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
               aria-selected={tab === t.key}
               onClick={(event) => {
                 event.preventDefault();
-                setTab(t.key);
+                selectTab(t.key);
+                event.currentTarget.closest('nav')?.querySelector('details')?.removeAttribute('open');
               }}
             >
               <span className="decisionops-nav-label">{t.label}</span>
               <span className="decisionops-nav-desc">{t.description}</span>
             </a>
           ))}
+          <details key={tab} className="decisionops-professional-entry">
+            <summary>{st('$i18n:decisionops.professional', '专业配置')}</summary>
+            <div>{tabs.filter(item => !['definitions', 'policies', 'logs'].includes(item.key) && item.key !== tab).map(item => (
+              <button key={item.key} type="button" data-testid={`doc-tab-${item.key}`} onClick={event => {selectTab(item.key);event.currentTarget.closest('details')?.removeAttribute('open');}}>{item.label}</button>
+            ))}</div>
+          </details>
         </nav>
 
-        <main className="decisionops-main">
+        <section className="decisionops-main" aria-label={activeTab.label}>
           <div className="decisionops-section-head">
             <div>
               <h2>{activeTab.label}</h2>
@@ -367,7 +398,12 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           <div className="doc-panel decisionops-content-card" data-testid={`doc-panel-${tab}`}>
             {tab === 'studio' && (
               <StrategyStudioWorkbench
+                readOnly={!hasPermission('decision.definition.manage')}
+                canPublish={hasPermission('decision.definition.publish')}
+                canRun={hasPermission('decision.runtime.evaluate')}
                 api={api}
+                initialDecisionCode={selectedDecisionCode}
+                onDecisionChange={code => {setSelectedDecisionCode(code);selectTab('studio',{decisionCode:code});}}
                 fields={strategyFields}
                 decisions={strategyDecisions}
                 conditionFragments={asConditionFragmentList(conditionFragmentQuery.data)}
@@ -397,17 +433,23 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
             )}
             {tab === 'policies' && (
               <EventPolicyListPage
+                readOnly={!hasPermission('decision.policy.manage')}
                 api={api}
                 onOpenDesigner={(policy) => {
                   setSelectedPolicy(policy);
-                  setTab('designer');
+                  selectTab('designer',{policyCode:policy.policyCode});
                 }}
-                onOpenLogs={() => setTab('logs')}
+                onOpenLogs={() => selectTab('logs')}
               />
             )}
-            {tab === 'definitions' && <DecisionDefinitionListPage api={api} />}
+            {tab === 'definitions' && <DecisionDefinitionListPage api={api} onOpen={definition => {
+              setSelectedDecisionCode(definition.decisionCode); selectTab('studio',{decisionCode:definition.decisionCode});
+            }} />}
             {tab === 'designer' && (
               <EventPolicyDesignerWorkflow
+                readOnly={!hasPermission('decision.policy.manage')}
+                canPublish={hasPermission('decision.policy.publish')}
+                canRun={hasPermission('decision.policy.run')}
                 api={api}
                 fields={designerFields}
                 samples={designerSamples}
@@ -441,7 +483,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
               <DecisionRolloutMonitor api={api} initialDecisionCode="complaint_sla_deadline" />
             )}
             {tab === 'logs' && (
-              <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50 } }} />
+              <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50, businessFirst: true } }} />
             )}
             {tab === 'model' && (
               <>
@@ -497,7 +539,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
               </>
             )}
           </div>
-        </main>
+        </section>
       </div>
     </div>
   );

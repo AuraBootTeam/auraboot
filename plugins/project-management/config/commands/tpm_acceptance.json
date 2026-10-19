@@ -17,7 +17,9 @@
       "tpm_ac_risk",
       "tpm_ac_scope",
       "tpm_ac_files",
-      "tpm_ac_reviewer"
+      "tpm_ac_reviewer",
+      "tpm_ac_open_issues",
+      "tpm_ac_materials_complete"
     ],
     "autoSetFields": {
       "tpm_ac_code": {
@@ -27,6 +29,14 @@
       "tpm_ac_status": {
         "strategy": "fixed_value",
         "value": "draft"
+      },
+      "tpm_ac_open_issues": {
+        "strategy": "default_value",
+        "value": 0
+      },
+      "tpm_ac_materials_complete": {
+        "strategy": "default_value",
+        "value": true
       }
     },
     "preconditions": [
@@ -67,7 +77,9 @@
       "tpm_ac_risk",
       "tpm_ac_scope",
       "tpm_ac_files",
-      "tpm_ac_reviewer"
+      "tpm_ac_reviewer",
+      "tpm_ac_open_issues",
+      "tpm_ac_materials_complete"
     ],
     "preconditions": [
       {
@@ -97,7 +109,17 @@
         "message:zh-CN": "请选择有效风险等级。",
         "message:en": "Select a valid risk level."
       }
-    ]
+    ],
+    "autoSetFields": {
+      "tpm_ac_open_issues": {
+        "strategy": "default_value",
+        "value": 0
+      },
+      "tpm_ac_materials_complete": {
+        "strategy": "default_value",
+        "value": true
+      }
+    }
   },
   {
     "modelCode": "tpm_acceptance",
@@ -145,6 +167,13 @@
         ],
         "message:zh-CN": "请选择有效风险等级。",
         "message:en": "Select a valid risk level."
+      },
+      {
+        "field": "tpm_ac_open_issues",
+        "operator": "gte",
+        "value": 0,
+        "message:zh-CN": "未解决问题数不能为负数。",
+        "message:en": "Unresolved issue count cannot be negative."
       }
     ],
     "postActions": [
@@ -158,7 +187,9 @@
           "tpm_ac_amount": "${payload.tpm_ac_amount}",
           "tpm_ac_risk": "${payload.tpm_ac_risk}",
           "tpm_ac_name": "${payload.tpm_ac_name}",
-          "tpm_ac_reviewer": "${payload.tpm_ac_reviewer}"
+          "tpm_ac_reviewer": "${payload.tpm_ac_reviewer}",
+          "tpm_ac_open_issues": "${payload.tpm_ac_open_issues}",
+          "tpm_ac_materials_complete": "${payload.tpm_ac_materials_complete}"
         }
       }
     ]

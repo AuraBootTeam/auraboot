@@ -10,6 +10,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { getKernel } from '~/framework/bootstrap';
 
 export interface ResourceOption {
+  readOnly?: boolean;
   label: string;
   value: string;
   description?: string;
@@ -64,6 +65,7 @@ interface FieldRecord {
   dataType: string;
   extension?: {
     displayName?: string;
+    readOnly?: boolean;
   };
   dictCode?: string;
 }
@@ -114,15 +116,16 @@ export async function fetchAutomationOptions(): Promise<ResourceOption[]> {
   }));
 }
 
-export async function fetchCommandOptions(): Promise<ResourceOption[]> {
+export async function fetchCommandOptions(modelCode?: string): Promise<ResourceOption[]> {
   // GET /api/meta/commands (no modelCode) lists every current command as a bare
   // array in `data` — the execute-command picker has no model scope. The earlier
   // `?size=200` + `data.records` read was doubly wrong: the endpoint required a
   // `modelCode` param (→ 500) and returns a List, not a paginated `{records}`
   // envelope, so the picker surfaced zero options. (golden FINDING-9)
-  const result = await fetchResult<CommandItem[]>('/api/meta/commands');
+  const result = await fetchResult<CommandItem[]>(modelCode
+    ? `/api/meta/commands?modelCode=${encodeURIComponent(modelCode)}` : '/api/meta/commands');
   return (result?.data || []).map((c) => ({
-    label: `${c.displayName || c.code} (${c.code})`,
+    label: c.displayName || c.code,
     value: c.code,
     description: c.type,
   }));
@@ -151,6 +154,7 @@ export async function fetchFieldOptions(modelCode: string): Promise<ResourceOpti
     label: f.extension?.displayName || f.code,
     value: f.code,
     description: f.dataType,
+    ...(f.extension?.readOnly ? { readOnly: true } : {}),
     ...(f.dictCode ? { dictCode: f.dictCode } : {}),
   }));
 }

@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import COPY from './ruleCenterV5.i18n.json';
 import type { DecisionApi, DecisionVersionSummary } from '../api/decisionApi';
 import { ImpactGraphPanel } from './ImpactGraphPanel';
 
@@ -13,6 +16,7 @@ import { ImpactGraphPanel } from './ImpactGraphPanel';
 export interface DefinitionSummary {
   decisionCode: string;
   decisionName?: string;
+  description?: string;
   scopeType?: string;
   ownerModule?: string;
   enabled?: boolean;
@@ -20,6 +24,7 @@ export interface DefinitionSummary {
 
 export interface DecisionDefinitionListPageProps {
   api: DecisionApi;
+  onOpen?: (definition: DefinitionSummary) => void;
 }
 
 /** Normalize the list response: tolerate array | {records:[]} | {data:[]} shapes. */
@@ -80,7 +85,9 @@ function rolloutStartHref(
   return `/p/decisionops_rollouts?${params.toString()}`;
 }
 
-export function DecisionDefinitionListPage({ api }: DecisionDefinitionListPageProps) {
+export function DecisionDefinitionListPage({ api, onOpen }: DecisionDefinitionListPageProps) {
+  const { locale } = useI18n();
+  const text = (key: keyof typeof COPY) => getLocalizedText(COPY[key], locale);
   const [impactCode, setImpactCode] = useState<string | null>(null);
   const [impactAcknowledged, setImpactAcknowledged] = useState(false);
   const [transitioningPid, setTransitioningPid] = useState<string | null>(null);
@@ -222,10 +229,10 @@ export function DecisionDefinitionListPage({ api }: DecisionDefinitionListPagePr
         <table className="decisionops-table ddl-table">
           <thead>
             <tr>
-              <th>决策编码</th>
-              <th>名称</th>
-              <th>范围</th>
-              <th>所属模块</th>
+              <th>{text('businessRule')}</th>
+              <th>{text('purpose')}</th>
+              <th>{text('consumer')}</th>
+              <th>{text('details')}</th>
               <th>启用</th>
               <th>影响</th>
             </tr>
@@ -233,14 +240,20 @@ export function DecisionDefinitionListPage({ api }: DecisionDefinitionListPagePr
           <tbody>
             {rows.map((d) => (
               <tr key={d.decisionCode} data-testid={`ddl-row-${d.decisionCode}`}>
-                <td className="mono decisionops-code" title={d.decisionCode}>
-                  {d.decisionCode}
-                </td>
-                <td className="decisionops-main-cell">{d.decisionName ?? '—'}</td>
-                <td>
-                  <span className="decisionops-badge is-neutral">{d.scopeType ?? '—'}</span>
-                </td>
-                <td className="decisionops-muted-cell">{d.ownerModule ?? '—'}</td>
+                <td className="decisionops-main-cell">{onOpen ? <button type="button"
+                  className="decisionops-rule-link" onClick={() => onOpen(d)}
+                  data-testid={`ddl-open-${d.decisionCode}`}>{d.decisionName ?? d.decisionCode}</button>
+                  : d.decisionName ?? text('unnamed')}</td>
+                <td className="decisionops-rule-purpose">{d.description || text('purposeMissing')}</td>
+                <td><span className="decisionops-badge is-neutral">{
+                  d.scopeType === 'BPM' || d.scopeType === 'WORKFLOW' ? text('approval')
+                  : d.scopeType === 'SLA' ? text('deadline')
+                  : d.scopeType === 'MODEL' ? text('model')
+                  : d.scopeType === 'COMMAND' ? text('operation') : text('shared')
+                }</span></td>
+                <td><details className="decisionops-rule-identifiers"><summary>{text('identifiers')}</summary>
+                  <div>{d.decisionCode}</div><div>{d.ownerModule ?? '—'}</div>
+                </details></td>
                 <td>
                   <span
                     className={`decisionops-badge ${d.enabled === false ? 'is-danger' : 'is-success'}`}

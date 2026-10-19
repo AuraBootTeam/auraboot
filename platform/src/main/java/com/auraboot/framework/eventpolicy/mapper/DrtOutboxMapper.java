@@ -17,9 +17,16 @@ import java.util.List;
 @Mapper
 public interface DrtOutboxMapper extends BaseMapper<DrtOutboxEntity> {
 
+    @Select("SELECT DISTINCT tenant_id FROM ab_drt_outbox WHERE status = 'PENDING' ORDER BY tenant_id LIMIT #{limit}")
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    List<Long> pendingTenantIds(@Param("limit") int limit);
+
     @Select("SELECT * FROM ab_drt_outbox WHERE tenant_id = #{tenantId} AND status = 'PENDING' "
             + "ORDER BY created_at LIMIT #{limit}")
     List<DrtOutboxEntity> findPending(@Param("tenantId") Long tenantId, @Param("limit") int limit);
+
+    @Select("SELECT * FROM ab_drt_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} FOR UPDATE")
+    DrtOutboxEntity findByEventIdForUpdate(@Param("tenantId") Long tenantId, @Param("eventId") String eventId);
 
     @Select("SELECT * FROM ab_drt_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId}")
     DrtOutboxEntity findByEventId(@Param("tenantId") Long tenantId, @Param("eventId") String eventId);

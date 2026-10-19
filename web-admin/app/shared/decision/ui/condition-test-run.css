@@ -1,0 +1,12 @@
+[data-testid="condition-testrun"] { display:grid; gap:14px; padding:18px; border:1px solid var(--color-border,#e2e8f0); border-radius:8px; background:var(--color-subtle,#f8fafc); font-size:13px; }
+.trp-samples { display:flex; gap:8px; flex-wrap:wrap; }
+.trp-samples button[aria-pressed="true"] { color:var(--color-accent,#2563eb); border-color:#bfdbfe; background:#eff6ff; }
+.trp-nl { line-height:1.7; overflow-wrap:anywhere; }
+.trp-context { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px 24px; margin:0; padding:14px 0; border-block:1px solid var(--color-border,#e2e8f0); }
+.trp-context dt { font-size:12px; color:var(--color-text-2,#64748b); margin-bottom:6px; }
+.trp-context dd { margin:0; font-weight:600; overflow-wrap:anywhere; }
+.trp-result { justify-self:start; border-radius:6px; padding:6px 12px; font-weight:500; }
+.trp-result.truth-true { background:#ecfdf5; color:#047857; }
+.trp-result.truth-false { background:#fef2f2; color:#b91c1c; }
+.trp-result.truth-unknown { background:#fffbeb; color:#92400e; }
+.trp-note { color:var(--color-text-2,#64748b); font-size:12px; line-height:1.6; }

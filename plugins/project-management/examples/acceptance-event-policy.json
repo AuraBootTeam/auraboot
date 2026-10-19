@@ -1,0 +1,85 @@
+{
+  "policyCode": "tpm_acceptance_registered",
+  "policyName": "验收通过 · 登记项目与核验",
+  "eventType": "COMMAND_COMPLETED",
+  "targetType": "MODEL",
+  "targetKey": "tpm_acceptance",
+  "version": {
+    "phase": "AFTER_COMMIT",
+    "matchMode": "COLLECT_ALL",
+    "executionMode": "ORDERED",
+    "failureStrategy": "FAIL_FAST",
+    "conflictStrategy": "REJECT_ON_CONFLICT",
+    "dedupStrategy": "BY_IDEMPOTENCY_KEY",
+    "rulesJson": [
+      {
+        "ruleCode": "acceptance-became-approved",
+        "ruleName": "验收首次通过",
+        "priority": 10,
+        "enabled": true,
+        "condition": {
+          "type": "group",
+          "op": "AND",
+          "children": [
+            {
+              "type": "compare",
+              "left": {
+                "type": "path",
+                "scope": "before",
+                "path": "data.tpm_ac_status",
+                "dataType": "enum"
+              },
+              "right": {
+                "type": "literal",
+                "value": "accepted",
+                "dataType": "enum"
+              },
+              "operator": "NE"
+            },
+            {
+              "type": "compare",
+              "left": {
+                "type": "path",
+                "scope": "after",
+                "path": "data.tpm_ac_status",
+                "dataType": "enum"
+              },
+              "right": {
+                "type": "literal",
+                "value": "accepted",
+                "dataType": "enum"
+              },
+              "operator": "EQ"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "EXECUTE_COMMAND",
+            "target": "record",
+            "order": 10,
+            "payload": {
+              "modelCode": "tpm_project",
+              "commandCode": "tdv:register_acceptance",
+              "targetRecordPid": "${record.data.tpm_ac_project}",
+              "params": {
+                "acceptancePid": "${record.recordPid}"
+              }
+            },
+            "idempotencyKeyTemplate": "tpm_acceptance_registered:v1:${event.eventId}:${record.recordPid}:register"
+          },
+          {
+            "type": "NOTIFY",
+            "target": "USER:${record.data.tpm_ac_reviewer}",
+            "order": 20,
+            "payload": {
+              "title": "验收通过，已登记项目交付",
+              "content": "${record.data.tpm_ac_name} 已通过验收，交付核验已准备。"
+            },
+            "idempotencyKeyTemplate": "tpm_acceptance_registered:v1:${event.eventId}:${record.recordPid}:notify"
+          }
+        ]
+      }
+    ]
+  }
+}

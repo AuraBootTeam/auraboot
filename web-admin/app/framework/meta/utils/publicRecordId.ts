@@ -28,10 +28,13 @@ export function buildCommandTargetParams(target: unknown): Record<string, string
   return pid ? { targetRecordPid: pid } : {};
 }
 
-/** Resolve canonical command identities through API response envelopes. */
-export function getCommandResultRecordPid(result: unknown): string | undefined {
-  if (!result || typeof result !== 'object') return undefined;
-  const value = result as Record<string, unknown>;
-  const pid = value.recordPid || value.pid;
-  return typeof pid === 'string' ? pid : getCommandResultRecordPid(value.data);
+/** Read a public PID from synchronous or nested command results. */
+export function getCommandResultRecordPid(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  for (const key of ['recordPid', 'pid']) {
+    const pid = record[key];
+    if (typeof pid === 'string' && pid.trim()) return pid;
+  }
+  return getCommandResultRecordPid(record.data);
 }

@@ -28,7 +28,7 @@ export function DependentFieldSelect({
 }: DependentFieldSelectProps) {
   const { nodes, selectedNodeId } = useFlowStore();
   const node = nodes.find((n) => n.id === selectedNodeId);
-  const modelCode = (node?.data.config?.[modelCodeKey] as string) || '';
+  const modelCode = String(adapter.context?.[modelCodeKey] ?? node?.data.config?.[modelCodeKey] ?? '');
   const prevModelCodeRef = useRef(modelCode);
 
   // Clear field value when modelCode changes
@@ -65,6 +65,7 @@ export function DependentFieldSelect({
     <div>
       {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
       <BaseResourceSelect
+        disabled={adapter.disabled || adapter.readOnly}
         value={(adapter.value as string) || ''}
         onChange={adapter.setValue as any}
         fetchOptions={fetchOptions}
