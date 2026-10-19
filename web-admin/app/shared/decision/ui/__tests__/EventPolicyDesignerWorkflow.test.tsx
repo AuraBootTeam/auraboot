@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventPolicyDesignerWorkflow } from '../EventPolicyDesignerWorkflow';
 import type { DecisionApi, EventPolicySummary } from '../../api/decisionApi';
@@ -418,11 +418,17 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-step-actions'));
     fireEvent.click(screen.getByTestId('epd-add-action'));
     fireEvent.click(screen.getByTestId('epd-step-publish'));
-    fireEvent.click(screen.getByTestId('epd-save-draft'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('epd-save-draft'));
+    });
     await waitFor(() => expect(fakeApi.createPolicyDraftVersion).toHaveBeenCalled());
-    fireEvent.click(screen.getByTestId('epd-validate-version'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('epd-validate-version'));
+    });
     await waitFor(() => expect(fakeApi.validatePolicyVersion).toHaveBeenCalledWith('draft-pid-1'));
-    fireEvent.click(screen.getByTestId('epd-publish-version'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('epd-publish-version'));
+    });
     await waitFor(() => expect(fakeApi.publishPolicyVersion).toHaveBeenCalledWith('draft-pid-1'));
 
     expect(fakeApi.createPolicyDraftVersion).toHaveBeenCalledWith(
