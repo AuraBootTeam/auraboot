@@ -1015,11 +1015,13 @@ describe('ContextualAuthoringSurface', () => {
         '原作者离线，继续紧急修复',
       ),
     );
-    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
-    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
-      'data-read-only',
-      'false',
-    );
+    await waitFor(() => {
+      expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+      expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'false',
+      );
+    });
   });
 
   it('reloads the authoritative lease when another node wins the observed revision', async () => {
