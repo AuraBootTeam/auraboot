@@ -887,6 +887,15 @@ test('rule center primary and professional views remain reachable through their 
     await entry.click();await expect(page.getByTestId(`doc-panel-${tab}`)).toBeVisible();
     await expect(page.getByTestId(`doc-panel-${tab}`)).not.toContainText('Failed to load');
     if(error)await expect(page.getByTestId(error)).toHaveCount(0);
+    if(tab==='dashboard') {
+      await expect(page.getByTestId('decision-dashboard')).toBeVisible();
+      const first=await page.getByTestId('dd-card-definitions').boundingBox();
+      const second=await page.getByTestId('dd-card-policies').boundingBox();
+      expect(first).toBeTruthy();expect(second).toBeTruthy();
+      expect(Math.abs(first!.y-second!.y)).toBeLessThan(2);
+      expect(second!.x).toBeGreaterThanOrEqual(first!.x+first!.width-2);
+    }
+    await expect(page.locator('details.decisionops-professional-entry')).not.toHaveAttribute('open');
     if(tab==='logs'){await expect(page.getByTestId('elta-business-results')).toBeVisible();await expect(page.getByTestId('elta-filters')).toHaveCount(0);}
     await shot(page,['R01','A03','A04','A05','R06'].includes(image)?`${image}-navigation`:image);
   }

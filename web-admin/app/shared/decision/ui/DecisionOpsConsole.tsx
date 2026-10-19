@@ -372,13 +372,14 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
               onClick={(event) => {
                 event.preventDefault();
                 selectTab(t.key);
+                event.currentTarget.closest('nav')?.querySelector('details')?.removeAttribute('open');
               }}
             >
               <span className="decisionops-nav-label">{t.label}</span>
               <span className="decisionops-nav-desc">{t.description}</span>
             </a>
           ))}
-          <details className="decisionops-professional-entry">
+          <details key={tab} className="decisionops-professional-entry">
             <summary>{st('$i18n:decisionops.professional', '专业配置')}</summary>
             <div>{tabs.filter(item => !['definitions', 'policies', 'logs'].includes(item.key) && item.key !== tab).map(item => (
               <button key={item.key} type="button" data-testid={`doc-tab-${item.key}`} onClick={event => {selectTab(item.key);event.currentTarget.closest('details')?.removeAttribute('open');}}>{item.label}</button>

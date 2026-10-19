@@ -133,3 +133,17 @@
 .decisionops-shell .epd-action-result-payload { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
 .decisionops-shell .epd-action-diagnostics { margin-top:14px; border-top:1px solid var(--color-border,#e2e8f0); padding-top:12px; font-size:12px; }
 .decisionops-shell .epd-action-diagnostics summary { cursor:pointer; color:var(--color-text-2,#64748b); }
+
+/* Overview metrics use the same grouped, compact workspace vocabulary. */
+.decisionops-shell [data-testid=decision-dashboard] { display:grid; gap:24px; }
+.decisionops-shell .dd-cards { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); border:1px solid var(--color-border,#e2e8f0); border-radius:8px; overflow:hidden; }
+.decisionops-shell .dd-card { min-width:0; padding:20px 16px; border-right:1px solid var(--color-border,#e2e8f0); }
+.decisionops-shell .dd-card:last-child { border-right:0; }
+.decisionops-shell .dd-card-value { font-size:26px; font-weight:600; line-height:1.3; margin-bottom:8px; }
+.decisionops-shell .dd-card-label { font-size:12px; color:var(--color-text-2,#64748b); }
+.decisionops-shell .dd-exceptions h4 { font-weight:600; margin-bottom:12px; }
+.decisionops-shell [data-testid=dd-exceptions-empty] { padding:32px; text-align:center; color:var(--color-text-2,#64748b); border:1px dashed var(--color-border,#e2e8f0); border-radius:8px; }
+.decisionops-shell .dd-exceptions ul { list-style:none; margin:0; padding:0; }
+.decisionops-shell .dd-exceptions li { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--color-border,#e2e8f0); }
+@media(max-width:1000px) { .decisionops-shell .dd-cards { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:600px) { .decisionops-shell .dd-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
