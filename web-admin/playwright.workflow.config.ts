@@ -23,7 +23,13 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'workflow-fixture',
+      testDir: './tests/api/setup',
+      testMatch: 'workflow-fixture.setup.ts',
+    },
+    {
       name: 'workflow-preflight',
+      dependencies: ['workflow-fixture'],
       testDir: './tests/api/setup',
       testMatch: 'workflow-application.setup.ts',
     },
