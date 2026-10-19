@@ -1545,6 +1545,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                     <span>{formatDate(log.createdAt, timezone, formats.datetime)}</span>
                   </div>
                   {(log.traceId ||
+                    matchedRuleLabels(log.matchedRulesJson).length > 0 ||
                     log.callerRef ||
                     log.runtimeAdapter ||
                     (log.decisionCode &&
@@ -1559,6 +1560,14 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                           <>
                             <dt>{traceLabel('semantic', 'traceIdentifier', locale)}</dt>
                             <dd>{log.traceId}</dd>
+                          </>
+                        )}
+                        {matchedRuleLabels(log.matchedRulesJson).length > 0 && (
+                          <>
+                            <dt>{traceLabel('ui', 'matchedRuleIdentifiers', locale)}</dt>
+                            <dd data-testid={`elta-rule-identifiers-${log.pid ?? index}`}>
+                              {matchedRuleLabels(log.matchedRulesJson).join(', ')}
+                            </dd>
                           </>
                         )}
                         {log.callerRef && (
@@ -1583,8 +1592,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       </dl>
                     </details>
                   )}
-                  <div className="elta-chain-rules">
-                    命中规则: {matchedRuleLabels(log.matchedRulesJson).join(', ') || '-'}
+                  <div className="elta-chain-rules" data-testid={`elta-rule-summary-${log.pid ?? index}`}>
+                    {traceLabel('ui', 'matchedRuleCount', locale)}: {matchedRuleLabels(log.matchedRulesJson).length}
                   </div>
                   <section className="elta-output-snapshot" data-testid={`elta-input-snapshot-${log.pid ?? index}`}>
                     <h4>{traceLabel('ui', 'inputSnapshot', locale)}</h4>

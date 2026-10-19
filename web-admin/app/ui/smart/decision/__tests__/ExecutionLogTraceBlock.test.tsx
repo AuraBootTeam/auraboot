@@ -914,6 +914,12 @@ describe('ExecutionLogTraceBlock', () => {
     expect(drawer).toHaveTextContent('执行链路');
     expect(drawer).not.toHaveTextContent('Trace Chain');
     await waitFor(() => expect(drawer).toHaveTextContent('R-101'));
+    expect(screen.getByTestId('elta-rule-summary-log-1')).toHaveTextContent('命中规则数: 1');
+    expect(screen.getByTestId('elta-rule-summary-log-1')).not.toHaveTextContent('R-101');
+    const identifiers = screen.getByTestId('elta-rule-identifiers-log-1');
+    expect(identifiers.closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(identifiers.closest('details')!.querySelector('summary')!);
+    expect(identifiers.closest('details')).toHaveAttribute('open');
     expect(drawer).toHaveTextContent('命中');
     expect(drawer).toHaveTextContent('未命中');
     expect(drawer).not.toHaveTextContent('MATCHED');

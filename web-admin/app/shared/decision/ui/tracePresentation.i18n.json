@@ -881,6 +881,14 @@
     "field": {
       "zh-CN": "业务字段",
       "en": "Business field"
+    },
+    "matchedRuleCount": {
+      "zh-CN": "命中规则数",
+      "en": "Matched rule count"
+    },
+    "matchedRuleIdentifiers": {
+      "zh-CN": "命中规则标识",
+      "en": "Matched rule identifiers"
     }
   }
 }

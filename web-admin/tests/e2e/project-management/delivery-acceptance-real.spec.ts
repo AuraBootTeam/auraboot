@@ -316,13 +316,24 @@ test('professional event policy publish, execution failure and recovery preserve
   await expect(page.getByTestId('elta-trace-drawer')).toBeVisible();
   await expect(page.getByTestId('elta-trace-chain')).toBeVisible();
   const captured=page.getByTestId(`elta-input-snapshot-${ownedLogs[0].pid}`);await expect(captured).toContainText('当次输入');await expect(captured).toContainText('68000');
-  expect(ownedLogs[0].traceSnapshot.inputSnapshot['record.data.tpm_ac_amount'].value).toBe(68000);await shot(page, 'R17');
+  expect(ownedLogs[0].traceSnapshot.inputSnapshot['record.data.tpm_ac_amount'].value).toBe(68000);
+  const summary=page.getByTestId(`elta-rule-summary-${ownedLogs[0].pid}`);
+  await expect(summary).toHaveText('命中规则数: 1');await expect(summary).not.toContainText('standard');
+  const identifiers=page.getByTestId(`elta-rule-identifiers-${ownedLogs[0].pid}`);
+  await expect(identifiers).toBeHidden();await shot(page, 'R17');
+  const technical=page.getByTestId(`elta-chain-technical-${ownedLogs[0].pid}`);
+  await technical.locator('summary').click();await expect(identifiers).toBeVisible();await expect(identifiers).toContainText('standard');
+  await shot(page,'R17-identifiers');await technical.locator('summary').click();
 });
 
 test('professional rule impact, metadata filters and load-error recovery remain usable @critical', async ({page}) => {
   test.setTimeout(90000);await login(page);await menu(page,'策略工作台');
   await page.getByTestId('ddl-impact-tpm_acceptance_route').click();
   await expect(page.getByTestId('ddl-impact-drawer')).toContainText('tpm_acceptance_route');
+  const columns=page.locator('.impact-graph-columns');
+  await expect(columns).toHaveCSS('align-items','start');
+  const heights=await columns.locator('.impact-graph-column').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
+  expect(heights).toHaveLength(2);expect(heights[0]).toBeLessThan(heights[1]);
   await expect(page.getByTestId('ddl-version-actions')).toBeVisible();await shot(page,'R02');
   await page.getByTestId('ddl-impact-close').click();
   await page.getByTestId('ddl-open-tpm_acceptance_route').click();
@@ -382,7 +393,7 @@ test('SLA paused completed and failed-action detail states use actual lifecycle 
   const dashboardPath=/\/api\/bpm\/monitor\/dashboard(?:\?.*)?$/;
   await page.route(dashboardPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：监控暂不可用'})}));
   await menu(page,'流程监控');await expect(page.getByTestId('sla-dashboard-error')).toBeVisible();
-  await expect(page.getByTestId('sla-dashboard-active-records')).toHaveCount(0);await shot(page,'S00-load-error');
+  await expect(page.getByTestId('sla-dashboard-active-records')).toHaveCount(0);await expect(page.getByText('暂无监控数据',{exact:true})).toHaveCount(0);await shot(page,'S00-load-error');
   await page.unroute(dashboardPath);await page.getByTestId('sla-refresh').click();
   await expect(page.getByTestId('sla-dashboard-active-records')).toBeVisible();await expect(page.getByTestId('sla-dashboard-error')).toHaveCount(0);
   const policiesPath=/\/api\/bpm\/sla-configs(?:\?.*)?$/;
