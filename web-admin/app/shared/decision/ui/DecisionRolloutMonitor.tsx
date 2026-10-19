@@ -705,7 +705,7 @@ export function DecisionRolloutMonitor({
                   {selectedAuditEntries.map((entry, index) => (
                     <li key={`${entry.action ?? 'audit'}-${entry.at ?? index}`}>
                       <div className="rollout-audit-entry">
-                        <strong>{text(entry.action?.toLowerCase() ?? 'audit')}</strong>
+                        <strong>{text(['activate','pause','promote','rollback'].includes(entry.action?.toLowerCase() ?? '') ? entry.action!.toLowerCase() : 'audit')}</strong>
                         {entry.note && <p>{entry.note}</p>}
                         <details><summary>{text('technical')}</summary><code>{entry.action}</code><dl>
                           {entry.by && (

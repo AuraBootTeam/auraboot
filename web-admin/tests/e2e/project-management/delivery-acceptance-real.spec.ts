@@ -427,7 +427,7 @@ test('professional rollout compares exact versions and audits activation pause a
   await menu(page,'策略工作台');await professionalTab(page,'rollouts');
   const choicesPath=/\/api\/decision\/definitions(?:\?.*)?$/;
   await page.route(choicesPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：发布规则目录暂不可用'})}));
-  await expect(page.getByTestId('decision-rollout-monitor')).toBeVisible();await page.reload();
+  await expect(page.getByTestId('decision-rollout-monitor')).toBeVisible();await expect(page).toHaveURL(/[?&]tab=rollouts(?:&|$)/);await page.reload();
   await expect(page.getByTestId('rollout-definitions-error')).toBeVisible();await shot(page,'R06-catalog-error');
   await page.unroute(choicesPath);await page.getByTestId('rollout-definitions-error').getByRole('button',{name:'重新加载',exact:true}).click();
   await expect(page.getByTestId('rollout-definitions-error')).toHaveCount(0);
