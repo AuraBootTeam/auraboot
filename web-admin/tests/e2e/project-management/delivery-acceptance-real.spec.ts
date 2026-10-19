@@ -346,7 +346,10 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   // Failure-only interception: normal requests after unroute must recover from the real server.
   const definitionPath=/\/api\/decision\/definitions(?:\?.*)?$/;
   await page.route(definitionPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：规则目录暂不可用'})}));
-  await menu(page,'策略工作台');await expect(page.getByTestId('ddl-error')).toBeVisible({timeout:20000});await shot(page,'A02');
+  await menu(page,'策略工作台');
+  const unavailable = page.waitForResponse(response => definitionPath.test(new URL(response.url()).pathname) && response.status() === 503);
+  await page.reload();await unavailable;
+  await expect(page.getByTestId('ddl-error')).toBeVisible({timeout:20000});await shot(page,'A02');
   await page.unroute(definitionPath);await page.reload();
   await expect(page.getByTestId('ddl-row-tpm_acceptance_route')).toBeVisible();await expect(page.getByTestId('ddl-error')).toHaveCount(0);await shot(page,'A02-recovered');
   await page.getByTestId('ddl-open-tpm_acceptance_deadline').click();
