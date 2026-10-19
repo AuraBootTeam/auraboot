@@ -347,6 +347,7 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   const definitionPath=/\/api\/decision\/definitions(?:\?.*)?$/;
   await page.route(definitionPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：规则目录暂不可用'})}));
   await menu(page,'策略工作台');
+  await expect(page.getByTestId('decisionops-console')).toBeVisible();
   const unavailable = page.waitForResponse(response => definitionPath.test(new URL(response.url()).pathname) && response.status() === 503);
   await page.reload();await unavailable;
   await expect(page.getByTestId('ddl-error')).toBeVisible({timeout:20000});await shot(page,'A02');
