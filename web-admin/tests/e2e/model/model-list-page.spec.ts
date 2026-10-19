@@ -91,7 +91,7 @@ async function submitFilters(page: Page) {
       response.status() === 200,
     { timeout: 10_000 },
   );
-  await page.getByTestId('filter-search').click();
+  await page.getByTestId('filter-btn-search').click();
   return responsePromise;
 }
 
