@@ -119,3 +119,17 @@
 .decisionops-shell .dmv-table { width:100%; border-collapse:collapse; font-size:12px; }
 .decisionops-shell .dmv-table th { padding:12px; text-align:left; background:var(--color-subtle,#f8fafc); color:var(--color-text-2,#64748b); font-weight:500; }
 .decisionops-shell .dmv-table td { padding:12px; border-bottom:1px solid var(--color-border,#e2e8f0); overflow-wrap:anywhere; }
+
+/* Professional navigation must not clip its own menu or obscure the next page. */
+.decisionops-shell .decisionops-layout .decisionops-nav { overflow:visible; flex-wrap:wrap; }
+.decisionops-shell .pm-grid { width:100%; border-collapse:collapse; font-size:13px; }
+.decisionops-shell .pm-grid th { padding:12px 16px; text-align:center; font-size:12px; font-weight:500; color:var(--color-text-2,#64748b); background:var(--color-subtle,#f8fafc); }
+.decisionops-shell .pm-grid td { padding:10px 16px; text-align:center; border-bottom:1px solid var(--color-border,#e2e8f0); }
+.decisionops-shell .pm-grid th:first-child,.decisionops-shell .pm-grid td:first-child { text-align:left; width:30%; }
+.decisionops-shell .pm-grid button { border:0; min-width:32px; background:transparent; }
+.decisionops-shell .pm-grid button[data-granted=true] { color:#047857; background:#ecfdf5; }
+.decisionops-shell .cl-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:16px; }
+.decisionops-shell [data-testid=cl-empty] { padding:32px; text-align:center; color:var(--color-text-2,#64748b); border:1px dashed var(--color-border,#e2e8f0); border-radius:8px; }
+.decisionops-shell .epd-action-result-payload { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+.decisionops-shell .epd-action-diagnostics { margin-top:14px; border-top:1px solid var(--color-border,#e2e8f0); padding-top:12px; font-size:12px; }
+.decisionops-shell .epd-action-diagnostics summary { cursor:pointer; color:var(--color-text-2,#64748b); }

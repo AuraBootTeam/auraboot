@@ -29,6 +29,8 @@ import {
   type RuleConsumerBindingDraft,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock';
 
+const BUSINESS_RESULT_KEYS = new Set(['sentCount', 'recipientCount', 'createdCount', 'ccCount', 'resolvedCount', 'fieldCount', 'failureReason', 'message', 'deliveryTraceStatus', 'dispatchAccepted']);
+
 export type DesignerStep = 'trigger' | 'rules' | 'actions' | 'test' | 'publish' | 'history';
 export type PolicyPhase = 'BEFORE_SUBMIT' | 'AFTER_COMMIT' | 'ASYNC_WORKER';
 export type ExecutionMode = 'ORDERED' | 'UNORDERED';
@@ -1124,21 +1126,28 @@ export function EventPolicyDesignerWorkflow({
                             {idempotencyEvidence(action.idempotencyKey)}
                           </span>
                         </div>
-                        {action.error ? (
-                          <div className="epd-state is-error">{String(action.error)}</div>
-                        ) : null}
-                        {payloadRows.length > 0 ? (
-                          <dl
-                            className="epd-action-result-payload"
-                            data-testid={`epd-action-result-payload-${idx}`}
-                          >
-                            {payloadRows.map((row) => (
-                              <div key={row.key}>
-                                <dt>{row.label}</dt>
-                                <dd>{row.value}</dd>
-                              </div>
+                        <div data-testid={`epd-action-result-payload-${idx}`}>
+                          <dl className="epd-action-result-payload">
+                            {payloadRows.filter(row => BUSINESS_RESULT_KEYS.has(row.key)).map(row => (
+                              <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>
                             ))}
                           </dl>
+                          {payloadRows.some(row => !BUSINESS_RESULT_KEYS.has(row.key)) ? (
+                            <details className="epd-action-diagnostics" data-testid={`epd-action-diagnostics-${idx}`}>
+                              <summary>{copy('technical_identifiers')}</summary>
+                              <dl className="epd-action-result-payload">
+                                {payloadRows.filter(row => !BUSINESS_RESULT_KEYS.has(row.key)).map(row => (
+                                  <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>
+                                ))}
+                              </dl>
+                            </details>
+                          ) : null}
+                        </div>
+                        {action.error ? (
+                          <details className="epd-action-diagnostics" data-testid={`epd-action-error-${idx}`}>
+                            <summary>{copy('error_message')}</summary>
+                            <div className="epd-state is-error">{String(action.error)}</div>
+                          </details>
                         ) : null}
                       </div>
                     );

@@ -477,6 +477,10 @@ describe('EventPolicyDesignerWorkflow', () => {
     expect(payload).toHaveTextContent('接收用户');
     expect(payload).toHaveTextContent('1001');
     expect(payload).not.toHaveTextContent('targetUserIds');
+    const diagnostics = screen.getByTestId('epd-action-diagnostics-0');
+    expect(diagnostics).not.toHaveAttribute('open');
+    expect(diagnostics).toHaveTextContent('support_manager');
+    expect(diagnostics).not.toHaveTextContent('发送数');
   });
 
   it('shows webhook delivery trace evidence without raw payload field names', async () => {

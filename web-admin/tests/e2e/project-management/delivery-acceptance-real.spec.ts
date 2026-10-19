@@ -280,6 +280,7 @@ test('professional event policy publish, execution failure and recovery preserve
   expect(success.execution.overallStatus).toBe('ALL_SUCCESS');
   expect(success.execution.actions).toHaveLength(1);
   expect(success.execution.actions[0].resultPayload.sentCount).toBe(1);
+  await expect(page.getByTestId('epd-action-diagnostics-0')).not.toHaveAttribute('open');
   await expect(page.getByTestId('epd-action-execution-0')).toContainText('成功');await page.getByTestId('epd-action-execution-0').scrollIntoViewIfNeeded();await shot(page, 'R13');
   // Real invalid recipient, not a fulfilled success response. This must fail at runtime.
   await page.getByTestId('epd-step-actions').click();
@@ -292,6 +293,10 @@ test('professional event policy publish, execution failure and recovery preserve
   expect(failed.execution.actions[0].status).toBe('FAILED');
   expect(failed.execution.actions[0].error).toBeTruthy();
   await expect(page.getByTestId('epd-action-execution-0')).toContainText('失败');await page.getByTestId('epd-action-execution-0').scrollIntoViewIfNeeded();await shot(page, 'R16');
+  await expect(page.getByTestId('epd-action-execution-0')).toContainText('接收人不可用');
+  await expect(page.getByTestId('epd-action-error-0')).not.toHaveAttribute('open');
+  await page.getByTestId('epd-action-error-0').locator('summary').click();
+  await expect(page.getByTestId('epd-action-error-0')).toHaveAttribute('open');
   const logs = await data(await page.request.get(`/api/event-policy/action-logs?policyCode=${policy}&size=100`));
   expect(logs.filter((l:any)=>l.status==='SUCCESS')).toHaveLength(1);
   expect(logs.filter((l:any)=>l.status==='FAILED')).toHaveLength(1);
@@ -333,7 +338,10 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   for(const button of await permissions.getByRole('button').all()) await expect(button).toBeDisabled();await shot(page,'A04');
   await professionalTab(page,'connectors');await page.getByRole('textbox',{name:'connector-search',exact:true}).fill('本轮不存在的连接器');
   await expect(page.getByTestId('cl-empty')).toBeVisible();await shot(page,'A05');
-  await menu(page,'Webhook 治理');await expect(page.getByRole('main')).not.toContainText(/Page Unavailable|加载失败/);
+  await menu(page,'Webhook 治理');await expect(page).toHaveURL(/\/p\/decisionops_webhooks(?:[?#].*)?$/);
+  await expect(page.getByTestId('dynamic-list')).toHaveAttribute('data-model-code','webhook');
+  await expect(page.getByTestId('dynamic-list')).toHaveAttribute('data-ready','true');
+  await expect(page.getByRole('main')).not.toContainText(/Page Unavailable|加载失败/);
   await expect(page.getByRole('main')).toContainText(/Webhook|订阅/);await shot(page,'A06');
   // Failure-only interception: normal requests after unroute must recover from the real server.
   const definitionPath=/\/api\/decision\/definitions(?:\?.*)?$/;

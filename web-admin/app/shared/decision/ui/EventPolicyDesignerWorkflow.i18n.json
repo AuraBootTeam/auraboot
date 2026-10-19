@@ -918,5 +918,13 @@
   "model_name_unavailable": {
     "zh-CN": "对象名称待核对",
     "en": "Object name unavailable"
+  },
+  "notification_title": {
+    "zh-CN": "通知标题",
+    "en": "Notification title"
+  },
+  "recipient_unavailable": {
+    "zh-CN": "接收人不可用，请检查其空间成员资格",
+    "en": "Recipient unavailable; check their space membership"
   }
 }
