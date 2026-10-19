@@ -1,3 +1,4 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
@@ -15,14 +16,10 @@ test.beforeEach(async({page})=>{page.setDefaultTimeout(20000);});
 async function data(response:APIResponse|Response) {
   expect(response.status()).toBe(200);const result=await response.json();expect(String(result.code)).toBe('0');return result.data;
 }
-async function login(page:Page, email=process.env.ADMIN_EMAIL!,tenant=process.env.AURA_ADMIN_TENANT_ID) {
-  page.setDefaultTimeout(20000);
-  await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
-  await page.locator('#identifier').fill(email);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
-  await page.getByRole('button',{name:'立即登录',exact:true}).click();await page.waitForURL(url=>!url.pathname.includes('/login'));
-  if(new URL(page.url()).pathname==='/tenant-selection') {expect(tenant).toBeTruthy();await page.getByTestId(`space-business-${tenant}`).click();await expect(page).not.toHaveURL(/tenant-selection/);}
-  return (await data(await page.request.get('/api/auth/me'))).user;
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
+  return (await loginDeliveryMember(page, email, tenant)).user;
 }
+
 async function menu(page:Page,name:string) {
   const link=page.getByRole('navigation').getByRole('link',{name,exact:true});
   const href=await link.getAttribute('href');expect(href).toBeTruthy();

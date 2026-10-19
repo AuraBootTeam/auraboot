@@ -1,3 +1,4 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test,expect,type Page,type APIResponse,type Response} from '@playwright/test';
@@ -11,17 +12,10 @@ const evidence=process.env.AURA_EVIDENCE_DIR;
 if(!root||!evidence||!process.env.ADMIN_EMAIL||!process.env.ADMIN_PASSWORD)throw Error('Bind the owned enterprise source, evidence and real local login.');
 const templatePath=join(root,'plugins/project-delivery-operations/examples/delivery-retrospective.report-template.json');
 async function data(r:APIResponse|Response){const b=await r.json();expect(r.status(),JSON.stringify(b)).toBe(200);expect(String(b.code)).toBe('0');return b.data;}
-async function login(page:Page,email=process.env.ADMIN_EMAIL!,tenant?:string){
- await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
- await page.locator('#identifier').fill(email);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);await page.getByRole('button',{name:'立即登录',exact:true}).click();await page.waitForURL(u=>!u.pathname.includes('/login'));
- if(new URL(page.url()).pathname==='/tenant-selection'){await page.getByTestId(`space-business-${tenant||process.env.AURA_ADMIN_TENANT_ID}`).click();await expect(page).not.toHaveURL(/tenant-selection/);}
- let identity=await data(await page.request.get('/api/auth/me'));const expected=tenant||process.env.AURA_ADMIN_TENANT_ID;expect(expected).toBeTruthy();
- if(String(identity.user.tenantId)!==expected){
-  await page.getByTestId('user-menu').getByRole('button').first().click();await expect(page.getByTestId('user-dropdown')).toBeVisible();
-  const switched=page.waitForResponse(r=>new URL(r.url()).pathname==='/_action/switch-space'&&r.request().method()==='POST');await page.getByTestId(`tenant-switch-${expected}`).click();expect((await switched).status()).toBe(302);await page.waitForLoadState('load');identity=await data(await page.request.get('/api/auth/me'));
- }
- expect(String(identity.user.tenantId)).toBe(expected);expect(identity.user.email).toBe(email);return identity;
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
+  return loginDeliveryMember(page, email, tenant);
 }
+
 async function shot(page:Page,id:string){await mkdir(join(evidence!,'screenshots'),{recursive:true});await page.screenshot({path:join(evidence!,'screenshots',`${id}.png`),fullPage:true});}
 const compact=(s:string)=>s.normalize('NFKC').replace(/\s+/g,'');
 

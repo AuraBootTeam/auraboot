@@ -1,3 +1,4 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
@@ -38,18 +39,9 @@ function canonicalInputMappings(mappings: any[]) {
   });
 }
 async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
-  await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(email);
-  await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
-  await page.getByRole('button', {name:'立即登录', exact:true}).click();
-  await page.waitForURL(url => !url.pathname.includes('/login'));
-  if (new URL(page.url()).pathname === '/tenant-selection') {
-    expect(tenant).toBeTruthy();await page.getByTestId(`space-business-${tenant}`).click();
-    await expect(page).not.toHaveURL(/tenant-selection/);
-  }
-  return (await data(await page.request.get('/api/auth/me'))).user;
+  return (await loginDeliveryMember(page, email, tenant)).user;
 }
+
 async function menu(page: Page, name: string) {
   await page.getByRole('navigation').getByRole('link', {name, exact:true}).click();
 }

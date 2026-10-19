@@ -1,3 +1,4 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { requireRuntimeUrl } from '../../helpers/environments';
 /** Owner-reviewed showcase. API fixture/maintenance steps are recorded separately from UI actions. */
 import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
@@ -20,27 +21,10 @@ async function data(response: APIResponse | Response) {
   expect(String(body.code)).toBe('0');
   return body.data;
 }
-async function login(page: Page, email = process.env.ADMIN_EMAIL!) {
-  await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(email);
-  await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
-  await page.getByRole('button', { name: '立即登录', exact: true }).click();
-  await page.waitForURL((u) => !u.pathname.includes('/login'));
-  const tenant = process.env.AURA_ADMIN_TENANT_ID!;
-  if (new URL(page.url()).pathname === '/tenant-selection')
-    await page.getByTestId(`space-business-${tenant}`).click();
-  let identity = await data(await page.request.get('/api/auth/me'));
-  if (String(identity.user.tenantId) !== tenant) {
-    await page.getByTestId('user-menu').getByRole('button').first().click();
-    await page.getByTestId(`tenant-switch-${tenant}`).click();
-    await page.waitForLoadState('load');
-    identity = await data(await page.request.get('/api/auth/me'));
-  }
-  expect(String(identity.user.tenantId)).toBe(tenant);
-  expect(identity.user.email).toBe(email);
-  return identity;
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
+  return loginDeliveryMember(page, email, tenant);
 }
+
 async function menu(page: Page, name: string) {
   await navigateToMenuByClick(page, [name]);
 }
