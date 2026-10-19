@@ -1,3 +1,5 @@
+import { useSmartText } from '~/utils/i18n';
+import { chartDataErrorLabel } from '../../utils/chartDataErrorLabel';
 import { hasAggregateModel } from '../../utils/aggregateModel';
 /**
  * SmartNumberCard Component
@@ -186,6 +188,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   drillDown,
   onDrillDown,
 }) => {
+  const text = useSmartText();
   const isConfigured = isDataSourceConfigured(dataSource);
   const chartState = useChartData({
     dataSource,
@@ -447,8 +450,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
               className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600"
               role="alert"
             >
-              <span className="font-medium">Error: </span>
-              {error.message || 'Failed to load data'}
+              {text(chartDataErrorLabel(error))}
             </div>
           ) : isEmpty ? (
             <div className="space-y-3">
