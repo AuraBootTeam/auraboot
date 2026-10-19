@@ -44,19 +44,22 @@ describe('Playwright test environment helpers', () => {
     vi.resetModules();
   });
 
-  it('refuses fixture writes without an explicit base URL even when a host fallback exists', async () => {
+  it('requires explicit runtime URLs even when host defaults are available', async () => {
     delete process.env.PLAYWRIGHT_BASE_URL;
+    delete process.env.BACKEND_URL;
     const env = await loadEnvironments();
     expect(env.BASE_URL).toBeTruthy();
-    expect(() => env.requireExplicitBaseUrl()).toThrow(
-      'PLAYWRIGHT_BASE_URL is required before fixture creation',
-    );
+    expect(env.BACKEND_URL).toBeTruthy();
+    expect(() => env.requireRuntimeUrl('base')).toThrow(/PLAYWRIGHT_BASE_URL must explicitly/);
+    expect(() => env.requireRuntimeUrl('backend')).toThrow(/BACKEND_URL must explicitly/);
   });
 
-  it('preserves the explicitly configured fixture origin', async () => {
-    process.env.PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:5173';
+  it('keeps explicitly configured runtime URLs unchanged', async () => {
+    process.env.PLAYWRIGHT_BASE_URL = 'https://test-web.example';
+    process.env.BACKEND_URL = 'https://test-api.example';
     const env = await loadEnvironments();
-    expect(env.requireExplicitBaseUrl()).toBe('http://127.0.0.1:5173');
+    expect(env.requireRuntimeUrl('base')).toBe('https://test-web.example');
+    expect(env.requireRuntimeUrl('backend')).toBe('https://test-api.example');
   });
 
   it('uses libpq PG* aliases when Aura PG_* aliases are absent', async () => {

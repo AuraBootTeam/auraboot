@@ -1,3 +1,4 @@
+import { requireRuntimeUrl } from '../../helpers/environments';
 import type { Browser, BrowserContext, Locator, Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -6,7 +7,6 @@ import { utils as XLSXUtils, write } from 'xlsx';
 import { expect, test } from '../../fixtures';
 import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, type FixtureRow } from './fixture-cleanup';
 import { loginViaUI } from '../../helpers/auth-fixtures';
-import { requireExplicitBaseUrl } from '../../helpers/environments';
 import {
   clickRowActionByLocator,
   ensureSidebarExpanded,
@@ -25,7 +25,8 @@ const fixtureJournals = new WeakMap<Page, FixtureCleanupJournal>();
 export function fixtureJournal(page: Page): FixtureCleanupJournal {
   let journal = fixtureJournals.get(page);
   if (!journal) {
-    const origin = requireExplicitBaseUrl();
+    const origin = requireRuntimeUrl('base');
+    if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
     if (page.url().startsWith('http') && new URL(page.url()).origin !== new URL(origin).origin) {
       throw new Error('Fixture page belongs to a different runtime origin');
     }

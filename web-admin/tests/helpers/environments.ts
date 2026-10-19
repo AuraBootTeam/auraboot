@@ -132,11 +132,14 @@ export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
 export const BASE_URL =
   EXPLICIT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
 
-/** Require an explicit target for fixture writes and cleanup; never use a host fallback. */
-export function requireExplicitBaseUrl(): string {
-  const origin = EXPLICIT_BASE_URL;
-  if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
-  return origin;
+/** Require an explicitly owned runtime URL for tests that must never use host defaults. */
+export function requireRuntimeUrl(target: 'base' | 'backend'): string {
+  const key = target === 'base' ? 'PLAYWRIGHT_BASE_URL' : 'BACKEND_URL';
+  const value = process.env[key];
+  if (!value?.trim()) {
+    throw new Error(`[E2E env] ${key} must explicitly identify the owned test runtime`);
+  }
+  return value;
 }
 
 /** Remix BFF base — for specs that need to drive `/login` or BFF-specific endpoints directly. */
