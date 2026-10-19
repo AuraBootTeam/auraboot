@@ -287,6 +287,8 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
   assert.match(golden, /platform-plugin-api\/build\/libs\/platform-plugin-api-1\.0\.0\.jar/);
   assert.match(golden, /"-PplatformPluginApiJar=\$platform_plugin_api_jar"/);
+  assert.match(golden, /"-PplatformRuntimeJar=\$REPO_ROOT\/platform\/build\/libs\/AuraBoot-1\.0\.0-boot\.jar"/,
+    'external hybrid plugins require the exact Core runtime artifact as well as the plugin API');
   assert.ok(
     golden.indexOf('platform_plugin_api_jar=') <
       golden.indexOf('"-PplatformPluginApiJar=$platform_plugin_api_jar"'),

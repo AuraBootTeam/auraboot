@@ -251,7 +251,8 @@ stage_requested_backend_jars() {
     [ -d "$backend_dir" ] || die "plugin backend missing for $plugin_name: $backend_dir"
     "$DEV" gradle "$runtime_name" --project "$backend_dir" \
       --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar \
-      "-PplatformPluginApiJar=$platform_plugin_api_jar" --console=plain \
+      "-PplatformPluginApiJar=$platform_plugin_api_jar" \
+      "-PplatformRuntimeJar=$REPO_ROOT/platform/build/libs/AuraBoot-1.0.0-boot.jar" --console=plain \
       >"$sd/logs/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/logs/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"

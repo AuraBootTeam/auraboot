@@ -596,3 +596,33 @@ await page.route('**/api/endpoint', route => {
 
 *Document Version: 1.0*
 *Last Updated: 2026-01-30*
+
+
+## Workflow execution profile
+
+`playwright.workflow.config.ts` owns the unchanged automation designer golden and
+automation deep suites. Their execution path requires the independent BPM plugin
+with its backend JAR, product migrations and `WorkflowCapability` provider. The
+Core-only OSS profile cannot deploy automations; exclusion from that profile is
+not a passing workflow result.
+
+Use an owned host-first stack composed by `scripts/oss-golden-stack.sh` with an
+explicit frozen BPM source, `--extra-plugin-root <bpm-root> --plugin plugin`, and
+`--product-migration-root <bpm-root>/migrations/bpm`. The launcher builds the BPM
+JAR against the exact Core plugin API and runtime artifacts before importing it.
+Run the normal setup, authentication and smoke phases against that same stack,
+then execute:
+
+```bash
+PLAYWRIGHT_BASE_URL=<owned-web-url> \
+PW_ADMIN_STORAGE_STATE=<private-run-directory>/storage/admin.json \
+PW_SKIP_WEBSERVER=1 \
+pnpm exec playwright test -c playwright.workflow.config.ts --workers=1 --retries=0
+```
+
+Keep the explicit runtime database/backend environment from the launcher. The
+workflow preflight requires the live BPM process-definition endpoint before the
+browser suites run. Preflight, executed cases, skips and dependent cases that did
+not run must be reported separately. The profile contract test compares every
+original automation case with the specialized collection; moving a case never
+counts as executing it.
