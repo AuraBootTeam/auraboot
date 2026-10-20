@@ -252,6 +252,7 @@ test('customer extension keeps read-only access and rejects conflicting contribu
     await page.getByTestId('list-search-input').fill('tpm_project_form');
     await page.getByTestId('list-search-input').press('Enter');
     await page.getByRole('row').filter({ hasText: 'tpm_project_form' }).getByText('统一设计器', { exact: true }).click();
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
     const designerUrl = page.url();
     const pagePid = new URL(designerUrl).searchParams.get('pid') || new URL(designerUrl).searchParams.get('pageId');
     expect(pagePid).toMatch(/^[0-9A-Z]{26}$/);

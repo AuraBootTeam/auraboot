@@ -229,6 +229,13 @@ export const actionNodes: FlowNodeDefinition[] = [
         placeholder: '{ "event": "record_updated", "data": "${trigger.record}" }',
         group: 'fields_mapping',
       },
+      {
+        key: 'headers',
+        label: '$i18n:automation.field.httpHeaders',
+        type: 'json',
+        placeholder: '{ "X-Project-Pid": "${recordPid}" }',
+        group: 'advanced',
+      },
     ],
     defaultConfig: {
       actionType: 'send_webhook',

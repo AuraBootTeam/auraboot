@@ -80,7 +80,8 @@ test('direct HTTP actions run from the real designer with resolved payloads and 
         await expect.poll(async () => {
           const logs = await data(await page.request.get(`/api/automations/${automation.pid}/logs`));
           expect(logs.length).toBe(1); log = logs[0]; return log.status;
-        }, { timeout: 30_000 }).toBe(variant === 'blocked' || variant === 'unavailable' ? 'failed' : 'success');
+        }, { timeout: 30_000 }).toMatch(/^(success|failed)$/);
+        expect(log.status, JSON.stringify(log.actionResults)).toBe(variant === 'blocked' || variant === 'unavailable' ? 'failed' : 'success');
         const result = page.getByTestId('automation-test-run-result');
         await expect(page.getByTestId('automation-run-status')).toContainText(log.status === 'success' ? /成功|Success/i : /失败|Failed/i);
         const action = log.actionResults.find((row: any) => row.actionType === type); expect(action).toBeTruthy();
