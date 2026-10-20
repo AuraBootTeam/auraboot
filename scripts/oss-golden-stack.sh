@@ -2,15 +2,15 @@
 #
 # oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot.
 #
-# Brings up a fully isolated host-first stack (zero docker) ready to run real-browser
+# Brings up a host-first stack (zero docker) ready to run real-browser
 # golden specs against the code in THIS checkout/worktree, collapsing the ~6 manual
 # failure points documented in the enterprise agent-rules e2e-playwright runbook
 #   (docs/agent-rules/engineering-gotchas/e2e-playwright.md)
 #   §"OSS auraboot host-first 视觉 golden 全栈 bring-up runbook".
 #
 # It does NOT reset the shared host and NEVER FORCE_HOSTs — it always uses an isolated
-# dev.sh runtime (slot-offset DB/redis/kafka), so it is safe to run alongside other
-# worktrees / concurrent sessions. It does a *minimal* bootstrap (admin + tenant), which
+# dev.sh runtime (slot-offset DB/redis/kafka). Redis databases share Pub/Sub channels;
+# browser acceptance alongside other stacks requires --isolated-redis-port. It does a *minimal* bootstrap (admin + tenant), which
 # is enough for designer / page golden that don't need the showcase seed. For golden that
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
@@ -18,6 +18,10 @@
 #   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--web-mode development|production] [--no-frontend] [--no-warm] [--no-redis] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #       --system-mode: bootstrap mode (default single). An initialized database
 #                      must already have this mode; retained data is never converted.
+#       --isolated-redis-port: run an owned private Redis endpoint on an unused port
+#                   other than 6379. Its persistent data is retained across suspend,
+#                   resume and source refresh; --fresh-db resets only this owned DB.
+#                   verify-artifacts proves its process, storage and backend connection.
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
 #       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
@@ -378,7 +382,7 @@ cmd_up() {
   local workspace_source_root="" report_renderer=0 renderer_env_args=()
   local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
-  local parallel_reason="" redis_host="127.0.0.1" web_mode="development"
+  local parallel_reason="" redis_host="127.0.0.1" redis_port="6379" isolated_redis_port="" web_mode="development"
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
@@ -405,6 +409,7 @@ cmd_up() {
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --no-redis) redis_host=""; shift;;
+    --isolated-redis-port) isolated_redis_port="${2:?--isolated-redis-port requires a port}"; shift 2;;
     --fresh-db) fresh_db=1; shift;;
     --require-new-db) require_new_db=1; shift;;
     --product-migration-root)
@@ -446,6 +451,11 @@ cmd_up() {
   fi
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
   [ "$fresh_db$require_new_db" != "11" ] || die "--fresh-db and --require-new-db are mutually exclusive"
+  if [ -n "$isolated_redis_port" ]; then
+    [ -n "$redis_host" ] || die "--isolated-redis-port conflicts with --no-redis"
+    redis_port="$(node "$SCRIPT_DIR/lib/golden-private-redis.mjs" validate-port "$isolated_redis_port")" \
+      || die "invalid isolated Redis port"
+  fi
   [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] || [ "$require_new_db" = "1" ] \
     || die "--product-migration-root requires a fresh database flag so product SQL is never replayed onto an unknown database"
   case "$runtime_mode" in
@@ -529,6 +539,12 @@ PYLOG
   bff_port="$(runtime_env "$name" BFF_PORT)"
   pg_db="$(runtime_env "$name" POSTGRES_DB)"
   redis_db="$(runtime_env "$name" REDIS_DATABASE)"
+  if [ -n "$isolated_redis_port" ]; then
+    local redis_reset=0
+    [ "$fresh_db$require_new_db" = "00" ] || redis_reset=1
+    node "$SCRIPT_DIR/lib/golden-private-redis.mjs" start "$name" "$REPO_ROOT" "$DEV" "$redis_port" "$redis_reset" \
+      || die "owned private Redis startup failed"
+  fi
   pg_host="$(runtime_env "$name" POSTGRES_HOST)"; pg_host="${pg_host:-127.0.0.1}"
   pg_port="$(runtime_env "$name" POSTGRES_PORT)"; pg_port="${pg_port:-5432}"
   pg_user="$(runtime_env "$name" POSTGRES_USER)"; pg_user="${pg_user:-auraboot}"
@@ -669,7 +685,7 @@ XML
     env AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
-      SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
+      SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT="$redis_port" SPRING_DATA_REDIS_DATABASE="$redis_db" \
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
@@ -1049,7 +1065,7 @@ cmd_lifecycle_resume() {
 }
 
 cmd_resume_retained() {
-  local name="$1" sd recipe run_jar llm_stub_mode logging_config runtime_token server_port vite_port bff_port pg_db redis_db redis_host
+  local name="$1" sd recipe run_jar llm_stub_mode logging_config runtime_token server_port vite_port bff_port pg_db redis_db redis_host redis_port isolated_redis_port
   sd="$(state_dir "$name")"
   recipe="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load "$name" "$REPO_ROOT" "$DEV")" \
     || die "retained launch inputs changed; resume refused"
@@ -1060,6 +1076,8 @@ cmd_resume_retained() {
     logging_args=("LOGGING_CONFIG=file:$logging_config" "LOGGING_FILE_NAME=$sd/logs/backend.log")
   fi
   redis_host="$(printf '%s\n' "$recipe" | sed -n '4p')"
+  redis_port="$(printf '%s\n' "$recipe" | sed -n '5p')"
+  isolated_redis_port="$(printf '%s\n' "$recipe" | sed -n '6p')"
   local telemetry_env_args=() telemetry_env_text
   telemetry_env_text="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load-env "$name" "$REPO_ROOT" "$DEV")" || die "retained telemetry configuration refused"
   while IFS= read -r line; do [ -z "$line" ] || telemetry_env_args+=("$line"); done <<< "$telemetry_env_text"
@@ -1070,6 +1088,10 @@ cmd_resume_retained() {
   pg_db="$(runtime_env "$name" POSTGRES_DB)"
   redis_db="$(runtime_env "$name" REDIS_DATABASE)"
   runtime_token="$("$DEV" runtime process token "$name")" || die "runtime ownership token unavailable"
+  if [ -n "$isolated_redis_port" ]; then
+    node "$SCRIPT_DIR/lib/golden-private-redis.mjs" start "$name" "$REPO_ROOT" "$DEV" "$isolated_redis_port" 0 \
+      || die "retained private Redis startup refused"
+  fi
   # The renderer receipt is written by 'up --report-renderer'; resume replays the same
   # registered wiring instead of silently dropping the WYSIWYG export path.
   local renderer_env_args=()
@@ -1080,7 +1102,7 @@ cmd_resume_retained() {
     env "${logging_args[@]}" ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
-      SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
+      SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT="$redis_port" SPRING_DATA_REDIS_DATABASE="$redis_db" \
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
