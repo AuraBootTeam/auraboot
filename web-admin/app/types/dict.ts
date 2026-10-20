@@ -1,151 +1,43 @@
-/**
- * Dictionary Type Definitions
- */
-
+import type { components } from '~/generated/internal-api/schema';
+import type { InternalRequestInput, JsonValue } from '~/shared/services/http-client/internal-api';
 import type { VersionStatus } from './status';
 
-/**
- * Backend Page Result (MyBatis Plus format)
- */
-export interface DictPageResult<T> {
-  records: T[];
-  total: number;
-  size: number;
-  current: number;
-  pages: number;
-}
+export type Present<T, K extends keyof T> = T & { [P in K]-?: NonNullable<T[P]> };
 
-/**
- * Dictionary DTO
- */
-export interface DictDTO {
-  id: number;
-  pid: string;
-  code: string;
-  name: string;
-  dictType: 'simple' | 'tree' | 'cascade'; // 简化为三种类型
-  description?: string;
-  remark?: string;
-  status: VersionStatus;
-  version: number;
-  isCurrent: boolean;
-  tenantId: number;
-  namespace?: string;
-  env?: string;
-  items?: DictItemData[];
-  createdAt: string;
-  updatedAt: string;
-  createdBy?: string;
-  updatedBy?: string;
-}
+/** UI projection: these identity/display fields are checked at the service boundary. */
+export type DictDTO = Omit<
+  Present<
+    components['schemas']['DictDTO'],
+    'pid' | 'code' | 'name' | 'dictType' | 'status' | 'updatedAt'
+  >,
+  'status'
+> & { status: VersionStatus };
+export type DictCreateRequest = InternalRequestInput<'post', '/api/meta/dict'>['body'];
+export type DictUpdateRequest = InternalRequestInput<'put', '/api/meta/dict/{pid}'>['body'];
+export type DictQueryRequest = NonNullable<InternalRequestInput<'get', '/api/meta/dict'>['query']>;
+export type DictPageResult<T> = Present<
+  Omit<components['schemas']['PageResultDictDTO'], 'records'>,
+  'total' | 'size' | 'current' | 'pages'
+> & { records: T[] };
 
-/**
- * Dictionary Item Data
- */
-export interface DictItemData {
-  value: string;
-  label: string;
+/** Editor state adds ordering/disabled/tree properties to the generated data item. */
+export type DictItemData = Present<
+  Omit<components['schemas']['DictItemData'], 'extension'>,
+  'value' | 'label'
+> & {
   order?: number;
-  sortOrder?: number; // Alias for order
-  parentValue?: string;
   disabled?: boolean;
-  extension?: Record<string, any>;
+  extension?: { [key: string]: JsonValue };
   children?: DictItemData[];
-}
-
-/**
- * Dictionary Create Request
- */
-export interface DictCreateRequest {
-  code: string;
-  name: string;
-  dictType: 'simple' | 'tree' | 'cascade'; // 简化为三种类型
-  sourceType: string; // Required: STATIC, API, SQL, etc.
-  description?: string;
-  remark?: string;
-  items?: Array<{
-    value: string;
-    label: string;
-    sortOrder?: number;
-    parentValue?: string; // 用于 TREE 类型
-    disabled?: boolean;
-    extension?: Record<string, any>;
-  }>;
-  sourceConfig?: Record<string, any>;
-  cascadeConfig?: Record<string, any>;
-  cacheConfig?: Record<string, any>;
-  extendedProps?: Record<string, any>;
-  versionStrategy?: string;
-  pinnedVersion?: string;
-  sortWeight?: number;
-  tags?: string;
-  enabled?: boolean;
-  isSystem?: boolean;
-  versionNote?: string;
-  createdBy?: string;
-}
-
-/**
- * Dictionary Update Request
- */
-export interface DictUpdateRequest {
-  name?: string;
-  description?: string;
-  items?: DictItemData[];
-}
-
-/**
- * Dictionary Query Request
- */
-export interface DictQueryRequest {
-  pageNum?: number;
-  pageSize?: number;
-  code?: string;
-  name?: string;
-  dictType?: string;
-  status?: string;
-}
-
-/**
- * Dictionary Data Result
- */
-export interface DictDataResult {
-  dictCode: string;
-  dictName: string;
-  dictType: string;
-  version: number;
+};
+export type DictDataResult = Omit<components['schemas']['DictDataResult'], 'items'> & {
   items: DictItemData[];
-  loadedAt: string;
-}
-
-/**
- * Dictionary Statistics
- */
-export interface DictStatistics {
-  totalCount: number;
-  publishedCount: number;
-  draftCount: number;
-  archivedCount: number;
-  simpleCount: number;
-  treeCount: number;
-  cascadeCount: number;
-}
-
-/**
- * Dictionary Validation Result
- */
-export interface DictValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
-/**
- * Dictionary Tree Node
- */
-export interface DictTreeNode {
-  value: string;
-  label: string;
+};
+export type DictStatistics = components['schemas']['DictStatistics'];
+export type DictValidationResult = components['schemas']['DictValidationResult'];
+export type DictTreeNode = Present<
+  Omit<components['schemas']['DictTreeNode'], 'children'>,
+  'value' | 'label'
+> & {
   children?: DictTreeNode[];
-  disabled?: boolean;
-}
+};

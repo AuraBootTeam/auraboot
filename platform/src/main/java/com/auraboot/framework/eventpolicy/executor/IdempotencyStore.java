@@ -11,6 +11,9 @@ import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
  */
 public interface IdempotencyStore {
 
+    /** Serialize the check, side effect and outcome until the owning transaction completes. */
+    default void lock(Long tenantId, String idempotencyKey) { }
+
     /** True if this idempotency key already executed successfully for the tenant. */
     boolean alreadySucceeded(Long tenantId, String idempotencyKey);
 

@@ -1,7 +1,11 @@
 package com.auraboot.framework.infrastructure.storage;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -13,8 +17,16 @@ import java.util.stream.Collectors;
  * Only active when {@code aura.storage.cdn.base-url} is configured.
  */
 @Component
-@ConditionalOnProperty("aura.storage.cdn.base-url")
+@Conditional(CdnUrlRewriter.HasCdnBaseUrl.class)
 public class CdnUrlRewriter {
+
+    /** An empty YAML placeholder must not override authenticated file download URLs. */
+    public static final class HasCdnBaseUrl implements Condition {
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            return StringUtils.hasText(context.getEnvironment().getProperty("aura.storage.cdn.base-url"));
+        }
+    }
 
     private final String cdnBaseUrl;
 

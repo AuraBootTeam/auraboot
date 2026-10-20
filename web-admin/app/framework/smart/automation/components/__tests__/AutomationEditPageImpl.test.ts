@@ -27,6 +27,8 @@ describe('AutomationEditPageImpl legacy flow synthesis', () => {
       'action-send-notification',
     ]);
     expect(flow?.edges).toHaveLength(1);
+    // Registered flow cards need room for their body and connecting edge.
+    expect(flow!.nodes[1].position.x - flow!.nodes[0].position.x).toBeGreaterThanOrEqual(320);
   });
 
   it('normalizes legacy notification action config for the visual property panel', () => {

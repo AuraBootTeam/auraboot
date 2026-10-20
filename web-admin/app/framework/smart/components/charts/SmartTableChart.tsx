@@ -1,3 +1,4 @@
+import { chartDataErrorLabel } from '../../utils/chartDataErrorLabel';
 /**
  * SmartTableChart Component
  *
@@ -441,7 +442,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
           <div className="mb-2 text-lg text-red-500">
             {l('数据加载失败', 'Failed to load data')}
           </div>
-          <div className="text-sm text-gray-500">{error.message}</div>
+          <div className="text-sm text-gray-500">{l(chartDataErrorLabel(error).zh, chartDataErrorLabel(error).en)}</div>
         </div>
       </div>
     );

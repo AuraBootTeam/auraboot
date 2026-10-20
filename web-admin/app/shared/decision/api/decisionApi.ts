@@ -87,7 +87,18 @@ export interface DecisionTraceOutputMetadata {
   valueLabels?: Record<string, string>;
 }
 
+export interface DecisionTraceInput {
+  scope: string;
+  path: string;
+  label?: string;
+  modelCode?: string;
+  dataType?: string;
+  state: 'VALUE' | 'NULL' | 'MISSING' | 'REDACTED' | 'OMITTED';
+  value?: string | number | boolean;
+}
+
 export interface DecisionTraceSnapshot {
+  inputSnapshot?: Record<string, DecisionTraceInput>;
   virtualSources?: DecisionVirtualSourceTrace[];
   unknownReasons?: string[];
   factMetadata?: Record<string, DecisionTraceFactMetadata>;

@@ -411,3 +411,63 @@ aurabot:
     saving: 保存中…
     saved_as_dashboard: ダッシュボードに保存しました
     save_failed: ダッシュボードへの保存に失敗しました
+
+"permission.capability.ungrouped": "その他の権限"
+
+"permission.module.系统管理": "システム管理"
+
+"permission.module.决策与事件策略管理": "意思決定とイベントポリシー"
+
+"permission.module.报表定义管理": "レポート定義"
+
+"permission.module.元数据与页面配置": "メタデータとページ"
+
+"permission.module.页面配置治理": "ページガバナンス"
+
+"permission.module.审计与留痕": "監査と履歴"
+
+"permission.module.报表与输出": "レポートと出力"
+
+"permission.module.文件与附件": "ファイルと添付"
+
+"permission.module.AI运行与治理": "AI運用とガバナンス"
+
+"permission.module.知识库": "ナレッジベース"
+
+"permission.module.自动化规则": "自動化ルール"
+
+"permission.module.计费信息": "請求"
+
+"permission.module.公告与通知": "お知らせと通知"
+
+"permission.module.数据交换与设备": "データ交換とデバイス"
+
+"permission.module.元数据工具": "メタデータツール"
+
+"permission.module.客服配置与接待": "カスタマーサポート"
+
+"permission.module.业务裁定": "業務裁定"
+
+"permission.module.制造计划与指标": "製造計画と指標"
+
+"permission.module.二维码管理": "QRコード"
+
+"permission.module.语义指标": "セマンティック指標"
+
+"permission.module.业务参与方": "業務関係者"
+
+"permission.module.列表视图": "リストビュー"
+
+"permission.module.主数据治理": "マスターデータ管理"
+
+"permission.module.组织与权限管理": "組織と権限"
+
+"permission.module.组织管理": "組織管理"
+
+"permission.capability.preset.label": "プリセット"
+
+"permission.capability.preset.viewer": "閲覧者"
+
+"permission.capability.preset.editor": "編集者"
+
+"permission.capability.preset.admin": "管理者"

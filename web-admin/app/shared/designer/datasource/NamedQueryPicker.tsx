@@ -19,19 +19,20 @@ export interface NamedQueryPickerProps {
 export const NamedQueryPicker: React.FC<NamedQueryPickerProps> = ({
   value,
   onChange,
-  label = 'Named Query',
+  label,
   required = false,
-  placeholder = 'Select a named query',
+  placeholder,
   className,
 }) => {
   const text = useSmartText();
+  const heading = label ?? text({ zh: '命名查询', en: 'Named Query' });
   const { namedQueries, isLoading, error } = useNamedQueries();
 
   return (
     <div className={className}>
-      {label && (
+      {heading && (
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          {label}
+          {heading}
           {required && <span className="text-red-500"> *</span>}
         </label>
       )}
@@ -41,7 +42,11 @@ export const NamedQueryPicker: React.FC<NamedQueryPickerProps> = ({
         disabled={isLoading || !!error}
         className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50"
       >
-        <option value="">{isLoading ? 'Loading...' : placeholder}</option>
+        <option value="">
+          {isLoading
+            ? text({ zh: '加载中…', en: 'Loading…' })
+            : (placeholder ?? text({ zh: '请选择命名查询', en: 'Select a named query' }))}
+        </option>
         {namedQueries.map((nq) => (
           <option key={nq.code} value={nq.code}>
             {nq.title} ({nq.code})

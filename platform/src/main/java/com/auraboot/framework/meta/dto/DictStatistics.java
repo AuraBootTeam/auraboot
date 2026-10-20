@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Map;
 
@@ -68,25 +69,30 @@ public class DictStatistics {
     /**
      * 最近创建数量（7天内）
      */
+    @Schema(nullable = true)
     private Long recentCreatedCount;
 
     /**
      * 最近更新数量（7天内）
      */
+    @Schema(nullable = true)
     private Long recentUpdatedCount;
 
     /**
      * 平均字典项数量
      */
+    @Schema(nullable = true)
     private Double averageItemCount;
 
     /**
      * 最大字典项数量
      */
+    @Schema(nullable = true)
     private Long maxItemCount;
 
     /**
      * 最小字典项数量
      */
+    @Schema(nullable = true)
     private Long minItemCount;
 }

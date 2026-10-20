@@ -4,6 +4,10 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.DataNotFoundException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
+import com.auraboot.framework.view.dto.ViewShareResponse;
+import com.auraboot.framework.view.dto.ViewShareStatusResponse;
+import com.auraboot.framework.view.dto.PublicSharedViewResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,7 +38,7 @@ public class ViewShareService {
     /**
      * Create a public share link for a view.
      */
-    public Map<String, Object> createShareLink(String viewPid, String password, Integer expireHours) {
+    public ViewShareResponse createShareLink(String viewPid, String password, Integer expireHours) {
         savedViewService.checkPublicShareAccess(viewPid);
 
         String token = UUID.randomUUID().toString().replace("-", "");
@@ -61,12 +65,9 @@ public class ViewShareService {
         // Update view with share metadata - use native JSONB cast to avoid type casting error
         savedViewMapper.updateViewConfigJson(viewPid, serializeConfig(config));
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("shareUrl", "/api/views/shared/" + token);
-        result.put("expiresAt", expiresAt != null ? expiresAt.toString() : null);
-        result.put("passwordProtected", password != null && !password.isBlank());
-        return result;
+        return new ViewShareResponse(token, "/api/views/shared/" + token,
+                expiresAt != null ? expiresAt.toString() : null,
+                password != null && !password.isBlank());
     }
 
     /**
@@ -85,7 +86,7 @@ public class ViewShareService {
      * Get share status.
      * Uses raw JSON query to avoid losing __share metadata during ViewConfig deserialization.
      */
-    public Map<String, Object> getShareStatus(String viewPid) {
+    public ViewShareStatusResponse getShareStatus(String viewPid) {
         savedViewService.checkPublicShareAccess(viewPid);
         // Use raw JSON to preserve __share key (not mapped in ViewConfig class)
         String rawJson = savedViewMapper.selectRawViewConfigJson(viewPid);
@@ -93,22 +94,19 @@ public class ViewShareService {
         @SuppressWarnings("unchecked")
         Map<String, Object> share = (Map<String, Object>) config.get("__share");
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("shared", share != null && Boolean.TRUE.equals(share.get("active")));
-        if (share != null) {
-            result.put("token", share.get("token"));
-            result.put("expiresAt", share.get("expiresAt"));
-            result.put("passwordProtected", share.containsKey("passwordHash"));
-        }
-        return result;
+        return new ViewShareStatusResponse(
+                share != null && Boolean.TRUE.equals(share.get("active")),
+                share != null ? String.class.cast(share.get("token")) : null,
+                share != null ? String.class.cast(share.get("expiresAt")) : null,
+                share != null ? share.containsKey("passwordHash") : null);
     }
 
     /**
      * Access a shared view by token (public endpoint, no tenant context).
      * Uses direct JSONB query to bypass TenantLineInterceptor and ViewConfigTypeHandler.
-     * Returns Map<String, Object> to avoid MetaContext dependency on public endpoints.
+     * Returns a configuration DTO without resolving tenant-scoped business records.
      */
-    public Map<String, Object> accessSharedView(String shareToken, String password) {
+    public PublicSharedViewResponse accessSharedView(String shareToken, String password) {
         // JSONB query returns raw Map — bypasses TenantLineInterceptor and ViewConfigTypeHandler
         // PostgreSQL returns column aliases in lowercase
         Map<String, Object> viewMeta = savedViewMapper.findRawViewByShareToken(shareToken);
@@ -141,32 +139,33 @@ public class ViewShareService {
         }
 
         // Return view data (without share metadata)
-        Map<String, Object> result = new HashMap<>();
-        result.put("name", viewMeta.get("name"));
-        result.put("modelCode", viewMeta.get("modelcode"));
-        result.put("viewType", viewMeta.get("viewtype"));
         Map<String, Object> cleanConfig = new HashMap<>(config);
         cleanConfig.remove("__share");
-        result.put("viewConfig", cleanConfig);
-        return result;
+        return new PublicSharedViewResponse(
+                String.class.cast(viewMeta.get("name")),
+                String.class.cast(viewMeta.get("modelcode")),
+                String.class.cast(viewMeta.get("viewtype")), cleanConfig);
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> parseRawJson(String rawJson) {
         if (rawJson == null || rawJson.isBlank()) return new HashMap<>();
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(rawJson, Map.class);
-        } catch (Exception e) {
-            log.warn("Failed to parse raw view_config JSON: {}", e.getMessage());
-            return new HashMap<>();
+            Map<String, Object> parsed = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                    rawJson, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            if (parsed == null) {
+                throw new IllegalStateException("Saved view configuration must be a JSON object");
+            }
+            return parsed;
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Saved view configuration is not valid JSON", e);
         }
     }
 
     private String serializeConfig(Map<String, Object> config) {
         try {
             return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(config);
-        } catch (Exception e) {
-            return "{}";
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Saved view configuration cannot be serialized", e);
         }
     }
 

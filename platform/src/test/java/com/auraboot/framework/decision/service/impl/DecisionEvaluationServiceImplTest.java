@@ -551,6 +551,13 @@ class DecisionEvaluationServiceImplTest {
                     .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
             when(dynamicData.getById("crm_customer", "rec-1")).thenReturn(Map.of(
                     "id", 1, "tenant_id", 42L, "level", "VIP"));
+            var fact = new com.auraboot.framework.decision.dto.DecisionFactDTO();
+            fact.setScope("record"); fact.setPath("data.level"); fact.setFactKey("record.data.level");
+            fact.setModelCode("crm_customer"); fact.setLabel("客户级别"); fact.setMasked(false);
+            var entity = new com.auraboot.framework.decision.dto.DecisionFactEntityDTO();
+            entity.setModelCode("crm_customer"); entity.setFacts(List.of(fact));
+            var catalogue = new com.auraboot.framework.decision.dto.DecisionFactCatalogDTO(); catalogue.setEntities(List.of(entity));
+            when(decisionModelFieldService.getFactCatalog("crm_customer")).thenReturn(catalogue);
 
             evaluateWith(metaRequest(Map.of("virtualSources", List.of(
                     Map.of("modelCode", "crm_customer", "recordId", "rec-1")))));

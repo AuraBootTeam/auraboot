@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * Resource Select Service
  *
@@ -10,6 +12,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { getKernel } from '~/framework/bootstrap';
 
 export interface ResourceOption {
+  readOnly?: boolean;
   label: string;
   value: string;
   description?: string;
@@ -64,16 +67,9 @@ interface FieldRecord {
   dataType: string;
   extension?: {
     displayName?: string;
+    readOnly?: boolean;
   };
   dictCode?: string;
-}
-
-interface DictItemRecord {
-  items: Array<{
-    value: string;
-    label: string;
-    description?: string;
-  }>;
 }
 
 export async function fetchPageOptions(): Promise<ResourceOption[]> {
@@ -95,11 +91,8 @@ export async function fetchDashboardOptions(): Promise<ResourceOption[]> {
 }
 
 export async function fetchWorkflowOptions(): Promise<ResourceOption[]> {
-  const provider = getKernel().contributionRegistry.getPrimaryService(
-    'aura.resource.workflow',
-  )?.provider as
-    | { fetchOptions?: () => Promise<ResourceOption[]> }
-    | undefined;
+  const provider = getKernel().contributionRegistry.getPrimaryService('aura.resource.workflow')
+    ?.provider as { fetchOptions?: () => Promise<ResourceOption[]> } | undefined;
   // Product packages own workflow discovery. An absent capability is empty;
   // errors from a registered provider must propagate to the caller.
   return provider?.fetchOptions ? provider.fetchOptions() : [];
@@ -114,15 +107,16 @@ export async function fetchAutomationOptions(): Promise<ResourceOption[]> {
   }));
 }
 
-export async function fetchCommandOptions(): Promise<ResourceOption[]> {
+export async function fetchCommandOptions(modelCode?: string): Promise<ResourceOption[]> {
   // GET /api/meta/commands (no modelCode) lists every current command as a bare
   // array in `data` — the execute-command picker has no model scope. The earlier
   // `?size=200` + `data.records` read was doubly wrong: the endpoint required a
   // `modelCode` param (→ 500) and returns a List, not a paginated `{records}`
   // envelope, so the picker surfaced zero options. (golden FINDING-9)
-  const result = await fetchResult<CommandItem[]>('/api/meta/commands');
+  const result = await fetchResult<CommandItem[]>(modelCode
+    ? `/api/meta/commands?modelCode=${encodeURIComponent(modelCode)}` : '/api/meta/commands');
   return (result?.data || []).map((c) => ({
-    label: `${c.displayName || c.code} (${c.code})`,
+    label: c.displayName || c.code,
     value: c.code,
     description: c.type,
   }));
@@ -151,12 +145,16 @@ export async function fetchFieldOptions(modelCode: string): Promise<ResourceOpti
     label: f.extension?.displayName || f.code,
     value: f.code,
     description: f.dataType,
+    ...(f.extension?.readOnly ? { readOnly: true } : {}),
     ...(f.dictCode ? { dictCode: f.dictCode } : {}),
   }));
 }
 
 /** Resolve the selected model field's dictionary; field codes are not dictionary codes. */
-export async function fetchFieldDictOptions(modelCode: string, fieldCode: string): Promise<ResourceOption[]> {
+export async function fetchFieldDictOptions(
+  modelCode: string,
+  fieldCode: string,
+): Promise<ResourceOption[]> {
   if (!modelCode || !fieldCode) return [];
   const fields = await fetchFieldOptions(modelCode);
   const dictCode = fields.find((field) => field.value === fieldCode)?.dictCode;
@@ -166,16 +164,15 @@ export async function fetchFieldDictOptions(modelCode: string, fieldCode: string
 
 export async function fetchDictOptions(dictCode: string): Promise<ResourceOption[]> {
   if (!dictCode) return [];
-  const result = await fetchResult<DictItemRecord>(
-    `/api/meta/dict/by-code/${encodeURIComponent(dictCode)}/data`,
-  );
-  if (result?.code != null && String(result.code) !== '0') {
+  const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+    path: { code: dictCode },
+  });
+  if (result.code !== '0' || !result.data)
     throw new Error('Dictionary options could not be loaded');
-  }
-  return (result?.data?.items || []).map((item) => ({
+  return dictionaryData(result.data).items.map((item) => ({
     label: item.label || item.value,
     value: item.value,
-    description: item.description,
+    description: item.description ?? undefined,
   }));
 }
 

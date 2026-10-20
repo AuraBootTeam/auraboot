@@ -825,85 +825,79 @@ public class DictServiceImpl implements DictService {
     public DictTreeNode buildCascadeTree(String rootPid) {
         log.info("构建级联字典树: rootPid={}", logSafe(rootPid));
 
-        try {
-            // 验证租户上下文
-              
+        Dict dict = findEntityByPid(rootPid);
+        if (!"cascade".equals(dict.getDictType()) && !"tree".equals(dict.getDictType())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Dictionary tree requires a tree or cascade dictionary");
+        }
 
-            Dict dict = findEntityByPid(rootPid);
-            if (!"cascade".equals(dict.getDictType()) && !"tree".equals(dict.getDictType())) {
-                log.warn("字典类型不是级联字典: {} (租户: {})", logSafe(rootPid), MetaContext.getCurrentTenantId());
-                return new DictTreeNode();
-            }
-            
-            // 获取所有字典项 - 使用Mapper方法
-            List<DictItem> allItems = dictItemMapper.selectByDictIdAndStatus(dict.getId(), "enabled");
-            
-            if (allItems.isEmpty()) {
-                return new DictTreeNode();
-            }
-            
-            // 构建节点映射
-            Map<String, DictTreeNode> nodeMap = new HashMap<>();
-            Map<String, List<DictTreeNode>> childrenMap = new HashMap<>();
-            
-            // 创建所有节点
-            for (DictItem item : allItems) {
-                DictTreeNode node = new DictTreeNode(item.getValue(), item.getLabel(), item.getParentValue());
-                node.setSortOrder(item.getSortNo());
-                node.setDisabled(!StatusConstants.ENABLED.equals(item.getStatus()));
-                // The item extra (which carries the localized "labels" map
-                // written at import/release time) must ride along so the
-                // controller can resolve the served label per request locale
-                // post cache — same contract as the by-code dict reads
-                // (DictLabelLocalizationHelper).
-                node.setExtension(item.getExtra());
-                nodeMap.put(item.getValue(), node);
-                
-                String parentKey = item.getParentValue() != null ? item.getParentValue() : "root";
-                childrenMap.computeIfAbsent(parentKey, k -> new ArrayList<>()).add(node);
-            }
-            
-            // 构建父子关系
-            for (DictItem item : allItems) {
-                DictTreeNode node = nodeMap.get(item.getValue());
-                List<DictTreeNode> children = childrenMap.get(item.getValue());
-                if (children != null) {
-                    for (DictTreeNode child : children) {
-                        node.addChild(child);
-                    }
-                }
-            }
-            
-            // 查找根节点
-            List<DictTreeNode> rootNodes = childrenMap.get("root");
-            if (rootNodes == null || rootNodes.isEmpty()) {
-                log.warn("没有找到根节点");
-                return new DictTreeNode();
-            }
-            
-            DictTreeNode root;
-            if (rootNodes.size() == 1) {
-                root = rootNodes.get(0);
-            } else {
-                // 创建虚拟根节点
-                root = new DictTreeNode("root", dict.getName());
-                for (DictTreeNode rootNode : rootNodes) {
-                    root.addChild(rootNode);
-                }
-            }
-            
-            // 排序所有节点的子节点
-            root.sortChildren();
+        // 获取所有字典项 - 使用Mapper方法
+        List<DictItem> allItems = dictItemMapper.selectByDictIdAndStatus(dict.getId(), "enabled");
 
-            log.info("级联字典树构建成功: rootPid={}, nodeCount={} (租户: {})",
-                    logSafe(rootPid), nodeMap.size(), MetaContext.getCurrentTenantId());
-            return root;
-            
-        } catch (Exception e) {
-            log.error("构建级联字典树失败: rootPid={}", logSafe(rootPid), e);
+        if (allItems.isEmpty()) {
             return new DictTreeNode();
         }
+
+        // 构建节点映射
+        Map<String, DictTreeNode> nodeMap = new HashMap<>();
+        Map<String, List<DictTreeNode>> childrenMap = new HashMap<>();
+
+        // 创建所有节点
+        for (DictItem item : allItems) {
+            DictTreeNode node = new DictTreeNode(item.getValue(), item.getLabel(), item.getParentValue());
+            node.setSortOrder(item.getSortNo());
+            node.setDisabled(!StatusConstants.ENABLED.equals(item.getStatus()));
+            // The item extra (which carries the localized "labels" map
+            // written at import/release time) must ride along so the
+            // controller can resolve the served label per request locale
+            // post cache — same contract as the by-code dict reads
+            // (DictLabelLocalizationHelper).
+            node.setExtension(item.getExtra());
+            nodeMap.put(item.getValue(), node);
+
+            String parentKey = item.getParentValue() != null ? item.getParentValue() : "root";
+            childrenMap.computeIfAbsent(parentKey, k -> new ArrayList<>()).add(node);
+        }
+
+        // 构建父子关系
+        for (DictItem item : allItems) {
+            DictTreeNode node = nodeMap.get(item.getValue());
+            List<DictTreeNode> children = childrenMap.get(item.getValue());
+            if (children != null) {
+                for (DictTreeNode child : children) {
+                    node.addChild(child);
+                }
+            }
+        }
+
+        // 查找根节点
+        List<DictTreeNode> rootNodes = childrenMap.get("root");
+        if (rootNodes == null || rootNodes.isEmpty()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Dictionary items do not contain a root node");
+        }
+
+        DictTreeNode root;
+        if (rootNodes.size() == 1) {
+            root = rootNodes.get(0);
+        } else {
+            // 创建虚拟根节点
+            root = new DictTreeNode("root", dict.getName());
+            for (DictTreeNode rootNode : rootNodes) {
+                root.addChild(rootNode);
+            }
+        }
+
+        // 排序所有节点的子节点
+        root.sortChildren();
+
+        log.info("级联字典树构建成功: rootPid={}, nodeCount={} (租户: {})",
+                logSafe(rootPid), nodeMap.size(), MetaContext.getCurrentTenantId());
+        return root;
+
     }
+
+
 
     // ==================== 字典数据加载 ====================
 

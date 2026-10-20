@@ -14,5 +14,8 @@ public interface IdentityDirectoryAccessor {
     /** Find a user by public pid or numeric id text. */
     UserIdentity findUser(String idOrPid);
 
+    /** Resolve a user only when they are an active member of the current tenant. */
+    UserIdentity findActiveTenantUser(Long tenantId, String idOrPid);
+
     record UserIdentity(Long id, String pid, String username, String displayName) {}
 }

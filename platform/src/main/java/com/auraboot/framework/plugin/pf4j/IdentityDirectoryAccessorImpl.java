@@ -86,6 +86,18 @@ public class IdentityDirectoryAccessorImpl implements IdentityDirectoryAccessor 
         return new UserIdentity(user.getId(), user.getPid(), user.getUserName(), displayName);
     }
 
+    @Override
+    public UserIdentity findActiveTenantUser(Long tenantId, String idOrPid) {
+        if (tenantId == null || !tenantId.equals(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId())) {
+            throw new IllegalStateException("Identity lookup requires the current tenant");
+        }
+        UserIdentity user = findUser(idOrPid);
+        if (user == null) return null;
+        TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, user.id());
+        return member != null && tenantId.equals(member.getTenantId()) && user.id().equals(member.getUserId())
+                && !Boolean.TRUE.equals(member.getDeletedFlag()) && "active".equalsIgnoreCase(member.getStatus()) ? user : null;
+    }
+
     private void addCodes(Set<String> target, List<Role> roles) {
         if (roles == null) return;
         roles.stream().map(Role::getCode).filter(code -> code != null && !code.isBlank()).forEach(target::add);

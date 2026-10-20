@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
+import com.auraboot.framework.user.dto.ActiveSessionResponse;
 
 @RestController
 @RequestMapping("/api/user/sessions")
@@ -26,16 +26,9 @@ public class SessionController {
 
     @GetMapping
     @Operation(summary = "Get active sessions")
-    public ApiResponse<List<Map<String, Object>>> getActiveSessions(@CurrentUserId Long userId) {
+    public ApiResponse<List<ActiveSessionResponse>> getActiveSessions(@CurrentUserId Long userId) {
         List<UserSession> sessions = sessionManagementService.getActiveSessions(userId);
-        List<Map<String, Object>> result = sessions.stream().map(s -> Map.<String, Object>of(
-                "pid", s.getPid(),
-                "deviceInfo", s.getDeviceInfo() != null ? s.getDeviceInfo() : "Unknown",
-                "ipAddress", s.getIpAddress() != null ? s.getIpAddress() : "Unknown",
-                "createdAt", s.getCreatedAt().toString(),
-                "lastActiveAt", s.getLastActiveAt().toString()
-        )).toList();
-        return ApiResponse.success(result);
+        return ApiResponse.success(sessions.stream().map(ActiveSessionResponse::from).toList());
     }
 
     @DeleteMapping("/{sessionPid}")

@@ -1,0 +1,1090 @@
+{
+  "schemaVersion": 1,
+  "scope": "Registered internal API offline guards and owned real-stack journeys; not complete domain migration or release qualification",
+  "completionRequires": [
+    "all-consumers-reconciled",
+    "all-domains-migrated",
+    "real-stack-evidence",
+    "release-gate-qualified"
+  ],
+  "profiles": {
+    "foundation": {
+      "purpose": "Offline contract and generated type checks only",
+      "unitFiles": [
+        "codegen.test.mjs",
+        "contract.test.mjs",
+        "discover.test.mjs",
+        "export.test.mjs",
+        "foundation.test.mjs",
+        "drift.test.mjs",
+        "response-shape.test.mjs",
+        "source-graph.test.mjs",
+        "browser-catalog.test.mjs",
+        "browser-evidence.test.mjs",
+        "browser-runner.test.mjs",
+        "type-origins.test.mjs"
+      ],
+      "generatedTypeProject": "scripts/internal-api/schema.tsconfig.json",
+      "unitTests": [
+        "generates deterministic required, enum and nullable types that reject invalid consumers",
+        "rejects unsupported query encodings including referenced parameters",
+        "normalizes only ordering and runtime origins without changing schema semantics",
+        "rejects empty, duplicate, dangling and missing-path-parameter contracts",
+        "does not normalize away field, required, enum, nullability, security or operation drift",
+        "explicit selection preserves recursive schemas and denies missing or repeated operations",
+        "external references fail closed instead of reading arbitrary remote contracts",
+        "resolves imported aliases, local constants, class base URLs and encoded templates",
+        "matches fixed routes preferentially and does not guess fixed paths from client variables",
+        "retains missing, external and indirect calls rather than silently excluding them",
+        "counts generated operations without mistaking request headers or request caches for HTTP calls",
+        "fails closed on unexpected endpoints, HTTP failures, invalid JSON and empty catalogs",
+        "requires a fresh receipt and never writes success when the live catalog drifts",
+        "foundation audit rejects empty missing repeated skipped failed and unexpected test evidence",
+        "foundation audit accepts each registered passing test exactly once",
+        "CLI entrypoints reject missing arguments when invoked through a symlink",
+        "captured drift compares semantic contracts and refuses receipt reuse",
+        "captured drift never creates success evidence for an empty or changed producer document",
+        "response shape validates nested references required fields nullability arrays and scalar types",
+        "response shape refuses undeclared operations statuses media and validates error response references",
+        "response shape detects stale nullable metadata without claiming format or business acceptance",
+        "generates binary multipart fields as Blob while preserving nullable parts",
+        "source graph follows router resources and workspace exports while retaining type-only candidates",
+        "source graph keeps missing imports dynamic modules and indirect route files unresolved",
+        "source graph respects package export boundaries and rejects ambiguous source identities",
+        "core release projection permits product additions but rejects core schema parameter and security drift",
+        "enumerates finite route branches and retains every missing external or unbounded alternative",
+        "retains aliased bound and injected network transports without marking shadowed generated calls migrated",
+        "keeps replaceable route defaults and mutable bases outside proven source links",
+        "browser catalog reconciles independent spec tests scenes and mandatory JSON evidence",
+        "browser catalog rejects missing empty skipped shadowed dynamic duplicated or unregistered evidence",
+        "browser evidence separates functional execution from exact original review and source runtime identity",
+        "browser evidence rejects stale failed skipped retried missing mismatched or unreviewed attempts",
+        "browser runner binds verified manifest addresses and rejects missing or conflicting runtime namespaces",
+        "network call identities survive unrelated layout and generated transport edits while ambiguous duplicates remain explicit",
+        "inventory binds clean source and tool input hashes and refuses dirty snapshots",
+        "type provenance follows real compiler aliases reexports nested declarations and standard library types without marking legacy calls migrated",
+        "type provenance refuses stale source call bindings dirty or mismatched inventory and preserves unknown type boundaries"
+      ],
+      "runner": "scripts/internal-api/foundation.mjs"
+    },
+    "dictionary": {
+      "purpose": "Dictionary JSON operation browser regression; not full migration acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-dictionary.spec.ts",
+      "tests": [
+        "generated dictionary operations preserve the UI journey",
+        "anonymous dictionary navigation and API access are refused",
+        "generated dictionary data supplies labels to the real DSL team list",
+        "dictionary batch feedback uses actual counts and an empty tree remains editable"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/meta/dict"
+        },
+        {
+          "method": "post",
+          "path": "/api/meta/dict"
+        },
+        {
+          "method": "delete",
+          "path": "/api/meta/dict/batch"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/by-code/{code}"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/by-code/{code}/data"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/code/{code}/unique"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/search"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/statistics"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}/validate"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{code}/versions"
+        },
+        {
+          "method": "delete",
+          "path": "/api/meta/dict/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}"
+        },
+        {
+          "method": "put",
+          "path": "/api/meta/dict/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}/cascade/children"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}/cascade/tree"
+        },
+        {
+          "method": "get",
+          "path": "/api/meta/dict/{pid}/data"
+        },
+        {
+          "method": "put",
+          "path": "/api/meta/dict/{pid}/items"
+        },
+        {
+          "method": "post",
+          "path": "/api/meta/dict/{pid}/publish"
+        },
+        {
+          "method": "post",
+          "path": "/api/meta/dict/{pid}/unpublish"
+        }
+      ]
+    },
+    "dictionaryWire": {
+      "purpose": "Real dictionary response structures and listed business invariants; API driver, not UI or full format acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-dictionary-wire.spec.ts",
+      "tests": [
+        "all registered dictionary operations satisfy their real JSON response structures"
+      ]
+    },
+    "profile": {
+      "purpose": "Owned username-only profile and avatar journey with existing password policy; not all authorization or tenant coverage",
+      "spec": "web-admin/tests/e2e/model/internal-api-profile.spec.ts",
+      "tests": [
+        "generated profile operations persist an owned avatar and no-email profile",
+        "anonymous profile access is refused",
+        "generated profile operations preserve an email-only account without a username"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/user/profile"
+        },
+        {
+          "method": "put",
+          "path": "/api/user/profile"
+        },
+        {
+          "method": "post",
+          "path": "/api/user/avatar/upload"
+        },
+        {
+          "method": "put",
+          "path": "/api/user/password"
+        }
+      ]
+    },
+    "savedViewWire": {
+      "purpose": "Real owned-account SavedView operation responses and listed persistence/negative invariants; API driver, not UI or complete tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/saved-view.spec.ts",
+      "tests": [
+        "generated SavedView operations preserve owned configuration and public sharing boundaries"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/views/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/accessible"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/personal"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/global"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/team"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/chip-pins"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{viewPid}/pin"
+        },
+        {
+          "method": "delete",
+          "path": "/api/views/{viewPid}/pin"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/my-teams"
+        },
+        {
+          "method": "post",
+          "path": "/api/tenant/members/search"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/default"
+        },
+        {
+          "method": "post",
+          "path": "/api/views"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/auto-save"
+        },
+        {
+          "method": "put",
+          "path": "/api/views/{pid}"
+        },
+        {
+          "method": "delete",
+          "path": "/api/views/{pid}"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{pid}/set-default"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{pid}/duplicate"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{pid}/copy-to-personal"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/{pid}/audit-events"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/capability-check"
+        },
+        {
+          "method": "post",
+          "path": "/api/views/{viewPid}/share"
+        },
+        {
+          "method": "delete",
+          "path": "/api/views/{viewPid}/share"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/{viewPid}/share/status"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/check-name"
+        },
+        {
+          "method": "get",
+          "path": "/api/views/shared/{shareToken}"
+        }
+      ]
+    },
+    "savedView": {
+      "purpose": "Owned global-view sharing through the real management panel and anonymous configuration/password/error UI; not all SavedView CRUD or tenant acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-saved-view.spec.ts",
+      "tests": [
+        "generated SavedView sharing preserves the owner and anonymous browser journeys"
+      ]
+    },
+    "sessionCompatibility": {
+      "purpose": "Real browser compatibility regression exposed by the internal API gate; not full auth or dashboard migration acceptance",
+      "spec": "web-admin/tests/e2e/dashboard/internal-api-session-compatibility.spec.ts",
+      "tests": [
+        "dashboard usage and account logout survive missing randomUUID"
+      ]
+    },
+    "teamsWire": {
+      "purpose": "Nine real team REST operations, nullable fields, owned membership transitions and anonymous refusal; not browser, role or tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/team.spec.ts",
+      "tests": [
+        "generated team operations preserve owned memberships and nullable response fields"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/org/teams"
+        },
+        {
+          "method": "post",
+          "path": "/api/org/teams"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/teams/{pid}"
+        },
+        {
+          "method": "put",
+          "path": "/api/org/teams/{pid}"
+        },
+        {
+          "method": "delete",
+          "path": "/api/org/teams/{pid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/teams/{teamPid}/members"
+        },
+        {
+          "method": "post",
+          "path": "/api/org/teams/{teamPid}/members"
+        },
+        {
+          "method": "delete",
+          "path": "/api/org/teams/{teamPid}/members/{memberPid}"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/teams/current-user"
+        }
+      ]
+    },
+    "teams": {
+      "purpose": "Owned team member UI journey through the registered DSL menu; not all organization or authorization coverage",
+      "spec": "web-admin/tests/e2e/model/internal-api-team.spec.ts",
+      "tests": [
+        "generated team memberships preserve the menu add reload and remove journey",
+        "team viewer reads the real menu while viewer and unassigned writes are forbidden"
+      ]
+    },
+    "dslRendererGate": {
+      "purpose": "Fixed static renderer gate fixtures; not API or UI behavior acceptance",
+      "unitFile": "scripts/check-dsl-render-types.test.mjs",
+      "unitTests": [
+        "reads actual registry calls instead of comments or string lookalikes",
+        "allows implemented status pills only on direct table columns",
+        "removing a real table renderer branch makes its page fail",
+        "unknown renderers still fail in table blocks and nested pages",
+        "comments strings and non-rendering conditions cannot declare table capabilities",
+        "empty and malformed page inputs fail without producing a green gate"
+      ]
+    },
+    "memberSearchWire": {
+      "purpose": "Tenant scoped member search structure, public identities and nullable email-only username; not cross-tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/tenant-member-search.spec.ts",
+      "tests": [
+        "generated tenant member search preserves scoped public identities and email-only null usernames"
+      ],
+      "operations": [
+        {
+          "method": "post",
+          "path": "/api/tenant/members/search"
+        }
+      ]
+    },
+    "sessionsWire": {
+      "purpose": "Own active session metadata and exact current/specific/all revocation; API-driven, not security page browser acceptance",
+      "spec": "web-admin/tests/api/internal-api/sessions.spec.ts",
+      "tests": [
+        "generated session operations revoke only owned sessions and preserve other users"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/user/sessions"
+        },
+        {
+          "method": "delete",
+          "path": "/api/user/sessions"
+        },
+        {
+          "method": "delete",
+          "path": "/api/user/sessions/current"
+        },
+        {
+          "method": "delete",
+          "path": "/api/user/sessions/{sessionPid}"
+        }
+      ]
+    },
+    "departmentTreeWire": {
+      "purpose": "Owned recursive department full/permitted tree read structures and nullable roots; not picker browser or cross-tenant acceptance",
+      "spec": "web-admin/tests/api/internal-api/department-tree.spec.ts",
+      "tests": [
+        "generated department tree reads preserve recursive public identities and nullable roots"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/org/departments/tree"
+        },
+        {
+          "method": "get",
+          "path": "/api/org/departments/permitted-tree"
+        }
+      ]
+    },
+    "roleMemberBrowser": {
+      "purpose": "Four role membership operations through the actual role menu with owned public-PID selection and persistence; not complete role, cross-tenant or time-window acceptance",
+      "spec": "web-admin/tests/e2e/model/internal-api-role-members.spec.ts",
+      "tests": [
+        "generated role memberships preserve public PID selection assignment reload and removal"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/roles/{rolePid}/members"
+        },
+        {
+          "method": "get",
+          "path": "/api/roles/{rolePid}/members/candidates"
+        },
+        {
+          "method": "post",
+          "path": "/api/roles/{rolePid}/members/assign"
+        },
+        {
+          "method": "post",
+          "path": "/api/roles/{rolePid}/members/remove"
+        }
+      ]
+    },
+    "capabilityBrowser": {
+      "purpose": "Three generated capability operations through the Roles menu with exact owned atomic-grant persistence; partial, read-only and cross-tenant branches remain pending",
+      "spec": "web-admin/tests/e2e/model/internal-api-capabilities.spec.ts",
+      "tests": [
+        "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants"
+      ],
+      "operations": [
+        {
+          "method": "get",
+          "path": "/api/permission/capabilities"
+        },
+        {
+          "method": "post",
+          "path": "/api/permission/capabilities/preview"
+        },
+        {
+          "method": "put",
+          "path": "/api/permission/capabilities"
+        }
+      ],
+      "capabilityFixture": {
+        "file": "plugins/org-management/config/capabilities.json",
+        "code": "org.cap.hr_view",
+        "includes": [
+          "model.org_department.read",
+          "model.org_employee.read",
+          "model.org_position.read",
+          "org.hr.read",
+          "org_management"
+        ]
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "DICT-01",
+      "feature": "dictionary",
+      "action": "menu-list",
+      "branch": "happy",
+      "expected": "The real dictionary menu displays controlled imported metadata and usable actions; CSR pagination uses pageNum/pageSize",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-01-menu-list.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-02",
+      "feature": "dictionary",
+      "action": "create-validation",
+      "branch": "sad",
+      "expected": "Missing required dictionary identity prevents a write and leaves the form usable",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-02-required-validation.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-03",
+      "feature": "dictionary",
+      "action": "create-detail",
+      "branch": "happy",
+      "expected": "UI create sends the declared payload, persists a new owned dictionary and opens its detail",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-03-created-detail.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-04",
+      "feature": "dictionary",
+      "action": "edit-reload",
+      "branch": "happy",
+      "expected": "UI edit sends only the intended changes and the new name survives reload",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-04-edited-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-05",
+      "feature": "dictionary",
+      "action": "search-empty",
+      "branch": "empty",
+      "expected": "A nonmatching native GET form filter passes through the SSR loader and displays a valid empty state",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-05-search-empty.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-06",
+      "feature": "dictionary",
+      "action": "anonymous-denial",
+      "branch": "permission",
+      "expected": "Anonymous dictionary navigation requires login and the API denies unauthenticated access",
+      "test": "anonymous dictionary navigation and API access are refused",
+      "screenshot": "DICT-06-anonymous-login.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-07",
+      "feature": "dictionary",
+      "action": "items-save-reload",
+      "branch": "happy",
+      "expected": "Generated array body preserves zero order and false disabled; saved item labels survive reload",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-07-items-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-08",
+      "feature": "dictionary",
+      "action": "publication-versions",
+      "branch": "happy",
+      "expected": "Unpublish and publish operations persist the state and version history stays readable",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-08-publication-versions.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-09",
+      "feature": "dictionary",
+      "action": "delete-confirm",
+      "branch": "confirmation",
+      "expected": "Deletion requires an explicit confirmation for the owned record and the API reports its persisted disabled status",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-09-delete-confirm.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-10",
+      "feature": "dictionary",
+      "action": "unpublish-republish",
+      "branch": "state-transition",
+      "expected": "Unpublish returns deprecated, displays the shared status badge and offers the producer-supported publish action",
+      "test": "generated dictionary operations preserve the UI journey",
+      "screenshot": "DICT-10-deprecated-republish.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-11",
+      "feature": "dictionary",
+      "action": "dsl-dictionary-label",
+      "branch": "happy",
+      "expected": "The actual organization menu displays a fresh owned team with the generated dictionary label and semantic color instead of its raw stored status code",
+      "test": "generated dictionary data supplies labels to the real DSL team list",
+      "screenshot": "DICT-11-dsl-team-label.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-12",
+      "feature": "dictionary",
+      "action": "batch-protected",
+      "branch": "sad",
+      "expected": "Published dictionary batch delete returns zero, reports no deletion, retains selection and persisted published state",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-12-batch-zero.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-13",
+      "feature": "dictionary",
+      "action": "batch-deprecated",
+      "branch": "happy",
+      "expected": "After UI unpublish batch delete reports exactly one, clears selection and persists disabled state",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-13-batch-one.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-14",
+      "feature": "dictionary",
+      "action": "empty-tree-detail",
+      "branch": "empty",
+      "expected": "An owned empty tree opens its item editor with a valid empty state and enabled root creation action",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-14-empty-tree.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "DICT-15",
+      "feature": "dictionary",
+      "action": "empty-tree-root-save-reload",
+      "branch": "state-transition",
+      "expected": "A real empty tree accepts a root through its item editor, sends the declared PUT payload and retains the root after reload and cascade API read",
+      "test": "dictionary batch feedback uses actual counts and an empty tree remains editable",
+      "screenshot": "DICT-15-tree-root-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-01",
+      "feature": "profile",
+      "action": "view-no-email",
+      "branch": "empty",
+      "expected": "A username-only owned account opens the real profile page with null email and a correctly converted fixture timestamp",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-01-view-no-email.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-02",
+      "feature": "profile",
+      "action": "edit-no-email",
+      "branch": "happy",
+      "expected": "The profile form allows no-email accounts and keeps credential fields read-only",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-02-edit-no-email.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-03",
+      "feature": "profile",
+      "action": "upload-avatar",
+      "branch": "state-transition",
+      "expected": "The browser sends a real multipart file and previews the returned file URL",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-03-upload-avatar.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-04",
+      "feature": "profile",
+      "action": "save-reload-avatar",
+      "branch": "state-transition",
+      "expected": "Saving submits imgId, and both avatar bytes and profile changes survive a full reload",
+      "test": "generated profile operations persist an owned avatar and no-email profile",
+      "screenshot": "PROFILE-04-save-reload-avatar.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-05",
+      "feature": "profile",
+      "action": "anonymous",
+      "branch": "permission",
+      "expected": "Anonymous profile navigation redirects to login and internal reads are refused",
+      "test": "anonymous profile access is refused",
+      "screenshot": "PROFILE-05-anonymous.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-01",
+      "feature": "savedView",
+      "action": "inactive",
+      "branch": "empty",
+      "expected": "Owner opens the actual team list from its menu and sees the owned view sharing scope before generating a link",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-01-inactive.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-02",
+      "feature": "savedView",
+      "action": "active",
+      "branch": "state-transition",
+      "expected": "Owner generates a public link through the panel and the returned link persists after reopening",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-02-active.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-03",
+      "feature": "savedView",
+      "action": "public-configuration",
+      "branch": "happy",
+      "expected": "Anonymous recipient sees the actual view name and settings counts without business records or a login redirect",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-03-public-configuration.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-04",
+      "feature": "savedView",
+      "action": "revoke-confirm",
+      "branch": "confirmation",
+      "expected": "Revocation confirmation is visible before the owner confirms it",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-04-revoke-confirm.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-05",
+      "feature": "savedView",
+      "action": "revoked",
+      "branch": "sad",
+      "expected": "The revoked public link shows unavailable and does not retain previous settings",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-05-revoked.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-06",
+      "feature": "savedView",
+      "action": "password-required",
+      "branch": "permission",
+      "expected": "Anonymous recipient must enter the password for an owned protected link",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-06-password-required.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-07",
+      "feature": "savedView",
+      "action": "password-invalid",
+      "branch": "sad",
+      "expected": "An incorrect password displays inline error and allows retry",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-07-password-invalid.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-08",
+      "feature": "savedView",
+      "action": "password-success",
+      "branch": "state-transition",
+      "expected": "The correct password opens configuration without business records",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-08-password-success.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SHARE-09",
+      "feature": "savedView",
+      "action": "expired",
+      "branch": "sad",
+      "expected": "An expired link shows the actual expiration error with a retry action",
+      "test": "generated SavedView sharing preserves the owner and anonymous browser journeys",
+      "screenshot": "SHARE-09-expired.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "PROFILE-06",
+      "test": "generated profile operations preserve an email-only account without a username",
+      "screenshot": "PROFILE-06-email-only-reload.png",
+      "expected": "Email-only identity retains null username, supports profile edit and reload, and never fabricates a username.",
+      "feature": "profile",
+      "action": "email-only-profile-edit",
+      "branch": "edge",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-01",
+      "feature": "sessionCompatibility",
+      "action": "reload-home",
+      "branch": "edge",
+      "expected": "The actual login landing page renders its dashboard with randomUUID absent and getRandomValues available",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-01-home.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-02",
+      "feature": "sessionCompatibility",
+      "action": "open-account-menu",
+      "branch": "edge",
+      "expected": "The real account menu opens on the working dashboard without a root error",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-02-account-menu.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-03",
+      "feature": "sessionCompatibility",
+      "action": "logout-confirmation",
+      "branch": "edge",
+      "expected": "The logout link reaches the confirmation page with an actionable submit button",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-03-logout-confirmation.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "SESSION-04",
+      "feature": "sessionCompatibility",
+      "action": "logged-out",
+      "branch": "edge",
+      "expected": "Browser confirmation logs out the owned session and subsequent identity access is HTTP401",
+      "test": "dashboard usage and account logout survive missing randomUUID",
+      "screenshot": "SESSION-04-logged-out.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-01",
+      "feature": "teams",
+      "action": "menu-detail-empty",
+      "branch": "happy",
+      "expected": "Real team menu and row member action open the persisted team with an empty members block",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-01-menu-detail-empty.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-02",
+      "feature": "teams",
+      "action": "select-owned-member",
+      "branch": "happy",
+      "expected": "The actual member dialog selects the owned actor by tenant-member PID",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-02-select-owned-member.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-03",
+      "feature": "teams",
+      "action": "add-reload",
+      "branch": "happy",
+      "expected": "Actual generated add operation persists a team membership and it remains visible after reload",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-03-add-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-04",
+      "feature": "teams",
+      "action": "remove-reload",
+      "branch": "happy",
+      "expected": "Actual remove operation targets the team-membership row PID and reload remains empty",
+      "test": "generated team memberships preserve the menu add reload and remove journey",
+      "screenshot": "TEAM-04-remove-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "TEAM-05",
+      "feature": "teams",
+      "action": "read-only-menu-refresh",
+      "branch": "sad",
+      "expected": "Viewer menu and refresh retain the persisted member without write controls; separate direct API probes refuse viewer/unassigned mutations",
+      "test": "team viewer reads the real menu while viewer and unassigned writes are forbidden",
+      "screenshot": "TEAM-05-read-only.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "ROLEMEM-01",
+      "feature": "role-members",
+      "action": "menu-empty",
+      "branch": "happy",
+      "expected": "An owned empty role shows the member entry through the actual Roles menu",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-01-menu-empty.png"
+    },
+    {
+      "id": "ROLEMEM-02",
+      "feature": "role-members",
+      "action": "candidate-selection",
+      "branch": "happy",
+      "expected": "Nullable enrichment remains blank and selection uses the public member PID",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-02-candidate-selection.png"
+    },
+    {
+      "id": "ROLEMEM-03",
+      "feature": "role-members",
+      "action": "assignment-reload",
+      "branch": "happy",
+      "expected": "The assigned member remains after reload with the same public identity",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-03-assignment-reload.png"
+    },
+    {
+      "id": "ROLEMEM-04",
+      "feature": "role-members",
+      "action": "removal-reload",
+      "branch": "happy",
+      "expected": "Removal submits the public member PID array and reload shows an empty role",
+      "test": "generated role memberships preserve public PID selection assignment reload and removal",
+      "screenshot": "ROLEMEM-04-removal-reload.png"
+    },
+    {
+      "id": "CAP-01",
+      "feature": "capabilities",
+      "action": "selection-draft",
+      "branch": "happy",
+      "expected": "Selecting the owned role capability opens a pending draft through the actual menu",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-01-selection-draft.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "CAP-02",
+      "feature": "capabilities",
+      "action": "grant-preview",
+      "branch": "happy",
+      "expected": "Preview shows the exact fixed capability grant before saving",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-02-grant-preview.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "CAP-03",
+      "feature": "capabilities",
+      "action": "grant-reload",
+      "branch": "happy",
+      "expected": "Reload retains the selected capability and the exact persisted atomic grant set",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-03-grant-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    },
+    {
+      "id": "CAP-04",
+      "feature": "capabilities",
+      "action": "revoke-reload",
+      "branch": "happy",
+      "expected": "Revoke saves a true empty selection array and reload retains zero owned grants",
+      "test": "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants",
+      "screenshot": "CAP-04-revoke-reload.png",
+      "surface": "journey",
+      "dependencies": "real-stack",
+      "authority": "regression",
+      "driver": "browser"
+    }
+  ]
+}

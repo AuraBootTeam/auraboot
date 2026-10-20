@@ -80,6 +80,7 @@ services:
       context: .
       dockerfile: platform/Dockerfile
       args:
+        AURA_GRADLE_REPOSITORY_POLICY: ${AURA_GRADLE_REPOSITORY_POLICY:-project}
         MAVEN_CENTRAL_FIRST: ${MAVEN_CENTRAL_FIRST:-false}
     container_name: auraboot-backend
     restart: unless-stopped

@@ -86,24 +86,31 @@ function leaveRequestRunContext(applicantPid?: string): TestSample['context'] {
 function defaultRecordSample(policy: EventPolicySummary | null): TestSample {
   const targetKey = policy?.targetKey || 'record';
   const recordPid = `TEST-${policy?.policyCode || targetKey}`;
-  return {
-    label: '默认样例',
-    context: {
-      event: {
-        type: policy?.eventType,
-      },
-      record: {
+  const context: TestSample['context'] = {
+    event: {
+      type: policy?.eventType,
+    },
+    record: {
+      entityCode: targetKey,
+      recordPid,
+      data: {
         entityCode: targetKey,
         recordPid,
-        data: {
-          entityCode: targetKey,
-          recordPid,
-          priority: 'HIGH',
-          amount: 9000,
-          status: 'OPEN',
-        },
+        priority: 'HIGH',
+        amount: 9000,
+        status: 'OPEN',
       },
     },
+  };
+  return {
+    label: '默认样例',
+    context,
+    // Each deliberate test run represents a new synthetic event. Reusing the
+    // preview identity would only replay a previous idempotent success.
+    executionContext: () => ({
+      ...context,
+      event: { type: policy?.eventType, eventId: `TEST-EVENT-${crypto.randomUUID()}` },
+    }),
   };
 }
 

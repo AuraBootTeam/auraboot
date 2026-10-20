@@ -135,7 +135,7 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(screen.getByTestId('strategy-workspace-tab-facts')).toHaveTextContent('事实目录');
     expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveTextContent('决策表');
     expect(screen.getByTestId('strategy-workspace-tab-review')).toHaveTextContent('片段与发布');
-    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('DMN 决策输出');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('判断逻辑与处理结果');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('请假审批 SLA 截止时间');
     expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('条件片段库');
     expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('暂无条件片段');
@@ -171,7 +171,7 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(screen.getByTestId('strategy-workspace-tab-facts')).toHaveTextContent('Fact catalog');
     expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveTextContent('Decision table');
     expect(screen.getByTestId('strategy-workspace-tab-review')).toHaveTextContent('Fragments & publish');
-    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('DMN decision output');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('Decision logic and outcomes');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('Leave approval SLA deadline');
     expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
       'Condition fragment library',

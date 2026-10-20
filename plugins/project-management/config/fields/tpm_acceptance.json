@@ -139,5 +139,29 @@
     "extension": {
       "renderComponent": "userselect"
     }
+  },
+  {
+    "code": "tpm_ac_registered",
+    "displayName:zh-CN": "已登记项目交付",
+    "displayName:en": "Registered project delivery",
+    "dataType": "boolean",
+    "defaultValue": false,
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tpm_ac_open_issues",
+    "displayName:zh-CN": "未解决问题数",
+    "displayName:en": "Unresolved issues",
+    "dataType": "integer",
+    "defaultValue": 0
+  },
+  {
+    "code": "tpm_ac_materials_complete",
+    "displayName:zh-CN": "材料内容已齐全",
+    "displayName:en": "Evidence content complete",
+    "dataType": "boolean",
+    "defaultValue": true
   }
 ]

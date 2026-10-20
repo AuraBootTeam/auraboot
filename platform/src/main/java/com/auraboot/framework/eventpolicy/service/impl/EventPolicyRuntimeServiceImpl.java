@@ -128,8 +128,14 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
                 rules
         );
 
-        // 5. Build DecisionContext from context map (mirroring DecisionEvaluationServiceImpl.buildContext)
-        DecisionContext ctx = buildContext(context);
+        // Server-owned policy identity must not be supplied by a browser/event payload.
+        Map<String, Map<String,Object>> resolvedContext = new java.util.LinkedHashMap<>();
+        if (context != null) resolvedContext.putAll(context);
+        resolvedContext.put("actor", serverActor());
+        Map<String,Object> metadata = new java.util.LinkedHashMap<>(resolvedContext.getOrDefault("meta", Map.of()));
+        metadata.put("policyCode", def.getPolicyCode());metadata.put("policyVersion", ver.getVersion());
+        resolvedContext.put("meta", metadata);
+        DecisionContext ctx = buildContext(resolvedContext);
 
         // 6. Evaluate
         String correlationId = "ep-" + UniqueIdGenerator.generate();
@@ -158,7 +164,10 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
         }
         Long tid = requireTenant();
         FailureStrategy fs = resolveFailureStrategy(tid, eventType, targetType, targetKey);
-        DecisionContext ctx = buildContext(context);
+        Map<String, Map<String,Object>> executionContext = new java.util.LinkedHashMap<>();
+        if (context != null) executionContext.putAll(context);
+        executionContext.put("actor", serverActor());
+        DecisionContext ctx = buildContext(executionContext);
         var exec = policyExecutor.execute(
                 result,
                 ctx,
@@ -180,6 +189,15 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
         return ver != null && ver.getFailureStrategy() != null
                 ? FailureStrategy.valueOf(ver.getFailureStrategy())
                 : FailureStrategy.CONTINUE_ON_ERROR;
+    }
+
+    /** Actor facts used for authorization/replay are always owned by the server. */
+    private static Map<String,Object> serverActor() {
+        Map<String,Object> actor = new java.util.LinkedHashMap<>();
+        if (MetaContext.getCurrentUserId() != null) actor.put("userId", MetaContext.getCurrentUserId());
+        if (MetaContext.getCurrentUserPid() != null) actor.put("userPid", MetaContext.getCurrentUserPid());
+        if (MetaContext.getCurrentUsername() != null) actor.put("username", MetaContext.getCurrentUsername());
+        return actor;
     }
 
     // ─── context building ────────────────────────────────────────────────────

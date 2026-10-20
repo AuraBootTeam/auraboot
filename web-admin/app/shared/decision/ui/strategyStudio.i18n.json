@@ -544,8 +544,8 @@
     "en": "Ready for the publish check"
   },
   "dmnOutputTitle": {
-    "zh-CN": "DMN 决策输出",
-    "en": "DMN decision output"
+    "zh-CN": "判断逻辑与处理结果",
+    "en": "Decision logic and outcomes"
   },
   "fragmentLibraryTitle": {
     "zh-CN": "条件片段库",
@@ -698,5 +698,25 @@
   "testTraceTitle": {
     "zh-CN": "执行标识",
     "en": "Execution reference"
+  },
+  "readOnlyNotice": {
+    "zh-CN": "只读查看：可查看判断逻辑与历史版本，修改和发布需相应权限。",
+    "en": "Read-only access. Editing and publishing require additional permissions."
+  },
+  "matchExplanation": {
+    "zh-CN": "为什么得到这个结果",
+    "en": "Why this result"
+  },
+  "matchedTableRow": {
+    "zh-CN": "命中第 {row} 条判断",
+    "en": "Matched decision row {row}"
+  },
+  "conditionAnd": {
+    "zh-CN": "，且 ",
+    "en": ", and "
+  },
+  "explanationUnavailable": {
+    "zh-CN": "本次结果未提供可核对的逐条命中依据，请查看专业诊断。",
+    "en": "No verifiable per-row explanation was returned. Inspect the diagnostics."
   }
 }

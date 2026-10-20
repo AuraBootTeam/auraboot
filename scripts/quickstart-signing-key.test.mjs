@@ -17,7 +17,7 @@ test('both deployment paths pass an operator key without a shared secret default
     assert.equal(backend.environment.SPRING_PROFILES_ACTIVE, 'community');
   }
   assert.equal(YAML.parse(read('docker-compose.prod.yml')).services.backend.environment.OPEN_PLATFORM_PROTOCOL_SIGNING_KEY,
-    '${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:?OPEN_PLATFORM_PROTOCOL_SIGNING_KEY is required for production deployments}');
+    '${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:?OPEN_PLATFORM_PROTOCOL_SIGNING_KEY is required for production deployments (openssl rand -hex 32)}');
 });
 
 test('quickstart CI creates a private fresh key before compose and never overwrites one', () => {

@@ -5,6 +5,8 @@ import type {
   EventPolicyDefinitionRequest,
   EventPolicySummary,
 } from '../api/decisionApi';
+import { useI18n } from '~/contexts/I18nContext';
+import { createEventPolicyPresentation } from './eventPolicyPresentation';
 import { useEventPolicyFormText } from './eventPolicyFormText';
 
 /**
@@ -14,6 +16,7 @@ import { useEventPolicyFormText } from './eventPolicyFormText';
  */
 
 export interface EventPolicyListPageProps {
+  readOnly?: boolean;
   api: DecisionApi;
   onOpenDesigner?: (policy: EventPolicySummary) => void;
   onOpenLogs?: (policy: EventPolicySummary) => void;
@@ -121,9 +124,12 @@ function statusTone(statusValue: unknown): string {
   return 'is-neutral';
 }
 
-export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPolicyListPageProps) {
+export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs, readOnly = false }: EventPolicyListPageProps) {
   const queryClient = useQueryClient();
   const { text } = useEventPolicyFormText();
+  const { locale } = useI18n();
+  const { copy, policyStatusLabel } = createEventPolicyPresentation(locale);
+  const eventText = (value: string) => value === 'ALL' ? copy('all_events') : value === 'COMMAND_COMPLETED' ? copy('business_operation_committed') : eventLabel(value);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<PolicyStatusFilter>('ALL');
   const [eventType, setEventType] = useState('ALL');
@@ -252,7 +258,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {s === 'ALL' ? copy('all_statuses') : policyStatusLabel(s)}
             </option>
           ))}
         </select>
@@ -263,7 +269,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
         >
           {eventTypes.map((e) => (
             <option key={e} value={e}>
-              {e}
+              {eventText(e)}
             </option>
           ))}
         </select>
@@ -273,6 +279,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
         <button
           className="decisionops-primary-button"
           type="button"
+          disabled={readOnly}
           data-testid="epl-new-policy"
           onClick={startCreate}
         >
@@ -346,11 +353,8 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
               <tr>
                 <th>策略</th>
                 <th>触发 / 对象</th>
-                <th>阶段</th>
-                <th>匹配模式</th>
                 <th>版本</th>
                 <th>状态</th>
-                <th>启用</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -358,28 +362,27 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
               {filtered.map((policy) => (
                 <tr key={policy.policyCode} data-testid={`epl-row-${policy.policyCode}`}>
                   <td>
-                    <strong>{display(policy.policyName ?? policy.policyCode)}</strong>
-                    <div className="decisionops-muted-cell">规则中心策略</div>
+                    <button type="button" className="text-left font-semibold text-blue-700" onClick={() => onOpenDesigner?.(policy)}>{display(policy.policyName ?? policy.policyCode)}</button>
+                    <details className="mt-2 text-xs text-slate-500"><summary>{copy('technical_identifiers')}</summary>
+                      <p>{phaseLabel(policy.phase)} · {matchModeLabel(policy.matchMode)}</p>
+                      <code>{policy.policyCode}</code><p>{policy.targetType} / {policy.targetKey}</p>
+                    </details>
                   </td>
                   <td>
-                    <span>{eventLabel(policy.eventType)}</span>
+                    <span>{eventText(policy.eventType ?? '')}</span>
                     <div className="decisionops-muted-cell">{targetLabel(policy)}</div>
                   </td>
-                  <td>{phaseLabel(policy.phase)}</td>
-                  <td>{matchModeLabel(policy.matchMode)}</td>
                   <td>{policy.version != null ? `v${policy.version}` : '-'}</td>
                   <td>
                     <span className={`decisionops-badge ${statusTone(policy.status)}`}>
-                      {display(policy.status)}
+                      {policyStatusLabel(policy.status)}
                     </span>
-                  </td>
-                  <td>
                     <button
                       className={`decisionops-switch-button ${policy.enabled !== false ? 'is-on' : ''}`}
                       type="button"
                       aria-pressed={policy.enabled !== false}
                       data-testid={`epl-toggle-enabled-${policy.policyCode}`}
-                      disabled={enabledMutation.isPending}
+                      disabled={readOnly || enabledMutation.isPending}
                       onClick={() =>
                         enabledMutation.mutate({
                           policyCode: policy.policyCode,
@@ -401,6 +404,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
                       </button>
                       <button
                         type="button"
+                        disabled={readOnly}
                         data-testid={`epl-copy-${policy.policyCode}`}
                         onClick={() => startCopy(policy)}
                       >

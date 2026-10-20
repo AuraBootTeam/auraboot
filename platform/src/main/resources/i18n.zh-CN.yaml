@@ -106,6 +106,13 @@ common:
   saved_view_scope_personal: 我的
   saved_view_scope_team: 团队
   saved_view_scope_global: 全员
+  saved_view_action_pin_chip: "钉为快捷筛选"
+  saved_view_action_unpin_chip: "取消快捷筛选"
+  saved_view_action_pin_team_chip: "为团队钉为快捷筛选"
+  saved_view_action_unpin_team_chip: "取消团队快捷筛选"
+  saved_view_action_share: "生成分享链接"
+  saved_view_public_share_group: "公开分享链接"
+  saved_view_public_share_subtitle: "管理个人视图与获授权的公开链接"
   saved_view_default: 默认
   saved_view_default_view: 默认视图
   saved_view_new: 新建视图
@@ -511,6 +518,7 @@ record_share:
   notification_permission_collaborate: 可协作
 
 member_picker:
+  member: 成员
   select: 选择成员…
   add: 添加
   search_placeholder: 搜索成员…
@@ -2871,7 +2879,92 @@ list_sample:
 "admin.permission.members.expiryDate": "到期日期"
 "admin.permission.members.colValidity": "有效期"
 "admin.permission.members.permanent": "长期有效"
+"admin.permission.members.unnamed": "成员"
+"admin.permission.members.loadFailed": "成员加载失败，请重试。"
+"admin.permission.members.manageHint": "管理此角色的成员与授权有效期。"
+"admin.permission.members.readOnlyHint": "查看成员与授权有效期；修改成员关系需要相应权限。"
+"admin.permission.tab.audit": "审计"
 "cloudConfig.save.readbackPending": "配置已保存，请重新读取后继续修改。"
 "cloudConfig.save.retryReadback": "重试读取"
 "admin.permission.editor.impactStateDetailsV2": "查看关联能力状态、菜单及动作明细"
 "admin.permission.editor.previewStateCountsV2": "关联能力保存后状态：完整授权 {full} 项 · 部分动作 {partial} 项 · 未授权 {none} 项"
+
+report:
+  generate: "报告"
+
+session_security:
+  title: "账号安全"
+  active: "活跃会话"
+  loading: "正在加载会话…"
+  empty: "暂无活跃会话。"
+  load_failed: "无法加载活跃会话。"
+  retry: "重试"
+  logout_all: "退出所有设备"
+  revoke: "撤销"
+  revoked: "会话已撤销"
+  revoke_failed: "无法撤销会话"
+  all_revoked: "所有会话已撤销，即将退出登录。"
+  revoke_all_failed: "无法撤销会话"
+  ip: "IP"
+  last_active: "最近活跃"
+  created: "创建时间"
+
+"permission.capability.ungrouped": "其他能力"
+
+"permission.module.系统管理": "系统管理"
+
+"permission.module.决策与事件策略管理": "决策与事件策略管理"
+
+"permission.module.报表定义管理": "报表定义管理"
+
+"permission.module.元数据与页面配置": "元数据与页面配置"
+
+"permission.module.页面配置治理": "页面配置治理"
+
+"permission.module.审计与留痕": "审计与留痕"
+
+"permission.module.报表与输出": "报表与输出"
+
+"permission.module.文件与附件": "文件与附件"
+
+"permission.module.AI运行与治理": "AI运行与治理"
+
+"permission.module.知识库": "知识库"
+
+"permission.module.自动化规则": "自动化规则"
+
+"permission.module.计费信息": "计费信息"
+
+"permission.module.公告与通知": "公告与通知"
+
+"permission.module.数据交换与设备": "数据交换与设备"
+
+"permission.module.元数据工具": "元数据工具"
+
+"permission.module.客服配置与接待": "客服配置与接待"
+
+"permission.module.业务裁定": "业务裁定"
+
+"permission.module.制造计划与指标": "制造计划与指标"
+
+"permission.module.二维码管理": "二维码管理"
+
+"permission.module.语义指标": "语义指标"
+
+"permission.module.业务参与方": "业务参与方"
+
+"permission.module.列表视图": "列表视图"
+
+"permission.module.主数据治理": "主数据治理"
+
+"permission.module.组织与权限管理": "组织与权限管理"
+
+"permission.module.组织管理": "组织管理"
+
+"permission.capability.preset.label": "预设"
+
+"permission.capability.preset.viewer": "查看者"
+
+"permission.capability.preset.editor": "编辑者"
+
+"permission.capability.preset.admin": "管理员"

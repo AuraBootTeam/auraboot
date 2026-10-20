@@ -54,11 +54,13 @@ const MENU_SECTION_ORDER: Record<string, number> = {
 export function menuSectionForCapability(capability: Capability): string | null {
   if (capability.conventionDerived) return null;
   // New declared business capabilities stay selectable without a frontend whitelist change.
-  return GROUP_TO_MENU_SECTION[capability.group] ?? capability.group;
+  return capability.group === null
+    ? null
+    : (GROUP_TO_MENU_SECTION[capability.group] ?? capability.group);
 }
 
 function isAdvancedCapability(capability: Capability): boolean {
-  return menuSectionForCapability(capability) === null;
+  return capability.conventionDerived;
 }
 
 function countGranted(groups: CapabilityGroup[]): number {
@@ -70,7 +72,7 @@ export function splitCapabilityGroupsForPrimaryView(
   groups: CapabilityGroup[],
 ): CapabilityPrimaryViewSplit {
   // Re-group primary capabilities by menu section (not by the backend's business-function group).
-  const bySection = new Map<string, Capability[]>();
+  const bySection = new Map<string | null, Capability[]>();
   const advancedGroups: CapabilityGroup[] = [];
 
   for (const group of groups) {
@@ -79,8 +81,8 @@ export function splitCapabilityGroupsForPrimaryView(
       advancedGroups.push({ ...group, capabilities: advancedCapabilities });
     }
     for (const capability of group.capabilities) {
+      if (isAdvancedCapability(capability)) continue;
       const section = menuSectionForCapability(capability);
-      if (section === null) continue;
       const bucket = bySection.get(section);
       if (bucket) bucket.push(capability);
       else bySection.set(section, [capability]);
@@ -104,8 +106,8 @@ export function splitCapabilityGroupsForPrimaryView(
   };
 }
 
-function menuSectionOrder(section: string): number {
-  return MENU_SECTION_ORDER[section] ?? 9999;
+function menuSectionOrder(section: string | null): number {
+  return section === null ? 9999 : (MENU_SECTION_ORDER[section] ?? 9999);
 }
 
 function sortCapabilityGroups(groups: CapabilityGroup[]): CapabilityGroup[] {

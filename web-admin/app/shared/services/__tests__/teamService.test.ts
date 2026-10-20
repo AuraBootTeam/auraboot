@@ -1,24 +1,7 @@
-/**
- * Unit tests for teamService
- * Validates URL construction, payload forwarding, and response handling.
- * teamService uses ResultHelper.isSuccess (code==='0') and result.desc.
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const { getMock, postMock, putMock, delMock } = vi.hoisted(() => ({
-  getMock: vi.fn(),
-  postMock: vi.fn(),
-  putMock: vi.fn(),
-  delMock: vi.fn(),
-}));
-
-vi.mock('~/shared/services/http-client', () => ({
-  get: getMock,
-  post: postMock,
-  put: putMock,
-  del: delMock,
-}));
-
+import type { InternalResponseData } from '../http-client/internal-api';
+const { call } = vi.hoisted(() => ({ call: vi.fn() }));
+vi.mock('~/shared/services/http-client/internal-api', () => ({ internalRequest: call }));
 import {
   fetchTeams,
   fetchTeam,
@@ -30,258 +13,164 @@ import {
   removeTeamMember,
   fetchCurrentUserTeams,
 } from '../teamService';
-
-function ok<T>(data: T) {
-  return { code: '0', desc: '', data };
-}
-
-function fail(desc = 'Server error') {
-  return { code: '1', desc, data: null };
-}
-
-const TEAM = {
-  pid: 't1',
+const team = {
+  pid: 'team-pid',
   code: 'SALES',
-  name: 'Sales Team',
+  name: 'Sales',
   description: null,
   leaderId: null,
   leaderName: null,
   status: 'active',
-  memberCount: 5,
-  createdAt: '2024-01-01',
-  updatedAt: '2024-01-01',
-};
-
-const MEMBER = {
-  pid: 'm1',
-  userId: '42',
-  userPid: 'u-pid-42',
-  memberPid: 'tm-pid-42',
+  memberCount: 1,
+  createdAt: '2026-10-18T00:00:00Z',
+  updatedAt: '2026-10-18T00:00:00Z',
+} satisfies InternalResponseData<'get', '/api/org/teams/{pid}'>;
+const member = {
+  pid: 'team-membership-pid',
+  userId: 42,
+  userPid: 'user-pid',
+  memberPid: 'tenant-member-pid',
   userName: 'Alice',
-  userEmail: 'alice@example.com',
+  userEmail: null,
   role: 'member',
-  joinedAt: '2024-01-01',
-};
-
-describe('teamService', () => {
-  beforeEach(() => {
-    getMock.mockReset();
-    postMock.mockReset();
-    putMock.mockReset();
-    delMock.mockReset();
+  joinedAt: '2026-10-18T00:00:00Z',
+} satisfies InternalResponseData<'post', '/api/org/teams/{teamPid}/members'>;
+const { userId: _legacyUserId, ...memberView } = member;
+const create = { code: 'SALES', name: 'Sales' },
+  update = { name: 'Updated' },
+  add = { memberPid: 'tenant-member-pid', role: 'member' };
+const cases = [
+  {
+    name: 'list',
+    method: 'get',
+    path: '/api/org/teams',
+    input: {},
+    data: [team],
+    expected: [team],
+    invoke: fetchTeams,
+  },
+  {
+    name: 'read',
+    method: 'get',
+    path: '/api/org/teams/{pid}',
+    input: { path: { pid: 'team-pid' } },
+    data: team,
+    expected: team,
+    invoke: (r?: Request) => fetchTeam('team-pid', r),
+  },
+  {
+    name: 'create',
+    method: 'post',
+    path: '/api/org/teams',
+    input: { body: create },
+    data: team,
+    expected: team,
+    invoke: (r?: Request) => createTeam(create, r),
+  },
+  {
+    name: 'update',
+    method: 'put',
+    path: '/api/org/teams/{pid}',
+    input: { path: { pid: 'team-pid' }, body: update },
+    data: team,
+    expected: team,
+    invoke: (r?: Request) => updateTeam('team-pid', update, r),
+  },
+  {
+    name: 'delete',
+    method: 'delete',
+    path: '/api/org/teams/{pid}',
+    input: { path: { pid: 'team-pid' } },
+    data: true,
+    expected: undefined,
+    invoke: (r?: Request) => deleteTeam('team-pid', r),
+  },
+  {
+    name: 'members',
+    method: 'get',
+    path: '/api/org/teams/{teamPid}/members',
+    input: { path: { teamPid: 'team-pid' } },
+    data: [member],
+    expected: [memberView],
+    invoke: (r?: Request) => fetchTeamMembers('team-pid', r),
+  },
+  {
+    name: 'add member',
+    method: 'post',
+    path: '/api/org/teams/{teamPid}/members',
+    input: { path: { teamPid: 'team-pid' }, body: add },
+    data: member,
+    expected: memberView,
+    invoke: (r?: Request) => addTeamMember('team-pid', add, r),
+  },
+  {
+    name: 'remove member',
+    method: 'delete',
+    path: '/api/org/teams/{teamPid}/members/{memberPid}',
+    input: { path: { teamPid: 'team-pid', memberPid: 'team-membership-pid' } },
+    data: true,
+    expected: undefined,
+    invoke: (r?: Request) => removeTeamMember('team-pid', 'team-membership-pid', r),
+  },
+  {
+    name: 'current-user teams',
+    method: 'get',
+    path: '/api/org/teams/current-user',
+    input: {},
+    data: [team],
+    expected: [{ id: 'team-pid', name: 'Sales' }],
+    invoke: fetchCurrentUserTeams,
+  },
+];
+describe('generated team operations', () => {
+  beforeEach(() => call.mockReset());
+  it.each(cases)('$name binds the operation and forwards the SSR request', async (row) => {
+    const request = new Request('http://bff.local/organization/teams');
+    call.mockResolvedValue({ code: '0', data: row.data });
+    expect(await row.invoke(request)).toEqual(row.expected);
+    expect(call).toHaveBeenCalledExactlyOnceWith(row.method, row.path, { ...row.input, request });
   });
-
-  // ── fetchTeams ───────────────────────────────────────────────────────────────
-
-  describe('fetchTeams', () => {
-    it('GETs /api/org/teams and returns array', async () => {
-      getMock.mockResolvedValue(ok([TEAM]));
-
-      const result = await fetchTeams();
-
-      expect(getMock).toHaveBeenCalledWith('/api/org/teams', undefined, undefined, undefined);
-      expect(result).toHaveLength(1);
-      expect(result[0].pid).toBe('t1');
-    });
-
-    it('throws when result code is not 0', async () => {
-      getMock.mockResolvedValue(fail('Forbidden'));
-
-      await expect(fetchTeams()).rejects.toThrow('Forbidden');
-    });
-
-    it('throws when data is null', async () => {
-      getMock.mockResolvedValue({ code: '0', desc: '', data: null });
-
-      await expect(fetchTeams()).rejects.toThrow('Failed to fetch teams');
-    });
+  it.each(cases)('$name preserves a rejected envelope', async (row) => {
+    call.mockResolvedValue({ code: '1', data: null, desc: 'Access denied' });
+    await expect(row.invoke()).rejects.toThrow('Access denied');
   });
-
-  // ── fetchTeam ────────────────────────────────────────────────────────────────
-
-  describe('fetchTeam', () => {
-    it('GETs /api/org/teams/:pid', async () => {
-      getMock.mockResolvedValue(ok(TEAM));
-
-      const result = await fetchTeam('t1');
-
-      expect(getMock).toHaveBeenCalledWith('/api/org/teams/t1', undefined, undefined, undefined);
-      expect(result.pid).toBe('t1');
+  it.each(cases.filter((row) => row.expected !== undefined))(
+    '$name refuses absent successful data',
+    async (row) => {
+      call.mockResolvedValue({ code: '0', data: null });
+      await expect(row.invoke()).rejects.toThrow(/Failed to/);
+    },
+  );
+  it('preserves nullable related identity without changing the membership PID', async () => {
+    call.mockResolvedValue({
+      code: '0',
+      data: { ...member, userPid: null, memberPid: null, userName: null, userEmail: null },
     });
-
-    it('throws on failure', async () => {
-      getMock.mockResolvedValue(fail('Not found'));
-
-      await expect(fetchTeam('t1')).rejects.toThrow('Not found');
-    });
-  });
-
-  // ── createTeam ───────────────────────────────────────────────────────────────
-
-  describe('createTeam', () => {
-    it('POSTs to /api/org/teams with team data', async () => {
-      postMock.mockResolvedValue(ok(TEAM));
-
-      const result = await createTeam({ code: 'SALES', name: 'Sales Team' });
-
-      expect(postMock).toHaveBeenCalledWith(
-        '/api/org/teams',
-        { code: 'SALES', name: 'Sales Team' },
-        undefined,
-        undefined,
-      );
-      expect(result.code).toBe('SALES');
-    });
-
-    it('throws on failure', async () => {
-      postMock.mockResolvedValue(fail('Code already exists'));
-
-      await expect(createTeam({ code: 'SALES', name: 'Sales Team' })).rejects.toThrow(
-        'Code already exists',
-      );
-    });
-  });
-
-  // ── updateTeam ───────────────────────────────────────────────────────────────
-
-  describe('updateTeam', () => {
-    it('PUTs to /api/org/teams/:pid', async () => {
-      const updated = { ...TEAM, name: 'New Name' };
-      putMock.mockResolvedValue(ok(updated));
-
-      const result = await updateTeam('t1', { name: 'New Name' });
-
-      expect(putMock).toHaveBeenCalledWith(
-        '/api/org/teams/t1',
-        { name: 'New Name' },
-        undefined,
-        undefined,
-      );
-      expect(result.name).toBe('New Name');
-    });
-
-    it('throws on failure', async () => {
-      putMock.mockResolvedValue(fail('Bad request'));
-
-      await expect(updateTeam('t1', {})).rejects.toThrow('Bad request');
-    });
-  });
-
-  // ── deleteTeam ───────────────────────────────────────────────────────────────
-
-  describe('deleteTeam', () => {
-    it('DELs /api/org/teams/:pid and resolves void', async () => {
-      delMock.mockResolvedValue(ok(true));
-
-      await expect(deleteTeam('t1')).resolves.toBeUndefined();
-      expect(delMock).toHaveBeenCalledWith('/api/org/teams/t1', undefined, undefined, undefined);
-    });
-
-    it('throws on failure', async () => {
-      delMock.mockResolvedValue(fail('Has members'));
-
-      await expect(deleteTeam('t1')).rejects.toThrow('Has members');
+    expect(await addTeamMember('team-pid', { userPid: 'user-pid' })).toEqual({
+      ...memberView,
+      userPid: null,
+      memberPid: null,
+      userName: null,
+      userEmail: null,
     });
   });
-
-  // ── fetchTeamMembers ──────────────────────────────────────────────────────────
-
-  describe('fetchTeamMembers', () => {
-    it('GETs /api/org/teams/:teamPid/members', async () => {
-      getMock.mockResolvedValue(ok([MEMBER]));
-
-      const result = await fetchTeamMembers('t1');
-
-      expect(getMock).toHaveBeenCalledWith(
-        '/api/org/teams/t1/members',
-        undefined,
-        undefined,
-        undefined,
-      );
-      expect(result).toHaveLength(1);
-      expect(result[0].userName).toBe('Alice');
+  it('discards legacy int64 identity without rounding it into a UI key', async () => {
+    call.mockResolvedValue({
+      code: '0',
+      data: [{ ...member, userId: Number.MAX_SAFE_INTEGER + 1 }],
     });
-
-    it('throws on failure', async () => {
-      getMock.mockResolvedValue(fail('Forbidden'));
-
-      await expect(fetchTeamMembers('t1')).rejects.toThrow('Forbidden');
-    });
+    expect(await fetchTeamMembers('team-pid')).toEqual([memberView]);
+    expect((await fetchTeamMembers('team-pid'))[0]).not.toHaveProperty('userId');
   });
-
-  // ── addTeamMember ─────────────────────────────────────────────────────────────
-
-  describe('addTeamMember', () => {
-    it('POSTs to /api/org/teams/:teamPid/members', async () => {
-      postMock.mockResolvedValue(ok(MEMBER));
-
-      const result = await addTeamMember('t1', { userId: '42', role: 'member' });
-
-      expect(postMock).toHaveBeenCalledWith(
-        '/api/org/teams/t1/members',
-        { userId: '42', role: 'member' },
-        undefined,
-        undefined,
-      );
-      expect(result.userId).toBe('42');
-    });
-
-    it('throws on failure', async () => {
-      postMock.mockResolvedValue(fail('Already member'));
-
-      await expect(addTeamMember('t1', { userId: '42' })).rejects.toThrow('Already member');
-    });
+  it.each(['', null])('refuses an absent public membership PID (%s)', async (pid) => {
+    call.mockResolvedValue({ code: '0', data: [{ ...member, pid }] });
+    await expect(fetchTeamMembers('team-pid')).rejects.toThrow('Invalid team membership identity');
   });
-
-  // ── removeTeamMember ──────────────────────────────────────────────────────────
-
-  describe('removeTeamMember', () => {
-    it('DELs /api/org/teams/:teamPid/members/:memberPid and resolves void', async () => {
-      delMock.mockResolvedValue(ok(true));
-
-      await expect(removeTeamMember('t1', 'm1')).resolves.toBeUndefined();
-      expect(delMock).toHaveBeenCalledWith(
-        '/api/org/teams/t1/members/m1',
-        undefined,
-        undefined,
-        undefined,
-      );
-    });
-
-    it('throws on failure', async () => {
-      delMock.mockResolvedValue(fail('Member not found'));
-
-      await expect(removeTeamMember('t1', 'x')).rejects.toThrow('Member not found');
-    });
-  });
-
-  // ── fetchCurrentUserTeams ─────────────────────────────────────────────────────
-
-  describe('fetchCurrentUserTeams', () => {
-    it('GETs /api/org/teams/current-user and maps to TeamOption', async () => {
-      getMock.mockResolvedValue(ok([TEAM]));
-
-      const result = await fetchCurrentUserTeams();
-
-      expect(getMock).toHaveBeenCalledWith(
-        '/api/org/teams/current-user',
-        undefined,
-        undefined,
-        undefined,
-      );
-      expect(result).toEqual([{ id: 't1', name: 'Sales Team' }]);
-    });
-
-    it('throws on failure', async () => {
-      getMock.mockResolvedValue(fail('Unauthorized'));
-
-      await expect(fetchCurrentUserTeams()).rejects.toThrow('Unauthorized');
-    });
-
-    it('throws when data is not array', async () => {
-      getMock.mockResolvedValue({ code: '0', desc: '', data: null });
-
-      await expect(fetchCurrentUserTeams()).rejects.toThrow('Failed to fetch current user teams');
-    });
+  it('rejects legacy numeric add-user input at the service boundary', async () => {
+    // @ts-expect-error UI callers must use public PIDs instead of an unsafe int64.
+    await expect(addTeamMember('team-pid', { userId: 42 })).rejects.toThrow(
+      'A public user or tenant-member PID is required',
+    );
+    expect(call).not.toHaveBeenCalled();
   });
 });

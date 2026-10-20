@@ -83,6 +83,9 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private com.auraboot.framework.tenant.service.TenantMemberService snapshotMembers;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     private JsonNode amountGtAst() throws Exception {
@@ -369,6 +372,57 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo("待审批");
         assertThat(factMetadata.path("record.data." + fieldCode).path("dictCode").asText())
                 .isEqualTo(dictCode);
+        JsonNode captured = logs.get(0).getTraceSnapshot().path("inputSnapshot").path("record.data." + fieldCode);
+        assertThat(captured.path("state").asText()).isEqualTo("VALUE");
+        assertThat(captured.path("value").asText()).isEqualTo("pending");
+        assertThat(captured.path("label").asText()).isEqualTo("审批状态");
+        String persisted = jdbcTemplate.queryForObject("select trace_snapshot::text from ab_drt_log where trace_id = ?", String.class, matched.traceId());
+        assertThat(new ObjectMapper().readTree(persisted).path("inputSnapshot").path("record.data." + fieldCode).path("value").asText()).isEqualTo("pending");
+    }
+
+    @Test
+    void evaluate_masksSensitiveInputsBeforePersistenceAndKeepsTheEngineOutcome() throws Exception {
+        String suffix=Long.toString(Math.abs(System.nanoTime()),36);
+        String model="trace_private_"+suffix, field="private_value_"+suffix, dict="trace_private_dict_"+suffix;
+        createStatusDict(dict); saveDictBackedModel(model,field,dict,true);
+        String code="trace_private_rule_"+suffix; createPublishedDecision(code,statusEqAst(field),"record.data."+field);
+        String secret="private-input-"+suffix;
+        var request=new DrtEvaluateRequest();request.setDecisionCode(code);request.setBinding(VersionBinding.LATEST);
+        request.setContext(Map.of("record",Map.of("modelCode",model,"data",Map.of(field,secret))));
+        var result=evaluationService.evaluate(request);
+        assertThat(result.status()).isEqualTo(DecisionStatus.NOT_MATCHED);
+        String persisted=jdbcTemplate.queryForObject("select trace_snapshot::text from ab_drt_log where trace_id = ?",String.class,result.traceId());
+        assertThat(persisted).doesNotContain(secret);
+        JsonNode captured=mapper.readTree(persisted).path("inputSnapshot").path("record.data."+field);
+        assertThat(captured.path("state").asText()).isEqualTo("REDACTED");
+        assertThat(captured.has("value")).isFalse();
+        var read=evaluationService.findLogsByTraceId(result.traceId());assertThat(read).hasSize(1);
+        assertThat(read.get(0).getTraceSnapshot().toString()).doesNotContain(secret);
+    }
+
+    @Test
+    void historicalInputsAreReauthorizedForARealMemberWithoutTheFieldRole() throws Exception {
+        String suffix=Long.toString(Math.abs(System.nanoTime()),36);
+        String model="trace_acl_"+suffix,field="restricted_"+suffix,dict="trace_acl_dict_"+suffix;
+        createStatusDict(dict);saveDictBackedModel(model,field,dict,false,true);
+        String code="trace_acl_rule_"+suffix;createPublishedDecision(code,statusEqAst(field),"record.data."+field);
+        var request=new DrtEvaluateRequest();request.setDecisionCode(code);request.setBinding(VersionBinding.LATEST);
+        request.setContext(Map.of("record",Map.of("modelCode",model,"data",Map.of(field,"pending"))));
+        var result=evaluationService.evaluate(request);
+        var ownerLog=evaluationService.findLogsByTraceId(result.traceId()).get(0);
+        assertThat(ownerLog.getTraceSnapshot().path("inputSnapshot").path("record.data."+field).path("value").asText()).isEqualTo("pending");
+        var viewer=userService.signUp("trace-viewer-"+suffix+"@example.test","Test-password-123");
+        var member=snapshotMembers.addMember(viewer.getId(),getTestTenant().getId(),"active");
+        var owner=MetaContext.snapshot();
+        try {
+            MetaContext.setContext(getTestTenant().getId(),viewer.getId(),viewer.getPid(),viewer.getUserName());
+            MetaContext.setMemberId(member.getId());
+            var read=evaluationService.findLogsByTraceId(result.traceId());assertThat(read).hasSize(1);
+            assertThat(read.get(0).getTraceSnapshot().path("inputSnapshot").has("record.data."+field)).isFalse();
+            assertThat(read.get(0).getTraceSnapshot().path("factMetadata").has(field)).isFalse();
+            assertThat(read.get(0).getTraceSnapshot().path("conditionSnapshot").toString()).doesNotContain("pending",field);
+            assertThat(evaluationService.findLogByPid(ownerLog.getPid()).getTraceSnapshot().path("inputSnapshot").has("record.data."+field)).isFalse();
+        } finally { MetaContext.restore(owner); }
     }
 
     @Test
@@ -825,6 +879,14 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     }
 
     private void saveDictBackedModel(String modelCode, String fieldCode, String dictCode) {
+        saveDictBackedModel(modelCode,fieldCode,dictCode,false);
+    }
+
+    private void saveDictBackedModel(String modelCode, String fieldCode, String dictCode, boolean masked) {
+        saveDictBackedModel(modelCode,fieldCode,dictCode,masked,false);
+    }
+
+    private void saveDictBackedModel(String modelCode, String fieldCode, String dictCode, boolean masked, boolean restricted) {
         MetaModelCreateRequest modelRequest = new MetaModelCreateRequest();
         modelRequest.setCode(modelCode);
         modelRequest.setDisplayName("Decision Trace Metadata " + modelCode);
@@ -838,7 +900,10 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
         fieldRequest.setCode(fieldCode);
         fieldRequest.setDataType("enum");
-        fieldRequest.setExtension(Map.of("displayName", "审批状态"));
+        var extension = new java.util.LinkedHashMap<String,Object>();
+        extension.put("displayName","审批状态");extension.put("masked",masked);
+        if (restricted) extension.put("fieldPermission",Map.of("view",List.of("test_user"),"edit",List.of("test_user")));
+        fieldRequest.setExtension(extension);
         fieldRequest.setAutoPublish(true);
 
         MetaFieldDTO field = metaFieldService.create(fieldRequest);

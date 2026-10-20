@@ -1,68 +1,117 @@
-import { get, put, post } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { ResultHelper, type Result } from '~/utils/type';
 import type { CapabilityGroup, CapabilitySelectionPreview } from './types';
 
-function unwrap<T>(
-  result: { code: string | number; desc?: string; data: T | null },
-  errorMsg: string,
-): T {
-  if (ResultHelper.isSuccess(result) && result.data !== null) {
-    return result.data;
+function unwrap<T>(result: Result<T>, message: string): T {
+  if (ResultHelper.isSuccess(result) && result.data != null) return result.data;
+  throw new Error(result.desc || message);
+}
+function record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function strings(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+function assertCapabilities(value: unknown): void {
+  if (!Array.isArray(value)) throw new Error('Invalid capability list');
+  const codes = new Set<string>();
+  for (const cap of value) {
+    if (
+      !record(cap) ||
+      typeof cap.code !== 'string' ||
+      !cap.code ||
+      codes.has(cap.code) ||
+      typeof cap.label !== 'string' ||
+      !(cap.group === null || typeof cap.group === 'string') ||
+      typeof cap.granted !== 'boolean' ||
+      typeof cap.sensitive !== 'boolean' ||
+      typeof cap.conventionDerived !== 'boolean' ||
+      !strings(cap.includes) ||
+      !strings(cap.missingCodes) ||
+      !['none', 'partial', 'full'].includes(String(cap.authorizationState)) ||
+      typeof cap.displayOrder !== 'number' ||
+      typeof cap.displayGroupOrder !== 'number'
+    )
+      throw new Error('Invalid capability response');
+    for (const field of ['description', 'tier'])
+      if (!(cap[field] === null || typeof cap[field] === 'string'))
+        throw new Error(`Invalid capability ${field}`);
+    for (const field of ['localizedLabels', 'localizedDescriptions']) {
+      const labels = cap[field];
+      if (!record(labels) || Object.values(labels).some((label) => typeof label !== 'string'))
+        throw new Error(`Invalid capability ${field}`);
+    }
+    if (!(cap.unlockedMenus === null || strings(cap.unlockedMenus)))
+      throw new Error('Invalid capability menus');
+    codes.add(cap.code);
   }
-  throw new Error(result.desc || errorMsg);
+}
+function groups(value: CapabilityGroup[]): CapabilityGroup[] {
+  if (!Array.isArray(value)) throw new Error('Invalid capability groups');
+  for (const group of value) {
+    if (!record(group) || !(group.group === null || typeof group.group === 'string'))
+      throw new Error('Invalid capability group');
+    assertCapabilities(group.capabilities);
+  }
+  return value;
+}
+function query(rolePid: string, revokePartial: string[] = []) {
+  if (typeof rolePid !== 'string' || !rolePid) throw new Error('A public role PID is required');
+  return { rolePid, revokePartial };
 }
 
-/**
- * Client for the permission v2 capability endpoints. Keyed on the role PID (string) — role ids are
- * snowflakes beyond JS safe-integer range, so a numeric id would round-trip lossily and resolve to
- * the wrong role. For applySelection the selected capability codes are the request body (http-client
- * passes the 2nd arg as the body for PUT).
- */
+/** PID queries and repeated revocations retain the shared SSR/session transport. */
 export class CapabilityService {
-  private baseUrl = '/api/permission/capabilities';
-
-  private selectionQuery(rolePid: string, revokePartial: string[]): string {
-    const params = new URLSearchParams({ rolePid });
-    revokePartial.forEach((code) => params.append('revokePartial', code));
-    return params.toString();
-  }
-
   async getForRole(rolePid: string, request?: Request): Promise<CapabilityGroup[]> {
-    const result = await get<CapabilityGroup[]>(
-      `${this.baseUrl}?rolePid=${encodeURIComponent(rolePid)}`,
-      undefined,
-      undefined,
-      request,
+    return groups(
+      unwrap(
+        await internalRequest('get', '/api/permission/capabilities', {
+          query: query(rolePid),
+          request,
+        }),
+        'Failed to fetch capabilities',
+      ),
     );
-    return unwrap(result, 'Failed to fetch capabilities');
   }
-
   async previewSelection(
     rolePid: string,
     selectedCapabilityCodes: string[],
     revokePartial: string[] = [],
   ): Promise<CapabilitySelectionPreview> {
-    const result = await post<CapabilitySelectionPreview>(
-      `${this.baseUrl}/preview?${this.selectionQuery(rolePid, revokePartial)}`,
-      selectedCapabilityCodes,
+    const plan = unwrap(
+      await internalRequest('post', '/api/permission/capabilities/preview', {
+        query: query(rolePid, revokePartial),
+        body: selectedCapabilityCodes,
+      }),
+      'Failed to preview permission changes',
     );
-    return unwrap(result, 'Failed to preview permission changes');
+    if (
+      !record(plan) ||
+      !strings(plan.grantedCodes) ||
+      !strings(plan.revokedCodes) ||
+      !strings(plan.preservedCodes) ||
+      !strings(plan.relatedMenus)
+    )
+      throw new Error('Invalid capability preview');
+    assertCapabilities(plan.resultingCapabilities);
+    return plan;
   }
-
   async applySelection(
     rolePid: string,
     selectedCapabilityCodes: string[],
     request?: Request,
     revokePartial: string[] = [],
   ): Promise<CapabilityGroup[]> {
-    const result = await put<CapabilityGroup[]>(
-      `${this.baseUrl}?${this.selectionQuery(rolePid, revokePartial)}`,
-      selectedCapabilityCodes,
-      undefined,
-      request,
+    return groups(
+      unwrap(
+        await internalRequest('put', '/api/permission/capabilities', {
+          query: query(rolePid, revokePartial),
+          body: selectedCapabilityCodes,
+          request,
+        }),
+        'Failed to apply capability selection',
+      ),
     );
-    return unwrap(result, 'Failed to apply capability selection');
   }
 }
-
 export const capabilityService = new CapabilityService();

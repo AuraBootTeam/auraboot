@@ -129,6 +129,16 @@ describe('ViewSelector', () => {
     expect(trigger).toHaveTextContent('我的表格');
   });
 
+  it.each([
+    ['team', '团队'],
+    ['global', '全员'],
+  ] as const)('labels an unlocked %s view by its actual scope rather than as a plugin preset', (scope, label) => {
+    const view = makeView({ scope, viewConfig: {}, actions: ['view', 'manage', 'share'] });
+    renderSelector({ views: [view], currentView: view });
+    expect(screen.getByTestId('view-selector-scope-label')).toHaveTextContent(label);
+    expect(screen.queryByLabelText('预置')).not.toBeInTheDocument();
+  });
+
   it('marks locked plugin presets in the trigger and dropdown', () => {
     const pluginView = makeView({
       pid: 'plugin-view',

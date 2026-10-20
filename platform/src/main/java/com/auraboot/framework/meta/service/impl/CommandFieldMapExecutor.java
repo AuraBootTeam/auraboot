@@ -23,7 +23,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.util.StringUtils;
 
 import com.auraboot.framework.common.util.JsonUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -835,9 +834,12 @@ public class CommandFieldMapExecutor {
                     Object rawValue = existingRow.get(hostCol);
                     if (rawValue instanceof String jsonStr && !jsonStr.isBlank()) {
                         try {
-                            Map<String, Object> parsed = JsonUtil.parse(jsonStr,
-                                    new TypeReference<Map<String, Object>>() {});
-                            data.put(hostCol, parsed);
+                            Object parsed = JsonUtil.parse(jsonStr, Object.class);
+                            // Only object hosts need key merging. Standalone array/scalar
+                            // columns (for example attachments) must remain untouched.
+                            if (parsed instanceof Map) {
+                                data.put(hostCol, parsed);
+                            }
                         } catch (Exception e) {
                             log.debug("Failed to parse existing JSONB column {}: {}", hostCol, e.getMessage());
                         }

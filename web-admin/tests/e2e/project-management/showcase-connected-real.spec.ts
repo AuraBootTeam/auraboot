@@ -1,3 +1,4 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { requireRuntimeUrl } from '../../helpers/environments';
 /** Owner-reviewed showcase. API fixture/maintenance steps are recorded separately from UI actions. */
 import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
@@ -20,27 +21,10 @@ async function data(response: APIResponse | Response) {
   expect(String(body.code)).toBe('0');
   return body.data;
 }
-async function login(page: Page, email = process.env.ADMIN_EMAIL!) {
-  await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(email);
-  await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
-  await page.getByRole('button', { name: '立即登录', exact: true }).click();
-  await page.waitForURL((u) => !u.pathname.includes('/login'));
-  const tenant = process.env.AURA_ADMIN_TENANT_ID!;
-  if (new URL(page.url()).pathname === '/tenant-selection')
-    await page.getByTestId(`space-business-${tenant}`).click();
-  let identity = await data(await page.request.get('/api/auth/me'));
-  if (String(identity.user.tenantId) !== tenant) {
-    await page.getByTestId('user-menu').getByRole('button').first().click();
-    await page.getByTestId(`tenant-switch-${tenant}`).click();
-    await page.waitForLoadState('load');
-    identity = await data(await page.request.get('/api/auth/me'));
-  }
-  expect(String(identity.user.tenantId)).toBe(tenant);
-  expect(identity.user.email).toBe(email);
-  return identity;
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
+  return loginDeliveryMember(page, email, tenant);
 }
+
 async function menu(page: Page, name: string) {
   await navigateToMenuByClick(page, [name]);
 }
@@ -67,7 +51,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
   const project = projects.find((p: any) => p.tpm_pj_name === '华辰制造 · 供应链协同平台');
   expect(project).toBeTruthy();
   const suffix = randomUUID().replaceAll('-', '').slice(0, 10),
-    taskName = `华辰制造 · 交付归档恢复 ${suffix}`;
+    taskName = '华辰制造 · 交付材料归档';
   const original = '验收材料已整理，等待交付归档。',
     recovered = '验收材料已核对，交付归档完成。';
   const created = await data(
@@ -148,7 +132,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
   const automation = await data(
     await page.request.post('/api/automations', {
       data: {
-        name: '华辰制造 · 交付归档与故障恢复 ' + suffix,
+        name: '华辰制造 · 交付归档与恢复',
         description: '仅更新专属交付任务的归档说明。权限不足时保留失败，修正后通过设计器再次执行。',
         modelCode: 'tpm_task',
         triggerType: 'webhook',
@@ -225,6 +209,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
         return (
           !!bounds &&
           nodes.length === 2 &&
+          (nodes[0].right + 16 <= nodes[1].x || nodes[1].right + 16 <= nodes[0].x) &&
           nodes.every(
             (node) =>
               node.x >= bounds.x &&

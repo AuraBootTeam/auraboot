@@ -138,6 +138,7 @@ def run_static_probe(request, admin):
 
 
 def main():
+    internal_document = os.environ["INTERNAL_API_DOCUMENT"]
     # Preserve the original qualification budget; new independent journeys own bounded budgets.
     clients = {"baseline": Client(BASE, max_requests=1000, allow_expected_rate_limit=True),
                "integrationTokens": Client(BASE, max_requests=64),
@@ -151,6 +152,7 @@ def main():
     try:
         request = clients["baseline"].request
         admin = bootstrap_module.bootstrap_admin(request)
+        bootstrap_module.capture_internal_document(request, admin, internal_document)
         bootstrap_module.provision_replay_actor_commands(request, admin)
         static = run_static_probe(request, admin)
         integration_tokens = run_integration_token_probe(clients["integrationTokens"].request, admin)

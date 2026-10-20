@@ -1038,6 +1038,119 @@ common:
   modified_this_week: Modified This Week
   preset_views: Preset Views
   view_saved: Saved to current view
+  saved_view_select: "Select view"
+  saved_view_personal_group: "Personal views"
+  saved_view_team_group: "Team views"
+  saved_view_global_group: "Everyone views"
+  saved_view_new: "New view"
+  saved_view_new_personal: "New personal view"
+  saved_view_manage: "Manage views"
+  saved_view_empty: "No saved views"
+  saved_view_empty_hint: "Create a personal view to save settings that affect only you."
+  saved_view_search_placeholder: "Search my views…"
+  saved_view_manage_search_placeholder: "Search my views…"
+  saved_view_manage_no_results: "No matching personal views"
+  saved_view_auto_name: "{type} view"
+  saved_view_copy_name: "{name} copy"
+  saved_view_untitled: "Untitled view"
+  saved_view_locked_preset: "Preset"
+  saved_view_capability_blocked: "Configuration required"
+  saved_view_panel_subtitle: "Manage personal views for this list"
+  saved_view_personal_draft: "This personal view has local changes"
+  saved_view_save_current: "Save to current view"
+  saved_view_save_as_personal: "Save as a new view"
+  saved_view_current_saved: "Current view saved"
+  saved_view_save_filters: "Save filters to current view"
+  saved_view_personal_quota: "Personal views: {count}/{limit}"
+  saved_view_personal_quota_reached: "You have reached the limit of 10 personal views. Delete or reuse an existing view."
+  saved_view_choose_type: "Choose view type"
+  saved_view_cancel: "Cancel"
+  saved_view_create_cancel: "Cancel"
+  saved_view_create_saving: "Saving…"
+  saved_view_create_save: "Save view"
+  saved_view_create_not_saveable: "This view type cannot be saved"
+  saved_view_config_title: "Configure {type} view"
+  saved_view_config_help: "Choose field mappings and save a personal view. Only your settings will change."
+  saved_view_select_field: "Select field"
+  saved_view_type_table: "Table"
+  saved_view_type_kanban: "Kanban"
+  saved_view_type_calendar: "Calendar"
+  saved_view_type_gallery: "Gallery"
+  saved_view_type_gantt: "Gantt"
+  saved_view_type_tree: "Tree"
+  saved_view_type_timeline: "Timeline"
+  saved_view_type_form: "Form"
+  saved_view_type_status_available: "Available"
+  saved_view_type_status_degraded: "Needs attention"
+  saved_view_type_status_blocked: "Not supported"
+  saved_view_field_groupByField: "Grouping field"
+  saved_view_field_titleField: "Title field"
+  saved_view_field_calendarDateField: "Date field"
+  saved_view_field_calendarTitleField: "Title field"
+  saved_view_field_ganttStartDateField: "Start date"
+  saved_view_field_ganttEndDateField: "End date"
+  saved_view_field_ganttTitleField: "Title field"
+  saved_view_field_galleryImageField: "Image field"
+  saved_view_field_galleryTitleField: "Title field"
+  saved_view_field_treeParentField: "Parent field"
+  saved_view_field_treeTitleField: "Title field"
+  saved_view_field_timelineStartField: "Start time"
+  saved_view_field_timelineEndField: "End time"
+  saved_view_field_timelineResourceField: "Resource field"
+  saved_view_field_timelineTitleField: "Title field"
+  saved_view_reason_missing_kanban_group_field: "A status, enum or category field is required to group the Kanban board."
+  saved_view_reason_missing_title_field: "A name or title field is required for card titles."
+  saved_view_reason_missing_date_field: "A date field is required to display this view."
+  saved_view_reason_missing_image_field: "An image, attachment or avatar field is required for a gallery view."
+  saved_view_reason_missing_tree_parent_field: "A parent, path or level field is required to build a tree."
+  saved_view_reason_missing_timeline_resource_field: "A resource field is required to group the timeline."
+  saved_view_reason_kanban_drag_command_missing: "Kanban dragging is disabled because no status update command is configured."
+  saved_view_reason_tree_reorder_command_missing: "Tree reordering is disabled because no node sorting command is configured."
+  saved_view_reason_single_date_field_reused: "The only date field will be used for both start and end time."
+  saved_view_action_edit: "Rename view"
+  saved_view_action_copy: "Copy view"
+  saved_view_action_delete: "Delete view"
+  saved_view_edit_name: "View name"
+  saved_view_edit_description: "Description"
+  saved_view_edit_description_placeholder: "Describe when to use this personal view"
+  saved_view_edit_save: "Save"
+  saved_view_duplicate_title: "Copy as a personal view"
+  saved_view_duplicate_name: "New view name"
+  saved_view_duplicate_submit: "Create copy"
+  saved_view_delete_confirm: "Delete “{name}”?"
+  saved_view_not_configured: "View is not configured"
+  saved_view_configure: "Configure"
+  saved_view_switch_to_table: "Switch to table"
+  saved_view_switch_to_table_full: "Switch to table to see complete pagination."
+  saved_view_error: "Something went wrong"
+  saved_view_diagnostics_summary: "The view loaded, but some records cannot be displayed."
+  saved_view_current_mapping: "Current field mapping:"
+  saved_view_total_records: "Total records"
+  saved_view_valid_records: "Displayable records"
+  saved_view_issue_records: "Records with issues"
+  saved_view_first_n: "First {count}"
+  saved_view_data_limit_summary: "Showing {fetchedCount}/{totalCount} records."
+  saved_view_shared_draft: "This shared view has local changes"
+  saved_view_save_shared: "Save to shared view"
+  saved_view_save_shared_disabled_reason: "You can adjust this view, but cannot save it for your team or everyone."
+  saved_view_locked_preset_reason: "Plugin presets cannot be changed directly. Copy the preset to a personal view first."
+  saved_view_save_shared_confirm_title: "Save to shared view?"
+  saved_view_save_shared_confirm_content: "This updates the shared view visible to {target}. Changes: {changes}."
+  saved_view_shared_changes: "View settings"
+  saved_view_shared_saved: "Shared view updated"
+  saved_view_shared_save_failed: "Failed to save shared view"
+  saved_view_copy_to_personal: "Copy to my views"
+  saved_view_dismiss_draft: "Discard changes"
+  saved_view_copied_to_personal: "Copied to personal views"
+  saved_view_copy_failed: "Failed to copy view"
+  saved_view_copy_disabled_reason: "Copying is not allowed for this view"
+  saved_view_action_pin_chip: "Pin as quick filter"
+  saved_view_action_unpin_chip: "Unpin quick filter"
+  saved_view_action_pin_team_chip: "Pin as team quick filter"
+  saved_view_action_unpin_team_chip: "Unpin team quick filter"
+  saved_view_action_share: "Generate share link"
+  saved_view_public_share_group: "Public share links"
+  saved_view_public_share_subtitle: "Manage personal views and authorized public links"
   saved_view_default: Default
   saved_view_default_view: Default View
   saved_view_action_set_default: Set as default
@@ -1136,6 +1249,7 @@ record_share:
   notification_permission_collaborate: collaboration
 
 member_picker:
+  member: Member
   select: Select member…
   add: Add
   search_placeholder: Search members…
@@ -2574,7 +2688,92 @@ list_sample:
 "admin.permission.members.expiryDate": "Expiry date"
 "admin.permission.members.colValidity": "Validity"
 "admin.permission.members.permanent": "Permanent"
+"admin.permission.members.unnamed": "Member"
+"admin.permission.members.loadFailed": "Members could not be loaded. Please retry."
+"admin.permission.members.manageHint": "Manage membership and access periods for this role."
+"admin.permission.members.readOnlyHint": "View members and access periods. Membership changes require permission."
+"admin.permission.tab.audit": "Audit"
 "cloudConfig.save.readbackPending": "Configuration saved. Reload it before making further changes."
 "cloudConfig.save.retryReadback": "Retry loading"
 "admin.permission.editor.impactStateDetailsV2": "Review related capability states, menus and action details"
 "admin.permission.editor.previewStateCountsV2": "Related capabilities after saving: {full} fully granted · {partial} with partial actions · {none} not granted"
+
+report:
+  generate: "Report"
+
+session_security:
+  title: "Security Settings"
+  active: "Active Sessions"
+  loading: "Loading sessions…"
+  empty: "No active sessions found."
+  load_failed: "Unable to load active sessions."
+  retry: "Try again"
+  logout_all: "Logout All Devices"
+  revoke: "Revoke"
+  revoked: "Session revoked"
+  revoke_failed: "Failed to revoke session"
+  all_revoked: "All sessions revoked. You will be logged out."
+  revoke_all_failed: "Failed to revoke sessions"
+  ip: "IP"
+  last_active: "Last active"
+  created: "Created"
+
+"permission.capability.ungrouped": "Other capabilities"
+
+"permission.module.系统管理": "System Management"
+
+"permission.module.决策与事件策略管理": "Decisions & Event Policies"
+
+"permission.module.报表定义管理": "Report Definitions"
+
+"permission.module.元数据与页面配置": "Metadata & Pages"
+
+"permission.module.页面配置治理": "Page Governance"
+
+"permission.module.审计与留痕": "Audit & History"
+
+"permission.module.报表与输出": "Reports & Output"
+
+"permission.module.文件与附件": "Files & Attachments"
+
+"permission.module.AI运行与治理": "AI Operations & Governance"
+
+"permission.module.知识库": "Knowledge Bases"
+
+"permission.module.自动化规则": "Automation Rules"
+
+"permission.module.计费信息": "Billing"
+
+"permission.module.公告与通知": "Announcements & Notifications"
+
+"permission.module.数据交换与设备": "Data Exchange & Devices"
+
+"permission.module.元数据工具": "Metadata Tools"
+
+"permission.module.客服配置与接待": "Customer Support"
+
+"permission.module.业务裁定": "Business Adjudication"
+
+"permission.module.制造计划与指标": "Manufacturing Plans & Metrics"
+
+"permission.module.二维码管理": "QR Codes"
+
+"permission.module.语义指标": "Semantic Metrics"
+
+"permission.module.业务参与方": "Business Parties"
+
+"permission.module.列表视图": "List Views"
+
+"permission.module.主数据治理": "Master Data Governance"
+
+"permission.module.组织与权限管理": "Organization & Permissions"
+
+"permission.module.组织管理": "Organization"
+
+"permission.capability.preset.label": "Presets"
+
+"permission.capability.preset.viewer": "Viewer"
+
+"permission.capability.preset.editor": "Editor"
+
+"permission.capability.preset.admin": "Administrator"

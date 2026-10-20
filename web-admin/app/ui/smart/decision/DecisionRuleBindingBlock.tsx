@@ -101,6 +101,8 @@ export interface RuleMappingTargetDraft {
 }
 
 export interface DecisionBindingDraft {
+  enabled?: boolean;
+  consumerEnabled?: boolean;
   decisionCode: string;
   versionPolicy: DecisionVersionPolicy;
   inputMappings: InputMapping[];
@@ -511,7 +513,9 @@ function buildInitialBinding(
 ): DecisionBindingDraft {
   const decisionBinding = initialValue?.decisionBinding;
   return {
-    decisionCode: decisionBinding?.decisionCode || initialDecisionCode || decisions[0]?.code || '',
+    decisionCode: decisionBinding?.decisionCode ?? initialDecisionCode ?? decisions[0]?.code ?? '',
+    enabled: decisionBinding?.enabled ?? true,
+    consumerEnabled: initialValue?.enabled ?? true,
     versionPolicy: decisionBinding?.versionPolicy || initialVersionPolicy || 'LATEST_PUBLISHED',
     inputMappings:
       decisionBinding?.inputMappings
@@ -561,10 +565,10 @@ function buildRuleConsumerBinding(
           })),
           fallbackPolicy: { mode: binding.fallbackMode },
           traceMode: 'SAMPLED',
-          enabled: true,
+          enabled: binding.enabled ?? true,
         }
       : undefined,
-    enabled: true,
+    enabled: binding.consumerEnabled ?? true,
   };
 }
 

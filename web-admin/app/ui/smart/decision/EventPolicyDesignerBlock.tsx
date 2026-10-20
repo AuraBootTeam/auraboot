@@ -1,3 +1,4 @@
+import { useAuth } from '~/contexts/AuthContext';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { getApiService } from '~/shared/services/ApiService';
@@ -112,6 +113,7 @@ function fieldsForPolicy(policy: EventPolicySummary | null, catalogFields: Field
 }
 
 export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesignerBlockProps) {
+  const { hasPermission } = useAuth();
   const [searchParams] = useSearchParams();
   const params = useParams();
   const api = useMemo(() => createApi(), []);
@@ -217,7 +219,8 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
           {error}
         </div>
       )}
-      {policy && <EventPolicyDesignerWorkflow api={api} fields={fields} selectedPolicy={policy} samples={samples} />}
+      {policy && <EventPolicyDesignerWorkflow readOnly={!hasPermission('decision.policy.manage')}
+        canPublish={hasPermission('decision.policy.publish')} canRun={hasPermission('decision.policy.run')} api={api} fields={fields} selectedPolicy={policy} samples={samples} />}
     </section>
   );
 }

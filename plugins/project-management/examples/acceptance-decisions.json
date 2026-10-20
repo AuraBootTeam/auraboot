@@ -28,6 +28,42 @@
             "scope": "record",
             "path": "data.tpm_ac_risk",
             "dataType": "enum"
+          },
+          "allowedValues": [
+            "normal",
+            "high"
+          ],
+          "valueLabels": {
+            "normal": "普通",
+            "high": "高风险"
+          }
+        },
+        {
+          "id": "issues",
+          "label": "未解决问题数",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_open_issues",
+            "dataType": "integer"
+          }
+        },
+        {
+          "id": "materials",
+          "label": "材料内容已齐全",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_materials_complete",
+            "dataType": "boolean"
+          },
+          "allowedValues": [
+            true,
+            false
+          ],
+          "valueLabels": {
+            "true": "齐全",
+            "false": "待补充"
           }
         }
       ],
@@ -35,7 +71,15 @@
         {
           "id": "route",
           "label": "审批路径",
-          "dataType": "string"
+          "dataType": "string",
+          "allowedValues": [
+            "standard",
+            "enhanced"
+          ],
+          "valueLabels": {
+            "standard": "常规审核",
+            "enhanced": "加强审核"
+          }
         }
       ],
       "rules": [
@@ -53,12 +97,29 @@
           }
         },
         {
+          "ruleId": "incomplete-evidence",
+          "priority": 15,
+          "when": {
+            "materials": {
+              "operator": "EQ",
+              "value": false
+            }
+          },
+          "then": {
+            "route": "enhanced"
+          }
+        },
+        {
           "ruleId": "large-amount",
           "priority": 20,
           "when": {
             "amount": {
               "operator": "GTE",
               "value": 100000
+            },
+            "issues": {
+              "operator": "GT",
+              "value": 0
             }
           },
           "then": {
@@ -84,7 +145,8 @@
         }
       ]
     },
-    "publish": true
+    "publish": true,
+    "description": "根据风险、材料完整性，以及金额与未解决问题的组合，决定审核路径。"
   },
   {
     "decisionCode": "tpm_acceptance_deadline",
@@ -144,6 +206,7 @@
         }
       ]
     },
-    "publish": true
+    "publish": true,
+    "description": "为不同审核节点确定处理时限，供 SLA 自动计时与提醒。"
   }
 ]

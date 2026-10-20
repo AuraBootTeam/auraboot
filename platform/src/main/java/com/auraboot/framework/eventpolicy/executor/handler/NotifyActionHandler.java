@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  * platform {@link NotificationService} when a policy rule matches. Wires the EventPolicy executor to
  * the real notification subsystem (additive — no change to that subsystem).
  *
- * <p>Supported target formats: {@code USER:<userId>}, {@code ROLE:<roleCode>},
+ * <p>Supported target formats: {@code USER:<publicPid-or-userId>}, {@code ROLE:<roleCode>},
  * {@code GROUP:<teamPid>} and {@code TEAM:<teamPid>}. Unsupported targets throw (the executor records
  * the failure per the policy FailureStrategy) rather than silently dropping the notification.
  *
@@ -43,6 +43,7 @@ public class NotifyActionHandler implements ActionHandler {
     private static final Pattern TEMPLATE = Pattern.compile("\\$\\{([^}]+)}");
 
     private final NotificationService notificationService;
+    private final com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor identities;
 
     @Override
     public boolean supports(String actionType) {
@@ -165,14 +166,15 @@ public class NotifyActionHandler implements ActionHandler {
         return new SourceReference(type, id);
     }
 
-    private static long parseUserId(ResolvedActionPlan plan, String target) {
-        try {
-            return Long.parseLong(suffix(plan, target, USER_PREFIX));
-        } catch (NumberFormatException e) {
-            throw notifyFailure(plan, "target_invalid",
-                    "Invalid NOTIFY target, expected USER:<numericId>: " + target,
-                    target, "USER", null, null, e.getMessage(), e);
-        }
+    private long parseUserId(ResolvedActionPlan plan, String target) {
+        String identity = suffix(plan, target, USER_PREFIX);
+        Long tenantId = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+        if (tenantId == null) throw notifyFailure(plan, "tenant_context_required", "NOTIFY requires the current space",
+                target, "USER", null, null, null, null);
+        var user = identities.findActiveTenantUser(tenantId, identity);
+        if (user == null) throw notifyFailure(plan, "recipient_unavailable", "Notification recipient is not an active member of this space",
+                target, "USER", null, 0, null, null);
+        return user.id();
     }
 
     private static String suffix(ResolvedActionPlan plan, String target, String prefix) {

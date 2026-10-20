@@ -34,7 +34,7 @@ services:
       # Required: without it the stack inherits the local-eval default, which the
       # app-side guard does not recognize, so a weak secret would boot in prod.
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for production deployments (min 32 chars, openssl rand -hex 32)}
-      OPEN_PLATFORM_PROTOCOL_SIGNING_KEY: ${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:?OPEN_PLATFORM_PROTOCOL_SIGNING_KEY is required for production deployments}
+      OPEN_PLATFORM_PROTOCOL_SIGNING_KEY: ${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:?OPEN_PLATFORM_PROTOCOL_SIGNING_KEY is required for production deployments (openssl rand -hex 32)}
       JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC"
             # Default-deny authorization knob (PermissionInterceptor un-annotated surface,
       # shipped deny since the authz flip); ops can override to shadow/allow per

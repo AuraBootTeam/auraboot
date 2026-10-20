@@ -11,6 +11,7 @@
  * Sources of truth (registered codes):
  *   - auraboot/platform/src/main/resources/tenant-templates/default-bootstrap.json
  *     -> permissions[].code
+ *   - Core Flyway INSERT INTO ab_permission registrations (literal code column only)
  *   - auraboot/plugins/*\/config/permissions.json (array of {code})
  *   - auraboot-enterprise/plugins/*\/config/permissions.json (skipped in --oss-only)
  *
@@ -52,6 +53,7 @@
  * ignored so unrelated edits don't churn the baseline.
  */
 
+import { permissionCodesFromSql } from './permission-sql-registrations.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -263,6 +265,16 @@ function collectRegisteredCodes() {
         for (const action of modelCodes.derivedActions) codes.add(`model.${modelCode}.${action}`)
       }
       sources.push(modelCodes.source)
+    }
+  }
+
+  // System-only permissions are registered by core Flyway migrations, not tenant templates.
+  // Accept only an actual ab_permission INSERT with a literal code-column projection.
+  for (const file of walk(path.join(OSS, 'platform/src/main/resources/db/migration/core'), f => f.endsWith('.sql'))) {
+    const registrations = permissionCodesFromSql(fs.readFileSync(file, 'utf8'))
+    if (registrations.size) {
+      for (const code of registrations) codes.add(code)
+      sources.push(file)
     }
   }
 
