@@ -7,7 +7,7 @@ import { navigateToMenuByClick } from '../helpers';
 const evidence = process.env.AURA_EVIDENCE_DIR!;
 if (!evidence || !process.env.DELIVERY_FIXTURE_PATH || !process.env.DELIVERY_PROJECT_PID)
   throw Error('Bind the owned delivery fixture and evidence');
-test.use({ locale: 'zh-CN', storageState: { cookies: [], origins: [] } });
+test.use({ locale: 'zh-CN', actionTimeout: 15_000, storageState: { cookies: [], origins: [] } });
 test.setTimeout(180_000);
 async function data(response: APIResponse | Response) {
   const body = await response.json();
@@ -31,7 +31,8 @@ async function openProject(page: Page) {
 }
 async function installedPlugin(page: Page) {
   await navigateToMenuByClick(page, ['系统管理', '插件管理']);
-  await page.getByRole('button', { name: /已安装|Installed/ }).click();
+  await expect(page.getByTestId('plugins-page')).toBeVisible();
+  await page.getByTestId('plugins-tab-installed').click();
   const row = page.getByRole('row').filter({ hasText: '客户交付扩展' });
   await expect(row).toHaveCount(1);
   return row;

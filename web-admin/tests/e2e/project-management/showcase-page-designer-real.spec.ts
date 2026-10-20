@@ -6,7 +6,7 @@ import { navigateToMenuByClick } from '../helpers';
 
 const evidence = process.env.AURA_EVIDENCE_DIR;
 if (!evidence) throw new Error('Bind the current owned evidence round');
-test.use({ locale: 'zh-CN', storageState: { cookies: [], origins: [] } });
+test.use({ locale: 'zh-CN', actionTimeout: 15_000, storageState: { cookies: [], origins: [] } });
 test.setTimeout(180_000);
 async function data(response: APIResponse | Response) {
   const body = await response.json();
