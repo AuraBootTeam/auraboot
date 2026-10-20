@@ -56,6 +56,8 @@ public class PluginRestDispatcher {
     private final ApiRateLimiter rateLimiter;
     private final SystemModeService systemModeService;
 
+    @com.auraboot.framework.permission.annotation.AuthenticatedAccess(
+            "Delegates to registered route AuthPolicy, exact permission and public rate limit before governed execution")
     @RequestMapping("/{namespace}/**")
     public void dispatch(@PathVariable String namespace,
                          HttpServletRequest httpReq,
