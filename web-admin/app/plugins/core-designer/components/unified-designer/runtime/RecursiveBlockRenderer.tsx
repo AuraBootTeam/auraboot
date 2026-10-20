@@ -5223,7 +5223,8 @@ function shouldExecuteLiveAction(block: DslBlockV3): boolean {
 
 function hasExecutableWidgetDataSource(block: DslBlockV3): boolean {
   const dataSource = block.dataSource;
-  if (!dataSource) return false;
+  // An explicit static preview must not execute even a configured named query.
+  if (!dataSource || dataSource.executionMode === 'preview') return false;
   const type = getStringProp(dataSource.type) || getStringProp(dataSource.mode);
   const live = dataSource.executionMode === 'live' || dataSource.executeLive === true;
   const hasQueryBuilderQuery = isRecord(dataSource.query);
@@ -5238,7 +5239,8 @@ function hasExecutableWidgetDataSource(block: DslBlockV3): boolean {
 
 function hasExecutableHelperDataSource(block: DslBlockV3): boolean {
   const dataSource = block.dataSource;
-  if (!dataSource) return false;
+  // An explicit static preview must not execute even a configured named query.
+  if (!dataSource || dataSource.executionMode === 'preview') return false;
   const type = getStringProp(dataSource.type) || getStringProp(dataSource.mode);
   const live = dataSource.executionMode === 'live' || dataSource.executeLive === true;
   const hasQueryBuilderQuery = isRecord(dataSource.query);
