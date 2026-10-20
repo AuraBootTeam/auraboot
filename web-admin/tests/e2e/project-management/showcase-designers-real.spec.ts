@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { navigateToMenuByClick } from '../helpers';
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 
 const root = process.env.AURA_ENTERPRISE_PROJECT_ROOT;
 const evidence = process.env.AURA_EVIDENCE_DIR;
@@ -14,12 +15,7 @@ async function data(r: APIResponse | Response) {
 }
 async function login(page: Page) {
   page.setDefaultTimeout(20000);
-  await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(process.env.ADMIN_EMAIL!);
-  await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
-  await page.getByRole('button', { name: '立即登录', exact: true }).click();
-  await page.waitForURL(u => !u.pathname.includes('/login'));
+  await loginDeliveryMember(page);
   const me = await data(await page.request.get('/api/auth/me'));
   expect(String(me.user.tenantId)).toBe(process.env.AURA_ADMIN_TENANT_ID);
   expect(me.user.email).toBe(process.env.ADMIN_EMAIL);
@@ -50,10 +46,22 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   await chart.click();
   const panel = page.getByTestId('widget-property-panel');
   await expect(panel.getByTestId('widget-prop-visualization-donut')).not.toBeChecked();
+  const filters = panel.getByTestId('designer-filter-builder');
+  await expect(filters).toContainText('未设置筛选条件');
+  await expect(panel.getByRole('option', {name:/交付验收状态分布/})).toBeAttached();
+  await page.mouse.move(280, 85);
   await shot(page, 'SC10-dashboard-before');
-  const title = '验收状态分布 · 交付负责人';
+  await filters.getByRole('button', {name:'添加条件',exact:true}).click();
+  await expect(filters.getByRole('textbox', {name:'字段',exact:true})).toBeVisible();
+  await expect(filters.getByRole('option', {name:'等于',exact:true})).toBeAttached();
+  await filters.scrollIntoViewIfNeeded();
+  await shot(page, 'SC10-dashboard-filter-controls');
+  await filters.getByRole('button', {name:'移除条件',exact:true}).click();
+  await expect(filters).toContainText('未设置筛选条件');
+  const title = '验收状态 · 负责人';
   await panel.getByTestId('widget-prop-title-zh').fill(title);
   await panel.getByTestId('widget-prop-visualization-donut').check();
+  await panel.getByTestId('widget-prop-visualization-showLabels').uncheck();
   const saved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST');
   await page.getByTestId('designer-toolbar-btn-save').click();
   const board = await data(await saved);
@@ -73,12 +81,17 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   const persisted = await data(await page.request.get(`/api/dashboards/${board.pid}`));
   const config = persisted.widgets.find((w:any) => w.id === 'acceptance-distribution').config;
   expect(config.visualization.donut).toBe(true);
+  expect(config.visualization.showLabels).toBe(false);
   expect(config.title['zh-CN'] || config.title.zh).toBe(title);
-  await chart.scrollIntoViewIfNeeded(); await shot(page, 'SC10-dashboard-after-reload');
+  await panel.getByTestId('widget-prop-title-zh').scrollIntoViewIfNeeded();
+  await chart.scrollIntoViewIfNeeded();
+  await page.mouse.move(280, 85);
+  await shot(page, 'SC10-dashboard-after-reload');
   const download = page.waitForEvent('download'); await page.getByTestId('dashboard-design-export').click();
   const output = join(evidence!, 'delivery-operations-edited.dashboard.json'); await (await download).saveAs(output);
   const exported = JSON.parse(await readFile(output,'utf8'));
   expect(exported.dashboard.widgets.find((w:any) => w.id === 'acceptance-distribution').config).toEqual(config);
+  await expect(page.getByText('已导出当前设计，包含未保存的修改。', {exact:true})).toBeHidden();
   await page.getByTestId('toolbar-btn-presentation').click();
   await expect(page.getByTestId('big-screen-mode')).toBeVisible();
   await expect(page.getByTestId('big-screen-mode').locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]')).toBeVisible();

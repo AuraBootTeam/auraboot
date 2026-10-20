@@ -216,7 +216,15 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
       legend: {
         orient: 'horizontal',
         bottom: 0,
-        type: 'scroll',
+        // Small distributions should expose every category, even in a narrow
+        // designer canvas. Keep paging for larger catalogs to bound legend height.
+        type: pieData.length <= 6 ? 'plain' : 'scroll',
+        left: 'center',
+        width: '90%',
+        itemWidth: 12,
+        itemGap: 10,
+        textStyle: { fontSize: 11 },
+        tooltip: { show: true },
       },
       series: [
         {
