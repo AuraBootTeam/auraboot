@@ -1,7 +1,6 @@
 package com.auraboot.framework.im.service.impl;
 
-import com.auraboot.framework.agent.entity.AgentDefinition;
-import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.im.service.ImAgentDirectory;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.im.dto.Announcement;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
@@ -42,19 +41,19 @@ public class ImConversationServiceImpl implements ImConversationService {
     private final ImConversationMemberMapper memberMapper;
     private final ImMessageMapper messageMapper;
     private final ImMessageService imMessageService;
-    private final AgentDefinitionMapper agentDefinitionMapper;
+    private final ImAgentDirectory agentDirectory;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     public ImConversationServiceImpl(ImConversationMapper conversationMapper,
                                       ImConversationMemberMapper memberMapper,
                                       ImMessageMapper messageMapper,
                                       @Lazy ImMessageService imMessageService,
-                                      AgentDefinitionMapper agentDefinitionMapper) {
+                                      ImAgentDirectory agentDirectory) {
         this.conversationMapper = conversationMapper;
         this.memberMapper = memberMapper;
         this.messageMapper = messageMapper;
         this.imMessageService = imMessageService;
-        this.agentDefinitionMapper = agentDefinitionMapper;
+        this.agentDirectory = agentDirectory;
     }
 
     @Override
@@ -315,7 +314,7 @@ public class ImConversationServiceImpl implements ImConversationService {
 
     @Override
     public List<ConversationMemberInfo> getMembers(Long conversationId, Long tenantId) {
-        return memberMapper.findMembersWithInfo(conversationId, tenantId);
+        return agentDirectory.findMembersWithInfo(conversationId, tenantId);
     }
 
     @Override
@@ -358,10 +357,10 @@ public class ImConversationServiceImpl implements ImConversationService {
     }
 
     private void sendAgentWelcomeMessage(Long conversationId, Long agentId, Long tenantId) {
-        AgentDefinition agent = agentDefinitionMapper.selectById(agentId);
+        ImAgentDirectory.Profile agent = agentDirectory.findById(agentId);
         if (agent != null) {
-            String role = agent.getEmployeeId() != null ? "AI Employee" : "AI Assistant";
-            String welcome = String.format("I'm %s, %s. @me to start collaborating.", agent.getName(), role);
+            String role = agent.employeeId() != null ? "AI Employee" : "AI Assistant";
+            String welcome = String.format("I'm %s, %s. @me to start collaborating.", agent.name(), role);
             imMessageService.sendSystemMessage(
                     conversationId, tenantId,
                     "system", welcome, null,
@@ -615,7 +614,7 @@ public class ImConversationServiceImpl implements ImConversationService {
      * Look up a user's display name from conversation members (must be called before removal).
      */
     private String lookupMemberNameFromConversation(Long conversationId, Long userId, Long tenantId) {
-        List<ConversationMemberInfo> members = memberMapper.findMembersWithInfo(conversationId, tenantId);
+        List<ConversationMemberInfo> members = agentDirectory.findMembersWithInfo(conversationId, tenantId);
         return members.stream()
                 .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType())
                         && userId.equals(m.getMemberId()))

@@ -86,5 +86,29 @@
     "required": true,
     "visible": true,
     "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_registered",
+    "sequence": 40,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_open_issues",
+    "sequence": 42,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_materials_complete",
+    "sequence": 43,
+    "required": false,
+    "visible": true,
+    "editable": true
   }
 ]

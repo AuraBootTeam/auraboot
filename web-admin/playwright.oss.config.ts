@@ -9,6 +9,7 @@ const scopePath = resolve(__dirname, '../oss-scope.json');
 const scope = JSON.parse(readFileSync(scopePath, 'utf-8')) as {
   test_paths: string[];
   test_excludes?: string[];
+  application_test_profiles?: Array<{ tags: string[] }>;
 };
 
 function escapeRegex(text: string): string {
@@ -38,6 +39,9 @@ function keepDeepOnly(entries: string[]): string[] {
 const ossTestMatch = toScopedMatch(scope.test_paths);
 const ossDeepTestMatch = toScopedMatch(keepDeepOnly(scope.test_paths), '.*-deep\\.spec\\.ts');
 const ossTestIgnore = toScopedMatch(scope.test_excludes ?? []);
+const applicationTags = (scope.application_test_profiles ?? []).flatMap(profile => profile.tags);
+const applicationTagExclusions = applicationTags.length
+  ? [new RegExp(applicationTags.map(escapeRegex).join('|'))] : [];
 
 /**
  * OSS-scoped Playwright configuration.
@@ -65,6 +69,7 @@ export default defineConfig({
     return {
       ...project,
       testMatch: project.name === 'chromium-deep' ? ossDeepTestMatch : ossTestMatch,
+      grepInvert: [...(Array.isArray(project.grepInvert) ? project.grepInvert : project.grepInvert ? [project.grepInvert] : []), ...applicationTagExclusions],
       testIgnore: [...(Array.isArray(project.testIgnore) ? project.testIgnore : project.testIgnore ? [project.testIgnore] : []), ...ossTestIgnore],
     };
   }),

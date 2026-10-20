@@ -32,6 +32,9 @@ export function buildCommandTargetParams(target: unknown): Record<string, string
 export function getCommandResultRecordPid(value: unknown): string | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
-  const pid = record.recordPid || record.pid;
-  return typeof pid === 'string' ? pid : getCommandResultRecordPid(record.data);
+  for (const key of ['recordPid', 'pid']) {
+    const pid = record[key];
+    if (typeof pid === 'string' && pid.trim()) return pid;
+  }
+  return getCommandResultRecordPid(record.data);
 }

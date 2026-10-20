@@ -11,9 +11,9 @@ import type { APIRequestContext } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 /**
- * Log in as the default admin user against the running backend (via vite
+ * Select an explicit business-space session for setup writes after admin login (via vite
  * proxy / BFF / backend chain — `request` fixture's baseURL is
- * PLAYWRIGHT_BASE_URL). Returns the explicitly selected business-space JWT.
+ * PLAYWRIGHT_BASE_URL). Returns the selected business JWT, never an onboarding JWT.
  *
  * Throws if the backend is not yet bootstrapped — call 00-bootstrap.spec.ts
  * before any spec that uses this helper.
@@ -36,28 +36,25 @@ export async function loginAdmin(request: APIRequestContext): Promise<string> {
       `[setup] admin login returned no JWT: ${JSON.stringify(body)}`,
     );
   }
-  const initialJwt = body.data.jwt as string;
-  const spacesResponse = await request.get('/api/tenant-selection/my-spaces', {
-    headers: authHeaders(initialJwt),
-  });
+  const headers = authHeaders(body.data.jwt as string);
+  const spacesResponse = await request.get('/api/tenant-selection/my-spaces', { headers });
+  if (!spacesResponse.ok()) throw new Error(`[setup] administrator spaces failed (${spacesResponse.status()})`);
   const spacesBody = await spacesResponse.json();
-  if (!spacesResponse.ok() || spacesBody.code !== '0' || !Array.isArray(spacesBody.data)) {
-    throw new Error(`[setup] admin spaces unavailable (HTTP ${spacesResponse.status()})`);
+  if (spacesBody.code !== '0' || !Array.isArray(spacesBody.data)) {
+    throw new Error('[setup] administrator spaces returned no inventory');
   }
-  const companyName = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
-  const spaces = spacesBody.data.filter((space: { spaceType?: string; tenantName?: string }) =>
-    space.spaceType === 'business' && space.tenantName === companyName);
-  if (spaces.length !== 1 || !spaces[0].tenantId) {
-    throw new Error(`[setup] expected exactly one business space named ${companyName}`);
-  }
+  const target = process.env.AURA_ADMIN_TENANT_ID;
+  const business = spacesBody.data.filter((space: { spaceType?: string; tenantId?: string | number }) =>
+    space.spaceType === 'business' && space.tenantId != null && (!target || String(space.tenantId) === target));
+  if (business.length !== 1) throw new Error('[setup] select exactly one business space with AURA_ADMIN_TENANT_ID');
   const selectedResponse = await request.post('/api/tenant-selection/process', {
-    headers: authHeaders(initialJwt),
-    data: { action: 'select', tenantId: spaces[0].tenantId },
+    headers, data: { action: 'select', tenantId: business[0].tenantId },
   });
+  if (!selectedResponse.ok()) throw new Error(`[setup] business space selection failed (${selectedResponse.status()})`);
   const selected = await selectedResponse.json();
-  if (!selectedResponse.ok() || selected.code !== '0' || !selected.data?.jwt
-      || String(selected.data.tenantId) !== String(spaces[0].tenantId)) {
-    throw new Error(`[setup] business-space selection failed (HTTP ${selectedResponse.status()})`);
+  if (selected.code !== '0' || !selected.data?.jwt
+      || String(selected.data.tenantId) !== String(business[0].tenantId)) {
+    throw new Error('[setup] business space selection returned no matching session');
   }
   return selected.data.jwt as string;
 }

@@ -1,10 +1,9 @@
 package com.auraboot.framework.automation.event;
 
-import com.auraboot.framework.agent.dto.LlmChunk;
 
 /**
  * Side-channel event emitted by {@code LlmCallExecutor} for every
- * {@link LlmChunk} observed on a streaming LLM call (E.1 Phase 1).
+ * {@link AutomationStreamChunk} observed on a streaming LLM call (E.1 Phase 1).
  *
  * <p>This is a <em>live observability</em> event only — it is NOT persisted,
  * and it is NOT part of the {@code ${outputVariable}} write path. Per spec
@@ -24,12 +23,12 @@ import com.auraboot.framework.agent.dto.LlmChunk;
  *                   that do not carry a stable id
  * @param chunk      the chunk just observed
  * @param chunkSeq   monotonic per-(runPid,nodeId) chunk sequence; mirrors
- *                   {@link LlmChunk#seq()} but is materialised here so
+ *                   {@link AutomationStreamChunk#seq()} but is materialised here so
  *                   subscribers do not need to peek into the chunk record
  */
 public record AutomationLlmChunkEvent(
         String runPid,
         String nodeId,
-        LlmChunk chunk,
+        AutomationStreamChunk chunk,
         long chunkSeq) {
 }

@@ -1,14 +1,15 @@
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import PermissionManagement from '../../PermissionManagement';
 
 const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(),
+  roles: new Set<string>(),
   fetchResult: vi.fn(),
 }));
 vi.mock('~/contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: (code: string) => mocks.permissions.has(code), hasRole: (role: string) => role === 'tenant_admin' }),
+  useAuth: () => ({ hasPermission: (code: string) => mocks.permissions.has(code), hasRole: (role: string) => mocks.roles.has(role) }),
   usePermissions: () => ({ hasPermission: (code: string) => mocks.permissions.has(code) }),
 }));
 vi.mock('~/contexts/I18nContext', () => ({
@@ -58,6 +59,7 @@ function showPage() {
 afterEach(cleanup);
 beforeEach(() => {
   mocks.permissions.clear();
+  mocks.roles.clear();
   mocks.fetchResult.mockReset();
   mocks.fetchResult.mockResolvedValue({ code: '0', data: { records: [role] } });
 });
@@ -65,6 +67,7 @@ describe('PermissionManagement access feedback', () => {
   it('keeps the actual creation action available to an authorized role manager', async () => {
     mocks.permissions.add('org.role.read');
     mocks.permissions.add('org.role.update');
+    mocks.roles.add('tenant_admin');
     showPage();
     expect(await screen.findByTestId('role-row-warehouse')).toHaveTextContent('Warehouse');
     expect(screen.getByTestId('role-create-btn')).toBeVisible();
@@ -77,18 +80,14 @@ describe('PermissionManagement access feedback', () => {
     expect(screen.queryByTestId('role-create-btn')).toBeNull();
     expect(mocks.fetchResult).not.toHaveBeenCalled();
   });
-  it('keeps role rows readable while disabling unavailable role mutations', async () => {
+  it('keeps role rows readable while disabling role mutations for a read-only account', async () => {
     mocks.permissions.add('org.role.read');
     showPage();
     expect(await screen.findByTestId('role-row-warehouse')).toHaveTextContent('Warehouse');
     expect(screen.getByTestId('role-create-btn')).toBeDisabled();
     expect(screen.getByTestId('role-action-edit-warehouse')).toBeDisabled();
-    for (const id of [
-      'role-action-toggle-warehouse',
-      'role-action-delete-warehouse',
-    ]) {
-      expect(screen.queryByTestId(id)).toBeNull();
-    }
+    expect(screen.queryByTestId('role-action-toggle-warehouse')).toBeNull();
+    expect(screen.queryByTestId('role-action-delete-warehouse')).toBeNull();
   });
   it('shows an explicit denial when the server rejects a stale read grant', async () => {
     mocks.permissions.add('org.role.read');
@@ -104,5 +103,27 @@ describe('PermissionManagement access feedback', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('角色加载失败'));
     expect(screen.queryByText('无权限访问')).toBeNull();
     expect(screen.queryByTestId('role-table')).toBeNull();
+  });
+  it('explains membership management on the members tab instead of capability editing', async () => {
+    for (const code of ['org.role.read','org.role.update','org.user_role.update']) mocks.permissions.add(code);
+    mocks.roles.add('tenant_admin');
+    showPage();
+    await screen.findByRole('heading', {name:'Warehouse'});
+    fireEvent.click(screen.getByTestId('permission-right-tab-members'));
+    expect(screen.getByText('Manage membership and access periods for this role.')).toBeVisible();
+    expect(screen.queryByText(/Select business capabilities/)).not.toBeInTheDocument();
+  });
+  it('explains read-only membership access using assignment permission rather than role-edit permission', async () => {
+    mocks.permissions.add('org.role.read'); mocks.permissions.add('org.role.update');
+    showPage();
+    await screen.findByRole('heading', {name:'Warehouse'});
+    fireEvent.click(screen.getByTestId('permission-right-tab-members'));
+    expect(screen.getByText('View members and access periods. Membership changes require permission.')).toBeVisible();
+  });
+  it('uses an English audit fallback when a locale has no override', async () => {
+    mocks.permissions.add('org.role.read'); mocks.permissions.add('meta.permission.update');
+    showPage();
+    await screen.findByTestId('role-row-warehouse');
+    expect(screen.getByTestId('permission-right-tab-audit')).toHaveTextContent('Audit');
   });
 });

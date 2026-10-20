@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '../../helpers/environments';
+import { requireRuntimeUrl } from '../../helpers/environments';
 // Real-stack browser workflow acceptance. No API or response mocks.
 // An executed result and original screenshot review are required for acceptance.
 import { test, expect, request as requestFactory, type Page, type APIResponse, type APIRequestContext } from '@playwright/test';
@@ -138,7 +138,7 @@ test.describe('i18n admin real workflow', () => {
   });
 
   test('same-role tenant administrators cannot read or mutate each other translation resources', async ({ browser }, info) => {
-    const backend = BACKEND_URL;
+    const backend = requireRuntimeUrl('backend');
     expect(backend, 'an explicit real backend URL is required').toBeTruthy();
     const admin = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
     const clients: APIRequestContext[] = [];

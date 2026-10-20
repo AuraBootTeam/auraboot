@@ -76,7 +76,14 @@ function stripCommentsAndLiterals(src) {
       i++;
     }
   }
-  return out;
+  // Annotation arrays and nested annotations may contain braces/semicolons. Only
+  // delimiters outside parentheses can end the declaration preceding a handler.
+  let depth = 0;
+  return [...out].map((ch) => {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    return depth > 0 && /[{};]/.test(ch) ? ' ' : ch;
+  }).join('');
 }
 
 /**

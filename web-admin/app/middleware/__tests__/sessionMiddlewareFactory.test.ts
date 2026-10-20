@@ -59,6 +59,32 @@ describe('createSessionMiddleware', () => {
     expect(isPublicRoute('/docs/open-platform-integration.html/private')).toBe(false);
   });
 
+  it('admits only the token-scoped public share page without exposing view management', async () => {
+    getSessionMock.mockResolvedValue({ get: vi.fn() });
+    const { isPublicRoute, createSessionMiddleware } =
+      await import('~/middleware/sessionMiddlewareFactory');
+    expect(isPublicRoute('/share/controlled-token')).toBe(true);
+    expect(isPublicRoute('/share/controlled-token/')).toBe(true);
+    for (const route of [
+      '/share',
+      '/share/',
+      '/share/controlled-token/settings',
+      '/api/views/owned-pid',
+      '/views',
+    ]) {
+      expect(isPublicRoute(route), route).toBe(false);
+    }
+    const next = vi.fn(async () => new Response('public receiver'));
+    const response = (await createSessionMiddleware()(
+      {
+        request: new Request('http://localhost/share/controlled-token'),
+      } as any,
+      next,
+    )) as Response;
+    expect(await response.text()).toBe('public receiver');
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it('redirects protected routes to login when cookie payload is malformed', async () => {
     getSessionMock.mockResolvedValue({ get: vi.fn() });
 

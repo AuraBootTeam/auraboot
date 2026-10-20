@@ -12,7 +12,6 @@ const fixtureName = 'PERF baseline 00999';
 test.use({
   locale: 'zh-CN',
   viewport: { width: 1440, height: 1000 },
-  storageState: 'tests/storage/admin.json',
 });
 
 async function capture(page: Page, id: string) {

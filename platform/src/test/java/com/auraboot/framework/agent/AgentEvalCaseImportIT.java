@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent;
 
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.auraboot.framework.agent.entity.AgentEvalCase;
 import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.agent.service.CapabilityEvalService;
@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Import-time seam gate: verifies that {@code importAgentDefinition} persists
- * {@link com.auraboot.framework.agent.dto.CapabilityEvalCase} rows to
+ * {@link com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase} rows to
  * {@code ab_agent_eval_case} via a physical DELETE+INSERT (overwrite semantics).
  *
  * <p>Deterministic — no LLM key required. Exercises the importer + DB seam

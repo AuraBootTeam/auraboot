@@ -1,12 +1,46 @@
 import { describe, it, expect } from 'vitest';
-import type { CapabilityGroup } from '../types';
+import type { Capability, CapabilityGroup } from '../types';
 import { deriveCodeSources, sourceFor } from '../coverageHelpers';
 
-function declared(code: string, label: string, includes: string[]): any {
-  return { code, group: 'crm', label, sensitive: false, includes, granted: false, conventionDerived: false };
+function declared(code: string, label: string, includes: string[]): Capability {
+  return {
+    authorizationState: 'none' as const,
+    description: null,
+    tier: null,
+    displayGroupOrder: 10000,
+    displayOrder: 100,
+    localizedLabels: {},
+    localizedDescriptions: {},
+    missingCodes: [],
+    unlockedMenus: null,
+    code,
+    group: 'crm',
+    label,
+    sensitive: false,
+    includes,
+    granted: false,
+    conventionDerived: false,
+  };
 }
-function derived(code: string, includes: string[]): any {
-  return { code, group: 'billing', label: code, sensitive: false, includes, granted: false, conventionDerived: true };
+function derived(code: string, includes: string[]): Capability {
+  return {
+    authorizationState: 'none' as const,
+    description: null,
+    tier: null,
+    displayGroupOrder: 10000,
+    displayOrder: 100,
+    localizedLabels: {},
+    localizedDescriptions: {},
+    missingCodes: [],
+    unlockedMenus: null,
+    code,
+    group: 'billing',
+    label: code,
+    sensitive: false,
+    includes,
+    granted: false,
+    conventionDerived: true,
+  };
 }
 
 const groups: CapabilityGroup[] = [

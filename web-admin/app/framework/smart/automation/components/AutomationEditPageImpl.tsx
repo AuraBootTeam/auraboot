@@ -147,6 +147,7 @@ export function synthesizeFlowData(automation: Automation | null | undefined): F
   const edges: FlowData['edges'] = [];
   const yCenter = 200;
   let x = 100;
+  const horizontalStep = 360;
 
   const triggerId = 'trigger_0';
   const triggerNodeType = TRIGGER_NODE_TYPE_BY_TRIGGER[automation.triggerType] ?? 'trigger-record-create';
@@ -166,7 +167,7 @@ export function synthesizeFlowData(automation: Automation | null | undefined): F
   });
 
   let prevId = triggerId;
-  x += 250;
+  x += horizontalStep;
 
   (automation.actions || []).forEach((action, idx) => {
     const actionId = `action_${idx}`;
@@ -191,7 +192,7 @@ export function synthesizeFlowData(automation: Automation | null | undefined): F
       type: 'smoothstep',
     });
     prevId = actionId;
-    x += 250;
+    x += horizontalStep;
   });
 
   return { nodes, edges };

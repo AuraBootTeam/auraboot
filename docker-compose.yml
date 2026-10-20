@@ -79,6 +79,9 @@ services:
       # below still overrides the baked copies for live dev iteration.
       context: .
       dockerfile: platform/Dockerfile
+      args:
+        AURA_GRADLE_REPOSITORY_POLICY: ${AURA_GRADLE_REPOSITORY_POLICY:-project}
+        MAVEN_CENTRAL_FIRST: ${MAVEN_CENTRAL_FIRST:-false}
     container_name: auraboot-backend
     restart: unless-stopped
     environment:
@@ -86,7 +89,8 @@ services:
       DATABASE_USERNAME: ${POSTGRES_USER:-auraboot}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
       JWT_SECRET: ${JWT_SECRET:-docker-eval-secret-change-in-production-min-32-chars}
-      OPEN_PLATFORM_PROTOCOL_SIGNING_KEY: ${OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:-}
+      # Inherit only when supplied; preserve the backend's existing key fallback.
+      OPEN_PLATFORM_PROTOCOL_SIGNING_KEY:
       FRONTEND_BASE_URL: http://localhost:${AURABOOT_PORT:-3000}
       SPRING_PROFILES_ACTIVE: community
       AURA_BUILTIN_PLUGINS_DIR: /app/plugins

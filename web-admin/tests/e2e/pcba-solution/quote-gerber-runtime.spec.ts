@@ -1,4 +1,4 @@
-import { PG_CONN } from '../../helpers/environments';
+import { PG_CONN, PG_ENV } from '../../helpers/environments';
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import {
@@ -274,7 +274,7 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
         '-tAc',
         `SELECT count(*) FROM ab_command_audit_log WHERE command_code = 'qo_quote_line_common:parse_gerber' AND request_payload->>'gerber_archive_file_id' = '${gerberFileId}'`,
       ], {
-        env: { ...process.env, PGPASSWORD: process.env.POSTGRES_PASSWORD || 'auraboot' },
+        env: PG_ENV,
         timeout: 30_000,
       }).toString().trim());
     await expect.poll(auditCountForUpload, {

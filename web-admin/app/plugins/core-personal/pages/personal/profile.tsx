@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Form,
   useActionData,
@@ -8,10 +8,17 @@ import {
   type LoaderFunctionArgs,
   type ActionFunctionArgs,
 } from 'react-router';
-import { getUserProfile, updateUserProfile, uploadAvatar } from '~/shared/services/profile';
+import {
+  getUserProfile,
+  updateUserProfile,
+  uploadAvatar,
+  profileUpdateFromFormData,
+} from '~/shared/services/profile';
 import type { UserProfile, UpdateUserProfileRequest } from '~/types/profile';
 import { useToast } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 
 // Loader函数 - 获取用户资料
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -34,23 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === 'update-profile') {
     try {
-      // 数据验证
-      const email = formData.get('email') as string;
-      if (!email || !email.includes('@')) {
-        return {
-          success: false,
-          error: 'Please enter a valid email address',
-          field: 'email',
-        };
-      }
-
-      const updateData: UpdateUserProfileRequest = {
-        nickName: (formData.get('nickName') as string) || undefined,
-        email,
-        mobile: (formData.get('mobile') as string) || undefined,
-        area: (formData.get('area') as string) || undefined,
-        signature: (formData.get('signature') as string) || undefined,
-      };
+      const updateData = profileUpdateFromFormData(formData);
 
       const updatedProfile = await updateUserProfile(request, updateData);
       return {
@@ -81,6 +72,7 @@ function AvatarUpload({
   onUploadSuccess: (fileId: string) => void;
 }) {
   const { showSuccessToast, showErrorToast } = useToast();
+  const { t, locale } = useI18n();
   const showToast = (message: string, type: 'success' | 'error') => {
     if (type === 'success') {
       showSuccessToast(message);
@@ -89,6 +81,10 @@ function AvatarUpload({
     }
   };
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string>();
+  useEffect(() => {
+    if (!isEditing) setUploadedAvatarUrl(undefined);
+  }, [isEditing]);
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -110,7 +106,8 @@ function AvatarUpload({
     try {
       const uploadResult = await uploadAvatar(file);
       if (uploadResult) {
-        onUploadSuccess(uploadResult);
+        onUploadSuccess(uploadResult.fileId);
+        setUploadedAvatarUrl(uploadResult.url);
         showToast('头像上传成功', 'success');
       } else {
         throw new Error('上传结果无效');
@@ -127,7 +124,7 @@ function AvatarUpload({
     <div className="text-center">
       <div className="relative inline-block">
         <img
-          src={profile.avatarUrl || '/avatar.jpeg'}
+          src={(isEditing && uploadedAvatarUrl) || profile.avatarUrl || '/avatar.jpeg'}
           alt="用户头像"
           className="h-32 w-32 rounded-full border-4 border-gray-200 object-cover"
         />
@@ -149,6 +146,7 @@ function AvatarUpload({
             </svg>
             <input
               type="file"
+              aria-label="Upload avatar"
               accept="image/*"
               onChange={handleAvatarUpload}
               className="hidden"
@@ -162,7 +160,23 @@ function AvatarUpload({
           </div>
         )}
       </div>
-      <p className="mt-4 text-sm text-gray-600">点击头像更换图片</p>
+      <p className="mt-4 text-sm text-gray-600">
+        {isEditing
+          ? t(
+              'profile.avatarEditingHelp',
+              undefined,
+              locale.startsWith('zh')
+                ? '上传新头像后请保存资料'
+                : 'Save your profile after uploading a new avatar.',
+            )
+          : t(
+              'profile.avatarViewHelp',
+              undefined,
+              locale.startsWith('zh')
+                ? '点击编辑资料后可更换头像'
+                : 'Choose Edit profile to change your avatar.',
+            )}
+      </p>
       <p className="text-xs text-gray-500">支持 JPG、PNG 格式，文件大小不超过 5MB</p>
     </div>
   );
@@ -198,11 +212,12 @@ function FormField({
 
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-gray-700">
+      <label htmlFor={name} className="mb-2 block text-sm font-medium text-gray-700">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {type === 'textarea' ? (
         <textarea
+          id={name}
           name={name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -214,6 +229,7 @@ function FormField({
       ) : (
         <input
           type={type}
+          id={name}
           name={name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -233,7 +249,7 @@ function InfoDisplay({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-      <p className="text-gray-900 [overflow-wrap:anywhere]">{value || '未设置'}</p>
+      <p className="[overflow-wrap:anywhere] text-gray-900">{value || '未设置'}</p>
     </div>
   );
 }
@@ -280,14 +296,15 @@ function ErrorDisplay({ error, onRetry }: { error: string; onRetry: () => void }
 
 export default function PersonalProfile() {
   const { t, locale } = useI18n();
+  const { timezone, formats } = useTimezone();
   const { showSuccessToast: showSuccessToast2, showErrorToast: showErrorToast2 } = useToast();
-  const showToast2 = (message: string, type: 'success' | 'error') => {
-    if (type === 'success') {
-      showSuccessToast2(message);
-    } else {
-      showErrorToast2(message);
-    }
-  };
+  const showToast2 = useCallback(
+    (message: string, type: 'success' | 'error') => {
+      if (type === 'success') showSuccessToast2(message);
+      else showErrorToast2(message);
+    },
+    [showSuccessToast2, showErrorToast2],
+  );
   const navigation = useNavigation();
   const actionData = useActionData<typeof action>();
   const loaderData = useLoaderData<typeof loader>();
@@ -302,7 +319,7 @@ export default function PersonalProfile() {
     if (profile) {
       setFormData({
         nickName: profile.nickName || '',
-        email: profile.email,
+        imgId: profile.imgId || '',
         mobile: profile.mobile || '',
         area: profile.area || '',
         signature: profile.signature || '',
@@ -343,9 +360,6 @@ export default function PersonalProfile() {
   const handleAvatarUploadSuccess = (fileId: string) => {
     // 更新本地状态
     setFormData((prev) => ({ ...prev, imgId: fileId }));
-
-    // 显示成功提示
-    showToast2('头像上传成功', 'success');
   };
 
   // 重试加载
@@ -360,7 +374,7 @@ export default function PersonalProfile() {
     if (profile) {
       setFormData({
         nickName: profile.nickName || '',
-        email: profile.email,
+        imgId: profile.imgId || '',
         mobile: profile.mobile || '',
         area: profile.area || '',
         signature: profile.signature || '',
@@ -415,12 +429,13 @@ export default function PersonalProfile() {
               {isEditing ? (
                 <Form method="post" className="space-y-6">
                   <input type="hidden" name="intent" value="update-profile" />
+                  <input type="hidden" name="imgId" value={formData.imgId || ''} />
 
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <FormField
                       label="用户名"
                       name="userName"
-                      value={profile.userName}
+                      value={profile.userName ?? ''}
                       onChange={() => {}}
                       disabled
                       helpText="用户名不可修改"
@@ -438,10 +453,16 @@ export default function PersonalProfile() {
                       label="邮箱"
                       name="email"
                       type="email"
-                      value={formData.email || ''}
-                      onChange={(value) => handleInputChange('email', value)}
-                      required
-                      placeholder="请输入邮箱"
+                      value={profile.email || ''}
+                      onChange={() => {}}
+                      disabled
+                      helpText={t(
+                        'personal.profile.emailVerificationHelp',
+                        undefined,
+                        locale.startsWith('zh')
+                          ? '邮箱变更需要通过邮箱绑定流程验证'
+                          : 'Email changes require verification through account linking.',
+                      )}
                     />
 
                     <FormField
@@ -495,14 +516,22 @@ export default function PersonalProfile() {
               ) : (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <InfoDisplay label="用户名" value={profile.userName} />
+                    <InfoDisplay label="用户名" value={profile.userName ?? ''} />
                     <InfoDisplay label="昵称" value={profile.nickName || ''} />
-                    <InfoDisplay label="邮箱" value={profile.email} />
+                    <InfoDisplay label="邮箱" value={profile.email || ''} />
                     <InfoDisplay label="手机号" value={profile.mobile || ''} />
                     <InfoDisplay label="地区" value={profile.area || ''} />
                     <InfoDisplay
                       label="注册时间"
-                      value={profile.createdAt == null ? t('common.notSet', undefined, locale.startsWith('zh') ? '未设置' : 'Not set') : new Date(profile.createdAt).toLocaleString(locale)}
+                      value={
+                        profile.createdAt == null
+                          ? t(
+                              'common.notSet',
+                              undefined,
+                              locale.startsWith('zh') ? '未设置' : 'Not set',
+                            )
+                          : formatInTimezone(profile.createdAt, formats.datetime, timezone)
+                      }
                     />
                   </div>
 
@@ -518,7 +547,7 @@ export default function PersonalProfile() {
                   {profile.lastSignInAt && (
                     <InfoDisplay
                       label="最后登录时间"
-                      value={new Date(profile.lastSignInAt).toLocaleString()}
+                      value={formatInTimezone(profile.lastSignInAt, formats.datetime, timezone)}
                     />
                   )}
                 </div>
@@ -531,18 +560,31 @@ export default function PersonalProfile() {
       {/* Social Account Binding Section */}
       <div className="rounded-lg bg-white shadow-md">
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-semibold text-gray-900">{t('profile.socialTitle', undefined, locale.startsWith('zh') ? '社交账号绑定' : 'Social Account Binding')}</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {t(
+              'profile.socialTitle',
+              undefined,
+              locale.startsWith('zh') ? '社交账号绑定' : 'Social Account Binding',
+            )}
+          </h2>
           <Link
             to="/personal/social-links"
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
             data-testid="profile-social-links-link"
           >
-            {t('profile.manageSocial', undefined, locale.startsWith('zh') ? '管理绑定' : 'Manage')} &rarr;
+            {t('profile.manageSocial', undefined, locale.startsWith('zh') ? '管理绑定' : 'Manage')}{' '}
+            &rarr;
           </Link>
         </div>
         <div className="p-6">
           <p className="text-sm text-gray-500">
-            {t('profile.socialHelp', undefined, locale.startsWith('zh') ? '绑定微信、Google 或 Apple 账号，便于快捷登录。' : 'Link your social accounts (WeChat, Google, Apple) for one-click login.')}
+            {t(
+              'profile.socialHelp',
+              undefined,
+              locale.startsWith('zh')
+                ? '绑定微信、Google 或 Apple 账号，便于快捷登录。'
+                : 'Link your social accounts (WeChat, Google, Apple) for one-click login.',
+            )}
           </p>
         </div>
       </div>
@@ -550,18 +592,34 @@ export default function PersonalProfile() {
       {/* Account Deactivation Section */}
       <div className="rounded-lg bg-white shadow-md">
         <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-semibold text-red-600">{t('profile.deactivationTitle', undefined, locale.startsWith('zh') ? '注销账户' : 'Account Deactivation')}</h2>
+          <h2 className="text-xl font-semibold text-red-600">
+            {t(
+              'profile.deactivationTitle',
+              undefined,
+              locale.startsWith('zh') ? '注销账户' : 'Account Deactivation',
+            )}
+          </h2>
         </div>
         <div className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500">
-            {t('profile.deactivationHelp', undefined, locale.startsWith('zh') ? '永久注销账户，并匿名化个人数据。' : 'Permanently deactivate your account and anonymize all personal data.')}
+            {t(
+              'profile.deactivationHelp',
+              undefined,
+              locale.startsWith('zh')
+                ? '永久注销账户，并匿名化个人数据。'
+                : 'Permanently deactivate your account and anonymize all personal data.',
+            )}
           </p>
           <Link
             to="/personal/deactivation"
             className="rounded-md border border-red-300 px-4 py-2 text-sm whitespace-nowrap text-red-600 transition-colors hover:bg-red-50"
             data-testid="profile-deactivation-link"
           >
-            {t('profile.deactivate', undefined, locale.startsWith('zh') ? '注销账户' : 'Deactivate Account')}
+            {t(
+              'profile.deactivate',
+              undefined,
+              locale.startsWith('zh') ? '注销账户' : 'Deactivate Account',
+            )}
           </Link>
         </div>
       </div>

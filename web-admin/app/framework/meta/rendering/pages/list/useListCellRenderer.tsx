@@ -122,9 +122,9 @@ export function useListCellRenderer({
             // to render a leading icon instead of the semantic color dot.
             return (
               <StatusDot
-                tone={resolveStatusTone(item.extension?.color)}
+                tone={resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined)}
                 label={item.label}
-                icon={(item.extension as any)?.icon}
+                icon={typeof item.extension?.icon === 'string' ? item.extension.icon : undefined}
               />
             );
           }

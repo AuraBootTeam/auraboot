@@ -1,3 +1,4 @@
+import { searchTenantMembers } from '~/shared/services/tenantMemberSearchService';
 /**
  * MemberPicker Component
  *
@@ -18,18 +19,6 @@ export interface MemberOption {
   email?: string;
   avatar?: string;
   department?: string;
-}
-
-interface TenantMemberSearchRecord {
-  displayName?: string;
-  departmentName?: string;
-  user?: {
-    pid?: string;
-    username?: string | null;
-    email?: string | null;
-    realName?: string | null;
-    avatar?: string | null;
-  };
 }
 
 export interface MemberPickerProps {
@@ -122,42 +111,24 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
     try {
       // Record collaborators are ordinary tenant members, not tenant administrators.
       // Keep discovery tenant-scoped without routing the picker through an admin-only API.
-      const response = await fetch('/api/tenant/members/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pageNum: 1,
-          pageSize: 20,
-          status: 'active',
-          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-        }),
+      const records = await searchTenantMembers({
+        pageNum: 1,
+        pageSize: 20,
+        status: 'active',
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
       });
-      if (response.ok) {
-        const result = await response.json();
-        if (ResultHelper.isSuccess(result) && result.data) {
-          const records: TenantMemberSearchRecord[] = Array.isArray(result.data)
-            ? result.data
-            : result.data.records || result.data.content || [];
-          nextOptions = records.flatMap((record): MemberOption[] => {
-            const userPid = record.user?.pid;
-            if (!userPid) return [];
-            return [
-              {
-                id: userPid,
-                name:
-                  record.displayName ||
-                  record.user?.realName ||
-                  record.user?.username ||
-                  record.user?.email ||
-                  userPid,
-                email: record.user?.email || undefined,
-                avatar: record.user?.avatar || undefined,
-                department: record.departmentName,
-              },
-            ];
-          });
-        }
-      }
+      nextOptions = records.flatMap((record): MemberOption[] => {
+        const user = record.user;
+        if (!user) return [];
+        return [
+          {
+            id: user.pid!,
+            name: user.realName || user.username || user.email || '',
+            email: user.email || undefined,
+            avatar: user.avatar || undefined,
+          },
+        ];
+      });
     } catch {
       // CATCH: non-transactional HTTP call, safe to handle
     } finally {
@@ -427,10 +398,12 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                       <span
                         className={cn(
                           'rounded-pill flex h-8 w-8 flex-shrink-0 items-center justify-center text-xs font-semibold text-white',
-                          getAvatarColor(opt.name),
+                          getAvatarColor(
+                            opt.name || t('member_picker.member', undefined, 'Member'),
+                          ),
                         )}
                       >
-                        {getInitials(opt.name)}
+                        {getInitials(opt.name || t('member_picker.member', undefined, 'Member'))}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -440,7 +413,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                               isSelected ? 'text-accent' : 'text-text-2',
                             )}
                           >
-                            {opt.name}
+                            {opt.name || t('member_picker.member', undefined, 'Member')}
                           </span>
                           {isSelected && (
                             <svg

@@ -30,6 +30,27 @@ describe('useChartData', () => {
     fetchResultMock.mockReset();
   });
 
+  it('does not query unfinished filter rows, clears stale data and resumes when the filter is complete', async () => {
+    fetchChartDataMock.mockResolvedValue({
+      rows: [{ count: 2 }],
+      meta: { dimensions: [], metrics: ['count'] },
+    });
+    const base: ChartDataSource = { type: 'namedQuery', queryCode: 'orders' };
+    const { result, rerender } = renderHook(({ source }: { source: ChartDataSource }) => useChartData({ dataSource: source }), {
+      initialProps: { source: base },
+    });
+    await waitFor(() => expect(result.current.data?.rows).toEqual([{ count: 2 }]));
+    rerender({ source: { ...base, filters: [{ field: '', operator: 'eq', value: '' }] } });
+    await waitFor(() => expect(result.current.data).toBeNull());
+    expect(result.current.error).toBeNull();
+    expect(fetchChartDataMock).toHaveBeenCalledTimes(1);
+    rerender({ source: { ...base, filters: [{ field: 'amount', operator: 'eq', value: 0 }] } });
+    await waitFor(() => expect(fetchChartDataMock).toHaveBeenCalledTimes(2));
+    expect(fetchChartDataMock.mock.lastCall?.[0].filters).toEqual([
+      { field: 'amount', operator: 'eq', value: 0 },
+    ]);
+  });
+
   it('loads the bound saved widget without sending a replacement query', async () => {
     fetchDashboardWidgetMock.mockResolvedValue({
       rows: [{ count: 2 }],

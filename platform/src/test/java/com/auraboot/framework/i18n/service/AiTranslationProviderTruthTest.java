@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 class AiTranslationProviderTruthTest {
     private final I18nResourceMapper mapper = mock(I18nResourceMapper.class);
     private final LlmProviderFactory factory = mock(LlmProviderFactory.class);
-    private final AiTranslationService service = new AiTranslationService(mapper, factory, new ObjectMapper());
+    private final AiTranslationService service = new AiTranslationService(mapper, new com.auraboot.framework.agent.integration.i18n.LlmTranslationGenerator(factory, new ObjectMapper()));
 
     @BeforeEach
     void setUp() {

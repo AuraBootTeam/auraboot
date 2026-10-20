@@ -116,6 +116,15 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
       </div>
     );
 
+  if (query.failed && !query.hasResult) {
+    return (
+      <div className="mx-auto max-w-4xl p-8">
+        <h1 className="mb-6 text-2xl font-bold">{report.title}</h1>
+        <ReportQueryControls report={report} query={query} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-4xl p-8">
       {/* Toolbar */}

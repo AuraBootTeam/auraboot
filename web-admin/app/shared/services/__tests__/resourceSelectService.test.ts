@@ -19,6 +19,8 @@ vi.mock('~/framework/bootstrap', () => ({
   getKernel: () => ({ contributionRegistry: { getPrimaryService: workflowProvider } }),
 }));
 
+vi.mock('~/shared/services/http-client/HttpClient', () => ({ fetchResult: fetchResultMock }));
+
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: fetchResultMock,
 }));
@@ -120,9 +122,7 @@ describe('resourceSelectService — error propagation', () => {
   it('fetchModelOptions: returns mapped options on success', async () => {
     fetchResultMock.mockResolvedValue({
       data: {
-        records: [
-          { pid: 'p1', code: 'order', displayName: 'Order', description: 'Sales order' },
-        ],
+        records: [{ pid: 'p1', code: 'order', displayName: 'Order', description: 'Sales order' }],
       },
     });
     const result = await fetchModelOptions();
@@ -154,23 +154,34 @@ describe('resourceSelectService — error propagation', () => {
 describe('model field dictionary resolution', () => {
   beforeEach(() => fetchResultMock.mockReset());
   it('loads the declared dictionary instead of assuming the field code is a dictionary code', async () => {
-    fetchResultMock.mockResolvedValueOnce({code: '0', data: {pid: 'task-model'}})
-      .mockResolvedValueOnce({code: '0', data: [{code: 'task_state', dataType: 'enum', dictCode: 'task_lifecycle'}]})
-      .mockResolvedValueOnce({code: '0', data: {items: [{value: 'in_review', label: '审核中'}]}});
-    expect(await fetchFieldDictOptions('task', 'task_state')).toEqual([{value: 'in_review', label: '审核中', description: undefined}]);
+    fetchResultMock
+      .mockResolvedValueOnce({ code: '0', data: { pid: 'task-model' } })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: [{ code: 'task_state', dataType: 'enum', dictCode: 'task_lifecycle' }],
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { items: [{ value: 'in_review', label: '审核中' }] },
+      });
+    expect(await fetchFieldDictOptions('task', 'task_state')).toEqual([
+      { value: 'in_review', label: '审核中', description: undefined },
+    ]);
     expect(fetchResultMock.mock.calls.map(([url]) => url)).toEqual([
-      '/api/meta/models/code/task', '/api/meta/models/task-model/fields',
+      '/api/meta/models/code/task',
+      '/api/meta/models/task-model/fields',
       '/api/meta/dict/by-code/task_lifecycle/data',
     ]);
   });
   it('rejects an unbound field without falling back to its field code', async () => {
-    fetchResultMock.mockResolvedValueOnce({data: {pid: 'task-model'}})
-      .mockResolvedValueOnce({data: [{code: 'task_state', dataType: 'enum'}]});
+    fetchResultMock
+      .mockResolvedValueOnce({ data: { pid: 'task-model' } })
+      .mockResolvedValueOnce({ data: [{ code: 'task_state', dataType: 'enum' }] });
     await expect(fetchFieldDictOptions('task', 'task_state')).rejects.toThrow('no dictionary');
     expect(fetchResultMock).toHaveBeenCalledTimes(2);
   });
   it('surfaces a business-error envelope instead of claiming an empty dictionary', async () => {
-    fetchResultMock.mockResolvedValueOnce({code: '1', data: null, context: 'missing dictionary'});
+    fetchResultMock.mockResolvedValueOnce({ code: '1', data: null, context: 'missing dictionary' });
     await expect(fetchDictOptions('missing')).rejects.toThrow('could not be loaded');
   });
 });

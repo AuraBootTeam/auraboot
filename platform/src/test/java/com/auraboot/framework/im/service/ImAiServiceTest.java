@@ -79,8 +79,8 @@ class ImAiServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ImAiService(messageService, broadcaster, memberMapper, turnService,
-                turnRegistry, agentResolver);
+        service = new ImAiService(new com.auraboot.framework.agent.integration.im.AgentImAiResponder(
+                messageService, broadcaster, memberMapper, turnService, turnRegistry, agentResolver));
         // generateResponse now always resolves the AuraBot agent id before building
         // the sink; lenient so tests that don't assert on the resolved id (and never
         // drive the sink) don't trip STRICT_STUBS.

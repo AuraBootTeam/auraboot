@@ -95,7 +95,7 @@ export async function openAsRole(
   return { context, page };
 }
 
-export type MenuSnapshotItem = { code: string; path: string; permissionCode: string; name: string };
+export type MenuSnapshotItem = { code: string; path: string; permissionCode: string; name: string; type: number; parentCode: string | null };
 export type RoleSnapshot = {
   roleCodes: string[];
   permissionCodes: string[];
@@ -119,7 +119,7 @@ function extractPermissionCodes(permissions: Record<string, unknown>): string[] 
 
 function flattenMenuData(items: unknown[]): MenuSnapshotItem[] {
   const result: MenuSnapshotItem[] = [];
-  const visit = (menuItems: unknown[]) => {
+  const visit = (menuItems: unknown[], parentCode: string | null = null) => {
     for (const item of menuItems) {
       const menu = item as Record<string, unknown>;
       result.push({
@@ -127,9 +127,11 @@ function flattenMenuData(items: unknown[]): MenuSnapshotItem[] {
         path: String(menu.path ?? ''),
         permissionCode: String(menu.permissionCode ?? menu.permission_code ?? ''),
         name: String(menu.name ?? ''),
+        type: typeof menu.type === 'number' ? menu.type : -1,
+        parentCode,
       });
       const children = menu.children ?? menu.submenu;
-      if (Array.isArray(children)) visit(children);
+      if (Array.isArray(children)) visit(children, String(menu.code ?? ''));
     }
   };
   visit(items);

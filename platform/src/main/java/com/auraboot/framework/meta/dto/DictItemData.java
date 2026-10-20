@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 字典项数据DTO
@@ -22,6 +23,7 @@ public class DictItemData {
     /**
      * 字典项描述
      */
+    @Schema(nullable = true)
     private String description;
 
     /**
@@ -32,6 +34,7 @@ public class DictItemData {
     /**
      * 父级值（用于级联字典）
      */
+    @Schema(nullable = true)
     private String parentValue;
 
     /**

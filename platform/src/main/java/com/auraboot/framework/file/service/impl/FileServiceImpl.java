@@ -63,7 +63,7 @@ public class FileServiceImpl implements FileService {
     @Autowired(required = false)
     private CdnUrlRewriter cdnUrlRewriter;
 
-    @Value("${file.download.base-url:/222}")
+    @Value("${file.download.base-url:}")
     private String baseUrl;
 
     private static final Pattern GENERATED_STORAGE_FILE_NAME =

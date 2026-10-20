@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
@@ -302,15 +304,12 @@ export function useListMetadata(
     const loadDictData = async () => {
       const promises = unloadedCodes.map(async (code: string) => {
         try {
-          const result = await fetchResult(`/api/meta/dict/by-code/${code}/data`, {
-            method: 'get',
-            token: token || undefined,
+          const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+            path: { code },
+            options: { token: token || undefined },
           });
-          if (ResultHelper.isSuccess(result) && result.data) {
-            // Adapt dict data format
-            const data = result.data as { items?: DictItem[] } | DictItem[];
-            const items: DictItem[] = Array.isArray(data) ? data : data.items || [];
-            dictDataCache.current.set(code, items);
+          if (result.code === '0' && result.data) {
+            dictDataCache.current.set(code, dictionaryData(result.data).items);
           }
         } catch (error) {
           console.error(`[ListPageContent] Failed to load dict: ${code}`, error);

@@ -1,9 +1,5 @@
 // Dict data item type
-export interface DictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, any>;
-}
+export type DictItem = Pick<import('~/types/dict').DictItemData, 'value' | 'label' | 'extension'>;
 
 export interface DynamicEntity {
   [key: string]: any;

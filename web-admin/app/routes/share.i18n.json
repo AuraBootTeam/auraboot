@@ -1,0 +1,114 @@
+{
+  "passwordTitle": {
+    "zh-CN": "需要访问密码",
+    "en-US": "Password required"
+  },
+  "passwordHelp": {
+    "zh-CN": "此分享链接受密码保护。",
+    "en-US": "This shared link is password protected."
+  },
+  "passwordLabel": {
+    "zh-CN": "访问密码",
+    "en-US": "Access password"
+  },
+  "passwordPlaceholder": {
+    "zh-CN": "输入访问密码",
+    "en-US": "Enter the access password"
+  },
+  "open": {
+    "zh-CN": "查看分享",
+    "en-US": "Open shared view"
+  },
+  "passwordInvalid": {
+    "zh-CN": "密码不正确，请重试。",
+    "en-US": "The password is incorrect. Please try again."
+  },
+  "loading": {
+    "zh-CN": "正在加载分享视图…",
+    "en-US": "Loading shared view…"
+  },
+  "unavailable": {
+    "zh-CN": "分享链接不可用。",
+    "en-US": "This shared link is unavailable."
+  },
+  "expired": {
+    "zh-CN": "分享链接已过期。",
+    "en-US": "This shared link has expired."
+  },
+  "revoked": {
+    "zh-CN": "分享链接已被撤销。",
+    "en-US": "This shared link has been revoked."
+  },
+  "network": {
+    "zh-CN": "加载失败，请稍后重试。",
+    "en-US": "Unable to load the shared view. Please try again."
+  },
+  "invalidPayload": {
+    "zh-CN": "分享视图的设置无法读取。",
+    "en-US": "The shared view settings could not be read."
+  },
+  "retry": {
+    "zh-CN": "重试",
+    "en-US": "Retry"
+  },
+  "readOnly": {
+    "zh-CN": "只读",
+    "en-US": "Read only"
+  },
+  "configuration": {
+    "zh-CN": "分享的视图设置",
+    "en-US": "Shared view settings"
+  },
+  "configurationHelp": {
+    "zh-CN": "此链接分享视图设置（包括已保存的筛选条件）。业务记录需要登录后按权限访问。",
+    "en-US": "This link shares view settings, including saved filters. Sign in to access business records according to your permissions."
+  },
+  "columns": {
+    "zh-CN": "列设置",
+    "en-US": "Columns"
+  },
+  "filters": {
+    "zh-CN": "筛选条件",
+    "en-US": "Filters"
+  },
+  "sorts": {
+    "zh-CN": "排序规则",
+    "en-US": "Sort rules"
+  },
+  "table": {
+    "zh-CN": "表格视图",
+    "en-US": "Table view"
+  },
+  "kanban": {
+    "zh-CN": "看板视图",
+    "en-US": "Kanban view"
+  },
+  "calendar": {
+    "zh-CN": "日历视图",
+    "en-US": "Calendar view"
+  },
+  "gallery": {
+    "zh-CN": "画廊视图",
+    "en-US": "Gallery view"
+  },
+  "gantt": {
+    "zh-CN": "甘特图视图",
+    "en-US": "Gantt view"
+  },
+  "tree": {
+    "zh-CN": "树形视图",
+    "en-US": "Tree view"
+  },
+  "timeline": {
+    "zh-CN": "时间线视图",
+    "en-US": "Timeline view"
+  },
+  "form": {
+    "zh-CN": "表单视图",
+    "en-US": "Form view"
+  },
+  "view": {
+    "zh-CN": "分享视图",
+    "en-US": "Shared view"
+  }
+}

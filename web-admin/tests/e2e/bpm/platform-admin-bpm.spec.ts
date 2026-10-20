@@ -29,105 +29,38 @@ import { annotateFallback, waitForFormReady, fillFormField, selectFormField, cli
 
 test.describe('PA: SLA Configuration CRUD', () => {
   test.describe.configure({ timeout: 45000 });
-  const createdPids: string[] = [];
-
-  test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
-    const page = await ctx.newPage();
-    const helper = new ModelTestHelper(page, ADMIN_SLA_CONFIG);
-    for (const pid of createdPids) {
-      await helper.deleteViaApi(pid).catch(() => {});
-    }
-    await ctx.close();
+  test('PA-001: SLA config list page renders with correct columns @smoke', async ({page}) => {
+    await navigateToDynamicPage(page,'sla-config');
+    await expect(page.getByTestId('sla-policy-workspace')).toBeVisible();
+    await expect(page.getByRole('button',{name:'新建策略',exact:true})).toBeEnabled();
+    const result=await (await page.request.get('/api/bpm/sla-configs')).json();
+    expect(String(result.code)).toBe('0');
+    if(result.data.length)for(const name of ['策略 / 适用任务','处理时限','提醒与升级'])await expect(page.getByRole('columnheader',{name,exact:true})).toBeVisible();
+    else await expect(page.getByTestId('sla-policy-workspace')).toContainText('还没有时限策略');
   });
-
-  test('PA-001: SLA config list page renders with correct columns @smoke', async ({ page }) => {
-    await navigateToDynamicPage(page, 'sla-config');
-    // Verify key table headers exist
-    const headers = page.locator('thead th');
-    await expect(headers.first()).toBeVisible({ timeout: 8000 });
-    // Verify toolbar create button
-    await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible();
+  test('PA-002: Create SLA config via UI @smoke',async({page})=>{
+    const name=`SLA-UI-${uniqueId()}`;
+    await navigateToDynamicPage(page,'sla-config');await page.getByRole('button',{name:'新建策略',exact:true}).click();await waitForFormReady(page);
+    await fillFormField(page,'name',name);await selectFormField(page,'target_type','process');
+    await page.getByRole('radio',{name:'固定时长',exact:true}).click();await page.getByLabel('时长单位',{exact:true}).selectOption('hours');await page.getByLabel('时长数值',{exact:true}).fill('1');
+    const body=await clickSaveAndWait(page,{expectedCommandCode:'admin:create_sla_config'});expect(extractRecordId(body)).toBeTruthy();
+    await navigateToDynamicPage(page,'sla-config');await expect(page.getByTestId('sla-policy-row').filter({hasText:name})).toContainText('1 小时');
   });
-
-  test('PA-002: Create SLA config via UI @smoke', async ({ page }) => {
-    test.slow();
-    const name = `SLA-UI-${uniqueId()}`;
-
-    await navigateToDynamicPage(page, 'sla-config');
-    await clickCreateButton(page);
-    await waitForFormReady(page);
-
-    // Fill required fields
-    await fillFormField(page, 'name', name);
-    await selectFormField(page, 'target_type', 'process');
-    await selectFormField(page, 'deadline_mode', 'fixed');
-    await fillFormField(page, 'deadline_value', 'pt1h');
-
-    const body = await clickSaveAndWait(page);
-    const recordId = extractRecordId(body);
-    if (recordId) createdPids.push(recordId);
-
-    await navigateToDynamicPage(page, 'sla-config');
-    const row = await findRowInPaginatedList(page, name, 12000);
-    await expect(row).toBeVisible();
+  test('PA-003: Edit SLA config via UI',async({page})=>{
+    const helper=new ModelTestHelper(page,ADMIN_SLA_CONFIG);const originalName=`SLA-Edit-${uniqueId()}`,updatedName=`SLA-Updated-${uniqueId()}`;
+    const pid=await helper.createViaApi({name:originalName});await navigateToDynamicPage(page,'sla-config');
+    await page.getByTestId('sla-policy-row').filter({hasText:originalName}).getByRole('button',{name:'编辑',exact:true}).click();
+    await fillControlledInput(page.locator('[name="name"]'),updatedName);await clickSaveAndWait(page,{expectedCommandCode:'admin:update_sla_config'});
+    expect((await helper.fetchViaApi(pid)).name).toBe(updatedName);
+    await navigateToDynamicPage(page,'sla-config');await expect(page.getByTestId('sla-policy-row').filter({hasText:updatedName})).toBeVisible();
   });
-
-  test('PA-003: Edit SLA config via UI', async ({ page }) => {
-    const helper = new ModelTestHelper(page, ADMIN_SLA_CONFIG);
-    const originalName = `SLA-Edit-${uniqueId()}`;
-    const updatedName = `SLA-Updated-${uniqueId()}`;
-
-    // Create via API
-    const pid = await helper.createViaApi({ name: originalName });
-    createdPids.push(pid);
-
-    // Use stable edit route with explicit update command to avoid row-action variance.
-    await openEditFormByPid(page, 'sla-config', pid);
-
-    // Update name field
-    const nameInput = page
-      .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
-      .first();
-    await fillControlledInput(nameInput, updatedName);
-    await clickSaveAndWait(page, { expectedCommandCode: 'admin:update_sla_config' });
-
-    // Backend truth for this record id is the assertion source of truth.
-    const updated = await helper.fetchViaApi(pid).catch(() => null);
-    expect(String(updated?.name ?? '')).toBe(updatedName);
-  });
-
-  test('PA-004: Delete SLA config via UI', async ({ page }) => {
-    const helper = new ModelTestHelper(page, ADMIN_SLA_CONFIG);
-    const name = `SLA-Del-${uniqueId()}`;
-
-    // Create via API
-    const pid = await helper.createViaApi({ name });
-    createdPids.push(pid);
-
-    await navigateToDynamicPage(page, 'sla-config');
-    const row = await findRowInPaginatedList(page, name, 12000);
-    try {
-      await clickRowDeleteAndConfirm(page, row);
-    } catch {
-      annotateFallback('SLA row delete action unavailable, fallback to edit-form delete');
-      await openEditFormByPid(page, 'sla-config', pid);
-      const deleted = await clickFormDeleteAndConfirm(page);
-      if (!deleted) {
-        throw new Error(String('SLA delete action is unavailable in current environment'));
-        return;
-      }
-    }
-
-    await expect
-      .poll(
-        async () => {
-          const records = await queryFilteredList(page, 'sla-config', 'name', name);
-          return records.length;
-        },
-        { timeout: 15000, intervals: [500, 1000, 1500] },
-      )
-      .toBe(0);
+  test('PA-004: Delete SLA config via UI',async({page})=>{
+    const helper=new ModelTestHelper(page,ADMIN_SLA_CONFIG);const name=`SLA-Del-${uniqueId()}`;const pid=await helper.createViaApi({name});
+    await navigateToDynamicPage(page,'sla-config');await page.getByTestId('sla-policy-row').filter({hasText:name}).getByRole('button',{name:'查看策略',exact:true}).click();
+    await page.getByRole('tab',{name:'专业配置',exact:true}).click();
+    const response=page.waitForResponse(result=>result.url().includes('/execute/admin:delete_sla_config')&&result.request().method()==='POST');
+    await page.getByRole('button',{name:'删除策略',exact:true}).click();await acceptConfirmDialog(page);expect((await response).ok()).toBe(true);
+    const result=await (await page.request.get('/api/bpm/sla-configs')).json();expect(String(result.code)).toBe('0');expect(result.data.some((row:any)=>row.pid===pid)).toBe(false);
   });
 });
 

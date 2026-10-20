@@ -5,11 +5,24 @@ import type { Capability, CapabilityGroup } from '../types';
 
 const i18n = vi.hoisted(() => ({ locale: 'zh-CN' }));
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ locale: i18n.locale, t: (_key: string, _vars?: unknown, fallback?: string) => fallback }),
+  useI18n: () => ({
+    locale: i18n.locale,
+    t: (_key: string, _vars?: unknown, fallback?: string) => fallback,
+  }),
 }));
 
 function cap(code: string, granted: boolean, sensitive = false) {
   return {
+    authorizationState: granted ? ('full' as const) : ('none' as const),
+    description: null,
+    tier: null,
+    displayGroupOrder: 10000,
+    displayOrder: 100,
+    localizedLabels: {},
+    localizedDescriptions: {},
+    missingCodes: [],
+    unlockedMenus: null,
+
     code,
     group: '客户管理',
     label: `${code}-label`,
@@ -20,7 +33,12 @@ function cap(code: string, granted: boolean, sensitive = false) {
   };
 }
 
-const legacyTranslations: Array<Capability['localizedLabels']> = [undefined, null, {}, { en: '' }];
+const legacyTranslations: Array<Capability['localizedLabels'] | null | undefined> = [
+  undefined,
+  null,
+  {},
+  { en: '' },
+];
 
 const groups: CapabilityGroup[] = [
   {
@@ -30,7 +48,23 @@ const groups: CapabilityGroup[] = [
 ];
 
 describe('CapabilityChecklist', () => {
-  beforeEach(() => { i18n.locale = 'zh-CN'; });
+  it('renders a readable group heading for an ungrouped declared capability and permits selection', () => {
+    const onToggle = vi.fn();
+    render(
+      <CapabilityChecklist
+        groups={[{ group: null, capabilities: [{ ...cap('org.cap.read', false), group: null }] }]}
+        selected={[]}
+        onToggle={onToggle}
+      />,
+    );
+    expect(screen.getByText('Other capabilities')).toBeVisible();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'org.cap.read-label' }));
+    expect(onToggle).toHaveBeenCalledWith('org.cap.read');
+    expect(screen.queryByText('null')).toBeNull();
+  });
+  beforeEach(() => {
+    i18n.locale = 'zh-CN';
+  });
   it('renders capability labels and marks only sensitive ones with a lock', () => {
     render(
       <CapabilityChecklist groups={groups} selected={['crm.cap.account']} onToggle={() => {}} />,
@@ -137,11 +171,21 @@ describe('CapabilityChecklist', () => {
   it('renders the English declaration label and toggles its original capability code', () => {
     i18n.locale = 'en-US';
     const onToggle = vi.fn();
-    const localized: CapabilityGroup[] = [{ group: 'Organization', capabilities: [{
-      ...cap('org.cap.role', true), label: '管理角色',
-      localizedLabels: { 'zh-CN': '管理角色', en: 'Manage Roles' },
-    }] }];
-    render(<CapabilityChecklist groups={localized} selected={['org.cap.role']} onToggle={onToggle} />);
+    const localized: CapabilityGroup[] = [
+      {
+        group: 'Organization',
+        capabilities: [
+          {
+            ...cap('org.cap.role', true),
+            label: '管理角色',
+            localizedLabels: { 'zh-CN': '管理角色', en: 'Manage Roles' },
+          },
+        ],
+      },
+    ];
+    render(
+      <CapabilityChecklist groups={localized} selected={['org.cap.role']} onToggle={onToggle} />,
+    );
     const checkbox = screen.getByRole('checkbox', { name: 'Manage Roles' });
     expect((checkbox as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByText('管理角色')).toBeNull();
@@ -150,10 +194,18 @@ describe('CapabilityChecklist', () => {
   });
 
   it('updates a declaration label when the locale changes without changing selection', () => {
-    const localized: CapabilityGroup[] = [{ group: 'Organization', capabilities: [{
-      ...cap('org.cap.role', true), label: '管理角色',
-      localizedLabels: { 'zh-CN': '管理角色', en: 'Manage Roles' },
-    }] }];
+    const localized: CapabilityGroup[] = [
+      {
+        group: 'Organization',
+        capabilities: [
+          {
+            ...cap('org.cap.role', true),
+            label: '管理角色',
+            localizedLabels: { 'zh-CN': '管理角色', en: 'Manage Roles' },
+          },
+        ],
+      },
+    ];
     const props = { groups: localized, selected: ['org.cap.role'], onToggle: vi.fn() };
     const view = render(<CapabilityChecklist {...props} />);
     expect(screen.getByRole('checkbox', { name: '管理角色' })).toBeChecked();
@@ -163,28 +215,51 @@ describe('CapabilityChecklist', () => {
     expect(props.onToggle).not.toHaveBeenCalled();
   });
 
-  it.each(legacyTranslations)('preserves a legacy label for absent or empty translations: %j', (localizedLabels) => {
-    i18n.locale = 'en-US';
-    const legacy: CapabilityGroup[] = [{ group: 'Legacy', capabilities: [{
-      ...cap('legacy.cap.read', false), label: 'Legacy Read', localizedLabels,
-    }] }];
-    render(<CapabilityChecklist groups={legacy} selected={[]} onToggle={() => {}} />);
-    expect(screen.getByRole('checkbox', { name: 'Legacy Read' })).not.toBeChecked();
-  });
+  it.each(legacyTranslations)(
+    'preserves a legacy label for absent or empty translations: %j',
+    (localizedLabels) => {
+      i18n.locale = 'en-US';
+      const legacy: CapabilityGroup[] = [
+        {
+          group: 'Legacy',
+          capabilities: [
+            {
+              ...cap('legacy.cap.read', false),
+              label: 'Legacy Read',
+              // @ts-expect-error Deliberately malformed legacy data exercises defensive rendering, not the current wire contract.
+              localizedLabels,
+            },
+          ],
+        },
+      ];
+      render(<CapabilityChecklist groups={legacy} selected={[]} onToggle={() => {}} />);
+      expect(screen.getByRole('checkbox', { name: 'Legacy Read' })).not.toBeChecked();
+    },
+  );
 
   it('switches a description hint by locale without changing the grant selection', () => {
     const capability = {
-      ...cap('org.cap.role', true), label: 'Manage Roles',
+      ...cap('org.cap.role', true),
+      label: 'Manage Roles',
       description: 'Source role description',
       localizedDescriptions: { 'zh-CN': 'Source role description', en: 'View and manage roles' },
     };
-    const props = { groups: [{ group: 'Organization', capabilities: [capability] }],
-      selected: ['org.cap.role'], onToggle: vi.fn() };
+    const props = {
+      groups: [{ group: 'Organization', capabilities: [capability] }],
+      selected: ['org.cap.role'],
+      onToggle: vi.fn(),
+    };
     const view = render(<CapabilityChecklist {...props} />);
-    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute('title', 'Source role description');
+    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute(
+      'title',
+      'Source role description',
+    );
     i18n.locale = 'en-GB';
     view.rerender(<CapabilityChecklist {...props} />);
-    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute('title', 'View and manage roles');
+    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute(
+      'title',
+      'View and manage roles',
+    );
     expect(screen.getByRole('checkbox', { name: 'Manage Roles' })).toBeChecked();
     expect(props.onToggle).not.toHaveBeenCalled();
   });
@@ -192,10 +267,17 @@ describe('CapabilityChecklist', () => {
   it('keeps a legacy description and omits the hint when no description is supplied', () => {
     i18n.locale = 'en-US';
     const legacy = { ...cap('legacy.cap.read', false), description: 'Legacy description' };
-    render(<CapabilityChecklist groups={[{ group: 'Legacy', capabilities: [legacy, cap('empty.cap.read', false)] }]}
-      selected={[]} onToggle={vi.fn()} />);
-    expect(screen.getByTestId('capability-legacy.cap.read')).toHaveAttribute('title', 'Legacy description');
+    render(
+      <CapabilityChecklist
+        groups={[{ group: 'Legacy', capabilities: [legacy, cap('empty.cap.read', false)] }]}
+        selected={[]}
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('capability-legacy.cap.read')).toHaveAttribute(
+      'title',
+      'Legacy description',
+    );
     expect(screen.getByTestId('capability-empty.cap.read')).not.toHaveAttribute('title');
   });
-
 });
