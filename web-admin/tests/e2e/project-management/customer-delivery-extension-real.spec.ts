@@ -193,6 +193,8 @@ test('customer extension keeps read-only access and rejects conflicting contribu
     'tpm.milestone.read',
     'model.tpm_milestone.read',
     'model.tpm_customer.read',
+    'meta.designer.read',
+    'page.page.read',
   ];
   await data(
     await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {
@@ -246,6 +248,23 @@ test('customer extension keeps read-only access and rejects conflicting contribu
         )
       ).tpm_pj_next_action,
     ).toBe(before.tpm_pj_next_action);
+    await navigateToMenuByClick(page, ['元数据管理', '页面配置']);
+    await page.getByTestId('list-search-input').fill('tpm_project_form');
+    await page.getByTestId('list-search-input').press('Enter');
+    await page.getByRole('row').filter({ hasText: 'tpm_project_form' }).getByText('统一设计器', { exact: true }).click();
+    const designerUrl = page.url();
+    const pagePid = new URL(designerUrl).searchParams.get('pid') || new URL(designerUrl).searchParams.get('pageId');
+    expect(pagePid).toMatch(/^[0-9A-Z]{26}$/);
+    const definition = await data(await page.request.get(`/api/pages/${pagePid}`));
+    await actor.goto(designerUrl);
+    await expect(actor.getByTestId('unified-designer-workbench')).toBeVisible();
+    await expect(actor.getByTestId('designer-save')).toBeDisabled();
+    await expect(actor.getByTestId('designer-publish')).toBeDisabled();
+    const deniedPage = await actor.request.put(`/api/pages/${pagePid}`, { data: { ...definition, title: 'Forbidden reader page mutation' } });
+    expect(deniedPage.status()).toBe(403);
+    const retained = await data(await page.request.get(`/api/pages/${pagePid}`));
+    expect(retained.title).toEqual(definition.title); expect(retained.blocks).toEqual(definition.blocks);
+    await shot(actor, 'X07-reader-designer');
   } finally {
     await context.close();
   }

@@ -82,6 +82,32 @@ test('mature project page is refined with real undo redo, save recovery, publish
   await expect.poll(sectionOrder).toEqual(['outline-item-plan', 'outline-item-outcome']);
   await page.getByTestId('designer-undo').click();
   await expect.poll(sectionOrder).toEqual(['outline-item-outcome', 'outline-item-plan']);
+  const originalDescription = original.blocks.find((block: any) => block.id === 'outcome').fields.find((field: any) => (typeof field === 'string' ? field : field.field) === 'tpm_pj_description');
+  const descriptionId = originalDescription.id ?? 'outcome_tpm_pj_description';
+  const moveDescription = async (parent: string) => {
+    const source = await page.getByTestId(`outline-item-${descriptionId}`).boundingBox();
+    const destination = await page.getByTestId(`outline-item-${parent}`).boundingBox();
+    expect(source).not.toBeNull(); expect(destination).not.toBeNull();
+    await page.mouse.move(source!.x + 16, source!.y + source!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(destination!.x + 40, destination!.y + destination!.height / 2, { steps: 14 });
+    await page.mouse.up();
+    await expect(page.getByTestId(`canvas-block-${parent}`).getByTestId(`canvas-block-${descriptionId}`)).toBeAttached();
+  };
+  await moveDescription('plan');
+  await page.getByTestId(`canvas-block-${descriptionId}`).scrollIntoViewIfNeeded();
+  await shot(page, 'PD00b-nested-field-moved');
+  const nestingSave = page.waitForResponse(response => new URL(response.url()).pathname === `/api/pages/${pid}` && response.request().method() === 'PUT');
+  await page.getByTestId('designer-save').click(); expect((await nestingSave).status()).toBe(200);
+  const nested = await data(await page.request.get(`/api/pages/${pid}`));
+  const fieldNames = (section: any) => section.fields.map((field: any) => typeof field === 'string' ? field : field.field);
+  expect(fieldNames(nested.blocks.find((block: any) => block.id === 'plan'))).toContain('tpm_pj_description');
+  expect(fieldNames(nested.blocks.find((block: any) => block.id === 'outcome'))).not.toContain('tpm_pj_description');
+  await page.reload();
+  await expect(page.getByTestId('canvas-block-plan').getByTestId(`canvas-block-${descriptionId}`)).toBeAttached();
+  await page.getByTestId(`canvas-block-${descriptionId}`).scrollIntoViewIfNeeded();
+  await shot(page, 'PD00c-nested-persisted-reopened');
+  await moveDescription('outcome');
   const originalTitle = original.blocks.find((block: any) => block.id === 'outcome').title;
   const before = typeof originalTitle === 'string' ? originalTitle : originalTitle['zh-CN'];
   const refined = before === '客户与交付背景' ? '客户与项目背景' : '客户与交付背景';
@@ -98,6 +124,7 @@ test('mature project page is refined with real undo redo, save recovery, publish
   await expect(title).toHaveValue(refined);
   await shot(page, 'PD02-project-form-refined');
 
+  const beforeRejectedSave = await data(await page.request.get(`/api/pages/${pid}`));
   // A transport failure is an explicit UI-state probe, not a real database outage.
   await page.route(`**/api/pages/${pid}`, (route) =>
     route.request().method() === 'PUT'
@@ -118,7 +145,7 @@ test('mature project page is refined with real undo redo, save recovery, publish
   await expect(title).toHaveValue(refined);
   await expect(page.getByTestId('designer-save')).toBeEnabled();
   const unchanged = await data(await page.request.get(`/api/pages/${pid}`));
-  expect(unchanged.blocks).toEqual(original.blocks);
+  expect(unchanged.blocks).toEqual(beforeRejectedSave.blocks);
   await shot(page, 'PD03-save-failure-retains-draft-injected');
   await page.unroute(`**/api/pages/${pid}`);
   const saving = page.waitForResponse(
