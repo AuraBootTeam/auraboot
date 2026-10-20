@@ -796,7 +796,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             // V2 plans own only physical DDL deferral; logical required remains unchanged.
             try (var migration = modelFieldRenameMigrator.prepare(request.getIdentifierMappingPath(),
-                    manifest, tenantId, pluginPid, importId)) {
+                    identifierMappingRoot(context, request), manifest, tenantId, pluginPid, importId)) {
                 importResources(context, request, result, pluginPid);
                 if (migration.isV2()) result.setFieldMigrations(migration.complete());
                 else applyIdentifierDataMigration(request, result, tenantId);
@@ -868,6 +868,14 @@ public class PluginImportServiceImpl implements PluginImportService {
      * when the request declares one, attaching per-model receipts to the result.
      * Runs inside the import transaction — any failure rolls the whole import back.
      */
+    private java.nio.file.Path identifierMappingRoot(ImportContext context, ImportRequest request) {
+        if (request.getIdentifierMappingPath() == null || request.getIdentifierMappingPath().isBlank()) return null;
+        if (!"directory".equals(context.getHistory().getSourceType())) {
+            throw new IllegalArgumentException("Identifier mapping requires a parsed directory import");
+        }
+        return java.nio.file.Path.of(context.getHistory().getSourceName());
+    }
+
     private void applyIdentifierDataMigration(ImportRequest request, ImportExecuteResult result, Long tenantId) {
         String mappingPath = request.getIdentifierMappingPath();
         if (mappingPath == null || mappingPath.isBlank()) {

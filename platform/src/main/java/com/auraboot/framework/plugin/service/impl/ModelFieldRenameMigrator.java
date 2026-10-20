@@ -66,13 +66,11 @@ public class ModelFieldRenameMigrator {
         return List.copyOf(result);
     }
 
-    public Session prepare(String mappingPath, PluginManifestExtended manifest, long tenant,
+    public Session prepare(String mappingPath, Path importRoot, PluginManifestExtended manifest, long tenant,
                            String pluginPid, String importId) {
         assertForwardOnly(manifest, tenant);
         if (mappingPath == null || mappingPath.isBlank()) return new Session(List.of(), null, tenant, pluginPid, importId);
-        JsonNode root;
-        try { root = json.readTree(Files.readString(Path.of(mappingPath))); }
-        catch (IOException ex) { throw new IllegalArgumentException("Unreadable identifier mapping", ex); }
+        JsonNode root = readMapping(mappingPath, importRoot, json);
         List<Rename> renames = parse(root);
         if (renames.isEmpty()) return new Session(List.of(), null, tenant, pluginPid, importId);
         require(TransactionSynchronizationManager.isActualTransactionActive(), "Field rename requires import transaction");
@@ -109,6 +107,34 @@ public class ModelFieldRenameMigrator {
             @Override public void afterCompletion(int status) { plans.forEach(p -> evict(tenant, p.rename())); }
         });
         return new Session(plans, scope, tenant, pluginPid, importId);
+    }
+
+    /** The root belongs to the parsed directory import, never to a second caller-supplied root. */
+    static JsonNode readMapping(String mappingPath, Path importRoot, ObjectMapper json) {
+        require(importRoot != null && importRoot.isAbsolute(), "Identifier mapping requires a directory import");
+        try {
+            Path root = importRoot.toRealPath();
+            Path candidate = Path.of(mappingPath);
+            for (Path segment : candidate) require(!segment.toString().equals(".."), "Identifier mapping traversal denied");
+            Path mapping = candidate.normalize();
+            // Existing repository migrations are an explicit sibling store, not arbitrary siblings.
+            Path sharedMigrations = root.getParent() == null ? null : root.getParent().resolve("migrations");
+            if (sharedMigrations != null && mapping.startsWith(sharedMigrations)) root = sharedMigrations.toRealPath();
+            require(mapping.isAbsolute() && mapping.startsWith(root), "Identifier mapping is outside the imported plugin directory");
+            require(Files.isRegularFile(mapping, java.nio.file.LinkOption.NOFOLLOW_LINKS), "Identifier mapping must be a regular file");
+            Path realMapping = mapping.toRealPath();
+            require(realMapping.startsWith(root), "Identifier mapping is outside the imported plugin directory");
+            try (var channel = Files.newByteChannel(realMapping,
+                    Set.of(java.nio.file.StandardOpenOption.READ, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+                 var input = java.nio.channels.Channels.newInputStream(channel)) {
+                require(channel.size() <= 1_048_576, "Identifier mapping is too large");
+                byte[] bytes = input.readNBytes(1_048_577);
+                require(bytes.length <= 1_048_576, "Identifier mapping is too large");
+                return json.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readTree(bytes);
+            }
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Unreadable identifier mapping", ex);
+        }
     }
 
     private void assertForwardOnly(PluginManifestExtended manifest, long tenant) {

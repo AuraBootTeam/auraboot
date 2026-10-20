@@ -116,7 +116,7 @@ public class ImportRequest {
     private Boolean dryRun = false;
 
     /**
-     * Optional absolute path to an identifier-mapping JSON
+     * Optional absolute path inside the parsed plugin directory or its sibling migrations store to an identifier-mapping JSON
      * ({"identifiers":[{"from":"legacy_code","to":"renamed_code"},...]}).
      * When present, after the import's resources are persisted and its models
      * published, the import chain migrates legacy-identifier physical-table

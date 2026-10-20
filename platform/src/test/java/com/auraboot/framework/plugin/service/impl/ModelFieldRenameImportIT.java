@@ -219,7 +219,8 @@ class ModelFieldRenameImportIT {
         return Map.of("pluginId","com.test."+nonce+"."+suffix,"namespace",nonce+suffix,"version","1.0.0","displayName",nonce,"models",modelList,"fields",fields,"modelFieldBindings",bindings,"commands",commandList);
     }
     Path mapping(String model,String from,String to) throws Exception {
-        Path path=evidence.resolve(model+"-mapping.json");json.writeValue(path.toFile(),Map.of("schemaVersion",2,"modelFieldRenames",List.of(Map.of("modelCode",model,"fromField",from,"toField",to))));return path;
+        Path mappings=evidence.resolve("migrations");Files.createDirectories(mappings);
+        Path path=mappings.resolve(model+"-mapping.json");json.writeValue(path.toFile(),Map.of("schemaVersion",2,"modelFieldRenames",List.of(Map.of("modelCode",model,"fromField",from,"toField",to))));return path;
     }
     ImportExecuteResult importManifest(String label,Map<String,Object> manifest,Path mapping) throws Exception {
         Path directory=evidence.resolve(label);Files.createDirectories(directory);json.writeValue(directory.resolve("plugin.json").toFile(),manifest);

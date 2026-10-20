@@ -82,9 +82,19 @@ class ModelFieldRenameWorkflowTest {
     Map<String,Object> field(String code,long id) {
         var f=new HashMap<String,Object>(); f.put("code",code); f.put("field_id",id); f.put("binding_pid",code+"-binding"); f.put("field_pid",code+"-pid"); f.put("data_type","STRING"); f.put("required",true); f.put("visible",true); f.put("editable",true); f.put("extension","{}"); return f;
     }
+    @TempDir Path outsideDirectory;
+    @Test void mappingOutsideTheImportedDirectoryIsRejectedBeforeReadingItsContents() throws Exception {
+        Path outside=outsideDirectory.resolve("mapping.json");Files.writeString(outside,"{\"identifiers\":[]}");
+        assertThrows(IllegalArgumentException.class,()->service.prepare(outside.toString(),directory,manifest,7L,"plugin","import"));
+    }
+    @Test void symbolicMappingCannotEscapeTheImportedDirectory() throws Exception {
+        Path outside=outsideDirectory.resolve("mapping.json");Files.writeString(outside,"{\"identifiers\":[]}");
+        Path link=directory.resolve("linked.json");Files.createSymbolicLink(link,outside);
+        assertThrows(IllegalArgumentException.class,()->service.prepare(link.toString(),directory,manifest,7L,"plugin","import"));
+    }
     @Test void freshModelHasNoSourceDependencyAndKeepsRequiredBinding() {
         fresh=true;
-        try(var session=service.prepare(path,manifest,7L,"plugin","import")) {
+        try(var session=service.prepare(path,directory,manifest,7L,"plugin","import")) {
             imported.set(true);
             var receipt=session.complete().getFirst();
             assertTrue(receipt.freshInstall()); assertEquals(0,receipt.copiedRows());
@@ -94,7 +104,7 @@ class ModelFieldRenameWorkflowTest {
     }
     @Test void freshTenantDoesNotInferOrTouchOtherTenantLegacyRows() {
         fresh=true;
-        try(var session=service.prepare(path,manifest,7L,"plugin","import")) {
+        try(var session=service.prepare(path,directory,manifest,7L,"plugin","import")) {
             imported.set(true); session.complete();
         }
         verify(jdbc).queryForList(contains("FROM \"mt_contact\" WHERE tenant_id=? AND (?::text IS NULL OR pid>?) ORDER BY pid LIMIT 500 FOR UPDATE"),eq(7L),isNull(),isNull());
@@ -102,7 +112,7 @@ class ModelFieldRenameWorkflowTest {
     }
     @Test void copyUpdatesOnlyTargetCellAndRetiresOnlyScopedBinding() {
         var row=new HashMap<String,Object>(); row.put("pid","row-pid");row.put("source_value","😀中文");row.put("target_value",null);businessRows.set(List.of(row));
-        try(var session=service.prepare(path,manifest,7L,"plugin","import")) { assertEquals(1,session.complete().getFirst().copiedRows()); }
+        try(var session=service.prepare(path,directory,manifest,7L,"plugin","import")) { assertEquals(1,session.complete().getFirst().copiedRows()); }
         verify(jdbc).update("UPDATE \"mt_contact\" SET \"new_name\"=? WHERE tenant_id=? AND pid=?","😀中文",7L,"row-pid");
         verify(jdbc).update(contains("SET deleted_flag=true"),eq(11L),eq(7L),eq(12L));
         verify(jdbc).execute("LOCK TABLE \"mt_contact\" IN SHARE ROW EXCLUSIVE MODE");
@@ -113,62 +123,62 @@ class ModelFieldRenameWorkflowTest {
         manifest.getModelFieldBindings().getFirst().setRequired(false);
         when(models.getModelDefinitionFromDb("contact")).thenReturn(Optional.of(ModelDefinition.builder().code("contact").tableName("mt_contact").fields(List.of(FieldDefinition.builder().code("new_name").columnName("new_name").dataType("string").maxLength(50).required(false).build())).build()));
         String targetHash;
-        try(var session=service.prepare(path,manifest,7L,"plugin","first")) { targetHash=session.complete().getFirst().targetDefinitionSha256(); }
+        try(var session=service.prepare(path,directory,manifest,7L,"plugin","first")) { targetHash=session.complete().getFirst().targetDefinitionSha256(); }
         source=null;
         prior.set(Map.of("id",99L,"plugin_pid","plugin","physical_table","mt_contact","source_definition_sha256","a".repeat(64),"target_definition_sha256",targetHash));
         for(Object edited : Arrays.asList("Legitimately edited",null)) {
             var row=new HashMap<String,Object>(); row.put("pid","row-pid");row.put("source_value","original");row.put("target_value",edited);businessRows.set(List.of(row));
-            try(var session=service.prepare(path,manifest,7L,"plugin","again")) { assertEquals(1,session.complete().getFirst().retainedRows()); }
+            try(var session=service.prepare(path,directory,manifest,7L,"plugin","again")) { assertEquals(1,session.complete().getFirst().retainedRows()); }
         }
         verify(jdbc,never()).update(contains("UPDATE \"mt_contact\""),any(Object[].class));
     }
     @Test void bindingFromAnotherModelAndWrongOwnerAreRejectedBeforeImport() {
         manifest.setModelFieldBindings(List.of(ModelFieldBindingDTO.builder().modelCode("category").fieldCode("new_name").build()));
-        assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"plugin","import"));
         manifest.setModelFieldBindings(List.of(ModelFieldBindingDTO.builder().modelCode("contact").fieldCode("new_name").build()));
-        assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"foreign-plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"foreign-plugin","import"));
     }
     @Test void retiredBindingAndCommandCannotReturnThroughUnmappedOrLegacyImports() throws Exception {
         doReturn(List.of(Map.of("model_code","contact","from_field","old_name"))).when(jdbc).queryForList(startsWith("SELECT model_code,from_field"),eq(7L));
         var clean=manifest.getModelFieldBindings();
         manifest.setModelFieldBindings(List.of(ModelFieldBindingDTO.builder().modelCode("contact").fieldCode("old_name").build()));
-        assertThrows(IllegalArgumentException.class,()->service.prepare(null,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(null,directory,manifest,7L,"plugin","import"));
         Files.writeString(Path.of(path),"{\"identifiers\":[{\"from\":\"legacy\",\"to\":\"renamed\"}]}");
-        assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"plugin","import"));
         manifest.setModelFieldBindings(clean);
         manifest.setCommands(List.of(CommandDefinitionDTO.builder().code("contact:update").modelCode("contact").type("update").inputFields(List.of("old_name")).build()));
-        assertThrows(IllegalArgumentException.class,()->service.prepare(null,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(null,directory,manifest,7L,"plugin","import"));
         manifest.setCommands(null);
-        assertDoesNotThrow(()->service.prepare(null,manifest,7L,"plugin","import").close());
+        assertDoesNotThrow(()->service.prepare(null,directory,manifest,7L,"plugin","import").close());
     }
     @Test void independentMasksAccessPoliciesAndFieldPermissionsCannotDisappear() {
         source.put("extension","{\"extension\":{\"fieldPermission\":{\"view\":[\"private_role\"]}}}");
-        assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"plugin","import"));
         source.put("extension","{}");
         when(jdbc.queryForObject(contains("FROM ab_field_mask_config"),eq(Long.class),any(Object[].class))).thenReturn(1L);
-        assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"plugin","import"));
         when(jdbc.queryForObject(contains("FROM ab_field_mask_config"),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.queryForObject(contains("FROM ab_data_permission_policy"),eq(Long.class),any(Object[].class))).thenReturn(1L);
-        assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"plugin","import"));
     }
     @Test void sourceCapabilitiesAndPhysicalConstraintsCannotBeDropped() {
         for(String feature : List.of("{\"validation\":{\"pattern\":\"private\"}}", "{\"unique\":true}","{\"readonly\":true}","{\"computeDependencies\":[\"other\"]}")) {
             source.put("feature",feature);
-            assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"plugin","import"));
+            assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"plugin","import"));
         }
         source.remove("feature");target.put("editable",false);
-        try(var session=service.prepare(path,manifest,7L,"plugin","import")) {assertThrows(IllegalArgumentException.class,session::complete);}
+        try(var session=service.prepare(path,directory,manifest,7L,"plugin","import")) {assertThrows(IllegalArgumentException.class,session::complete);}
         target.put("editable",true);
         when(jdbc.queryForObject(contains("FROM pg_constraint"),eq(Long.class),any(Object[].class))).thenReturn(1L);
-        try(var session=service.prepare(path,manifest,7L,"plugin","import")) {assertThrows(IllegalArgumentException.class,session::complete);}
+        try(var session=service.prepare(path,directory,manifest,7L,"plugin","import")) {assertThrows(IllegalArgumentException.class,session::complete);}
         verify(jdbc,never()).update(contains("UPDATE \"mt_contact\""),any(Object[].class));
     }
     @Test void virtualSourceAndTargetConflictFailClosed() {
         source.put("extension","{\"jsonbPath\":\"name\"}");
-        assertThrows(IllegalArgumentException.class,()->service.prepare(path,manifest,7L,"plugin","import"));
+        assertThrows(IllegalArgumentException.class,()->service.prepare(path,directory,manifest,7L,"plugin","import"));
         source.put("extension","{}");
         businessRows.set(List.of(Map.of("pid","row-pid","source_value","original","target_value","conflict")));
-        try(var session=service.prepare(path,manifest,7L,"plugin","import")) { assertThrows(IllegalArgumentException.class,session::complete); }
+        try(var session=service.prepare(path,directory,manifest,7L,"plugin","import")) { assertThrows(IllegalArgumentException.class,session::complete); }
         verify(jdbc,never()).update(contains("UPDATE \"mt_contact\""),any(Object[].class));
     }
 }
