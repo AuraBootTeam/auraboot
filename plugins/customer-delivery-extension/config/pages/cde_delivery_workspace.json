@@ -144,10 +144,10 @@
         {
           "field": "delivery_stage",
           "label": {
-            "zh-CN": "交付阶段",
+            "zh-CN": "阶段",
             "en": "Stage"
           },
-          "width": 90
+          "width": 110
         },
         {
           "field": "budget",
@@ -155,7 +155,10 @@
             "zh-CN": "预算（元）",
             "en": "Budget"
           },
-          "width": 120
+          "width": 120,
+          "valueType": "currency",
+          "currencyCode": "CNY",
+          "align": "right"
         },
         {
           "field": "delivery_date",

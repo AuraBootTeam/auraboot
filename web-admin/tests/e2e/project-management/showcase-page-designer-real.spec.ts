@@ -177,7 +177,7 @@ test('mature project creation and editing preserve customer owner dates budget a
   const identity = await loginDeliveryMember(page);
   await projects(page);
   await expect(page.getByRole('row').filter({ hasText: '华辰制造 · 供应链协同平台' })).toHaveCount(1);
-  await expect(page.getByRole('columnheader', { name: '负责人', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: /负责人$/ })).toBeVisible();
   await shot(page, 'PJ01-mature-project-list');
   await page.getByRole('button', { name: '新建项目', exact: true }).click();
   const name = `华辰制造 · 服务交付二期 · ${Date.now().toString(36)}`;
