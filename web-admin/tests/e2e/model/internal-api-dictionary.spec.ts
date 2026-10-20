@@ -352,6 +352,7 @@ test('dictionary batch feedback uses actual counts and an empty tree remains edi
     await expect(page).toHaveURL(
       (url) => url.pathname === '/meta/dict' && url.searchParams.get('code') === code,
     );
+    await expect(page.getByTestId('filter-search')).toBeEnabled();
     return page.locator('tbody tr').filter({ hasText: code });
   }
   async function batch() {

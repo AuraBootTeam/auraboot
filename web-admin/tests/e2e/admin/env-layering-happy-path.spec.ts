@@ -66,16 +66,10 @@ async function fillCreateForm(page: Page, code: string, name: string) {
 }
 
 async function openCreateModal(page: Page) {
-  // Click the New-Environment header button and wait for the modal to render.
-  // Under parallel workers the modal click can race with React re-renders
-  // triggered by concurrent network activity, so retry once if the initial
-  // click is absorbed before showForm flips to true.
+  await expect(page.locator('header')).toHaveAttribute('data-hydrated', 'true');
   const btn = page.locator('button', { hasText: 'New Environment' }).first();
   const codeInput = page.locator('input[placeholder*="dev, staging, prod"]');
   await btn.click();
-  if (!(await codeInput.isVisible({ timeout: 3_000 }).catch(() => false))) {
-    await btn.click();
-  }
   await codeInput.waitFor({ state: 'visible', timeout: 5_000 });
 }
 
@@ -237,6 +231,7 @@ test.describe('Env-layering happy path', () => {
   }) => {
     await page.goto(PROMOTION_PAGE);
     await expect(page.locator('h1', { hasText: 'Promotions' })).toBeVisible();
+    await expect(page.locator('header')).toHaveAttribute('data-hydrated', 'true');
 
     await page.locator('[data-testid="promotion-new-btn"]').click();
     const modal = page.locator('[data-testid="promotion-create-modal"]');

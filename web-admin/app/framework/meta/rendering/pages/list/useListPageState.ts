@@ -461,10 +461,12 @@ export function useListPageState(
     const needsUpdate =
       currentUrlPageNum !== pagination.current || currentUrlPageSize !== pagination.pageSize;
     if (!needsUpdate) return;
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('pageNum', String(pagination.current));
-    nextParams.set('pageSize', String(pagination.pageSize));
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams((previous) => {
+      const nextParams = new URLSearchParams(previous);
+      nextParams.set('pageNum', String(pagination.current));
+      nextParams.set('pageSize', String(pagination.pageSize));
+      return nextParams;
+    }, { replace: true });
   }, [pagination.current, pagination.pageSize, searchParams, setSearchParams]);
 
   return {
