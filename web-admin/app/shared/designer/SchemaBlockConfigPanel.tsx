@@ -17,6 +17,7 @@ import { PropertyFieldRenderer } from '~/shared/designer/PropertyFieldRenderer';
 import type { PropertySchema } from '~/shared/designer/types';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import { cn } from '~/utils/cn';
+import { getByPath, setByPath } from './propertyPath';
 import { getLocalizedText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 
@@ -53,18 +54,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
 }: SchemaBlockConfigPanelProps<T>) {
   const { locale, t } = useI18n();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const read = (object: Record<string, unknown>, key: string) =>
-    pathMode === 'nested'
-      ? key
-          .split('.')
-          .reduce<unknown>(
-            (node, part) =>
-              node && typeof node === 'object'
-                ? (node as Record<string, unknown>)[part]
-                : undefined,
-            object,
-          )
-      : object[key];
+  const read = (object: Record<string,unknown>, key: string) => pathMode === 'nested' ? getByPath(object,key) : object[key];
   const effectiveValue: Record<string, unknown> = { ...value };
   for (const schema of schemas) {
     if (read(value, schema.key) === undefined && schema.defaultValue !== undefined) {
@@ -139,7 +129,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
                     setErrors((previous) => ({ ...previous, [schema.key]: '' }));
                     const next =
                       pathMode === 'nested'
-                        ? setPropertyPath(latestValueRef.current, schema.key, v)
+                        ? setByPath(latestValueRef.current, schema.key, v)
                         : { ...latestValueRef.current, [schema.key]: v };
                     latestValueRef.current = next;
                     onChange(next, schema.key);
@@ -315,26 +305,4 @@ function buildGroupHint(
     { count: visibleCount },
     'This group has ' + visibleCount + ' configurable settings.',
   );
-}
-
-/** Immutable nested writes keep document identity and unrelated DSL values intact. */
-export function setPropertyPath<T extends Record<string, unknown>>(
-  value: T,
-  path: string,
-  next: unknown,
-): T {
-  const keys = path.split('.');
-  if (keys.some((key) => ['__proto__', 'constructor', 'prototype'].includes(key)))
-    throw new Error('Unsafe property path');
-  const result = { ...value };
-  let node: Record<string, unknown> = result;
-  for (const key of keys.slice(0, -1)) {
-    node[key] =
-      node[key] && typeof node[key] === 'object' && !Array.isArray(node[key])
-        ? { ...(node[key] as Record<string, unknown>) }
-        : {};
-    node = node[key] as Record<string, unknown>;
-  }
-  node[keys[keys.length - 1]] = next;
-  return result;
 }

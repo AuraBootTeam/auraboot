@@ -26,7 +26,7 @@ it('keeps every registered widget schema and its custom-control declarations rea
 describe('dashboard schema document properties',()=>{
   it('changes a zero numeric value, nested toggles and defaults through real undo/redo',()=>{
     const store=useDashboardStore.getState(); store.createDashboard('Schema board');
-    const id=store.addWidget({type:'smart-number-card',x:0,y:0,w:3,h:2,config:{title:'Revenue',precision:0,dataSource:{type:'static',data:[]}}});
+    const id=store.addWidget({type:'smart-number-card',x:0,y:0,w:3,h:2,config:{title:'Revenue',precision:0,dataSource:{type:'static'}}});
     useDashboardStore.getState().selectWidget(id);
     render(<I18nProvider initialLocale="en-US" initialData={{fixture:'loaded'}}><WidgetPropertyPanel /></I18nProvider>);
     expect(within(screen.getByTestId('schema-config-field-refreshInterval')).getByRole('spinbutton')).toHaveValue(0);
