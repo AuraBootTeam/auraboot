@@ -638,7 +638,9 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
 
 
 test('readonly viewers and unassigned reviewers cannot change another acceptance @critical',async({page,browser})=>{
-  const admin=await login(page);const name='华辰制造 · 验收协作权限验证';
+  const admin=await login(page);
+  const issue = new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
+  const name=`华辰制造 · 验收协作权限验证 · ${issue}`;
   const pid=await create(page,admin,name,68000,'普通',true);const sla=await submit(page,pid,480,'tpm_standard_review');
   const tree=await data(await page.request.get('/api/permissions/tree'));const ids=new Map<string,number>();
   const collect=(nodes:any[])=>nodes.forEach(node=>{ids.set(node.code,node.id);collect(node.children||[]);});collect(tree);
@@ -658,6 +660,8 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
       await expect(actor.getByRole('tab',{name:'核验结果',exact:true})).toHaveCount(0);
       if(reviewer) {
         await expect(actor.getByTestId('bpm-operations-approve')).toBeDisabled();
+        await expect(actor.getByTestId('bpm-sla-summary')).toContainText('没有查看处理时限的权限');
+        expect((await actor.request.get(`/api/bpm/monitor/instances/${sla.processInstanceId}/sla`)).status()).toBe(403);
         const refused=await actor.request.post(`/api/bpm/tasks/${sla.taskId}/approve`,{data:{comment:'An unassigned reviewer must be refused',variables:{}}});expect(refused.status()).toBe(403);
       } else {
         await expect(actor.getByTestId('toolbar-btn-edit')).toHaveCount(0);
@@ -679,7 +683,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
       }
       expect((await row(page,pid)).tpm_ac_status).toBe('submitted');await shot(actor,reviewer?'d13':'d13-readonly');
       if(reviewer) {
-        const assignedName='华辰制造 · 指定协作成员审批';
+        const assignedName=`华辰制造 · 指定协作成员审批 · ${issue}`;
         const assignedPid=await create(page,actorUser,assignedName,68000,'普通',true);
         await submit(page,assignedPid,480,'tpm_standard_review');
         await openRecord(actor,assignedName);await expect(actor.getByTestId('bpm-operations-approve')).toBeEnabled();
