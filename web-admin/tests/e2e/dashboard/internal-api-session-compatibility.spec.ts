@@ -24,11 +24,9 @@ test('dashboard usage and account logout survive missing randomUUID', async ({ b
   const widgetResults: Array<{ path: string; status: number; code: unknown; error?: string }> = [];
   const widgetPending: Promise<void>[] = [];
   const reloadedRequests = new WeakSet<object>();
-  let observingReload = false;
   let reloaded = false;
   let journeyError: unknown;
   page.on('pageerror', error => pageErrors.push(error.message));
-  page.on('framenavigated', frame => { if (observingReload && frame === page.mainFrame()) reloaded = true; });
   page.on('request', request => { if (reloaded) reloadedRequests.add(request); });
   page.on('response', response => {
     if (!reloadedRequests.has(response.request())) return;
@@ -48,9 +46,9 @@ test('dashboard usage and account logout survive missing randomUUID', async ({ b
       // Reproduce the precise capability absence seen on CI's HTTP origin.
       Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true });
     });
-    observingReload = true;
-    reloaded = false;
-    await page.reload({ waitUntil: 'load' });
+    await page.reload({ waitUntil: 'commit' });
+    reloaded = true;
+    await page.waitForLoadState('load');
     expect(await page.evaluate(() => typeof crypto.randomUUID)).toBe('undefined');
     expect(await page.evaluate(() => typeof crypto.getRandomValues)).toBe('function');
     await expect(page.getByTestId('ab:dashboard:workbench:container')).toBeVisible();

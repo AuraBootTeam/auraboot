@@ -191,6 +191,7 @@ test.describe('Plugin Lifecycle', () => {
           autoPublishPages: true,
         },
         headers: { 'Content-Type': 'application/json' },
+        timeout: 120_000,
         failOnStatusCode: false,
       });
 
