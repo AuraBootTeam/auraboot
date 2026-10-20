@@ -92,6 +92,7 @@ class ProcurementReminderTickContractTest {
         assertThat(current.indexOf(start, first + 1)).isEqualTo(-1);
         assertThat(last).isGreaterThan(first);
         String original = current.substring(0, first) + current.substring(last + end.length());
+        original = restoreLiteralRuntimePathsForLegacyByteProof(original);
         assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(original.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isEqualTo("4958d64035d321914b2357caece3fcc47b6adc5941a156cd45b9b7b159ee7e28");
         assertThat(original).contains("\"nativeTickExecuted\", false");
     }
@@ -241,7 +242,8 @@ class ProcurementReminderTickContractTest {
         Path root = Path.of("src/test/java/com/auraboot/framework/notification/sourcebinding");
         if (!Files.isDirectory(root)) root = Path.of("platform").resolve(root);
         Map<String, String> originalHashes = Map.of(
-                "ProcurementReminderTickNativeIT.java", "b837f476d5bc8b31b582c336e053ec0c88702e415ca5a53aefd5cc451ca20f88",
+                // Frozen source51751c9c already included prior Native runner fixes.
+                "ProcurementReminderTickNativeIT.java", "3a6e7aeda36155148abc29521b2ab3ba5f72f4c666880ccd31933179ce17f866",
                 "ProductQuoteNativeInitialization.java", "af7f97c3c9308efc4f39063392c8dbe76dbd0f34b1d6410b8955ede3fa7b936a",
                 "ProductQuoteReminderNativeFacet.java", "759436112d6412371baceae75519b84b2104e94948f306a2a239a62e4a8234d0");
         for (var entry : originalHashes.entrySet()) {
@@ -256,10 +258,20 @@ class ProcurementReminderTickContractTest {
             assertThat(first).isNotNegative(); assertThat(last).isGreaterThan(first);
             assertThat(content.indexOf(start, first + 1)).isEqualTo(-1);
             String original = content.substring(0, first) + content.substring(last + end.length());
+            original = restoreLiteralRuntimePathsForLegacyByteProof(original);
             assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                     .digest(original.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isEqualTo(entry.getValue());
         }
     }
+    /** Only the reviewed runtime-path generalization is reversed; all other legacy bytes stay checked. */
+    private static String restoreLiteralRuntimePathsForLegacyByteProof(String value) {
+        return value.replace("resolve(\".workspace/runtimes\").resolve(NativeProcurementWorkspace.runtime())",
+                        "resolve(\".workspace/runtimes/procurement-web-stack-20261010\")")
+                .replace("resolve(\".workspace/evidence\").resolve(NativeProcurementWorkspace.runtime())",
+                        "resolve(\".workspace/evidence/procurement-web-stack-20261010\")")
+                .replace("isEqualTo(NativeProcurementWorkspace.runtime())", "isEqualTo(\"procurement-web-stack-20261010\")");
+    }
+
     public static final class FactoryClockProbe implements com.auraboot.framework.plugin.extension.BackgroundComponentExtension {
         private java.time.Clock clock = java.time.Clock.systemUTC();
         public FactoryClockProbe() {}

@@ -623,6 +623,17 @@ class ProcurementReminderTickNativeIT {
     void automaticallyQueue(AutomaticBackground frame, Clock fixedClock, Path admittedProductJar) throws Exception {
         var manager = context.getBean(com.auraboot.framework.plugin.pf4j.AuraPluginManager.class);
         String owner = "com.auraboot.quote-engine";
+        // Observe the registry's real PF4J return values. The inventory-only discovery
+        // proof API deliberately does not admit background component types.
+        var discoveredInstances = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+        var registrationManager = org.mockito.Mockito.spy(manager);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Object returned = invocation.callRealMethod();
+            assertThat(returned).isInstanceOf(List.class);
+            ((List<?>) returned).forEach(discoveredInstances::add);
+            return returned;
+        }).when(registrationManager).getExtensionsOfType(
+                com.auraboot.framework.plugin.extension.BackgroundComponentExtension.class, owner);
         var captured = new RegisteredAutomaticClock();
         BackgroundDataAccessor bounded = frame.proxy();
         BackgroundTenantAccessor tenantAccessor = () -> List.of(frame.tenant);
@@ -646,7 +657,9 @@ class ProcurementReminderTickNativeIT {
                             if (bean instanceof com.auraboot.framework.plugin.extension.BackgroundComponentExtension) {
                                 assertThat(name).isEqualTo("procurementReminderScheduler");
                                 assertThat(bean.getClass().getName()).isEqualTo("com.auraboot.quote.engine.procurement.ProcurementReminderScheduler");
-                                assertThat(manager.isDiscoveredExtensionInstance(com.auraboot.framework.plugin.extension.BackgroundComponentExtension.class, bean)).isTrue();
+                                assertThat(discoveredInstances.contains(bean)).as("exact object returned by real registry discovery").isTrue();
+                                assertThat(manager.getPlugin(owner).getPluginState()).isEqualTo(org.pf4j.PluginState.STARTED);
+                                assertThat(bean.getClass().getClassLoader()).isSameAs(manager.getPluginClassLoader(owner));
                                 try {
                                     assertThat(Files.isSameFile(admittedProductJar, Path.of(bean.getClass().getProtectionDomain().getCodeSource().getLocation().toURI()))).isTrue();
                                 } catch (java.io.IOException | java.net.URISyntaxException failure) {
@@ -664,9 +677,11 @@ class ProcurementReminderTickNativeIT {
             executor = timer.getScheduledThreadPoolExecutor();
             var processor = child.getBean(ScheduledAnnotationBeanPostProcessor.class);
             assertThat(processor.getScheduledTasks()).isEmpty();
-            var registry = new com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry(child, manager);
+            var registry = new com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry(child, registrationManager);
             try {
                 registry.register(owner);
+                org.mockito.Mockito.verify(registrationManager).getExtensionsOfType(
+                        com.auraboot.framework.plugin.extension.BackgroundComponentExtension.class, owner);
                 assertThat(registry.registeredBeanNames(owner)).containsExactly("procurementReminderScheduler");
                 assertThat(captured.bean.get()).isNotNull();
                 assertThat(child.getBean("procurementReminderScheduler")).isSameAs(captured.bean.get());
