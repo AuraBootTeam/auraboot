@@ -2246,6 +2246,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       );
       await expect(activitiesBlock.getByTestId('activities-empty')).toBeVisible();
       await expect(activitiesBlock).not.toContainText('workbench.activities.');
+      await page.screenshot({ path: test.info().outputPath('DWR-011-crm-ui-seam.png'), fullPage: true });
     } finally {
       await cleanupDashboard(page, dashboard?.pid);
     }
@@ -2394,6 +2395,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         await expect(row.getByTestId(`activity-type-${activity.crm_act_type}`)).toBeVisible();
       }
       await expect(activitiesBlock).not.toContainText('workbench.activities.');
+      await page.screenshot({ path: test.info().outputPath('DWR-012-crm-ui-seam.png'), fullPage: true });
     } finally {
       await cleanupDashboard(page, dashboard?.pid);
     }
@@ -2459,6 +2461,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       );
       await expect(activitiesBlock.getByTestId('activities-permission-denied')).toBeVisible();
       await expect(activitiesBlock).not.toContainText('No recent activities');
+      await page.screenshot({ path: test.info().outputPath('DWR-013-crm-ui-seam.png'), fullPage: true });
     } finally {
       await cleanupDashboard(page, dashboard?.pid);
     }

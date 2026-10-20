@@ -22,7 +22,9 @@
       "maxLength": 128
     },
     "feature": {
-      "searchable": true
+      "searchable": true,
+      "sortable": true,
+      "filterable": true
     }
   },
   {

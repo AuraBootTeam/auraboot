@@ -402,14 +402,14 @@ async function bindAggregate(page: import('@playwright/test').Page, index: numbe
     const dimensions = dp.propertyPanel.locator('label', { hasText: /^分组维度$/ }).locator('..');
     await dimensions.locator('label').filter({ hasText: '(e2et_order_status)' }).getByRole('checkbox').check();
   }
-  const filters = dp.propertyPanel.locator('label', { hasText: /^筛选条件$/ }).locator('..').locator('..');
-  await filters.getByRole('button', { name: 'Add', exact: true }).click();
-  await filters.locator('select').nth(0).selectOption('e2et_order_title');
-  await filters.locator('select').nth(1).selectOption('like');
+  const filters = dp.propertyPanel.getByTestId('designer-filter-builder');
+  await filters.getByRole('button', { name: '添加条件', exact: true }).click();
+  await filters.getByRole('combobox', { name: '字段', exact: true }).selectOption('e2et_order_title');
+  await filters.getByRole('combobox', { name: '运算符', exact: true }).selectOption('like');
   const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/meta/chart-data')
     && r.request().method() === 'POST'
     && r.request().postDataJSON()?.filters?.some((f: { value: string }) => f.value === `HiFi看板-${dashRun}-`));
-  await filters.getByPlaceholder('Value', { exact: true }).fill(`HiFi看板-${dashRun}-`);
+  await filters.getByRole('textbox', { name: '值', exact: true }).fill(`HiFi看板-${dashRun}-`);
   const response = await responsePromise;
   assertBinding(response.request().postDataJSON(), index);
   const body = await response.json();

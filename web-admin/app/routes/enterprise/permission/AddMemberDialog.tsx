@@ -318,7 +318,7 @@ export default function AddMemberDialog({
                     {t('admin.permission.members.noCandidates', undefined, 'No available members found')}
                   </div>
                 ) : (
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <table className="min-w-full [overflow-wrap:anywhere] divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-800">
                       <tr>
                         <th className="px-3 py-2 text-left">

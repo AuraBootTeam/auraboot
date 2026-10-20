@@ -113,6 +113,11 @@ test('v2 permissions: members surface supports add and remove without raw i18n k
   expect(confirmBox!.y).toBeGreaterThanOrEqual(0);
   expect(confirmBox!.x + confirmBox!.width).toBeLessThanOrEqual(viewport!.width);
   expect(confirmBox!.y + confirmBox!.height).toBeLessThanOrEqual(viewport!.height);
+  const dialogBox = await dialog.boundingBox();
+  const tableBox = await dialog.getByRole('table').boundingBox();
+  expect(dialogBox).not.toBeNull();
+  expect(tableBox).not.toBeNull();
+  expect(tableBox!.x + tableBox!.width).toBeLessThanOrEqual(dialogBox!.x + dialogBox!.width + 1);
   await page.screenshot({ path: `${SHOTS}/04-members.png`, fullPage: true });
   const added = page.waitForResponse(r => r.url().includes(`/api/roles/${role.pid}/members/assign`) && r.request().method() === 'POST');
   await page.getByTestId('add-member-confirm').click();
