@@ -143,7 +143,8 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   const expected = action==='approve'?'accepted':'returned';
   await expect.poll(async ()=>(await row(page,pid)).tpm_ac_status).toBe(expected);
   // The detail must update through the contributed block callback, without manual reload.
-  await expect(page.getByTestId('detail-persistent-header')).toHaveCount(0);
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-section-operations')).toHaveCount(0);
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-sla-summary')).toBeVisible();
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
   const sla = await data(await observer.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));
   expect(sla.every((item:any)=>item.status==='completed' && !item.active)).toBe(true);
@@ -917,6 +918,8 @@ async function publishAcceptanceDesign(page: Page) {
   expect((await data(await deployed)).status).toBe('deployed');
   const xml = await data(await page.request.get(`/api/bpm/process-definitions/${definitionPid}/bpmn`));
   expect(xml).toContain('commandCode="tpm:accept_acceptance"');
+  expect(xml).toContain('assigneeType="expression"');
+  expect(xml).toContain('assignee="#tpm_ac_reviewer"');
   expect(xml).toContain('targetRecordPid="${processBusinessKey}"');
   await shot(page,'BPM02-published-design');
   return {definitionPid,originalPid,version:draft.version,originalUnchanged:true,node:'tpm_enhanced_review',label:'验收负责人 · 加强审核',compiledCommand:'tpm:accept_acceptance'};
