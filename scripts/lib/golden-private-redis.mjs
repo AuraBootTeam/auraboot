@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { lstatSync, mkdirSync, openSync, closeSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { constants, fstatSync, lstatSync, mkdirSync, openSync, closeSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -48,13 +48,23 @@ function descriptorPath(report) {
 
 export function readPrivateRedisConfig(report, repo, options) {
   const file = descriptorPath(report);
-  if (!entryStat(file)) return null;
-  need(lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink(), 'Invalid private Redis descriptor');
-  const bytes = readFileSync(file), config = JSON.parse(bytes);
-  need(isDeepStrictEqual(config, privateRedisConfig(report, repo, config.port, options)), 'Private Redis configuration changed');
-  need(!entryStat(config.dataDirectory) || (lstatSync(config.dataDirectory).isDirectory() &&
-    !lstatSync(config.dataDirectory).isSymbolicLink()), 'Invalid private Redis data directory');
-  return { config, path: file, hash: hash(bytes) };
+  need(Number.isInteger(constants.O_NOFOLLOW) && Number.isInteger(constants.O_NONBLOCK),
+    'Safe descriptor reads are unavailable');
+  let fd;
+  try { fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
+  catch (cause) {
+    // An absent descriptor permits initialization; links and other open failures never do.
+    if (cause.code === 'ENOENT') return null;
+    throw cause;
+  }
+  try {
+    need(fstatSync(fd).isFile(), 'Invalid private Redis descriptor');
+    const bytes = readFileSync(fd), config = JSON.parse(bytes);
+    need(isDeepStrictEqual(config, privateRedisConfig(report, repo, config.port, options)), 'Private Redis configuration changed');
+    need(!entryStat(config.dataDirectory) || (lstatSync(config.dataDirectory).isDirectory() &&
+      !lstatSync(config.dataDirectory).isSymbolicLink()), 'Invalid private Redis data directory');
+    return { config, path: file, hash: hash(bytes) };
+  } finally { closeSync(fd); }
 }
 
 function command(file, args) {

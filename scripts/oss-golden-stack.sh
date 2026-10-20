@@ -15,7 +15,7 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--web-mode development|production] [--no-frontend] [--no-warm] [--no-redis] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--web-mode development|production] [--no-frontend] [--no-warm] [--no-redis] [--isolated-redis-port N] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #       --system-mode: bootstrap mode (default single). An initialized database
 #                      must already have this mode; retained data is never converted.
 #       --isolated-redis-port: run an owned private Redis endpoint on an unused port
