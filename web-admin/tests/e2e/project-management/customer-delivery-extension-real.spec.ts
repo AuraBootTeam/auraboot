@@ -261,14 +261,18 @@ test('customer extension keeps read-only access and rejects conflicting contribu
     await expect(actor.getByTestId('unified-designer-workbench')).toBeVisible();
     await expect(actor.getByTestId('designer-save')).toBeDisabled();
     await expect(actor.getByTestId('designer-publish')).toBeDisabled();
+    await expect(actor.getByTestId('designer-unpublish')).toBeDisabled();
     const deniedPage = await actor.request.put(`/api/pages/${pagePid}`, { data: { ...definition, title: 'Forbidden reader page mutation' } });
     expect(deniedPage.status()).toBe(403);
+    expect((await actor.request.post(`/api/pages/${pagePid}/publish`)).status()).toBe(403);
+    expect((await actor.request.post(`/api/pages/${pagePid}/unpublish`)).status()).toBe(403);
     const retained = await data(await page.request.get(`/api/pages/${pagePid}`));
     expect(retained.title).toEqual(definition.title); expect(retained.blocks).toEqual(definition.blocks);
     await shot(actor, 'X07-reader-designer');
   } finally {
     await context.close();
   }
+  await openProject(page);
   const manifest = JSON.parse(
     await readFile(
       join(process.env.AURA_CORE_PROJECT_ROOT!, 'plugins/customer-delivery-extension/plugin.json'),
