@@ -22,6 +22,7 @@ async function packValue(page: Page, key: string) {
   return pack[key];
 }
 async function openSidebarPage(page: Page, path: string) {
+  await expect(page.locator('header')).toHaveAttribute('data-hydrated', 'true');
   await ensureSidebarExpanded(page);
   // Reachability is part of the acceptance: do not bypass the sidebar by goto.
   const entry = page.locator(`nav a[href="${path}"]`);
@@ -39,6 +40,7 @@ async function openSidebarPage(page: Page, path: string) {
   await expect(entry).toBeVisible();
   await entry.click();
   await expect(page).toHaveURL(url => url.pathname === path);
+  await expect(page.locator('header')).toHaveAttribute('data-hydrated', 'true');
 }
 async function openResources(page: Page) {
   await openSidebarPage(page, '/i18n-resources');
