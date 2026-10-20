@@ -209,10 +209,10 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await fillNodeConfig(page, archive, {});
   await expect(page.getByTestId('model-map-field-0')).toHaveValue('tpm_ts_description');
   await expect(page.getByTestId('model-map-value-0')).toHaveValue(marker);
-  const inspector = await page.getByTestId('flow-inspector-shell').boundingBox();
+  const flowInspector = await page.getByTestId('flow-inspector-shell').boundingBox();
   const canvas = await page.getByTestId('flow-canvas-shell').boundingBox();
-  expect(inspector).not.toBeNull(); expect(canvas).not.toBeNull();
-  expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(inspector!.x + 1);
+  expect(flowInspector).not.toBeNull(); expect(canvas).not.toBeNull();
+  expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(flowInspector!.x + 1);
   await expect(page.getByTestId('flow-drawer-backdrop')).toHaveCount(0);
   await page.screenshot({path: info.outputPath('AD01-field-mapping-reopened.png')});
   await fillNodeConfig(page, guard, {});
