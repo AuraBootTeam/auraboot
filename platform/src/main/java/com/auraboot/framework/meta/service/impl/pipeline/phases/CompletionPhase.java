@@ -170,7 +170,7 @@ public class CompletionPhase implements CommandPhase {
 
     private void publishDomainEvent(CommandPipelineContext ctx) {
         try {
-            String recordId = ctx.getRequest() != null ? ctx.getRequest().getTargetRecordId() : null;
+            String recordId = resolveEventRecordId(ctx);
             String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
             Map<String, Object> extraMeta = new HashMap<>();
             if (ctx.getRequest() != null && ctx.getRequest().getAuditContext() != null) {
@@ -199,6 +199,23 @@ public class CompletionPhase implements CommandPhase {
         } catch (Exception e) {
             log.warn("Failed to publish domain event for command {}: {}", ctx.getCommand().getCode(), e.getMessage());
         }
+    }
+
+    private String resolveEventRecordId(CommandPipelineContext ctx) {
+        String target = ctx.getRequest() != null ? ctx.getRequest().getTargetRecordId() : null;
+        if (StringUtils.hasText(target)) return target;
+
+        // Creation has no input target. Use only the server execution result of
+        // a published create command; client payload and read results are not evidence.
+        Map<String, Object> execution = ctx.getExecConfig();
+        if (execution == null) return null;
+        Object params = execution.get("handlerParams");
+        boolean createsRecord = "create".equalsIgnoreCase(String.valueOf(execution.get("type")))
+                || params instanceof Map<?, ?> handlerParams
+                && "create".equalsIgnoreCase(String.valueOf(handlerParams.get("targetRecordAction")));
+        if (!createsRecord) return null;
+        Object created = ctx.resultData().get("recordPid");
+        return created instanceof String pid && StringUtils.hasText(pid) ? pid : null;
     }
 
     private String resolveOperationType(CommandPipelineContext ctx) {
