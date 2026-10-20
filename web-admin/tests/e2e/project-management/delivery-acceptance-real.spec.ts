@@ -903,6 +903,7 @@ async function configureAcceptanceModelAction(page: Page, publish = false) {
     await page.getByTestId('epd-publish-version').click();
     expect((await data(await published)).status).toBe('PUBLISHED');
     await page.reload();
+    await page.getByTestId('epd-step-publish').click();
     await expect(page.getByTestId('epd-publish-status')).toContainText(/已发布|PUBLISHED/);
     await shot(page,'AC02-published');
   }

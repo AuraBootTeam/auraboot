@@ -567,11 +567,12 @@ test('R01 restores a persisted business table and retains server rules after rel
     }),
   );
   await navigateToMenuByClick(page, ['策略工作台']);
-  await page.getByTestId('strategy-business-decision').selectOption(code);
+  await page.getByTestId(`ddl-open-${code}`).click();
   await expect(page.getByTestId('strategy-studio')).toContainText(name);
   await expect(page.getByTestId('dt-in-delivery_amount')).toHaveText('交付金额（元）');
   await expect(page.getByLabel('val-0-delivery_amount', { exact: true })).toHaveValue('168000');
   await expect(page.getByTestId('strategy-publish')).toBeDisabled();
+  await page.getByTestId('strategy-workspace-tab-test').click();
   await page
     .getByTestId('strategy-test-inputs')
     .getByLabel('交付金额（元）', { exact: true })
@@ -580,7 +581,7 @@ test('R01 restores a persisted business table and retains server rules after rel
   await expect(page.getByTestId('strategy-test-outputs')).toContainText('enhanced');
   await shot(page, 'R01-restored');
   await page.reload();
-  await page.getByTestId('strategy-business-decision').selectOption(code);
+  await expect(page.getByTestId('strategy-business-decision')).toHaveValue(code);
   await expect(page.getByLabel('val-0-delivery_amount', { exact: true })).toHaveValue('168000');
   const after = await payload(await page.request.get(`/api/decision/definitions/${code}/versions`));
   expect(after).toHaveLength(1);
