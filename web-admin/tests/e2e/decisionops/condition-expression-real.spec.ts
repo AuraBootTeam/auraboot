@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { navigateToMenuByClick } from '../helpers';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 
 const evidence = process.env.AURA_EVIDENCE_DIR;
 if (!evidence) throw Error('Bind AURA_EVIDENCE_DIR to the owned runtime evidence round');
@@ -22,22 +23,14 @@ async function shot(page: Page, id: string) {
   await mkdir(join(evidence!, 'screenshots'), { recursive: true });
   await page.screenshot({ path: join(evidence!, 'screenshots', id + '.png'), fullPage: true });
 }
-async function login(page: Page, account = DEFAULT_TEST_ACCOUNT) {
-  await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(account.email);
-  await page.locator('#password').fill(account.password);
-  await page.getByRole('button', { name: '立即登录', exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes('/login'));
-  if (new URL(page.url()).pathname === '/tenant-selection') {
-    const spaces = (await (await page.request.get('/api/tenant-selection/my-spaces')).json()).data;
-    const business = spaces.filter(
-      (space: { spaceType: string }) => space.spaceType === 'business',
-    );
-    expect(business).toHaveLength(1);
-    await page.getByTestId(`space-business-${business[0].tenantId}`).click();
-  }
+async function login(page: Page, account = {
+  ...DEFAULT_TEST_ACCOUNT,
+  email: process.env.ADMIN_EMAIL || DEFAULT_TEST_ACCOUNT.email,
+  password: process.env.ADMIN_PASSWORD || DEFAULT_TEST_ACCOUNT.password,
+}) {
+  return loginDeliveryMember(page, account.email, process.env.AURA_ADMIN_TENANT_ID, account.password);
 }
+
 const amount = 'record:data.tpm_ac_amount',
   budget = 'record:data.tpm_pj_budget',
   risk = 'record:data.tpm_ac_risk',
@@ -574,11 +567,12 @@ test('R01 restores a persisted business table and retains server rules after rel
     }),
   );
   await navigateToMenuByClick(page, ['策略工作台']);
-  await page.getByTestId('strategy-business-decision').selectOption(code);
+  await page.getByTestId(`ddl-open-${code}`).click();
   await expect(page.getByTestId('strategy-studio')).toContainText(name);
   await expect(page.getByTestId('dt-in-delivery_amount')).toHaveText('交付金额（元）');
   await expect(page.getByLabel('val-0-delivery_amount', { exact: true })).toHaveValue('168000');
   await expect(page.getByTestId('strategy-publish')).toBeDisabled();
+  await page.getByTestId('strategy-workspace-tab-test').click();
   await page
     .getByTestId('strategy-test-inputs')
     .getByLabel('交付金额（元）', { exact: true })
@@ -587,7 +581,7 @@ test('R01 restores a persisted business table and retains server rules after rel
   await expect(page.getByTestId('strategy-test-outputs')).toContainText('enhanced');
   await shot(page, 'R01-restored');
   await page.reload();
-  await page.getByTestId('strategy-business-decision').selectOption(code);
+  await expect(page.getByTestId('strategy-business-decision')).toHaveValue(code);
   await expect(page.getByLabel('val-0-delivery_amount', { exact: true })).toHaveValue('168000');
   const after = await payload(await page.request.get(`/api/decision/definitions/${code}/versions`));
   expect(after).toHaveLength(1);
