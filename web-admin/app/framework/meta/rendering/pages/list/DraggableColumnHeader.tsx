@@ -110,6 +110,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
   if (column.isActionColumn) {
     return (
       <th
+        scope="col"
         className="border-border bg-subtle text-text-2 sticky right-0 z-20 w-px border-l px-2 py-3 text-xs font-medium tracking-wider uppercase shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]"
         data-testid={`table-header-${column.field}`}
         data-authoring-node-id={(column as any).id || column.field}
@@ -121,6 +122,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
 
   return (
     <th
+      scope="col"
       ref={setNodeRef}
       className={`group/th bg-subtle text-text-2 relative px-6 py-3 text-xs font-medium tracking-wider uppercase ${
         column.align === 'right'

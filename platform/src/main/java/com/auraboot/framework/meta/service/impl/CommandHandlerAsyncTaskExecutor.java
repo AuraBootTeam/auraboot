@@ -71,6 +71,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private final DynamicDataService dynamicDataService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+
+    @Autowired(required = false)
     private BiTemporalService biTemporalService;
     @Autowired(required = false)
     private AiProviderAccessorFactory aiProviderAccessorFactory;
@@ -174,6 +177,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY,
                         commandExpectedVersion);
             }
+            com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
+                    pluginSettings, tenantId, cloudConfigService, objectMapper);
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null) {
                 // Q03-04: async-dispatched handlers must get the same nested

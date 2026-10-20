@@ -86,6 +86,9 @@ class HandlerPhaseTest {
     private DataDomainService dataDomainService;
 
     @Mock
+    private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+
+    @Mock
     private FileService fileService;
 
     @Mock
@@ -102,6 +105,7 @@ class HandlerPhaseTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(phase, "cloudConfigService", cloudConfigService);
         ReflectionTestUtils.setField(phase, "fileService", fileService);
         ReflectionTestUtils.setField(phase, "storageProvider", storageProvider);
         ReflectionTestUtils.setField(phase, "asyncTaskService", asyncTaskService);
@@ -194,6 +198,41 @@ class HandlerPhaseTest {
         phase.execute(rejected);
 
         assertThat(stringValue.capturedContext.get().tenantProjectionAccessor()).isNull();
+    }
+
+    @Test
+    void execute_installsTenantSecretOnlyForExplicitServerScope() {
+        for (Object optIn : List.of(true, false, "true")) {
+            RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                    "type", "custom", "handler", PLUGIN_HANDLER_CODE,
+                    "handlerParams", Map.of("tenantSecretRead", optIn,
+                            "tenantSecretServiceTypes", List.of("integration"), "tenantSecretFields", List.of("appSecret"))));
+            context.getPayload().put("tenantSecretRead", true);
+            phase.execute(context);
+            assertThat(handler.capturedContext.get().tenantSecretAccessor() != null).isEqualTo(Boolean.TRUE.equals(optIn));
+        }
+        org.mockito.Mockito.verifyNoInteractions(cloudConfigService);
+    }
+
+    @Test
+    void execute_installsRelatedDeleteOnlyWithTargetAuthorizationAndProjection() throws Exception {
+        MetaContext.setContext(1L,2L,"supplier-pid","Supplier");
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+        var allowed=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom",
+                "handler",PLUGIN_HANDLER_CODE,"handlerParams",Map.of("targetRecordAuthorization","handler",
+                        TenantProjectionAccessor.OPT_IN_HANDLER_PARAM,true,"relatedDeleteAuthorization",true)));
+        phase.execute(allowed);
+        assertThat(handler.capturedContext.get().dataAccessor())
+                .isInstanceOf(com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.class);
+        handler.capturedContext.set(null);
+        var missing=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom",
+                "handler",PLUGIN_HANDLER_CODE,"handlerParams",Map.of("relatedDeleteAuthorization",true)));
+        assertThatThrownBy(()->phase.execute(missing)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(handler.capturedContext.get()).isNull();
     }
 
     @Test
@@ -330,6 +369,24 @@ class HandlerPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Plugin handler execution failed: $i18n:inventory.error.quality_hold.issue");
+    }
+
+    @Test
+    void execute_mapsTransportNeutralSecurityDenialWithoutDiagnosticLeakage() {
+        SecurityException denial = new SecurityException("FOREIGN_ORDER_LINE:private-record-id");
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) { throw denial; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Access denied")
+                .hasCause(denial);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
     }
 
     @Test
@@ -714,6 +771,33 @@ class HandlerPhaseTest {
 
         verify(extensionRegistry).getCommandHandler(BUSINESS_COMMAND_CODE);
         org.assertj.core.api.Assertions.assertThat(ctx.getHandlerResults()).isEmpty();
+    }
+
+
+    @Test
+    void handlerReturnedFieldsRetainParentAndRecordSqlProtection() throws Exception {
+        MetaContext.setContext(1L,null,null,"system");
+        var handler=new RecordingFullRowHandler(BUSINESS_COMMAND_CODE);
+        when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
+        var marker=com.auraboot.framework.meta.dto.FieldDefinition.builder().code("managed").columnName("managed_flag").dataType("boolean").immutable(true).build();
+        var reference=new com.auraboot.framework.meta.dto.FieldDefinition.RefTarget();reference.setTargetEntity("parent");reference.setValueField("pid");
+        var link=com.auraboot.framework.meta.dto.FieldDefinition.builder().code("order_link").columnName("order_pid").refTarget(reference).build();
+        var policy=Map.of("field","managed","commands",Map.of("create",List.of(),"update",List.of("app:save"),"delete",List.of()));
+        var model=com.auraboot.framework.meta.dto.ModelDefinition.builder().code("line").tableName("mt_line")
+            .fields(List.of(marker,link,com.auraboot.framework.meta.dto.FieldDefinition.builder().code("cr_cj_status").dataType("string").build()))
+            .extension(Map.of("recordCommandWriters",policy,"parentModel","parent","parentField","order_link")).build();
+        var parent=com.auraboot.framework.meta.dto.ModelDefinition.builder().code("parent").tableName("mt_parent")
+            .fields(List.of(marker)).extension(Map.of("recordCommandWriters",policy)).build();
+        when(metaModelService.getModelDefinition("line")).thenReturn(Optional.of(model));
+        when(metaModelService.getModelDefinition("parent")).thenReturn(Optional.of(parent));
+        when(metaModelService.getTableName("line")).thenReturn("mt_line");
+        when(dynamicDataMapper.selectByQuery(any(),any())).thenReturn(List.of(Map.of("id",42L)));
+        assertThatThrownBy(() -> phase.execute(buildContext(BUSINESS_COMMAND_CODE,"line",Map.of("type","custom"))))
+            .isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
+        var sql=ArgumentCaptor.forClass(String.class);verify(dynamicDataMapper).updateByQuery(sql.capture(),any());
+        assertThat(sql.getValue()).contains("managed_flag IS DISTINCT FROM TRUE","NOT EXISTS",
+            "record_writer_parent.pid = mt_line.order_pid","record_writer_parent.tenant_id = mt_line.tenant_id");
+        verify(dynamicDataMapper,never()).update(any(),any(),any());
     }
 
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {

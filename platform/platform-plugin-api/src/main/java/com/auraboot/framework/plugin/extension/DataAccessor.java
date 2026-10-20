@@ -19,7 +19,7 @@ import java.util.Optional;
  * @author AuraBoot Team
  * @since 2.4.0
  */
-public interface DataAccessor {
+public interface DataAccessor extends RecordReadAccessor {
 
     /**
      * Get a single record by ID.
@@ -39,6 +39,16 @@ public interface DataAccessor {
      * @return list of matching records
      */
     List<Map<String, Object>> query(String modelCode, Map<String, Object> filters);
+
+    /**
+     * Read one database-backed page, including its authorized total count.
+     * Filters, ordering and page boundaries must execute in the host query service;
+     * loading all matches and paginating in memory does not satisfy this contract.
+     * The default preserves compatibility while failing closed on older hosts.
+     */
+    default DataPage queryPage(String modelCode, DataPageQuery query) {
+        throw new UnsupportedOperationException("DataAccessor database pagination is unavailable");
+    }
 
     /**
      * Query records where a single field is in the provided value set.

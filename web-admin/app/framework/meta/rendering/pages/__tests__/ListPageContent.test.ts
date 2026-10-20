@@ -1,6 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  useListKeywordSearch,
+  useListApiReadRetry,
   applyLocalSortUpdate,
   beginLatestListRequest,
   useRestoreSavedViewFromUrl,
@@ -1219,5 +1221,133 @@ describe('resolveUserFilterCondition', () => {
     expect(
       resolveUserFilterCondition('fin_cfw_week_start', null, smartInputFields, modelFieldMap),
     ).toEqual([]);
+  });
+});
+
+
+describe('useListKeywordSearch submitted filter contract', () => {
+  it('keeps applied filters through debounce and Enter without applying pending form edits', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const form = { s2p_se_status: 'draft' };
+      const { result, unmount } = renderHook(() =>
+        useListKeywordSearch(load, true, 20, {}),
+      );
+      act(() => result.current.rememberSubmittedFilters(form));
+      form.s2p_se_status = 'bidding'; // Edited form has not been submitted.
+      act(() => result.current.debouncedSearch());
+      act(() => vi.advanceTimersByTime(299));
+      expect(load).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1));
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => result.current.debouncedSearch());
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenCalledTimes(2);
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenCalledTimes(2);
+      // Explicit filter-search commits the edited form.
+      act(() => result.current.rememberSubmittedFilters(form));
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'bidding' } });
+      // Explicit reset uses {}, rather than falling back to the previous query.
+      act(() => result.current.rememberSubmittedFilters({}));
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: {} });
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('Enter retains the submitted query even before a pending debounce fires', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const { result, unmount } = renderHook(() => useListKeywordSearch(load, true, 20, {}));
+      act(() => result.current.rememberSubmittedFilters({ s2p_se_status: 'draft' }));
+      act(() => result.current.debouncedSearch());
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenCalledExactlyOnceWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenCalledTimes(1);
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('preserves initial URL filters, latest page size and enabled state in the real scheduling hook', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const { result, rerender, unmount } = renderHook(
+        ({ enabled, size }: { enabled: boolean; size: number }) => useListKeywordSearch(load, enabled, size, { source: 'selected' }),
+        { initialProps: { enabled: false, size: 20 } },
+      );
+      act(() => result.current.commitSearch());
+      expect(load).not.toHaveBeenCalled();
+      rerender({ enabled: true, size: 50 });
+      act(() => result.current.debouncedSearch());
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 50, filters: { source: 'selected' } });
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+
+describe('useListApiReadRetry transport request identity', () => {
+  const failed = { code: '35000', message: 'Rejected', data: null };
+  const success = { code: '0', data: { records: [], total: 0 } };
+  const request = {
+    endpoint: '/api/ext/qoe/procurement/tasks', method: 'get' as const,
+    queryParams: { page: 2, size: 50, sortField: 'updated_at', sortOrder: 'desc', keyword: 'RFQ-exact', s2p_se_status: 'draft' },
+  };
+
+  it('replays the exact failed query instead of pending form, keyword, sort or page changes', async () => {
+    const { result } = renderHook(() => useListApiReadRetry());
+    const original = structuredClone(request);
+    const fetch = vi.fn().mockResolvedValueOnce(failed).mockResolvedValueOnce(success);
+    await act(async () => { await result.current.read(original, () => true, fetch); });
+    original.queryParams.s2p_se_status = 'bidding';
+    original.queryParams.keyword = 'pending-keyword';
+    original.queryParams.page = 0;
+    original.queryParams.size = 20;
+    original.queryParams.sortOrder = 'asc';
+    const retry = result.current.getFailedRequest();
+    expect(retry).toEqual(request);
+    expect(Object.keys(retry!)).toEqual(['endpoint', 'method', 'queryParams']);
+    await act(async () => { await result.current.read(retry!, () => true, fetch); });
+    expect(fetch).toHaveBeenNthCalledWith(2, request);
+    expect(result.current.getFailedRequest()).toBeNull();
+  });
+
+  it('seals thrown transport failures and cannot let an older failure replace newer success', async () => {
+    const { result } = renderHook(() => useListApiReadRetry());
+    const rejection = new Error('network');
+    const throws = vi.fn().mockRejectedValue(rejection);
+    await act(async () => { await expect(result.current.read(request, () => true, throws)).rejects.toBe(rejection); });
+    expect(result.current.getFailedRequest()).toEqual(request);
+    let rejectOld!: (reason: Error) => void;
+    let latest = 1;
+    const old = result.current.read(request, () => latest === 1, () => new Promise((_, reject) => { rejectOld = reject; }));
+    const observedOld = old.catch((error: unknown) => error);
+    latest = 2;
+    const newer = { ...request, queryParams: { ...request.queryParams, keyword: 'newer' } };
+    await act(async () => { await result.current.read(newer, () => latest === 2, vi.fn().mockResolvedValue(success)); });
+    await act(async () => { rejectOld(rejection); await observedOld; });
+    expect(result.current.getFailedRequest()).toBeNull();
+  });
+
+  it('keeps newer failed identity when older result failure resolves late, and clears for explicit new queries', async () => {
+    const { result } = renderHook(() => useListApiReadRetry());
+    let resolveOld!: (value: typeof failed) => void;
+    let latest = 1;
+    const old = result.current.read(request, () => latest === 1, () => new Promise<typeof failed>(resolve => { resolveOld = resolve; }));
+    latest = 2;
+    const newer = { ...request, queryParams: { ...request.queryParams, s2p_se_status: 'bidding' } };
+    await act(async () => { await result.current.read(newer, () => latest === 2, vi.fn().mockResolvedValue(failed)); });
+    await act(async () => { resolveOld(failed); await old; });
+    expect(result.current.getFailedRequest()).toEqual(newer);
+    act(() => result.current.clearFailure());
+    expect(result.current.getFailedRequest()).toBeNull();
   });
 });

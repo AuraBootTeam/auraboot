@@ -24,6 +24,7 @@ public interface PluginRecordMapper extends BaseMapper<PluginRecord> {
      * @param pid business unique identifier
      * @return plugin record or null
      */
+    @ResultMap("mybatis-plus_PluginRecord")
     @Select("SELECT * FROM ab_plugin WHERE pid = #{pid} AND deleted_flag = false")
     PluginRecord findByPid(@Param("pid") String pid);
 

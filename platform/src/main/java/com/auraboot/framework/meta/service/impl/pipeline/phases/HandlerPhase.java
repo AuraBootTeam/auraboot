@@ -29,6 +29,7 @@ import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
+import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
@@ -74,6 +75,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class HandlerPhase implements CommandPhase {
 
+    @Autowired(required = false)
+    private com.auraboot.framework.integration.InventoryReceiptEnqueueProvenance inventoryReceiptProvenance;
+
     private final ApplicationContext applicationContext;
     private final ExtensionRegistry extensionRegistry;
     private final ObjectMapper objectMapper;
@@ -83,6 +87,12 @@ public class HandlerPhase implements CommandPhase {
     private final RecordSnapshotReader snapshotReader;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.auth.wechat.WechatMiniIdentityService wechatMiniIdentityService;
 
     @Autowired(required = false)
     private BiTemporalService biTemporalService;
@@ -278,6 +288,9 @@ public class HandlerPhase implements CommandPhase {
         ModelMutationGuard.assertMutableOrInsertedInThisCommand(
                 modelDef, "updated by handler result persistence", fieldMapResults, recordIdStr);
         FieldWriterGuard.assertFieldsAllowed(modelDef, persistable.keySet());
+        RecordCommandWriterGuard.assertInputAllowed(modelDef, persistable, "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, modelDef,
+                code -> metaModelService.getModelDefinition(code).orElse(null), persistable);
 
         String tableName = metaModelService.getTableName(modelCode);
         CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
@@ -307,7 +320,7 @@ public class HandlerPhase implements CommandPhase {
         // in the data map. (Distinct from OSS #398, which only covered the
         // CommandSideEffectExecutor UPDATE_RECORD + partial-CRUD paths.)
         Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);
-        if (shouldUseScopedWrite()) {
+        if (shouldUseScopedWrite() || RecordCommandWriterGuard.hasPolicy(modelDef)) {
             executeScopedUpdate(
                     tableName, modelCode, recordIdStr, idEntry, persistable, tenantId, jsonbColumns);
         } else if (jsonbColumns.isEmpty()) {
@@ -396,10 +409,14 @@ public class HandlerPhase implements CommandPhase {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel, "update",
+                code -> metaModelService.getModelDefinition(code).orElse(null));
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode);
 
         int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
-        if (updated <= 0 && expectedVersion != null) {
+        if (updated <= 0 && (expectedVersion != null || RecordCommandWriterGuard.hasPolicy(writerModel))) {
             throw new com.auraboot.framework.exception.ConflictException(
                     "Handler result write failed: target changed after command authorization");
         }
@@ -522,6 +539,8 @@ public class HandlerPhase implements CommandPhase {
         // Opt-in secondaries chain AFTER the primary (same transaction + context). Empty for every
         // command with no opt-in secondaries, i.e. every command today — so this is a no-op now.
         List<CommandHandlerExtension> secondaryHandlers = extensionRegistry.getSecondaryCommandHandlers(handlerCode);
+        com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.verifyHandler(
+                commandCode, pluginHandler.orElse(null), secondaryHandlers);
         if (pluginHandler.isEmpty() && secondaryHandlers.isEmpty()) {
             // A command whose execution config explicitly declares a handler has a handler contract.
             // Letting the phase return silently here turns every effect of a custom command into a
@@ -606,9 +625,15 @@ public class HandlerPhase implements CommandPhase {
             if (request.getExpectedVersion() != null && expectedVersion != null) {
                 pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY, expectedVersion);
             }
+            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.install(
+                    commandCode, tenantId, pluginSettings);
+            com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
+                    pluginSettings, tenantId, cloudConfigService, objectMapper);
+            com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
+                    pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
-            if (commandExecutor != null) {
+            if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
                 // Q03-04: nested follow-up commands dispatch through the real
                 // pipeline (validated, invariant-checked, evented, audited)
                 // instead of handlers `new`-ing other handlers directly.
@@ -620,6 +645,20 @@ public class HandlerPhase implements CommandPhase {
                         new TenantProjectionAccessorImpl(tenantId,
                                 new BackgroundDataAccessorImpl(dynamicDataService)));
             }
+            if (Boolean.TRUE.equals(pluginSettings.get(
+                    com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))) {
+                if (handler == null || !"handler".equals(pluginSettings.get("targetRecordAuthorization"))
+                        || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                            instanceof TenantProjectionAccessor projection)) {
+                    throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
+                }
+                pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                        new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
+                                tenantId,commandCode,modelCode,effectiveRecordId,
+                                MetaContext.getCurrentUserPid(),handler,projection));
+            }
+            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
+                    pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);
             pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
                     new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
                             roleMapper, userRoleService, tenantMemberService, userService));
@@ -648,6 +687,7 @@ public class HandlerPhase implements CommandPhase {
             if (recordShareAccessor != null) {
                 pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
             }
+            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.finishSettings(pluginSettings);
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)
                     .namespace(namespace)
@@ -667,7 +707,8 @@ public class HandlerPhase implements CommandPhase {
                     log.info("Dry-run: skipping primary handler {} for command {} (supportsDryRun()=false)",
                             handler.getClass().getName(), handlerCode);
                 } else {
-                    Object result = handler.execute(pluginContext);
+                    Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
+                            : inventoryReceiptProvenance.invoke(handler, pluginContext);
                     if (result instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -691,7 +732,8 @@ public class HandlerPhase implements CommandPhase {
                 }
                 log.info("Executing chained secondary handler {} for command {}",
                         secondary.getClass().getName(), handlerCode);
-                Object secResult = secondary.execute(pluginContext);
+                Object secResult = inventoryReceiptProvenance == null ? secondary.execute(pluginContext)
+                        : inventoryReceiptProvenance.invoke(secondary, pluginContext);
                 if (secResult instanceof Map) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> secMap = (Map<String, Object>) secResult;
@@ -706,6 +748,11 @@ public class HandlerPhase implements CommandPhase {
                     handlerCode, commandCode, e.getMessage(), e);
             if (e instanceof AccessDeniedException accessDeniedException) {
                 throw accessDeniedException;
+            }
+            if (e instanceof SecurityException) {
+                // The transport-neutral plugin SPI may reject ownership without Spring dependencies.
+                // Keep the authorization status and cause, never expose its internal record diagnostics.
+                throw new AccessDeniedException("Access denied", e);
             }
             if (e instanceof DataAccessorException dataAccess
                     && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {

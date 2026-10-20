@@ -14,6 +14,41 @@
  */
 
 import dayjs from 'dayjs';
+import { projectRows } from './row-projection';
+import { selectRows } from './row-selection';
+
+// Decimal strings retain precision beyond JavaScript's safe integer range.
+type ExactDecimal = { units: bigint; scale: number };
+function exactDecimal(value: unknown): ExactDecimal {
+  if (typeof value !== 'string' || value.length > 256 || !/^[+-]?\d+(?:\.\d+)?$/.test(value)) throw new Error('Expected a bounded decimal string');
+  const [integer, fraction = ''] = value.split('.');
+  return { units: BigInt(integer + fraction), scale: fraction.length };
+}
+function decimalText(units: bigint, scale: number): string {
+  const negative = units < 0n;
+  const digits = (negative ? -units : units).toString().padStart(scale + 1, '0');
+  const value = scale ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}`.replace(/\.?0+$/, '') : digits;
+  return `${negative && units !== 0n ? '-' : ''}${value}`;
+}
+function decimalAdd(left: ExactDecimal, right: ExactDecimal): ExactDecimal {
+  const scale = Math.max(left.scale, right.scale);
+  return { units: left.units * 10n ** BigInt(scale - left.scale) + right.units * 10n ** BigInt(scale - right.scale), scale };
+}
+function DECIMAL_SUBTRACT(left: string, right: string): string {
+  const parsed = exactDecimal(right);
+  const result = decimalAdd(exactDecimal(left), { ...parsed, units: -parsed.units });
+  return decimalText(result.units, result.scale);
+}
+function DECIMAL_SUM_BY(rows: unknown, valueField: string, matchField?: string, matchValue?: unknown): string {
+  if (!Array.isArray(rows) || rows.length > 10000 || !valueField) throw new Error('Expected bounded decimal rows');
+  let result: ExactDecimal = { units: 0n, scale: 0 };
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') throw new Error('Expected decimal row');
+    if (matchField && row[matchField] !== matchValue) continue;
+    result = decimalAdd(result, exactDecimal(row[valueField]));
+  }
+  return decimalText(result.units, result.scale);
+}
 
 // ==================== Logical Functions ====================
 
@@ -483,6 +518,9 @@ export const businessFunctions = {
   STARTSWITH,
   ENDSWITH,
 
+  DECIMAL_SUBTRACT,
+  DECIMAL_SUM_BY,
+
   // Number (12)
   ROUND: ROUND_FN,
   FLOOR: FLOOR_FN,
@@ -532,6 +570,8 @@ export const businessFunctions = {
   COUNTIF,
   SUMIF,
   PLUCK,
+  PROJECT_ROWS: projectRows,
+  SELECT_ROWS: selectRows,
   UNIQUE,
   FIRST,
   LAST,

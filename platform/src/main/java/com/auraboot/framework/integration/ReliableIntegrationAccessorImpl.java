@@ -7,7 +7,7 @@ import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvel
 import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -17,7 +17,6 @@ import java.util.Locale;
 
 /** Platform-owned transactional outbox bridge exposed to plugins by type. */
 @Service
-@RequiredArgsConstructor
 public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAccessor {
 
     private static final int DEFAULT_MAX_RETRIES = 10;
@@ -25,16 +24,63 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
     private final OutboxEventMapper outboxEventMapper;
     private final ObjectMapper objectMapper;
     private final ReliableIntegrationMetrics metrics;
+    private final InventoryReceiptEnqueueProvenance provenance;
+
+    public ReliableIntegrationAccessorImpl(OutboxEventMapper outboxEventMapper, ObjectMapper objectMapper,
+                                           ReliableIntegrationMetrics metrics) {
+        this(outboxEventMapper, objectMapper, metrics, null);
+    }
+    @Autowired
+    public ReliableIntegrationAccessorImpl(OutboxEventMapper outboxEventMapper, ObjectMapper objectMapper,
+                                           ReliableIntegrationMetrics metrics, InventoryReceiptEnqueueProvenance provenance) {
+        this.outboxEventMapper = outboxEventMapper; this.objectMapper = objectMapper;
+        this.metrics = metrics; this.provenance = provenance;
+    }
+
 
     @Override
     public void enqueue(IntegrationEventEnvelope envelope) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Reliable integration events require an active business transaction");
         }
+        envelope = prepareProvenance(envelope);
+        OutboxEvent event = toEvent(envelope);
+        outboxEventMapper.insertEnvelope(event);
+        recordEnqueuedAfterCommit();
+    }
+
+    @Override
+    public boolean enqueueIdempotent(IntegrationEventEnvelope envelope) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Reliable integration events require an active business transaction");
+        }
+        envelope = prepareProvenance(envelope);
+        OutboxEvent event = toEvent(envelope);
+        int inserted = outboxEventMapper.insertEnvelopeIfAbsent(event);
+        if (inserted == 1) {
+            recordEnqueuedAfterCommit();
+            return true;
+        }
+        if (inserted != 0 || outboxEventMapper.countMatchingEnvelope(event) != 1) {
+            throw new IllegalArgumentException("RELIABLE_ENVELOPE_CONFLICT");
+        }
+        return false;
+    }
+
+    private IntegrationEventEnvelope prepareProvenance(IntegrationEventEnvelope envelope) {
+        InventoryReceiptEnqueueProvenance.rejectReservedHeaders(envelope);
+        if (!InventoryReceiptEnqueueProvenance.EVENT.equals(envelope.eventType())) return envelope;
+        if (provenance == null) throw new SecurityException("Inventory posted receipt host provenance is unavailable");
+        return provenance.stamp(envelope);
+    }
+
+    private OutboxEvent toEvent(IntegrationEventEnvelope envelope) {
         OutboxEvent event = new OutboxEvent();
         event.setTenantId(envelope.tenantId());
         event.setEventId(envelope.eventId());
         event.setEventType(envelope.eventType());
+        if (InventoryReceiptEnqueueProvenance.EVENT.equals(envelope.eventType()))
+            event.setCommandCode(InventoryReceiptEnqueueProvenance.COMMAND);
         event.setSchemaVersion(envelope.schemaVersion());
         event.setEventSource(envelope.source());
         event.setSubject(envelope.subject());
@@ -51,7 +97,10 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
         event.setNextRetryAt(Instant.now());
         event.setCreatedAt(Instant.now());
         event.setReplayCount(0);
-        outboxEventMapper.insertEnvelope(event);
+        return event;
+    }
+
+    private void recordEnqueuedAfterCommit() {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

@@ -242,6 +242,12 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
     blocks: block.blocks?.map((child) => migrateGenericBlock(child, kind)),
     extension: normalizeExtension(block),
   };
+  // Generic containers render their ordered fields directly. normalizeProps
+  // excludes section fields, so preserve this shorthand on passthrough blocks
+  // instead of silently deleting it during an edit-free designer round trip.
+  if (PASSTHROUGH_BLOCK_TYPES.has(block.blockType) && block.fields !== undefined) {
+    (migrated as Record<string, unknown>).fields = block.fields;
+  }
   // Passthrough display blocks (metric-strip, status-banner, description, …)
   // are rendered from the BLOCK TOP LEVEL by the platform renderers and bound
   // there by the inspector — keep their legacy keys at the top level instead

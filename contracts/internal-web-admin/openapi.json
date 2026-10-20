@@ -30323,6 +30323,12 @@
           "errorMessage": {
             "type": "string"
           },
+          "fieldMigrations": {
+            "items": {
+              "$ref": "#/components/schemas/ModelFieldRenameReceipt"
+            },
+            "type": "array"
+          },
           "importId": {
             "type": "string"
           },
@@ -33556,6 +33562,40 @@
           },
           "visible": {
             "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ModelFieldRenameReceipt": {
+        "properties": {
+          "copiedRows": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "freshInstall": {
+            "type": "boolean"
+          },
+          "fromField": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "modelPid": {
+            "type": "string"
+          },
+          "retainedRows": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceDefinitionSha256": {
+            "type": "string"
+          },
+          "targetDefinitionSha256": {
+            "type": "string"
+          },
+          "toField": {
+            "type": "string"
           }
         },
         "type": "object"

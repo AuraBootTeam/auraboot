@@ -27,6 +27,8 @@ import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import { useContributionRegistry } from '~/framework/extensions/use-contribution';
 
 export interface UsePageRuntimeOptions {
+  /** Page-owned loader, separate from user-editable expression context. */
+  loadData?: (params?: any) => Promise<void>;
   /** Auth token */
   token?: string;
   /** Additional expression context (e.g., filters, form data) */
@@ -182,6 +184,13 @@ export function usePageRuntime(
           skipDataSourceRegistration: true,
           initialContext: effectiveAdditionalContext,
           user: runtimeUser,
+          loadData: options?.loadData,
+          requestKeyIdentity: {
+            tenantId: sessionUser?.tenantId,
+            userId: sessionUser?.id,
+            pageKey: (schema as any)?.pageKey,
+            recordPid: (additionalContext as any).$page?.recordPid,
+          },
         },
   );
   let contributedRuntime: SchemaRuntime | null = runtime;

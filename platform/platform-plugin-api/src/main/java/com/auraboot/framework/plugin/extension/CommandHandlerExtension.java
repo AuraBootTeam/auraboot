@@ -31,6 +31,40 @@ import java.util.Set;
 public interface CommandHandlerExtension extends ExtensionPoint {
 
     /**
+     * Explicit server-metadata opt-in for a handler-owned target authorization boundary.
+     * Invoked after command permission and before idempotency; never grants raw model reads.
+     * An older handler fails closed when its command opts in without implementing this contract.
+     */
+    default boolean authorizeTarget(TargetAuthorizationContext context) {
+        throw new UnsupportedOperationException("Handler target authorization is unavailable");
+    }
+
+    /** Authenticated host identity and read-only tenant data; no caller payload is exposed. */
+    record TargetAuthorizationContext(String commandType, String modelCode, String recordId,
+            String action, Long tenantId, String currentUserPid, Map<String,Object> record,
+            RecordReadAccessor records) {}
+
+    /** Explicit per-related-record delete decision; older handlers cannot grant it. */
+    default boolean authorizeRelatedDelete(RelatedDeleteAuthorizationContext context) {
+        return false;
+    }
+
+    /** Server-loaded root and related record; no caller-supplied authorization data. */
+    record RelatedDeleteAuthorizationContext(TargetAuthorizationContext root,
+            String modelCode, String recordId, Map<String,Object> record) {}
+
+    /** Installed process commands must authorize every related mutation; older handlers deny. */
+    default boolean authorizeInstalledRelatedWrite(InstalledRelatedWriteAuthorizationContext context) {
+        return false;
+    }
+
+    /** Host-loaded identities and immutable records; creation provenance cannot come from payloads. */
+    record InstalledRelatedWriteAuthorizationContext(TargetAuthorizationContext root,
+            com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding binding,
+            String operation, String modelCode, String recordId, Map<String,Object> record,
+            boolean createdInInvocation) {}
+
+    /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
      *
@@ -188,6 +222,14 @@ public interface CommandHandlerExtension extends ExtensionPoint {
          * Get the DataAccessor from the settings map.
          * Returns null if not available.
          */
+        /** Present only during a host-authorized installed integration command. */
+        public com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding installedIntegration() {
+            Object binding = settings == null ? null : settings.get(
+                    com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding.SETTINGS_KEY);
+            return binding instanceof com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding value
+                    ? value : null;
+        }
+
         public DataAccessor dataAccessor() {
             Object da = settings != null ? settings.get(DATA_ACCESSOR_KEY) : null;
             return da instanceof DataAccessor ? (DataAccessor) da : null;
@@ -203,6 +245,18 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public TenantRoleAssignmentAccessor tenantRoleAssignmentAccessor() {
             Object accessor = settings != null ? settings.get(TENANT_ROLE_ASSIGNMENT_ACCESSOR_KEY) : null;
             return accessor instanceof TenantRoleAssignmentAccessor value ? value : null;
+        }
+
+        /** Available only through explicit server-owned secret scope metadata. */
+        public TenantSecretAccessor tenantSecretAccessor() {
+            Object accessor = settings != null ? settings.get(TenantSecretAccessor.SETTINGS_KEY) : null;
+            return accessor instanceof TenantSecretAccessor value ? value : null;
+        }
+
+        /** Available only to an explicitly opted-in synchronous authenticated host command. */
+        public VerifiedPhoneGrantAccessor verifiedPhoneGrantAccessor() {
+            Object accessor = settings != null ? settings.get(VerifiedPhoneGrantAccessor.SETTINGS_KEY) : null;
+            return accessor instanceof VerifiedPhoneGrantAccessor value ? value : null;
         }
 
         public IdentityDirectoryAccessor identityDirectoryAccessor() {

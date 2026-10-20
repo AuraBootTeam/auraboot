@@ -113,6 +113,42 @@ class PermitPlanAssemblyPhaseTest {
 
     // ---------- row scope (D3) ----------
 
+    @Test
+    void verifiedHandlerWritePinsTheExactRootInsteadOfInheritingGenericAllScope() {
+        var engine = Mockito.mock(DataPermissionEngine.class);
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        var ctx = ctxWithModel("quote-1", "s2p_bid");
+        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("qo.srm.use"));
+        ctx.setTargetRecordReadable(true);
+        ctx.setTargetRecordVersion(7L);
+        ctx.setExecConfig(java.util.Map.of("handlerParams", java.util.Map.of(
+                "targetRecordAuthorization", "handler", "targetRecordAction", "update")));
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+        phase.execute(ctx);
+        assertThat(ctx.getPermitPlan().scope()).isEqualTo(ScopeGrade.TARGET);
+        assertThat(ctx.getPermitPlan().aggregateId()).isEqualTo("quote-1");
+        assertThat(ctx.getPermitPlan().expectedVersion()).isEqualTo(7L);
+        Mockito.verifyNoInteractions(engine);
+    }
+
+    @Test
+    void handlerMetadataAloneAndReadCommandsCannotGrantTargetWriteScope() {
+        var engine = Mockito.mock(DataPermissionEngine.class);
+        when(engine.buildRowFilter(anyLong(), anyString(), anyLong())).thenReturn("owner = actor");
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        for (String action : java.util.List.of("update", "read", "missing")) {
+            var ctx = ctxWithModel("quote-1", "s2p_bid");
+            ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("qo.srm.use"));
+            ctx.setTargetRecordReadable(!"update".equals(action));
+            ctx.setExecConfig(java.util.Map.of("handlerParams", "missing".equals(action)
+                    ? java.util.Map.of("targetRecordAuthorization", "handler")
+                    : java.util.Map.of("targetRecordAuthorization", "handler", "targetRecordAction", action)));
+            ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+            phase.execute(ctx);
+            assertThat(ctx.getPermitPlan().scope()).as(action).isEqualTo(ScopeGrade.SELF);
+        }
+    }
+
     /** A caller the engine applies no row filter to has ALL access — the grade is ALL. */
     @Test
     @DisplayName("an empty row filter from the engine resolves to ALL scope")

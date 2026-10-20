@@ -50,6 +50,19 @@ public class NotificationSendLog {
     @TableField("sent_at")
     private Instant sentAt;
 
+    private String deliveryKey;
+    private String requestHash;
+    private String resolutionReference;
+    private String configurationHash;
+    @TableField(value = "request_snapshot", jdbcType = org.apache.ibatis.type.JdbcType.OTHER,
+            typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
+    private String requestSnapshot;
+    private String attemptFence;
+    private Instant attemptStartedAt;
+    private Instant attemptLeaseUntil;
+    private Instant finishedAt;
+    private Long providerCode;
+
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Instant createdAt;
 }
