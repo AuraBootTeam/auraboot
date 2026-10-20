@@ -125,9 +125,9 @@ public class InstalledIntegrationService {
         InstalledIntegrationBinding binding = new InstalledIntegrationBinding(principal.tenantId(), principal.applicationPid(),
                 principal.installationPid(), source, eventId, durableId, selected.get("revision").asLong(), parameters);
         return new Resolved(registration, entry.getValue(), binding, Map.copyOf(configs), Map.copyOf(approvedHandlers), hash(binding),
-                hash(Map.of("registration",registration,"configs",configs)),
+                commandHash(registration,configs),
                 registry.completedReceiptRegistrations(source).stream()
-                        .map(previous -> hash(Map.of("registration",previous,"configs",configs))).collect(java.util.stream.Collectors.toUnmodifiableSet()), common.path("conflictMessageKey").asText(null));
+                        .map(previous -> commandHash(previous,configs)).collect(java.util.stream.Collectors.toUnmodifiableSet()), common.path("conflictMessageKey").asText(null));
     }
 
     @Transactional
@@ -299,6 +299,14 @@ public class InstalledIntegrationService {
                 Map.of("applicationPid",event.headers().get("applicationPid"),"installationPid",event.headers().get("installationPid"),
                        "sourceCode",event.headers().get("sourceCode"),"externalEventId",event.headers().get("externalEventId"),
                        "externalSubjectType",event.headers().get("externalSubjectType"),"externalSubjectPid",event.headers().get("externalSubjectPid"))));
+    }
+    String commandHash(Registration registration,Map<String,String> configs) {
+        JsonNode tree=json.valueToTree(registration);
+        if(!(tree instanceof com.fasterxml.jackson.databind.node.ObjectNode declaration) || !declaration.has("eventTypes"))
+            throw new IllegalStateException("Invalid installed integration registration");
+        // Sets have no stable JVM iteration order; preserve legacy record layout and sort only this set.
+        declaration.set("eventTypes",json.valueToTree(registration.eventTypes().stream().sorted().toList()));
+        return hash(Map.of("registration",declaration,"configs",configs));
     }
     String hash(Object value) {
         try { return codec.sha256(json.copy().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS,true).writeValueAsString(value)); }

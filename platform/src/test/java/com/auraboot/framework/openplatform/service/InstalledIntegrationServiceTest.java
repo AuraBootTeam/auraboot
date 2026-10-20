@@ -122,6 +122,20 @@ class InstalledIntegrationServiceTest {
         when(plugins.observeLoadedArtifact(any())).thenReturn(Optional.of(new AuraPluginManager.LoadedPluginArtifact(
                 registration.providerPluginId(),java.nio.file.Path.of("provider-new.jar"),digest)));
     }
+    @Test void commandFingerprintDoesNotDependOnEventSetIterationOrderAndPreservesLegacySingleTypeHashes() {
+        var configs=Map.of(accept,"accept-config",process,"process-config",result,"result-config");
+        var expanded=spy(new Registration(source,registration.capability(),Set.of(event().eventType(),"external."+source+".inquiry.changed.v1"),
+                registration.requiredScope(),registration.commandPermission(),registration.providerPluginId(),registration.commandOwnerPluginId(),
+                accept,process,result,registration.serverActorParameter()));
+        var events=List.of(event().eventType(),"external."+source+".inquiry.changed.v1");
+        doReturn(new LinkedHashSet<>(events)).when(expanded).eventTypes();String first=service.commandHash(expanded,configs);
+        doReturn(new LinkedHashSet<>(events.reversed())).when(expanded).eventTypes();
+        assertEquals(first,service.commandHash(expanded,configs),"event discovery order must not change a durable receipt fingerprint");
+        assertEquals(service.hash(Map.of("registration",registration,"configs",configs)),service.commandHash(registration,configs));
+        var legacy=new Registration(source,registration.capability(),registration.eventTypes(),registration.requiredScope(),registration.commandPermission(),
+                registration.providerPluginId(),registration.commandOwnerPluginId(),accept,process,result);
+        assertEquals(service.hash(Map.of("registration",legacy,"configs",configs)),service.commandHash(legacy,configs));
+    }
     @Test void explicitlyDeclaredEventExpansionPreservesOnlyCompletedReceiptQueriesAndReplays() {
         service.accept(principal,source,event());var old=acceptedReceipt();
         var expanded=new Registration(source,registration.capability(),Set.of(event().eventType(),"external."+source+".inquiry.changed.v1"),
