@@ -249,8 +249,12 @@ public class DictController {
             return ApiResponse.failure("字典不存在: " + pid);
         }
 
-        // 使用 code 加载数据
-        DictDataResult result = dictService.loadDictData(dict.getCode(), versionStrategy, pinnedVersion);
+        // Default governance reads must retain the selected PID after unpublish clears is_current.
+        // Explicit version strategies and all by-code runtime reads retain their existing policy.
+        DictDataResult result = "latest".equals(versionStrategy)
+                && !org.springframework.util.StringUtils.hasText(pinnedVersion)
+                ? dictService.loadSelectedDictData(pid)
+                : dictService.loadDictData(dict.getCode(), versionStrategy, pinnedVersion);
         localizeDictLabels(result, request);
         return ApiResponse.success(result);
     }

@@ -181,6 +181,13 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await expect(page.getByTestId('dict-item-row-0').locator('input').nth(1)).toHaveValue('启用');
   await capture('DICT-07', page, info);
 
+  const runtimeBeforeUnpublish = await page.request.get(`/api/meta/dict/by-code/${code}/data`);
+  const cachedPublished = await runtimeBeforeUnpublish.json();
+  expect(cachedPublished.data.success).toBe(true);
+  expect(cachedPublished.data.items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ value: 'active', label: '启用' }),
+  ]));
+
   const unpublishResponse = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === `/api/meta/dict/${pid}/unpublish` &&
@@ -188,10 +195,19 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   );
   await page.getByRole('button', { name: '取消发布', exact: true }).click();
   expect((await (await unpublishResponse).json()).data.status).toBe('deprecated');
+  // Runtime reads must reject the unpublished version even after a cached editor read.
+  const unpublishedRuntime = await page.request.get(`/api/meta/dict/by-code/${code}/data`);
+  const unpublishedBody = await unpublishedRuntime.json();
+  expect(unpublishedBody.code !== '0' || unpublishedBody.data?.success === false).toBe(true);
+  await page.reload();
+  await header.waitForHeader();
   await expect(page.getByRole('button', { name: '发布', exact: true })).toBeVisible();
   await page.getByTestId('dict-tab-basic').click();
   await expect(page.locator('main')).toContainText('已废弃');
   await capture('DICT-10', page, info);
+  await page.getByTestId('dict-tab-items').click();
+  await expect(page.getByTestId('dict-item-row-0').locator('input').nth(0)).toHaveValue('active');
+  await expect(page.getByTestId('dict-item-row-0').locator('input').nth(1)).toHaveValue('启用');
   const publishResponse = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === `/api/meta/dict/${pid}/publish` &&
@@ -199,6 +215,12 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   );
   await page.getByRole('button', { name: '发布', exact: true }).click();
   expect((await (await publishResponse).json()).data.status).toBe('published');
+  const runtimeAfterRepublish = await page.request.get(`/api/meta/dict/by-code/${code}/data`);
+  const republished = await runtimeAfterRepublish.json();
+  expect(republished.data.success).toBe(true);
+  expect(republished.data.items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ value: 'active', label: '启用' }),
+  ]));
   await page.reload();
   await header.waitForHeader();
   await expect(page.getByRole('button', { name: '取消发布', exact: true })).toBeVisible();
