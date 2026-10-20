@@ -272,7 +272,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     `${automationName}-副本微调`,
   );
   await expect(page.locator('.react-flow__node')).toHaveCount(4);
-  await expect(page.getByText('写入审计', { exact: true })).toBeVisible();
+  await expect(page.locator('.react-flow__node').getByText('写入审计', { exact: true })).toBeVisible();
   await expect(page.getByText('加载设计器...', { exact: true })).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath('AD01b-automation-round-trip.png'),
