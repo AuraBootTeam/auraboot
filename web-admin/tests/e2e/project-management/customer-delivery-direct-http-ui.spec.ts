@@ -16,6 +16,11 @@ async function data(response: APIResponse) {
 }
 async function shot(page: Page, id: string) {
   await mkdir(join(evidence, 'screenshots'), { recursive: true });
+  await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, { timeout: 15_000 });
+  for (const error of await page.getByTestId(/automation-(run|action)-error/).all()) {
+    await expect(error).toBeVisible();
+    expect(await error.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  }
   await page.screenshot({ path: join(evidence, 'screenshots', id + '.png') });
 }
 

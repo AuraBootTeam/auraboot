@@ -54,6 +54,7 @@ test('customer integration is inspectable, its external event survives designer 
     await panel.getByRole('button', { name: '生成 Token', exact: true }).click();
     await panel.getByLabel('Token 名称', { exact: true }).fill(name);
     await panel.getByLabel('有效期模式', { exact: true }).selectOption(mode);
+    await panel.getByRole('button', { name: '确认', exact: true }).scrollIntoViewIfNeeded();
     await shot(page, mode === 'fixed' ? 'I02-fixed-token-form' : 'I03-permanent-token-form');
     let token = '';
     try {
@@ -100,6 +101,8 @@ test('customer integration is inspectable, its external event survives designer 
     expect(saved.triggerConfig.eventTypes).toEqual(eventTypes.triggerConfig.eventTypes);
     await page.getByTestId('flow-node-action_0').click();
     await expect(page.getByTestId('model-map-field-0')).toHaveValue('tpm_pj_next_action');
+    await expect(page.getByTestId('model-map-field-0').locator('option:checked')).toHaveText('下一步行动');
+    await expect(page.getByText('正在读取模型属性...', { exact: true })).toHaveCount(0);
     await expect(page.getByTestId('model-map-value-0')).toHaveValue('${trigger.data.nextAction}');
     await shot(page, 'I06-mapping-saved-and-reopened');
 
@@ -128,7 +131,9 @@ test('customer integration is inspectable, its external event survives designer 
     const active = panel.getByTestId('integration-token-row').filter({ hasText: `交付协同 · 长期接入 · ${stamp}` }).filter({ has: page.getByText('有效', { exact: true }) });
     await active.getByRole('button', { name: '轮换 Token', exact: true }).click();
     await panel.getByLabel('有效期模式', { exact: true }).selectOption('never');
-    await panel.getByLabel('旧 Token 宽限分钟数', { exact: true }).fill('0'); await shot(page, 'I09-token-rotation-form');
+    await panel.getByLabel('旧 Token 宽限分钟数', { exact: true }).fill('0');
+    await panel.getByRole('button', { name: '确认', exact: true }).scrollIntoViewIfNeeded();
+    await shot(page, 'I09-token-rotation-form');
     let replacement = '';
     try { await panel.getByRole('button', { name: '确认', exact: true }).click(); replacement = await panel.getByLabel('新 Token', { exact: true }).inputValue(); }
     finally { await closeSecret(page); }
