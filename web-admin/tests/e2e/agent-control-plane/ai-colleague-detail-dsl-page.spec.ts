@@ -18,6 +18,7 @@
  * A keyword-path result is seam evidence only; it is not counted as generation-quality evidence.
  */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { createServer, type Server } from 'node:http';
 
 const UNIQUE = `agent-kb-${Date.now().toString(36)}`;
 const AGENT_CODE = `agent_kb_${UNIQUE.replaceAll('-', '_')}`;
@@ -32,6 +33,56 @@ const RUNTIME_MODEL = process.env.AURA_LIVE_LLM_MODEL?.trim() || 'provider-defau
 
 let agentPid = '';
 let knowledgeBasePid = '';
+const EMBEDDING_PROVIDER = `agent_kb_embedding_${UNIQUE.replaceAll('-', '_')}`;
+const EMBEDDING_MODEL = 'owned-unavailable-embedding';
+let embeddingServer: Server | undefined;
+let embeddingConfigPid = '';
+let embeddingConfig = '';
+const embeddingRequests: Array<{ method?: string; path?: string; body: Record<string, unknown> }> = [];
+
+async function configureUnavailableEmbedding(request: APIRequestContext) {
+  // The original scenario exercises keyword fallback, not semantic embedding quality.
+  // Keep the actual provider/config/HTTP boundary and make its unavailability owned.
+  embeddingServer = createServer((req, res) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      let parsed: Record<string, unknown>;
+      try { parsed = JSON.parse(body); } catch { parsed = { invalidJson: body }; }
+      embeddingRequests.push({ method: req.method, path: req.url, body: parsed });
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Owned embedding outage for keyword fallback' }));
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    embeddingServer!.once('error', reject);
+    embeddingServer!.listen(0, '127.0.0.1', resolve);
+  });
+  const address = embeddingServer.address();
+  expect(address && typeof address !== 'string').toBeTruthy();
+  if (!address || typeof address === 'string') throw new Error('No embedding fixture address');
+  embeddingConfig = JSON.stringify({
+    displayName: `Owned embedding outage ${UNIQUE}`, apiKey: 'owned-fixture-not-a-secret',
+    baseUrl: `http://127.0.0.1:${address.port}`, defaultModel: EMBEDDING_MODEL, dimensions: 1536,
+  });
+  const saved = await request.post('/api/admin/cloud-config', { data: {
+    configLevel: 'tenant', serviceType: 'embedding', providerCode: EMBEDDING_PROVIDER,
+    config: embeddingConfig, enabled: true, priority: 100000,
+  } });
+  expect(saved.status(), await saved.text()).toBe(200);
+  expect(String((await saved.json()).code)).toBe('0');
+  const listed = await request.get('/api/admin/cloud-config?level=tenant');
+  expect(listed.status()).toBe(200);
+  embeddingConfigPid = (await listed.json()).data.find(
+    (config: { providerCode: string }) => config.providerCode === EMBEDDING_PROVIDER,
+  )?.pid;
+  expect(embeddingConfigPid).toBeTruthy();
+  const profiles = await request.get('/api/ai/knowledge/embedding-profiles');
+  expect(profiles.status()).toBe(200);
+  expect((await profiles.json()).data).toContainEqual(expect.objectContaining({
+    providerCode: EMBEDDING_PROVIDER, defaultModel: EMBEDDING_MODEL, dimensions: 1536,
+  }));
+}
 
 function asObject(value: unknown): Record<string, any> {
   if (value && typeof value === 'object') return value as Record<string, any>;
@@ -49,13 +100,15 @@ async function seedKnowledgeBase(request: APIRequestContext): Promise<string> {
     data: {
       name: KB_NAME,
       description: 'Per-agent knowledge binding golden fixture',
-      embeddingProvider: '',
-      embeddingModel: '',
+      embeddingProvider: EMBEDDING_PROVIDER,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimension: 1536,
       chunkSize: 300,
       chunkOverlap: 30,
     },
   });
-  expect(created.ok(), 'knowledge base fixture must be created').toBeTruthy();
+  expect(created.status(), await created.text()).toBe(200);
+  expect(String((await created.json()).code)).toBe('0');
   const pid = (await created.json())?.data?.pid;
   expect(pid).toBeTruthy();
 
@@ -87,6 +140,13 @@ async function seedKnowledgeBase(request: APIRequestContext): Promise<string> {
     )
     .toBe('completed:true');
 
+  await expect.poll(() => embeddingRequests.length).toBeGreaterThan(0);
+  for (const seen of embeddingRequests) {
+    expect(seen.method).toBe('POST');
+    expect(seen.path).toBe('/v1/embeddings');
+    expect(seen.body).toMatchObject({ model: EMBEDDING_MODEL, dimensions: 1536 });
+    expect(seen.body.input).toEqual(expect.arrayContaining([expect.stringContaining(UNIQUE_FACT)]));
+  }
   return pid;
 }
 
@@ -126,8 +186,26 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
   test.setTimeout(240_000);
 
   test.beforeAll(async ({ request }) => {
+    await configureUnavailableEmbedding(request);
     knowledgeBasePid = await seedKnowledgeBase(request);
     agentPid = await seedNamedAgent(request);
+  });
+
+  test.afterAll(async ({ request }) => {
+    try {
+      if (embeddingConfigPid) {
+        const disabled = await request.put(`/api/admin/cloud-config/${embeddingConfigPid}`, { data: {
+          configLevel: 'tenant', serviceType: 'embedding', providerCode: EMBEDDING_PROVIDER,
+          config: embeddingConfig, enabled: false, priority: 100000,
+        } });
+        expect(disabled.status()).toBe(200);
+        expect(String((await disabled.json()).code)).toBe('0');
+      }
+    } finally {
+      if (embeddingServer?.listening) await new Promise<void>((resolve, reject) => {
+        embeddingServer!.close(error => error ? reject(error) : resolve());
+      });
+    }
   });
 
   test('binds one KB through UI, reloads it, and uses it as named-agent fallback', async ({

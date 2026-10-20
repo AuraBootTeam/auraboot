@@ -471,3 +471,5 @@ aurabot:
 "permission.capability.preset.editor": "편집자"
 
 "permission.capability.preset.admin": "관리자"
+
+"about.menuLabel": "{productName} 정보"

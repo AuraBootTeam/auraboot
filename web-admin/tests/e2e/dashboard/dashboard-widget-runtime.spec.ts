@@ -19,6 +19,8 @@ import { existsSync, readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { executeCommandViaApi, uniqueId } from '../helpers';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
 
 type DashboardWidgetFixture = {
   id: string;
@@ -626,7 +628,7 @@ function shortcutWidgets(): DashboardWidgetFixture[] {
           {
             label: 'Runtime Dashboards',
             icon: '>',
-            path: '/dashboards',
+            path: '/p/dashboard_management',
             color: 'bg-blue-50',
           },
         ],
@@ -1010,7 +1012,7 @@ async function cleanupDashboard(page: Page, pid?: string): Promise<void> {
 
 async function createRecentEngagementFixture(page: Page): Promise<CreatedEngagement> {
   const targetId = `runtime-recent-${Date.now()}`;
-  const targetPath = `/runtime/recent/${targetId}`;
+  const targetPath = `/p/dashboard_management?e2eRecent=${targetId}`;
   const response = await page.request.post('/api/user-engagement', {
     data: {
       targetType: 'page',
@@ -1110,22 +1112,32 @@ async function expectAnnouncementListContains(
 async function createInboxFixture(page: Page): Promise<CreatedInboxFixture> {
   const testRunId = `dwr-inbox-${Date.now()}`;
   const currentUser = await getCurrentUserContext(page);
-  const response = await page.request.post('/api/test/fixture', {
-    data: {
-      name: 'approval',
-      testRunId,
-      params: {
-        count: 1,
-        tenantId: currentUser.tenantId,
-        userId: currentUser.userId,
-      },
-    },
-  });
-  const body = await parseJsonResponse<CreatedInboxFixture>(response, 'create inbox fixture');
-  expect(body.recordIds, 'created inbox record ids').toHaveLength(1);
-  expect(body.metadata?.itemType, 'created inbox item type').toBe('approval');
-  expect(String(body.metadata?.tenantId), 'created inbox tenant id').toBe(currentUser.tenantId);
-  expect(String(body.metadata?.userId), 'created inbox user id').toBe(currentUser.userId);
+  // Core production bootJar does not expose test-only fixture controllers.
+  // Seed only the owned pending read-model row; the verdict uses real API + viewer rendering.
+  const db = new Client(PG_CONN);
+  await db.connect();
+  let row: { id: string; tenant_id: string; user_id: string; item_type: string };
+  try {
+    const inserted = await db.query(
+      `INSERT INTO ab_inbox_item
+       (tenant_id, user_id, item_type, title, subtitle, priority, status, source_type, source_id)
+       VALUES ($1, $2, 'approval', $3, 'Owned dashboard E2E fixture', 'high', 'pending', 'test', $4)
+       RETURNING id::text, tenant_id::text, user_id::text, item_type`,
+      [currentUser.tenantId, currentUser.userId, `E2E Approval Request [${testRunId}-1]`, `${testRunId}-1`],
+    );
+    expect(inserted.rows).toHaveLength(1);
+    row = inserted.rows[0];
+    expect(row.id).toMatch(/^\d+$/);
+    expect(row.tenant_id).toBe(currentUser.tenantId);
+    expect(row.user_id).toBe(currentUser.userId);
+    expect(row.item_type).toBe('approval');
+  } finally {
+    await db.end();
+  }
+  const body: CreatedInboxFixture = {
+    recordIds: [row.id], testRunId,
+    metadata: { itemType: row.item_type, tenantId: row.tenant_id, userId: row.user_id },
+  };
   await expectInboxListContains(page, testRunId, 'inbox list immediately after fixture create');
   return body;
 }
@@ -1727,6 +1739,12 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
     try {
       dashboard = await createPublishedDashboard(page);
 
+      const statsResponse = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        const keys = url.searchParams.get('keys')?.split(',').sort();
+        return url.pathname === '/api/workbench/stats'
+          && JSON.stringify(keys) === JSON.stringify(['inbox_pending', 'inbox_urgent']);
+      });
       await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { name: dashboard.title })).toBeVisible({
         timeout: 15_000,
@@ -1766,7 +1784,18 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
 
       const statsRow = await expectRuntimeBlock(page, 'runtime-stats-row', 'smart-stats-row');
       await expect(statsRow.getByTestId('stats-row')).toBeVisible();
-      await expect(statsRow.locator('[data-testid^="stat-card-"]')).toHaveCount(4);
+      await expect(statsRow.locator('[data-testid^="stat-card-"]')).toHaveCount(2);
+      const response = await statsResponse;
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(String(body.code)).toBe('0');
+      const stats = body.data.stats ?? body.data;
+      for (const key of ['inbox_pending', 'inbox_urgent']) {
+        const value = Number(stats[key]?.value);
+        expect(Number.isFinite(value), `real core inbox stat ${key}`).toBe(true);
+        await expect(statsRow.getByTestId(`stat-card-${key}`)
+          .getByText(value.toLocaleString('en-US'), { exact: true })).toBeVisible();
+      }
 
       const statsCard = await expectRuntimeBlock(page, 'runtime-stats-card', 'smart-stats-card');
       const singleCard = statsCard.getByTestId('stat-card-inbox_pending');
@@ -1834,10 +1863,10 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       await expect(shortcuts.getByTestId('shortcuts-list')).toBeVisible();
 
       const shortcut = shortcuts.getByRole('link', { name: /Runtime Dashboards/ });
-      await expect(shortcut).toHaveAttribute('href', /\/dashboards$/);
+      await expect(shortcut).toHaveAttribute('href', /\/p\/dashboard_management$/);
 
       await shortcut.click();
-      await expect(page).toHaveURL(/\/dashboards$/);
+      await expect(page).toHaveURL(/\/p\/dashboard_management$/);
     } finally {
       await cleanupDashboard(page, dashboard?.pid);
     }

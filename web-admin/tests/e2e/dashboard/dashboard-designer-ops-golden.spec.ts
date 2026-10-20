@@ -48,7 +48,7 @@ test.describe('Dashboard designer ops golden', () => {
     const list = versions.data?.records ?? versions.data ?? [];
     expect(list.length).toBeGreaterThanOrEqual(2);
 
-    await page.locator('button', { hasText: /^History|历史$/ }).first().click();
+    await page.getByTitle('版本历史', { exact: true }).click();
     const panel = page.getByTestId('version-history-panel');
     await expect(panel).toBeVisible();
     const oldest = panel.locator('button').filter({ hasText: /由/ }).filter({ hasNotText: '最新' }).last();
