@@ -6663,7 +6663,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await expect(page.getByTestId('designer-save')).toBeEnabled();
     await saveDesignerPage(page, helperPermissionPid);
-    for (const permission of ['meta.designer.read', 'page.page.read', 'meta.query.read']) {
+    for (const permission of ['meta.designer.read', 'page.page.read', 'meta.query.read', 'model.page_schema.read']) {
       await grantRolePermissionByCode(page, 'e2et_viewer', permission);
     }
     const roleContext = await createAuthenticatedRoleContext(
@@ -6677,6 +6677,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       expect(codes).not.toContain('*');
       expect(codes).not.toContain(missingPermissionCode);
       expect(codes).toContain(allowedPermissionCode);
+      expect(codes).toContain('meta.query.read');
+      expect(codes).toContain('model.page_schema.read');
       await rolePage.goto(`/unified-designer?pageId=${helperPermissionPid}`, {
         waitUntil: 'domcontentloaded',
       });
