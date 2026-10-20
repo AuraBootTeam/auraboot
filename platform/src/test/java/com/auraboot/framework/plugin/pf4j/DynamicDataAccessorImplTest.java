@@ -42,6 +42,28 @@ class DynamicDataAccessorImplTest {
     @InjectMocks private DynamicDataAccessorImpl accessor;
 
     @Test
+    void queryPage_omitsAbsentKeywordForTheRealMachineQueryGuard() {
+        var principal=new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                1L,"inst","Integration",java.util.Set.of(),"app","inst",null,null);
+        var decision=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(
+                1L,"inst","m",java.util.Set.of("read"),java.util.Set.of("pid","name"),java.util.Set.of(),List.of());
+        when(dynamicDataService.list(eq("m"),any(DynamicQueryRequest.class))).thenAnswer(call->{
+            DynamicQueryRequest request=call.getArgument(1);
+            com.auraboot.framework.meta.service.impl.MachineDataAccessGuards.requireQueryFields("m",request);
+            assertThat(request.getKeyword()).isNull();
+            return PaginationResult.of(List.of(Map.of("pid","row","name","sample")),1L,1,20);
+        });
+        try(var machine=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var authority=com.auraboot.framework.application.security.MachineDataAccessContext.authorize(Map.of("m",decision))) {
+            assertThat(accessor.queryPage("m",new DataPageQuery(Map.of("name","sample"),Map.of(),List.of(),1,20)).records())
+                    .containsExactly(Map.of("pid","row","name","sample"));
+            org.assertj.core.api.Assertions.assertThatThrownBy(()->accessor.queryPage("m",
+                    new DataPageQuery(Map.of(),Map.of(),List.of(),1,20,"not authorized")))
+                    .isInstanceOf(DataAccessorException.class);
+        }
+    }
+
+    @Test
     void queryPage_sendsOneBoundedOrderedAndFilteredDatabaseQueryForALargeMatchSet() {
         when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
                 .thenReturn(PaginationResult.of(List.of(Map.of("pid", "B")), 100_001L, 3, 20));
