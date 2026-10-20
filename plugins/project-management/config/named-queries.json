@@ -214,7 +214,7 @@
       {
         "code": "project_version",
         "columnExpr": "project_version",
-        "dataType": "integer"
+        "dataType": "number"
       }
     ]
   }
