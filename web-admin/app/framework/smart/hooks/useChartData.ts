@@ -18,6 +18,7 @@ import { ResultHelper } from '~/utils/type';
 import { useDimensionLabels } from './useDimensionLabels';
 import { DashboardQueryContext } from './DashboardQueryContext';
 import { aggregateModelField, hasAggregateModel } from '../utils/aggregateModel';
+import { hasIncompleteChartFilters } from '../utils/chartFilterState';
 
 type ApiDataPayload =
   | { records?: Record<string, unknown>[]; rows?: Record<string, unknown>[] }
@@ -120,6 +121,11 @@ async function fetchApiChartData(url: string, paramsKey: string): Promise<Aggreg
 
 function isDataSourceComplete(dataSource: ChartDataSource | undefined): boolean {
   if (!dataSource) return false;
+  if (
+    ['aggregate', 'namedQuery'].includes(dataSource.type) &&
+    hasIncompleteChartFilters(dataSource.filters)
+  )
+    return false;
 
   switch (dataSource.type) {
     case 'aggregate':
@@ -254,8 +260,8 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const ownsRequest = () => mountedRef.current
-      && abortControllerRef.current === controller && !controller.signal.aborted;
+    const ownsRequest = () =>
+      mountedRef.current && abortControllerRef.current === controller && !controller.signal.aborted;
 
     if (!enabled) {
       setData(null);
@@ -298,7 +304,10 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
       }
 
       // Build the request from data source configuration
-      const modelField = currentDataSource.type === 'aggregate' ? aggregateModelField(currentDataSource) : 'modelCode';
+      const modelField =
+        currentDataSource.type === 'aggregate'
+          ? aggregateModelField(currentDataSource)
+          : 'modelCode';
       const request: AggregateQueryRequest = {
         type: currentDataSource.type === 'namedQuery' ? 'namedQuery' : 'aggregate',
         [modelField]: currentDataSource[modelField],

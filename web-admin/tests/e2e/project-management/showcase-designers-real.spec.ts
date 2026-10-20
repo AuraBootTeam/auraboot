@@ -51,13 +51,22 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   await expect(panel.getByRole('option', {name:/交付验收状态分布/})).toBeAttached();
   await page.mouse.move(280, 85);
   await shot(page, 'SC10-dashboard-before');
+  let unfinishedQueries = 0;
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/meta/chart-data'
+      && request.postDataJSON()?.filters?.some((filter:any) => !filter.field?.trim())) unfinishedQueries++;
+  });
   await filters.getByRole('button', {name:'添加条件',exact:true}).click();
   await expect(filters.getByRole('textbox', {name:'字段',exact:true})).toBeVisible();
   await expect(filters.getByRole('option', {name:'等于',exact:true})).toBeAttached();
+  await expect(chart.getByTestId('chart-filter-draft')).toContainText('请补全筛选条件后预览');
+  await expect(chart.getByRole('alert')).toHaveCount(0);
   await filters.scrollIntoViewIfNeeded();
   await shot(page, 'SC10-dashboard-filter-controls');
   await filters.getByRole('button', {name:'移除条件',exact:true}).click();
   await expect(filters).toContainText('未设置筛选条件');
+  await expect(chart.locator('[data-chart-ready="true"]')).toBeVisible();
+  expect(unfinishedQueries, 'Unfinished designer filters must not query the backend').toBe(0);
   const title = '验收状态 · 负责人';
   await panel.getByTestId('widget-prop-title-zh').fill(title);
   await panel.getByTestId('widget-prop-visualization-donut').check();

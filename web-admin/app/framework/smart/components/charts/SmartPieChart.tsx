@@ -20,6 +20,8 @@ import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
 import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 import { enrichDrillDownFilters } from '~/framework/smart/utils/drillDownFilters';
+import { hasIncompleteChartFilters } from '~/framework/smart/utils/chartFilterState';
+import { useSmartText } from '~/utils/i18n';
 
 /**
  * Props for SmartPieChart component
@@ -127,7 +129,11 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
   style,
   chartOptions,
 }) => {
+  const text = useSmartText();
   const isConfigured = isDataSourceConfigured(dataSource);
+  const incompleteFilters =
+    ['aggregate', 'namedQuery'].includes(dataSource.type) &&
+    hasIncompleteChartFilters(dataSource.filters);
 
   const { data, loading, error } = useChartData({
     dataSource,
@@ -294,6 +300,24 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
           <div className="font-medium text-gray-500">{title || '饼图'}</div>
           <div className="mt-1 text-sm text-gray-400">请在右侧配置数据源</div>
         </div>
+      </div>
+    );
+  }
+
+  if (incompleteFilters) {
+    return (
+      <div
+        className={cn(
+          'flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white p-4',
+          className,
+        )}
+        style={style}
+        role="status"
+        data-testid="chart-filter-draft"
+      >
+        <p className="text-center text-sm text-gray-500">
+          {text({ zh: '请补全筛选条件后预览', en: 'Complete the filter conditions to preview' })}
+        </p>
       </div>
     );
   }

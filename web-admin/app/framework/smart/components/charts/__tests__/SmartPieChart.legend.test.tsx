@@ -28,6 +28,16 @@ beforeEach(() => {
 });
 
 describe('pie chart legends in designer canvases', () => {
+  it('explains an unfinished filter instead of displaying stale or failed query results', () => {
+    render(
+      <SmartPieChart
+        dataSource={{ ...source, filters: [{ field: '', operator: 'eq', value: '' }] }}
+      />,
+    );
+    expect(screen.getByTestId('chart-filter-draft')).toBeVisible();
+    expect(screen.queryByTestId('chart-options')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
   it('wraps a small distribution and preserves every actual label and value', () => {
     render(<SmartPieChart dataSource={source} ring />);
     const config = options();
