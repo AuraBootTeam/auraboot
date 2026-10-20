@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { inflateSync } from 'node:zlib';
 import { auditHifiReport } from '../gates/hifi-golden-results.mjs';
 import { canonicalJson, requireCondition, sha256 } from './contract.mjs';
 
@@ -10,6 +11,49 @@ function evidencePath(root, target) {
   return file;
 }
 export function readEvidenceFile(root, target) { return fs.readFileSync(evidencePath(root, target)); }
+
+const crcTable = Array.from({ length: 256 }, (_, value) => {
+  for (let bit = 0; bit < 8; bit++) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  return value >>> 0;
+});
+function pngCrc(bytes) {
+  let value = 0xffffffff;
+  for (const byte of bytes) value = crcTable[(value ^ byte) & 255] ^ (value >>> 8);
+  return (value ^ 0xffffffff) >>> 0;
+}
+/** Validate complete browser RGB/RGBA PNG bytes, not merely the eight-byte signature. */
+function validBrowserPng(bytes) {
+  try {
+    if (!bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return false;
+    let offset = 8, width, height, channels, ended = false;
+    const imageData = [];
+    while (offset < bytes.length) {
+      if (offset + 12 > bytes.length) return false;
+      const length = bytes.readUInt32BE(offset), end = offset + 12 + length;
+      if (end > bytes.length) return false;
+      const type = bytes.toString('ascii', offset + 4, offset + 8), data = bytes.subarray(offset + 8, end - 4);
+      if (pngCrc(bytes.subarray(offset + 4, end - 4)) !== bytes.readUInt32BE(end - 4)) return false;
+      if (offset === 8 && type !== 'IHDR') return false;
+      if (type === 'IHDR') {
+        if (offset !== 8 || length !== 13) return false;
+        width = data.readUInt32BE(0); height = data.readUInt32BE(4);
+        channels = data[9] === 2 ? 3 : data[9] === 6 ? 4 : 0;
+        if (!width || !height || !channels || data[8] !== 8 || data[10] || data[11] || data[12]) return false;
+      } else if (type === 'IDAT') imageData.push(data);
+      else if (type === 'IEND') {
+        if (length || end !== bytes.length) return false;
+        ended = true;
+      }
+      offset = end;
+    }
+    const stride = width * channels + 1, size = height * stride;
+    if (!ended || !imageData.length || !Number.isSafeInteger(size) || size > 128 * 1024 * 1024) return false;
+    const raw = inflateSync(Buffer.concat(imageData), { maxOutputLength: size });
+    if (raw.length !== size) return false;
+    for (let row = 0; row < height; row++) if (raw[row * stride] > 4) return false;
+    return true;
+  } catch { return false; }
+}
 
 function sessionProof(proof) {
   requireCondition(proof && typeof proof.context === 'string' && proof.context.length > 0
@@ -146,7 +190,7 @@ export function auditBrowserEvidence({ registry, catalog, report, reportBytes, b
     requireCondition(attached.length === 1 && original.length === 1
       && path.basename(original[0].path) === scene.screenshot, `Missing or duplicated image: ${scene.id}`);
     const originalBytes = readEvidenceFile(root, original[0].path), bytes = readEvidenceFile(root, attached[0].path);
-    requireCondition(originalBytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+    requireCondition(validBrowserPng(originalBytes)
       && originalBytes.equals(bytes), `Invalid or mismatched PNG image: ${scene.id}`);
     return { id: scene.id, screenshotPath: original[0].path, screenshotSha256: sha256(bytes), visual: 'pending' };
   });

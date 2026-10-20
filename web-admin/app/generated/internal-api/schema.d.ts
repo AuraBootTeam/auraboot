@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: baf2e0211748c72d587ad5cccb507656aa675334538c81bbac075fec3364bc34
+ * Contract SHA-256: 2a1919db374fac2ce7bc949f4d9739068e5bcb0ffed6bcfd8ab9d14a4f487ec3
  */
 export interface paths {
     "/api/activities": {
@@ -29333,7 +29333,7 @@ export interface components {
             auditEvents?: components["schemas"]["AdminEventLog"][];
             behaviorEvents?: components["schemas"]["BehaviorEvent"][];
             commandAudits?: components["schemas"]["CommandAuditLogDTO"][];
-            llmUsage?: components["schemas"]["GenAiUsageRecord"][];
+            llmUsage?: components["schemas"]["LlmUsageView"][];
             permissionDenials?: components["schemas"]["PermissionDenialView"][];
             traceId?: string;
         };
@@ -32130,33 +32130,6 @@ export interface components {
             example?: string;
             name?: string;
         };
-        GenAiUsageRecord: {
-            amount?: number;
-            /** Format: int32 */
-            cacheReadTokens?: number;
-            /** Format: int32 */
-            cacheWriteTokens?: number;
-            /** Format: date-time */
-            createdAt?: string;
-            currency?: string;
-            /** Format: int64 */
-            id?: number;
-            /** Format: int32 */
-            inputTokens?: number;
-            /** Format: int32 */
-            outputTokens?: number;
-            pricingVersion?: string;
-            provider?: string;
-            /** Format: int32 */
-            reasoningTokens?: number;
-            requestModel?: string;
-            responseModel?: string;
-            runId?: string;
-            spanId?: string;
-            /** Format: int64 */
-            tenantId?: number;
-            traceId?: string;
-        };
         GenAiUsageSummary: {
             /** Format: int64 */
             callCount?: number;
@@ -33127,6 +33100,33 @@ export interface components {
             dataType?: "string" | "text" | "integer" | "decimal" | "boolean" | "date" | "time" | "datetime" | "duration" | "enum" | "dict" | "reference" | "user" | "role" | "group" | "department" | "collection" | "object";
             value?: unknown;
         });
+        LlmUsageView: {
+            amount?: number;
+            /** Format: int32 */
+            cacheReadTokens?: number;
+            /** Format: int32 */
+            cacheWriteTokens?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            currency?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: int32 */
+            inputTokens?: number;
+            /** Format: int32 */
+            outputTokens?: number;
+            pricingVersion?: string;
+            provider?: string;
+            /** Format: int32 */
+            reasoningTokens?: number;
+            requestModel?: string;
+            responseModel?: string;
+            runId?: string;
+            spanId?: string;
+            /** Format: int64 */
+            tenantId?: number;
+            traceId?: string;
+        };
         LocaleCoverage: {
             /** Format: double */
             coverage?: number;

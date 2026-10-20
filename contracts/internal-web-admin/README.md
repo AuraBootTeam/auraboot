@@ -248,6 +248,9 @@ node scripts/internal-api/browser.mjs collect \
 
 A missing, duplicate, stale, mismatched or unreviewed image prevents a reviewed
 receipt. Evidence paths must remain inside the attempt, including symlink targets.
+Browser PNG evidence must contain complete RGB/RGBA image data with valid chunk
+checksums, dimensions, scanlines and termination; a PNG signature alone is refused.
+This integrity check does not judge visual quality or replace individual original review.
 Functional and visual receipts preserve the actual executed commit. They do not
 certify unregistered domain branches, global absence of session residue, JSON
 formats, or the separate admitted Linux release-image gate.

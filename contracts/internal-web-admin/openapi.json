@@ -21003,7 +21003,7 @@
           },
           "llmUsage": {
             "items": {
-              "$ref": "#/components/schemas/GenAiUsageRecord"
+              "$ref": "#/components/schemas/LlmUsageView"
             },
             "type": "array"
           },
@@ -29071,70 +29071,6 @@
         },
         "type": "object"
       },
-      "GenAiUsageRecord": {
-        "properties": {
-          "amount": {
-            "type": "number"
-          },
-          "cacheReadTokens": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "cacheWriteTokens": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "id": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "inputTokens": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "outputTokens": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "pricingVersion": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
-          },
-          "reasoningTokens": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "requestModel": {
-            "type": "string"
-          },
-          "responseModel": {
-            "type": "string"
-          },
-          "runId": {
-            "type": "string"
-          },
-          "spanId": {
-            "type": "string"
-          },
-          "tenantId": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "traceId": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "GenAiUsageSummary": {
         "properties": {
           "callCount": {
@@ -31792,6 +31728,70 @@
             "type": "object"
           }
         ]
+      },
+      "LlmUsageView": {
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "cacheReadTokens": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "cacheWriteTokens": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "inputTokens": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "outputTokens": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pricingVersion": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "reasoningTokens": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requestModel": {
+            "type": "string"
+          },
+          "responseModel": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "spanId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "LocaleCoverage": {
         "properties": {

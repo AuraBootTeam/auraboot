@@ -1,8 +1,11 @@
 """Hermetic capture checks; image qualification still requires the admitted Linux runner."""
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
 import tempfile
+import textwrap
 import unittest
 
 spec = importlib.util.spec_from_file_location("capture_internal", Path(__file__).with_name("capture-internal-document.py"))
@@ -66,6 +69,40 @@ class CaptureTests(unittest.TestCase):
             with self.subTest(base=base), self.assertRaises(RuntimeError):
                 module.transport(base)
         self.assertIsNone(module.NoRedirect().redirect_request(None, None, 302, "redirect", {}, "https://remote.invalid"))
+
+    def test_quickstart_cleanup_preserves_failure_and_requires_revoked_identity(self):
+        workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/quickstart.yml").read_text()
+        start = workflow.index("          capture_session_cleanup() {")
+        end = workflow.index("          trap capture_session_cleanup EXIT", start)
+        cleanup = textwrap.dedent(workflow[start:end])
+        for original, revoke, identity, expected in [(0, 0, "401", 0), (7, 0, "401", 7),
+                                                     (0, 1, "401", 1), (0, 0, "200", 1)]:
+            with self.subTest(original=original, revoke=revoke, identity=identity), tempfile.TemporaryDirectory() as directory:
+                script = r'''
+set -euo pipefail
+mkdir "$RUNNER_TEMP/internal-api-live"
+token=fixture-private-session
+curl() {
+  case "$*" in
+    *"/api/user/sessions/current"*)
+      printf 'revoke\n' >> "$RUNNER_TEMP/calls"
+      return "$REVOKE_STATUS" ;;
+    *"/api/auth/me"*)
+      printf 'identity\n' >> "$RUNNER_TEMP/calls"
+      printf '%s' "$IDENTITY_STATUS" ;;
+    *) return 99 ;;
+  esac
+}
+''' + cleanup + '\ntrap capture_session_cleanup EXIT\nexit "$ORIGINAL_STATUS"\n'
+                result = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
+                                        env={**os.environ, "RUNNER_TEMP": directory, "REVOKE_STATUS": str(revoke),
+                                             "IDENTITY_STATUS": identity, "ORIGINAL_STATUS": str(original)})
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertEqual((Path(directory) / "calls").read_text().splitlines(),
+                                 ["revoke"] if revoke else ["revoke", "identity"])
+                receipt = Path(directory) / "internal-api-live/session-cleanup.json"
+                self.assertEqual(receipt.exists(), revoke == 0 and identity == "401")
+                self.assertNotIn("fixture-private-session", result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

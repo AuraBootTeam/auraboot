@@ -9,7 +9,9 @@ import { canonicalJson, sha256 } from './contract.mjs';
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'internal-browser-evidence-'));
   const original = path.join(root, 'SAMPLE-01.png'), attached = path.join(root, 'attachment.png');
-  const bytes = Buffer.from([137,80,78,71,13,10,26,10,1]); fs.writeFileSync(original, bytes); fs.writeFileSync(attached, bytes);
+  // Complete independently encoded 1x1 RGBA PNG, including chunk CRCs and compressed pixels.
+  const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=', 'base64');
+  fs.writeFileSync(original, bytes); fs.writeFileSync(attached, bytes);
   const catalog = { scenarios: [{ id: 'SAMPLE-01', test: 'browser', screenshot: 'SAMPLE-01.png' }] };
   const registry = { tests: [{ id: 'browser', title: 'browser', project: 'contract', file: 'web-admin/tests/e2e/a.spec.ts', requiredEvidence: [{ name: 'wire', fields: {} }] }] };
   const identity = { sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), catalogSha256: sha256(canonicalJson(catalog)),
@@ -26,6 +28,12 @@ function fixture() {
 }
 function withFixture(run) { const f = fixture(); try { run(f); } finally { fs.rmSync(f.root, { recursive: true, force: true }); } }
 function rebindReport(f) { f.reportBytes = Buffer.from(JSON.stringify(f.report)); f.after.reportSha256 = sha256(f.reportBytes); f.review.reportSha256 = f.after.reportSha256; }
+function replaceImage(f, mutate) {
+  const bytes = mutate(fs.readFileSync(f.originals[0].path));
+  fs.writeFileSync(f.originals[0].path, bytes);
+  fs.writeFileSync(f.report.suites[0].specs[0].tests[0].results[0].attachments[1].path, bytes);
+  f.review.rows[0].screenshotSha256 = sha256(bytes);
+}
 function roleMemberObservation(f, denials) {
   const name='role-member-browser-observations';
   f.registry.tests[0].requiredEvidence[0].name=name;
@@ -86,6 +94,10 @@ test('browser evidence separates functional execution from exact original review
 
 test('browser evidence rejects stale failed skipped retried missing mismatched or unreviewed attempts', () => {
   const mutations = [
+    f => replaceImage(f, bytes => bytes.subarray(0, 9)),
+    f => replaceImage(f, bytes => bytes.subarray(0, bytes.length - 12)),
+    f => replaceImage(f, bytes => { bytes[45] ^= 1; return bytes; }),
+    f => replaceImage(f, bytes => Buffer.concat([bytes, Buffer.from('trailing')])),
     f => { f.after.nonce = 'different'; }, f => { f.before.identity.sourceCommit = 'f'.repeat(40); },
     f => { roleMemberObservation(f,roleMemberDenials.slice(1)); },
     f => { roleMemberObservation(f,roleMemberDenials.map(row=>({...row,status:200}))); },

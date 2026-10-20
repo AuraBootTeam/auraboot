@@ -138,6 +138,10 @@ jobs:
         # and this goes red.
         run: ./scripts/quickstart.sh
 
+      - name: Internal contract capture and cleanup self-tests
+        if: steps.changes.outputs.run == 'true'
+        run: python3 scripts/ci/capture-internal-document.test.py
+
       - name: Internal API contract drift from the built backend
         if: steps.changes.outputs.run == 'true'
         run: |
@@ -149,6 +153,22 @@ jobs:
             -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
             | python3 -c 'import json,re,sys; token=json.load(sys.stdin).get("data", {}).get("jwt"); assert isinstance(token,str) and re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",token), "Missing session token"; print(token)')
           echo "::add-mask::$token"
+          # Revoke only this capture's session, including when the drift gate fails.
+          capture_session_cleanup() {
+            local original_status=$?
+            trap - EXIT
+            curl -fsS -m 15 -X DELETE http://localhost:3000/api/user/sessions/current \
+              -H "Authorization: Bearer $token" -H "Origin: http://localhost:3000" \
+              > /dev/null || exit 1
+            local identity_status
+            identity_status=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' \
+              http://localhost:3000/api/auth/me -H "Authorization: Bearer $token") || exit 1
+            [[ "$identity_status" == 401 ]] || { echo "Capture session remained authorized" >&2; exit 1; }
+            printf '%s\n' '{"claim":"capture-session-cleanup-only","sessionRevoked":true,"identityAfterRevocation":401}' \
+              > "$RUNNER_TEMP/internal-api-live/session-cleanup.json"
+            exit "$original_status"
+          }
+          trap capture_session_cleanup EXIT
           printf '%s\n' "$token" | docker compose exec -T backend sh -c '
             IFS= read -r token
             exec wget -q -O - --header="Authorization: Bearer $token" \
