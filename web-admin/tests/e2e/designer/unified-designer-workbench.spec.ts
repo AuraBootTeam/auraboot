@@ -506,6 +506,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: liveNamedQueryTitle,
       description: 'Auto-generated for Unified Designer named query widget E2E',
       fromSql: 'ab_page_schema p',
+      baseWhere: [{
+        field: 'page_key', operator: 'in',
+        value: [formPageKey, listPageKey, detailPageKey, dashboardPageKey],
+      }],
     });
 
     for (const field of [
@@ -536,6 +540,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: liveHelperNamedQueryTitle,
       description: 'Auto-generated for Unified Designer helper block live data E2E',
       fromSql: 'ab_page_schema p',
+      baseWhere: [{
+        field: 'page_key', operator: 'in',
+        value: [formPageKey, listPageKey, detailPageKey, dashboardPageKey],
+      }],
     });
 
     for (const field of [
@@ -4100,14 +4108,19 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const pickerOptionsBody = await pickerOptionsResp.json();
     expect(pickerOptionsBody.code).toBe('0');
     const pickerRows = (pickerOptionsBody.data?.records ?? []) as Array<Record<string, unknown>>;
-    const namedQueryPickerRow = pickerRows.find((row) => typeof row.page_key === 'string');
+    const namedQueryPickerRow = pickerRows.find((row) => row.page_key === formPageKey);
     expect(namedQueryPickerRow).toBeTruthy();
     const expectedPickerValue = String(namedQueryPickerRow?.page_key);
     const expectedPickerLabel = String(namedQueryPickerRow?.name ?? expectedPickerValue);
 
     const picker = page.getByTestId('runtime-picker-field_seed_secondary');
     await expect(picker).toBeVisible();
-    await expect(picker.locator('option', { hasText: expectedPickerLabel })).toHaveCount(1);
+    await expect.poll(() => picker.locator('option').evaluateAll(
+      (options, value) => options
+        .filter(option => (option as HTMLOptionElement).value === value)
+        .map(option => option.textContent?.trim()),
+      expectedPickerValue,
+    )).toEqual([expectedPickerLabel]);
     await expect(page.getByTestId('runtime-picker-meta-field_seed_secondary')).toContainText(
       `named-query / ${liveNamedQueryCode} / name / page_key`,
     );
@@ -6974,6 +6987,7 @@ async function ensureNamedQuery(
     title: string;
     description: string;
     fromSql: string;
+    baseWhere?: Array<{ field: string; operator: string; value: string[] }>;
   },
 ): Promise<void> {
   const createResp = await page.request.post('/api/meta/named-queries', { data: request });
