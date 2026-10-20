@@ -30,5 +30,24 @@ public class InstalledIntegrationRegistry {
         return matches.stream().findFirst();
     }
 
+    public Set<Registration> completedReceiptRegistrations(String source) {
+        var current = registration(source).orElseThrow(InstalledIntegrationRegistry::denied).getKey();
+        var matches = plugins.getExtensionsOfType(ExternalEventIngressExtension.class).stream()
+                .filter(extension -> source.equals(extension.registration().sourceCode())).toList();
+        if (matches.size() != 1 || !current.equals(matches.getFirst().registration())) throw denied();
+        var sets = Objects.requireNonNull(matches.getFirst().completedReceiptEventTypeSets());
+        if (sets.size() > 4) throw denied();
+        Set<Registration> result = new HashSet<>();
+        for (var events : sets) {
+            if (events == null || events.isEmpty() || events.equals(current.eventTypes())
+                    || !current.eventTypes().containsAll(events)) throw denied();
+            result.add(new Registration(current.sourceCode(), current.capability(), events,
+                    current.requiredScope(), current.commandPermission(), current.providerPluginId(),
+                    current.commandOwnerPluginId(), current.acceptCommand(), current.processCommand(),
+                    current.resultCommand(), current.serverActorParameter()));
+        }
+        return Set.copyOf(result);
+    }
+
     private static SecurityException denied() { return new SecurityException("Installed integration provider denied"); }
 }

@@ -3755,14 +3755,23 @@ CREATE TABLE public.ab_application_access_token (
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
     installation_id bigint NOT NULL,
-    credential_id bigint NOT NULL,
+    credential_id bigint,
     token_hash character(64) NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     audience character varying(96) DEFAULT 'auraboot-open-api'::character varying NOT NULL,
     issued_at timestamp with time zone NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone,
     last_used_at timestamp with time zone,
-    revoked_at timestamp with time zone
+    revoked_at timestamp with time zone,
+    token_kind character varying(16) DEFAULT 'oauth'::character varying NOT NULL,
+    token_name character varying(160),
+    never_expires boolean DEFAULT false NOT NULL,
+    accept_until timestamp with time zone,
+    rotated_at timestamp with time zone,
+    replaced_by_pid character varying(26),
+    management_key character varying(160),
+    CONSTRAINT ck_application_token_kind CHECK (((((token_kind)::text = 'oauth'::text) AND (credential_id IS NOT NULL) AND (expires_at IS NOT NULL) AND (NOT never_expires) AND (token_name IS NULL) AND (management_key IS NULL)) OR (((token_kind)::text = 'integration'::text) AND (credential_id IS NULL) AND (token_name IS NOT NULL) AND ((length(TRIM(BOTH FROM token_name)) >= 1) AND (length(TRIM(BOTH FROM token_name)) <= 160)) AND (management_key IS NOT NULL) AND ((never_expires AND (expires_at IS NULL)) OR ((NOT never_expires) AND (expires_at IS NOT NULL) AND (expires_at > issued_at)))))),
+    CONSTRAINT ck_application_token_rotation CHECK ((((rotated_at IS NULL) AND (accept_until IS NULL) AND (replaced_by_pid IS NULL)) OR ((rotated_at IS NOT NULL) AND (accept_until IS NOT NULL) AND (accept_until >= rotated_at))))
 );
 
 
@@ -25964,6 +25973,13 @@ CREATE INDEX idx_application_installation_tenant ON public.ab_application_instal
 
 
 --
+-- Name: idx_application_integration_token_list; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_application_integration_token_list ON public.ab_application_access_token USING btree (tenant_id, installation_id, issued_at DESC) WHERE ((token_kind)::text = 'integration'::text);
+
+
+--
 -- Name: idx_application_scope_grant_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -30010,6 +30026,13 @@ CREATE UNIQUE INDEX uq_ai_token_tenant_user_provider ON public.ab_ai_provider_to
 
 
 --
+-- Name: uq_application_token_management_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_application_token_management_key ON public.ab_application_access_token USING btree (tenant_id, installation_id, management_key) WHERE ((token_kind)::text = 'integration'::text);
+
+
+--
 -- Name: uq_aurabot_skill_idemp; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -30710,6 +30733,14 @@ ALTER TABLE ONLY public.ab_analytics_task_execution
 
 ALTER TABLE ONLY public.ab_application_access_token
     ADD CONSTRAINT ab_application_access_token_credential_id_fkey FOREIGN KEY (credential_id) REFERENCES public.ab_application_credential(id);
+
+
+--
+-- Name: ab_application_access_token ab_application_access_token_replaced_by_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_access_token
+    ADD CONSTRAINT ab_application_access_token_replaced_by_pid_fkey FOREIGN KEY (replaced_by_pid) REFERENCES public.ab_application_access_token(pid) ON DELETE SET NULL;
 
 
 --

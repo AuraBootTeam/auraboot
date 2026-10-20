@@ -41,6 +41,23 @@ class InstalledIntegrationRegistryTest {
         when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(extension,extension));
         assertThrows(SecurityException.class,()->duplicateRegistry.registration("kingdee-procurement"));
     }
+    @Test void historicalEventSetsCannotChangeAuthorityOrInventUnregisteredEvents() {
+        var expanded=new Registration(registration.sourceCode(),registration.capability(),
+                Set.of("external.kingdee-procurement.inquiry.requested.v1","external.kingdee-procurement.inquiry.changed.v1"),
+                registration.requiredScope(),registration.commandPermission(),registration.providerPluginId(),registration.commandOwnerPluginId(),
+                registration.acceptCommand(),registration.processCommand(),registration.resultCommand(),registration.serverActorParameter());
+        var provider=mock(ExternalEventIngressExtension.class);when(provider.registration()).thenReturn(expanded);
+        when(provider.completedReceiptEventTypeSets()).thenReturn(Set.of(registration.eventTypes()));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.of(
+                new AuraPluginManager.LoadedPluginArtifact(registration.providerPluginId(),Path.of("provider.jar"),"sha256:"+"a".repeat(64))));
+        var registry=new InstalledIntegrationRegistry(plugins);
+        assertEquals(Set.of(registration),registry.completedReceiptRegistrations(registration.sourceCode()));
+        when(provider.completedReceiptEventTypeSets()).thenReturn(Set.of(Set.of("external.kingdee-procurement.forged.v1")));
+        assertThrows(SecurityException.class,()->registry.completedReceiptRegistrations(registration.sourceCode()));
+        when(provider.completedReceiptEventTypeSets()).thenReturn(Set.of(expanded.eventTypes()));
+        assertThrows(SecurityException.class,()->registry.completedReceiptRegistrations(registration.sourceCode()));
+    }
     @Test void registrationRejectsUnrelatedEventFamilyOrArbitraryCommand() {
         assertThrows(IllegalArgumentException.class,()->new Registration("kingdee-procurement","procurement.inquiry.ingress",
             Set.of("external.other.inquiry.requested.v1"),"scope","permission","provider","owner","qo_request:accept","qo_request:process","qo_request:result"));
