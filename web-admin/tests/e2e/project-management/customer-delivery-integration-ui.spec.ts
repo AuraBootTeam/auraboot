@@ -41,7 +41,7 @@ test('customer integration is inspectable, its external event survives designer 
   const base = `/api/open-platform/installations/${fixture.installationPid}`;
   const names: string[] = []; const stamp = Date.now().toString(36); const ledger: unknown[] = [];
   let permanent = ''; let fixed = ''; let result: Record<string, unknown> | undefined;
-  const external = await request.newContext({ storageState: { cookies: [], origins: [] } });
+  const external = await request.newContext({ extraHTTPHeaders: {}, storageState: { cookies: [], origins: [] } });
   const machine = async (token: string, status: number) => {
     const response = await external.get(`${BACKEND_URL}/api/open/v1/whoami`, { headers: { Authorization: `Bearer ${token}` } });
     expect(response.status(), await response.text()).toBe(status);
