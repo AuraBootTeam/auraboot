@@ -453,6 +453,9 @@ importers:
       match-sorter:
         specifier: ^6.3.1
         version: 6.4.0
+      monaco-editor:
+        specifier: 0.55.1
+        version: 0.55.1
       mysql2:
         specifier: ^3.23.1
         version: 3.23.1(@types/node@20.19.39)

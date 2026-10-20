@@ -8,7 +8,8 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
+import type { Monaco, OnMount } from '@monaco-editor/react';
+import Editor from '~/shared/components/monaco/MonacoEditor';
 import type { editor } from 'monaco-editor';
 import { expressionParser } from '~/plugins/core-designer/components/studio/services/runtime/expression/expression-parser';
 import type { ExpressionEditorProps, ExpressionValidationResult } from './types';

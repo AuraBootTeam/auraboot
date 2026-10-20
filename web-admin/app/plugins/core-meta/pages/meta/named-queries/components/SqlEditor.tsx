@@ -8,7 +8,7 @@ import type { Monaco, OnMount } from '@monaco-editor/react';
 import { registerSqlCompletion, disposeSqlCompletion } from './sql-completion';
 
 // Lazy import Monaco Editor (SSR-safe)
-const LazyEditor = React.lazy(() => import('@monaco-editor/react'));
+const LazyEditor = React.lazy(() => import('~/shared/components/monaco/MonacoEditor.client'));
 
 interface SqlEditorProps {
   value: string;
