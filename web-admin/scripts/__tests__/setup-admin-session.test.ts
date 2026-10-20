@@ -55,7 +55,9 @@ describe('setup administrator session', () => {
     'refuses missing or ambiguous business membership before any fixture write (%j)', async spaces => {
       vi.stubEnv('AURA_ADMIN_TENANT_ID', '');
       const { request, post } = fixture(spaces);
-      await expect(loginAdmin(request)).rejects.toThrow(/named business space list|exactly one business space/);
+      await expect(loginAdmin(request)).rejects.toThrow(
+        spaces === null ? 'business-space list returned no inventory' : 'expected exactly one business space',
+      );
       expect(post).toHaveBeenCalledTimes(1);
     },
   );
@@ -63,6 +65,15 @@ describe('setup administrator session', () => {
   it('rejects a sole business membership with a different declared name', async () => {
     const { request, post } = fixture([{ tenantId: '2', spaceType: 'business', tenantName: 'Other company' }]);
     await expect(loginAdmin(request)).rejects.toThrow('exactly one business space');
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an error envelope even when it contains a plausible business membership', async () => {
+    const { request, post, get } = fixture([]);
+    get.mockResolvedValue(response([
+      { tenantId: '2', spaceType: 'business', tenantName: companyName },
+    ], '1'));
+    await expect(loginAdmin(request)).rejects.toThrow('business-space list returned no inventory');
     expect(post).toHaveBeenCalledTimes(1);
   });
 

@@ -46,7 +46,11 @@ export async function loginAdmin(
     headers: authHeaders(loginToken),
   });
   if (!spaces.ok()) throw new Error(`[setup] list spaces failed (${spaces.status()})`);
-  const space = resolveSetupBusinessSpace((await spaces.json()).data, companyName, SETUP_TENANT_ID);
+  const inventory = await spaces.json();
+  if (inventory.code !== '0' || !Array.isArray(inventory.data)) {
+    throw new Error('[setup] business-space list returned no inventory');
+  }
+  const space = resolveSetupBusinessSpace(inventory.data, companyName, SETUP_TENANT_ID);
   const selection = await request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
     headers: authHeaders(loginToken),
     data: { action: 'select', tenantId: space.tenantId },
