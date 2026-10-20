@@ -5,7 +5,7 @@
     "displayName:en": "Page Name",
     "dataType": "text",
     "constraints": { "required": true, "maxLength": 200 },
-    "feature": { "searchable": true }
+    "feature": { "searchable": true, "sortable": true, "filterable": true }
   },
   {
     "code": "page_key",

@@ -4,6 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import pg from 'pg';
 import { PG_CONN } from '../../helpers/environments';
 import { LoginPage } from '../../pages/LoginPage';
+import { HeaderPage } from '../../pages/HeaderPage';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { revokeInternalApiCurrentSession, type InternalApiSessionCleanup } from '../../helpers/internal-api-owned-user';
 import { createResponseShapeValidator } from '../../../../scripts/internal-api/response-shape.mjs';
@@ -152,6 +153,7 @@ test('generated profile operations persist an owned avatar and no-email profile'
     );
     expect(spoofed.pid).toBe(userPid);
     await ownedPage.goto('/personal/profile');
+    await new HeaderPage(ownedPage).waitForHeader();
     await expect(ownedPage.getByRole('heading', { name: '个人资料', exact: true })).toBeVisible();
     await expect(ownedPage.locator('body')).toContainText('2026-10-01 09:02:03');
     await capture('PROFILE-01', ownedPage, info);
@@ -234,6 +236,7 @@ test('generated profile operations persist an owned avatar and no-email profile'
     const adminAfter = (await (await page.request.get('/api/user/profile')).json()).data;
     expect(adminAfter).toEqual(adminBefore);
     await ownedPage.reload();
+    await new HeaderPage(ownedPage).waitForHeader();
     await expect(ownedPage.locator('body')).toContainText('Owned contract profile');
     await expect(ownedPage.locator('body')).toContainText('Owned contract signature');
     const avatar = ownedPage.getByRole('img', { name: '用户头像' });
@@ -416,6 +419,7 @@ test('generated profile operations preserve an email-only account without a user
     await login(owned, email, password);
     await record(await owned.request.get('/api/user/profile'), 'get');
     await owned.goto('/personal/profile');
+    await new HeaderPage(owned).waitForHeader();
     await expect(owned.getByRole('heading', { name: '个人资料', exact: true })).toBeVisible();
     await owned.getByTestId('profile-edit-btn').click();
     await expect(owned.getByLabel('用户名', { exact: true })).toBeDisabled();
@@ -428,6 +432,7 @@ test('generated profile operations preserve an email-only account without a user
     const persisted = await record(await owned.request.get('/api/user/profile'), 'get');
     expect(persisted.nickName).toBe('Owned email-only edited');
     await owned.reload();
+    await new HeaderPage(owned).waitForHeader();
     await expect(owned.getByRole('heading', { name: '个人资料', exact: true })).toBeVisible();
     await expect(owned.locator('body')).toContainText('Owned email-only edited');
     await capture('PROFILE-06', owned, info);

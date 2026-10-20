@@ -43,6 +43,9 @@ public interface DictService {
      */
     DictDTO findByPid(String pid);
 
+    /** Load the selected tenant-owned record for governance, including unpublished versions. */
+    DictDataResult loadSelectedDictData(String pid);
+
 
     /**
      * 根据字典编码查询字典（不抛异常）

@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import fs from 'node:fs/promises';
 import { LoginPage } from '../../pages/LoginPage';
+import { HeaderPage } from '../../pages/HeaderPage';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { revokeInternalApiCurrentSession } from '../../helpers/internal-api-owned-user';
 import { uniqueId } from '../helpers';
@@ -47,6 +48,7 @@ test.afterEach(async ({ page }, info) => {
 test('generated dictionary operations preserve the UI journey', async ({ page }, info) => {
   test.setTimeout(90_000);
   const login = new LoginPage(page);
+  const header = new HeaderPage(page);
   await login.gotoRoot();
   await login.waitForFormReady();
   await login.login(DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
@@ -64,6 +66,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
 
   // Force a deterministic second page, then inspect the CSR operation query.
   await page.goto('/meta/dict?size=1');
+  await expect(page.getByTestId('filter-search')).toBeEnabled();
   const pagedResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
     return url.pathname === '/api/meta/dict' && url.searchParams.get('pageNum') === '2';
@@ -150,6 +153,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   expect((await updated.json()).code).toBe('0');
   await expect(page).toHaveURL((url) => url.pathname === `/meta/dict/${pid}`);
   await page.reload();
+  await header.waitForHeader();
   await expect(page.getByRole('heading', { name: updatedName, exact: true })).toBeVisible();
   await capture('DICT-04', page, info);
 
@@ -171,10 +175,18 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   expect((await savedItems.json()).code).toBe('0');
   await expect(page.getByTestId('dict-save-items')).toBeDisabled();
   await page.reload();
+  await header.waitForHeader();
   await page.getByTestId('dict-tab-items').click();
   await expect(page.getByTestId('dict-item-row-0').locator('input').nth(0)).toHaveValue('active');
   await expect(page.getByTestId('dict-item-row-0').locator('input').nth(1)).toHaveValue('启用');
   await capture('DICT-07', page, info);
+
+  const runtimeBeforeUnpublish = await page.request.get(`/api/meta/dict/by-code/${code}/data`);
+  const cachedPublished = await runtimeBeforeUnpublish.json();
+  expect(cachedPublished.data.success).toBe(true);
+  expect(cachedPublished.data.items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ value: 'active', label: '启用' }),
+  ]));
 
   const unpublishResponse = page.waitForResponse(
     (response) =>
@@ -183,10 +195,19 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   );
   await page.getByRole('button', { name: '取消发布', exact: true }).click();
   expect((await (await unpublishResponse).json()).data.status).toBe('deprecated');
+  // Runtime reads must reject the unpublished version even after a cached editor read.
+  const unpublishedRuntime = await page.request.get(`/api/meta/dict/by-code/${code}/data`);
+  const unpublishedBody = await unpublishedRuntime.json();
+  expect(unpublishedBody.code !== '0' || unpublishedBody.data?.success === false).toBe(true);
+  await page.reload();
+  await header.waitForHeader();
   await expect(page.getByRole('button', { name: '发布', exact: true })).toBeVisible();
   await page.getByTestId('dict-tab-basic').click();
   await expect(page.locator('main')).toContainText('已废弃');
   await capture('DICT-10', page, info);
+  await page.getByTestId('dict-tab-items').click();
+  await expect(page.getByTestId('dict-item-row-0').locator('input').nth(0)).toHaveValue('active');
+  await expect(page.getByTestId('dict-item-row-0').locator('input').nth(1)).toHaveValue('启用');
   const publishResponse = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === `/api/meta/dict/${pid}/publish` &&
@@ -194,7 +215,14 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   );
   await page.getByRole('button', { name: '发布', exact: true }).click();
   expect((await (await publishResponse).json()).data.status).toBe('published');
+  const runtimeAfterRepublish = await page.request.get(`/api/meta/dict/by-code/${code}/data`);
+  const republished = await runtimeAfterRepublish.json();
+  expect(republished.data.success).toBe(true);
+  expect(republished.data.items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ value: 'active', label: '启用' }),
+  ]));
   await page.reload();
+  await header.waitForHeader();
   await expect(page.getByRole('button', { name: '取消发布', exact: true })).toBeVisible();
   await page.getByTestId('dict-tab-versions').click();
   await expect(
@@ -224,6 +252,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
 
   // Delete only this attempt's own record; dictionary deletion is a soft disable.
   await page.goto(`/meta/dict/${pid}`);
+  await header.waitForHeader();
   const deprecateBeforeDelete = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === `/api/meta/dict/${pid}/unpublish` &&
@@ -352,6 +381,7 @@ test('dictionary batch feedback uses actual counts and an empty tree remains edi
     await expect(page).toHaveURL(
       (url) => url.pathname === '/meta/dict' && url.searchParams.get('code') === code,
     );
+    await expect(page.getByTestId('filter-search')).toBeEnabled();
     return page.locator('tbody tr').filter({ hasText: code });
   }
   async function batch() {

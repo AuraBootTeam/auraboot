@@ -49,6 +49,11 @@ async function capture(page: Page, info: TestInfo, name: string) {
 
 test.describe('Named Query Deep', () => {
   test.describe.configure({ mode: 'serial', timeout: 30000 });
+
+  test.beforeEach(async ({ page }) => {
+    // Editor readiness must depend on application assets, not a warm CDN cache.
+    await page.route('https://cdn.jsdelivr.net/npm/monaco-editor@**', route => route.abort());
+  });
   let base: Query;
   let joinSql: string;
   let simpleSql: string;

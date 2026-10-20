@@ -95,19 +95,23 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
+      const customer = await executeCommandViaApi(page, 'e2et:create_customer', {
+        e2et_cust_code: `ULS-${UID}`,
+        e2et_cust_name: `ULS Customer ${UID}`,
+        e2et_cust_region: 'north',
+      }, undefined, 'create');
+      expect(customer.recordId).toMatch(/^[0-9A-Z]{26}$/);
       await executeCommandViaApi(
         page,
         'e2et:create_order',
         {
           e2et_order_title: `ULS Order ${UID}`,
-          e2et_order_customer: `ULS Customer ${UID}`,
+          e2et_order_customer: customer.recordId,
           e2et_order_type: 'normal',
         },
         undefined,
         'create',
       );
-    } catch {
-      // Best-effort — list may already have data
     } finally {
       await ctx.close();
     }

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -228,27 +228,39 @@ test.describe('Page Designer stat refresh authoring', () => {
     const runtimePageKey = await createAndPublishListRuntimePage(page, savedPage);
 
     const statResponses: unknown[] = [];
-    page.on('response', async (response) => {
+    const pendingResponses: Promise<void>[] = [];
+    const responseErrors: string[] = [];
+    const collectResponse = (response: Response) => {
       if (
         response.url().includes('/api/dynamic/page_schema/list') &&
         response.url().includes(encodeURIComponent(pageKey)) &&
         response.status() === 200
       ) {
-        statResponses.push(await response.json());
+        pendingResponses.push(response.json().then(
+          body => { statResponses.push(body); },
+          error => { responseErrors.push(String(error)); },
+        ));
       }
-    });
+    };
+    page.on('response', collectResponse);
 
-    await page.goto(`/p/c/${runtimePageKey}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('stat-card-value')).toHaveText(title, { timeout: 15_000 });
-    await expect(page.getByTestId('stat-card-block')).toContainText('records');
-    await expect
-      .poll(
-        () =>
-          statResponses.filter(
-            (body: any) => Array.isArray(body?.data?.records) && body.data.records.length > 0,
-          ).length >= 2,
-        { timeout: 8_000, intervals: [100, 250, 500] },
-      )
-      .toBe(true);
+    try {
+      await page.goto(`/p/c/${runtimePageKey}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('stat-card-value')).toHaveText(title, { timeout: 15_000 });
+      await expect(page.getByTestId('stat-card-block')).toContainText('records');
+      await expect
+        .poll(
+          () =>
+            statResponses.filter(
+              (body: any) => Array.isArray(body?.data?.records) && body.data.records.length > 0,
+            ).length >= 2,
+          { timeout: 8_000, intervals: [100, 250, 500] },
+        )
+        .toBe(true);
+    } finally {
+      page.off('response', collectResponse);
+      await Promise.all(pendingResponses);
+      expect(responseErrors).toEqual([]);
+    }
   });
 });

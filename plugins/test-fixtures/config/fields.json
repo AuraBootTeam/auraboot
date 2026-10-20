@@ -135,8 +135,8 @@
     "dataType": "reference",
     "description": "Reference to e2et_customer (REFERENCE field type, self-contained)",
     "refTarget": {
-      "targetModel": "e2et_customer",
-      "targetField": "e2et_cust_name",
+      "targetEntity": "e2et_customer",
+      "displayField": "e2et_cust_name",
       "valueField": "pid"
     },
     "extension": {
@@ -627,8 +627,8 @@
     "dataType": "reference",
     "description": "REFERENCE field type with searchable picker (target e2et_customer)",
     "refTarget": {
-      "targetModel": "e2et_customer",
-      "targetField": "e2et_cust_name",
+      "targetEntity": "e2et_customer",
+      "displayField": "e2et_cust_name",
       "valueField": "pid"
     },
     "extension": {

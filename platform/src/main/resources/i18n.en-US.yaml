@@ -2782,3 +2782,5 @@ session_security:
 "permission.capability.preset.editor": "Editor"
 
 "permission.capability.preset.admin": "Administrator"
+
+"about.menuLabel": "About {productName}"

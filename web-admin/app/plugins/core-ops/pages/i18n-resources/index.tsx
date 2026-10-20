@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchResult } from '~/shared/services/http-client';
 import { requireI18nAdminResult } from '~/shared/services/i18n-admin-response';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -72,7 +72,9 @@ export default function I18nResourcesPage() {
   const [rejectTarget, setRejectTarget] = useState<I18nResourceRow | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
+  const loadSequence = useRef(0);
   const load = useCallback(async () => {
+    const requestId = ++loadSequence.current;
     setLoading(true);
     setError('');
     try {
@@ -86,6 +88,7 @@ export default function I18nResourcesPage() {
           keyword: keyword || undefined,
         },
       });
+      if (requestId !== loadSequence.current) return;
       if (page && Array.isArray(page.records)) {
         setRows(page.records);
         setTotal(page.total ?? page.records.length);
@@ -94,16 +97,18 @@ export default function I18nResourcesPage() {
         setTotal(0);
       }
     } catch {
+      if (requestId !== loadSequence.current) return;
       setError(l('加载失败', 'Failed to load resources'));
       setRows([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (requestId === loadSequence.current) setLoading(false);
     }
   }, [pageNum, lang, keyPrefix, keyword, l]);
 
   useEffect(() => {
     load();
+    return () => { loadSequence.current += 1; };
   }, [load]);
 
   const mutate = useCallback(async (operation: () => Promise<unknown>) => {

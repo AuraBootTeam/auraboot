@@ -234,6 +234,7 @@ function useMarqueeSelect(
     // interactive control / drag handle. Anything inside a canvas block keeps
     // its existing selection / drag behaviour.
     if (isOnBlockOrInteractive(event.target)) return;
+    event.preventDefault();
 
     const startClientX = event.clientX;
     const startClientY = event.clientY;
@@ -247,6 +248,8 @@ function useMarqueeSelect(
       };
     };
 
+    const startContent = toContentPoint(startClientX, startClientY);
+
     const handleMove = (moveEvent: PointerEvent) => {
       const dx = Math.abs(moveEvent.clientX - startClientX);
       const dy = Math.abs(moveEvent.clientY - startClientY);
@@ -254,7 +257,7 @@ function useMarqueeSelect(
         return;
       }
       started = true;
-      const start = toContentPoint(startClientX, startClientY);
+      const start = startContent;
       const current = toContentPoint(moveEvent.clientX, moveEvent.clientY);
       setRect({
         left: Math.min(start.x, current.x),
@@ -273,8 +276,12 @@ function useMarqueeSelect(
 
       // Resolve hits in viewport-pixel space (matches getBoundingClientRect),
       // so the marquee and block rects share one coordinate frame.
+      const hostRect = host.getBoundingClientRect();
       const marqueeRect: PixelRect = rectFromPoints(
-        { x: startClientX, y: startClientY },
+        {
+          x: startContent.x + hostRect.left - host.scrollLeft,
+          y: startContent.y + hostRect.top - host.scrollTop,
+        },
         { x: endEvent.clientX, y: endEvent.clientY },
       );
       const blockRects = collectCanvasBlockRects(host);

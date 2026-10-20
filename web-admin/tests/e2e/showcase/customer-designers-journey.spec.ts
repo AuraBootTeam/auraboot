@@ -120,7 +120,11 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   ).then((response) => ({
     status: response.status(), url: response.url(), payload: response.request().postDataJSON(),
   }));
-  await page.getByTestId('model-publish-confirm').click();
+  await Promise.all([
+    page.waitForEvent('domcontentloaded'),
+    page.getByTestId('model-publish-confirm').click(),
+  ]);
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
   // The successful UI action hard-reloads, invalidating the old CDP response body.
   const published = await publish;
   expect(published.status).toBe(200);
