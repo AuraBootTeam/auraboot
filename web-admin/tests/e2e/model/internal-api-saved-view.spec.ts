@@ -118,6 +118,8 @@ test('generated SavedView sharing preserves the owner and anonymous browser jour
         .getByRole('button', { name: /Organization|组织管理/ })
         .click();
     await menu.click();
+    // Wait for the real DSL table after a cold route-module load, before inspecting its records.
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 60_000 });
     await expect(page.locator('tbody tr').filter({ hasText: teamName })).toBeVisible();
     await openPanel();
     await expect(page.getByTestId(`saved-view-share-generate-${pid}`)).toHaveText(

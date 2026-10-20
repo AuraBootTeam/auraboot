@@ -261,7 +261,7 @@ test('anonymous dictionary navigation and API access are refused', async ({ page
 test('generated dictionary data supplies labels to the real DSL team list', async ({
   page,
 }, info) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const login = new LoginPage(page);
   await login.gotoRoot();
   await login.waitForFormReady();
@@ -290,9 +290,12 @@ test('generated dictionary data supplies labels to the real DSL team list', asyn
     const dictionaryResponse = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === '/api/meta/dict/by-code/org_team_status/data',
-      { timeout: 20_000 },
+      // The host-first runtime deliberately starts without warmed DSL modules.
+      { timeout: 90_000 },
     );
     await menu.click();
+    await expect(page).toHaveURL(/\/organization\/teams(?:[?#]|$)/);
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 60_000 });
     const dictionary = await dictionaryResponse;
     expect(dictionary.status()).toBe(200);
     const payload = await dictionary.json();
