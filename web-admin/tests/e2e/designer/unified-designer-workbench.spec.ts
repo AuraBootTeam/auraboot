@@ -5839,7 +5839,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const helperBlocks = [
       { paletteId: 'palette-add-ai-fill-banner', blockType: 'ai-fill-banner', title: aiTitle },
-      { paletteId: 'palette-add-bpm-panel', blockType: 'bpm-panel', title: bpmTitle },
+      { paletteId: 'palette-add-workflow-panel', blockType: 'workflow-panel', title: bpmTitle },
       {
         paletteId: 'palette-add-activity-timeline',
         blockType: 'activity-timeline',
@@ -5884,7 +5884,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
           .fill(JSON.stringify(aiSuggestedFields));
         await applyJsonField(page, 'inspector-json-field-apply-props.suggestedFields');
       }
-      if (helper.blockType === 'bpm-panel') {
+      if (helper.blockType === 'workflow-panel') {
         await page.getByTestId('inspector-field-props.description').fill(bpmDescription);
         await page.getByTestId('inspector-field-props.status').selectOption('pending');
         await page.getByTestId('inspector-field-props.assignee').fill(bpmAssignee);
@@ -5961,7 +5961,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         suggestedFields: aiSuggestedFields,
       }),
     });
-    expect(findBlockById(persisted.blocks ?? [], helperIdsByType['bpm-panel'])).toMatchObject({
+    expect(findBlockById(persisted.blocks ?? [], helperIdsByType['workflow-panel'])).toMatchObject({
       props: expect.objectContaining({
         description: bpmDescription,
         status: 'pending',
@@ -5994,14 +5994,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-ai-fill-status-${helperIdsByType['ai-fill-banner']}`),
     ).toContainText(aiFeedback);
-    await expect(page.getByTestId(`runtime-bpm-status-${helperIdsByType['bpm-panel']}`)).toHaveText(
+    await expect(page.getByTestId(`runtime-bpm-status-${helperIdsByType['workflow-panel']}`)).toHaveText(
       'pending',
     );
     await expect(
-      page.getByTestId(`runtime-bpm-assignee-${helperIdsByType['bpm-panel']}`),
+      page.getByTestId(`runtime-bpm-assignee-${helperIdsByType['workflow-panel']}`),
     ).toContainText(bpmAssignee);
     await expect(
-      page.getByTestId(`runtime-bpm-action-${helperIdsByType['bpm-panel']}-0`),
+      page.getByTestId(`runtime-bpm-action-${helperIdsByType['workflow-panel']}-0`),
     ).toContainText(`Approve ${uid}`);
     await expect(
       page.getByTestId(`runtime-activity-item-${helperIdsByType['activity-timeline']}-0`),
@@ -6121,7 +6121,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
             },
             {
               id: 'bpm_live_helper',
-              blockType: 'bpm-panel',
+              blockType: 'workflow-panel',
               title: `Live BPM helper ${uid}`,
               dataSource: helperDataSource,
               props: {
@@ -6380,7 +6380,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
             },
             {
               id: 'bpm_empty_helper',
-              blockType: 'bpm-panel',
+              blockType: 'workflow-panel',
               title: `Empty BPM ${uid}`,
               dataSource: {
                 type: 'namedQuery',

@@ -196,8 +196,11 @@ test.describe('Plugin Lifecycle', () => {
 
       expect(importResp.status()).toBe(200);
       const imported = await importResp.json();
-      expect(String(imported.code)).toBe('0');
-      expect(imported.data.success).toBe(true);
+      expect(imported.success).toBe(true);
+      expect(imported.status).toBe('SUCCESS');
+      expect(imported.pluginId).toBe('com.auraboot.test-fixtures');
+      expect(imported.resourceCounts.MODEL.UPDATE).toBeGreaterThan(0);
+      expect(imported.resourceCounts.COMMAND.UPDATE).toBeGreaterThan(0);
 
       // Step 3: Navigate again and verify the sentinel record still exists
       const listResponsePromise = page

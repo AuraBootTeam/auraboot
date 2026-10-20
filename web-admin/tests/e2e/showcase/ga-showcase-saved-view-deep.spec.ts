@@ -388,7 +388,36 @@ test.describe('GA showcase SavedView deep persistence', () => {
       )
       .toEqual({ fieldCode: 'sc_code', direction: 'asc', priority: 0 });
 
+    const isSortedList = (response: import('@playwright/test').Response, pageNumber?: number) => {
+      const url = new URL(response.url());
+      return url.pathname === `/api/dynamic/${MODEL_CODE}/list`
+        && url.searchParams.get('sortField') === 'sc_code'
+        && url.searchParams.get('sortOrder') === 'asc'
+        && (pageNumber === undefined || url.searchParams.get('pageNum') === String(pageNumber));
+    };
+    const restoredList = page.waitForResponse(response => isSortedList(response));
     await page.reload({ waitUntil: 'load' });
+    let response = await restoredList;
+    expect(response.status()).toBe(200);
+    let body = await response.json();
+    const pageSize = Number(new URL(response.url()).searchParams.get('pageSize'));
+    expect(pageSize).toBeGreaterThan(0);
+    const totalPages = Math.ceil(Number(body.data.total) / pageSize);
+    let currentPage = Number(new URL(response.url()).searchParams.get('pageNum'));
+    // Ascending order can put this run's new record after the first page when
+    // retained records exist. Reach it through the real sorted pagination UI.
+    while (!body.data.records.some((row: { pid: string }) => row.pid === currentSeed.pid)
+      && currentPage < totalPages) {
+      const nextPage = currentPage + 1;
+      const nextList = page.waitForResponse(result => isSortedList(result, nextPage));
+      await expect(page.getByTestId('pagination-next')).toBeEnabled();
+      await page.getByTestId('pagination-next').click();
+      response = await nextList;
+      expect(response.status()).toBe(200);
+      body = await response.json();
+      currentPage = nextPage;
+    }
+    expect(body.data.records.some((row: { pid: string }) => row.pid === currentSeed.pid)).toBe(true);
     await expect(seededRow(page)).toBeVisible({
       timeout: 15_000,
     });

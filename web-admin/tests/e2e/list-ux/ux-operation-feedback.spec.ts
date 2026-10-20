@@ -13,11 +13,8 @@
  *   Layer 3 (Behavior): After confirm-delete, record disappears from list;
  *                        after cancel, record stays
  *
- * Toast selector strategy:
- *   The Toast component uses bg-emerald-500 (success) / bg-red-500 (error) /
- *   bg-amber-500 (warning) without a role="alert" attribute.
- *   Selector: '[class*="bg-emerald-500"] p, [class*="bg-red-500"] p' or
- *             '.bg-emerald-500 p.text-white' (wrapping div → p with message text).
+ * Toast selector strategy: the shared UI package renders semantic alerts;
+ * the status icon distinguishes success feedback from error feedback.
  *
  * "Delete test": if the Toast component rendering were removed from
  * ToastContext.tsx, or if showSuccessToast() were not called after command
@@ -182,7 +179,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     expect(String((await created.json()).code)).toBe('0');
     expect(created.request().postDataJSON().payload.e2et_order_customer).toBe(customerPids.get(customerForCreate));
 
-    const successToast = page.locator('[class*="bg-emerald-500"] p.text-white').first();
+    const successToast = page.getByRole('alert').filter({ has: page.locator('svg.text-emerald-600') }).first();
     await expect(successToast).toBeVisible();
     await expect(successToast).toContainText(/\S/);
     await expect(page).toHaveURL(/\/p\/e2et_order(?:[?#]|$)/);
@@ -343,9 +340,6 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       { timeout: 10_000, message: `UOF-003: record "${companyForDelete}" must not be visible after deletion` },
     ).toBe(false);
 
-    // Optional: success toast may appear
-    const toastWrapper = page.locator('[class*="bg-emerald-500"]').first();
-    // We don't assert toast here — the key assertion is the record is gone
   });
 
   // -------------------------------------------------------------------------
@@ -393,7 +387,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       '.text-status-red:not(:empty), .text-red-500:not(:empty), ' +
         '.text-red-600:not(:empty), [data-testid*="error"]:not(:empty)',
     );
-    const errorToast = page.locator('[class*="bg-red-500"]').first();
+    const errorToast = page.getByRole('alert').filter({ has: page.locator('svg.text-red-600') }).first();
     const validationSummary = page.locator('[data-testid="validation-summary"]');
 
     // We must still be on the form page (not navigated away)
