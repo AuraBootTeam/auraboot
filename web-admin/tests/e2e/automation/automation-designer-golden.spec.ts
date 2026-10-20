@@ -2376,11 +2376,9 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
     await connectEdge(page, trigger, action);
     await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
-    // commandCode via the real command-select picker — filter by the unique command code
-    // (BaseResourceSelect filters by label OR value). e2et:touch_order_noperm is a
-    // permission-free update (test-fixtures) the restricted automation principal CAN run.
+    // Select the fixture's visible label; the saved code below remains authoritative.
     await fillNodeConfig(page, action, {
-      commandCode: 'e2et:touch_order_noperm',
+      commandCode: '标注订单备注(免权限)',
       params: `{"e2et_order_remark":"${marker}"}`,
     });
     const { pid } = await saveAutomation(page);
@@ -2441,11 +2439,14 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
       // The authenticated author and trigger actor both lack the command permission.
       await fillNodeConfig(page, action, {
-        commandCode: 'e2et:update_order',
+        commandCode: '编辑订单',
         params: '{"e2et_order_title":"EXEC_SHOULD_BE_DENIED"}',
       });
       const { pid } = await saveAutomation(page);
       createdPids.push(pid);
+      const saved = await readFlowConfig(page, pid);
+      const pickedNode = saved.flowConfig.nodes.find((n: any) => n.id === action);
+      expect(pickedNode.data.config.commandCode, 'localized command selection preserves the gated command').toBe('e2et:update_order');
       await enableViaListToggle(page, pid);
 
       const firedAt = Date.now();
