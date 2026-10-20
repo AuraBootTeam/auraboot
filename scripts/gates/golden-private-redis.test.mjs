@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { privateRedisPort, privateRedisConfig, readPrivateRedisConfig, verifyPrivateRedis, privateRedisRuntimeReport } from '../lib/golden-private-redis.mjs';
+import net from 'node:net';
+import { once } from 'node:events';
+import { privateRedisPort, privateRedisConfig, readPrivateRedisConfig, verifyPrivateRedis, privateRedisRuntimeReport, verifyBackendRedisConnection } from '../lib/golden-private-redis.mjs';
 
 // Hermetic contract controls; live Redis/process isolation is verified separately.
 function fixture() {
@@ -81,4 +83,21 @@ test('uses live explain probes even while other startup listeners are absent', t
   assert.throws(() => privateRedisRuntimeReport(cli, 'owned'));
   writeFileSync(cli, script(f.report, 2));
   assert.throws(() => privateRedisRuntimeReport(cli, 'owned'));
+});
+
+test('matches a live numeric loopback connection independently of hostname resolution', async t => {
+  const peers = new Set();
+  const server = net.createServer(socket => peers.add(socket));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const endpoint = { host: '127.0.0.1', port: server.address().port };
+  const client = net.connect(endpoint.port, endpoint.host);
+  t.after(async () => {
+    client.destroy();
+    for (const socket of peers) socket.destroy();
+    await new Promise(done => server.close(done));
+  });
+  await once(client, 'connect');
+  verifyBackendRedisConnection(process.pid, endpoint);
+  assert.throws(() => verifyBackendRedisConnection(process.pid, { ...endpoint, host: '127.0.0.2' }));
 });

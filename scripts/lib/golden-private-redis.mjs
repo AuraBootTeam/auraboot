@@ -114,7 +114,7 @@ export function collectPrivateRedis(report, repo) {
 }
 
 export function verifyBackendRedisConnection(pid, endpoint) {
-  const links = command('lsof', ['-a', '-p', String(pid), `-iTCP:${endpoint.port}`,
+  const links = command('lsof', ['-nP', '-a', '-p', String(pid), `-iTCP:${endpoint.port}`,
     '-sTCP:ESTABLISHED', '-Fn']);
   need(links.split('\n').some(line => line.startsWith('n') &&
     line.endsWith(`->${endpoint.host}:${endpoint.port}`)), 'Backend private Redis connection missing');
