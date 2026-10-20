@@ -47,6 +47,7 @@ import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema } from './types';
+import { propertyEditorRegistry } from './PropertyEditorRegistry';
 import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { getLocalizedText, useSmartText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
@@ -79,6 +80,11 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
   const helpText = schema.description
     ? getLocalizedText(schema.description as string | Record<string, string>, locale)
     : undefined;
+
+  if (schema.editor) {
+    const Editor = propertyEditorRegistry.resolve(schema.editor);
+    return <Editor schema={schema} adapter={adapter} />;
+  }
 
   switch (schema.type) {
     // ---- Text-like inputs ----
@@ -210,7 +216,9 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       );
 
     case 'model-field-map':
-      return <ModelFieldMapEditor adapter={adapter} label={label} modelKey={schema.dependsOn?.field} />;
+      return (
+        <ModelFieldMapEditor adapter={adapter} label={label} modelKey={schema.dependsOn?.field} />
+      );
 
     case 'field-select':
       return (
@@ -302,7 +310,8 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           onChange={(next) => adapter.setValue(next as unknown)}
           label={label}
           placeholder={placeholder}
-          testId={schema.key}
+          testId={schema.testId ?? schema.key}
+          disabled={adapter.disabled}
         />
       );
 
@@ -318,8 +327,14 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       );
 
     case 'command-select':
-      return <CommandResourceField adapter={adapter} label={label}
-        placeholder={placeholder} helpText={helpText} />;
+      return (
+        <CommandResourceField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder}
+          helpText={helpText}
+        />
+      );
 
     case 'rule-binding':
       return (
@@ -1236,11 +1251,28 @@ function DictSelectField({
 export default PropertyFieldRenderer;
 
 /** Model-scoped command discovery shared by schema-driven action editors. */
-function CommandResourceField({ adapter, label, placeholder, helpText }: {
-  adapter: FieldAdapter<unknown>; label: string; placeholder?: string; helpText?: string;
+function CommandResourceField({
+  adapter,
+  label,
+  placeholder,
+  helpText,
+}: {
+  adapter: FieldAdapter<unknown>;
+  label: string;
+  placeholder?: string;
+  helpText?: string;
 }) {
-  const modelCode = typeof adapter.context?.modelCode === 'string' ? adapter.context.modelCode : undefined;
+  const modelCode =
+    typeof adapter.context?.modelCode === 'string' ? adapter.context.modelCode : undefined;
   const fetchOptions = useCallback(() => fetchCommandOptions(modelCode), [modelCode]);
-  return <ResourceSelectField key={modelCode ?? 'all'} adapter={adapter} label={label}
-    placeholder={placeholder ?? ''} helpText={helpText} fetchOptions={fetchOptions} />;
+  return (
+    <ResourceSelectField
+      key={modelCode ?? 'all'}
+      adapter={adapter}
+      label={label}
+      placeholder={placeholder ?? ''}
+      helpText={helpText}
+      fetchOptions={fetchOptions}
+    />
+  );
 }
