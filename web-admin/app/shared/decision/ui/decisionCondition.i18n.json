@@ -466,5 +466,9 @@
   "draftSaved": {
     "zh-CN": "草稿已保存",
     "en": "Draft saved"
+  },
+  "actualComparison": {
+    "zh-CN": "实际值比较",
+    "en": "Actual comparison"
   }
 }

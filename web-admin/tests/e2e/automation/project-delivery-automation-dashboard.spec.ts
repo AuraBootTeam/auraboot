@@ -274,6 +274,14 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await expect(page.locator('.react-flow__node')).toHaveCount(4);
   await expect(page.locator('.react-flow__node').getByText('写入审计', { exact: true })).toBeVisible();
   await expect(page.getByText('加载设计器...', { exact: true })).toHaveCount(0);
+  const boxes = await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(node => {
+    const rect = node.getBoundingClientRect();
+    return {left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom};
+  }));
+  for (let i=0;i<boxes.length;i++) for(let j=i+1;j<boxes.length;j++) {
+    const a=boxes[i],b=boxes[j];
+    expect(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, 'Canvas nodes must not overlap').toBe(true);
+  }
   await page.screenshot({
     path: info.outputPath('AD01b-automation-round-trip.png'),
   });

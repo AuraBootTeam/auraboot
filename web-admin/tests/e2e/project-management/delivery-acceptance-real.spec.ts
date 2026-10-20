@@ -616,7 +616,16 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
     expect(action.resultPayload.sentCount).toBeGreaterThan(0);
     await writeFile(join(evidence!,'sla-notification-evidence.json'),JSON.stringify({notifications:actual,action},null,2));
     await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('SLA');await expect(page.getByTestId('sla-record-row').filter({hasText:name})).toContainText('逾期');await shot(page,'S01');await page.getByTestId('sla-record-row').filter({hasText:name}).getByTestId('sla-record-detail').click();await expect(page.getByTestId('sla-item-detail')).toContainText('已执行成功');await expect(page.getByTestId('sla-item-detail')).not.toContainText(/NaN|undefined/);await expect(page.getByTestId('sla-item-detail')).toContainText('第 1 级');await shot(page,'S02');
-    await openRecord(page,name);await decide(page,pid,'approve');
+    await openRecord(page,name);
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已超时');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已触发 2 次');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('不会自动通过或驳回');
+    await shot(page,'S03-overdue-acceptance');
+    await decide(page,pid,'approve');
+    await page.reload();
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('超时办结');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已停止计时');
+    await shot(page,'S04-completed-acceptance');
     const completed=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));
     const closedAt=Date.parse(completed.completedTime);
     await expect.poll(async()=>{const next=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));expect(next.status).toBe('completed');expect(next.warningHistory).toEqual(completed.warningHistory);return Date.now()-closedAt;},{timeout:25000,intervals:[3000]}).toBeGreaterThan(16000);
