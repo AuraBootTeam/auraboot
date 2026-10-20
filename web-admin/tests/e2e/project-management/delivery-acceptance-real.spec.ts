@@ -598,6 +598,7 @@ test('high-risk rejection can be corrected and resubmitted through a new owned i
 
 test('accelerated SLA uses the real scheduler and stops after approval @critical',async({page})=>{
   test.setTimeout(240000);const user=await login(page);
+  const publishedDesign = await publishAcceptanceDesign(page);
   const publishedAction = await configureAcceptanceModelAction(page, true);
   const configs=await data(await page.request.get('/api/bpm/sla-configs'));
   const config=configs.find((item:any)=>item.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
@@ -621,7 +622,7 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
     await expect.poll(async()=>{const next=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));expect(next.status).toBe('completed');expect(next.warningHistory).toEqual(completed.warningHistory);return Date.now()-closedAt;},{timeout:25000,intervals:[3000]}).toBeGreaterThan(16000);
     const after=await data(await page.request.get('/api/bpm/notify/received?type=urge'));expect(after.filter((item:any)=>item.taskId===sla.taskId)).toHaveLength(2);
     const actionAfter=await data(await page.request.get(`/api/event-policy/action-logs?correlationId=sla:${sla.pid}`));expect(actionAfter).toHaveLength(1);
-    receipts.push({accelerated:true,sla:expired,completed,publishedAction});await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
+    receipts.push({accelerated:true,sla:expired,completed,publishedAction,publishedDesign});await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   } finally { await change(config); }
 });
 
@@ -862,6 +863,38 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   await expect(page.getByTestId('bpm-bound-form').getByTestId('dsl-form-readonly')).toBeVisible();
   await shot(page,'form-approved-readonly');
 });
+
+async function publishAcceptanceDesign(page: Page) {
+  await menu(page,'流程定义');
+  await page.getByTestId('list-search-input').fill('tpm_delivery_acceptance');
+  await page.getByTestId('list-search-input').press('Enter');
+  await page.getByRole('row').filter({hasText:'tpm_delivery_acceptance'}).getByText('tpm_delivery_acceptance',{exact:true}).click();
+  await page.getByTestId('toolbar-btn-open_bpmn_designer').click();
+  await expect(page).toHaveURL(/\/bpm\/designer\?pid=/);
+  const definitionPid = new URL(page.url()).searchParams.get('pid');
+  expect(definitionPid).toBeTruthy();
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
+  await page.locator('.react-flow__node[data-id="tpm_enhanced_review"]').click();
+  await page.getByTestId('node-label-input').fill('验收负责人 · 加强审核');
+  await page.getByTestId('bpmn-toolbar').getByTestId('bpmn-toolbar-btn-save').click();
+  await expect(page.getByTestId('bpmn-save-dialog-panel')).toBeVisible();
+  const saved = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bpm/process-definitions/${definitionPid}` && r.request().method()==='PUT');
+  await page.getByTestId('bpmn-save-dialog-submit').click();
+  await data(await saved);
+  await page.reload();
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
+  await expect(page.locator('.react-flow__node[data-id="tpm_enhanced_review"]')).toContainText('验收负责人 · 加强审核');
+  await page.getByRole('button',{name:/fit view/i}).click();
+  await shot(page,'BPM01-persisted-design');
+  const deployed = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bpm/process-definitions/${definitionPid}/deploy` && r.request().method()==='POST');
+  await page.getByTestId('bpmn-btn-deploy').click();
+  expect((await data(await deployed)).status).toBe('deployed');
+  const xml = await data(await page.request.get(`/api/bpm/process-definitions/${definitionPid}/bpmn`));
+  expect(xml).toContain('commandCode="tpm:accept_acceptance"');
+  expect(xml).toContain('targetRecordPid="${processBusinessKey}"');
+  await shot(page,'BPM02-published-design');
+  return {definitionPid,node:'tpm_enhanced_review',label:'验收负责人 · 加强审核',compiledCommand:'tpm:accept_acceptance'};
+}
 
 async function configureAcceptanceModelAction(page: Page, publish = false) {
   await menu(page,'事件策略');
