@@ -1276,11 +1276,14 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
       // Persist via batch API
       try {
-        await fetchResult(`/api/dynamic/${config.childModel}/batch`, {
+        const result = await fetchResult(`/api/dynamic/${config.childModel}/batch`, {
           method: 'put',
           token,
           params: updates,
         });
+        if (!ResultHelper.isSuccess(result)) {
+          throw new Error(result.message || result.desc || 'Failed to update sort order');
+        }
       } catch (err) {
         console.error('[SubTableViewer] Batch sort update failed:', err);
         reloadRows(); // Rollback by reloading
