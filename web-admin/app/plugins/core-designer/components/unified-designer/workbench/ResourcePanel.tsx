@@ -574,6 +574,11 @@ function OutlineItem({
       data-testid={`outline-item-${block.id}`}
       data-drop-intent={dropIntent ?? 'none'}
       onClick={() => onSelect(block.id)}
+      onPointerDownCapture={(event) => {
+        // A completed pointer drag briefly suppresses document click events.
+        // Select on the next primary press; keep click for keyboard activation.
+        if (event.button === 0) onSelect(block.id);
+      }}
       {...dragAttributes}
       {...listeners}
       className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${
