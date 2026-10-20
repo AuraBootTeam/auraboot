@@ -68,6 +68,15 @@ class S06NativeEncryptionAdmissionTest {
     }
 
     @Test
+    void matchingKeyCannotAdmitAProofForTheOtherAllowedRuntime() {
+        ObjectNode proof = proof("encrypted");
+        proof.put("runtime", NativeProcurementWorkspace.runtime().equals("procurement-main-validation")
+                ? "procurement-web-stack-20261010" : "procurement-main-validation");
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.mode(proof, key()))
+                .hasMessage("S06_ENCRYPTION_PROOF_SCHEMA_INVALID");
+    }
+
+    @Test
     void realEncryptionBeansMustMatchModeAndRoundTripWithoutLeakingSecrets() {
         FieldEncryptionService blank = bean("");
         S06NativeEncryptionAdmission.probe("dev-passthrough", blank);
@@ -266,7 +275,7 @@ class S06NativeEncryptionAdmissionTest {
     private static ObjectNode source(ObjectNode proof, java.nio.file.Path target) throws Exception {
         ObjectNode result = new ObjectMapper().createObjectNode().put("schemaVersion",1)
                 .put("kind","procurement-private-additional-properties-evidence-v1")
-                .put("runtime","procurement-web-stack-20261010").put("backendPid",proof.path("backendPid").intValue())
+                .put("runtime",NativeProcurementWorkspace.runtime()).put("backendPid",proof.path("backendPid").intValue())
                 .put("environmentKeyState","UNSET").put("effectiveKeyState","SET")
                 .put("additionalLocationCount",1).put("additionalLocation","file:" + target)
                 .put("propertiesPath",target.toString()).put("propertiesSha256",java.util.HexFormat.of().formatHex(
@@ -298,7 +307,7 @@ class S06NativeEncryptionAdmissionTest {
 
     private static ObjectNode proof(String mode) {
         return new ObjectMapper().createObjectNode().put("kind", "procurement-native-runtime-encryption-proof-v1")
-                .put("schemaVersion", 1).put("runtime", "procurement-web-stack-20261010")
+                .put("schemaVersion", 1).put("runtime", NativeProcurementWorkspace.runtime())
                 .put("configProperty", "${FIELD_ENCRYPTION_KEY:}").put("mode", mode)
                 .put("runtimeMode", "development").put("actualSpringProfiles", "dev,local,test")
                 .put("environmentKeyState", mode.equals("encrypted") ? "SET" : "UNSET");

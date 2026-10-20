@@ -11,7 +11,20 @@ final class NativeProcurementWorkspace {
         return root(System.getenv());
     }
 
+    static String runtime() {
+        return runtime(System.getenv());
+    }
+
+    static String runtime(Map<String, String> environment) {
+        String value = environment.getOrDefault("PROCUREMENT_NATIVE_RUNTIME", "procurement-web-stack-20261010");
+        if (!java.util.Set.of("procurement-web-stack-20261010", "procurement-main-validation").contains(value)) {
+            throw new IllegalStateException("PROCUREMENT_NATIVE_RUNTIME_NOT_OWNED");
+        }
+        return value;
+    }
+
     static Path root(Map<String, String> environment) {
+        runtime(environment);
         String value = environment.get("AURA_WORKSPACE_ROOT");
         if (value == null || value.isBlank()) {
             throw new IllegalStateException("AURA_WORKSPACE_ROOT_REQUIRED");
