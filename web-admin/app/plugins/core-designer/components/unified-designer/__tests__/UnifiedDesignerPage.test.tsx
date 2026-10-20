@@ -206,6 +206,24 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.queryByTestId('unified-designer-workbench')).not.toBeInTheDocument();
   });
 
+  it('keeps a standalone published page read-only without page management permission', async () => {
+    setSearch('?pageId=page_1');
+    permissionMock.canAdministerDesigner.mockImplementation(permission => permission !== 'page.page.manage');
+    vi.mocked(loadPageSchemaV3).mockResolvedValue({
+      document: createDocument('document_one', 'Document One'),
+      source: { type: 'page', pid: 'page_1', pageKey: 'document_one' },
+      published: true,
+    });
+    render(<UnifiedDesignerPage />);
+    expect(await screen.findByTestId('unified-designer-workbench')).toBeVisible();
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(screen.getByTestId('designer-publish')).toBeDisabled();
+    expect(screen.getByTestId('designer-unpublish')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('designer-save'));
+    fireEvent.click(screen.getByTestId('designer-unpublish'));
+    expect(savePageSchemaV3).not.toHaveBeenCalled();
+  });
+
   it('loads a pageId document and saves edits through the V3 repository', async () => {
     setSearch('?pageId=page_1');
     vi.mocked(loadPageSchemaV3).mockResolvedValue({

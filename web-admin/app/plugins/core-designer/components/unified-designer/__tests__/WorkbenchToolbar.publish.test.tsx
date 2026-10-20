@@ -16,7 +16,7 @@ it('does not offer a second publish for an already published page and retains un
 it('denies unpublish to a reader even when the saved page is published', () => {
   const unpublish = vi.fn();
   render(<WorkbenchToolbar document={samplePageSchemaV3} mode="edit" isDirty={false} saveStatus="saved"
-    validationErrorCount={0} canUndo={false} canRedo={false} pageId="page-one" publishStatus="published" canPublish={false}
+    validationErrorCount={0} canUndo={false} canRedo={false} pageId="page-one" publishStatus="published" readOnly
     onModeChange={vi.fn()} onUndo={vi.fn()} onRedo={vi.fn()} onSave={vi.fn()} onPublish={vi.fn()} onUnpublish={unpublish} />);
   expect(screen.getByTestId('designer-unpublish')).toBeDisabled();
   fireEvent.click(screen.getByTestId('designer-unpublish'));

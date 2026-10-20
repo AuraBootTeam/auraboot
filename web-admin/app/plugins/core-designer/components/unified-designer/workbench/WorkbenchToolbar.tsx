@@ -382,10 +382,10 @@ export function WorkbenchToolbar({
           <button
             type="button"
             data-testid="designer-unpublish"
-            disabled={readOnly || !canPublish || publishBusy || isDirty || !pageId}
+            disabled={readOnly || publishBusy || isDirty || !pageId}
             onClick={onUnpublish}
             className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
-              readOnly || !canPublish || publishBusy || isDirty || !pageId
+              readOnly || publishBusy || isDirty || !pageId
                 ? 'cursor-not-allowed border-slate-200 text-slate-400'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
