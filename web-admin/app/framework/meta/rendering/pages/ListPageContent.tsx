@@ -1816,14 +1816,15 @@ function ListPageContentInner(props: PageContentProps) {
     const restoredFilters = pendingSavedViewFiltersRef.current;
     if (!restoredFilters) return;
     pendingSavedViewFiltersRef.current = null;
-    // The latest loadData closure already reads the effective active sorts. Do
-    // not bypass a URL override with the selected SavedView's baseline sorts.
+    // Hydration can finish after the user changes pages. Reload the current
+    // page with the restored filters rather than superseding that newer request
+    // with page one. The latest loadData closure retains effective URL sorts.
     loadDataRef.current?.({
-      page: 0,
+      page: pagination.current - 1,
       size: pagination.pageSize,
       filters: restoredFilters,
     });
-  }, [loadData, pagination.pageSize]);
+  }, [loadData, pagination.current, pagination.pageSize]);
 
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
