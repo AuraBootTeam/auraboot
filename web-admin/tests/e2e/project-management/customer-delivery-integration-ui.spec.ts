@@ -1,4 +1,4 @@
-import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
+import { test, expect, request, type Page, type APIResponse, type Response } from '@playwright/test';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BACKEND_URL } from '../../helpers/environments';
@@ -41,9 +41,10 @@ test('customer integration is inspectable, its external event survives designer 
   const base = `/api/open-platform/installations/${fixture.installationPid}`;
   const names: string[] = []; const stamp = Date.now().toString(36); const ledger: unknown[] = [];
   let permanent = ''; let fixed = ''; let result: Record<string, unknown> | undefined;
+  const external = await request.newContext({ storageState: { cookies: [], origins: [] } });
   const machine = async (token: string, status: number) => {
-    const response = await page.request.get(`${BACKEND_URL}/api/open/v1/whoami`, { headers: { Authorization: `Bearer ${token}` } });
-    expect(response.status()).toBe(status);
+    const response = await external.get(`${BACKEND_URL}/api/open/v1/whoami`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(response.status(), await response.text()).toBe(status);
     if (status === 200) expect(await response.json()).toMatchObject({ applicationPid: fixture.applicationPid, installationPid: fixture.installationPid });
     ledger.push({ action: 'machine-identity', expectedStatus: status, actualStatus: response.status() });
   };
@@ -103,7 +104,7 @@ test('customer integration is inspectable, its external event survives designer 
     const event = { id: `materials-ui-${stamp}`, type: 'materials.received', schemaVersion: 1,
       occurredAt: new Date().toISOString(), subject: { type: 'project', pid: fixture.projectPid }, sequence: 3,
       data: { projectPid: fixture.projectPid, nextAction: action } };
-    const accepted = await page.request.post(`${BACKEND_URL}/api/open/v1/event-sources/${fixture.sourceCode}/events`, {
+    const accepted = await external.post(`${BACKEND_URL}/api/open/v1/event-sources/${fixture.sourceCode}/events`, {
       headers: { Authorization: `Bearer ${permanent}`, 'Idempotency-Key': `materials-ui-${stamp}` }, data: event });
     expect(accepted.status()).toBe(202); expect(await accepted.json()).toEqual({ eventId: event.id, duplicate: false });
     await expect.poll(async () => (await data(await page.request.get(`/api/dynamic/tpm_project/${fixture.projectPid}`))).tpm_pj_next_action, { timeout: 30_000 }).toBe(action);
@@ -137,6 +138,7 @@ test('customer integration is inspectable, its external event survives designer 
       applicationPid: fixture.applicationPid, installationPid: fixture.installationPid, projectPid: fixture.projectPid,
       businessResult: action, savedTriggerType: saved.triggerType, eventId: event.id, machineChecks: ledger, status: 'passed' };
   } finally {
+    await external.dispose();
     await closeSecret(page);
     const rows = await data(await page.request.get(base + '/integration-tokens'));
     for (const token of rows.filter((row: any) => names.includes(row.name) && row.status !== 'revoked')) {

@@ -1,6 +1,7 @@
 import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
 import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { BASE_URL } from '../../helpers/environments';
 import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { navigateToMenuByClick } from '../helpers';
 
@@ -54,15 +55,15 @@ test('customer plugin contributes a real command dialog and workspace, survives 
     (row: any) => row.pluginId === 'com.auraboot.customer-delivery-extension',
   );
   expect(extension).toBeTruthy();
-  if (extension.status !== 'enabled') {
-    expect(['installed', 'disabled']).toContain(extension.status);
+  if (extension.status !== 'active') {
+    expect(['installed', 'stopped']).toContain(extension.status);
     const enabling = page.waitForResponse(
       (response) =>
         /\/api\/plugins\/[^/]+\/enable$/.test(new URL(response.url()).pathname) &&
         response.request().method() === 'POST',
     );
     await installed.getByRole('button', { name: /启用|Enable/ }).click();
-    await pluginState(page, await enabling, 'enabled');
+    await pluginState(page, await enabling, 'active');
   } else {
     await expect(installed.getByRole('button', { name: /禁用|停用|Disable/ })).toBeVisible();
   }
@@ -125,7 +126,7 @@ test('customer plugin contributes a real command dialog and workspace, survives 
       response.request().method() === 'POST',
   );
   await row.getByRole('button', { name: /禁用|停用|Disable/ }).click();
-  await pluginState(page, await stopping, 'disabled');
+  await pluginState(page, await stopping, 'stopped');
   await shot(page, 'X04-plugin-stopped');
   await openProject(page);
   await expect(button).toHaveCount(0);
@@ -138,7 +139,7 @@ test('customer plugin contributes a real command dialog and workspace, survives 
       response.request().method() === 'POST',
   );
   await stopped.getByRole('button', { name: /启用|Enable/ }).click();
-  await pluginState(page, await starting, 'enabled');
+  await pluginState(page, await starting, 'active');
   await openProject(page);
   await expect(button).toBeVisible();
   expect(
@@ -211,7 +212,7 @@ test('customer extension keeps read-only access and rejects conflicting contribu
     }),
   );
   const context = await browser.newContext({
-    baseURL: process.env.PLAYWRIGHT_BASE_URL,
+    baseURL: BASE_URL,
     storageState: { cookies: [], origins: [] },
     locale: 'zh-CN',
     viewport: { width: 1440, height: 1000 },
