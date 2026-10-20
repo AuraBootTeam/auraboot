@@ -668,8 +668,9 @@ test.describe('Page Templates', () => {
     await new HeaderPage(page).waitForHeader();
     const nav = page.locator('nav, aside, [role="navigation"]').first();
     await expect(nav).toBeVisible();
-    await nav.getByRole('button', { name: /\u5143\u6570\u636e\u7ba1\u7406|Meta/i }).click();
     const menu = nav.locator('a[href="/p/page_schema"]');
+    if (!(await menu.isVisible()))
+      await nav.getByRole('button', { name: /\u5143\u6570\u636e\u7ba1\u7406|Meta/i }).click();
     await expect(menu).toBeVisible();
     await menu.click();
     await expect(page).toHaveURL(`${BASE_URL}/p/page_schema`);
