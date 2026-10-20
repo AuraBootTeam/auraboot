@@ -26,6 +26,7 @@ import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.dto.imports.ModelFieldBindingDTO;
 import com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
