@@ -66,7 +66,7 @@ async function fillCreateForm(page: Page, code: string, name: string) {
 }
 
 async function openCreateModal(page: Page) {
-  await expect(page.locator('header')).toHaveAttribute('data-hydrated', 'true');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
   const btn = page.locator('button', { hasText: 'New Environment' }).first();
   const codeInput = page.locator('input[placeholder*="dev, staging, prod"]');
   await btn.click();
@@ -231,7 +231,7 @@ test.describe('Env-layering happy path', () => {
   }) => {
     await page.goto(PROMOTION_PAGE);
     await expect(page.locator('h1', { hasText: 'Promotions' })).toBeVisible();
-    await expect(page.locator('header')).toHaveAttribute('data-hydrated', 'true');
+    await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
 
     await page.locator('[data-testid="promotion-new-btn"]').click();
     const modal = page.locator('[data-testid="promotion-create-modal"]');
