@@ -74,6 +74,7 @@ const EXPECTED_AUTOMATION_FIELD_TYPES = [
   'field-select',
   'json',
   'model-select',
+  'model-field-map',
   'multiselect',
   'number',
   'workflow-select',

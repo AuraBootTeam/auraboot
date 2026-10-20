@@ -28,6 +28,7 @@ import {
 } from '~/shared/services/resourceSelectService';
 import { ExpressionEditor } from './expression';
 import type { FieldOption as ExpressionFieldOption } from './expression/types';
+import { ModelFieldMapEditor } from './ModelFieldMapEditor';
 import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
@@ -207,6 +208,9 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           fetchOptions={fetchModelOptions}
         />
       );
+
+    case 'model-field-map':
+      return <ModelFieldMapEditor adapter={adapter} label={label} modelKey={schema.dependsOn?.field} />;
 
     case 'field-select':
       return (

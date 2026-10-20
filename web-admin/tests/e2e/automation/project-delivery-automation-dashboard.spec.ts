@@ -201,11 +201,23 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     page.getByTestId('automation-editor-description-input'),
   ).toHaveValue(description);
   await page.screenshot({
-    path: info.outputPath('AD01-explicit-archive-scope.png'),
+    path: info.outputPath('AD00-edge-expression-diagnostics.png'),
   });
   const { pid: automationPid } = await saveAutomation(page);
   await expect(page).toHaveURL(new RegExp(`/automation/${automationPid}$`));
   await page.reload();
+  await fillNodeConfig(page, archive, {});
+  await expect(page.getByTestId('model-map-field-0')).toHaveValue('tpm_ts_description');
+  await expect(page.getByTestId('model-map-value-0')).toHaveValue(marker);
+  const inspector = await page.getByTestId('flow-inspector-shell').boundingBox();
+  const canvas = await page.getByTestId('flow-canvas-shell').boundingBox();
+  expect(inspector).not.toBeNull(); expect(canvas).not.toBeNull();
+  expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(inspector!.x + 1);
+  await expect(page.getByTestId('flow-drawer-backdrop')).toHaveCount(0);
+  await page.screenshot({path: info.outputPath('AD01-field-mapping-reopened.png')});
+  await fillNodeConfig(page, guard, {});
+  await page.screenshot({path: info.outputPath('AD01-explicit-archive-scope.png')});
+  await page.getByTestId('flow-close-inspector').click();
   await expect(page.getByTestId('automation-editor-name-input')).toHaveValue(
     automationName,
   );

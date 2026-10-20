@@ -21,6 +21,7 @@ import { cn } from '~/utils/cn';
 
 const COMPACT_FLOW_DESIGNER_QUERY = '(max-width: 1599px)';
 const WIDE_FLOW_WORKSPACE_MIN_WIDTH = 1440;
+const DOCKED_INSPECTOR_MIN_WIDTH = 960;
 
 function readCompactFlowDesignerViewport(): boolean {
   if (typeof window === 'undefined') return false;
@@ -52,6 +53,9 @@ export function FlowDesignerWorkspace({
   const hasPalette = Boolean(palette);
   const initialCompact = readCompactFlowDesignerViewport();
   const [isCompact, setIsCompact] = useState(initialCompact);
+  const [workspaceWidth, setWorkspaceWidth] = useState(() =>
+    typeof window === 'undefined' ? WIDE_FLOW_WORKSPACE_MIN_WIDTH : window.innerWidth - 256,
+  );
   const [paletteOpen, setPaletteOpen] = useState(() => !initialCompact && hasPalette);
   const [inspectorOpen, setInspectorOpen] = useState(() => !initialCompact);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
@@ -106,6 +110,7 @@ export function FlowDesignerWorkspace({
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? 0;
       if (width > 0) {
+        setWorkspaceWidth(width);
         applyViewportMode(width < WIDE_FLOW_WORKSPACE_MIN_WIDTH);
       }
     });
@@ -125,6 +130,7 @@ export function FlowDesignerWorkspace({
 
   const paletteVisible = hasPalette && (!isCompact || paletteOpen);
   const inspectorVisible = !isCompact || inspectorOpen;
+  const inspectorOverlay = isCompact && workspaceWidth < DOCKED_INSPECTOR_MIN_WIDTH;
   const closeDrawers = () => {
     setPaletteOpen(false);
     setInspectorOpen(false);
@@ -180,7 +186,7 @@ export function FlowDesignerWorkspace({
         </div>
       )}
 
-      {isCompact && (paletteOpen || inspectorOpen) && (
+      {isCompact && (paletteOpen || (inspectorOverlay && inspectorOpen)) && (
         <button
           type="button"
           aria-label={labels.close}
@@ -222,12 +228,13 @@ export function FlowDesignerWorkspace({
 
       <div
         className={cn(
-          isCompact
+          inspectorOverlay
             ? 'absolute inset-y-0 right-0 z-40 max-w-[calc(100vw-2rem)] shadow-2xl'
             : 'relative z-20 flex shrink-0',
           !inspectorVisible && 'hidden',
         )}
         data-testid="flow-inspector-shell"
+        data-presentation={inspectorOverlay ? 'overlay' : 'docked'}
         data-open={inspectorVisible ? 'true' : 'false'}
       >
         {isCompact && (

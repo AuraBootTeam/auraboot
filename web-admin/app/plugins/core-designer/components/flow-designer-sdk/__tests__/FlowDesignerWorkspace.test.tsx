@@ -65,6 +65,7 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     document.body.innerHTML = '';
   });
 
@@ -100,6 +101,7 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
 
   it('starts compact viewports with drawers closed so the automation canvas keeps width', () => {
     mockMatchMedia(true);
+    mockResizeObserver(720);
 
     renderWorkspace();
 
@@ -113,6 +115,7 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
 
   it('opens one compact drawer at a time without changing the canvas flex contract', () => {
     mockMatchMedia(true);
+    mockResizeObserver(720);
 
     renderWorkspace();
 
@@ -127,8 +130,24 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
     expect(screen.getByTestId('flow-canvas-shell')).toHaveClass('flex', 'min-w-0', 'flex-1');
   });
 
+  it('docks the inspector beside the canvas when a desktop workspace fits two columns', () => {
+    mockMatchMedia(true);
+    mockResizeObserver(1184);
+    renderWorkspace();
+
+    fireEvent.click(screen.getByTestId('flow-toggle-inspector'));
+    expect(screen.getByTestId('flow-inspector-shell')).toHaveAttribute('data-open', 'true');
+    expect(screen.getByTestId('flow-inspector-shell')).not.toHaveClass('absolute');
+    expect(screen.queryByTestId('flow-drawer-backdrop')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('flow-toggle-palette'));
+    expect(screen.getByTestId('flow-palette-shell')).toHaveClass('absolute');
+    expect(screen.getByTestId('flow-drawer-backdrop')).toBeVisible();
+  });
+
   it('opens the inspector drawer when compact mode receives a new selected node', () => {
     mockMatchMedia(true);
+    mockResizeObserver(720);
 
     const { rerender } = renderWorkspace({ inspectorFocusKey: null });
 

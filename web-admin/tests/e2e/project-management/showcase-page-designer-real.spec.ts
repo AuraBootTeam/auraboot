@@ -1,0 +1,155 @@
+import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { loginDeliveryMember } from '../../helpers/delivery-session';
+import { navigateToMenuByClick } from '../helpers';
+
+const evidence = process.env.AURA_EVIDENCE_DIR;
+if (!evidence) throw new Error('Bind the current owned evidence round');
+test.use({ locale: 'zh-CN' });
+test.setTimeout(180_000);
+async function data(response: APIResponse | Response) {
+  const body = await response.json();
+  expect(response.status(), JSON.stringify(body)).toBe(200);
+  expect(String(body.code)).toBe('0');
+  return body.data;
+}
+async function shot(page: Page, id: string) {
+  await mkdir(join(evidence!, 'screenshots'), { recursive: true });
+  await page.screenshot({ path: join(evidence!, 'screenshots', `${id}.png`), fullPage: true });
+}
+async function projects(page: Page) {
+  await navigateToMenuByClick(page, ['项目交付', '项目']);
+  await expect(page.getByRole('main')).not.toContainText(/Page Unavailable|Internal Server Error/);
+}
+async function designer(page: Page) {
+  await navigateToMenuByClick(page, ['元数据管理', '页面配置']);
+  await page.getByTestId('list-search-input').fill('tpm_project_form');
+  await page.getByTestId('list-search-input').press('Enter');
+  const row = page.getByRole('row').filter({ hasText: 'tpm_project_form' });
+  await expect(row).toHaveCount(1);
+  await row.getByText('统一设计器', { exact: true }).click();
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+  const pid = new URL(page.url()).pathname.split('/').at(-1)!;
+  expect(pid).toMatch(/^[0-9A-Z]{26}$/);
+  return pid;
+}
+
+test('mature project page is refined with real undo redo, save recovery, publish and runtime readback @critical', async ({ page }, info) => {
+  await loginDeliveryMember(page);
+  const pid = await designer(page);
+  const original = await data(await page.request.get(`/api/pages/${pid}`));
+  expect(original.modelCode).toBe('tpm_project');
+  const originalTitle = original.blocks.find((block: any) => block.id === 'outcome').title;
+  const before = typeof originalTitle === 'string' ? originalTitle : originalTitle['zh-CN'];
+  const refined = before === '客户与交付背景' ? '客户与项目背景' : '客户与交付背景';
+  await page.getByTestId('outline-item-outcome').click();
+  const title = page.getByTestId('inspector-field-title');
+  await expect(title).toHaveValue(before);
+  await shot(page, 'PD01-project-form-designer');
+  await title.fill(refined);
+  await expect(title).toHaveValue(refined);
+  await expect(page.getByTestId('designer-undo')).toBeEnabled();
+  await page.getByTestId('designer-undo').click();
+  await expect(title).toHaveValue(before);
+  await page.getByTestId('designer-redo').click();
+  await expect(title).toHaveValue(refined);
+  await shot(page, 'PD02-project-form-refined');
+
+  // A transport failure is an explicit UI-state probe, not a real database outage.
+  await page.route(`**/api/pages/${pid}`, route => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: '503', message: 'Temporary test transport failure' }) })
+    : route.continue());
+  const rejected = page.waitForResponse(response => new URL(response.url()).pathname === `/api/pages/${pid}` && response.request().method() === 'PUT');
+  await page.getByTestId('designer-save').click();
+  expect((await rejected).status()).toBe(503);
+  await expect(title).toHaveValue(refined);
+  await expect(page.getByTestId('designer-save')).toBeEnabled();
+  const unchanged = await data(await page.request.get(`/api/pages/${pid}`));
+  expect(unchanged.blocks).toEqual(original.blocks);
+  await shot(page, 'PD03-save-failure-retains-draft-injected');
+  await page.unroute(`**/api/pages/${pid}`);
+  const saving = page.waitForResponse(response => new URL(response.url()).pathname === `/api/pages/${pid}` && response.request().method() === 'PUT');
+  await page.getByTestId('designer-save').click();
+  await data(await saving);
+  const saved = await data(await page.request.get(`/api/pages/${pid}`));
+  expect(saved.schemaVersion).toBe(4);
+  expect(saved.blocks.find((block: any) => block.id === 'outcome').title['zh-CN']).toBe(refined);
+  expect(saved.blocks.flatMap((block: any) => block.fields ?? []).map((field: any) => typeof field === 'string' ? field : field.field))
+    .toEqual(original.blocks.flatMap((block: any) => block.fields ?? []).map((field: any) => typeof field === 'string' ? field : field.field));
+  const publishing = page.waitForResponse(response => new URL(response.url()).pathname === `/api/pages/${pid}/publish` && response.request().method() === 'POST');
+  await page.getByTestId('designer-publish').click();
+  await data(await publishing);
+  await page.reload();
+  await page.getByTestId('outline-item-outcome').click();
+  await expect(page.getByTestId('inspector-field-title')).toHaveValue(refined);
+  await shot(page, 'PD04-designer-published-reopened');
+  await info.attach('PD-project-page-persisted', { body: JSON.stringify({ before: original, after: await data(await page.request.get(`/api/pages/${pid}`)) }), contentType: 'application/json' });
+  await projects(page);
+  await page.getByRole('button', { name: '新建项目', exact: true }).click();
+  await expect(page.getByText(refined, { exact: true })).toBeVisible();
+  await expect(page.locator('#tpm_pj_name')).toBeVisible();
+  await shot(page, 'PD05-refined-project-form-runtime');
+});
+
+test('mature project creation and editing preserve customer owner dates budget and uploaded evidence @critical', async ({ page }, info) => {
+  const identity = await loginDeliveryMember(page);
+  await projects(page);
+  await shot(page, 'PJ01-mature-project-list');
+  await page.getByRole('button', { name: '新建项目', exact: true }).click();
+  const name = `华辰制造 · 服务交付二期 · ${Date.now().toString(36)}`;
+  await page.locator('#tpm_pj_name').fill(name);
+  await page.getByTestId('select-trigger-tpm_pj_customer_id').click();
+  await page.getByRole('option', { name: '华辰制造', exact: true }).click();
+  await page.getByTestId('user-select-trigger-tpm_pj_owner_user').click();
+  await page.getByTestId(`user-select-option-tpm_pj_owner_user-${identity.user.pid}`).click();
+  await page.locator('#tpm_pj_description').fill('分阶段交付客户门户、权限配置与供应链协同，按里程碑核对范围和交付材料。');
+  await page.locator('#tpm_pj_start_date').fill('2026-11-01');
+  await page.locator('#tpm_pj_end_date').fill('2026-12-20');
+  await page.locator('#tpm_pj_budget').fill('268000');
+  await page.locator('#tpm_pj_risk_summary').fill('等待客户确认接口字段，已安排联合评审。');
+  await page.locator('#tpm_pj_next_action').fill('11月5日前完成字段映射评审，负责人林晓。');
+  await page.getByTestId('form-section-supplement').locator('summary').click();
+  const fileBytes = Buffer.from('华辰制造交付二期\n范围：客户门户、权限、供应链接口\n验收：按里程碑及交付清单核对\n');
+  const upload = page.waitForResponse(response => response.url().includes('/api/file/upload') && response.request().method() === 'POST');
+  await page.getByTestId('form-field-tpm_pj_files').locator('input[type=file]').setInputFiles({ name: '二期交付范围清单.txt', mimeType: 'text/plain', buffer: fileBytes });
+  const file = await data(await upload);
+  await expect(page.getByTestId('form-field-tpm_pj_files')).toContainText('二期交付范围清单.txt');
+  await shot(page, 'PJ02-mature-project-filled');
+  const creating = page.waitForResponse(response => response.url().includes('/execute/tpm:create_project') && response.request().method() === 'POST');
+  await page.getByTestId('form-btn-submit').click();
+  const created = await data(await creating);
+  expect(created.phaseReached).toBe('completed');
+  const pid = String(created.recordId);
+  expect(pid).toMatch(/^[0-9A-Z]{26}$/);
+  const row = page.getByRole('row').filter({ has: page.getByText(name, { exact: true }) });
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: /查看|详情/ }).click();
+  await expect(page.getByTestId('object-summary')).toContainText('268,000');
+  await expect(page.getByTestId('attachment-download-0')).toContainText('二期交付范围清单.txt');
+  const downloading = page.waitForEvent('download');
+  await page.getByTestId('attachment-download-0').click();
+  const download = await downloading;
+  expect(await readFile((await download.path())!)).toEqual(fileBytes);
+  await shot(page, 'PJ03-mature-project-created');
+  await page.getByTestId('toolbar-btn-edit').click();
+  await expect(page.locator('#tpm_pj_name')).toHaveValue(name);
+  await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
+  await expect(page.getByTestId('user-select-trigger-tpm_pj_owner_user')).toContainText('Admin User');
+  await page.locator('#tpm_pj_budget').fill('286000');
+  await page.locator('#tpm_pj_next_action').fill('范围已确认，11月8日开始接口联调。');
+  await shot(page, 'PJ04-mature-project-edit');
+  const updating = page.waitForResponse(response => response.url().includes('/execute/tpm:update_project') && response.request().method() === 'POST');
+  await page.getByTestId('form-btn-submit').click();
+  expect((await data(await updating)).phaseReached).toBe('completed');
+  await page.reload();
+  const persisted = await data(await page.request.get(`/api/dynamic/tpm_project/${pid}`));
+  expect(persisted).toMatchObject({ tpm_pj_name: name, tpm_pj_budget: 286000, tpm_pj_owner_user: identity.user.pid,
+    tpm_pj_start_date: '2026-11-01', tpm_pj_end_date: '2026-12-20', tpm_pj_next_action: '范围已确认，11月8日开始接口联调。' });
+  expect(JSON.stringify(persisted.tpm_pj_files)).toContain(String(file.fileId));
+  await expect(page.getByTestId('object-summary')).toContainText('286,000');
+  await expect(page.getByRole('main')).toContainText('范围已确认，11月8日开始接口联调。');
+  await shot(page, 'PJ05-mature-project-reopened');
+  await writeFile(join(evidence!, 'mature-project-identity.json'), JSON.stringify({ pid, name, fileId: file.fileId }, null, 2));
+  await info.attach('PJ-persisted-result', { body: JSON.stringify(persisted), contentType: 'application/json' });
+});

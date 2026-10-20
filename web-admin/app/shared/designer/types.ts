@@ -25,6 +25,7 @@ export type PropertyType =
   | 'model'
   | 'model-select'
   | 'field-select'
+  | 'model-field-map'
   | 'namedQuery'
   | 'formula'
   | 'page-select'
