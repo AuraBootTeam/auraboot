@@ -6579,10 +6579,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
   });
 
   test('UDW-052: configures helper permission code and gates live helper data loading', async ({
-    page,
+    page, browser, baseURL,
   }) => {
     expect(liveHelperNamedQueryCode).toBeTruthy();
-    const allowedPermissionCode = await pickCurrentPermissionCode(page);
+    const allowedPermissionCode = 'e2et.order.read';
+    const admin = await page.request.get('/api/auth/me');
+    expect(admin.status()).toBe(200);
+    expect(collectPermissionCodes((await admin.json()).data.permissions)).toContain('*');
     const missingPermissionCode = `meta.unified-designer.helper-missing.${uid}`;
     const blockedQueryCode = `missing_helper_permission_blocked_${uid}`;
     const helperPermissionPid = await createPageResource(page, {
@@ -6652,56 +6655,78 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       allowedPermissionCode,
     );
 
-    const blockedRequests: string[] = [];
-    const blockedRequestListener = (request: Request) => {
-      if (request.url().includes(`/api/meta/named-queries/${blockedQueryCode}/execute`)) {
-        blockedRequests.push(request.url());
-      }
-    };
-    page.on('request', blockedRequestListener);
-    const allowedRespPromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/meta/named-queries/${liveHelperNamedQueryCode}/execute`) &&
-        response.request().method() === 'POST',
-      { timeout: 15000 },
+    await saveDesignerPage(page, helperPermissionPid);
+    for (const permission of ['meta.designer.read', 'page.page.read', 'meta.query.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const roleContext = await createAuthenticatedRoleContext(
+      browser, baseURL ?? new URL(page.url()).origin, 'viewer',
     );
-    await page.getByTestId('designer-mode-preview').click();
-    const allowedResp = await allowedRespPromise;
-    expect(allowedResp.status()).toBe(200);
-    page.off('request', blockedRequestListener);
+    try {
+      const rolePage = await roleContext.newPage();
+      const identity = await rolePage.request.get('/api/auth/me');
+      expect(identity.status()).toBe(200);
+      const codes = collectPermissionCodes((await identity.json()).data.permissions);
+      expect(codes).not.toContain('*');
+      expect(codes).not.toContain(missingPermissionCode);
+      expect(codes).toContain(allowedPermissionCode);
+      await rolePage.goto(`/unified-designer?pageId=${helperPermissionPid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(rolePage.getByTestId('unified-designer-workbench')).toBeVisible();
+      const blockedRequests: string[] = [];
+      const blockedRequestListener = (request: Request) => {
+        if (request.url().includes(`/api/meta/named-queries/${blockedQueryCode}/execute`)) {
+          blockedRequests.push(request.url());
+        }
+      };
+      rolePage.on('request', blockedRequestListener);
+      const allowedRespPromise = rolePage.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/meta/named-queries/${liveHelperNamedQueryCode}/execute`) &&
+          response.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      await rolePage.getByTestId('designer-mode-preview').click();
+      const allowedResp = await allowedRespPromise;
+      expect(allowedResp.status()).toBe(200);
+      rolePage.off('request', blockedRequestListener);
 
-    const deniedPermission = page.getByTestId(
-      'runtime-helper-permission-ai_permission_denied_helper',
-    );
-    await expect(deniedPermission).toContainText(`Requires permission: ${missingPermissionCode}`);
-    await expect(deniedPermission).toHaveAttribute('data-permission-code', missingPermissionCode);
-    await expect(deniedPermission).toHaveAttribute('data-permission-allowed', 'false');
-    await expect(page.getByTestId('runtime-helper-source-ai_permission_denied_helper')).toHaveCount(
-      0,
-    );
-    await expect(page.getByTestId('runtime-helper-error-ai_permission_denied_helper')).toHaveCount(
-      0,
-    );
-    await expect(
-      page.getByTestId('runtime-ai-fill-field-ai_permission_denied_helper-0'),
-    ).toHaveCount(0);
-    await expect(
-      page.getByTestId('runtime-ai-fill-empty-ai_permission_denied_helper'),
-    ).toContainText(`Permission denied helper stays private ${uid}`);
+      const deniedPermission = rolePage.getByTestId(
+        'runtime-helper-permission-ai_permission_denied_helper',
+      );
+      await expect(deniedPermission).toContainText(`Requires permission: ${missingPermissionCode}`);
+      await expect(deniedPermission).toHaveAttribute('data-permission-code', missingPermissionCode);
+      await expect(deniedPermission).toHaveAttribute('data-permission-allowed', 'false');
+      await expect(rolePage.getByTestId('runtime-helper-source-ai_permission_denied_helper')).toHaveCount(
+        0,
+      );
+      await expect(rolePage.getByTestId('runtime-helper-error-ai_permission_denied_helper')).toHaveCount(
+        0,
+      );
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-field-ai_permission_denied_helper-0'),
+      ).toHaveCount(0);
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-empty-ai_permission_denied_helper'),
+      ).toContainText(`Permission denied helper stays private ${uid}`);
 
-    const allowedPermission = page.getByTestId(
-      'runtime-helper-permission-ai_permission_allowed_helper',
-    );
-    await expect(allowedPermission).toContainText(`Permission: ${allowedPermissionCode}`);
-    await expect(allowedPermission).toHaveAttribute('data-permission-code', allowedPermissionCode);
-    await expect(allowedPermission).toHaveAttribute('data-permission-allowed', 'true');
-    await expect(page.getByTestId('runtime-helper-source-ai_permission_allowed_helper')).toHaveText(
-      'named-query',
-    );
-    await expect(
-      page.getByTestId('runtime-ai-fill-field-ai_permission_allowed_helper-0'),
-    ).toBeVisible();
-    expect(blockedRequests).toEqual([]);
+      const allowedPermission = rolePage.getByTestId(
+        'runtime-helper-permission-ai_permission_allowed_helper',
+      );
+      await expect(allowedPermission).toContainText(`Permission: ${allowedPermissionCode}`);
+      await expect(allowedPermission).toHaveAttribute('data-permission-code', allowedPermissionCode);
+      await expect(allowedPermission).toHaveAttribute('data-permission-allowed', 'true');
+      await expect(rolePage.getByTestId('runtime-helper-source-ai_permission_allowed_helper')).toHaveText(
+        'named-query',
+      );
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-field-ai_permission_allowed_helper-0'),
+      ).toBeVisible();
+      expect(blockedRequests).toEqual([]);
+    } finally {
+      await roleContext.close();
+    }
   });
 
   test('UDW-062: reorders blocks by dragging outline rows through the shared dnd kernel', async ({
