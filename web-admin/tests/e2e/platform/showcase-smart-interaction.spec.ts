@@ -86,6 +86,7 @@ async function openCreateForm(page: Page): Promise<void> {
     .waitForURL(/showcase.all.fields.*form|\/new|\/create/, { timeout: 15_000 })
     .catch(() => null);
   await waitForFormReady(page, 15_000);
+  await expect(page.getByTestId('form-section-related_contact')).toBeAttached();
   await expandFormSections(page);
 }
 
