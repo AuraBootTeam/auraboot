@@ -166,7 +166,9 @@
             "zh-CN": "交付日期",
             "en": "Delivery date"
           },
-          "width": 120
+          "width": 150,
+          "valueType": "date",
+          "ellipsis": true
         },
         {
           "field": "next_action",

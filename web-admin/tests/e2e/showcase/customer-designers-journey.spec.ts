@@ -43,6 +43,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('model-type-physical').click();
   await page.getByTestId('model-code-input').fill(code);
   await page.getByTestId('model-display-name-input').fill('交付客户跟进');
+  await expect(page.getByTestId('model-create-submit')).toBeEnabled();
   await screenshot(page, info, 'SC02-model-create-filled');
   const create = page.waitForResponse(
     (r) => r.url().endsWith('/api/meta/models') && r.request().method() === 'POST',
