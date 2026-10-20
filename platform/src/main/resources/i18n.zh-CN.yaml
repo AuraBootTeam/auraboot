@@ -1531,6 +1531,11 @@ bpmn:
     instance_id_placeholder: 输入流程实例 ID
   save:
     title: 保存流程定义
+    newVersionTitle: 保存为新的草稿版本
+    newVersionNotice: 已发布版本及其已有实例保持不变。保存将创建新草稿，单独发布后才供新实例使用。
+    newVersionConfirm: 创建草稿版本
+    versionAssigned: 保存时分配
+    versionNew: 新草稿版本
     closeAria: 关闭对话框
     cancel: 取消
     confirm: 确定

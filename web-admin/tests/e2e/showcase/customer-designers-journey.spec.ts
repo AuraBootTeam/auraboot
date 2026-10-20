@@ -16,6 +16,7 @@ async function menu(page: Page, label: string) {
   );
 }
 async function screenshot(page: Page, info: TestInfo, name: string) {
+  await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, { timeout: 15000 });
   await info.attach(name, {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',

@@ -871,8 +871,11 @@ async function publishAcceptanceDesign(page: Page) {
   await page.getByRole('row').filter({hasText:'tpm_delivery_acceptance'}).getByText('tpm_delivery_acceptance',{exact:true}).click();
   await page.getByTestId('toolbar-btn-open_bpmn_designer').click();
   await expect(page).toHaveURL(/\/bpm\/designer\?pid=/);
-  const definitionPid = new URL(page.url()).searchParams.get('pid');
+  let definitionPid = new URL(page.url()).searchParams.get('pid');
   expect(definitionPid).toBeTruthy();
+  const originalPid = definitionPid;
+  const original = await data(await page.request.get(`/api/bpm/process-definitions/${originalPid}`));
+  expect(original.status).toBe('deployed');
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await page.locator('.react-flow__node[data-id="tpm_enhanced_review"]').click();
   await page.getByTestId('node-label-input').fill('验收负责人 · 加强审核');
@@ -881,9 +884,20 @@ async function publishAcceptanceDesign(page: Page) {
   }
   await page.getByTestId('bpmn-toolbar').getByTestId('bpmn-toolbar-btn-save').click();
   await expect(page.getByTestId('bpmn-save-dialog-panel')).toBeVisible();
-  const saved = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bpm/process-definitions/${definitionPid}` && r.request().method()==='PUT');
+  await expect(page.getByTestId('bpmn-save-version-notice')).toContainText('已有实例保持不变');
+  await shot(page,'BPM00-new-version-confirmation');
+  const saved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/bpm/process-definitions/key/tpm_delivery_acceptance/versions' && r.request().method()==='POST');
   await page.getByTestId('bpmn-save-dialog-submit').click();
-  await data(await saved);
+  const draft = await data(await saved);
+  definitionPid = draft.pid;
+  expect(definitionPid).not.toBe(originalPid);
+  expect(draft.version).toBe(original.version + 1);
+  expect(draft.status).toBe('draft');
+  await expect(page).toHaveURL(new RegExp(`/bpm/designer\\?pid=${definitionPid}$`));
+  const historical = await data(await page.request.get(`/api/bpm/process-definitions/${originalPid}`));
+  expect(historical.designerJson).toBe(original.designerJson);
+  expect(historical.bpmnContent).toBe(original.bpmnContent);
+  expect(historical.status).toBe('deployed');
   await page.reload();
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await expect(page.locator('.react-flow__node[data-id="tpm_enhanced_review"]')).toContainText('验收负责人 · 加强审核');
@@ -896,7 +910,7 @@ async function publishAcceptanceDesign(page: Page) {
   expect(xml).toContain('commandCode="tpm:accept_acceptance"');
   expect(xml).toContain('targetRecordPid="${processBusinessKey}"');
   await shot(page,'BPM02-published-design');
-  return {definitionPid,node:'tpm_enhanced_review',label:'验收负责人 · 加强审核',compiledCommand:'tpm:accept_acceptance'};
+  return {definitionPid,originalPid,version:draft.version,originalUnchanged:true,node:'tpm_enhanced_review',label:'验收负责人 · 加强审核',compiledCommand:'tpm:accept_acceptance'};
 }
 
 async function configureAcceptanceModelAction(page: Page, publish = false) {
