@@ -876,6 +876,9 @@ async function publishAcceptanceDesign(page: Page) {
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await page.locator('.react-flow__node[data-id="tpm_enhanced_review"]').click();
   await page.getByTestId('node-label-input').fill('验收负责人 · 加强审核');
+  if (await page.getByTestId('bpmn-drawer-backdrop').isVisible()) {
+    await page.getByTestId('bpmn-close-inspector').click();
+  }
   await page.getByTestId('bpmn-toolbar').getByTestId('bpmn-toolbar-btn-save').click();
   await expect(page.getByTestId('bpmn-save-dialog-panel')).toBeVisible();
   const saved = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bpm/process-definitions/${definitionPid}` && r.request().method()==='PUT');

@@ -35,7 +35,10 @@ async function processMenu(page: Page) {
 async function capture(page: Page, info: TestInfo, name: string) {
   await expect(page.locator('main')).not.toContainText(/Page Unavailable|Internal Server Error/);
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, {timeout:15000});
-  if (!(await page.getByTestId('bpmn-save-dialog-panel').isVisible())) await page.getByRole('button', {name:/fit view/i}).click();
+  if (!(await page.getByTestId('bpmn-save-dialog-panel').isVisible()) &&
+      !(await page.getByTestId('bpmn-drawer-backdrop').isVisible())) {
+    await page.getByRole('button', {name:/fit view/i}).click();
+  }
   await info.attach(name, {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
@@ -161,6 +164,9 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
   const refinedName = '客户项目交付 · 验收审批与材料复核';
   await toolbar(page).getByTestId('bpmn-field-name').fill(refinedName);
   await capture(page, info, 'SC05-BPM-imported-and-refined');
+  if (await page.getByTestId('bpmn-drawer-backdrop').isVisible()) {
+    await page.getByTestId('bpmn-close-inspector').click();
+  }
   const pid = await saveNewDefinition(page, key, refinedName, info, 'SC05-BPM-original');
   const read = await page.request.get(`/api/bpm/process-definitions/${pid}`);
   expect(read.ok()).toBe(true);
