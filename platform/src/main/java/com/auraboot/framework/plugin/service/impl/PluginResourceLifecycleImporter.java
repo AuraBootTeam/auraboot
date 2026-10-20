@@ -138,7 +138,7 @@ final class PluginResourceLifecycleImporter {
                         metaModelService.delete(resource.getResourcePid());
                     } catch (Exception e) {
                         log.warn("Service delete failed for model {}: {}",
-                                support.logSafe(resource.getResourcePid()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourcePid()), PluginImportSupport.logSafe(e.getMessage()));
                         metaModelMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -149,7 +149,7 @@ final class PluginResourceLifecycleImporter {
                         metaFieldService.delete(resource.getResourcePid());
                     } catch (Exception e) {
                         log.warn("Service delete failed for field {}: {}",
-                                support.logSafe(resource.getResourcePid()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourcePid()), PluginImportSupport.logSafe(e.getMessage()));
                         metaFieldMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -160,7 +160,7 @@ final class PluginResourceLifecycleImporter {
                         commandService.delete(resource.getResourcePid());
                     } catch (Exception e) {
                         log.warn("Service delete failed for command {}: {}",
-                                support.logSafe(resource.getResourcePid()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourcePid()), PluginImportSupport.logSafe(e.getMessage()));
                         commandDefinitionMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -171,7 +171,7 @@ final class PluginResourceLifecycleImporter {
                         permissionService.delete(resource.getResourceId());
                     } catch (Exception e) {
                         log.warn("Service delete failed for permission {}: {}",
-                                support.logSafe(resource.getResourceId()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourceId()), PluginImportSupport.logSafe(e.getMessage()));
                         permissionMapper.softDelete(resource.getResourceId());
                     }
                 }
@@ -181,7 +181,7 @@ final class PluginResourceLifecycleImporter {
                     roleMapper.softDeleteByPid(resource.getResourcePid());
                 } catch (Exception e) {
                     log.warn("Failed to delete role {}: {}",
-                            support.logSafe(resource.getResourcePid()), support.logSafe(e.getMessage()));
+                            PluginImportSupport.logSafe(resource.getResourcePid()), PluginImportSupport.logSafe(e.getMessage()));
                 }
             }
             case MENU -> {
@@ -190,7 +190,7 @@ final class PluginResourceLifecycleImporter {
                         menuService.deleteMenu(resource.getResourceId());
                     } catch (Exception e) {
                         log.warn("Service delete failed for menu {}: {}",
-                                support.logSafe(resource.getResourceId()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourceId()), PluginImportSupport.logSafe(e.getMessage()));
                         menuMapper.softDeleteById(resource.getResourceId());
                     }
                 }
@@ -201,7 +201,7 @@ final class PluginResourceLifecycleImporter {
                         pageSchemaService.delete(resource.getResourcePid());
                     } catch (Exception e) {
                         log.warn("Service delete failed for page {}: {}",
-                                support.logSafe(resource.getResourcePid()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourcePid()), PluginImportSupport.logSafe(e.getMessage()));
                         pageSchemaMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -212,7 +212,7 @@ final class PluginResourceLifecycleImporter {
                         dictService.delete(resource.getResourcePid());
                     } catch (Exception e) {
                         log.warn("Service delete failed for dict {}, using mapper fallback: {}",
-                                support.logSafe(resource.getResourcePid()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourcePid()), PluginImportSupport.logSafe(e.getMessage()));
                         dictMapper.softDeleteByPid(resource.getResourcePid());
                     }
                 }
@@ -223,7 +223,7 @@ final class PluginResourceLifecycleImporter {
                         namedQueryService.delete(resource.getResourcePid());
                     } catch (Exception e) {
                         log.warn("Failed to delete named query {}: {}",
-                                support.logSafe(resource.getResourcePid()), support.logSafe(e.getMessage()));
+                                PluginImportSupport.logSafe(resource.getResourcePid()), PluginImportSupport.logSafe(e.getMessage()));
                         namedQueryMapper.updateStatusByPid(resource.getResourcePid(), "archived");
                     }
                 }
@@ -234,7 +234,7 @@ final class PluginResourceLifecycleImporter {
     }
 
     public void restoreResource(PluginResource resource) {
-        log.info("Restoring resource: {} ({})", support.logSafe(resource.getResourceCode()), resource.getResourceType());
+        log.info("Restoring resource: {} ({})", PluginImportSupport.logSafe(resource.getResourceCode()), resource.getResourceType());
         ResourceType type = resource.getResourceTypeEnum();
         if (type.isPublicPublication()) {
             publicPublicationLifecycle.restore(resource);
@@ -262,7 +262,7 @@ final class PluginResourceLifecycleImporter {
         }
         int pruned = deleteTrackedMenus(pluginPid, importId, tenantId, staleCodes);
         log.info("Pruned {} stale menu(s) dropped from plugin {} declaration: {}",
-                pruned, support.logSafe(pluginPid), staleCodes);
+                pruned, PluginImportSupport.logSafe(pluginPid), staleCodes);
         return pruned;
     }
 
@@ -273,7 +273,7 @@ final class PluginResourceLifecycleImporter {
         }
         int deactivated = deleteTrackedMenus(pluginPid, null, tenantId, codes);
         log.info("Deactivated {} imported menu(s) of uninstalled plugin {}: {}",
-                deactivated, support.logSafe(pluginPid), codes);
+                deactivated, PluginImportSupport.logSafe(pluginPid), codes);
         return deactivated;
     }
 
@@ -321,8 +321,8 @@ final class PluginResourceLifecycleImporter {
             try {
                 facadeReceiver.rollbackResource(record);
             } catch (Exception e) {
-                log.warn("Failed to prune stale menu {}: {}", support.logSafe(code),
-                        support.logSafe(e.getMessage()));
+                log.warn("Failed to prune stale menu {}: {}", PluginImportSupport.logSafe(code),
+                        PluginImportSupport.logSafe(e.getMessage()));
                 continue;
             }
             pruned++;

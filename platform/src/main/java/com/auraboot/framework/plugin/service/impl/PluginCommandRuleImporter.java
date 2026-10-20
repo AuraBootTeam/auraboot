@@ -63,7 +63,7 @@ final class PluginCommandRuleImporter {
             log.warn("Command '{}' has inline 'bindingRules' in commands.json — "
                     + "this field is ignored during import. "
                     + "Use a separate bindingRules.json file registered in plugin.json resourceDirs.bindingRules.",
-                    support.logSafe(dto.getCode()));
+                    PluginImportSupport.logSafe(dto.getCode()));
         }
 
         boolean exists = facadeReceiver.checkCommandExists(tenantId, dto.getCode());
@@ -77,7 +77,7 @@ final class PluginCommandRuleImporter {
                     dto.getCode(), tenantId, pluginPid, dto.getEffectiveExtension());
             if (resurrectedPid != null) {
                 log.info("Resurrected soft-deleted command {} as {} for plugin reimport",
-                        support.logSafe(dto.getCode()), support.logSafe(resurrectedPid));
+                        PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(resurrectedPid));
                 exists = facadeReceiver.checkCommandExists(tenantId, dto.getCode());
             }
         }
@@ -92,7 +92,7 @@ final class PluginCommandRuleImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.COMMAND, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.COMMAND, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.COMMAND, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.COMMAND,
                     null, null, dto.getCode(), dto.getEffectiveDisplayName(), ResourceAction.SKIP, null, null);
         }
@@ -123,7 +123,7 @@ final class PluginCommandRuleImporter {
 
             commandMetadataCache.evictAll();
             log.info("Command updated in place for plugin reimport: code={}, pid={}",
-                     support.logSafe(dto.getCode()), support.logSafe(existingCmd.getPid()));
+                     PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(existingCmd.getPid()));
 
             // Auto-publish if requested — skip if already PUBLISHED to avoid rollback-only tx
             if (Boolean.TRUE.equals(autoPublish) && !StatusConstants.PUBLISHED.equals(existingCmd.getStatus())) {
@@ -204,7 +204,7 @@ final class PluginCommandRuleImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.BINDING_RULE, ruleCode)) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.BINDING_RULE, support.logSafe(ruleCode));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.BINDING_RULE, PluginImportSupport.logSafe(ruleCode));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.BINDING_RULE,
                     null, null, ruleCode, dto.getRuleType(), ResourceAction.SKIP, null, null);
         }

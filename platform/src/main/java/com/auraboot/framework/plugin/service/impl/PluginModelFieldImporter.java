@@ -114,7 +114,7 @@ final class PluginModelFieldImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.MODEL, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL,
                     null, null, dto.getCode(), dto.getEffectiveDisplayName(), ResourceAction.SKIP, null, null);
         }
@@ -170,7 +170,7 @@ final class PluginModelFieldImporter {
                     metaModelMapper.updateTableNameByPid(effectiveTableName, resurrectPid);
                 }
                 log.info("Resurrected soft-deleted model: code={}, pid={}",
-                        support.logSafe(dto.getCode()), support.logSafe(resurrectPid));
+                        PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(resurrectPid));
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL,
                         resurrectPid, null, dto.getCode(), dto.getEffectiveDisplayName(),
                         ResourceAction.CREATE, null, extension);
@@ -222,7 +222,7 @@ final class PluginModelFieldImporter {
             public void afterCompletion(int status) {
                 if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
                     log.warn("Import rolled back; evicting cached definitions of model {}",
-                            support.logSafe(modelCode));
+                            PluginImportSupport.logSafe(modelCode));
                     metaModelService.clearAllCache();
                 }
             }
@@ -244,7 +244,7 @@ final class PluginModelFieldImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.FIELD, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.FIELD, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.FIELD, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
                     null, null, dto.getCode(), dto.getEffectiveDisplayName(), ResourceAction.SKIP, null, null);
         }
@@ -261,7 +261,7 @@ final class PluginModelFieldImporter {
             String resurrectPid = support.resurrectSoftDeleted("ab_meta_field", "code", dto.getCode(), tenantId, pluginPid, extension);
             if (resurrectPid != null) {
                 log.info("Resurrected soft-deleted field: code={}, pid={}",
-                        support.logSafe(dto.getCode()), support.logSafe(resurrectPid));
+                        PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(resurrectPid));
                 result = createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
                         resurrectPid, null, dto.getCode(), dto.getEffectiveDisplayName(),
                         ResourceAction.CREATE, null, extension);
@@ -277,12 +277,12 @@ final class PluginModelFieldImporter {
             if (field != null && "draft".equalsIgnoreCase(field.getStatus())) {
                 try {
                     metaFieldService.publishVersion(field.getPid());
-                    log.info("Auto-published field after import: {}", support.logSafe(dto.getCode()));
+                    log.info("Auto-published field after import: {}", PluginImportSupport.logSafe(dto.getCode()));
                 } catch (Exception e) {
                     // Auto-publish is best-effort: import succeeded, the field exists in
                     // draft state, an admin can publish manually later. Don't fail the
                     // whole import for a publish hiccup.
-                    log.warn("Failed to auto-publish field {}: {}", support.logSafe(dto.getCode()), support.logSafe(e.getMessage()), e);
+                    log.warn("Failed to auto-publish field {}: {}", PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(e.getMessage()), e);
                 }
             }
         }
@@ -293,7 +293,7 @@ final class PluginModelFieldImporter {
             if (field != null) {
                 metaFieldService.bindDictionary(field.getPid(), dto.getDictCode());
                 log.info("Bound dictionary to field: fieldCode={}, dictCode={}",
-                        support.logSafe(dto.getCode()), support.logSafe(dto.getDictCode()));
+                        PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(dto.getDictCode()));
             }
         }
 
@@ -344,7 +344,7 @@ final class PluginModelFieldImporter {
         }
 
         log.info("Field updated in place for plugin reimport: code={}, pid={}",
-                 support.logSafe(dto.getCode()), support.logSafe(existingField.getPid()));
+                 PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(existingField.getPid()));
 
         // 5. Return resource record
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
@@ -608,7 +608,7 @@ final class PluginModelFieldImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.MODEL_FIELD_BINDING, bindingCode)) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL_FIELD_BINDING, support.logSafe(bindingCode));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL_FIELD_BINDING, PluginImportSupport.logSafe(bindingCode));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                     bindingPid, null, bindingCode, bindingCode, ResourceAction.SKIP, null, null);
         }
@@ -664,7 +664,7 @@ final class PluginModelFieldImporter {
                         .orElse(false);
 
                 bindingPid = fieldBindingMapper.getPidByModelAndField(modelId, fieldId);
-                log.info("Resurrected soft-deleted binding: {}", support.logSafe(bindingCode));
+                log.info("Resurrected soft-deleted binding: {}", PluginImportSupport.logSafe(bindingCode));
                 metaModelService.clearAllCache();
                 syncBindingIndexesWhenRequired(model, dto.getModelCode(), searchabilityChanged);
 
@@ -704,7 +704,7 @@ final class PluginModelFieldImporter {
                         fieldEntity.setStatus(StatusConstants.PUBLISHED);
                         metaFieldMapper.updateById(fieldEntity);
                         log.info("Auto-published field {} (bound to published model {})",
-                                support.logSafe(dto.getFieldCode()), support.logSafe(dto.getModelCode()));
+                                PluginImportSupport.logSafe(dto.getFieldCode()), PluginImportSupport.logSafe(dto.getModelCode()));
                     }
                 }
 

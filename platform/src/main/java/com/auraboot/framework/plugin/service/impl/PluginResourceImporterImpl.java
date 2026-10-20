@@ -296,6 +296,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         return resourceLifecycle().deactivateAllPluginMenus(pluginPid, tenantId);
     }
 
+    void registerModelCacheRollbackEviction(String modelCode) {
+        fieldsModelsBindings().registerModelCacheRollbackEviction(modelCode);
+    }
+
     int reconcileDeclaredRolesStrictly(PluginManifestExtended manifest, Long tenantId) {
         return accessPolicies().reconcileDeclaredRolesStrictly(manifest, tenantId);
     }

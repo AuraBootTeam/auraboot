@@ -41,7 +41,7 @@ class PluginResourceImporterRollbackEvictionTest {
 
     @Test
     void rolledBackImportEvictsTheModelDefinitionCache() {
-        ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "registerModelCacheRollbackEviction", "data_permission");
+        ReflectionTestUtils.invokeMethod(importer, "registerModelCacheRollbackEviction", "data_permission");
 
         List<TransactionSynchronization> synchronizations =
                 TransactionSynchronizationManager.getSynchronizations();
@@ -53,7 +53,7 @@ class PluginResourceImporterRollbackEvictionTest {
 
     @Test
     void committedImportKeepsTheCache() {
-        ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "registerModelCacheRollbackEviction", "data_permission");
+        ReflectionTestUtils.invokeMethod(importer, "registerModelCacheRollbackEviction", "data_permission");
 
         TransactionSynchronizationManager.getSynchronizations()
                 .getFirst()
@@ -66,7 +66,7 @@ class PluginResourceImporterRollbackEvictionTest {
     void noActiveTransactionRegistersNothing() {
         TransactionSynchronizationManager.clearSynchronization();
 
-        ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "registerModelCacheRollbackEviction", "data_permission");
+        ReflectionTestUtils.invokeMethod(importer, "registerModelCacheRollbackEviction", "data_permission");
 
         verifyNoInteractions(modelService);
     }

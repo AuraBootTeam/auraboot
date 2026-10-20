@@ -124,7 +124,7 @@ final class PluginPageNavigationImporter {
         } catch (Exception e) {
             // Defensive: on lookup failure, do not bypass the user-modified guard.
             log.debug("isAutoCreatedStubPage lookup failed for pageKey={}: {}",
-                    support.logSafe(pageKey), support.logSafe(e.getMessage()));
+                    PluginImportSupport.logSafe(pageKey), PluginImportSupport.logSafe(e.getMessage()));
             return false;
         }
     }
@@ -152,7 +152,7 @@ final class PluginPageNavigationImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.MENU, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.MENU, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.MENU, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MENU,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -267,11 +267,11 @@ final class PluginPageNavigationImporter {
             // publish and plugin import. They must never block plugin DSL overwrite, even if the
             // resource was somehow flagged user-modified earlier. Bypass the skip in that case.
             if (!isAutoCreatedStubPage(dto.getPageKey())) {
-                log.info("Skipping user-modified resource: {} {}", ResourceType.PAGE, support.logSafe(dto.getPageKey()));
+                log.info("Skipping user-modified resource: {} {}", ResourceType.PAGE, PluginImportSupport.logSafe(dto.getPageKey()));
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                         null, null, dto.getPageKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
             }
-            log.info("Forcing overwrite of auto-created stub page: {}", support.logSafe(dto.getPageKey()));
+            log.info("Forcing overwrite of auto-created stub page: {}", PluginImportSupport.logSafe(dto.getPageKey()));
         }
 
         // V2 flat format: kind/profile/title/layout/blocks directly on DTO
@@ -361,7 +361,7 @@ final class PluginPageNavigationImporter {
      */
     public PluginResource importDashboard(DashboardDefinitionDTO dto, String pluginPid, String importId,
                                           Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        log.info("Importing dashboard '{}' from config/dashboards/", support.logSafe(dto.getCode()));
+        log.info("Importing dashboard '{}' from config/dashboards/", PluginImportSupport.logSafe(dto.getCode()));
 
         if (!dto.isValid()) {
             throw new PluginException(
@@ -381,7 +381,7 @@ final class PluginPageNavigationImporter {
         }
 
         if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
-            log.info("Dashboard '{}' already exists — skipping (SKIP strategy)", support.logSafe(dto.getCode()));
+            log.info("Dashboard '{}' already exists — skipping (SKIP strategy)", PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     existing.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.SKIP, null, null);
@@ -405,7 +405,7 @@ final class PluginPageNavigationImporter {
                 dashboardService.publish(existing.getPid());
             }
             log.info("Dashboard updated from config/dashboards/: code={}, pid={}",
-                    support.logSafe(dto.getCode()), support.logSafe(existing.getPid()));
+                    PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(existing.getPid()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     existing.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.UPDATE, null, null);
@@ -426,7 +426,7 @@ final class PluginPageNavigationImporter {
                 dashboardService.publish(created.getPid());
             }
             log.info("Dashboard created from config/dashboards/: code={}, pid={}",
-                    support.logSafe(dto.getCode()), support.logSafe(created.getPid()));
+                    PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(created.getPid()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     created.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.CREATE, null, null);
@@ -464,7 +464,7 @@ final class PluginPageNavigationImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.DICT, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.DICT, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.DICT, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DICT,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -476,7 +476,7 @@ final class PluginPageNavigationImporter {
             // row. Revive it first so the reimport lands on a live dict.
             int revived = dictMapper.reviveRetiredByCode(dto.getCode());
             if (revived > 0) {
-                log.info("Revived soft-deleted dict {} for plugin reimport", support.logSafe(dto.getCode()));
+                log.info("Revived soft-deleted dict {} for plugin reimport", PluginImportSupport.logSafe(dto.getCode()));
             }
 
             // Update existing dict
@@ -508,7 +508,7 @@ final class PluginPageNavigationImporter {
             String resurrectPid = support.resurrectSoftDeleted("ab_dict", "code", dto.getCode(), tenantId, pluginPid, null);
             if (resurrectPid != null) {
                 log.info("Resurrected soft-deleted dict: code={}, pid={}",
-                        support.logSafe(dto.getCode()), support.logSafe(resurrectPid));
+                        PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(resurrectPid));
                 // Now update the resurrected dict with current data
                 DictDTO resurrected = dictService.findByCode(dto.getCode());
                 if (resurrected != null && dto.getItems() != null && !dto.getItems().isEmpty()) {

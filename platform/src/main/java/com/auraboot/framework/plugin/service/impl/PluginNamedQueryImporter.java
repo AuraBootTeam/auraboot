@@ -55,7 +55,7 @@ final class PluginNamedQueryImporter {
             return query != null;
         } catch (Exception e) {
             log.debug("checkNamedQueryExists treating exception as 'not exists' for code={}: {}",
-                    support.logSafe(code), support.logSafe(e.toString()));
+                    PluginImportSupport.logSafe(code), PluginImportSupport.logSafe(e.toString()));
             return false;
         }
     }
@@ -74,7 +74,7 @@ final class PluginNamedQueryImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.NAMED_QUERY, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.NAMED_QUERY, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.NAMED_QUERY, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.NAMED_QUERY,
                     null, null, dto.getCode(), dto.getEffectiveTitle(), ResourceAction.SKIP, null, null);
         }

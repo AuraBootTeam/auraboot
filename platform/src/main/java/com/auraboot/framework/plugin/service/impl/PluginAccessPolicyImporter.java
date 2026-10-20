@@ -101,7 +101,7 @@ final class PluginAccessPolicyImporter {
             return perm != null;
         } catch (Exception e) {
             log.debug("checkPermissionExists treating exception as 'not exists' for code={}: {}",
-                    support.logSafe(code), support.logSafe(e.toString()));
+                    PluginImportSupport.logSafe(code), PluginImportSupport.logSafe(e.toString()));
             return false;
         }
     }
@@ -124,7 +124,7 @@ final class PluginAccessPolicyImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PERMISSION, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.PERMISSION, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.PERMISSION, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PERMISSION,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -153,7 +153,7 @@ final class PluginAccessPolicyImporter {
             String resurrectPid = support.resurrectSoftDeleted("ab_permission", "code", dto.getCode(), tenantId, pluginPid, null);
             if (resurrectPid != null) {
                 log.info("Resurrected soft-deleted permission: code={}, pid={}",
-                        support.logSafe(dto.getCode()), support.logSafe(resurrectPid));
+                        PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(resurrectPid));
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PERMISSION,
                         resurrectPid, null, dto.getCode(), dto.getEffectiveName(),
                         ResourceAction.CREATE, null, null);
@@ -206,7 +206,7 @@ final class PluginAccessPolicyImporter {
         }
 
         if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.ROLE, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.ROLE, support.logSafe(dto.getCode()));
+            log.info("Skipping user-modified resource: {} {}", ResourceType.ROLE, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -362,7 +362,7 @@ final class PluginAccessPolicyImporter {
         int after = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
         if (after > before) {
             log.info("Role permission reconciliation bound {} additional codes for role {}",
-                    after - before, support.logSafe(dto.getCode()));
+                    after - before, PluginImportSupport.logSafe(dto.getCode()));
         }
         return after > before;
     }
@@ -435,14 +435,14 @@ final class PluginAccessPolicyImporter {
                 // the import if anything remains unbound, so a transient race with another
                 // import gets a second chance instead of aborting the whole plugin here.
                 log.warn("Failed to bind permission {} to role {} at role-import stage; strict reconcile will re-attempt: {}",
-                        support.logSafe(permCode), support.logSafe(dto.getCode()), support.logSafe(e.getMessage()), e);
+                        PluginImportSupport.logSafe(permCode), PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(e.getMessage()), e);
             }
         }
         if (!deferred.isEmpty()) {
             log.info("Role {} defers {} declared permission code(s) that are not registered yet "
                             + "(own-plugin model actions are generated after the role stage); the strict "
                             + "post-publication reconcile must resolve them: {}",
-                    support.logSafe(dto.getCode()), deferred.size(), String.join(", ", deferred));
+                    PluginImportSupport.logSafe(dto.getCode()), deferred.size(), String.join(", ", deferred));
         }
     }
 
@@ -588,7 +588,7 @@ final class PluginAccessPolicyImporter {
         RolePermission binding = rolePermissionMapper.findByRoleAndPermission(roleId, permission.getId());
         if (binding == null || binding.getId() == null) {
             log.warn("Role-permission binding not found for seeded policy: roleId={}, permissionCode={}",
-                    roleId, support.logSafe(policy.getPermissionCode()));
+                    roleId, PluginImportSupport.logSafe(policy.getPermissionCode()));
             return;
         }
         binding.setConditions(policy.getConditions());
