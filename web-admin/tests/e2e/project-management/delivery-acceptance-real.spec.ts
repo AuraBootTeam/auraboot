@@ -119,7 +119,7 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   expect((Date.parse(sla[0].deadlineTime)-Date.parse(sla[0].startTime))/60000).toBe(minutes);
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
-  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel').filter({has:page.getByTestId('bpm-section-operations')})).toHaveAttribute('data-state','ready');
   await expect(page.getByRole('tab',{name:'验收详情',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
   await expect(page.getByTestId('bpm-history-container')).toHaveCount(0);
@@ -998,4 +998,37 @@ test('rule center primary and professional views remain reachable through their 
     if(tab==='logs'){await expect(page.getByTestId('elta-business-results')).toBeVisible();await expect(page.getByTestId('elta-filters')).toHaveCount(0);}
     await shot(page,['R01','A03','A04','A05','R06'].includes(image)?`${image}-navigation`:image);
   }
+});
+
+
+test('SLA business summary exposes loading errors and empty reads and recovers explicitly @critical', async ({page}) => {
+  const user=await login(page);
+  const name='交付验收 · 时限读取与恢复验证';
+  const pid=await create(page,user,name,1000,'普通',true);
+  const sla=await submit(page,pid,480,'tpm_standard_review');
+  const endpoint=`**/api/bpm/monitor/instances/${sla.processInstanceId}/sla`;
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route(endpoint,async route=>{
+    await pending;
+    await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'Injected monitoring outage'})});
+  });
+  await page.reload();
+  await expect(page.getByTestId('bpm-sla-summary')).toContainText('正在读取处理时限');
+  await shot(page,'S05-loading-injected');
+  release();
+  await expect(page.getByTestId('bpm-sla-summary').getByRole('alert')).toContainText('读取失败');
+  await expect(page.getByTestId('bpm-sla-summary')).not.toContainText('没有 SLA');
+  await shot(page,'S06-error-injected');
+  await page.unroute(endpoint);
+  await page.getByTestId('bpm-sla-summary').getByRole('button',{name:'刷新状态',exact:true}).click();
+  await expect(page.getByTestId('bpm-sla-record')).toContainText('计时中');
+  await shot(page,'S07-recovered-real');
+  await page.route(endpoint,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({code:'0',data:[]})}));
+  await page.getByTestId('bpm-sla-summary').getByRole('button',{name:'刷新状态',exact:true}).click();
+  await expect(page.getByTestId('bpm-sla-summary')).toContainText('此审批没有 SLA 计时记录');
+  await shot(page,'S08-empty-injected');
+  await page.unroute(endpoint);
+  await page.getByTestId('bpm-sla-summary').getByRole('button',{name:'刷新状态',exact:true}).click();
+  await expect(page.getByTestId('bpm-sla-record')).toContainText('计时中');
 });
