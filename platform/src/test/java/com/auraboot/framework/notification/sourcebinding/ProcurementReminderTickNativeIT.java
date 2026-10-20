@@ -620,13 +620,21 @@ class ProcurementReminderTickNativeIT {
                 definition -> definition.setRole(org.springframework.beans.factory.config.BeanDefinition.ROLE_INFRASTRUCTURE));
     }
 
+    static com.auraboot.framework.plugin.pf4j.AuraPluginManager registrationSpy(
+            com.auraboot.framework.plugin.pf4j.AuraPluginManager manager) {
+        // Mockito must observe the target, not Spring CGLIB proxy infrastructure.
+        com.auraboot.framework.plugin.pf4j.AuraPluginManager target =
+                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(manager);
+        return org.mockito.Mockito.spy(target);
+    }
+
     void automaticallyQueue(AutomaticBackground frame, Clock fixedClock, Path admittedProductJar) throws Exception {
         var manager = context.getBean(com.auraboot.framework.plugin.pf4j.AuraPluginManager.class);
         String owner = "com.auraboot.quote-engine";
         // Observe the registry's real PF4J return values. The inventory-only discovery
         // proof API deliberately does not admit background component types.
         var discoveredInstances = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
-        var registrationManager = org.mockito.Mockito.spy(manager);
+        var registrationManager = registrationSpy(manager);
         org.mockito.Mockito.doAnswer(invocation -> {
             Object returned = invocation.callRealMethod();
             assertThat(returned).isInstanceOf(List.class);

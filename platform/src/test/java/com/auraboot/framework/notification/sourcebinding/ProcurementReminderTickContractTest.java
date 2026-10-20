@@ -297,6 +297,25 @@ class ProcurementReminderTickContractTest {
         }
     }
     @Test
+    void registrationObservationUnwrapsSpringProxyBeforeMockitoStubbing() {
+        var target = new com.auraboot.framework.plugin.pf4j.AuraPluginManager(automaticResources.toString());
+        var factory = new org.springframework.aop.framework.ProxyFactory(target);
+        factory.setProxyTargetClass(true);
+        var proxy = (com.auraboot.framework.plugin.pf4j.AuraPluginManager) factory.getProxy();
+        var observed = ProcurementReminderTickNativeIT.registrationSpy(proxy);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            calls.incrementAndGet();
+            return invocation.callRealMethod();
+        }).when(observed).getPlugins();
+        assertThat(observed.getPlugins()).isEmpty();
+        assertThat(calls).hasValue(1);
+        org.mockito.Mockito.verify(observed).getPlugins();
+        assertThat(org.springframework.aop.support.AopUtils.isAopProxy(observed)).isFalse();
+        assertThat(org.springframework.aop.support.AopUtils.isAopProxy(proxy)).isTrue();
+    }
+
+    @Test
     void intentTeardownEvidenceUsesActualNumericIdOrderRatherThanEventHashOrJsonLexicalOrder() {
         var rows = ProcurementReminderTickNativeIT.actualOwnedOutboxRows(List.of(
                 "{\"id\":10,\"event_id\":\"notification-a\"}", "{\"id\":9,\"event_id\":\"notification-z\"}"));
