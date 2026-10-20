@@ -92,6 +92,10 @@ class InstalledIntegrationServiceTest {
             Map<String,Object> settings=new HashMap<>();InstalledIntegrationExecution.install(accept,42L,settings);
             var installed=(InstalledIntegrationBinding)settings.get(InstalledIntegrationBinding.SETTINGS_KEY);
             assertEquals("connection",installed.parameters().get("connectionPid"));assertEquals("evt-1",installed.externalEventId());
+            var eventFacts=(InstalledIntegrationEvent)settings.get(InstalledIntegrationEvent.SETTINGS_KEY);
+            assertNotNull(eventFacts);assertEquals(event().eventType(),eventFacts.eventType());
+            assertEquals(event().sequence(),eventFacts.sequence());assertEquals(event().occurredAt(),eventFacts.occurredAt());
+            assertEquals("purchase-requisition",eventFacts.subjectType());assertEquals("10",eventFacts.subjectPid());
             return CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","accepted")).build();
         });
     }
@@ -117,6 +121,29 @@ class InstalledIntegrationServiceTest {
         when(registry.registration(source)).thenReturn(Optional.of(Map.entry(registration,digest)));
         when(plugins.observeLoadedArtifact(any())).thenReturn(Optional.of(new AuraPluginManager.LoadedPluginArtifact(
                 registration.providerPluginId(),java.nio.file.Path.of("provider-new.jar"),digest)));
+    }
+    @Test void explicitlyDeclaredEventExpansionPreservesOnlyCompletedReceiptQueriesAndReplays() {
+        service.accept(principal,source,event());var old=acceptedReceipt();
+        var expanded=new Registration(source,registration.capability(),Set.of(event().eventType(),"external."+source+".inquiry.changed.v1"),
+                registration.requiredScope(),registration.commandPermission(),registration.providerPluginId(),registration.commandOwnerPluginId(),
+                accept,process,result,registration.serverActorParameter());
+        when(registry.registration(source)).thenReturn(Optional.of(Map.entry(expanded,"sha256:"+"a".repeat(64))));
+        when(registry.completedReceiptRegistrations(source)).thenReturn(Set.of(registration));
+        when(receipts.claim(any())).thenReturn(0);
+        var completed=receiptWith(old,"completed","request-pid",old.bindingSha256(),old.commandSha256());
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);clearInvocations(executor);
+        assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","completed")).build());
+        assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));
+        clearInvocations(executor);
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(old);
+        assertThrows(SecurityException.class,()->service.accept(principal,source,event()));
+        assertThrows(SecurityException.class,()->service.consume(event()));
+        assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));verifyNoInteractions(executor);
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);
+        when(registry.completedReceiptRegistrations(source)).thenReturn(Set.of());
+        assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
     }
     @Test void completedReceiptSurvivesProviderUpgradeWithoutRepeatingBusinessCommands() {
         service.accept(principal,source,event());var r=acceptedReceipt();
@@ -217,6 +244,25 @@ class InstalledIntegrationServiceTest {
         assertEquals("request-pid",request.getValue().getTargetRecordPid());assertEquals(Map.of("requestPid","request-pid"),request.getValue().getPayload());
         assertThrows(SecurityException.class,()->service.consume(event(Map.of("title","forged"))));
     }
+    @Test void processReceivesOriginalVerifiedEnvelopeButResultHasNoInventedEvent() {
+        service.accept(principal,source,event());var receipt=acceptedReceipt();
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receipt);
+        when(executor.execute(eq(process),any())).thenAnswer(call->{
+            var settings=new HashMap<String,Object>();InstalledIntegrationExecution.install(process,42L,settings);
+            var facts=(InstalledIntegrationEvent)settings.get(InstalledIntegrationEvent.SETTINGS_KEY);
+            assertNotNull(facts);assertEquals(event().eventType(),facts.eventType());assertEquals(event().occurredAt(),facts.occurredAt());
+            assertEquals(event().sequence(),facts.sequence());assertEquals("10",facts.subjectPid());
+            return CommandExecuteResult.builder().phaseReached("completed").data(Map.of("state","completed")).build();
+        });
+        service.consume(event());
+        when(executor.execute(eq(result),any())).thenAnswer(call->{
+            var settings=new HashMap<String,Object>();settings.put(InstalledIntegrationEvent.SETTINGS_KEY,"configured");
+            InstalledIntegrationExecution.install(result,42L,settings);assertFalse(settings.containsKey(InstalledIntegrationEvent.SETTINGS_KEY));
+            return CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","completed")).build();
+        });
+        assertEquals("completed",service.result(principal,source,"evt-1").get("state"));
+    }
+
     @Test void ownerScopedResultAlwaysExecutesReadAndNeverCachesInitialAcceptedState() {
         service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
         when(executor.execute(eq(result),any())).thenReturn(

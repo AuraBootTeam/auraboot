@@ -37,7 +37,7 @@ public class InstalledIntegrationService {
     private final OpenPlatformSecretCodec codec;
 
     record Resolved(Registration registration, String artifact, InstalledIntegrationBinding binding,
-                    Map<String,String> configs, Map<String,Object> handlers, String bindingHash, String commandHash, String conflictMessageKey) {}
+                    Map<String,String> configs, Map<String,Object> handlers, String bindingHash, String commandHash, Set<String> completedCommandHashes, String conflictMessageKey) {}
     public record Acceptance(String recordPid, boolean duplicate) {}
 
     public boolean registered(String source) { return registry.registration(source).isPresent(); }
@@ -125,7 +125,9 @@ public class InstalledIntegrationService {
         InstalledIntegrationBinding binding = new InstalledIntegrationBinding(principal.tenantId(), principal.applicationPid(),
                 principal.installationPid(), source, eventId, durableId, selected.get("revision").asLong(), parameters);
         return new Resolved(registration, entry.getValue(), binding, Map.copyOf(configs), Map.copyOf(approvedHandlers), hash(binding),
-                hash(Map.of("registration",registration,"configs",configs)), common.path("conflictMessageKey").asText(null));
+                hash(Map.of("registration",registration,"configs",configs)),
+                registry.completedReceiptRegistrations(source).stream()
+                        .map(previous -> hash(Map.of("registration",previous,"configs",configs))).collect(java.util.stream.Collectors.toUnmodifiableSet()), common.path("conflictMessageKey").asText(null));
     }
 
     @Transactional
@@ -152,7 +154,7 @@ public class InstalledIntegrationService {
             payload.put("requestId", external);
             payload.put("externalSubject",Map.of("type",envelope.headers().get("externalSubjectType"),
                     "pid",envelope.headers().get("externalSubjectPid")));
-            Map<String,Object> data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false);
+            Map<String,Object> data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
             Object record = data.get("recordPid");
             if (!(record instanceof String pid) || !pid.matches("[A-Za-z0-9_-]{1,100}")
                     || !"accepted".equals(data.get("state"))) throw new IllegalStateException("Invalid native acceptance result");
@@ -176,7 +178,7 @@ public class InstalledIntegrationService {
             verifyEnvelope(resolved,envelope); verifyReceipt(resolved,envelope,r,false);
             if ("completed".equals(r.state())) return null;
             if (!"accepted".equals(r.state()) || r.requestPid() == null) throw denied();
-            execute(resolved,candidate.processCommand(),Map.of("requestPid",r.requestPid()),r.requestPid(),false);
+            execute(resolved,candidate.processCommand(),Map.of("requestPid",r.requestPid()),r.requestPid(),false,envelope);
             if (receipts.completed(r.tenantId(),installation,source,external,r.requestPid()) != 1) throw denied();
             return null;
         });
@@ -188,7 +190,7 @@ public class InstalledIntegrationService {
             var r = receipts.find(principal.tenantId(),principal.installationPid(),source,eventId);
             if (r == null) throw denied();
             Resolved resolved = resolve(principal,source,eventId,r.durableEventId());
-            if (!r.bindingSha256().equals(resolved.bindingHash()) || !r.commandSha256().equals(resolved.commandHash())
+            if (!r.bindingSha256().equals(resolved.bindingHash()) || !commandMatches(resolved,r)
                     || !providerMatches(resolved,r) || !validRequestPid(r.requestPid())) throw denied();
             Map<String,Object> result = new LinkedHashMap<>(execute(resolved,resolved.registration().resultCommand(),Map.of("requestId",eventId),null,true));
             if (!r.requestPid().equals(result.get("recordPid"))) throw denied();
@@ -202,6 +204,11 @@ public class InstalledIntegrationService {
     }
 
     private Map<String,Object> execute(Resolved resolved, String code, Map<String,Object> payload, String target, boolean query) {
+        return execute(resolved,code,payload,target,query,null);
+    }
+
+    private Map<String,Object> execute(Resolved resolved, String code, Map<String,Object> payload, String target,
+            boolean query, IntegrationEventEnvelope envelope) {
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setPayload(payload); request.setTargetRecordPid(target);
         request.setOperationType(query ? "QUERY" : target == null ? "CREATE" : "UPDATE");
@@ -214,7 +221,9 @@ public class InstalledIntegrationService {
             if (handler.requiresDslPersistence(code,config,request)) throw denied();
         }
         if (!query) request.setClientRequestId("ii-" + hash(List.of(resolved.binding().durableEventId(),code)).substring(0,48));
-        return InstalledIntegrationExecution.run(code,resolved.configs().get(code),resolved.binding(),query,resolved.handlers().get(code), target, () ->
+        InstalledIntegrationEvent event=envelope==null?null:new InstalledIntegrationEvent(envelope.eventType(),envelope.sequence(),
+                envelope.occurredAt(),envelope.headers().get("externalSubjectType"),envelope.headers().get("externalSubjectPid"));
+        return InstalledIntegrationExecution.run(code,resolved.configs().get(code),resolved.binding(),query,resolved.handlers().get(code), target, event, () ->
             MetaContext.runWithExternalCommandPermission(resolved.registration().commandPermission(), () -> {
                 CommandExecuteResult result;
                 try { result = executor.execute(code,request); }
@@ -251,8 +260,13 @@ public class InstalledIntegrationService {
             throw denied();
         }
         if (r == null || !r.bindingSha256().equals(resolved.bindingHash())
-                || !r.commandSha256().equals(resolved.commandHash()) || !providerMatches(resolved,r)
+                || !commandMatches(resolved,r) || !providerMatches(resolved,r)
                 || !r.durableEventId().equals(event.eventId())) throw denied();
+    }
+    private boolean commandMatches(Resolved resolved, InstalledIntegrationReceiptMapper.Receipt receipt) {
+        return receipt.commandSha256().equals(resolved.commandHash())
+                || ("completed".equals(receipt.state()) && validRequestPid(receipt.requestPid())
+                    && resolved.completedCommandHashes().contains(receipt.commandSha256()));
     }
     private boolean providerMatches(Resolved resolved, InstalledIntegrationReceiptMapper.Receipt receipt) {
         // Terminal replay never invokes old business code; the current result query is PID-bound.

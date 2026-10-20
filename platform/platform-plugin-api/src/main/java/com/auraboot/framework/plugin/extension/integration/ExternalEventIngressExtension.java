@@ -7,6 +7,11 @@ import java.util.Set;
 public interface ExternalEventIngressExtension extends ExtensionPoint {
     Registration registration();
 
+    /** Explicit historical event sets allowed only for terminal receipt queries/replays.
+     * No command, binding, permission or provider identity compatibility is implied. */
+    default Set<Set<String>> completedReceiptEventTypeSets() { return Set.of(); }
+
+
     record Registration(String sourceCode, String capability, Set<String> eventTypes,
                         String requiredScope, String commandPermission,
                         String providerPluginId, String commandOwnerPluginId,

@@ -2,13 +2,14 @@ package com.auraboot.framework.openplatform.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.extension.integration.InstalledIntegrationBinding;
+import com.auraboot.framework.plugin.extension.integration.InstalledIntegrationEvent;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 
 /** Host-only, lexical command identity. Not request data and not an independent data permit. */
 public final class InstalledIntegrationExecution {
-    private record Invocation(String command, String config, InstalledIntegrationBinding binding, boolean query, Object handler, String target) {}
+    private record Invocation(String command, String config, InstalledIntegrationBinding binding, boolean query, Object handler, String target, InstalledIntegrationEvent event) {}
     private static final ThreadLocal<Invocation> CURRENT = new ThreadLocal<>();
     private static final ThreadLocal<Invocation> VERIFIED = new ThreadLocal<>();
     private static final ThreadLocal<Invocation> VERIFIED_HANDLER = new ThreadLocal<>();
@@ -20,8 +21,13 @@ public final class InstalledIntegrationExecution {
 
     static <T> T run(String command, String config, InstalledIntegrationBinding binding, boolean query, Object handler,
                      String target, Supplier<T> work) {
+        return run(command,config,binding,query,handler,target,null,work);
+    }
+
+    static <T> T run(String command, String config, InstalledIntegrationBinding binding, boolean query, Object handler,
+                     String target, InstalledIntegrationEvent event, Supplier<T> work) {
         if (CURRENT.get() != null) throw new SecurityException("Nested installed integration invocation denied");
-        CURRENT.set(new Invocation(command, config, binding, query, handler, target));
+        CURRENT.set(new Invocation(command, config, binding, query, handler, target, event));
         try { return work.get(); } finally { VERIFIED_HANDLER.remove(); VERIFIED.remove(); CURRENT.remove(); }
     }
 
@@ -47,11 +53,13 @@ public final class InstalledIntegrationExecution {
 
     public static void install(String command, Long tenant, Map<String,Object> settings) {
         settings.remove(InstalledIntegrationBinding.SETTINGS_KEY);
+        settings.remove(InstalledIntegrationEvent.SETTINGS_KEY);
         Invocation value = CURRENT.get();
         if (value == null) return;
         if (!value.command().equals(command) || !Objects.equals(tenant, value.binding().tenantId()))
             throw new SecurityException("Installed handler identity changed");
         settings.put(InstalledIntegrationBinding.SETTINGS_KEY, value.binding());
+        if(value.event()!=null)settings.put(InstalledIntegrationEvent.SETTINGS_KEY,value.event());
     }
 
     public static void verifyHandler(String command, Object handler, java.util.List<?> secondaryHandlers) {
