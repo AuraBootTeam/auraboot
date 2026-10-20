@@ -35,7 +35,7 @@ async function processMenu(page: Page) {
 async function capture(page: Page, info: TestInfo, name: string) {
   await expect(page.locator('main')).not.toContainText(/Page Unavailable|Internal Server Error/);
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, {timeout:15000});
-  if (!(await page.getByRole('dialog').isVisible())) await page.getByRole('button', {name:/fit view/i}).click();
+  if (!(await page.getByTestId('bpmn-save-dialog-panel').isVisible())) await page.getByRole('button', {name:/fit view/i}).click();
   await info.attach(name, {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',

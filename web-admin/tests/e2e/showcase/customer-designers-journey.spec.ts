@@ -106,6 +106,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(metadata.data.filter((field: { code: string }) => !field.code.startsWith(`${code}_`))
     .map((field: { code: string }) => field.code).sort()).toEqual(['created_at', 'updated_at']);
   expect(JSON.stringify(metadata.data)).toContain(`${code}_opportunity_amount`);
+  await screenshot(page, info, 'SC02-model-fields-ready');
   await page.getByTestId('model-more-actions').click();
   await page.getByTestId('model-publish-action').click();
   await expect(page.getByTestId('model-publish-dialog')).toBeVisible();
