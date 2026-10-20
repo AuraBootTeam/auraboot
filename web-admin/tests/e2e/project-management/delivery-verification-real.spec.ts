@@ -1,3 +1,5 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
+import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
 import {mkdir, writeFile} from 'node:fs/promises';
@@ -14,14 +16,10 @@ test.beforeEach(async({page})=>{page.setDefaultTimeout(20000);});
 async function data(response:APIResponse|Response) {
   expect(response.status()).toBe(200);const result=await response.json();expect(String(result.code)).toBe('0');return result.data;
 }
-async function login(page:Page, email=process.env.ADMIN_EMAIL!,tenant?:string) {
-  page.setDefaultTimeout(20000);
-  await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
-  await page.locator('#identifier').fill(email);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
-  await page.getByRole('button',{name:'立即登录',exact:true}).click();await page.waitForURL(url=>!url.pathname.includes('/login'));
-  if(new URL(page.url()).pathname==='/tenant-selection') {expect(tenant).toBeTruthy();await page.getByTestId(`space-business-${tenant}`).click();await expect(page).not.toHaveURL(/tenant-selection/);}
-  return (await data(await page.request.get('/api/auth/me'))).user;
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
+  return (await loginDeliveryMember(page, email, tenant)).user;
 }
+
 async function menu(page:Page,name:string) {
   const link=page.getByRole('navigation').getByRole('link',{name,exact:true});
   const href=await link.getAttribute('href');expect(href).toBeTruthy();
@@ -118,10 +116,12 @@ test('optional PF4J verifier reads stored evidence and recomputes after actual f
   await page.getByRole('tab',{name:'核验结果',exact:true}).click();
   await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(1);
   await expect(page.getByRole('row').filter({hasText:name})).toContainText('核验通过');
-  await shot(page,'v06-acceptance-tab');
   await page.reload();
   await expect(page.getByRole('tab',{name:'核验结果',exact:true})).toHaveAttribute('aria-selected','true');
-  await expect(page.getByRole('row').filter({hasText:name})).toHaveCount(1);
+  const persistedRow=page.getByTestId('subtable-viewer').getByRole('row').filter({hasText:name});
+  await expect(persistedRow).toBeVisible();
+  await expect(persistedRow).toContainText('核验通过');
+  await shot(page,'v06-acceptance-tab');
   const activities=await data(await page.request.get('/api/activities',{params:{objectModel:'tdv_check',objectRecord:pid,limit:100}}));
   expect(activities.length).toBeGreaterThan(0);await writeFile(join(evidence!,'verification-activity.json'),JSON.stringify(activities,null,2));
   await menu(page,'交付核验');await expect(page.getByRole('row').filter({hasText:name})).toContainText('核验通过');
@@ -136,10 +136,8 @@ test('accepted delivery reduces budget and one cent over the exact allowance blo
   const user=await login(page);await prepareProject(page);const acceptedName=prefix+' · 前次已验收';const acceptedPid=await createAcceptance(page,user,acceptedName,60000,true);
   const submitted=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');
   await page.getByTestId('toolbar-btn-submit_acceptance').click();await data(await submitted);
-  await expect(page.getByTestId('bpm-operations-approve')).toBeEnabled();await page.getByTestId('bpm-operations-approve').click();
-  await page.getByTestId('bpm-approve-comment').fill('材料与交付范围一致，确认前阶段验收。');
-  const approved=page.waitForResponse(r=>/\/api\/bpm\/tasks\/[^/]+\/approve$/.test(new URL(r.url()).pathname)&&r.request().method()==='POST');
-  await page.getByTestId('bpm-approve-confirm').click();await data(await approved);
+  await expect(page.getByTestId('bpm-operations-approve')).toBeEnabled();
+  await data(await completeDeliveryApproval(page,'approve','材料与交付范围一致，确认前阶段验收。'));
   await expect.poll(async()=>(await record(page,'tpm_acceptance',acceptedPid)).tpm_ac_status).toBe('accepted');
   const name=prefix+' · 预算边界';await createAcceptance(page,user,name,68000,true);const pid=await createCheck(page,name,name);
   let result=await verify(page,pid,'passed');expect(Number(result.tdv_ck_accepted)).toBe(60000);expect(Number(result.tdv_ck_available)).toBe(68000);

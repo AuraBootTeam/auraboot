@@ -640,6 +640,40 @@ describe('ExecutionLogTraceBlock', () => {
     expect(output).not.toHaveTextContent('pending');
   });
 
+  it('distinguishes captured input values, redaction and legacy metadata', async () => {
+    const log = { ...recentLog, traceSnapshot: { ...recentLog.traceSnapshot, conditionSnapshot:[{leftKey:'record.data.review_status',operator:'EQ',expected:'pending',truth:'TRUE'}], inputSnapshot: {
+      'record.data.review_status': {scope:'record',path:'data.review_status',label:'审批状态',state:'VALUE',value:'pending'},
+      'record.data.salary': {scope:'record',path:'data.salary',label:'薪酬',state:'REDACTED'},
+      'record.data.optional': {scope:'record',path:'data.optional',label:'可选信息',state:'MISSING'},
+    } } };
+    http.get.mockImplementation((endpoint:string) => Promise.resolve({data:endpoint==='/decision/logs/recent'?{records:[log],total:1}:[log]}));
+    render(<MemoryRouter><ExecutionLogTraceBlock block={{props:{mode:'list'}}}/></MemoryRouter>);
+    await screen.findByTestId('elta-row-log-1'); fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
+    const inputs = await screen.findByTestId('elta-input-snapshot-log-1');
+    expect(inputs).toHaveTextContent('当次输入'); expect(inputs).toHaveTextContent('待审批');
+    expect(inputs).not.toHaveTextContent('已通过'); expect(inputs).toHaveTextContent('敏感值已隐藏');
+    expect(inputs).toHaveTextContent('未提供');
+    expect(screen.getByTestId('elta-condition-snapshot-log-1')).toHaveTextContent('审批状态');
+    expect(screen.getByTestId('elta-condition-snapshot-log-1')).toHaveTextContent('满足');
+    const definitions = screen.getByTestId('elta-fact-metadata-log-1'); expect(definitions).not.toHaveAttribute('open');
+  });
+
+  it('does not present a failed chain load as complete and recovers in the same drawer', async () => {
+    let broken = true;
+    http.get.mockImplementation((endpoint:string) => {
+      if (endpoint==='/decision/logs/recent') return Promise.resolve({data:{records:[recentLog],total:1}});
+      if (endpoint==='/decision/logs' && broken) return Promise.reject(new Error('trace unavailable'));
+      return Promise.resolve({data:[recentLog]});
+    });
+    render(<MemoryRouter><ExecutionLogTraceBlock block={{props:{mode:'list'}}}/></MemoryRouter>);
+    await screen.findByTestId('elta-row-log-1'); fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
+    await screen.findByTestId('elta-trace-error'); expect(screen.getByTestId('elta-trace-chain').children).toHaveLength(0);
+    broken = false; fireEvent.click(screen.getByRole('button',{name:'重新加载'}));
+    await screen.findByTestId('elta-input-snapshot-log-1');
+    expect(screen.queryByTestId('elta-trace-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('elta-input-snapshot-log-1')).toHaveTextContent('该历史记录未保存当次输入');
+  });
+
   it('shows low-code fact metadata snapshots in the trace drawer', async () => {
     render(
       <MemoryRouter initialEntries={['/p/decisionops_execution_logs?traceId=trace-1']}>
@@ -651,7 +685,7 @@ describe('ExecutionLogTraceBlock', () => {
     fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
 
     const facts = await screen.findByTestId('elta-fact-metadata-log-1');
-    expect(facts).toHaveTextContent('事实快照');
+    expect(facts).toHaveTextContent('字段定义与字典说明');
     expect(facts).toHaveTextContent('审批状态');
     expect(facts).toHaveTextContent('record.data.review_status');
     expect(facts).toHaveTextContent('pending');
@@ -880,6 +914,12 @@ describe('ExecutionLogTraceBlock', () => {
     expect(drawer).toHaveTextContent('执行链路');
     expect(drawer).not.toHaveTextContent('Trace Chain');
     await waitFor(() => expect(drawer).toHaveTextContent('R-101'));
+    expect(screen.getByTestId('elta-rule-summary-log-1')).toHaveTextContent('命中规则数: 1');
+    expect(screen.getByTestId('elta-rule-summary-log-1')).not.toHaveTextContent('R-101');
+    const identifiers = screen.getByTestId('elta-rule-identifiers-log-1');
+    expect(identifiers.closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(identifiers.closest('details')!.querySelector('summary')!);
+    expect(identifiers.closest('details')).toHaveAttribute('open');
     expect(drawer).toHaveTextContent('命中');
     expect(drawer).toHaveTextContent('未命中');
     expect(drawer).not.toHaveTextContent('MATCHED');

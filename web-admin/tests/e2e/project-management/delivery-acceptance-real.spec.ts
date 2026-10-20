@@ -1,3 +1,5 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
+import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test, expect, type Page, type APIResponse, type Response} from '@playwright/test';
 import {mkdir, writeFile, readFile} from 'node:fs/promises';
@@ -36,19 +38,10 @@ function canonicalInputMappings(mappings: any[]) {
     return {...mapping, source};
   });
 }
-async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant?: string) {
-  await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(email);
-  await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
-  await page.getByRole('button', {name:'立即登录', exact:true}).click();
-  await page.waitForURL(url => !url.pathname.includes('/login'));
-  if (new URL(page.url()).pathname === '/tenant-selection') {
-    expect(tenant).toBeTruthy();await page.getByTestId(`space-business-${tenant}`).click();
-    await expect(page).not.toHaveURL(/tenant-selection/);
-  }
-  return (await data(await page.request.get('/api/auth/me'))).user;
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
+  return (await loginDeliveryMember(page, email, tenant)).user;
 }
+
 async function menu(page: Page, name: string) {
   await page.getByRole('navigation').getByRole('link', {name, exact:true}).click();
 }
@@ -144,21 +137,8 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
 }
 async function decide(page: Page, pid: string, action: 'approve'|'reject', observer: Page = page) {
   const pending = await row(page,pid);
-  const sent = page.waitForResponse(r => (new URL(r.url()).pathname.match(new RegExp(`/api/bpm/tasks/[^/]+/${action}$`))!==null || /\/api\/bpm\/forms\/task\/[^/]+\/submit$/.test(new URL(r.url()).pathname)) && r.request().method()==='POST');
-  await page.getByTestId(`bpm-operations-${action}`).click();
   const comment = action==='approve'?'交付范围、完成标准和材料一致，批准验收。':'缺少培训签到记录，请补正后重新提交。';
-  await expect(page.getByTestId('bpm-task-drawer').or(page.getByTestId(`bpm-${action}-comment`))).toBeVisible();
-  if (await page.getByTestId('bpm-task-drawer').count()) {
-    await page.getByTestId('approval-comment-textarea').fill(comment);
-    await page.getByTestId(`bpm-drawer-${action}-btn`).scrollIntoViewIfNeeded();
-    const footer=await page.getByTestId('bpm-drawer-footer').boundingBox();
-    expect(footer).toBeTruthy();expect(footer!.y).toBeGreaterThanOrEqual(0);expect(footer!.y+footer!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-    await page.getByTestId(`bpm-drawer-${action}-btn`).click({timeout:10000});
-  } else {
-    await page.getByTestId(`bpm-${action}-comment`).fill(comment);
-    await page.getByTestId(`bpm-${action}-confirm`).click();
-  }
-  await data(await sent);
+  await data(await completeDeliveryApproval(page, action, comment));
   await page.getByRole('tab',{name:'验收详情',exact:true}).click();
   const expected = action==='approve'?'accepted':'returned';
   await expect.poll(async ()=>(await row(page,pid)).tpm_ac_status).toBe(expected);
@@ -221,7 +201,7 @@ test('professional event policy publish, execution failure and recovery preserve
   const policy = `sla_review_${Date.now()}`;
   await menu(page, '事件策略');
   await page.getByTestId('epl-new-policy').click();
-  for (const [field, value] of Object.entries({code:policy,name:'交付规则 · 专业配置核验', 'event-type':'SHOWCASE_REVIEW', 'target-type':'MODEL', 'target-key':'tpm_acceptance'})) {
+  for (const [field, value] of Object.entries({code:policy,name:'交付规则 · 专业配置核验', 'event-type':`SHOWCASE_REVIEW_${policy}`, 'target-type':'MODEL', 'target-key':'tpm_acceptance'})) {
     await page.getByTestId(`epl-policy-${field}`).fill(value);
   }
   const created = page.waitForResponse(r => new URL(r.url()).pathname === '/api/event-policy/definitions' && r.request().method() === 'POST');
@@ -306,15 +286,34 @@ test('professional event policy publish, execution failure and recovery preserve
   const traceLogs=await data(await page.request.get(`/api/decision/logs?traceId=${encodeURIComponent(trace.traceId)}`));
   const ownedLogs=traceLogs.filter((log:any)=>log.decisionCode==='tpm_acceptance_route');expect(ownedLogs).toHaveLength(1);
   await menu(page,'执行日志');await expect(page.getByTestId('elta-business-results')).toBeVisible();
+  const tracePath=/\/api\/decision\/logs\?traceId=/;
+  await page.route(tracePath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：执行链路暂不可用'})}));
   await page.getByTestId(`elta-open-trace-${ownedLogs[0].pid ?? ownedLogs[0].traceId}`).click();
+  await expect(page.getByTestId('elta-trace-error')).toBeVisible();await shot(page,'R17-error');
+  await expect(page.getByTestId('elta-trace-chain').locator('li')).toHaveCount(0);
+  await page.unroute(tracePath);await page.getByTestId('elta-trace-error').getByRole('button',{name:'重新加载',exact:true}).click();
+
   await expect(page.getByTestId('elta-trace-drawer')).toBeVisible();
-  await expect(page.getByTestId('elta-trace-chain')).toBeVisible();await shot(page, 'R17');
+  await expect(page.getByTestId('elta-trace-chain')).toBeVisible();
+  const captured=page.getByTestId(`elta-input-snapshot-${ownedLogs[0].pid}`);await expect(captured).toContainText('当次输入');await expect(captured).toContainText('68000');
+  expect(ownedLogs[0].traceSnapshot.inputSnapshot['record.data.tpm_ac_amount'].value).toBe(68000);
+  const summary=page.getByTestId(`elta-rule-summary-${ownedLogs[0].pid}`);
+  await expect(summary).toHaveText('命中规则数: 1');await expect(summary).not.toContainText('standard');
+  const identifiers=page.getByTestId(`elta-rule-identifiers-${ownedLogs[0].pid}`);
+  await expect(identifiers).toBeHidden();await shot(page, 'R17');
+  const technical=page.getByTestId(`elta-chain-technical-${ownedLogs[0].pid}`);
+  await technical.locator('summary').click();await expect(identifiers).toBeVisible();await expect(identifiers).toContainText('standard');
+  await shot(page,'R17-identifiers');await technical.locator('summary').click();
 });
 
 test('professional rule impact, metadata filters and load-error recovery remain usable @critical', async ({page}) => {
   test.setTimeout(90000);await login(page);await menu(page,'策略工作台');
   await page.getByTestId('ddl-impact-tpm_acceptance_route').click();
   await expect(page.getByTestId('ddl-impact-drawer')).toContainText('tpm_acceptance_route');
+  const columns=page.locator('.impact-graph-columns');
+  await expect(columns).toHaveCSS('align-items','start');
+  const heights=await columns.locator('.impact-graph-column').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
+  expect(heights).toHaveLength(2);expect(heights[0]).toBeLessThan(heights[1]);
   await expect(page.getByTestId('ddl-version-actions')).toBeVisible();await shot(page,'R02');
   await page.getByTestId('ddl-impact-close').click();
   await page.getByTestId('ddl-open-tpm_acceptance_route').click();
@@ -351,7 +350,7 @@ test('professional rule impact, metadata filters and load-error recovery remain 
   const unavailable = page.waitForResponse(response => definitionPath.test(new URL(response.url()).pathname) && response.status() === 503);
   await page.reload();await unavailable;
   await expect(page.getByTestId('ddl-error')).toBeVisible({timeout:20000});await shot(page,'A02');
-  await page.unroute(definitionPath);await page.reload();
+  await page.unroute(definitionPath);await page.getByTestId('ddl-error').getByRole('button',{name:'重新加载',exact:true}).click();
   await expect(page.getByTestId('ddl-row-tpm_acceptance_route')).toBeVisible();await expect(page.getByTestId('ddl-error')).toHaveCount(0);await shot(page,'A02-recovered');
   await page.getByTestId('ddl-open-tpm_acceptance_deadline').click();
   await expect(page.getByTestId('strategy-business-decision')).toHaveValue('tpm_acceptance_deadline');
@@ -360,7 +359,7 @@ test('professional rule impact, metadata filters and load-error recovery remain 
 });
 
 test('SLA paused completed and failed-action detail states use actual lifecycle records @critical', async ({page}) => {
-  test.setTimeout(180000);const user=await login(page);const name='华辰制造 · 暂停恢复核验';
+  test.setTimeout(180000);const user=await login(page);const runLabel=new Date().toISOString().slice(11,23);const name=`华辰制造 · 暂停恢复核验 · ${runLabel}`;
   const pid=await create(page,user,name,68000,'普通',true);const sla=await submit(page,pid,480,'tpm_standard_review');
   async function processAction(action:'suspend'|'resume') {
     await menu(page,'任务中心');await page.getByRole('button',{name:'我发起的',exact:true}).click();
@@ -371,7 +370,18 @@ test('SLA paused completed and failed-action detail states use actual lifecycle 
   }
   await processAction('suspend');
   const paused=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));expect(paused.status).toBe('paused');
-  await menu(page,'流程监控');await page.getByTestId('sla-stat-paused').click();
+  const dashboardPath=/\/api\/bpm\/monitor\/dashboard(?:\?.*)?$/;
+  await page.route(dashboardPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：监控暂不可用'})}));
+  await menu(page,'流程监控');await expect(page.getByTestId('sla-dashboard-error')).toBeVisible();
+  await expect(page.getByTestId('sla-dashboard-active-records')).toHaveCount(0);await expect(page.getByText('暂无监控数据',{exact:true})).toHaveCount(0);await shot(page,'S00-load-error');
+  await page.unroute(dashboardPath);await page.getByTestId('sla-refresh').click();
+  await expect(page.getByTestId('sla-dashboard-active-records')).toBeVisible();await expect(page.getByTestId('sla-dashboard-error')).toHaveCount(0);
+  const policiesPath=/\/api\/bpm\/sla-configs(?:\?.*)?$/;
+  await page.route(policiesPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：SLA策略目录暂不可用'})}));
+  await page.getByTestId('sla-refresh').click();await expect(page.getByTestId('sla-strategy-error')).toBeVisible();await shot(page,'S00-policy-error');
+  await expect(page.getByTestId('sla-strategy-chain')).not.toContainText('暂无已启用的 SLA 策略');
+  await page.unroute(policiesPath);await page.getByTestId('sla-refresh').click();await expect(page.getByTestId('sla-strategy-error')).toHaveCount(0);
+  await page.getByTestId('sla-stat-paused').click();
   await page.getByTestId('sla-record-row').filter({hasText:name}).getByTestId('sla-record-detail').click();
   await expect(page.getByTestId('sla-item-detail')).toContainText('已暂停');await shot(page,'S05');
   await processAction('resume');expect((await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`))).status).toBe('running');
@@ -382,7 +392,7 @@ test('SLA paused completed and failed-action detail states use actual lifecycle 
   const configs=await data(await page.request.get('/api/bpm/sla-configs'));const config=configs.find((c:any)=>c.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
   await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:{...config,deadlineMode:'FIXED',deadlineValue:'PT5S',ruleBinding:{...config.ruleBinding,enabled:false},warningRules:[],actionPolicy:{trigger:'SLA_TIMEOUT',failureStrategy:'FAIL_FAST',actions:[{type:'NOTIFY',order:10,target:'USER:missing_rule_sla_recipient',payload:{title:'无效收件人失败核验',content:'必须失败，不能伪装已送达'}}]}}}));
   try {
-    const failName='华辰制造 · 催办失败诊断核验';const failedPid=await create(page,user,failName,100000,'高风险',true);const failedSla=await submit(page,failedPid,5/60,'tpm_enhanced_review');
+    const failName=`华辰制造 · 催办失败诊断核验 · ${runLabel}`;const failedPid=await create(page,user,failName,100000,'高风险',true);const failedSla=await submit(page,failedPid,5/60,'tpm_enhanced_review');
     let logs:any[]=[];await expect.poll(async()=>{logs=await data(await page.request.get(`/api/event-policy/action-logs?correlationId=sla:${failedSla.pid}&size=100`));return logs.length;},{timeout:45000,intervals:[2000]}).toBe(1);
     expect(logs[0].status).toBe('FAILED');expect(logs[0].errorMessage).toBeTruthy();
     await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();
@@ -406,7 +416,17 @@ test('professional rollout compares exact versions and audits activation pause a
     await data(await page.request.post(`/api/decision/versions/${version.pid}/publish`,{data:{impactAcknowledged:true,note:'Owned review versions'}}));versions.push(version);
   }
   await menu(page,'策略工作台');await professionalTab(page,'rollouts');
-  await page.getByLabel('rollout-decision-code',{exact:true}).fill(code);
+  const choicesPath=/\/api\/decision\/definitions(?:\?.*)?$/;
+  await page.route(choicesPath,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'测试注入：发布规则目录暂不可用'})}));
+  await expect(page.getByTestId('decision-rollout-monitor')).toBeVisible();await expect(page).toHaveURL(/[?&]tab=rollouts(?:&|$)/);await page.reload();
+  await expect(page.getByTestId('rollout-definitions-error')).toBeVisible();await shot(page,'R06-catalog-error');
+  await page.unroute(choicesPath);await page.getByTestId('rollout-definitions-error').getByRole('button',{name:'重新加载',exact:true}).click();
+  await expect(page.getByTestId('rollout-definitions-error')).toHaveCount(0);
+  await page.getByLabel('rollout-decision-code',{exact:true}).selectOption(code);
+  await expect(page.getByTestId('rollout-advanced')).not.toHaveAttribute('open');
+  await page.getByTestId('rollout-advanced').locator('summary').click();await expect(page.getByLabel('rollout-routing-key',{exact:true})).toBeVisible();await shot(page,'R06-advanced');
+  await page.getByTestId('rollout-advanced').locator('summary').click();
+
   await page.getByLabel('rollout-baseline-version',{exact:true}).fill(String(versions[0].version));
   await page.getByLabel('rollout-candidate-version',{exact:true}).fill(String(versions[1].version));
   await page.getByLabel('rollout-percentage',{exact:true}).fill('100');
@@ -423,11 +443,11 @@ test('professional rollout compares exact versions and audits activation pause a
       await page.getByTestId('rollout-confirm-action').click();
     }
     expect((await data(await response)).status).toBe(expected);
-    await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText(expected);
+    await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText(({ACTIVE:'运行中',PAUSED:'已暂停',ROLLED_BACK:'已回滚'} as Record<string,string>)[expected]);
   }
   await transition('activate','ACTIVE');await transition('pause','PAUSED');await transition('activate','ACTIVE');await transition('rollback','ROLLED_BACK');
   await expect(page.getByTestId('rollout-audit-panel')).toContainText('本轮专属版本核验');await shot(page,'R06');
-  await page.reload();await page.getByLabel('rollout-decision-code',{exact:true}).fill(code);await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('ROLLED_BACK');
+  await page.reload();await page.getByLabel('rollout-decision-code',{exact:true}).selectOption(code);await expect(page.getByTestId(`rollout-row-${rollout.pid}`)).toContainText('已回滚');
   const actual=await data(await page.request.get(`/api/decision/definitions/${code}/rollouts`));
   expect(actual.find((r:any)=>r.pid===rollout.pid).status).toBe('ROLLED_BACK');
   await writeFile(join(evidence!,'professional-rollout-receipt.json'),JSON.stringify({versions,actual},null,2));

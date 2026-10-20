@@ -1,3 +1,5 @@
+import { loginDeliveryMember } from '../../helpers/delivery-session';
+import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
 import {test,expect,type Page,type APIResponse,type Response} from '@playwright/test';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
@@ -10,17 +12,10 @@ const evidence=process.env.AURA_EVIDENCE_DIR;
 if(!root||!evidence||!process.env.ADMIN_EMAIL||!process.env.ADMIN_PASSWORD)throw Error('Bind the owned enterprise source, evidence and real local login.');
 const templatePath=join(root,'plugins/project-delivery-operations/examples/delivery-retrospective.report-template.json');
 async function data(r:APIResponse|Response){const b=await r.json();expect(r.status(),JSON.stringify(b)).toBe(200);expect(String(b.code)).toBe('0');return b.data;}
-async function login(page:Page,email=process.env.ADMIN_EMAIL!,tenant?:string){
- await page.goto('/login');await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated','true');
- await page.locator('#identifier').fill(email);await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);await page.getByRole('button',{name:'立即登录',exact:true}).click();await page.waitForURL(u=>!u.pathname.includes('/login'));
- if(new URL(page.url()).pathname==='/tenant-selection'){await page.getByTestId(`space-business-${tenant||process.env.AURA_ADMIN_TENANT_ID}`).click();await expect(page).not.toHaveURL(/tenant-selection/);}
- let identity=await data(await page.request.get('/api/auth/me'));const expected=tenant||process.env.AURA_ADMIN_TENANT_ID;expect(expected).toBeTruthy();
- if(String(identity.user.tenantId)!==expected){
-  await page.getByTestId('user-menu').getByRole('button').first().click();await expect(page.getByTestId('user-dropdown')).toBeVisible();
-  const switched=page.waitForResponse(r=>new URL(r.url()).pathname==='/_action/switch-space'&&r.request().method()==='POST');await page.getByTestId(`tenant-switch-${expected}`).click();expect((await switched).status()).toBe(302);await page.waitForLoadState('load');identity=await data(await page.request.get('/api/auth/me'));
- }
- expect(String(identity.user.tenantId)).toBe(expected);expect(identity.user.email).toBe(email);return identity;
+async function login(page: Page, email = process.env.ADMIN_EMAIL!, tenant = process.env.AURA_ADMIN_TENANT_ID) {
+  return loginDeliveryMember(page, email, tenant);
 }
+
 async function shot(page:Page,id:string){await mkdir(join(evidence!,'screenshots'),{recursive:true});await page.screenshot({path:join(evidence!,'screenshots',`${id}.png`),fullPage:true});}
 const compact=(s:string)=>s.normalize('NFKC').replace(/\s+/g,'');
 
@@ -31,14 +26,14 @@ async function createAcceptance(page:Page,user:any,name:string){
  await page.locator('#tpm_ac_scope').fill('完成供应商数据联调，核对交付清单、权限和验收材料。');await page.locator('#tpm_ac_amount').fill('18000');await page.getByTestId('select-trigger-tpm_ac_risk').click();await page.getByRole('option',{name:'高风险',exact:true}).click();await page.getByTestId('user-select-trigger-tpm_ac_reviewer').click();await page.getByTestId(`user-select-option-tpm_ac_reviewer-${user.pid}`).click();
  const upload=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/file/upload'&&r.request().method()==='POST');await page.getByTestId('form-field-tpm_ac_files').locator('input[type=file]').setInputFiles({name:'供应商联调验收清单.txt',mimeType:'text/plain',buffer:Buffer.from('Delivered: supplier integration, access review, training. Reviewed evidence attached.')});expect((await data(await upload)).fileId).toBeTruthy();
  const save=page.waitForResponse(r=>r.url().includes('/execute/tpm:create_acceptance')&&r.request().method()==='POST');await page.getByRole('button',{name:'保存验收草稿',exact:true}).click();const pid=(await data(await save)).data.recordPid;await expect(page).not.toHaveURL(/\/new$/);await openAcceptance(page,name);
- const submit=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');await page.getByTestId('toolbar-btn-submit_acceptance').click();await data(await submit);await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+ const submit=page.waitForResponse(r=>r.url().includes('/execute/tpm:submit_delivery_acceptance')&&r.request().method()==='POST');await page.getByTestId('toolbar-btn-submit_acceptance').click();await data(await submit);await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
  const rows=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:'500'}}));return rows.records.find((a:any)=>a.pid===pid);
 }
 async function prepareOperations(page:Page,user:any){
  const control=await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:'500'}}));const example=control.records[0];expect(example).toBeTruthy();
  const tombstone=await data(await page.request.post('/api/meta/commands/execute/tpm:create_acceptance',{data:{operationType:'create',payload:{tpm_ac_name:'已撤销的统计对照',tpm_ac_project:example.tpm_ac_project,tpm_ac_scope:'Source exclusion control',tpm_ac_amount:1,tpm_ac_risk:'normal',tpm_ac_reviewer:user.pid}}}));await data(await page.request.delete(`/api/dynamic/tpm_acceptance/${tombstone.data.recordPid}`));
  const returned=await createAcceptance(page,user,'华辰制造 · 供应商联调补正');
- await page.getByTestId('bpm-operations-reject').click();await page.getByTestId('bpm-reject-comment').fill('缺少供应商对账差异说明，请补齐后重新提交。');const rejected=page.waitForResponse(r=>r.url().includes('/api/bpm/tasks/')&&r.url().endsWith('/reject')&&r.request().method()==='POST');await page.getByTestId('bpm-reject-confirm').click();await data(await rejected);await expect(page.getByRole('main')).toContainText('缺少供应商对账差异说明');
+ await data(await completeDeliveryApproval(page,'reject','缺少供应商对账差异说明，请补齐后重新提交。'));await page.getByRole('tab',{name:'审批记录',exact:true}).click();await expect(page.getByTestId('bpm-history-container')).toContainText('缺少供应商对账差异说明，请补齐后重新提交。');
  const configs=await data(await page.request.get('/api/bpm/sla-configs'));const config=configs.find((c:any)=>c.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
  await data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:{...config,deadlineMode:'FIXED',deadlineValue:'PT30S',ruleBinding:{...config.ruleBinding,enabled:false}}}));
  let pending:any;
@@ -83,7 +78,7 @@ test('OP delivery dashboard drills into real acceptances and its report exports 
  // Use the first actual rendered business row; the server fact is an independent identity oracle.
  const firstRow=page.getByTestId('dashboard-block-delivery-actions').getByRole('row').filter({hasText:target.acceptance_name});await firstRow.click();
  await expect(page).toHaveURL(/\/p\/tpm_acceptance\?/);await expect(page.getByRole('row').filter({hasText:target.acceptance_name})).toHaveCount(1);
- await page.getByRole('row').filter({hasText:target.acceptance_name}).getByRole('button',{name:/查看|详情/}).click();await expect(page).toHaveURL(new RegExp(`/p/tpm_acceptance/view/${target.acceptance_pid}$`));await expect(page.getByRole('main')).toContainText(target.acceptance_name);await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');await shot(page,'OP02');
+ await page.getByRole('row').filter({hasText:target.acceptance_name}).getByRole('button',{name:/查看|详情/}).click();await expect(page).toHaveURL(new RegExp(`/p/tpm_acceptance/view/${target.acceptance_pid}$`));await expect(page.getByRole('main')).toContainText(target.acceptance_name);await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');await shot(page,'OP02');
  await navigateToMenuByClick(page,['元数据管理','报表管理']);await page.getByRole('button',{name:'新建报表',exact:true}).click();
  const chooser=page.waitForEvent('filechooser');await page.getByTestId('report-template-import').click();await(await chooser).setFiles(templatePath);await expect(page.getByTestId('report-template-imported')).toBeVisible();
  const title='客户项目交付复盘';await page.getByRole('textbox',{name:'报表标题',exact:true}).fill(title);
@@ -119,13 +114,14 @@ test('OP source grants independently protect native SLA and verification facts i
    const queries:Promise<any>[]=[];const observe=(r:Response)=>{if(new URL(r.url()).pathname==='/api/meta/chart-data'&&r.request().postDataJSON()?.queryCode?.startsWith('tdo_'))queries.push(r.finished().then(()=>({status:r.status()})));};actor.on('response',observe);
    await actor.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect.poll(()=>queries.length).toBeGreaterThanOrEqual(7);const outcomes=await Promise.all(queries);actor.off('response',observe);
    for(const result of outcomes)expect(result.status).toBe(missing?403:200);
-   if(missing)await expect(actor.getByTestId('dashboard-block-delivery-actions').getByRole('alert')).toBeVisible();else await expect(actor.getByTestId('dashboard-block-delivery-actions')).toContainText(receipt.factRows[0].acceptance_name);
+   if(missing){await expect(actor.getByTestId('dashboard-block-delivery-actions').getByRole('alert')).toContainText('无权读取数据');await expect(actor.getByTestId('dashboard-block-pending_count').getByRole('alert')).toContainText('请联系管理员');await expect(actor.getByRole('main')).not.toContainText('Access forbidden');}else await expect(actor.getByTestId('dashboard-block-delivery-actions')).toContainText(receipt.factRows[0].acceptance_name);
    await shot(actor,missing==='bpm.monitor.read'?'OP05':'OP05-verification-'+(missing?'denied':'allowed'));
    for(const format of ['markdown','html','pdf']){const r=await actor.request.post(`/api/reports/export/${format}`,{data:{reportPid}});expect(r.status(),`${missing}: ${format}`).toBe(missing?403:200);if(missing)expect(await r.text()).not.toContain(receipt.factRows[0].acceptance_name);}
    if(missing){
     await navigateToMenuByClick(actor,['元数据管理','报表管理']);await actor.getByRole('row').filter({hasText:'客户项目交付复盘'}).last().getByRole('button',{name:/打开|Open/}).click();
     const toolbar=actor.getByTestId('report-reader-toolbar').filter({visible:true});await expect(toolbar).toBeVisible();
     for(const format of ['Markdown','HTML','PDF'])await expect(toolbar.getByRole('button',{name:`导出 ${format}`,exact:true})).toBeDisabled();
+    await expect(actor.getByRole('alert')).toContainText('当前没有可用结果');await expect(actor.getByRole('main')).not.toContainText('暂无数据');
     await shot(actor,'OP12-'+missing.replaceAll('.','-'));
    }
   }
@@ -154,10 +150,13 @@ test('OP responsive dashboard and compact retrospective preserve the existing re
   await page.setViewportSize({width,height:width===1280?900:1000});await expect.poll(async()=>{const box=await page.getByTestId('dashboard-block-late_completed_count').boundingBox();return box?Math.round(box.x+box.width):9999;}).toBeLessThanOrEqual(width);
   await expect(page.getByTestId('dashboard-block-delivery-actions')).toContainText('补充资料后重新提交');await shot(page,width===1280?'OP04':'OP01');
  }
+ const dashboard=JSON.parse(await readFile(join(root!,'plugins/project-delivery-operations/config/dashboards/tdo_delivery_operations.json'),'utf8'));
+ const pageSize=dashboard.widgets.find((w:any)=>w.id==='delivery-actions').config.pageSize;expect(pageSize).toBeGreaterThan(0);
+ const totalPages=Math.ceil(receipt.factRows.length/pageSize);expect(totalPages).toBeGreaterThan(1);
  const actions=page.getByTestId('dashboard-block-delivery-actions');const pendingName=receipt.factRows.find((r:any)=>Number(r.current_overdue)>0).acceptance_name;
- await actions.getByRole('button',{name:'下一页',exact:true}).click();await expect(actions).toContainText('2 / 3');await expect(actions.getByRole('row').filter({hasText:pendingName})).toHaveCount(0);await shot(page,'OP16');await actions.getByRole('button',{name:'上一页',exact:true}).click();await expect(actions).toContainText('1 / 3');await expect(actions.locator('tbody tr').first()).toContainText(pendingName);
- await actions.getByRole('columnheader',{name:/^验收金额/}).click();await actions.getByRole('columnheader',{name:/^验收金额/}).click();await expect(actions.locator('tbody tr').first()).toContainText('100,000.00');await shot(page,'OP15');await page.getByRole('button',{name:'刷新',exact:true}).click();await expect(actions.locator('tbody tr').first()).toContainText(pendingName);
- const overdue=receipt.factRows.find((r:any)=>Number(r.current_overdue)>0);expect(overdue).toBeTruthy();await page.getByTestId('dashboard-block-delivery-actions').getByRole('row').filter({hasText:overdue.acceptance_name}).click();await expect(page).toHaveURL(/\/p\/tpm_acceptance\?/);await page.getByRole('row').filter({hasText:overdue.acceptance_name}).getByRole('button',{name:/查看|详情/}).click();await expect(page).toHaveURL(new RegExp(`/p/tpm_acceptance/view/${overdue.acceptance_pid}$`));await expect(page.getByRole('main')).toContainText(overdue.acceptance_name);await expect(page.getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');await shot(page,'OP02');
+ await actions.getByRole('button',{name:'下一页',exact:true}).click();await expect(actions).toContainText(`2 / ${totalPages}`);await expect(actions.getByRole('row').filter({hasText:pendingName})).toHaveCount(0);await actions.scrollIntoViewIfNeeded();await shot(page,'OP16');await actions.getByRole('button',{name:'上一页',exact:true}).click();await expect(actions).toContainText(`1 / ${totalPages}`);await expect(actions.locator('tbody tr').first()).toContainText(pendingName);
+ await actions.getByRole('columnheader',{name:/^验收金额/}).click();await actions.getByRole('columnheader',{name:/^验收金额/}).click();await expect(actions.locator('tbody tr').first()).toContainText('100,000.00');await shot(page,'OP15');await page.getByRole('button',{name:'刷新',exact:true}).click();await expect(actions.locator('tbody tr').first()).toContainText(pendingName);await expect(page.getByRole('main').getByText('加载中...', {exact:true})).toHaveCount(0);await shot(page,'OP03');
+ const overdue=receipt.factRows.find((r:any)=>Number(r.current_overdue)>0);expect(overdue).toBeTruthy();await page.getByTestId('dashboard-block-delivery-actions').getByRole('row').filter({hasText:overdue.acceptance_name}).click();await expect(page).toHaveURL(/\/p\/tpm_acceptance\?/);await page.getByRole('row').filter({hasText:overdue.acceptance_name}).getByRole('button',{name:/查看|详情/}).click();await expect(page).toHaveURL(new RegExp(`/p/tpm_acceptance/view/${overdue.acceptance_pid}$`));await expect(page.getByRole('main')).toContainText(overdue.acceptance_name);await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');await shot(page,'OP02');
  await navigateToMenuByClick(page,['元数据管理','报表管理']);await page.getByRole('row').filter({hasText:'客户项目交付复盘'}).last().getByRole('button',{name:/打开|Open/}).click();await expect(page).toHaveURL(new RegExp(`/report-designer/${receipt.reportPid}$`));
  const chooser=page.waitForEvent('filechooser');await page.getByTestId('report-template-import').click();await(await chooser).setFiles(templatePath);await expect(page.getByTestId('report-template-imported')).toBeVisible();
  const save=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/report-definitions/${receipt.reportPid}`&&r.request().method()==='PUT');await page.getByTestId('report-designer-toolbar-btn-save').click();const saved=await save;await data(saved);expect(saved.request().postDataJSON().dsl.page.margin).toEqual({top:10,right:10,bottom:10,left:10});await page.reload();await expect(page.getByRole('textbox',{name:'报表标题',exact:true})).toHaveValue('客户项目交付复盘');await shot(page,'OP07');
