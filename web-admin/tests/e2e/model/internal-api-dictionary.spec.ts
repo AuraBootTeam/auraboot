@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import fs from 'node:fs/promises';
 import { LoginPage } from '../../pages/LoginPage';
+import { HeaderPage } from '../../pages/HeaderPage';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { revokeInternalApiCurrentSession } from '../../helpers/internal-api-owned-user';
 import { uniqueId } from '../helpers';
@@ -47,6 +48,7 @@ test.afterEach(async ({ page }, info) => {
 test('generated dictionary operations preserve the UI journey', async ({ page }, info) => {
   test.setTimeout(90_000);
   const login = new LoginPage(page);
+  const header = new HeaderPage(page);
   await login.gotoRoot();
   await login.waitForFormReady();
   await login.login(DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
@@ -151,6 +153,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   expect((await updated.json()).code).toBe('0');
   await expect(page).toHaveURL((url) => url.pathname === `/meta/dict/${pid}`);
   await page.reload();
+  await header.waitForHeader();
   await expect(page.getByRole('heading', { name: updatedName, exact: true })).toBeVisible();
   await capture('DICT-04', page, info);
 
@@ -172,6 +175,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   expect((await savedItems.json()).code).toBe('0');
   await expect(page.getByTestId('dict-save-items')).toBeDisabled();
   await page.reload();
+  await header.waitForHeader();
   await page.getByTestId('dict-tab-items').click();
   await expect(page.getByTestId('dict-item-row-0').locator('input').nth(0)).toHaveValue('active');
   await expect(page.getByTestId('dict-item-row-0').locator('input').nth(1)).toHaveValue('启用');
@@ -196,6 +200,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
   await page.getByRole('button', { name: '发布', exact: true }).click();
   expect((await (await publishResponse).json()).data.status).toBe('published');
   await page.reload();
+  await header.waitForHeader();
   await expect(page.getByRole('button', { name: '取消发布', exact: true })).toBeVisible();
   await page.getByTestId('dict-tab-versions').click();
   await expect(
@@ -225,6 +230,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
 
   // Delete only this attempt's own record; dictionary deletion is a soft disable.
   await page.goto(`/meta/dict/${pid}`);
+  await header.waitForHeader();
   const deprecateBeforeDelete = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === `/api/meta/dict/${pid}/unpublish` &&
