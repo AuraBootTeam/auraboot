@@ -21,6 +21,28 @@ test('plans supervisor-first shutdown and omits secrets from the plan', () => {
   assert.deepEqual(plan.map(item => item.pid), [supervisor, backend, child]);
   assert.doesNotMatch(JSON.stringify(plan), /fixture-token|"token"/);
 });
+test('permits Redis storage cwd only for its authenticated registered ancestry', () => {
+  const redisPid = 1000000030, redisChild = 1000000031;
+  const f = fixture();
+  f.ownedRedis = { pid: redisPid, cwd: '/state/redis/owned' };
+  f.roots.push(redisPid);
+  const redis = { ...f.snapshots[0], pid: redisPid, parent: 1, cwd: f.ownedRedis.cwd };
+  const descendant = { ...redis, pid: redisChild, parent: redisPid };
+  f.snapshots.push(redis, descendant);
+  f.listeners.push(redisPid);
+  assert.equal(planGoldenStop(f).length, 5);
+  for (const change of [
+    { token: 'foreign' }, { runtime: 'foreign' }, { cwd: '/foreign' }, { parent: supervisor },
+  ]) {
+    const altered = structuredClone(f);
+    Object.assign(altered.snapshots.find(item => item.pid === redisChild), change);
+    assert.throws(() => planGoldenStop(altered));
+  }
+  assert.throws(() => planGoldenStop({ ...f, ownedRedis: null }));
+  const unrelated = structuredClone(f);
+  unrelated.snapshots[0].cwd = f.ownedRedis.cwd;
+  assert.throws(() => planGoldenStop(unrelated));
+});
 test('rechecks each process generation before signaling only owned targets', () => {
   const f = fixture(); const calls = [];
   const plan = planGoldenStop(f);

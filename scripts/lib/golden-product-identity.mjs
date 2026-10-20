@@ -2,16 +2,17 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, realpathSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { collectPrivateRedis, privateRedisPort, verifyBackendRedisConnection } from './golden-private-redis.mjs';
 
 const environmentKeys = ['SESSION_SECRET_FILE', 'NODE_ENV', 'AURA_WEB_MODE', 'AURA_RUNTIME_NAME', 'AURA_RUNTIME_OWNERSHIP_TOKEN',
-  'SERVER_PORT', 'SPRING_DATASOURCE_URL', 'SPRING_DATA_REDIS_DATABASE', 'SPRING_DATA_REDIS_HOST',
+  'SERVER_PORT', 'SPRING_DATASOURCE_URL', 'SPRING_DATA_REDIS_DATABASE', 'SPRING_DATA_REDIS_HOST', 'SPRING_DATA_REDIS_PORT',
   'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED', 'MANAGEMENT_TRACING_SAMPLING_PROBABILITY',
   'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG', 'VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'VITE_OTEL_TRACES_SAMPLE_RATE',
   'VITE_PORT', 'BFF_PORT', 'SPRING_BOOT_URL', 'BFF_INTERNAL_URL', 'AGENT_LLM_STUB_MODE'];
 const requireIdentity = (condition, message) => { if (!condition) throw new Error(message); };
 
 // Compare independent live observations. Never include credentials or raw commands in evidence.
-export function verifyGoldenProduct({ report, repo, environments, commands, token, database, health }) {
+export function verifyGoldenProduct({ report, repo, environments, commands, token, database, health, redisEndpoint = null }) {
   requireIdentity(report.verdict === 'ok', 'Workspace identity verification failed');
   const source = report.sources.find(item => ['auraboot', 'core'].includes(item.key));
   requireIdentity(source?.status === 'ok' && source.expected.root === repo, 'OSS source identity mismatch');
@@ -44,6 +45,16 @@ export function verifyGoldenProduct({ report, repo, environments, commands, toke
     `jdbc:postgresql://127.0.0.1:5432/${report.environment.POSTGRES_DB}?charSet=UTF8`, 'Backend database namespace mismatch');
   requireIdentity(database === report.environment.POSTGRES_DB, 'Database connection identity mismatch');
   requireIdentity(backend.SPRING_DATA_REDIS_DATABASE === report.environment.REDIS_DATABASE, 'Redis namespace mismatch');
+  const redisProcess = report.processes.find(item => item.key === 'redis-owned');
+  requireIdentity(!redisProcess || redisEndpoint?.isolated, 'Private Redis endpoint proof missing');
+  if (redisEndpoint?.isolated) {
+    privateRedisPort(redisEndpoint.port);
+    requireIdentity(redisEndpoint.host === '127.0.0.1' && backend.SPRING_DATA_REDIS_HOST === redisEndpoint.host &&
+      backend.SPRING_DATA_REDIS_PORT === String(redisEndpoint.port) &&
+      redisEndpoint.database === report.environment.REDIS_DATABASE, 'Private Redis endpoint drift');
+    requireIdentity(redisProcess?.status === 'ok' && redisProcess.expected.pid === redisEndpoint.pid &&
+      redisProcess.expected.cwd === redisEndpoint.dataDirectory, 'Private Redis process proof mismatch');
+  }
   for (const key of ['web', 'bff']) {
     const env = environments[key];
     requireIdentity(env.VITE_PORT === String(ports.web.port) && env.BFF_PORT === String(ports.bff.port),
@@ -61,6 +72,8 @@ export function verifyGoldenProduct({ report, repo, environments, commands, toke
     processes: report.processes.map(item => ({ key: item.key, ...item.expected,
       tokenFile: undefined, tokenHash: undefined })),
     ports, database, redisDatabase: report.environment.REDIS_DATABASE,
+    redisEndpoint: redisEndpoint ?? { isolated: false, host: backend.SPRING_DATA_REDIS_HOST ?? '127.0.0.1',
+      port: Number(backend.SPRING_DATA_REDIS_PORT ?? 6379), database: report.environment.REDIS_DATABASE },
     backendUrl: `http://127.0.0.1:${ports.backend.port}`,
     webUrl: `http://127.0.0.1:${ports.web.port}`, bffUrl: `http://127.0.0.1:${ports.bff.port}`,
     scope: 'OSS source, staged backend, live Web/BFF/backend identity and service namespaces; plugin import and browser acceptance are separate' };
@@ -101,7 +114,9 @@ export function collectGoldenProduct(name, repo, cli) {
   const health = Object.fromEntries(['backend', 'bff'].map(key => [key,
     JSON.parse(run('curl', ['--noproxy', '*', '--fail', '--silent', '--max-time', '10',
       `http://127.0.0.1:${report.ports[key].port}/${key === 'backend' ? 'actuator/health' : 'health'}`]))]));
-  const manifest = verifyGoldenProduct({ report, repo: realpathSync(repo), environments, commands, token, database, health });
+  const redisEndpoint = collectPrivateRedis(report, realpathSync(repo));
+  if (redisEndpoint) verifyBackendRedisConnection(report.processes.find(item => item.key === 'backend').expected.pid, redisEndpoint);
+  const manifest = verifyGoldenProduct({ report, repo: realpathSync(repo), environments, commands, token, database, health, redisEndpoint });
   const file = join(report.stateDir, 'runtimes', name, 'oss-golden-stack', 'manifest.json');
   mkdirSync(dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;

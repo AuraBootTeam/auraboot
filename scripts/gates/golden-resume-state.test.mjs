@@ -26,7 +26,7 @@ function fixture() {
       environment: { POSTGRES_DB: plan.database, REDIS_DATABASE: plan.redisDatabase } } };
 }
 test('returns only the bound backend and retained LLM mode for unchanged launch inputs', () => {
-  assert.deepEqual(verifyResumeState(fixture()), { backend: '/state/artifacts/backend.jar', llmStubMode: 'true', redisHost: '127.0.0.1', telemetryEnvironment: {} });
+  assert.deepEqual(verifyResumeState(fixture()), { backend: '/state/artifacts/backend.jar', llmStubMode: 'true', redisHost: '127.0.0.1', redisPort: '6379', telemetryEnvironment: {} });
 });
 const mutations = {
   'Workspace drift': f => { f.report.verdict = 'invalid'; },
@@ -99,7 +99,7 @@ function privateFixture(t, lifecycle = 'resuming') {
 }
 test('public loader accepts unchanged private fixtures only inside the lifecycle transaction', t => {
   const { f, cli } = privateFixture(t);
-  assert.deepEqual(loadResumeState('owned', f.repo, cli), { backend: f.plan.backend.path, llmStubMode: 'true', redisHost: '127.0.0.1', telemetryEnvironment: {} });
+  assert.deepEqual(loadResumeState('owned', f.repo, cli), { backend: f.plan.backend.path, llmStubMode: 'true', redisHost: '127.0.0.1', redisPort: '6379', telemetryEnvironment: {} });
 });
 test('public loader refuses an open runtime before any launch can begin', t => {
   const { f, cli } = privateFixture(t, 'open');
@@ -178,4 +178,33 @@ test('production resume requires the exact compiled frontend bytes and mode', ()
   f.frontendBuild = { ...f.plan.frontendBuild };
   f.plan.telemetryEnvironment.AURA_WEB_MODE = 'development';
   assert.throws(() => verifyResumeState(f), /production frontend changed/);
+});
+
+function privateRedisFixture() {
+  const f = fixture();
+  f.plan.redisHost = '127.0.0.1'; f.plan.redisPort = '16317';
+  const config = { runtime: 'owned', repo: f.repo, host: '127.0.0.1', port: 16317, database: '5',
+    dataDirectory: '/state/redis/owned' };
+  f.plan.isolatedRedis = { path: '/state/isolated-redis.json', hash: 'redis-config-hash', config };
+  f.isolatedRedis = structuredClone(f.plan.isolatedRedis);
+  f.manifest.redisEndpoint = { isolated: true, host: '127.0.0.1', port: 16317, database: '5' };
+  return f;
+}
+
+test('retains the private Redis port and descriptor for restart before the backend', () => {
+  const value = verifyResumeState(privateRedisFixture());
+  assert.equal(value.redisPort, '16317'); assert.equal(value.isolatedRedisPort, '16317');
+});
+
+for (const [label, mutate] of Object.entries({
+  'private Redis port': f => { f.plan.redisPort = '16311'; },
+  'private Redis descriptor bytes': f => { f.isolatedRedis.hash = 'changed'; },
+  'missing private Redis descriptor': f => { f.isolatedRedis = null; },
+  'private Redis runtime': f => { f.isolatedRedis.config.runtime = 'foreign'; },
+  'private Redis source': f => { f.isolatedRedis.config.repo = '/foreign'; },
+  'private Redis database': f => { f.isolatedRedis.config.database = '0'; },
+  'private Redis storage': f => { f.isolatedRedis.config.dataDirectory = '/foreign'; },
+  'private Redis downgraded to shared': f => { f.manifest.redisEndpoint.isolated = false; },
+})) test(`refuses changed ${label} before resume`, () => {
+  const f = privateRedisFixture(); mutate(f); assert.throws(() => verifyResumeState(f));
 });
