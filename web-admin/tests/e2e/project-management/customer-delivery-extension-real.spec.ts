@@ -27,7 +27,7 @@ async function openProject(page: Page) {
   const row = page.getByRole('row').filter({ has: page.getByText(project.name, { exact: true }) });
   await expect(row).toHaveCount(1);
   await row.getByRole('button', { name: '查看', exact: true }).click();
-  await expect(page.getByTestId('object-summary')).toContainText(project.name.split('·')[0].trim());
+  await expect(page.getByRole('heading', { name: project.name, exact: true })).toBeVisible();
 }
 async function installedPlugin(page: Page) {
   await navigateToMenuByClick(page, ['系统管理', '插件管理']);
