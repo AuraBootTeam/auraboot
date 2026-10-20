@@ -769,6 +769,17 @@
         "history",
         "activity"
       ]
+    ],
+    "contributionSlots": [
+      {
+        "id": "delivery-follow-up",
+        "kind": "block",
+        "anchor": {
+          "target": "tab-blocks",
+          "blockId": "detail_tabs",
+          "tabKey": "overview"
+        }
+      }
     ]
   },
   "dataSources": {

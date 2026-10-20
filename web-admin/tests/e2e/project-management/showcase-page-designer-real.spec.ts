@@ -30,7 +30,7 @@ async function designer(page: Page) {
   await expect(row).toHaveCount(1);
   await row.getByText('统一设计器', { exact: true }).click();
   await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
-  const pid = new URL(page.url()).pathname.split('/').at(-1)!;
+  const pid = new URL(page.url()).searchParams.get('pid') || new URL(page.url()).searchParams.get('pageId') || '';
   expect(pid).toMatch(/^[0-9A-Z]{26}$/);
   return pid;
 }
@@ -115,12 +115,15 @@ test('mature project creation and editing preserve customer owner dates budget a
   await page.getByTestId('form-field-tpm_pj_files').locator('input[type=file]').setInputFiles({ name: '二期交付范围清单.txt', mimeType: 'text/plain', buffer: fileBytes });
   const file = await data(await upload);
   await expect(page.getByTestId('form-field-tpm_pj_files')).toContainText('二期交付范围清单.txt');
+  await page.locator('#tpm_pj_name').scrollIntoViewIfNeeded();
   await shot(page, 'PJ02-mature-project-filled');
+  await page.getByTestId('form-field-tpm_pj_files').scrollIntoViewIfNeeded();
+  await shot(page, 'PJ02-project-evidence-and-notes');
   const creating = page.waitForResponse(response => response.url().includes('/execute/tpm:create_project') && response.request().method() === 'POST');
   await page.getByTestId('form-btn-submit').click();
   const created = await data(await creating);
   expect(created.phaseReached).toBe('completed');
-  const pid = String(created.recordId);
+  const pid = String(created.data.recordPid);
   expect(pid).toMatch(/^[0-9A-Z]{26}$/);
   const row = page.getByRole('row').filter({ has: page.getByText(name, { exact: true }) });
   await expect(row).toBeVisible();
@@ -138,6 +141,7 @@ test('mature project creation and editing preserve customer owner dates budget a
   await expect(page.getByTestId('user-select-trigger-tpm_pj_owner_user')).toContainText('Admin User');
   await page.locator('#tpm_pj_budget').fill('286000');
   await page.locator('#tpm_pj_next_action').fill('范围已确认，11月8日开始接口联调。');
+  await page.locator('#tpm_pj_name').scrollIntoViewIfNeeded();
   await shot(page, 'PJ04-mature-project-edit');
   const updating = page.waitForResponse(response => response.url().includes('/execute/tpm:update_project') && response.request().method() === 'POST');
   await page.getByTestId('form-btn-submit').click();
