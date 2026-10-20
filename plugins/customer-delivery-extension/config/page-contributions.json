@@ -57,7 +57,8 @@
                   "zh-CN": "交付跟进已保存，可重新打开项目核对。",
                   "en": "Delivery follow-up saved. Reopen the project to verify."
                 }
-              }
+              },
+              "expectedVersion": "${form.row_version}"
             }
           }
         },

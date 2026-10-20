@@ -15,6 +15,12 @@ async function data(response: APIResponse | Response) {
   expect(String(body.code)).toBe('0');
   return body.data;
 }
+async function pluginState(page: Page, response: Response, status: string) {
+  expect(response.status()).toBe(200);
+  const pid = new URL(response.url()).pathname.split('/').at(-2)!;
+  expect(pid).toMatch(/^[0-9A-Z]{26}$/);
+  expect((await data(await page.request.get(`/api/plugins/${pid}`))).status).toBe(status);
+}
 async function shot(page: Page, id: string) {
   await mkdir(join(evidence, 'screenshots'), { recursive: true });
   await page.screenshot({ path: join(evidence, 'screenshots', `${id}.png`) });
@@ -44,13 +50,19 @@ test('customer plugin contributes a real command dialog and workspace, survives 
   await loginDeliveryMember(page);
   const installed = await installedPlugin(page);
   const plugins = await data(await page.request.get('/api/plugins'));
-  const extension = plugins.find((row: any) => row.pluginId === 'com.auraboot.customer-delivery-extension');
+  const extension = plugins.find(
+    (row: any) => row.pluginId === 'com.auraboot.customer-delivery-extension',
+  );
   expect(extension).toBeTruthy();
   if (extension.status !== 'enabled') {
     expect(['installed', 'disabled']).toContain(extension.status);
-    const enabling = page.waitForResponse(response => /\/api\/plugins\/[^/]+\/enable$/.test(new URL(response.url()).pathname) && response.request().method() === 'POST');
+    const enabling = page.waitForResponse(
+      (response) =>
+        /\/api\/plugins\/[^/]+\/enable$/.test(new URL(response.url()).pathname) &&
+        response.request().method() === 'POST',
+    );
     await installed.getByRole('button', { name: /启用|Enable/ }).click();
-    await data(await enabling);
+    await pluginState(page, await enabling, 'enabled');
   } else {
     await expect(installed.getByRole('button', { name: /禁用|停用|Disable/ })).toBeVisible();
   }
@@ -82,6 +94,20 @@ test('customer plugin contributes a real command dialog and workspace, survives 
     await page.request.get(`/api/dynamic/tpm_project/${process.env.DELIVERY_PROJECT_PID}`),
   );
   expect(record.tpm_pj_next_action).toBe(next);
+  const conflicting = await page.request.post('/api/meta/commands/execute/tpm:update_project', {
+    data: {
+      ...payload,
+      payload: { tpm_pj_next_action: 'Stale follow-up must not overwrite the saved action' },
+    },
+  });
+  expect(conflicting.status()).toBe(409);
+  expect(
+    (
+      await data(
+        await page.request.get(`/api/dynamic/tpm_project/${process.env.DELIVERY_PROJECT_PID}`),
+      )
+    ).tpm_pj_next_action,
+  ).toBe(next);
   await expect(page.getByRole('main')).toContainText(next);
   await page.getByTestId('workbench-action-cde_open_workspace').click();
   await expect(page).toHaveURL(/\/p\/c\/cde_delivery_workspace$/);
@@ -99,7 +125,7 @@ test('customer plugin contributes a real command dialog and workspace, survives 
       response.request().method() === 'POST',
   );
   await row.getByRole('button', { name: /禁用|停用|Disable/ }).click();
-  await data(await stopping);
+  await pluginState(page, await stopping, 'disabled');
   await shot(page, 'X04-plugin-stopped');
   await openProject(page);
   await expect(button).toHaveCount(0);
@@ -112,7 +138,7 @@ test('customer plugin contributes a real command dialog and workspace, survives 
       response.request().method() === 'POST',
   );
   await stopped.getByRole('button', { name: /启用|Enable/ }).click();
-  await data(await starting);
+  await pluginState(page, await starting, 'enabled');
   await openProject(page);
   await expect(button).toBeVisible();
   expect(

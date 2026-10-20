@@ -22,7 +22,9 @@ async function projects(page: Page) {
   await navigateToMenuByClick(page, ['项目交付', '项目']);
   await expect(page).toHaveURL(/\/p\/tpm_project$/);
   await expect(page.getByRole('button', { name: '新建项目', exact: true })).toBeVisible();
-  await expect(page.locator('main[data-aura-scroll-container="page-content"]')).not.toContainText(/Page Unavailable|Internal Server Error/);
+  await expect(page.locator('main[data-aura-scroll-container="page-content"]')).not.toContainText(
+    /Page Unavailable|Internal Server Error/,
+  );
 }
 async function designer(page: Page) {
   await navigateToMenuByClick(page, ['元数据管理', '页面配置']);
@@ -204,7 +206,9 @@ test('mature project creation and editing preserve customer owner dates budget a
     .setInputFiles({ name: '二期交付范围清单.txt', mimeType: 'text/plain', buffer: fileBytes });
   const file = await data(await upload);
   await expect(page.getByTestId('form-field-tpm_pj_files')).toContainText('二期交付范围清单.txt');
-  await page.locator('#tpm_pj_name').scrollIntoViewIfNeeded();
+  await page
+    .locator('main[data-aura-scroll-container="page-content"]')
+    .evaluate((element) => element.scrollTo({ top: 0 }));
   await shot(page, 'PJ02-mature-project-filled');
   await page.getByTestId('form-field-tpm_pj_files').scrollIntoViewIfNeeded();
   await shot(page, 'PJ02-project-evidence-and-notes');
@@ -240,7 +244,9 @@ test('mature project creation and editing preserve customer owner dates budget a
   await page.locator('#tpm_pj_budget').press('Tab');
   await expect(page.locator('#tpm_pj_budget')).toHaveValue('286,000.00');
   await page.locator('#tpm_pj_next_action').fill('范围已确认，11月8日开始接口联调。');
-  await page.locator('#tpm_pj_name').scrollIntoViewIfNeeded();
+  await page
+    .locator('main[data-aura-scroll-container="page-content"]')
+    .evaluate((element) => element.scrollTo({ top: 0 }));
   await shot(page, 'PJ04-mature-project-edit');
   const updating = page.waitForResponse(
     (response) =>

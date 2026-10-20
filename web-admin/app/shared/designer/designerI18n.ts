@@ -1048,6 +1048,7 @@ export const DESIGNER_I18N = {
       'Suggested fields JSON': { 'zh-CN': '建议字段 JSON', 'en-US': 'Suggested fields JSON' } as L,
       'Thresholds JSON': { 'zh-CN': '阈值 JSON', 'en-US': 'Thresholds JSON' } as L,
       'Validation rules JSON': { 'zh-CN': '校验规则 JSON', 'en-US': 'Validation rules JSON' } as L,
+      'AI locked': { 'zh-CN': 'AI 修改锁定', 'en-US': 'AI locked' } as L,
       'Visible when JSON': { 'zh-CN': '显示条件 JSON', 'en-US': 'Visible when JSON' } as L,
     },
   },

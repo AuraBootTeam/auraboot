@@ -684,7 +684,9 @@ function InspectorField({
 
   if (type === 'json') {
     return (
-      <div className="rounded-md border border-slate-200 bg-white p-3">
+      <details className="rounded-md border border-slate-200 bg-white p-3" data-testid={`inspector-json-section-${path}`}>
+        <summary className="cursor-pointer text-xs font-semibold text-slate-600">{label}</summary>
+        <div className="mt-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <label
             htmlFor={id}
@@ -711,7 +713,7 @@ function InspectorField({
           }}
           spellCheck={false}
           aria-invalid={Boolean(jsonError)}
-          className="h-24 w-full resize-y rounded-md border border-slate-300 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-50 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="h-24 w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
         {jsonError ? (
           <div
@@ -721,7 +723,8 @@ function InspectorField({
             {jsonError}
           </div>
         ) : null}
-      </div>
+        </div>
+      </details>
     );
   }
 

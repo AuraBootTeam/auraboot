@@ -82,7 +82,8 @@
                   "zh-CN": "交付跟进已保存，可重新打开项目核对。",
                   "en": "Delivery follow-up saved. Reopen the project to verify."
                 }
-              }
+              },
+              "expectedVersion": "${state.selectedProject.project_version}"
             }
           }
         },
@@ -122,7 +123,7 @@
             "zh-CN": "客户项目",
             "en": "Project"
           },
-          "width": 280
+          "width": 240
         },
         {
           "field": "customer_name",
@@ -130,7 +131,7 @@
             "zh-CN": "客户",
             "en": "Customer"
           },
-          "width": 120
+          "width": 110
         },
         {
           "field": "owner_name",
@@ -138,7 +139,7 @@
             "zh-CN": "负责人",
             "en": "Owner"
           },
-          "width": 110
+          "width": 96
         },
         {
           "field": "delivery_stage",
@@ -146,7 +147,7 @@
             "zh-CN": "交付阶段",
             "en": "Stage"
           },
-          "width": 100
+          "width": 90
         },
         {
           "field": "budget",

@@ -607,6 +607,16 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
+  it('keeps professional JSON controls collapsed until explicitly opened', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
+    const section = screen.getByTestId('inspector-json-section-props.visibleWhen');
+    expect(section).not.toHaveAttribute('open');
+    expect(screen.getByTestId('inspector-field-props.visibleWhen')).not.toBeVisible();
+    fireEvent.click(section.querySelector('summary')!);
+    expect(screen.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
+  });
+
   it('renders action-type specific inspector fields for button configuration', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
