@@ -30,6 +30,7 @@ import {
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { get, post, put, del } from '~/shared/services/http-client';
+import { organizationService, type DepartmentTreeNode } from '~/shared/services/organizationService';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -79,13 +80,6 @@ interface AgentDetail {
   updated_at: string;
 }
 
-interface DepartmentTreeNode {
-  pid: string;
-  name: string;
-  parentPid: string | null;
-  employeeCount: number;
-  children: DepartmentTreeNode[];
-}
 
 interface PositionItem {
   pid: string;
@@ -2007,7 +2001,7 @@ function EnrollEmployeeDialog({
 
   // Load department tree
   useEffect(() => {
-    get<DepartmentTreeNode[]>('/api/org/departments/tree')
+    organizationService.getDepartmentTree()
       .then((res) => {
         if (ResultHelper.isSuccess(res) && res.data) {
           setDepartments(flattenDepts(res.data));

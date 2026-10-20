@@ -15,6 +15,7 @@ export interface ResourceOption {
 }
 
 export interface BaseResourceSelectProps {
+  ariaLabel?: string;
   value: string;
   onChange: (value: string) => void;
   fetchOptions: () => Promise<ResourceOption[]>;
@@ -24,6 +25,7 @@ export interface BaseResourceSelectProps {
 }
 
 export function BaseResourceSelect({
+  ariaLabel,
   value,
   onChange,
   fetchOptions,
@@ -108,6 +110,7 @@ export function BaseResourceSelect({
     <div ref={containerRef} className={`relative ${className || ''}`}>
       <input
         type="text"
+        aria-label={ariaLabel}
         value={displayValue}
         onChange={(e) => {
           setSearch(e.target.value);

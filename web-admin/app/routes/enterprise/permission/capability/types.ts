@@ -1,38 +1,9 @@
-/**
- * Permission v2 capability view types (mirror of the backend CapabilityGroup / Capability served
- * by GET /api/permission/capabilities).
- */
-export interface Capability {
-  code: string;
-  group: string;
-  label: string;
-  /** Declaration labels by locale; omitted by older servers and legacy capabilities. */
-  localizedLabels?: Record<string, string> | null;
-  description?: string | null;
-  localizedDescriptions?: Record<string, string> | null;
-  sensitive: boolean;
-  /** Preset tier (viewer/editor/admin); null for convention-derived capabilities. */
-  tier?: string | null;
-  displayGroupOrder?: number | null;
-  displayOrder?: number | null;
-  includes: string[];
-  granted: boolean;
-  authorizationState?: 'none' | 'partial' | 'full';
-  missingCodes?: string[];
-  conventionDerived: boolean;
-  /** Menus this capability unlocks (derived server-side from menu.permissionCode ∈ includes). */
-  unlockedMenus?: string[] | null;
-}
+import type { InternalResponseData } from '~/shared/services/http-client/internal-api';
 
-export interface CapabilityGroup {
-  group: string;
-  capabilities: Capability[];
-}
-
-export interface CapabilitySelectionPreview {
-  grantedCodes: string[];
-  revokedCodes: string[];
-  preservedCodes: string[];
-  resultingCapabilities: Capability[];
-  relatedMenus: string[];
-}
+/** Wire types come from the exact capability operations; no handwritten response mirror. */
+export type CapabilityGroup = InternalResponseData<'get', '/api/permission/capabilities'>[number];
+export type Capability = CapabilityGroup['capabilities'][number];
+export type CapabilitySelectionPreview = InternalResponseData<
+  'post',
+  '/api/permission/capabilities/preview'
+>;

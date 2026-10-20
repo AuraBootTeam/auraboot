@@ -1,11 +1,11 @@
-/**
- * SavedView Service
- *
- * API service for managing user saved views.
- * Provides CRUD operations and utility methods for view management.
- */
-
-import { get, post, put, del } from '~/shared/services/http-client';
+import { searchTenantMembers } from './tenantMemberSearchService';
+/** SavedView HTTP operations use generated contracts; editor/display projections are explicit. */
+import {
+  internalRequest,
+  type JsonValue,
+  type InternalRequestInput,
+} from './http-client/internal-api';
+import type { Result } from './http-client/types';
 import { ResultHelper } from '~/utils/type';
 import type {
   SavedView,
@@ -21,414 +21,344 @@ import type {
   SavedViewUserOption,
   SavedViewUpdateRequest,
   SavedViewQueryParams,
-  ViewConfig,
+  SavedViewAutoSaveRequest,
 } from '~/framework/smart/types/savedView';
+import type {
+  PresentFields,
+  SavedViewWire,
+  SavedViewChipPinWire,
+  SavedViewChipPinRequestWire,
+  PublicSharedViewWire,
+} from '~/framework/smart/types/savedViewWire';
+import {
+  presentFields,
+  savedViewForView,
+  savedViewConfigToWire,
+  savedViewCapabilityForView,
+  savedViewJson,
+} from './savedViewContract';
 
-const BASE_URL = '/api/views';
-
-interface TenantMemberUserRecord {
-  pid?: string;
-  username?: string;
-  email?: string;
-  realName?: string;
-  avatar?: string;
+function responseData<T>(result: Result<T>, message: string): T {
+  ensureSuccess(result, message);
+  if (result.data == null) throw new Error(message);
+  return result.data;
 }
-
-interface TenantMemberSearchRecord {
-  user?: TenantMemberUserRecord;
-  displayName?: string;
-  email?: string;
-  avatarUrl?: string;
-  departmentName?: string;
+function ensureSuccess(result: Result<unknown>, message: string): void {
+  if (!ResultHelper.isSuccess(result)) throw new Error(result.desc || result.message || message);
 }
-
-type TenantMemberSearchResult =
-  | TenantMemberSearchRecord[]
-  | {
-      records?: TenantMemberSearchRecord[];
-      content?: TenantMemberSearchRecord[];
-    };
-
-/**
- * Helper function to handle API responses
- */
-function handleResponse<T>(
-  result: { code: string; desc: string; data: T | null },
-  errorMsg: string,
-): T {
-  if (ResultHelper.isSuccess(result) && result.data !== null) {
-    return result.data;
-  }
-  throw new Error(result.desc || errorMsg);
+function views(data: SavedViewWire[]): SavedView[] {
+  if (!Array.isArray(data)) throw new Error('Invalid saved view list response');
+  return data.map(savedViewForView);
 }
+export type ChipPin = SavedViewChipPinWire & { viewPid: string; order: number };
+export type ChipPinOptions = Pick<
+  PresentFields<SavedViewChipPinRequestWire>,
+  'order' | 'teamId'
+> & { scope?: 'personal' | 'team' };
+export type PublicSharedView = PublicSharedViewWire & {
+  name: string;
+  viewConfig: Record<string, JsonValue>;
+};
 
-/**
- * A quick-filter chip pin: which view the current user pinned and its order.
- * Structurally matches the `pins` input of assembleQuickFilterChips.
- */
-export interface ChipPin {
-  viewPid: string;
-  order: number;
-}
-
-/**
- * Options for pinning/unpinning a view as a quick-filter chip.
- * `scope: 'team'` requires `teamId` and the caller holding team-manage (enforced
- * server-side); it defaults to a personal pin.
- */
-export interface ChipPinOptions {
-  order?: number;
-  scope?: 'personal' | 'team';
-  teamId?: string;
-}
-
-/**
- * SavedView Service Class
- *
- * Encapsulates all SavedView-related API calls
- */
 export class SavedViewService {
-  /**
-   * Get a single view by PID
-   */
   async getView(pid: string, request?: Request): Promise<SavedView> {
-    const result = await get<SavedView>(`${BASE_URL}/${pid}`, undefined, undefined, request);
-    return handleResponse(result, 'Failed to fetch view');
+    return savedViewForView(
+      responseData(
+        await internalRequest('get', '/api/views/{pid}', { path: { pid }, request }),
+        'Failed to fetch view',
+      ),
+    );
   }
-
-  /**
-   * Get all accessible views for the current user
-   * Includes personal views and global views
-   */
-  async getAccessibleViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
-    const result = await get<SavedView[]>(`${BASE_URL}/accessible`, params, undefined, request);
-    return handleResponse(result, 'Failed to fetch accessible views');
+  async getAccessibleViews(query: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
+    return views(
+      responseData(
+        await internalRequest('get', '/api/views/accessible', { query, request }),
+        'Failed to fetch accessible views',
+      ),
+    );
   }
-
-  /**
-   * Get personal views for the current user
-   */
-  async getPersonalViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
-    const result = await get<SavedView[]>(`${BASE_URL}/personal`, params, undefined, request);
-    return handleResponse(result, 'Failed to fetch personal views');
+  async getPersonalViews(query: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
+    return views(
+      responseData(
+        await internalRequest('get', '/api/views/personal', { query, request }),
+        'Failed to fetch personal views',
+      ),
+    );
   }
-
-  /**
-   * Get global views
-   */
-  async getGlobalViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
-    const result = await get<SavedView[]>(`${BASE_URL}/global`, params, undefined, request);
-    return handleResponse(result, 'Failed to fetch global views');
+  async getGlobalViews(query: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
+    return views(
+      responseData(
+        await internalRequest('get', '/api/views/global', { query, request }),
+        'Failed to fetch global views',
+      ),
+    );
   }
-
-  /**
-   * Get team views shared with the current user's teams (scope=team).
-   */
-  async getTeamViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
-    const result = await get<SavedView[]>(`${BASE_URL}/team`, params, undefined, request);
-    return handleResponse(result, 'Failed to fetch team views');
+  async getTeamViews(query: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
+    return views(
+      responseData(
+        await internalRequest('get', '/api/views/team', { query, request }),
+        'Failed to fetch team views',
+      ),
+    );
   }
-
-  /**
-   * List the current user's quick-filter chip pins for a model/page.
-   */
-  async getChipPins(params: SavedViewQueryParams, request?: Request): Promise<ChipPin[]> {
-    const result = await get<ChipPin[]>(`${BASE_URL}/chip-pins`, params, undefined, request);
-    return handleResponse(result, 'Failed to fetch quick-filter chip pins');
+  async getChipPins(query: SavedViewQueryParams, request?: Request): Promise<ChipPin[]> {
+    const data = responseData(
+      await internalRequest('get', '/api/views/chip-pins', { query, request }),
+      'Failed to fetch quick-filter pins',
+    );
+    if (!Array.isArray(data)) throw new Error('Invalid saved view pin response');
+    return data.map((item) => {
+      if (
+        !item.viewPid ||
+        typeof item.viewPid !== 'string' ||
+        typeof item.order !== 'number' ||
+        !Number.isFinite(item.order)
+      ) {
+        throw new Error('Invalid saved view pin identity or order');
+      }
+      return { ...item, viewPid: item.viewPid, order: item.order };
+    });
   }
-
-  /**
-   * Pin a view to the quick-filter chip row. Defaults to a personal pin; pass
-   * `{ scope: 'team', teamId }` to pin it for a team (requires team-manage).
-   */
   async pinView(viewPid: string, options: ChipPinOptions = {}, request?: Request): Promise<void> {
-    const body: Record<string, unknown> = { order: options.order };
-    if (options.scope === 'team') {
-      body.scope = 'team';
-      body.teamId = options.teamId;
-    }
-    const result = await post<void>(`${BASE_URL}/${viewPid}/pin`, body, undefined, request);
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'Failed to pin view');
-    }
+    const body = {
+      order: options.order,
+      ...(options.scope === 'team' ? { scope: 'team', teamId: options.teamId } : {}),
+    };
+    ensureSuccess(
+      await internalRequest('post', '/api/views/{viewPid}/pin', {
+        path: { viewPid },
+        body,
+        request,
+      }),
+      'Failed to pin view',
+    );
   }
-
-  /**
-   * Remove a pin of a view from the quick-filter chip row. Defaults to the
-   * current user's personal pin; pass `{ scope: 'team', teamId }` to remove a
-   * team pin (requires team-manage).
-   */
   async unpinView(
     viewPid: string,
     options: Pick<ChipPinOptions, 'scope' | 'teamId'> = {},
     request?: Request,
   ): Promise<void> {
-    const params =
-      options.scope === 'team' ? { scope: 'team', teamId: options.teamId } : undefined;
-    const result = await del<void>(`${BASE_URL}/${viewPid}/pin`, params, undefined, request);
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'Failed to unpin view');
-    }
-  }
-
-  /**
-   * Get teams the current user can use when creating TEAM scoped views.
-   */
-  async getMyTeams(request?: Request): Promise<SavedViewTeamOption[]> {
-    const result = await get<Array<SavedViewTeamOption & {
-      teamPid?: string;
-      teamName?: string;
-      teamCode?: string;
-    }>>(
-      `${BASE_URL}/my-teams`,
-      undefined,
-      undefined,
-      request,
+    const query = options.scope === 'team' ? { scope: 'team', teamId: options.teamId } : undefined;
+    ensureSuccess(
+      await internalRequest('delete', '/api/views/{viewPid}/pin', {
+        path: { viewPid },
+        query,
+        request,
+      }),
+      'Failed to unpin view',
     );
-    const teams = handleResponse(result, 'Failed to fetch saved view teams');
-    return teams
-      .map((team) => ({
-        pid: team.pid ?? team.teamPid ?? '',
-        name: team.name ?? team.teamName ?? team.teamCode ?? team.pid ?? team.teamPid ?? '',
-        role: team.role,
-        memberCount: team.memberCount,
-      }))
-      .filter((team) => team.pid);
   }
-
-  /**
-   * Search tenant users for SavedView collaborator assignment.
-   */
-  async searchUsers(
-    keyword: string,
-    size = 10,
-    request?: Request,
-  ): Promise<SavedViewUserOption[]> {
-    const result = await post<TenantMemberSearchResult>(
-      '/api/tenant/members/search',
+  async getMyTeams(request?: Request): Promise<SavedViewTeamOption[]> {
+    const data = responseData(
+      await internalRequest('get', '/api/views/my-teams', { request }),
+      'Failed to fetch saved view teams',
+    );
+    if (!Array.isArray(data)) throw new Error('Invalid saved view team response');
+    return data.map((team) => {
+      if (typeof team.teamPid !== 'string' || !team.teamPid)
+        throw new Error('Invalid saved view team identity');
+      return {
+        pid: team.teamPid,
+        name: team.teamName || team.teamCode || 'Team',
+        role: team.role ?? undefined,
+      };
+    });
+  }
+  async searchUsers(keyword: string, size = 10, request?: Request): Promise<SavedViewUserOption[]> {
+    const records = await searchTenantMembers(
       {
         pageNum: 1,
         pageSize: size,
         status: 'active',
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
       },
-      undefined,
       request,
     );
-    const data = handleResponse(result, 'Failed to search users');
-    const records = Array.isArray(data) ? data : data.records ?? data.content ?? [];
-    return records.flatMap((record): SavedViewUserOption[] => {
-      const pid = record.user?.pid;
-      if (!pid) {
-        return [];
-      }
+    return records.flatMap((record) => {
+      const user = record.user;
+      if (user == null) return [];
+      if (typeof user.pid !== 'string' || !user.pid)
+        throw new Error('Invalid collaborator identity');
       return [
         {
-          pid,
-          displayName:
-            record.displayName ||
-            record.user?.realName ||
-            record.user?.username ||
-            record.user?.email ||
-            pid,
-          email: record.email || record.user?.email,
-          avatarUrl: record.avatarUrl || record.user?.avatar,
-          departmentName: record.departmentName,
+          pid: user.pid,
+          displayName: user.realName || user.username || user.email || undefined,
+          email: user.email ?? undefined,
+          avatarUrl: user.avatar ?? undefined,
         },
       ];
     });
   }
-
-  /**
-   * Get the default view for a model/page
-   * Returns null if no default view exists (not an error condition)
-   */
-  async getDefaultView(params: SavedViewQueryParams, request?: Request): Promise<SavedView | null> {
-    const result = await get<SavedView>(`${BASE_URL}/default`, params, undefined, request);
-    // Return null instead of throwing error when no default view exists
-    if (ResultHelper.isSuccess(result)) {
-      return result.data;
-    }
-    // Only return null for "not found" scenarios, throw for real errors
-    if (result.code === '404' || result.desc?.toLowerCase().includes('not found')) {
-      return null;
-    }
-    throw new Error(result.desc || 'Failed to fetch default view');
+  async getDefaultView(query: SavedViewQueryParams, request?: Request): Promise<SavedView | null> {
+    const result = await internalRequest('get', '/api/views/default', { query, request });
+    ensureSuccess(result, 'Failed to fetch default view');
+    return result.data == null ? null : savedViewForView(result.data);
   }
-
-  /**
-   * Create a new view
-   */
   async createView(data: SavedViewCreateRequest, request?: Request): Promise<SavedView> {
-    const result = await post<SavedView>(BASE_URL, data, undefined, request);
-    return handleResponse(result, 'Failed to create view');
+    const body = { ...data, viewConfig: savedViewConfigToWire(data.viewConfig) };
+    return savedViewForView(
+      responseData(
+        await internalRequest('post', '/api/views', { body, request }),
+        'Failed to create view',
+      ),
+    );
   }
-
-  /**
-   * Auto-save view config (atomic upsert of implicit view).
-   * Backend finds or creates an implicit personal view for the current user/model/page.
-   */
-  async autoSave(
-    data: { modelCode: string; pageKey?: string; viewConfig?: Partial<ViewConfig> },
-    request?: Request,
-  ): Promise<SavedView> {
-    const result = await post<SavedView>(`${BASE_URL}/auto-save`, data, undefined, request);
-    return handleResponse(result, 'Failed to auto-save view');
+  async autoSave(data: SavedViewAutoSaveRequest, request?: Request): Promise<SavedView> {
+    const body = { ...data, viewConfig: savedViewConfigToWire(data.viewConfig) };
+    return savedViewForView(
+      responseData(
+        await internalRequest('post', '/api/views/auto-save', { body, request }),
+        'Failed to auto-save view',
+      ),
+    );
   }
-
-  /**
-   * Update an existing view
-   */
   async updateView(
     pid: string,
     data: SavedViewUpdateRequest,
     request?: Request,
   ): Promise<SavedView> {
-    const result = await put<SavedView>(`${BASE_URL}/${pid}`, data, undefined, request);
-    return handleResponse(result, 'Failed to update view');
+    const body = { ...data, viewConfig: savedViewConfigToWire(data.viewConfig) };
+    return savedViewForView(
+      responseData(
+        await internalRequest('put', '/api/views/{pid}', { path: { pid }, body, request }),
+        'Failed to update view',
+      ),
+    );
   }
-
-  /**
-   * Delete a view
-   */
   async deleteView(pid: string, request?: Request): Promise<void> {
-    const result = await del<void>(`${BASE_URL}/${pid}`, undefined, undefined, request);
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'Failed to delete view');
-    }
+    ensureSuccess(
+      await internalRequest('delete', '/api/views/{pid}', { path: { pid }, request }),
+      'Failed to delete view',
+    );
   }
-
-  /**
-   * Set a view as the default for its model/page
-   */
   async setDefaultView(pid: string, request?: Request): Promise<SavedView> {
-    const result = await post<SavedView>(
-      `${BASE_URL}/${pid}/set-default`,
-      undefined,
-      undefined,
-      request,
+    return savedViewForView(
+      responseData(
+        await internalRequest('post', '/api/views/{pid}/set-default', { path: { pid }, request }),
+        'Failed to set default view',
+      ),
     );
-    return handleResponse(result, 'Failed to set default view');
   }
-
-  /**
-   * Duplicate an existing view with a new name
-   */
   async duplicateView(pid: string, newName: string, request?: Request): Promise<SavedView> {
-    const result = await post<SavedView>(
-      `${BASE_URL}/${pid}/duplicate`,
-      { name: newName },
-      undefined,
-      request,
+    return savedViewForView(
+      responseData(
+        await internalRequest('post', '/api/views/{pid}/duplicate', {
+          path: { pid },
+          body: { name: newName },
+          request,
+        }),
+        'Failed to duplicate view',
+      ),
     );
-    return handleResponse(result, 'Failed to duplicate view');
   }
-
-  /**
-   * Copy any accessible view into the current user's personal scope.
-   */
   async copyToPersonal(
     pid: string,
     data: SavedViewCopyToPersonalRequest = {},
     request?: Request,
   ): Promise<SavedView> {
-    const result = await post<SavedView>(
-      `${BASE_URL}/${pid}/copy-to-personal`,
-      data,
-      undefined,
-      request,
+    const body = { ...data, viewConfig: savedViewConfigToWire(data.viewConfig) };
+    return savedViewForView(
+      responseData(
+        await internalRequest('post', '/api/views/{pid}/copy-to-personal', {
+          path: { pid },
+          body,
+          request,
+        }),
+        'Failed to copy view',
+      ),
     );
-    return handleResponse(result, 'Failed to copy view to personal scope');
   }
-
-  /**
-   * Get audit events for a visible shared/global view.
-   */
   async getAuditEvents(pid: string, request?: Request): Promise<SavedViewAuditEvent[]> {
-    const result = await get<SavedViewAuditEvent[]>(
-      `${BASE_URL}/${pid}/audit-events`,
-      undefined,
-      undefined,
-      request,
+    const data = responseData(
+      await internalRequest('get', '/api/views/{pid}/audit-events', { path: { pid }, request }),
+      'Failed to fetch view audit events',
     );
-    return handleResponse(result, 'Failed to fetch saved view audit events');
+    if (!Array.isArray(data)) throw new Error('Invalid saved view audit response');
+    return data.map((item) => ({ ...presentFields(item), metadata: item.metadata }));
   }
-
-  /**
-   * Check whether a view type has the required backend field mapping before saving.
-   */
   async checkCapability(
     data: SavedViewCapabilityCheckRequest,
     request?: Request,
   ): Promise<SavedViewCapabilityCheckResponse> {
-    const result = await post<SavedViewCapabilityCheckResponse>(
-      `${BASE_URL}/capability-check`,
-      data,
-      undefined,
-      request,
+    const body = { ...data, viewConfig: savedViewConfigToWire(data.viewConfig) };
+    return savedViewCapabilityForView(
+      responseData(
+        await internalRequest('post', '/api/views/capability-check', { body, request }),
+        'Failed to check view capability',
+      ),
     );
-    return handleResponse(result, 'Failed to check saved view capability');
   }
-
-  /**
-   * Generate a public share link for a view (ViewShareController POST /{viewPid}/share).
-   * The public page is served at /share/{token}; `shareUrl` in the response is the
-   * API path, not the user-facing page.
-   */
   async shareView(
-    pid: string,
-    options: SavedViewShareRequest = {},
+    viewPid: string,
+    body: SavedViewShareRequest = {},
     request?: Request,
   ): Promise<SavedViewShareResult> {
-    const result = await post<SavedViewShareResult>(
-      `${BASE_URL}/${pid}/share`,
-      options,
-      undefined,
-      request,
+    const data = responseData(
+      await internalRequest('post', '/api/views/{viewPid}/share', {
+        path: { viewPid },
+        body,
+        request,
+      }),
+      'Failed to create share link',
     );
-    return handleResponse(result, 'Failed to create share link');
+    if (
+      typeof data.token !== 'string' ||
+      !data.token ||
+      typeof data.shareUrl !== 'string' ||
+      !data.shareUrl
+    )
+      throw new Error('Invalid saved view share link');
+    return data;
   }
-
-  /**
-   * Revoke the public share link of a view (ViewShareController DELETE /{viewPid}/share).
-   */
-  async revokeShare(pid: string, request?: Request): Promise<void> {
-    const result = await del<boolean>(`${BASE_URL}/${pid}/share`, undefined, undefined, request);
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'Failed to revoke share link');
-    }
-  }
-
-  /**
-   * Current share status of a view (ViewShareController GET /{viewPid}/share/status).
-   */
-  async getShareStatus(pid: string, request?: Request): Promise<SavedViewShareStatus> {
-    const result = await get<SavedViewShareStatus>(
-      `${BASE_URL}/${pid}/share/status`,
-      undefined,
-      undefined,
-      request,
+  async revokeShare(viewPid: string, request?: Request): Promise<void> {
+    ensureSuccess(
+      await internalRequest('delete', '/api/views/{viewPid}/share', { path: { viewPid }, request }),
+      'Failed to revoke share link',
     );
-    return handleResponse(result, 'Failed to fetch share status');
   }
-
-  /**
-   * Check if a view name is unique within a model/page
-   * Returns true if the name is available (unique)
-   */
+  async getShareStatus(viewPid: string, request?: Request): Promise<SavedViewShareStatus> {
+    const data = responseData(
+      await internalRequest('get', '/api/views/{viewPid}/share/status', {
+        path: { viewPid },
+        request,
+      }),
+      'Failed to fetch share status',
+    );
+    if (typeof data.shared !== 'boolean') throw new Error('Invalid saved view share status');
+    return data;
+  }
   async checkNameUnique(
-    params: {
-      modelCode: string;
-      name: string;
-      pageKey?: string;
-      excludePid?: string;
-    },
+    query: NonNullable<InternalRequestInput<'get', '/api/views/check-name'>['query']>,
     request?: Request,
   ): Promise<boolean> {
-    const result = await get<boolean>(`${BASE_URL}/check-name`, params, undefined, request);
-    return handleResponse(result, 'Failed to check name uniqueness');
+    const data = responseData(
+      await internalRequest('get', '/api/views/check-name', { query, request }),
+      'Failed to check view name',
+    );
+    if (typeof data !== 'boolean') throw new Error('Invalid saved view name check');
+    return data;
   }
 }
 
-// Export singleton instance
+/** The public endpoint shares configuration, not business records. */
+export async function loadPublicSharedView(
+  shareToken: string,
+  password?: string,
+  signal?: AbortSignal,
+): Promise<Result<PublicSharedView>> {
+  const result = await internalRequest('get', '/api/views/shared/{shareToken}', {
+    path: { shareToken },
+    query: password ? { password } : undefined,
+    options: { skipAutoToken: true, signal },
+  });
+  if (!ResultHelper.isSuccess(result) || result.data == null) return { ...result, data: null };
+  const data = result.data;
+  if (typeof data.name !== 'string' || !data.name || !data.viewConfig)
+    throw new Error('Invalid public view configuration');
+  const config = savedViewJson(data.viewConfig);
+  if (!config || typeof config !== 'object' || Array.isArray(config))
+    throw new Error('Invalid public view configuration');
+  return { ...result, data: { ...data, name: data.name, viewConfig: config } };
+}
+
 export const savedViewService = new SavedViewService();

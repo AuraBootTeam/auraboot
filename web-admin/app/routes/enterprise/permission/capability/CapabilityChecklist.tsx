@@ -71,7 +71,9 @@ export default function CapabilityChecklist({
               {/* Declared groups carry a business bucket name (e.g. 客户管理) — t() misses and falls
                   back to it. Convention-derived groups carry the raw module code (billing/ai/iot) —
                   localized here via the existing permission.module.<code> i18n. */}
-              {t(`permission.module.${group.group}`, undefined, group.group)}
+              {group.group === null
+                ? t('permission.capability.ungrouped', undefined, 'Other capabilities')
+                : t(`permission.module.${group.group}`, undefined, group.group)}
               <span className="ml-2 text-xs font-normal text-gray-400">
                 {t('permission.capability.groupSummary', { granted, total }, `${granted}/${total}`)}
               </span>
@@ -81,7 +83,11 @@ export default function CapabilityChecklist({
                 <div
                   key={cap.code}
                   data-testid={`capability-${cap.code}`}
-                  title={getLocalizedText(cap.localizedDescriptions, locale, t) || cap.description || undefined}
+                  title={
+                    getLocalizedText(cap.localizedDescriptions, locale, t) ||
+                    cap.description ||
+                    undefined
+                  }
                   className="flex cursor-pointer items-start gap-2 text-sm text-gray-700"
                 >
                   <input

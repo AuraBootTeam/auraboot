@@ -1,11 +1,10 @@
 import { get, post, put, del, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { roleMemberService, type RoleMember, type RoleMemberPage, type RoleMembershipWindow } from './roleMemberService';
 import type { Permission, PermissionReference, IPermissionService } from '~/types/model';
 import type {
   PermissionMatrixDTO,
   PermissionGrantRequest,
-  RoleMemberDTO,
-  PaginationResult,
 } from '~/routes/enterprise/permission/types';
 
 /**
@@ -260,67 +259,20 @@ export class PermissionService implements IPermissionService {
   /**
    * Get paginated members for a role
    */
-  async getRoleMembers(
-    rolePid: string,
-    params: { pageNum: number; pageSize: number },
-    request?: Request,
-  ): Promise<PaginationResult<RoleMemberDTO>> {
-    const result = await get<PaginationResult<RoleMemberDTO>>(
-      `/api/roles/${rolePid}/members`,
-      params,
-      undefined,
-      request,
-    );
-    return handleResponse(result, 'Failed to fetch role members');
+  getRoleMembers(rolePid: string, params: { pageNum: number; pageSize: number }, request?: Request): Promise<RoleMemberPage> {
+    return roleMemberService.list(rolePid, params, request);
   }
 
-  /**
-   * Add members to a role
-   */
-  async addRoleMembers(
-    rolePid: string,
-    memberPids: string[],
-    window?: { effectiveDate?: string; expiryDate?: string },
-    request?: Request,
-  ): Promise<void> {
-    const result = await fetchResult<void>(`/api/roles/${rolePid}/members/assign`, {
-      method: 'post',
-      params: { memberPids, ...window },
-    }, request);
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'Failed to add role members');
-    }
+  addRoleMembers(rolePid: string, memberPids: string[], window?: RoleMembershipWindow, request?: Request): Promise<void> {
+    return roleMemberService.assign(rolePid, memberPids, window, request);
   }
 
-  /**
-   * Remove members from a role
-   */
-  async removeRoleMembers(rolePid: string, memberPids: string[], request?: Request): Promise<void> {
-    const result = await fetchResult<void>(`/api/roles/${rolePid}/members/remove`, {
-      method: 'post',
-      params: memberPids as unknown as Record<string, any>,
-    }, request);
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'Failed to remove role members');
-    }
+  removeRoleMembers(rolePid: string, memberPids: string[], request?: Request): Promise<void> {
+    return roleMemberService.remove(rolePid, memberPids, request);
   }
 
-  /**
-   * Get candidate members that can be added to a role
-   */
-  async getRoleMemberCandidates(
-    rolePid: string,
-    keyword?: string,
-    request?: Request,
-  ): Promise<RoleMemberDTO[]> {
-    const params = keyword ? { keyword } : {};
-    const result = await get<RoleMemberDTO[]>(
-      `/api/roles/${rolePid}/members/candidates`,
-      params,
-      undefined,
-      request,
-    );
-    return handleResponse(result, 'Failed to fetch role member candidates');
+  getRoleMemberCandidates(rolePid: string, keyword?: string, request?: Request): Promise<RoleMember[]> {
+    return roleMemberService.candidates(rolePid, keyword, request);
   }
 }
 

@@ -98,6 +98,16 @@ const capabilityGroups: CapabilityGroup[] = [
     // crm.account.read covered by a declared capability; crm.account.export only convention-derived
     capabilities: [
       {
+        authorizationState: 'full' as const,
+        description: null,
+        tier: null,
+        displayGroupOrder: 10000,
+        displayOrder: 100,
+        localizedLabels: {},
+        localizedDescriptions: {},
+        missingCodes: [],
+        unlockedMenus: null,
+
         code: 'crm.cap.account',
         group: '客户管理',
         label: '查看客户列表',
@@ -107,6 +117,16 @@ const capabilityGroups: CapabilityGroup[] = [
         conventionDerived: false,
       },
       {
+        authorizationState: 'full' as const,
+        description: null,
+        tier: null,
+        displayGroupOrder: 10000,
+        displayOrder: 100,
+        localizedLabels: {},
+        localizedDescriptions: {},
+        missingCodes: [],
+        unlockedMenus: null,
+
         code: 'crm.account',
         group: 'crm',
         label: '客户',

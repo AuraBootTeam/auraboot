@@ -22,6 +22,7 @@ import {
 } from '~/framework/smart/types/savedView';
 import { savedViewService } from '~/shared/services/savedViewService';
 import type { FieldOption } from './KanbanConfigPanel';
+import shareMessages from './ViewManagePanel.share.i18n.json';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
 import {
@@ -308,11 +309,14 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   onTeamPinView,
   onTeamUnpinView,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const tx = useCallback(
-    (key: string, fallback: string, params?: Record<string, unknown>) =>
-      interpolateMessage(t(key, params, fallback), params),
-    [t],
+    (key: string, fallback: string, params?: Record<string, unknown>) => {
+      const local = shareMessages[key as keyof typeof shareMessages];
+      const translatedFallback = local?.[locale.startsWith('zh') ? 'zh-CN' : 'en-US'] ?? fallback;
+      return interpolateMessage(t(key, params, translatedFallback), params);
+    },
+    [t, locale],
   );
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [configStep, setConfigStep] = useState<{
@@ -759,6 +763,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   const handleRevokeShareLink = useCallback(async () => {
     if (!sharingView) return;
     const confirmed = await confirmDialog({
+      title: tx('common.saved_view_share_title', '公开分享链接'),
       content: tx(
         'common.saved_view_share_revoke_confirm',
         '撤销后该链接立即失效，已拿到链接的人将无法访问。确定撤销？',

@@ -121,6 +121,11 @@ function envValue(primary: string, alias: string, fallback: string): string {
   return process.env[primary] ?? process.env[alias] ?? fallback;
 }
 
+/** Explicit targets stay optional so fixture-owning specs can reject missing runtime admission. */
+export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
+export const EXPLICIT_BACKEND_URL = process.env.BACKEND_URL;
+export const EXPLICIT_SPRING_BOOT_URL = process.env.SPRING_BOOT_URL;
+
 /** Require an explicitly owned runtime URL for tests that must never use host defaults. */
 export function requireRuntimeUrl(target: 'base' | 'backend'): string {
   const key = target === 'base' ? 'PLAYWRIGHT_BASE_URL' : 'BACKEND_URL';
@@ -134,9 +139,6 @@ export function requireRuntimeUrl(target: 'base' | 'backend'): string {
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;
-
-/** Explicit URL for tests that require an owned runtime rather than host defaults. */
-export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
 
 /** Vite-served base — what `page.goto` and `page.request` use by default. */
 export const BASE_URL =

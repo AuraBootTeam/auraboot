@@ -141,7 +141,7 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
             {!NO_VALUE_OPS.has(rule.operator) && (
               <input
                 type="text"
-                value={rule.value || ''}
+                value={rule.value == null ? '' : String(rule.value)}
                 onChange={(e) => handleUpdate(index, { value: e.target.value })}
                 placeholder="Value"
                 className="w-28 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"

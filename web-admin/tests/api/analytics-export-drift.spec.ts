@@ -1,8 +1,9 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** Stored exports must track record-ownership drift and complex SQL must respect scopes. */
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { BACKEND_URL, PG_CONN } from '../helpers/environments';
+import { PG_CONN } from '../helpers/environments';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
@@ -71,7 +72,7 @@ test('department drift invalidates stored exports and complex SQL respects the s
     );
     expect(identity.rows).toHaveLength(1);
     const ctx = await requestFactory.newContext({
-      baseURL: BACKEND_URL,
+      baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${(await login.json()).data.jwt}` },
     });
     return { ctx, email, userId: String(identity.rows[0].user_id), memberPid: String(identity.rows[0].member_pid) };

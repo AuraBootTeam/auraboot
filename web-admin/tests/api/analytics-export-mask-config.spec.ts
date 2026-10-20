@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '../helpers/environments';
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** Stored artifacts must reauthorize their source before streaming bytes. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -96,7 +96,7 @@ test(`config masking rechecks export applicability and exemptions`, async ({
   const jwt = (await login.json()).data.jwt;
   expect(jwt).toBeTruthy();
   const owner = await requestFactory.newContext({
-    baseURL: BACKEND_URL,
+    baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
     extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
   });
   let configId: number | undefined;

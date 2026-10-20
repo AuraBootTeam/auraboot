@@ -39,7 +39,9 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void notifyAction_persistsInAppNotification_viaRealNotificationService() throws Exception {
-        long userId = 880000L + (System.nanoTime() % 100000);
+        long userId = getTestUser().getId();
+        String userPid = getTestUser().getPid();
+        String title = "High priority complaint " + System.nanoTime();
         String code = "it_notify_" + System.nanoTime();
         String targetKey = code + "_form";
         definitionService.create(code, "Notify IT", "FORM_SUBMITTED", "FORM", targetKey);
@@ -48,10 +50,10 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
               "condition":{"type":"compare",
                  "left":{"type":"path","scope":"record","path":"data.priority","dataType":"enum"},
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
-              "actions":[{"type":"NOTIFY","target":"USER:%d","order":10,
-                 "payload":{"title":"High priority complaint","content":"please review"},
+              "actions":[{"type":"NOTIFY","target":"USER:%s","order":10,
+                 "payload":{"title":"%s","content":"please review"},
                  "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:NOTIFY"}]}]
-            """.formatted(userId));
+            """.formatted(userPid, title));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
                 DedupStrategy.BY_IDEMPOTENCY_KEY, rules);
@@ -60,7 +62,7 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
 
         Long tid = getTestTenant().getId();
         EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
-                Map.of("record", Map.of("entityCode", targetKey, "recordPid", "CMP-N-1",
+                Map.of("actor", Map.of("userId", -1L, "userPid", "forged-actor"), "record", Map.of("entityCode", targetKey, "recordPid", "CMP-N-1",
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
@@ -71,11 +73,16 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
                 .containsEntry("recipientId", String.valueOf(userId))
                 .containsEntry("sentCount", 1);
 
+        String loggedActor = jdbcTemplate.queryForObject(
+                "select context_payload->'actor'->>'userId' from ab_drt_policy_exec_log where tenant_id=? and policy_code=?",
+                String.class, tid, code);
+        assertThat(loggedActor).isEqualTo(String.valueOf(userId));
+
         // a real in-app notification was persisted for the target user by NotificationService
         Map<String, Object> n = jdbcTemplate.queryForMap(
-                "select title, content, source_type from ab_notification where tenant_id=? and user_id=?",
-                tid, userId);
-        assertThat(n.get("title")).isEqualTo("High priority complaint");
+                "select title, content, source_type from ab_notification where tenant_id=? and user_id=? and title=?",
+                tid, userId, title);
+        assertThat(n.get("title")).isEqualTo(title);
         assertThat(n.get("content")).isEqualTo("please review");
         assertThat(n.get("source_type")).isEqualTo("EVENT_POLICY");
     }

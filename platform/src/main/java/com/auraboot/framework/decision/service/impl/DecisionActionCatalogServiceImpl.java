@@ -177,6 +177,15 @@ public class DecisionActionCatalogServiceImpl implements DecisionActionCatalogSe
 
     private static final List<ActionDefinition> ACTION_DEFINITIONS = List.of(
             new ActionDefinition(
+                    "EXECUTE_COMMAND", "执行业务操作", "data",
+                    "调用所选模型的业务命令，并执行其权限、字段校验与状态约束。",
+                    List.of("record", "actor", "event"), RULE_ACTION_CONSUMERS, null,
+                    schema(List.of("payload.modelCode", "payload.commandCode"), Map.of(
+                            "payload.modelCode", field("model", "目标模型", true),
+                            "payload.commandCode", field("command", "业务操作", true),
+                            "payload.targetRecordPid", field("string", "目标记录", false),
+                            "payload.params", field("object", "操作参数", false)))),
+            new ActionDefinition(
                     "NOTIFY",
                     "发送通知",
                     "messaging",

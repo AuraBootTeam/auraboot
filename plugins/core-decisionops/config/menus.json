@@ -51,7 +51,7 @@
     "type": 1,
     "permissionCode": "decision.definition.read",
     "orderNo": 24,
-    "visible": true,
+    "visible": false,
     "extension": {
       "platforms": [
         "web"
@@ -72,7 +72,7 @@
     "type": 1,
     "permissionCode": "decision.definition.manage",
     "orderNo": 26,
-    "visible": true,
+    "visible": false,
     "extension": {
       "platforms": [
         "web"
@@ -113,8 +113,7 @@
     "name": "事件策略",
     "name:zh-CN": "事件策略",
     "name:en": "Event Policy",
-    "path": "/p/decisionops_event_policies",
-    "pageKey": "decisionops_event_policies_list",
+    "path": "/decision-ops?tab=policies",
     "component": null,
     "icon": "bolt",
     "type": 1,
@@ -141,7 +140,7 @@
     "type": 1,
     "permissionCode": "decision.definition.read",
     "orderNo": 28,
-    "visible": true,
+    "visible": false,
     "extension": {
       "platforms": [
         "web"
@@ -158,8 +157,7 @@
     "name": "执行日志",
     "name:zh-CN": "执行日志",
     "name:en": "Execution Logs",
-    "path": "/p/decisionops_execution_logs",
-    "pageKey": "decisionops_execution_logs_list",
+    "path": "/decision-ops?tab=logs",
     "component": null,
     "icon": "activity",
     "type": 1,
@@ -186,7 +184,7 @@
     "type": 1,
     "permissionCode": "decision.definition.read",
     "orderNo": 30,
-    "visible": true,
+    "visible": false,
     "extension": {
       "platforms": [
         "web"
@@ -207,7 +205,7 @@
     "type": 1,
     "permissionCode": "sys.connector.update",
     "orderNo": 31,
-    "visible": true,
+    "visible": false,
     "extension": {
       "platforms": [
         "web"

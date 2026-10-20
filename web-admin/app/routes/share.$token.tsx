@@ -1,218 +1,187 @@
-/**
- * Public Shared View Page — GAP-121
- *
- * Renders a shared view without authentication.
- * Accessed via /share/{token} — fetches data from /api/views/shared/{token}.
- */
-
-import { useCallback, useEffect, useState } from 'react';
+/** Anonymous, token-scoped view configuration; business records are not part of this HTTP response. */
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import { ResultHelper } from '~/utils/type';
+import { loadPublicSharedView, type PublicSharedView } from '~/shared/services/savedViewService';
+import TEXT from './share.i18n.json';
 
-interface SharedViewData {
-  viewName: string;
-  modelCode: string;
-  viewType: string;
-  columns: Array<{ code: string; label: string }>;
-  records: Array<Record<string, any>>;
-}
+type Failure = 'unavailable' | 'expired' | 'revoked' | 'network' | 'invalidPayload';
+const VIEW_KINDS = new Set([
+  'table',
+  'kanban',
+  'calendar',
+  'gallery',
+  'gantt',
+  'tree',
+  'timeline',
+  'form',
+]);
 
 export default function SharedViewPage() {
   const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
+  const { locale } = useI18n();
+  const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale);
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
-
-  const [data, setData] = useState<SharedViewData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const passwordParam = searchParams.get('password');
+  const pending = useRef<AbortController | null>(null);
+  const [data, setData] = useState<PublicSharedView | null>(null);
+  const [error, setError] = useState<Failure | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRequired, setPasswordRequired] = useState(false);
+  const [passwordInvalid, setPasswordInvalid] = useState(false);
   const [password, setPassword] = useState('');
-  const passwordParam = searchParams.get('password');
 
   const fetchSharedView = useCallback(
     async (pwd?: string) => {
+      pending.current?.abort();
+      const controller = new AbortController();
+      pending.current = controller;
       setLoading(true);
       setError(null);
+      setData(null);
+      setPasswordInvalid(false);
       try {
-        const url = pwd
-          ? `/api/views/shared/${token}?password=${encodeURIComponent(pwd)}`
-          : `/api/views/shared/${token}`;
-        const resp = await fetch(url);
-        const json = await resp.json();
-
-        if (resp.status === 401 || json?.message?.includes('password')) {
-          setPasswordRequired(true);
-          setLoading(false);
+        if (!token) {
+          setError('unavailable');
           return;
         }
-
-        if (resp.status === 404 || resp.status === 410) {
-          setError(json?.message || 'This shared link has expired or been revoked.');
-          setLoading(false);
+        const result = await loadPublicSharedView(token, pwd, controller.signal);
+        if (controller.signal.aborted) return;
+        if (!ResultHelper.isSuccess(result)) {
+          // Validation context is preserved separately from the localized envelope message.
+          const detail = result.context?.error;
+          if (result.httpStatus === 422 && detail === 'Invalid password') {
+            setPasswordRequired(true);
+            setPasswordInvalid(Boolean(pwd));
+          } else if (detail === 'Share link has expired') setError('expired');
+          else if (detail === 'Share link has been revoked') setError('revoked');
+          else setError('unavailable');
           return;
         }
-
-        if (!resp.ok) {
-          setError(json?.message || 'Failed to load shared view.');
-          setLoading(false);
+        if (!result.data) {
+          setError('invalidPayload');
           return;
         }
-
-        setData(json.data);
+        setData(result.data);
         setPasswordRequired(false);
       } catch {
-        setError('Network error. Please try again.');
+        if (!controller.signal.aborted) setError('network');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [token],
   );
 
   useEffect(() => {
-    if (token) {
-      void fetchSharedView(passwordParam || undefined);
-    }
-  }, [fetchSharedView, passwordParam, token]);
+    void fetchSharedView(passwordParam || undefined);
+    return () => pending.current?.abort();
+  }, [fetchSharedView, passwordParam]);
 
-  // Password prompt
-  if (passwordRequired) {
+  if (loading)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
-          <div className="mb-4 text-center">
-            <svg
-              className="mx-auto h-10 w-10 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-            <h2 className="mt-2 text-lg font-semibold text-gray-900">Password Required</h2>
-            <p className="mt-1 text-sm text-gray-500">This shared view is password protected.</p>
-          </div>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchSharedView(password)}
-            placeholder="Enter password"
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-            autoFocus
-          />
+      <div
+        role="status"
+        aria-label={text('loading')}
+        className="flex min-h-screen items-center justify-center bg-gray-50"
+      >
+        <span className="text-sm text-gray-600">{text('loading')}</span>
+      </div>
+    );
+  if (error)
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+        <div
+          role="alert"
+          className="max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm"
+        >
+          <h1 className="text-lg font-semibold text-gray-900">{text(error)}</h1>
           <button
-            onClick={() => fetchSharedView(password)}
-            className="mt-3 w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            type="button"
+            onClick={() => void fetchSharedView(password || passwordParam || undefined)}
+            className="mt-5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
           >
-            Access View
+            {text('retry')}
           </button>
         </div>
-      </div>
+      </main>
     );
-  }
-
-  // Loading
-  if (loading) {
+  if (passwordRequired)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-      </div>
-    );
-  }
-
-  // Error
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+      <main className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void fetchSharedView(password);
+          }}
+          className="w-full max-w-sm space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+        >
+          <h1 className="text-lg font-semibold text-gray-900">{text('passwordTitle')}</h1>
+          <p className="text-sm text-gray-600">{text('passwordHelp')}</p>
+          <label className="block text-sm font-medium text-gray-700">
+            {text('passwordLabel')}
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={text('passwordPlaceholder')}
+              aria-invalid={passwordInvalid}
+              aria-describedby={passwordInvalid ? 'share-password-error' : undefined}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
-          </svg>
-          <h2 className="mt-3 text-lg font-semibold text-gray-700">{error}</h2>
-          <p className="mt-1 text-sm text-gray-400">The link may have expired or been revoked.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Render shared view data
-  if (!data) return null;
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="mx-auto max-w-6xl">
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">{data.viewName}</h1>
-            <p className="text-sm text-gray-500">
-              Shared view — {data.viewType} · {data.modelCode}
+          </label>
+          {passwordInvalid && (
+            <p id="share-password-error" role="alert" className="text-sm text-red-600">
+              {text('passwordInvalid')}
             </p>
+          )}
+          <button
+            type="submit"
+            className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+          >
+            {text('open')}
+          </button>
+        </form>
+      </main>
+    );
+  if (!data) return null;
+  const kind = data.viewType === 'list' ? 'table' : data.viewType;
+  const label = kind && VIEW_KINDS.has(kind) ? text(kind as keyof typeof TEXT) : text('view');
+  return (
+    <main className="min-h-screen bg-gray-50 p-6" data-testid="public-shared-view">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold break-words text-gray-900">{data.name}</h1>
+            <p className="mt-1 text-sm text-gray-600">{label}</p>
           </div>
-          <div className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
-            Read Only
-          </div>
-        </div>
-
-        {/* Data Table */}
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs tracking-wide text-gray-500 uppercase">
-              <tr>
-                {data.columns?.map((col) => (
-                  <th key={col.code} className="px-4 py-3 text-left">
-                    {col.label || col.code}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {data.records?.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={data.columns?.length || 1}
-                    className="px-4 py-8 text-center text-gray-400"
-                  >
-                    No data available
-                  </td>
-                </tr>
-              ) : (
-                data.records?.map((record, idx) => (
-                  <tr key={record.pid || idx} className="hover:bg-gray-50">
-                    {data.columns?.map((col) => (
-                      <td key={col.code} className="px-4 py-3 text-gray-700">
-                        {String(record[col.code] ?? '')}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-4 text-center text-xs text-gray-400">
-          {branding.poweredByText} · {data.records?.length || 0} records
-        </div>
+          <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
+            {text('readOnly')}
+          </span>
+        </header>
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{text('configuration')}</h2>
+          <p className="mt-2 text-sm leading-6 text-gray-600">{text('configurationHelp')}</p>
+          <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {(['columns', 'filters', 'sorts'] as const).map((key) => (
+              <div key={key} className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <dt className="text-sm text-gray-600">{text(key)}</dt>
+                <dd className="mt-1 text-2xl font-semibold text-gray-900">
+                  {Array.isArray(data.viewConfig[key]) ? data.viewConfig[key].length : 0}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+        <footer className="text-center text-xs text-gray-500">{branding.poweredByText}</footer>
       </div>
-    </div>
+    </main>
   );
 }

@@ -234,7 +234,7 @@ export function RecordListView({
         const item = items.find((i) => String(i.value) === String(value));
         if (item) {
           // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
-          return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;
+          return <StatusDot tone={resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined)} label={item.label} />;
         }
         return String(value);
       }

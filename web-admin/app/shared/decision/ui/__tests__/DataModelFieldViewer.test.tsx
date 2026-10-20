@@ -18,6 +18,20 @@ describe('DataModelFieldViewer', () => {
     expect(screen.getByTestId('dmv-refs-amount')).toHaveTextContent('12');
   });
 
+  it('separates model metadata from identical unscoped rule references', () => {
+    render(<DataModelFieldViewer fields={[
+      {entityCode:'record',modelCode:'acceptance',modelName:'Acceptance',path:'data.amount',label:'Amount',dataType:'decimal'},
+      {entityCode:'record',modelCode:'project',modelName:'Project',path:'data.amount',label:'Budget',dataType:'decimal'},
+      {entityCode:'record',path:'data.amount',label:'Indexed reference',dataType:'decimal',refs:2},
+    ]} />);
+    expect(screen.getByTestId('dmv-count')).toHaveTextContent('3');
+    fireEvent.change(screen.getByLabelText('model-filter'), {target:{value:'acceptance'}});
+    expect(screen.getByTestId('dmv-count')).toHaveTextContent('1');
+    expect(screen.getByRole('cell',{name:'Acceptance',exact:true})).toBeVisible();
+    expect(screen.queryByRole('cell',{name:'Budget',exact:true})).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell',{name:'Indexed reference',exact:true})).not.toBeInTheDocument();
+  });
+
   it('filters by entity', () => {
     render(<DataModelFieldViewer fields={fields} />);
     fireEvent.change(screen.getByLabelText('entity-filter'), { target: { value: 'incident' } });

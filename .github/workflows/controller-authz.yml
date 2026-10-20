@@ -1,11 +1,7 @@
 name: Controller Authz Fail-Open Gate
 
-# REG-COVER Phase 1 (DDR-2026-06-30 deny-flip campaign): the PermissionInterceptor fail-opens for
-# handlers with no @RequirePermission (unannotated-mode=shadow). check-controller-authz.mjs pins the
-# current set of unguarded WRITE controllers (POST/PUT/DELETE/PATCH, no guard, not under /api/admin)
-# as a baseline and FAILS when a NEW one appears — so the fail-open surface cannot silently grow
-# while the campaign annotates the existing baseline down toward zero (then the runtime default can
-# be flipped shadow -> deny). Regenerate intentionally-accepted additions with --write-baseline.
+# Permission decisions are required per handler, including reads and admin routes.
+# The zero baseline must stay closed; scanner fixtures run before the repository audit.
 
 on:
   push:
@@ -13,6 +9,7 @@ on:
     paths:
       - 'platform/src/main/java/**/*Controller.java'
       - 'scripts/check-controller-authz.mjs'
+      - 'scripts/check-controller-authz.test.mjs'
       - 'scripts/controller-authz-baseline.json'
       - '.github/workflows/controller-authz.yml'
   pull_request:
@@ -20,6 +17,7 @@ on:
     paths:
       - 'platform/src/main/java/**/*Controller.java'
       - 'scripts/check-controller-authz.mjs'
+      - 'scripts/check-controller-authz.test.mjs'
       - 'scripts/controller-authz-baseline.json'
       - '.github/workflows/controller-authz.yml'
   workflow_dispatch:
@@ -46,5 +44,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Check for new unguarded write controllers (fail-open drift)
+      - name: Verify authorization scanner boundaries
+        run: node --test scripts/check-controller-authz.test.mjs
+
+      - name: Check every mapped handler for an authorization decision
         run: node scripts/check-controller-authz.mjs

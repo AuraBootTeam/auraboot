@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import {
   createDecisionApi,
   type HttpClient,
@@ -41,7 +41,7 @@ const CONSOLE_TABS = new Set<ConsoleTab>([
 ])
 
 function tabFromSearch(value: string | null): ConsoleTab {
-  return value && CONSOLE_TABS.has(value as ConsoleTab) ? (value as ConsoleTab) : 'studio'
+  return value && CONSOLE_TABS.has(value as ConsoleTab) ? (value as ConsoleTab) : 'definitions'
 }
 
 function createApi() {
@@ -56,6 +56,7 @@ function createApi() {
 }
 
 export default function DecisionOpsConsolePage() {
+  const navigate = useNavigate()
   const api = useMemo(() => createApi(), [])
   const location = useLocation()
   const browserSearch = typeof window !== 'undefined' ? window.location.search : ''
@@ -65,6 +66,15 @@ export default function DecisionOpsConsolePage() {
       api={api}
       fields={DEFAULT_FIELDS}
       initialTab={tabFromSearch(searchParams.get('tab'))}
+      initialDecisionCode={searchParams.get('decision') ?? undefined}
+      initialPolicyCode={searchParams.get('policy') ?? undefined}
+      onTabChange={(tab, selection) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('tab',tab);
+        if(selection?.decisionCode != null) next.set('decision',selection.decisionCode);
+        if(selection?.policyCode != null) next.set('policy',selection.policyCode);
+        navigate(`/decision-ops?${next}`, {replace:true});
+      }}
     />
   )
 }

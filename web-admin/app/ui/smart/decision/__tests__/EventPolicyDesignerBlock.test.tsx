@@ -5,6 +5,11 @@ import { EventPolicyDesignerBlock } from '../EventPolicyDesignerBlock';
 
 const get = vi.fn();
 const post = vi.fn();
+const auth = vi.hoisted(() => ({ permissions: new Set<string>() }));
+
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: (code: string) => auth.permissions.has(code) }),
+}));
 
 vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => ({
@@ -16,6 +21,7 @@ vi.mock('~/shared/services/ApiService', () => ({
 
 describe('EventPolicyDesignerBlock', () => {
   beforeEach(() => {
+    auth.permissions = new Set(['decision.policy.manage', 'decision.policy.publish', 'decision.policy.run']);
     get.mockReset();
     post.mockReset();
     post.mockResolvedValue({
@@ -121,7 +127,8 @@ describe('EventPolicyDesignerBlock', () => {
     expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('FORM_SUBMITTED');
     expect(screen.getByTestId('epd-run-summary')).toHaveTextContent('待运行样例');
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('Complaint Policy');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('草稿');
     await waitFor(() =>
       expect(get).toHaveBeenCalledWith(
         '/event-policy/definitions/complaint_policy/versions',
@@ -311,5 +318,16 @@ describe('EventPolicyDesignerBlock', () => {
       expect(screen.getByTestId('epd-run-summary')).toHaveTextContent('已命中 / 全部成功'),
     );
     expect(screen.getByTestId('epd-abnormal-actions')).toHaveTextContent('无异常动作');
+  });
+
+  it('denies execution when the current role has no policy run permission', async () => {
+    auth.permissions.clear();
+    render(<MemoryRouter><EventPolicyDesignerBlock block={{ props: { policyCode: 'complaint_policy' } }} /></MemoryRouter>);
+    await screen.findByTestId('epd-workflow');
+    fireEvent.click(screen.getByTestId('epd-step-test'));
+    const run = screen.getByTestId('epd-run-published');
+    expect(run).toBeDisabled();
+    fireEvent.click(run);
+    expect(post).not.toHaveBeenCalled();
   });
 });

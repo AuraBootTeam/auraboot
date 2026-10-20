@@ -1,37 +1,12 @@
-// ~/types/profile.ts
-export interface UserProfile {
-  userName: string;
-  nickName?: string;
-  email: string;
-  mobile?: string;
-  area?: string;
-  signature?: string;
-  avatarUrl?: string;
-  imgId?: string; // 如果后端返回头像文件ID
-  createdAt: string | number | Date | null;
-  lastSignInAt?: string | number | Date;
-}
+import type {
+  InternalRequestInput,
+  InternalResponseData,
+} from '~/shared/services/http-client/internal-api';
 
-export type UpdateUserProfileRequest = {
-  nickName?: string;
-  email?: string;
-  mobile?: string;
-  area?: string;
-  signature?: string;
-  imgId?: string; // 允许更新头像ID
-};
-
-export interface FileUploadResponse {
-  fileId: string;
-  fileName: string;
-  originalName: string;
-  fileSize: number;
-  mimeType: string;
-  localPath?: string;
-  cloudPath?: string;
-  storageType: string;
-  uploadTime: string;
-  createdBy: string;
-  status: string;
-  url?: string;
-}
+export type UserProfileWire = InternalResponseData<'get', '/api/user/profile'>;
+/** Identity required by the profile view, checked when adapting the wire response. */
+export type UserProfile = UserProfileWire & { pid: string };
+export type UpdateUserProfileRequest = InternalRequestInput<'put', '/api/user/profile'>['body'];
+export type FileUploadResponseWire = InternalResponseData<'post', '/api/user/avatar/upload'>;
+/** Upload identity and usable URL are checked before the page accepts the upload. */
+export type FileUploadResponse = FileUploadResponseWire & { fileId: string; url: string };

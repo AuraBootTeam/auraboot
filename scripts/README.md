@@ -57,7 +57,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `check-docs.sh` | 2 | 2026-07-02 | Documentation quality gate. |
 | `check-dsl-actions.mjs` | 3 | 2026-07-15 | check-dsl-actions.mjs — a workbench button may only ask for an action the runtime runs. |
 | `check-dsl-command-convention.mjs` | 0 | 2026-06-19 | check-dsl-command-convention.mjs — regression gate for convention CRUD routing. |
-| `check-dsl-render-types.mjs` | 1 | 2026-07-17 | check-dsl-render-types.mjs — a DSL page may only ask for a renderer that exists. |
+| `check-dsl-render-types.mjs` | 1 | 2026-10-19 | Parse registry and table-column renderer capabilities using the pinned internal-api toolchain; `--self-test` verifies fixed fixtures. |
 | `check-dsl-status-colors.mjs` | 1 | 2026-07-13 | check-dsl-status-colors.mjs — DSL dict status color semantics gate. |
 | `check-e2e-assertions.mjs` | 1 | 2026-07-14 | check-e2e-assertions — an assertion that something is ABSENT must be able to fail. |
 | `check-e2e-spec-registration.mjs` | 3 | 2026-07-23 | Gate: no E2E spec may exist without being selectable by some project. |
@@ -265,6 +265,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `performance/measure-home.mjs` | 0 | 2026-10-16 | Measure browser home readiness and retain the native performance evidence. |
 | `performance/seed-api.mjs` | 0 | 2026-10-16 | Seed fixtures through the explicit performance API target. |
 | `publish-repos.sh` | 1 | 2026-04-15 |  |
+| `prepare-quickstart-env.py` | 2 | 2026-10-18 | Prepare missing persistent protocol signing material without printing or rotating existing keys. |
 | `quickstart.sh` | 8 | 2026-07-13 | quickstart.sh — turn a freshly-started AuraBoot stack into a usable one. |
 | `release/bump-version.sh` | 1 | 2026-06-18 | Bump the release version. Single source of truth = VERSION at repo root. |
 | `reset-db.sh` | 13 | 2026-06-18 | AuraBoot Database Reset Script |
@@ -336,3 +337,22 @@ These local measurement helpers require an explicitly configured runtime and cre
 |---|---|---|
 | `dev/start-web-stack.sh` | tooling | Start the governed development or production Web/BFF entrypoint. |
 | `performance/home-readiness.mjs` | tooling | Observe browser readiness marks for the home performance runner. |
+
+## Internal Web Admin API contracts
+
+| script | category | purpose |
+|---|---|---|
+| `internal-api/contract.mjs` | contract | Validate, normalize and select explicit internal OpenAPI operations without removing schema constraints. |
+| `internal-api/discover.mjs` | contract | Reconcile frontend network-call candidates with a captured runtime catalog; retain unresolved and unmigrated entries. |
+| `internal-api/type-origins.mjs` | contract | Associate bound inventory calls with actual compiler types and declaration origins; retain casts, unknowns and unresolved symbols without claiming wire compatibility. |
+| `internal-api/source-graph.mjs` | contract | Trace Web Admin entries, router resources, source aliases and workspace package exports; retain dynamic/data boundaries and unproven candidates. |
+| `internal-api/export.mjs` | contract | Export or compare the internal OpenAPI group and create a fresh source-bound export receipt. |
+| `internal-api/toolchain/generate.mjs` | codegen | Generate or check TypeScript declarations using the isolated, locked OpenAPI toolchain. |
+
+| `internal-api/browser-catalog.mjs` | contract | Reconcile independently enumerated spec tests, scene captures and JSON evidence declarations with the fixed catalog. |
+| `internal-api/browser-evidence.mjs` | contract | Validate source/runtime/report identity, mandatory observations and exact original-image review; retain functional and visual verdicts separately. |
+| `internal-api/browser.mjs` | contract | Run owned catalog journeys against a verified managed stack and collect fresh source-bound functional or reviewed evidence. |
+| `internal-api/foundation.mjs` | contract | Verify canonical spec, generated declarations and the exact registered offline unit denominator; emit a fresh source-bound consistency receipt. |
+| `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
+| `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |
+| `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |

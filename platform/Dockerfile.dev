@@ -30,6 +30,7 @@ ENV MAVEN_HOME=/m2-cache
 COPY gradlew gradlew
 COPY gradle gradle
 COPY build.gradle settings.gradle gradle.properties ./
+COPY lombok.config ./
 
 COPY platform-plugin-api/build.gradle platform-plugin-api/build.gradle
 COPY platform-storage-minio/build.gradle platform-storage-minio/build.gradle

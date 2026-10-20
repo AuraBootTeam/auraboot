@@ -7,6 +7,81 @@ import {
 } from '../URLBuilder';
 import type { RequestContext, FetchOptions } from '../types';
 
+describe('multipart body', () => {
+  const context: RequestContext = { isServer: false, timezone: 'Asia/Shanghai' };
+
+  it('preserves file bytes and filename with auth, timezone and cancellation', async () => {
+    const formData = new FormData();
+    formData.append('file', new Blob(['actual file bytes'], { type: 'image/png' }), 'avatar.png');
+    const controller = new AbortController();
+    const { init } = buildRequest(
+      '/api/upload',
+      {
+        method: 'post',
+        formData,
+        signal: controller.signal,
+      },
+      context,
+      'test-token',
+    );
+    expect(init.body).toBe(formData);
+    const file = formData.get('file') as File;
+    expect(file.name).toBe('avatar.png');
+    expect(await file.text()).toBe('actual file bytes');
+    const headers = new Headers(init.headers);
+    expect(headers.has('Content-Type')).toBe(false);
+    expect(headers.get('Authorization')).toBe('Bearer test-token');
+    expect(headers.get('X-Timezone')).toBe('Asia/Shanghai');
+    expect(init.credentials).toBe('include');
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('rejects ambiguous or invalid multipart requests', () => {
+    const formData = new FormData();
+    for (const extra of [
+      { body: {} },
+      { method: 'get' as const },
+      { headers: { 'content-type': 'multipart/form-data' } },
+      { params: { ignored: 'value' } },
+      { params: [] },
+    ]) {
+      expect(() =>
+        buildRequest('/api/upload', { method: 'post', formData, ...extra }, context),
+      ).toThrow();
+    }
+  });
+});
+
+describe('explicit JSON body', () => {
+  const context: RequestContext = { isServer: false };
+
+  it.each([{}, [], null, false, 0, 'value'])(
+    'preserves JSON body %j without moving it into a query',
+    (body) => {
+      const result = buildRequest('/api/example', { method: 'post', body }, context, undefined);
+      expect(result.init.body).toBe(JSON.stringify(body));
+      expect(result.url).not.toContain('?');
+    },
+  );
+
+  it('preserves an explicit DELETE object body', () => {
+    const result = buildRequest(
+      '/api/example',
+      { method: 'delete', body: { pid: 'record-pid' } },
+      context,
+      undefined,
+    );
+    expect(result.init.body).toBe('{"pid":"record-pid"}');
+    expect(result.url).not.toContain('?');
+  });
+
+  it('rejects a GET body before issuing a request', () => {
+    expect(() =>
+      buildRequest('/api/example', { method: 'get', body: {} }, context, undefined),
+    ).toThrow('GET and HEAD requests cannot carry a JSON body');
+  });
+});
+
 describe('replacePathVariables', () => {
   it('should replace single path variable', () => {
     const result = replacePathVariables('/api/user/{userId}', { userId: 123 });

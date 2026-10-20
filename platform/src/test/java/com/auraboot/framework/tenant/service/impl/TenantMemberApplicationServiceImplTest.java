@@ -268,6 +268,29 @@ class TenantMemberApplicationServiceImplTest {
     }
 
     @Test
+    @DisplayName("member search preserves null usernames for email-only identities")
+    void searchMembersEmailOnlyIdentity() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        Page<TenantMember> page = new Page<>(1, 10);
+        page.setRecords(List.of(member(1L, 99L, 7L, StatusConstants.ACTIVE)));
+        page.setTotal(1L);
+        when(tenantMemberService.findMembers(anyInt(), anyInt(), eq(99L), any(), any(), any()))
+                .thenReturn(page);
+        User user = u(7L, "email-only@example.test");
+        user.setUserName(null);
+        user.setNickName(null);
+        when(userService.findByUserId(7L)).thenReturn(user);
+        MemberQueryRequest request = new MemberQueryRequest();
+        request.setPageNum(1);
+        request.setPageSize(10);
+        var identity = service.searchMembers(request, 7L).getRecords().get(0).user();
+        var json = new ObjectMapper().valueToTree(identity);
+        assertTrue(json.get("username").isNull());
+        assertEquals("email-only@example.test", json.get("email").asText());
+        assertEquals(user.getPid(), identity.pid());
+    }
+
+    @Test
     @DisplayName("getMemberById throws when not found")
     void getMemberMissing() {
         when(tenantMemberService.findByPid("p")).thenReturn(null);

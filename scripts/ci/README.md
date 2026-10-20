@@ -1,5 +1,23 @@
 # Open Platform probe and receiver tools
 
+## Image build dependency repositories
+
+`AURA_GRADLE_REPOSITORY_POLICY=central` selects Maven Local and Maven Central for
+all image-build projects through `gradle-repositories.init.gradle`. Quickstart and
+Auth GitHub runners set this build argument explicitly because their network can
+time out against the default regional mirrors. `project` retains the declared
+project repositories and is the default for other image builds. Unknown policies
+fail. This changes resolution endpoints only; wrapper, dependency versions, locks
+and verification remain in force. The policy is confined to the builder stage.
+
+Gradle's [settings repository mode](https://docs.gradle.org/current/userguide/centralizing_repositories.html#sub:centralized-repository-declaration)
+applies the selected repositories to the root and included provider modules.
+
+The GitHub frontend and DSL runners install the locked internal API toolchain
+with npm Central registry selection and `--replace-registry-host=registry.npmmirror.com`.
+This replaces only that lockfile download host for the installation; committed
+package versions, lockfile bytes and tarball integrity checks remain unchanged.
+
 Run the tool self-tests, including an invalid-signature mutation and restored validation:
 
 ```sh

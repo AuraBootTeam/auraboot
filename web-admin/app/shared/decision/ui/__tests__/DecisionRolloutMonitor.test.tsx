@@ -115,6 +115,28 @@ function rolloutApi(overrides: Partial<DecisionApi> = {}): Partial<DecisionApi> 
 }
 
 describe('DecisionRolloutMonitor', () => {
+  it('uses business rule choices and keeps advanced routing collapsed', async () => {
+    const api = rolloutApi({listDefinitions:vi.fn(async()=>[{decisionCode:'risk_score',decisionName:'客户分级规则'}])});
+    renderMonitor(api);
+    expect(await screen.findByRole('option',{name:'客户分级规则'})).toHaveValue('risk_score');
+    expect(screen.getByTestId('rollout-advanced')).not.toHaveAttribute('open');
+    expect(await screen.findByTestId('rollout-row-rollout-1')).toHaveTextContent('客户分级规则');
+    fireEvent.click(screen.getByTestId('rollout-advanced').querySelector('summary')!);
+    expect(screen.getByLabelText('rollout-routing-key')).toBeVisible();
+  });
+
+  it('shows a recoverable creation failure without an unhandled rejection', async () => {
+    const api=rolloutApi({createRollout:vi.fn().mockRejectedValueOnce(new Error('exact server error')).mockResolvedValue({pid:'rollout-1'})});
+    renderMonitor(api);await screen.findByTestId('rollout-row-rollout-1');
+    fireEvent.click(screen.getByTestId('rollout-create'));
+    expect(await screen.findByTestId('rollout-status-message')).toHaveTextContent('操作未完成');
+    const technical=screen.getByTestId('rollout-status-message').querySelector('details')!;
+    expect(technical).not.toHaveAttribute('open');expect(technical).toHaveTextContent('exact server error');
+    await waitFor(()=>expect(screen.getByTestId('rollout-create')).toBeEnabled());
+    fireEvent.click(screen.getByTestId('rollout-create'));
+    await waitFor(()=>expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('灰度策略已创建'));
+  });
+
   it('lists rollout policies and renders baseline/candidate metrics', async () => {
     const api = rolloutApi();
     renderMonitor(api);
@@ -303,7 +325,7 @@ describe('DecisionRolloutMonitor', () => {
 
     await waitFor(() => expect(screen.getByTestId('rollout-row-rollout-1')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('rollout-promote-rollout-1'));
-    expect(screen.getByTestId('rollout-confirm-panel')).toHaveTextContent('promote');
+    expect(screen.getByTestId('rollout-confirm-panel')).toHaveTextContent('全量发布');
     fireEvent.change(screen.getByLabelText('rollout-action-note'), {
       target: { value: 'metrics accepted' },
     });
@@ -313,7 +335,7 @@ describe('DecisionRolloutMonitor', () => {
       expect(api.promoteRollout).toHaveBeenCalledWith('rollout-1', { note: 'metrics accepted' }),
     );
     await waitFor(() =>
-      expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 promote'),
+      expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 全量发布'),
     );
 
     fireEvent.click(screen.getByTestId('rollout-rollback-rollout-1'));
@@ -328,7 +350,7 @@ describe('DecisionRolloutMonitor', () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 rollback'),
+      expect(screen.getByTestId('rollout-status-message')).toHaveTextContent('已执行 回滚'),
     );
   });
 });

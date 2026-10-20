@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ActionModelParameters } from './ActionModelParameters';
 import type {
   DecisionAction,
   DecisionApi,
@@ -28,6 +29,8 @@ import {
   type RuleConsumerBindingDraft,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock';
 
+const BUSINESS_RESULT_KEYS = new Set(['sentCount', 'recipientCount', 'createdCount', 'ccCount', 'resolvedCount', 'fieldCount', 'failureReason', 'message', 'deliveryTraceStatus', 'dispatchAccepted']);
+
 export type DesignerStep = 'trigger' | 'rules' | 'actions' | 'test' | 'publish' | 'history';
 export type PolicyPhase = 'BEFORE_SUBMIT' | 'AFTER_COMMIT' | 'ASYNC_WORKER';
 export type ExecutionMode = 'ORDERED' | 'UNORDERED';
@@ -47,6 +50,9 @@ type DecisionBindingValue = NonNullable<RuleConsumerBindingDraft['decisionBindin
 
 export interface EventPolicyDesignerWorkflowProps {
   api: DecisionApi;
+  readOnly?: boolean;
+  canPublish?: boolean;
+  canRun?: boolean;
   fields: FieldOption[];
   selectedPolicy?: EventPolicySummary | null;
   samples?: TestSample[];
@@ -61,7 +67,7 @@ export interface PolicyActionDraft {
 }
 
 const DEFAULT_IDEMPOTENCY =
-  '${record.entityCode}:${record.recordPid}:${rule.ruleCode}:${action.type}';
+  '${event.eventId}:${record.entityCode}:${record.recordPid}:${rule.ruleCode}:${action.type}:${action.order}';
 const POLICY_PHASES: readonly PolicyPhase[] = ['BEFORE_SUBMIT', 'AFTER_COMMIT', 'ASYNC_WORKER'];
 const EXECUTION_MODES: readonly ExecutionMode[] = ['ORDERED', 'UNORDERED'];
 const FAILURE_STRATEGIES: readonly FailureStrategy[] = [
@@ -316,9 +322,13 @@ function executionContextForSample(sample: TestSample | undefined): ScopedContex
 export function EventPolicyDesignerWorkflow({
   api,
   fields,
+  readOnly = false,
+  canPublish = true,
+  canRun = true,
   selectedPolicy,
   samples = [],
 }: EventPolicyDesignerWorkflowProps) {
+  const fieldsForActions = fields;
   const { locale } = useI18n();
   const presentation = useMemo(() => createEventPolicyPresentation(locale), [locale]);
   const {
@@ -357,6 +367,7 @@ export function EventPolicyDesignerWorkflow({
   );
   const [selectedRuleCode, setSelectedRuleCode] = useState('R-1');
   const [draftPid, setDraftPid] = useState(selectedPolicy?.latestVersionPid ?? '');
+  const [operationVersion, setOperationVersion] = useState<number | undefined>(selectedPolicy?.version);
   const [publishStatus, setPublishStatus] = useState(selectedPolicy?.status ?? 'UNSAVED');
   const [error, setError] = useState('');
   const [versionLoading, setVersionLoading] = useState(false);
@@ -517,6 +528,7 @@ export function EventPolicyDesignerWorkflow({
     setRulesValue(restoredRules);
     setSelectedRuleCode(restoredRules.rules[0]?.ruleCode ?? '');
     setDraftPid(selectedPolicy?.latestVersionPid ?? '');
+    setOperationVersion(selectedPolicy?.version);
     setPublishStatus(selectedPolicy?.status ?? 'UNSAVED');
     setError('');
     setVersionError('');
@@ -538,6 +550,7 @@ export function EventPolicyDesignerWorkflow({
         const version = latestVersion(versions, selectedPolicy?.latestVersionPid);
         if (!version) return;
         setDraftPid(version.pid);
+        setOperationVersion(version.version);
         setPublishStatus(version.status ?? selectedPolicy?.status ?? 'UNSAVED');
         if (archivedDraft) return;
         const hydratedRules = hydrateRules(
@@ -621,6 +634,7 @@ export function EventPolicyDesignerWorkflow({
   };
 
   const createDraft = async () => {
+    if (readOnly) return;
     if (!selectedPolicy?.policyCode) return;
     setError('');
     try {
@@ -634,6 +648,7 @@ export function EventPolicyDesignerWorkflow({
         rulesJson: buildRulesJson(rulesValue),
       });
       setDraftPid(result.pid);
+      setOperationVersion(result.version);
       setPublishStatus(result.status ?? 'DRAFT');
       // The draft now lives in a backend version — the session archive for this
       // policy served its purpose and must not resurrect older edits later.
@@ -644,31 +659,51 @@ export function EventPolicyDesignerWorkflow({
   };
 
   const validateDraft = async () => {
+    if (readOnly) return;
     if (!draftPid) return;
-    const result = await api.validatePolicyVersion(draftPid);
-    setPublishStatus(result.status ?? 'VALIDATED');
+    setError('');
+    try {
+      const result = await api.validatePolicyVersion(draftPid);
+      setPublishStatus(result.status ?? 'VALIDATED');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    }
   };
 
   const publishDraft = async () => {
+    if (!canPublish) return;
     if (!draftPid) return;
-    const result = await api.publishPolicyVersion(draftPid);
-    setPublishStatus(result.status ?? 'PUBLISHED');
+    setError('');
+    try {
+      const result = await api.publishPolicyVersion(draftPid);
+      setPublishStatus(result.status ?? 'PUBLISHED');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    }
   };
 
   const runPublishedPolicy = async () => {
+    if (!canRun) return;
     if (!selectedPolicy?.eventType || !selectedPolicy.targetType || !selectedPolicy.targetKey)
       return;
-    const result = await api.runAndExecutePolicy({
-      eventType: selectedPolicy.eventType,
-      targetType: selectedPolicy.targetType,
-      targetKey: selectedPolicy.targetKey,
-      context: executionContextForSample(samples[0]),
-    });
-    setRunResult(result);
+    setError('');
+    setRunResult(null);
+    try {
+      const result = await api.runAndExecutePolicy({
+        eventType: selectedPolicy.eventType,
+        targetType: selectedPolicy.targetType,
+        targetKey: selectedPolicy.targetKey,
+        context: executionContextForSample(samples[0]),
+      });
+      setRunResult(result);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    }
   };
 
   return (
     <div className="epd-workflow" data-testid="epd-workflow">
+      {readOnly && <p className="epd-state" role="status">{copy('read_only_policy')}</p>}
       <section className="epd-command-center" data-testid="epd-command-center">
         <div className="epd-command-main" data-testid="epd-strategy-summary">
           <div className="epd-panel-heading">
@@ -679,13 +714,14 @@ export function EventPolicyDesignerWorkflow({
                   selectedPolicy?.policyCode ??
                   copy('no_policy_selected')}
               </strong>
-              <div className="epd-context-meta">
+              <details className="epd-context-meta"><summary>{copy('technical_identifiers')}</summary>
                 <span>{selectedPolicy?.policyCode ?? '-'}</span>
                 <span>{selectedPolicy?.eventType ?? '-'}</span>
                 <span>
                   {selectedPolicy?.targetType ?? '-'} / {selectedPolicy?.targetKey ?? '-'}
                 </span>
-              </div>
+              </details>
+              <p className="text-sm text-slate-500">{selectedPolicy?.eventType === 'COMMAND_COMPLETED' ? copy('business_operation_committed') : copy('event_driven_policy')}</p>
             </div>
             <span className={`epd-status epd-status-${String(publishStatus).toLowerCase()}`}>
               {policyStatusLabel(publishStatus)}
@@ -710,8 +746,8 @@ export function EventPolicyDesignerWorkflow({
 
         <div className="epd-command-card" data-testid="epd-abnormal-actions">
           <span>{copy('abnormal_actions')}</span>
-          <strong>{abnormalSummary}</strong>
-          <small>{abnormalDetail}</small>
+          <strong>{runResult ? abnormalSummary : copy('awaiting_execution_verification')}</strong>
+          <small>{runResult ? abnormalDetail : copy('not_executed_no_delivery_claim')}</small>
           <button type="button" onClick={() => setStep('actions')}>
             {copy('inspect_actions')}
           </button>
@@ -734,8 +770,10 @@ export function EventPolicyDesignerWorkflow({
         ))}
       </nav>
 
+      {error && <div className="epd-state is-error" role="alert" data-testid="epd-error">{error}</div>}
       {step === 'trigger' && (
         <section className="epd-panel" data-testid="epd-trigger-panel">
+          <fieldset disabled={readOnly} className="epd-edit-scope">
           <div className="epd-panel-heading" data-testid="epd-trigger-context">
             <div>
               <span className="epd-eyebrow">{copy('event_policy')}</span>
@@ -744,13 +782,7 @@ export function EventPolicyDesignerWorkflow({
                   selectedPolicy?.policyCode ??
                   copy('no_policy_selected')}
               </strong>
-              <div className="epd-context-meta">
-                <span>{selectedPolicy?.policyCode ?? '-'}</span>
-                <span>{selectedPolicy?.eventType ?? '-'}</span>
-                <span>
-                  {selectedPolicy?.targetType ?? '-'} / {selectedPolicy?.targetKey ?? '-'}
-                </span>
-              </div>
+
             </div>
             <span className={`epd-status epd-status-${String(publishStatus).toLowerCase()}`}>
               {policyStatusLabel(publishStatus)}
@@ -768,18 +800,12 @@ export function EventPolicyDesignerWorkflow({
           )}
           <div className="epd-summary-grid">
             <div className="epd-summary-card">
-              <span>{copy('policy_code')}</span>
-              <strong>{selectedPolicy?.policyCode ?? '-'}</strong>
-            </div>
-            <div className="epd-summary-card">
               <span>{copy('trigger_event')}</span>
-              <strong>{selectedPolicy?.eventType ?? '-'}</strong>
+              <strong>{selectedPolicy?.eventType === 'COMMAND_COMPLETED' ? copy('business_operation_committed') : copy('event_driven_policy')}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('target_object')}</span>
-              <strong>
-                {selectedPolicy?.targetType ?? '-'} / {selectedPolicy?.targetKey ?? '-'}
-              </strong>
+              <strong>{fields.find(field => field.modelCode === selectedPolicy?.targetKey)?.modelName || copy('model_name_unavailable')}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('match_mode')}</span>
@@ -796,11 +822,12 @@ export function EventPolicyDesignerWorkflow({
               {POLICY_PHASES.map((value) => enumOption(value, PHASE_LABELS))}
             </select>
           </div>
-        </section>
+        </fieldset></section>
       )}
 
       {step === 'rules' && (
         <section className="epd-panel">
+          <fieldset disabled={readOnly} className="epd-edit-scope">
           <div className="epd-panel-heading">
             <div>
               <span className="epd-eyebrow">{copy('condition_setup')}</span>
@@ -862,11 +889,12 @@ export function EventPolicyDesignerWorkflow({
               </div>
             ))}
           </div>
-        </section>
+        </fieldset></section>
       )}
 
       {step === 'actions' && (
         <section className="epd-panel" data-testid="epd-actions-panel">
+          <fieldset disabled={readOnly} className="epd-edit-scope">
           <div className="epd-panel-heading">
             <div>
               <span className="epd-eyebrow">{copy('action_setup')}</span>
@@ -941,7 +969,7 @@ export function EventPolicyDesignerWorkflow({
                       id={`epd-action-type-${idx}`}
                       aria-label={`action-type-${idx}`}
                       value={action.type}
-                      onChange={(e) => updateAction(idx, { type: e.target.value })}
+                      onChange={(e) => updateAction(idx, { type: e.target.value, payloadJson: '{}', target: '' })}
                     >
                       {actionOptions.map((option) => (
                         <option key={option.actionType} value={option.actionType}>
@@ -963,11 +991,15 @@ export function EventPolicyDesignerWorkflow({
                     </div>
                     <div className="epd-payload-summary">
                       <span>{copy('payload_summary')}</span>
-                      <strong>{payloadTitle(action.payloadJson)}</strong>
+                      <strong>{action.type === 'EXECUTE_COMMAND' && payload.commandCode ? copy('business_command_configured') : payloadTitle(action.payloadJson)}</strong>
                     </div>
                   </div>
                   <div className="epd-action-schema" data-testid={`epd-action-schema-${idx}`}>
-                    {fields.map((field) => {
+                    {['EXECUTE_COMMAND', 'UPDATE_RECORD', 'PATCH_RECORD'].includes(action.type) ? (
+                      <ActionModelParameters actionType={action.type} payload={payload} fields={fieldsForActions} readOnly={readOnly}
+                        currentModelCode={fieldsForActions.find(field => field.modelCode === selectedPolicy?.targetKey)?.modelCode}
+                        onChange={(next) => updateAction(idx, { payloadJson: payloadToJson(next) })} />
+                    ) : fields.map((field) => {
                       const inputKind = actionFieldInputKind(field);
                       const ariaLabel =
                         field.path === 'target'
@@ -1014,7 +1046,7 @@ export function EventPolicyDesignerWorkflow({
               );
             })}
           </div>
-        </section>
+        </fieldset></section>
       )}
 
       {step === 'test' && (
@@ -1026,7 +1058,7 @@ export function EventPolicyDesignerWorkflow({
                 {copy('verify_policy_matches_and_action_execution_with_sample_facts')}
               </strong>
             </div>
-            <button type="button" data-testid="epd-run-published" onClick={runPublishedPolicy}>
+            <button type="button" data-testid="epd-run-published" disabled={!canRun} onClick={runPublishedPolicy}>
               {copy('run_and_execute_actions')}
             </button>
           </div>
@@ -1050,9 +1082,9 @@ export function EventPolicyDesignerWorkflow({
               <span>{copy('run_result')}</span>
               <strong>{runStatus(runResult)}</strong>
               {runCorrelationId(runResult) ? (
-                <span className="epd-correlation" data-testid="epd-correlation-id">
+                <details className="epd-context-meta"><summary>{copy('technical_identifiers')}</summary><span className="epd-correlation" data-testid="epd-correlation-id">
                   Correlation {runCorrelationId(runResult)}
-                </span>
+                </span></details>
               ) : null}
               {eventPolicyTraceHref(runResult, selectedPolicy) ? (
                 <a
@@ -1094,21 +1126,28 @@ export function EventPolicyDesignerWorkflow({
                             {idempotencyEvidence(action.idempotencyKey)}
                           </span>
                         </div>
-                        {action.error ? (
-                          <div className="epd-state is-error">{String(action.error)}</div>
-                        ) : null}
-                        {payloadRows.length > 0 ? (
-                          <dl
-                            className="epd-action-result-payload"
-                            data-testid={`epd-action-result-payload-${idx}`}
-                          >
-                            {payloadRows.map((row) => (
-                              <div key={row.key}>
-                                <dt>{row.label}</dt>
-                                <dd>{row.value}</dd>
-                              </div>
+                        <div data-testid={`epd-action-result-payload-${idx}`}>
+                          <dl className="epd-action-result-payload">
+                            {payloadRows.filter(row => BUSINESS_RESULT_KEYS.has(row.key)).map(row => (
+                              <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>
                             ))}
                           </dl>
+                          {payloadRows.some(row => !BUSINESS_RESULT_KEYS.has(row.key)) ? (
+                            <details className="epd-action-diagnostics" data-testid={`epd-action-diagnostics-${idx}`}>
+                              <summary>{copy('technical_identifiers')}</summary>
+                              <dl className="epd-action-result-payload">
+                                {payloadRows.filter(row => !BUSINESS_RESULT_KEYS.has(row.key)).map(row => (
+                                  <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>
+                                ))}
+                              </dl>
+                            </details>
+                          ) : null}
+                        </div>
+                        {action.error ? (
+                          <details className="epd-action-diagnostics" data-testid={`epd-action-error-${idx}`}>
+                            <summary>{copy('error_message')}</summary>
+                            <div className="epd-state is-error">{String(action.error)}</div>
+                          </details>
                         ) : null}
                       </div>
                     );
@@ -1128,13 +1167,13 @@ export function EventPolicyDesignerWorkflow({
               <strong>{copy('save_validate_and_publish_policy_versions')}</strong>
             </div>
             <div className="epd-publish-actions">
-              <button type="button" data-testid="epd-save-draft" onClick={createDraft}>
+              <button type="button" data-testid="epd-save-draft" disabled={readOnly} onClick={createDraft}>
                 {copy('save_draft')}
               </button>
               <button
                 type="button"
                 data-testid="epd-validate-version"
-                disabled={!draftPid}
+                disabled={!draftPid || readOnly}
                 onClick={validateDraft}
               >
                 {copy('validate_version')}
@@ -1142,7 +1181,7 @@ export function EventPolicyDesignerWorkflow({
               <button
                 type="button"
                 data-testid="epd-publish-version"
-                disabled={!draftPid}
+                disabled={!draftPid || !canPublish}
                 onClick={publishDraft}
               >
                 {copy('publish_version')}
@@ -1195,11 +1234,7 @@ export function EventPolicyDesignerWorkflow({
             <span>{copy('current_status')}</span>
             <strong data-testid="epd-publish-status">{policyStatusLabel(publishStatus)}</strong>
           </div>
-          {error && (
-            <div className="epd-state is-error" data-testid="epd-error">
-              {error}
-            </div>
-          )}
+
         </section>
       )}
 
@@ -1214,11 +1249,11 @@ export function EventPolicyDesignerWorkflow({
           <div className="epd-summary-grid">
             <div className="epd-summary-card">
               <span>{copy('current_status')}</span>
-              <strong>{policyStatusLabel(selectedPolicy?.status)}</strong>
+              <strong>{policyStatusLabel(publishStatus)}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('current_version')}</span>
-              <strong>v{selectedPolicy?.version ?? '-'}</strong>
+              <strong>v{operationVersion ?? '-'}</strong>
             </div>
             <div className="epd-summary-card">
               <span>{copy('draft_status')}</span>
