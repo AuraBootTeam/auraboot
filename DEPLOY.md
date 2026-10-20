@@ -33,6 +33,7 @@ cd auraboot
 
 # Configure the installation environment
 cp .env.example .env
+chmod 600 .env
 # Generate once; keep this installation key in .env across restarts.
 printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 # Edit .env with other settings (change JWT_SECRET for production).

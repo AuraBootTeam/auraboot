@@ -279,6 +279,12 @@ prevents further child restarts; runtime databases and evidence remain retained.
 
 ## test (20)
 
+Quickstart signing-key regression: `node --test scripts/quickstart-signing-key.test.mjs scripts/quickstart-session.test.mjs` checks key transport and private generation; it does not replace the Docker Quickstart real-stack workflow.
+
+| script | purpose |
+|---|---|
+| `quickstart-signing-key.test.mjs` | Hermetic key transport, private generation, no overwrite and no shared default contracts. |
+
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
 
 ## Package distribution self-tests

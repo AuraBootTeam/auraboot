@@ -44,10 +44,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { BACKEND_URL, PG_ENV } from '../../helpers/environments';
+import { BACKEND_URL, PG_ENV, BOOTSTRAP_COMPANY_NAME } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
-const COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
+const COMPANY_NAME = BOOTSTRAP_COMPANY_NAME;
 const AUTO_BOOTSTRAP_WAIT_MS = Number(process.env.AURA_AUTO_BOOTSTRAP_WAIT_MS ?? '0');
 const BOOTSTRAP_POLL_MS = 2000;
 const TENANT_INVITE_MANAGE_PERMISSION = 'org.tenant.invite.manage';

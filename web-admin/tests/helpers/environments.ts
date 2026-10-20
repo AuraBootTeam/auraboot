@@ -136,6 +136,9 @@ export function requireRuntimeUrl(target: 'base' | 'backend'): string {
   return value;
 }
 
+export const BOOTSTRAP_COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
+export const SETUP_TENANT_ID = process.env.AURA_ADMIN_TENANT_ID;
+
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;

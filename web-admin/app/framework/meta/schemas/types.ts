@@ -227,6 +227,8 @@ export interface ColumnConfig {
 
   // Format
   format?: string; // 'currency' | 'percent' | 'number'
+  /** Maximum displayed fractional digits for numeric cells; defaults to 2 when omitted. */
+  precision?: number;
   readOnly?: boolean;
 
   /**

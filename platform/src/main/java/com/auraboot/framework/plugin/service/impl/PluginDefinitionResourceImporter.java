@@ -63,21 +63,33 @@ final class PluginDefinitionResourceImporter {
                               ImportExecuteResult result, String pluginPid, String importId, Long tenantId){
         if (manifest.getFields() == null) return;
 
+        List<FieldDefinitionDTO> validFields = new ArrayList<>();
         for (FieldDefinitionDTO field : manifest.getFields()) {
             if (!field.isValid()) {
                 log.warn("Skipping invalid field entry (missing code/dataType): index={}", manifest.getFields().indexOf(field));
                 continue;
             }
-            PluginResource resource = resourceImporter.importField(field, pluginPid, importId, tenantId,
-                    request.getConflictStrategy(), request.getAutoPublishFields());
-            if (resource != null) {
-                captureImportSnapshot(resource, field);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.FIELD, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.FIELD, resource.getResourcePid());
+            validFields.add(field);
+        }
+        if (validFields.isEmpty()) return;
+        resourceImporter.beginFieldImportBatch();
+        boolean completed = false;
+        try {
+            for (FieldDefinitionDTO field : validFields) {
+                PluginResource resource = resourceImporter.importField(field, pluginPid, importId, tenantId,
+                        request.getConflictStrategy(), request.getAutoPublishFields());
+                if (resource != null) {
+                    captureImportSnapshot(resource, field);
+                    saveOrUpdatePluginResource(resource, tenantId);
+                    result.incrementResourceCount(ResourceType.FIELD, resource.getActionEnum());
+                    if (resource.getResourcePid() != null) {
+                        result.addCreatedResource(ResourceType.FIELD, resource.getResourcePid());
+                    }
                 }
             }
+            completed = true;
+        } finally {
+            resourceImporter.endFieldImportBatch(completed);
         }
     }
 

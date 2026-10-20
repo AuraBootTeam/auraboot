@@ -24,6 +24,12 @@ import java.util.regex.Pattern;
  * <p>Supported target formats: {@code USER:<publicPid-or-userId>}, {@code ROLE:<roleCode>},
  * {@code GROUP:<teamPid>} and {@code TEAM:<teamPid>}. Unsupported targets throw (the executor records
  * the failure per the policy FailureStrategy) rather than silently dropping the notification.
+ *
+ * <p>The optional payload pair {@code sourceType}/{@code sourceId} identifies an internal model
+ * record for native notification navigation. Both support decision-context templates and must
+ * resolve to safe route segments. Omitting both preserves the event-policy source reference;
+ * providing an incomplete or unsafe pair fails before delivery. Opening a source record still
+ * uses the client's normal tenant and record authorization.
  */
 @Slf4j
 @Component
@@ -60,6 +66,7 @@ public class NotifyActionHandler implements ActionHandler {
         Map<String, Object> payload = plan.payload() != null ? plan.payload() : Map.of();
         String title = str(render(payload.get("title"), context), "Policy notification");
         String content = str(render(payload.get("content"), context), "");
+        SourceReference source = sourceReference(plan, payload, context);
         if (target == null || target.isBlank()) {
             throw notifyFailure(plan, "action_target_missing", "NOTIFY requires target",
                     target, "UNKNOWN", null, null, null, null);
@@ -67,28 +74,28 @@ public class NotifyActionHandler implements ActionHandler {
         if (target != null && target.startsWith(USER_PREFIX)) {
             long userId = parseUserId(plan, target);
             try {
-                notificationService.sendInApp(userId, title, content, "EVENT_POLICY", "EVENT_POLICY", plan.ruleCode());
+                notificationService.sendInApp(userId, title, content, "EVENT_POLICY", source.type(), source.id());
             } catch (RuntimeException e) {
                 throw notifyFailure(plan, "notify_delivery_failed",
                         "NOTIFY failed: " + ActionFailurePayload.messageOf(e),
                         target, "USER", String.valueOf(userId), null, ActionFailurePayload.messageOf(e), e);
             }
-            return result("USER", String.valueOf(userId), title, plan, List.of(userId));
+            return result("USER", String.valueOf(userId), title, List.of(userId), source);
         }
         if (target != null && target.startsWith(ROLE_PREFIX)) {
             String recipientId = suffix(plan, target, ROLE_PREFIX);
-            List<Long> targetUserIds = sendToRecipient(plan, target, "ROLE", "role", recipientId, title, content);
-            return result("ROLE", recipientId, title, plan, targetUserIds);
+            List<Long> targetUserIds = sendToRecipient(plan, target, "ROLE", "role", recipientId, title, content, source);
+            return result("ROLE", recipientId, title, targetUserIds, source);
         }
         if (target != null && target.startsWith(GROUP_PREFIX)) {
             String recipientId = suffix(plan, target, GROUP_PREFIX);
-            List<Long> targetUserIds = sendToRecipient(plan, target, "GROUP", "group", recipientId, title, content);
-            return result("GROUP", recipientId, title, plan, targetUserIds);
+            List<Long> targetUserIds = sendToRecipient(plan, target, "GROUP", "group", recipientId, title, content, source);
+            return result("GROUP", recipientId, title, targetUserIds, source);
         }
         if (target != null && target.startsWith(TEAM_PREFIX)) {
             String recipientId = suffix(plan, target, TEAM_PREFIX);
-            List<Long> targetUserIds = sendToRecipient(plan, target, "TEAM", "team", recipientId, title, content);
-            return result("TEAM", recipientId, title, plan, targetUserIds);
+            List<Long> targetUserIds = sendToRecipient(plan, target, "TEAM", "team", recipientId, title, content, source);
+            return result("TEAM", recipientId, title, targetUserIds, source);
         }
         throw notifyFailure(plan, "target_invalid",
                 "NotifyActionHandler supports USER:<userId>, ROLE:<roleCode>, GROUP:<teamPid>, TEAM:<teamPid>. Got: "
@@ -102,11 +109,11 @@ public class NotifyActionHandler implements ActionHandler {
                                        String recipientKind,
                                        String recipientId,
                                        String title,
-                                       String content) {
+                                       String content, SourceReference source) {
         List<Long> targetUserIds;
         try {
             targetUserIds = notificationService.sendInAppToRecipient(recipientKind, recipientId, title, content,
-                    "EVENT_POLICY", "EVENT_POLICY", plan.ruleCode());
+                    "EVENT_POLICY", source.type(), source.id());
         } catch (RuntimeException e) {
             throw notifyFailure(plan, "notify_delivery_failed",
                     "NOTIFY failed: " + ActionFailurePayload.messageOf(e),
@@ -121,7 +128,7 @@ public class NotifyActionHandler implements ActionHandler {
     }
 
     private static Map<String, Object> result(String recipientType, String recipientId, String title,
-                                              ResolvedActionPlan plan, List<Long> targetUserIds) {
+                                              List<Long> targetUserIds, SourceReference source) {
         List<Long> deliveredUserIds = targetUserIds == null ? List.of() : List.copyOf(targetUserIds);
         return Map.of(
                 "channel", "in_app",
@@ -131,8 +138,32 @@ public class NotifyActionHandler implements ActionHandler {
                 "recipientCount", deliveredUserIds.size(),
                 "targetUserIds", deliveredUserIds,
                 "title", title,
-                "sourceId", plan.ruleCode()
+                "sourceId", source.id(),
+                "sourceType", source.type()
         );
+    }
+
+    private record SourceReference(String type, String id) {}
+
+    private static SourceReference sourceReference(ResolvedActionPlan plan,
+                                                    Map<String, Object> payload,
+                                                    DecisionContext context) {
+        Object rawType = payload.get("sourceType");
+        Object rawId = payload.get("sourceId");
+        if (rawType == null && rawId == null) {
+            return new SourceReference("EVENT_POLICY", plan.ruleCode());
+        }
+        String type = rawType instanceof String ? render(rawType, context) : null;
+        String id = rawId instanceof String ? render(rawId, context) : null;
+        // These values become internal route segments in all native clients.
+        // Require a complete safe pair; malformed links must fail before sending.
+        if (type == null || !type.matches("[A-Za-z][A-Za-z0-9_]{0,63}")
+                || id == null || !id.matches("[A-Za-z0-9_-]{1,128}")) {
+            throw notifyFailure(plan, "notification_source_invalid",
+                    "NOTIFY sourceType and sourceId must be safe internal record identifiers",
+                    plan.target(), targetType(plan.target()), null, null, null, null);
+        }
+        return new SourceReference(type, id);
     }
 
     private long parseUserId(ResolvedActionPlan plan, String target) {

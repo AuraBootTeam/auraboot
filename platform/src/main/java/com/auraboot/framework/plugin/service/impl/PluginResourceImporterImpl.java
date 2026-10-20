@@ -107,6 +107,8 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -125,6 +127,24 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class PluginResourceImporterImpl implements PluginResourceImporter {
+    private static final ThreadLocal<Set<String>> FIELD_BATCH_MODELS = new ThreadLocal<>();
+
+    @Override
+    public void beginFieldImportBatch() {
+        if (FIELD_BATCH_MODELS.get() != null) {
+            throw new PluginException("Nested field import schema batch");
+        }
+        FIELD_BATCH_MODELS.set(new LinkedHashSet<>());
+    }
+
+    @Override
+    public void endFieldImportBatch(boolean completed) {
+        Set<String> models = FIELD_BATCH_MODELS.get();
+        FIELD_BATCH_MODELS.remove();
+        if (completed && models != null && !models.isEmpty()) {
+            syncReimportedModels(new ArrayList<>(models), "field batch");
+        }
+    }
 
     // Service layer dependencies
     private final MetaModelService metaModelService;
@@ -609,6 +629,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             return;
         }
 
+        Set<String> batch = FIELD_BATCH_MODELS.get();
+        if (batch != null) {
+            batch.addAll(modelCodes);
+            return;
+        }
+        syncReimportedModels(modelCodes, fieldCode);
+    }
+
+    private void syncReimportedModels(List<String> modelCodes, String fieldCode) {
         for (String modelCode : modelCodes) {
             SchemaOperationResult schemaResult = schemaManagementService.updateTableByModel(modelCode);
             if (schemaResult == null || !schemaResult.isSuccess()) {

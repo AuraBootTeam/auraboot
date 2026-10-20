@@ -1,13 +1,20 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { APIRequestContext } from '@playwright/test';
-import { loginAdmin } from '../../../../tests/api/setup/_helpers';
+const companyName = 'Declared business session fixture';
+const backendUrl = 'http://127.0.0.1:65530';
+let loginAdmin: typeof import('../../../../tests/api/setup/_helpers').loginAdmin;
+
+async function loadHelper() {
+  vi.resetModules();
+  ({ loginAdmin } = await import('../../../../tests/api/setup/_helpers'));
+}
 
 const response = (data: unknown, code = '0', ok = true) => ({
   ok: () => ok,
   json: async () => ({ code, data }),
 });
 
-const space = (tenantId: string, spaceType = 'business') => ({ tenantId, spaceType });
+const space = (tenantId: string, spaceType = 'business') => ({ tenantId, spaceType, tenantName: companyName });
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -15,10 +22,13 @@ afterEach(() => {
 });
 
 describe('setup administrator business session', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // Empty string behaves as unset in the helper's narrowing logic, so the
     // suite cannot be polluted by a worker-wide AURA_ADMIN_TENANT_ID.
     vi.stubEnv('AURA_ADMIN_TENANT_ID', '');
+    vi.stubEnv('AURA_BOOTSTRAP_COMPANY', companyName);
+    vi.stubEnv('BACKEND_URL', backendUrl);
+    await loadHelper();
   });
 
   it('selects the sole business membership and returns the selected session', async () => {
@@ -32,10 +42,10 @@ describe('setup administrator business session', () => {
     expect(await loginAdmin({ post, get } as unknown as APIRequestContext)).toBe(
       'business-session',
     );
-    expect(get).toHaveBeenCalledWith('/api/tenant-selection/my-spaces', {
+    expect(get).toHaveBeenCalledWith(`${backendUrl}/api/tenant-selection/my-spaces`, {
       headers: { Authorization: 'Bearer onboarding-session', 'Content-Type': 'application/json' },
     });
-    expect(post).toHaveBeenLastCalledWith('/api/tenant-selection/process', {
+    expect(post).toHaveBeenLastCalledWith(`${backendUrl}/api/tenant-selection/process`, {
       headers: { Authorization: 'Bearer onboarding-session', 'Content-Type': 'application/json' },
       data: { action: 'select', tenantId: '42' },
     });
@@ -43,6 +53,7 @@ describe('setup administrator business session', () => {
 
   it('honors AURA_ADMIN_TENANT_ID when narrowing business memberships', async () => {
     vi.stubEnv('AURA_ADMIN_TENANT_ID', '43');
+    await loadHelper();
     const post = vi
       .fn()
       .mockResolvedValueOnce(response({ jwt: 'onboarding-session', tenantId: null, nextAction: 'SELECT_SCHOOL' }))
@@ -51,7 +62,7 @@ describe('setup administrator business session', () => {
     expect(await loginAdmin({ post, get } as unknown as APIRequestContext)).toBe(
       'business-43-session',
     );
-    expect(post).toHaveBeenLastCalledWith('/api/tenant-selection/process', {
+    expect(post).toHaveBeenLastCalledWith(`${backendUrl}/api/tenant-selection/process`, {
       headers: { Authorization: 'Bearer onboarding-session', 'Content-Type': 'application/json' },
       data: { action: 'select', tenantId: '43' },
     });
@@ -67,7 +78,7 @@ describe('setup administrator business session', () => {
     );
     const get = vi.fn().mockResolvedValue(response(spaces as unknown));
     await expect(loginAdmin({ post, get } as unknown as APIRequestContext)).rejects.toThrow(
-      'select exactly one business space',
+      'expected exactly one business space',
     );
     expect(post).toHaveBeenCalledTimes(1);
   });
