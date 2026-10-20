@@ -375,3 +375,15 @@ function pickerButtons(container: HTMLElement, name: RegExp): HTMLButtonElement[
     name.test(button.textContent?.replace(/\s+/g, ' ') ?? ''),
   );
 }
+
+it('propagates read-only to schema node controls and rejects a direct field change', () => {
+  useFlowStore.getState().reset();
+  nodeRegistry.register({type:'readonly-schema-probe',label:'Locked node',icon:'',category:'action',configSchema:[{key:'note',label:'Locked note',type:'text'}]});
+  const id=useFlowStore.getState().addNode({type:'readonly-schema-probe',position:{x:0,y:0},data:{label:'Locked node',config:{note:'Original'}}});
+  useFlowStore.getState().selectNode(id);
+  render(<FlowPropertyPanel readOnly />);
+  const field=screen.getByRole('textbox',{name:'Locked note'});
+  expect(field).toBeDisabled();
+  fireEvent.change(field,{target:{value:'Forbidden'}});
+  expect(useFlowStore.getState().nodes.find(node=>node.id===id)?.data.config.note).toBe('Original');
+});

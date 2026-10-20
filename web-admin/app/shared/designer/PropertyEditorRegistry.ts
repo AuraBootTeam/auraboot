@@ -12,12 +12,15 @@ export interface RegisteredPropertyEditorProps {
 export class PropertyEditorRegistry {
   private readonly editors = new Map<string, ComponentType<RegisteredPropertyEditorProps>>();
 
-  register(key: string, editor: ComponentType<RegisteredPropertyEditorProps>): void {
+  register(key: string, editor: ComponentType<RegisteredPropertyEditorProps>): () => void {
     const existing = this.editors.get(key);
     if (!key.trim() || (existing && existing !== editor)) {
       throw new Error(`Conflicting property editor registration: ${key}`);
     }
     this.editors.set(key, editor);
+    return () => {
+      if (this.editors.get(key) === editor) this.editors.delete(key);
+    };
   }
 
   resolve(key: string): ComponentType<RegisteredPropertyEditorProps> {

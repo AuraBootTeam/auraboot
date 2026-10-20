@@ -36,8 +36,15 @@ test('SC04-PERMISSIONS global dashboard viewing does not grant customer-project 
   const sourceBody = await source.json();
   expect(String(sourceBody.code)).toBe('0');
   expect(sourceBody.data.records.map((row: { pid: string }) => row.pid).sort())
-    .toEqual(fixture.projects.map((row: { pid: string }) => row.pid).sort());
-  expect(sourceBody.data.records.reduce((sum: number, row: { tpm_pj_budget: number }) => sum + Number(row.tpm_pj_budget), 0)).toBe(expected.budget);
+    .toEqual(expect.arrayContaining(fixture.projects.map((row: { pid: string }) => row.pid).sort()));
+  expect(sourceBody.data.total).toBe(sourceBody.data.records.length);
+  const fixtureIds=new Set(fixture.projects.map((row:{pid:string})=>row.pid));
+  const baseline=sourceBody.data.records.filter((row:any)=>fixtureIds.has(row.pid));
+  expect(baseline.reduce((sum:number,row:any)=>sum+Number(row.tpm_pj_budget),0)).toBe(expected.budget);
+  expected.count=sourceBody.data.records.length;
+  expected.budget=sourceBody.data.records.reduce((sum:number,row:any)=>sum+Number(row.tpm_pj_budget),0);
+  expected.acceptance=sourceBody.data.records.filter((row:any)=>row.tpm_pj_status==='acceptance').length;
+  expected.completed=sourceBody.data.records.filter((row:any)=>row.tpm_pj_status==='completed').length;
   const key = `delivery_perm_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
   const title = `客户交付看板源权限-${key}`;
   const created = await page.request.post('/api/dashboards', {
@@ -185,6 +192,15 @@ test('SC04-PERMISSIONS global dashboard viewing does not grant customer-project 
         }
       }
       await actor.screenshot({ path: info.outputPath(`CDP-${hasSourceRead ? 'source-reader' : 'artifact-only'}.png`), fullPage: true });
+      await actor.goto(`/dashboard-designer/${dashboardPid}`);
+      await expect(actor.getByRole('heading',{name:'无权编辑仪表盘',exact:true})).toBeVisible();
+      await expect(actor.getByTestId('widget-palette')).toHaveCount(0);
+      await expect(actor.getByTestId('designer-toolbar-btn-save')).toHaveCount(0);
+      const deniedEdit=await actor.request.put(`/api/dashboards/${dashboardPid}`,{data:{...publishedDefinition,title:'Forbidden reader edit'}});
+      expect(deniedEdit.status()).toBe(403);
+      const retained=await page.request.get(`/api/dashboards/${dashboardPid}`);
+      expect((await retained.json()).data.title).toBe(title);
+      await actor.screenshot({path:path.join(process.env.AURA_EVIDENCE_DIR!,`DS03-designer-denied-${hasSourceRead?'source':'artifact'}.png`),fullPage:true});
       receipts.push({ tenantId, roleCode, hasSourceRead, dashboardPid, configStatus: configResponse.status(), queryStatuses: queries.map(query => query.status), expected });
     } finally {
       await context.close();

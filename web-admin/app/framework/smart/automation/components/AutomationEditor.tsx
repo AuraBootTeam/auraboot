@@ -487,7 +487,7 @@ export function AutomationEditor({
   /** Page-level save: uses the latest flowData snapshot and keeps the only save
    *  action in the Automation editor shell. */
   const handleToolbarSave = useCallback(async () => {
-    if (!onSave || !flowData) return;
+    if (readOnly || !onSave || !flowData) return;
     const result = validate();
     if (!result.valid) {
       showErrorToast(
@@ -503,7 +503,7 @@ export function AutomationEditor({
     } finally {
       setSaving(false);
     }
-  }, [onSave, name, description, flowData, validate, showErrorToast, st]);
+  }, [readOnly, onSave, name, description, flowData, validate, showErrorToast, st]);
 
   const handleChange = useCallback((data: FlowData) => {
     setFlowData(data);
@@ -532,12 +532,12 @@ export function AutomationEditor({
   const declaredActions = useMemo(() => extractDeclaredActions(flowData), [flowData]);
 
   const handleDebug = useCallback(() => {
-    if (!automationId) return;
+    if (readOnly || !automationId) return;
     startDebug(automationId);
-  }, [automationId, startDebug]);
+  }, [readOnly, automationId, startDebug]);
 
   const handleTestRun = useCallback(async () => {
-    if (!automationId) return;
+    if (readOnly || !automationId) return;
     setTestRunning(true);
     try {
       const response = await fetch(`/api/automations/${automationId}/trigger`, {
@@ -593,7 +593,7 @@ export function AutomationEditor({
     } finally {
       setTestRunning(false);
     }
-  }, [automationId, showSuccessToast, showErrorToast, testRunContext, testRunRecordPid]);
+  }, [readOnly, automationId, showSuccessToast, showErrorToast, testRunContext, testRunRecordPid, st]);
 
   const handleExport = useCallback(() => {
     if (!flowData) return;

@@ -19,8 +19,9 @@ function DrilldownEditor({ adapter }: RegisteredPropertyEditorProps) {
       onChange={value => adapter.setValue(value)} />
   </fieldset>;
 }
-propertyEditorRegistry.register('dashboard.data-source', DataSourceEditor);
-propertyEditorRegistry.register('dashboard.drilldown', DrilldownEditor);
+const disposeDataSource = propertyEditorRegistry.register('dashboard.data-source', DataSourceEditor);
+const disposeDrilldown = propertyEditorRegistry.register('dashboard.drilldown', DrilldownEditor);
+import.meta.hot?.dispose(()=>{disposeDataSource();disposeDrilldown();});
 
 export function dashboardPropertySchemas(config: PropertySchema[], label: (key: 'panel.dataSource' | 'panel.style' | 'panel.linkage' | 'panel.drilldown' | 'panel.refresh') => string, locale: string): Schema<string>[] {
   // The same schema declares every basic field. Complex controls are named extensions.
@@ -47,7 +48,7 @@ function styleSchemas(group: string, locale: string): Schema<string>[] {
     field('showLabel','显示标签','Show label','boolean',{defaultValue:false}),
     field('labelPosition','标签位置','Label position','select',{defaultValue:'outside',dependsOn:{field:'style.showLabel',value:true},options:[['inside','内部','Inside'],['outside','外部','Outside'],['top','上方','Top']].map(([value,zh,en])=>({value,label:localized(zh,en,locale)}))}),
     field('borderRadius','圆角','Border radius','number',{min:0,max:24,defaultValue:8}),
-    field('backgroundColor','背景色','Background color','text',{defaultValue:'#ffffff'}),
+    field('backgroundColor','背景色','Background color','text',{defaultValue:'#ffffff',editor:'designer.color'}),
   ];
 }
 function linkageSchemas(group: string, locale: string): Schema<string>[] {

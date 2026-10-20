@@ -80,3 +80,14 @@ describe('PropertyFieldRenderer / array', () => {
     expect(setValue.mock.calls[0][0]).toEqual([{ name: 'gamma', count: 1 }]);
   });
 });
+
+it('keeps nested array controls read only, including adding and removing items', () => {
+  const setValue=vi.fn();
+  render(<PropertyFieldRenderer schema={arraySchema} adapter={{...makeAdapter([{name:'locked',count:0}],setValue),disabled:true}} />);
+  expect(screen.getByDisplayValue('locked')).toBeDisabled();
+  const add=screen.getByRole('button',{name:'+ Add'});
+  const remove=screen.getByRole('button',{name:'remove'});
+  expect(add).toBeDisabled(); expect(remove).toBeDisabled();
+  fireEvent.click(add); fireEvent.click(remove);
+  expect(setValue).not.toHaveBeenCalled();
+});

@@ -21,6 +21,14 @@ describe('registered property controls', () => {
     expect(() => registry.register('sample', other)).toThrow('Conflicting');
     expect(registry.resolve('sample')).toBe(first);
   });
+  it('supports owned extension cleanup without removing a newer registration', () => {
+    const registry=new PropertyEditorRegistry();
+    const first=()=>null, second=()=>null;
+    const stop=registry.register('owned',first); stop();
+    expect(()=>registry.resolve('owned')).toThrow('Unregistered');
+    registry.register('owned',second); stop();
+    expect(registry.resolve('owned')).toBe(second);
+  });
   it('introduces a complex control through schema only and enforces read-only writes at the host', () => {
     const Editor = ({ adapter }: RegisteredPropertyEditorProps) => (
       <button onClick={() => adapter.setValue({ field: 'budget', value: 100 })}>

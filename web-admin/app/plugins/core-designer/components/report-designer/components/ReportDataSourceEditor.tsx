@@ -131,4 +131,5 @@ const ReportDataSourceEditor = ({ adapter }: RegisteredPropertyEditorProps) => {
   </fieldset>;
 };
 
-propertyEditorRegistry.register('report.data-source', ReportDataSourceEditor);
+const disposeDataSourceEditor = propertyEditorRegistry.register('report.data-source', ReportDataSourceEditor);
+import.meta.hot?.dispose(disposeDataSourceEditor);

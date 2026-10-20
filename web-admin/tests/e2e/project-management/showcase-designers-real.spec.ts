@@ -112,12 +112,21 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
     expect(box).toBeTruthy();
     return box!;
   };
+  const settleGeometry = async () => {
+    await expect.poll(() => tile.evaluate(element => {
+      const declared = new DOMMatrixReadOnly((element as HTMLElement).style.transform);
+      const displayed = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+      return Math.max(Math.abs(declared.m41-displayed.m41),Math.abs(declared.m42-displayed.m42),Math.abs(parseFloat((element as HTMLElement).style.width)-element.getBoundingClientRect().width));
+    })).toBeLessThan(0.1);
+  };
+  await settleGeometry();
   const initialBox = await readBox();
   await page.mouse.move(initialBox.x + 20, initialBox.y + 20);
   await page.mouse.down();
   await page.mouse.move(initialBox.x + 100, initialBox.y + 20, { steps: 16 });
   await page.mouse.up();
   await expect.poll(async () => (await readBox()).x).not.toBeCloseTo(initialBox.x, 0);
+  await settleGeometry();
   const movedBox = await readBox();
   await page.getByTestId('designer-toolbar-btn-undo').click();
   await expect.poll(async () => (await readBox()).x).toBeCloseTo(initialBox.x, 0);
@@ -132,6 +141,7 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   await page.mouse.move(handleBox!.x + 100, handleBox!.y + 90, { steps: 16 });
   await page.mouse.up();
   await expect.poll(async () => (await readBox()).width).toBeGreaterThan(movedBox.width + 20);
+  await settleGeometry();
   const resizedBox = await readBox();
   await shot(page, 'DS03-dashboard-drag-resize');
   await chart.click();
@@ -274,6 +284,34 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   await expect(editor).toHaveValue(original);
   await editor.fill(note);
   await shot(page, 'SC10-report-edited-draft');
+  await page.getByTestId('drag-handle-summary').locator('..').click();
+  await page.getByTestId('schema-config-field-title').getByRole('textbox').fill('当前交付经营摘要');
+  await shot(page,'DS04-table-schema-properties');
+  const addedTitles:Record<string,string>={'grouped-table':'按客户项目分组','stat-card':'当前明细金额合计','cross-tab':'项目与验收状态交叉分析',chart:'项目验收金额分布',barcode:'验收记录条码',watermark:'内部交付复盘'};
+  const addedTypes = Object.keys(addedTitles);
+  for (const type of addedTypes) {
+    await page.getByTestId(`block-palette-item-${type}`).click();
+    const panel = page.getByTestId('block-property-panel');
+    const textField = (key:string) => panel.getByTestId(`schema-config-field-${key}`).getByRole('textbox');
+    if (type==='watermark') await textField('text').fill('内部交付复盘');
+    else await textField('title').fill(addedTitles[type]);
+    if (['grouped-table','stat-card','cross-tab','chart'].includes(type)) {
+      await panel.getByTestId('schema-config-field-dataSource').locator('select').selectOption('delivery');
+    }
+    if (type==='grouped-table') {
+      await textField('groupByField').fill('project_name');
+      const columns=panel.getByTestId('schema-config-field-columns');
+      await columns.getByRole('button',{name:'+ Add',exact:true}).click();
+      await columns.getByRole('textbox',{name:'字段名称',exact:true}).fill('amount');
+      await columns.getByRole('textbox',{name:'显示名称',exact:true}).fill('交付金额');
+    }
+    if (['stat-card','cross-tab','chart'].includes(type)) await textField('valueField').fill('amount');
+    if (type==='stat-card') await textField('label').fill('交付总金额');
+    if (type==='cross-tab') { await textField('rowField').fill('project_name'); await textField('columnField').fill('acceptance_label'); }
+    if (type==='chart') await textField('categoryField').fill('project_name');
+    if (type==='barcode') await textField('staticValue').fill('ACC20261021');
+    await shot(page,`DS04-${type}-schema-properties`);
+  }
   const title = '客户项目交付复盘 · 每周行动';
   await page.getByRole('textbox', { name: '报表标题', exact: true }).fill(title);
   const save = page.waitForResponse(
@@ -287,7 +325,14 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   const persisted = await data(await page.request.get(`/api/report-definitions/${saved.pid}`));
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').content).toBe(note);
   expect(persisted.dsl.dataSources).toEqual(template.dsl.dataSources);
-  expect(persisted.dsl.body.map((b: any) => `drag-handle-${b.id}`)).toEqual(movedOrder);
+  expect(persisted.dsl.body.find((b:any)=>b.id==='summary').title).toBe('当前交付经营摘要');
+  expect(persisted.dsl.body.slice(0,movedOrder.length).map((b: any) => `drag-handle-${b.id}`)).toEqual(movedOrder);
+  expect(persisted.dsl.body.slice(movedOrder.length).map((b:any)=>b.blockType)).toEqual(addedTypes);
+  for(const block of persisted.dsl.body.slice(movedOrder.length)) {
+    if(block.blockType==='watermark') expect(block.text).toBe('内部交付复盘');
+    else expect(block.title).toBe(addedTitles[block.blockType]);
+    if(['grouped-table','stat-card','cross-tab','chart'].includes(block.blockType)) expect(block.dataSource).toBe('delivery');
+  }
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').style.fontSize).toBe(18);
   const toolbar = page.getByTestId('report-designer-toolbar');
   await toolbar.getByRole('button', { name: '预览', exact: true }).click();
