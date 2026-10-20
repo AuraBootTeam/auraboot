@@ -992,35 +992,33 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   test('N-CALL-API: drag trigger-record-create→action-call-api, configure url+method via panel, save, enable, fire → node completes (real outbound GET) @golden', async ({
     page,
   }) => {
-    // host-env: SSRF guard blocks loopback; this real-outbound happy path needs a
-    // reachable non-loopback endpoint (docker CI-parity / E2E_CALLAPI_OK_URL).
-    test.skip(
-      /127\.0\.0\.1|localhost/.test(CALLAPI_OK_URL),
-      'call_api outbound happy-path needs a reachable non-loopback endpoint (SSRF guard blocks loopback on host-first); set E2E_CALLAPI_OK_URL or run in docker CI-parity.',
-    );
-    await openNewDesigner(page);
-    await setAutomationName(page, `N-CALL-API ${uniqueId()}`);
+    const receiver = await startWebhookReceiver();
+    try {
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-CALL-API ${uniqueId()}`);
 
-    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
-    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
-    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
-    await connectEdge(page, trigger, action);
-    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
-    // url (expression) → the backend's own actuator/health via the test-allowlisted
-    // host.docker.internal; method (select) → GET. (call_api fix = FINDING-6.)
-    await fillNodeConfig(page, action, {
-      url: CALLAPI_OK_URL,
-      method: 'GET',
-    });
-    const { pid } = await saveAutomation(page);
-    createdPids.push(pid);
-    await enableViaListToggle(page, pid);
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      await fillNodeConfig(page, action, {
+        url: `http://${OUTBOUND_HOST}:${receiver.port}/call-api`,
+        method: 'GET',
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      await enableViaListToggle(page, pid);
 
-    const firedAt = Date.now();
-    await fireCreate(page, 100, `N-CALL-API-order ${uniqueId()}`);
-    const log = await pollLogTerminal(page, pid, firedAt);
-    expect(String(log!.status).toLowerCase(), `N-CALL-API run: ${JSON.stringify(log)}`).toBe('success');
-    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
+      const firedAt = Date.now();
+      await fireCreate(page, 100, `N-CALL-API-order ${uniqueId()}`);
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(String(log!.status).toLowerCase(), `N-CALL-API run: ${JSON.stringify(log)}`).toBe('success');
+      expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
+      expect(receiver.received).toEqual([{ method: 'GET', path: '/call-api', body: '' }]);
+    } finally {
+      await receiver.close();
+    }
   });
 
   // ── send-webhook REAL OUTBOUND (GAP-F): the node POSTs the payload directly to the ──
