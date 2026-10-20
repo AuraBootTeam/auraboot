@@ -6601,39 +6601,48 @@ test.describe.serial('Unified Designer Workbench V3', () => {
           blockType: 'detail',
           title: 'Helper permission detail',
           dataSource: { model: modelCode },
-          blocks: [
-            {
-              id: 'ai_permission_denied_helper',
-              blockType: 'ai-fill-banner',
-              title: `Permission denied AI ${uid}`,
-              dataSource: {
-                type: 'namedQuery',
-                executionMode: 'live',
-                queryCode: blockedQueryCode,
-                page: 1,
-                size: 3,
-              },
-              props: {
-                emptyText: `Permission denied helper stays private ${uid}`,
-              },
-            },
-            {
-              id: 'ai_permission_allowed_helper',
-              blockType: 'ai-fill-banner',
-              title: `Permission allowed AI ${uid}`,
-              dataSource: {
-                type: 'namedQuery',
-                executionMode: 'live',
-                queryCode: liveHelperNamedQueryCode,
-                page: 1,
-                size: 3,
-              },
-              props: {
-                permissionCode: allowedPermissionCode,
-                emptyText: `Allowed helper fallback ${uid}`,
-              },
-            },
-          ],
+          blocks: [{
+            id: 'helper_permission_tabs', blockType: 'tabs',
+            blocks: [{
+              id: 'helper_permission_tab', blockType: 'tab', title: 'Helper permissions',
+              blocks: [{
+                id: 'helper_permission_section', blockType: 'section', title: 'Permission controls',
+                blocks: [
+                  {
+                    id: 'ai_permission_denied_helper',
+                    blockType: 'ai-fill-banner',
+                    title: `Permission denied AI ${uid}`,
+                    dataSource: {
+                      type: 'namedQuery',
+                      executionMode: 'live',
+                      queryCode: blockedQueryCode,
+                      page: 1,
+                      size: 3,
+                    },
+                    props: {
+                      emptyText: `Permission denied helper stays private ${uid}`,
+                    },
+                  },
+                  {
+                    id: 'ai_permission_allowed_helper',
+                    blockType: 'ai-fill-banner',
+                    title: `Permission allowed AI ${uid}`,
+                    dataSource: {
+                      type: 'namedQuery',
+                      executionMode: 'live',
+                      queryCode: liveHelperNamedQueryCode,
+                      page: 1,
+                      size: 3,
+                    },
+                    props: {
+                      permissionCode: allowedPermissionCode,
+                      emptyText: `Allowed helper fallback ${uid}`,
+                    },
+                  },
+                ],
+              }],
+            }],
+          }],
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-workbench-v3-helper-permission' },
@@ -6690,7 +6699,6 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await rolePage.getByTestId('designer-mode-preview').click();
       const allowedResp = await allowedRespPromise;
       expect(allowedResp.status()).toBe(200);
-      rolePage.off('request', blockedRequestListener);
 
       const deniedPermission = rolePage.getByTestId(
         'runtime-helper-permission-ai_permission_denied_helper',
@@ -6724,6 +6732,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         rolePage.getByTestId('runtime-ai-fill-field-ai_permission_allowed_helper-0'),
       ).toBeVisible();
       expect(blockedRequests).toEqual([]);
+      rolePage.off('request', blockedRequestListener);
     } finally {
       await roleContext.close();
     }
