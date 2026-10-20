@@ -6605,9 +6605,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
             id: 'helper_permission_tabs', blockType: 'tabs',
             blocks: [{
               id: 'helper_permission_tab', blockType: 'tab', title: 'Helper permissions',
-              blocks: [{
-                id: 'helper_permission_section', blockType: 'section', title: 'Permission controls',
-                blocks: [
+              blocks: [
                   {
                     id: 'ai_permission_denied_helper',
                     blockType: 'ai-fill-banner',
@@ -6639,8 +6637,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
                       emptyText: `Allowed helper fallback ${uid}`,
                     },
                   },
-                ],
-              }],
+              ],
             }],
           }],
         },
@@ -6664,6 +6661,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       allowedPermissionCode,
     );
 
+    await expect(page.getByTestId('designer-save')).toBeEnabled();
     await saveDesignerPage(page, helperPermissionPid);
     for (const permission of ['meta.designer.read', 'page.page.read', 'meta.query.read']) {
       await grantRolePermissionByCode(page, 'e2et_viewer', permission);
