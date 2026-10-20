@@ -113,11 +113,22 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
     return box!;
   };
   const settleGeometry = async () => {
-    await expect.poll(() => tile.evaluate(element => {
-      const declared = new DOMMatrixReadOnly((element as HTMLElement).style.transform);
-      const displayed = new DOMMatrixReadOnly(getComputedStyle(element).transform);
-      return Math.max(Math.abs(declared.m41-displayed.m41),Math.abs(declared.m42-displayed.m42),Math.abs(parseFloat((element as HTMLElement).style.width)-element.getBoundingClientRect().width));
-    })).toBeLessThan(0.1);
+    await expect
+      .poll(() =>
+        tile.evaluate((element) => {
+          const declared = new DOMMatrixReadOnly((element as HTMLElement).style.transform);
+          const displayed = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+          return Math.max(
+            Math.abs(declared.m41 - displayed.m41),
+            Math.abs(declared.m42 - displayed.m42),
+            Math.abs(
+              parseFloat((element as HTMLElement).style.width) -
+                element.getBoundingClientRect().width,
+            ),
+          );
+        }),
+      )
+      .toBeLessThan(0.1);
   };
   await settleGeometry();
   const initialBox = await readBox();
@@ -152,6 +163,18 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
     .getByTestId('schema-config-field-visualization.showLabels')
     .getByRole('switch')
     .uncheck();
+  await panel
+    .getByTestId('schema-config-field-style.borderRadius')
+    .getByRole('spinbutton')
+    .fill('16');
+  await panel.getByTestId('schema-config-field-style.showLegend').getByRole('switch').uncheck();
+  const color = panel.getByTestId('schema-config-field-style.backgroundColor');
+  await color.getByRole('button').click();
+  await color.getByRole('textbox').fill('#eef2ff');
+  await panel.getByRole('heading', { name: '样式', exact: true }).click();
+  const chartSurface = chart.locator(':scope > div').first();
+  await expect(chartSurface).toHaveCSS('border-radius', '16px');
+  await expect(chartSurface).toHaveCSS('background-color', 'rgb(238, 242, 255)');
   const saved = page.waitForResponse(
     (r) => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST',
   );
@@ -192,6 +215,13 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   expect(config.visualization.donut).toBe(true);
   expect(config.visualization.showLabels).toBe(false);
   expect(config.title['zh-CN'] || config.title.zh).toBe(title);
+  expect(config.style).toMatchObject({
+    borderRadius: 16,
+    backgroundColor: '#eef2ff',
+    showLegend: false,
+  });
+  await expect(chartSurface).toHaveCSS('border-radius', '16px');
+  await expect(chartSurface).toHaveCSS('background-color', 'rgb(238, 242, 255)');
   await panel.getByTestId('widget-prop-title-zh').scrollIntoViewIfNeeded();
   await chart.scrollIntoViewIfNeeded();
   await page.mouse.move(280, 85);
@@ -286,31 +316,46 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   await shot(page, 'SC10-report-edited-draft');
   await page.getByTestId('drag-handle-summary').locator('..').click();
   await page.getByTestId('schema-config-field-title').getByRole('textbox').fill('当前交付经营摘要');
-  await shot(page,'DS04-table-schema-properties');
-  const addedTitles:Record<string,string>={'grouped-table':'按客户项目分组','stat-card':'当前明细金额合计','cross-tab':'项目与验收状态交叉分析',chart:'项目验收金额分布',barcode:'验收记录条码',watermark:'内部交付复盘'};
+  await shot(page, 'DS04-table-schema-properties');
+  const addedTitles: Record<string, string> = {
+    'grouped-table': '按客户项目分组',
+    'stat-card': '当前明细金额合计',
+    'cross-tab': '项目与验收状态交叉分析',
+    chart: '项目验收金额分布',
+    barcode: '验收记录条码',
+    watermark: '内部交付复盘',
+  };
   const addedTypes = Object.keys(addedTitles);
   for (const type of addedTypes) {
     await page.getByTestId(`block-palette-item-${type}`).click();
     const panel = page.getByTestId('block-property-panel');
-    const textField = (key:string) => panel.getByTestId(`schema-config-field-${key}`).getByRole('textbox');
-    if (type==='watermark') await textField('text').fill('内部交付复盘');
+    const textField = (key: string) =>
+      panel.getByTestId(`schema-config-field-${key}`).getByRole('textbox');
+    if (type === 'watermark') await textField('text').fill('内部交付复盘');
     else await textField('title').fill(addedTitles[type]);
-    if (['grouped-table','stat-card','cross-tab','chart'].includes(type)) {
-      await panel.getByTestId('schema-config-field-dataSource').locator('select').selectOption('delivery');
+    if (['grouped-table', 'stat-card', 'cross-tab', 'chart'].includes(type)) {
+      await panel
+        .getByTestId('schema-config-field-dataSource')
+        .locator('select')
+        .selectOption('delivery');
     }
-    if (type==='grouped-table') {
+    if (type === 'grouped-table') {
       await textField('groupByField').fill('project_name');
-      const columns=panel.getByTestId('schema-config-field-columns');
-      await columns.getByRole('button',{name:'+ Add',exact:true}).click();
-      await columns.getByRole('textbox',{name:'字段名称',exact:true}).fill('amount');
-      await columns.getByRole('textbox',{name:'显示名称',exact:true}).fill('交付金额');
+      const columns = panel.getByTestId('schema-config-field-columns');
+      await columns.getByRole('button', { name: '+ Add', exact: true }).click();
+      await columns.getByRole('textbox', { name: '字段名称', exact: true }).fill('amount');
+      await columns.getByRole('textbox', { name: '显示名称', exact: true }).fill('交付金额');
     }
-    if (['stat-card','cross-tab','chart'].includes(type)) await textField('valueField').fill('amount');
-    if (type==='stat-card') await textField('label').fill('交付总金额');
-    if (type==='cross-tab') { await textField('rowField').fill('project_name'); await textField('columnField').fill('acceptance_label'); }
-    if (type==='chart') await textField('categoryField').fill('project_name');
-    if (type==='barcode') await textField('staticValue').fill('ACC20261021');
-    await shot(page,`DS04-${type}-schema-properties`);
+    if (['stat-card', 'cross-tab', 'chart'].includes(type))
+      await textField('valueField').fill('amount');
+    if (type === 'stat-card') await textField('label').fill('交付总金额');
+    if (type === 'cross-tab') {
+      await textField('rowField').fill('project_name');
+      await textField('columnField').fill('acceptance_label');
+    }
+    if (type === 'chart') await textField('categoryField').fill('project_name');
+    if (type === 'barcode') await textField('staticValue').fill('ACC20261021');
+    await shot(page, `DS04-${type}-schema-properties`);
   }
   const title = '客户项目交付复盘 · 每周行动';
   await page.getByRole('textbox', { name: '报表标题', exact: true }).fill(title);
@@ -325,13 +370,18 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   const persisted = await data(await page.request.get(`/api/report-definitions/${saved.pid}`));
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').content).toBe(note);
   expect(persisted.dsl.dataSources).toEqual(template.dsl.dataSources);
-  expect(persisted.dsl.body.find((b:any)=>b.id==='summary').title).toBe('当前交付经营摘要');
-  expect(persisted.dsl.body.slice(0,movedOrder.length).map((b: any) => `drag-handle-${b.id}`)).toEqual(movedOrder);
-  expect(persisted.dsl.body.slice(movedOrder.length).map((b:any)=>b.blockType)).toEqual(addedTypes);
-  for(const block of persisted.dsl.body.slice(movedOrder.length)) {
-    if(block.blockType==='watermark') expect(block.text).toBe('内部交付复盘');
+  expect(persisted.dsl.body.find((b: any) => b.id === 'summary').title).toBe('当前交付经营摘要');
+  expect(
+    persisted.dsl.body.slice(0, movedOrder.length).map((b: any) => `drag-handle-${b.id}`),
+  ).toEqual(movedOrder);
+  expect(persisted.dsl.body.slice(movedOrder.length).map((b: any) => b.blockType)).toEqual(
+    addedTypes,
+  );
+  for (const block of persisted.dsl.body.slice(movedOrder.length)) {
+    if (block.blockType === 'watermark') expect(block.text).toBe('内部交付复盘');
     else expect(block.title).toBe(addedTitles[block.blockType]);
-    if(['grouped-table','stat-card','cross-tab','chart'].includes(block.blockType)) expect(block.dataSource).toBe('delivery');
+    if (['grouped-table', 'stat-card', 'cross-tab', 'chart'].includes(block.blockType))
+      expect(block.dataSource).toBe('delivery');
   }
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').style.fontSize).toBe(18);
   const toolbar = page.getByTestId('report-designer-toolbar');

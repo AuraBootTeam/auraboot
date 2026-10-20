@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { BASE_URL } from '../../helpers/environments';
 import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { test, expect, type Page } from '@playwright/test';
 import { ensureSidebarExpanded, navigateToMenuByClick, executeCommandViaApi } from '../helpers';
@@ -59,37 +60,107 @@ async function dragNodeToCanvas(page: Page, type: string, offset: { x: number; y
   return id!;
 }
 
-async function verifyAutomationReadOnly(page:Page,browser:import('@playwright/test').Browser,pid:string,nodeId:string) {
-  const read=async(response:import('@playwright/test').APIResponse)=>{expect(response.status()).toBe(200);const body=await response.json();expect(String(body.code)).toBe('0');return body.data;};
-  const before=await read(await page.request.get(`/api/automations/${pid}`));
-  const code=`designer_reader_${randomUUID().slice(0,8)}`;
-  const role=await read(await page.request.post('/api/roles',{data:{code,name:code,type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'all'}}));
-  const tree=await read(await page.request.get('/api/permissions/tree'));
-  const ids=new Map<string,number>();
-  const visit=(nodes:any[])=>nodes.forEach(node=>{ids.set(node.code,node.id);visit(node.children||[]);});visit(tree);
+async function verifyAutomationReadOnly(
+  page: Page,
+  browser: import('@playwright/test').Browser,
+  pid: string,
+  nodeId: string,
+) {
+  const read = async (response: import('@playwright/test').APIResponse) => {
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    return body.data;
+  };
+  const before = await read(await page.request.get(`/api/automations/${pid}`));
+  const code = `designer_reader_${randomUUID().slice(0, 8)}`;
+  const role = await read(
+    await page.request.post('/api/roles', {
+      data: {
+        code,
+        name: code,
+        type: 'custom',
+        status: 'active',
+        scopeType: 'tenant',
+        defaultDataScopeType: 'all',
+      },
+    }),
+  );
+  const tree = await read(await page.request.get('/api/permissions/tree'));
+  const ids = new Map<string, number>();
+  const visit = (nodes: any[]) =>
+    nodes.forEach((node) => {
+      ids.set(node.code, node.id);
+      visit(node.children || []);
+    });
+  visit(tree);
   expect(ids.has('automation.read')).toBe(true);
-  await read(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:[{permissionId:ids.get('automation.read'),granted:true}]}));
-  const email=`${code}@e2e.local`;
-  await read(await page.request.post('/api/admin/users',{data:{email,displayName:'自动化只读验收',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
-  const context=await browser.newContext({baseURL:process.env.PLAYWRIGHT_BASE_URL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1920,height:1080}});
+  await read(
+    await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {
+      data: [{ permissionId: ids.get('automation.read'), granted: true }],
+    }),
+  );
+  const email = `${code}@e2e.local`;
+  await read(
+    await page.request.post('/api/admin/users', {
+      data: {
+        email,
+        displayName: '自动化只读验收',
+        initialPassword: process.env.ADMIN_PASSWORD,
+        roleCodes: [code],
+        sendInviteEmail: false,
+      },
+    }),
+  );
+  const context = await browser.newContext({
+    baseURL: BASE_URL,
+    storageState: { cookies: [], origins: [] },
+    locale: 'zh-CN',
+    viewport: { width: 1920, height: 1080 },
+  });
   try {
-    const actor=await context.newPage();const identity=await loginDeliveryMember(actor,email);
+    const actor = await context.newPage();
+    const identity = await loginDeliveryMember(actor, email);
     expect(identity.permissions.permissionCodes).not.toContain('automation.update');
     await actor.goto(`/automation/${pid}`);
     await expect(actor.locator('.react-flow__node')).toHaveCount(4);
     await expect(actor.getByTestId('automation-editor-toolbar-btn-save')).toHaveCount(0);
     await expect(actor.getByTestId('flow-palette')).toHaveCount(0);
-    const node=actor.locator(`.react-flow__node[data-id="${nodeId}"]`);await node.click();
-    await openFlowDesignerPanel(actor,'inspector');
+    await expect(
+      actor.getByRole('button', { name: 'Toggle Interactivity', exact: true }),
+    ).toHaveCount(0);
+    const node = actor.locator(`.react-flow__node[data-id="${nodeId}"]`);
+    await node.click();
+    await openFlowDesignerPanel(actor, 'inspector');
+    await actor.getByTestId('prop-group-toggle-advanced').click();
     await expect(actor.getByTestId('prop-field-message').getByRole('textbox')).toBeDisabled();
-    const box=await node.boundingBox();expect(box).toBeTruthy();
-    const transform=await node.getAttribute('style');
-    await actor.mouse.move(box!.x+70,box!.y+20);await actor.mouse.down();await actor.mouse.move(box!.x+130,box!.y+70,{steps:12});await actor.mouse.up();
+    const box = await node.boundingBox();
+    expect(box).toBeTruthy();
+    const transform = await node.getAttribute('style');
+    await actor.mouse.move(box!.x + 70, box!.y + 20);
+    await actor.mouse.down();
+    await actor.mouse.move(box!.x + 130, box!.y + 70, { steps: 12 });
+    await actor.mouse.up();
     expect(await node.getAttribute('style')).toBe(transform);
-    expect((await actor.request.put(`/api/automations/${pid}`,{data:{name:'Forbidden reader edit'}})).status()).toBe(403);
-    const after=await read(await page.request.get(`/api/automations/${pid}`));expect(after.name).toBe(before.name);expect(after.flowConfig).toEqual(before.flowConfig);
-    await actor.screenshot({path:path.join(process.env.AURA_EVIDENCE_DIR!,'DS05-readonly-schema-controls.png'),fullPage:false});
-  } finally {await context.close();}
+    await actor.locator('body').press('Backspace');
+    await expect(actor.locator('.react-flow__node')).toHaveCount(4);
+    expect(
+      (
+        await actor.request.put(`/api/automations/${pid}`, {
+          data: { name: 'Forbidden reader edit' },
+        })
+      ).status(),
+    ).toBe(403);
+    const after = await read(await page.request.get(`/api/automations/${pid}`));
+    expect(after.name).toBe(before.name);
+    expect(after.flowConfig).toEqual(before.flowConfig);
+    await actor.screenshot({
+      path: path.join(process.env.AURA_EVIDENCE_DIR!, 'DS05-readonly-schema-controls.png'),
+      fullPage: false,
+    });
+  } finally {
+    await context.close();
+  }
 }
 
 async function record(page: Page, pid: string) {
@@ -299,7 +370,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   });
   const { pid: automationPid } = await saveAutomation(page);
   await expect(page).toHaveURL(new RegExp(`/automation/${automationPid}$`));
-  await verifyAutomationReadOnly(page,browser,automationPid,ignore);
+  await verifyAutomationReadOnly(page, browser, automationPid, ignore);
   await page.reload();
   await fillNodeConfig(page, archive, {});
   await expect(page.getByTestId('model-map-field-0')).toHaveValue('tpm_ts_description');
@@ -630,13 +701,11 @@ test('portable archive template selects a task once and binds every reference be
     await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()
   ).data;
   const upload = async () =>
-    page
-      .getByTestId('input-import-automation')
-      .setInputFiles({
-        name: '任务归档.automation.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify(template)),
-      });
+    page.getByTestId('input-import-automation').setInputFiles({
+      name: '任务归档.automation.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(template)),
+    });
   await upload();
   const dialog = page.getByRole('dialog', { name: '配置导入参数' });
   await expect(dialog).toBeVisible();

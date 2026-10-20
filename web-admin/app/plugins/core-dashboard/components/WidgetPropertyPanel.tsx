@@ -97,7 +97,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
 
       <div className="flex-1 overflow-y-auto p-4">
         <SchemaBlockConfigPanel key={widget.id} density="compact" pathMode="nested"
-          schemas={dashboardPropertySchemas(widgetDef.configSchema ?? [], l, locale)}
+          schemas={dashboardPropertySchemas(widgetDef.configSchema ?? [], l, locale, widget.type)}
           value={widget.config as unknown as Record<string, unknown>}
           onChange={next => updateWidgetConfig(widget.id, next as Partial<WidgetConfig>)} />
 

@@ -10,7 +10,10 @@ import { useReportDocument } from '../state/ReportDocumentProvider';
 import type { ReportDataSource } from '../types';
 import { ModelPicker, NamedQueryPicker } from '~/shared/designer/datasource';
 
-import { propertyEditorRegistry, type RegisteredPropertyEditorProps } from '~/shared/designer/PropertyEditorRegistry';
+import {
+  propertyEditorRegistry,
+  type RegisteredPropertyEditorProps,
+} from '~/shared/designer/PropertyEditorRegistry';
 
 const ReportDataSourceEditor = ({ adapter }: RegisteredPropertyEditorProps) => {
   const text = useSmartText();
@@ -23,7 +26,6 @@ const ReportDataSourceEditor = ({ adapter }: RegisteredPropertyEditorProps) => {
   const [newDsType, setNewDsType] = useState<'model' | 'namedQuery' | 'api'>('model');
   const [newDsValue, setNewDsValue] = useState('');
   const [showAddDs, setShowAddDs] = useState(false);
-
 
   const dsKeys = Object.keys(dataSources);
 
@@ -41,7 +43,8 @@ const ReportDataSourceEditor = ({ adapter }: RegisteredPropertyEditorProps) => {
     setShowAddDs(false);
   };
 
-  return <fieldset disabled={adapter.disabled} className="min-w-0 space-y-3">
+  return (
+    <fieldset disabled={adapter.disabled} className="min-w-0 space-y-3">
       {/* Data Source */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -127,9 +130,12 @@ const ReportDataSourceEditor = ({ adapter }: RegisteredPropertyEditorProps) => {
           </div>
         )}
       </div>
-
-  </fieldset>;
+    </fieldset>
+  );
 };
 
-const disposeDataSourceEditor = propertyEditorRegistry.register('report.data-source', ReportDataSourceEditor);
+const disposeDataSourceEditor = propertyEditorRegistry.register(
+  'report.data-source',
+  ReportDataSourceEditor,
+);
 import.meta.hot?.dispose(disposeDataSourceEditor);
