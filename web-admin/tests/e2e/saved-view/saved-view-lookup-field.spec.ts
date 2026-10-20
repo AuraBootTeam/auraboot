@@ -35,31 +35,48 @@ async function fetchList(page: Page, modelCode: string): Promise<any> {
 }
 
 test.describe('Lookup Field Type (GAP-124)', () => {
-  test('LF-001: REFERENCE field _display suffix returned by API', async ({ page }) => {
-    // Navigate to establish auth
-    await page.goto('/');
-    await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
-
-    // Fetch e2et_order list — e2et_order_customer is a REFERENCE field
-    const data = await fetchList(page, 'e2et_order');
-    if (!data || !data.records || data.records.length === 0) {
-      test.skip(true, 'No e2et_order records to test lookup');
-      return;
-    }
-
-    // Check if any record has the _display suffix
-    const firstRecord = data.records[0];
-    const hasCustomerRef = 'e2et_order_customer' in firstRecord;
-    if (!hasCustomerRef) {
-      test.skip(true, 'e2et_order_customer field not in response');
-      return;
-    }
-
-    // If the customer_id has a value, there should be a _display suffix
-    if (firstRecord.e2et_order_customer) {
-      expect(firstRecord).toHaveProperty('e2et_order_customer_display');
-      expect(firstRecord.e2et_order_customer_display).toBeTruthy();
-    }
+  test('LF-001: REFERENCE field _display suffix returned by API', async ({ page }, info) => {
+    const tag = uniqueId('lookup');
+    const customerName = `Lookup customer ${tag}`;
+    const title = `Lookup order ${tag}`;
+    const create = async (model: string, data: Record<string, unknown>) => {
+      const response = await page.request.post(`/api/dynamic/${model}/create`, { data });
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(String(body.code)).toBe('0');
+      expect(body.data.pid).toMatch(/^[0-9A-Z]{26}$/);
+      return body.data.pid as string;
+    };
+    const customerPid = await create('e2et_customer', {
+      e2et_cust_code: tag,
+      e2et_cust_name: customerName,
+      e2et_cust_region: 'north',
+      e2et_cust_active: true,
+    });
+    const orderPid = await create('e2et_order', {
+      e2et_order_title: title,
+      e2et_order_type: 'normal',
+      e2et_order_status: 'draft',
+      e2et_order_urgent: false,
+      e2et_order_customer: customerPid,
+    });
+    const response = await page.request.get('/api/dynamic/e2et_order/list', {
+      params: { pageNum: 1, pageSize: 5, keyword: title },
+    });
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    expect(body.data.records).toHaveLength(1);
+    expect(body.data.records[0]).toMatchObject({
+      pid: orderPid,
+      e2et_order_title: title,
+      e2et_order_customer: customerPid,
+      e2et_order_customer_display: customerName,
+    });
+    await info.attach('owned-reference-enrichment', {
+      body: JSON.stringify({ customerPid, customerName, order: body.data.records[0] }),
+      contentType: 'application/json',
+    });
   });
 
   test('LF-002: reference valueType inferred for _id fields', async ({ page }) => {
