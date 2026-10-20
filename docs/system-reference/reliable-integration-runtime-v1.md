@@ -154,3 +154,22 @@ metadata cannot authorize these reads. Product reads retain their actual legitim
 this change does not require product models to belong to Procurement. Standalone counterexamples
 cover wrong PR ownership and invalid current definitions; assembled tenant metadata and PG
 permission acceptance still require native verification.
+
+
+## Installed integration machine data authority
+
+Installed command identity and command permits do not substitute for machine data authority.
+The verified command configuration may declare `handlerParams.installedMachineData` as a finite
+map keyed by model code. Each model declares explicit `read`, `create`, and/or `update` field
+arrays; `read` must include `pid` and every writable field. Wildcards, physical deletion,
+unknown actions, and malformed contracts are rejected. An absent contract grants no machine
+model access. Installation bindings and inbound payloads cannot supply this contract.
+
+The host checks tenant, application, and installation against the authenticated machine before
+opening a lexical read scope. Mutations additionally require the verified command and handler,
+its published permit, an explicit model/action/field declaration, and an exact target and physical
+row version for updates. Related writes still require the handler's existing lineage authorization.
+Each related or root operation reloads the authorized record version before the native CAS; this
+supports multiple operations in one transaction without reusing the first operation's old version.
+The reliable consumer reconstructs the same machine principal after verifying the original durable
+receipt and envelope. Neither path clears machine context or impersonates a human member.
