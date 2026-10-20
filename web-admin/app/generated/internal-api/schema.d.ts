@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 2a1919db374fac2ce7bc949f4d9739068e5bcb0ffed6bcfd8ab9d14a4f487ec3
+ * Contract SHA-256: 2c07f437edb77a7954e4825a9391aef1255f9233f2e07e80a539c74befe8ec77
  */
 export interface paths {
     "/api/activities": {
@@ -32524,6 +32524,7 @@ export interface components {
             durationMs?: number;
             errorDetail?: string;
             errorMessage?: string;
+            fieldMigrations?: components["schemas"]["ModelFieldRenameReceipt"][];
             importId?: string;
             namespace?: string;
             pluginId?: string;
@@ -33782,6 +33783,19 @@ export interface components {
             valid?: boolean;
             validationOverride?: string;
             visible?: boolean;
+        };
+        ModelFieldRenameReceipt: {
+            /** Format: int64 */
+            copiedRows?: number;
+            freshInstall?: boolean;
+            fromField?: string;
+            modelCode?: string;
+            modelPid?: string;
+            /** Format: int64 */
+            retainedRows?: number;
+            sourceDefinitionSha256?: string;
+            targetDefinitionSha256?: string;
+            toField?: string;
         };
         ModelIntrospection: {
             code?: string;

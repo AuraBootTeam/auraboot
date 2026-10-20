@@ -419,10 +419,10 @@ class S06Current001PluginCleanupAdmissionTest {
                 .hasMessage("CLEANUP_AUTOMATIC_PHASES_INVALID");
     }
     @Test
-    void originalCleanupV1V2AndOfficialTransactionBodiesAreBytePreserved() throws Exception {
+    void cleanupV1V2AndOfficialTransactionBodiesRemainPinnedAfterWorkspacePortability() throws Exception {
         java.nio.file.Path root = java.nio.file.Path.of("src/test/java/com/auraboot/framework/notification/sourcebinding");
         if (!java.nio.file.Files.isDirectory(root)) root = java.nio.file.Path.of("platform").resolve(root);
-        for (var entry : Map.of("S06Current001PluginCleanupAdmission.java", "fbb3851b34b42d721d5a131e81d36a7c47454a0dd028f48a9df39209edf37395", "S06Current001PluginRegistryCleanupIT.java", "3229a0796894a033226875ba89b3171d1a8e35ca77e1fdc539d4eb275787f216").entrySet()) {
+        for (var entry : Map.of("S06Current001PluginCleanupAdmission.java", "502c0816da66376c528a4fe040f3bd42859da13e601ac2604a298cc6fdbe6b14", "S06Current001PluginRegistryCleanupIT.java", "e10ecca8ce72f442a88e2a00904c0c0dd4f22afee7c81224633fc556f76823b5").entrySet()) {
             String source = java.nio.file.Files.readString(root.resolve(entry.getKey()));
             String start = entry.getKey().equals("S06Current001PluginCleanupAdmission.java") ? "    // BEGIN automatic sourceFamily cleanup admission.\n" : "    // BEGIN automatic sourceFamily official cleanup.\n";
             String end = entry.getKey().equals("S06Current001PluginCleanupAdmission.java") ? "    // END automatic sourceFamily cleanup admission.\n" : "    // END automatic sourceFamily official cleanup.\n";

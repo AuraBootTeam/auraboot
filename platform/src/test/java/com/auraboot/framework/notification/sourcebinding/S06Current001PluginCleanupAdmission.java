@@ -19,8 +19,8 @@ import java.util.Set;
 final class S06Current001PluginCleanupAdmission {
     static final String RUNTIME = "procurement-web-stack-20261010";
     static final String CLASSIFICATION_SHA = "b9e7931faeb7caf28611acb439f2b4a2ecdfad99d4b5c569ebe106abf3d3c7ea";
-    static final Path EVIDENCE = Path.of("/Users/ghj/work/auraboot/.workspace/evidence/" + RUNTIME);
-    static final Path ORIGINAL = EVIDENCE.resolve("managed-fixture-integration-20261015/s06-native-main509-attempt-001");
+    static Path evidence() { return NativeProcurementWorkspace.root().resolve(".workspace/evidence").resolve(RUNTIME); }
+    static Path original() { return evidence().resolve("managed-fixture-integration-20261015/s06-native-main509-attempt-001"); }
     static final Map<String, String> TRACES = Map.ofEntries(
             Map.entry("sn5ee4edb1e3b8", "440974bb3b76002cccbce9e49bc6a778d46e0fdf7fc171b2fb86d1259006afb0"),
             Map.entry("sn6034b1b0e7ae", "7233cac44fe9b9782aa6c4af729d81f89e35e3b03d82ef4da21bae9036550f27"),
@@ -45,7 +45,7 @@ final class S06Current001PluginCleanupAdmission {
     private S06Current001PluginCleanupAdmission() {}
 
     static Admission load(Path input, String expectedHash, ObjectMapper json) throws Exception {
-        return load(input, expectedHash, json, EVIDENCE.toRealPath(), java.time.Instant.now());
+        return load(input, expectedHash, json, evidence().toRealPath(), java.time.Instant.now());
     }
 
     /** Test-owned filesystem root only; the Native entry point always supplies EVIDENCE. */
@@ -66,21 +66,21 @@ final class S06Current001PluginCleanupAdmission {
                 && value.path("runtime").asText().equals(RUNTIME) && value.path("database").asText().equals("enterprise_22")
                 && value.path("redisDatabase").isInt() && value.path("redisDatabase").intValue() == 13
                 && value.path("execute").isBoolean() && value.path("execute").booleanValue(), "CLEANUP_FIXED_SCOPE_INVALID");
-        require(Files.isSameFile(Path.of(value.path("originalAttemptPath").asText()), ORIGINAL), "CLEANUP_WRONG_ORIGINAL_ATTEMPT");
-        Path classification = ORIGINAL.resolve("classification.json").toRealPath();
+        require(Files.isSameFile(Path.of(value.path("originalAttemptPath").asText()), original()), "CLEANUP_WRONG_ORIGINAL_ATTEMPT");
+        Path classification = original().resolve("classification.json").toRealPath();
         require(value.path("originalClassificationSha256").asText().equals(CLASSIFICATION_SHA)
                 && hash(classification).equals(CLASSIFICATION_SHA), "CLEANUP_CLASSIFICATION_CHANGED");
         JsonNode verdict = json.readTree(classification.toFile());
         require(verdict.path("originalMethodsPassed").asInt(-1) == 7 && verdict.path("productFacetPassed").asBoolean(false),
                 "CLEANUP_ORIGINAL_NATIVE_NOT_PASS");
-        require(hash(ORIGINAL.resolve("native.xml")).equals(verdict.path("xmlSha256").asText()), "CLEANUP_ORIGINAL_XML_CHANGED");
+        require(hash(original().resolve("native.xml")).equals(verdict.path("xmlSha256").asText()), "CLEANUP_ORIGINAL_XML_CHANGED");
         Map<Long, Target> targets = new LinkedHashMap<>();
         Set<String> methods = new HashSet<>();
         require(verdict.path("originalTracePairs").isArray() && verdict.path("originalTracePairs").size() == 7,
                 "CLEANUP_ORIGINAL_TRACE_ROSTER_INVALID");
         for (JsonNode pair : verdict.path("originalTracePairs")) {
             Path trace = Path.of(pair.path("tracePath").asText()).toRealPath();
-            require(trace.getParent().equals(ORIGINAL.resolve("test-traces").toRealPath()), "CLEANUP_TRACE_OUTSIDE_ORIGINAL");
+            require(trace.getParent().equals(original().resolve("test-traces").toRealPath()), "CLEANUP_TRACE_OUTSIDE_ORIGINAL");
             JsonNode facts = json.readTree(trace.toFile());
             String namespace = facts.path("namespace").asText();
             require(TRACES.containsKey(namespace) && trace.getFileName().toString().equals(namespace + ".json")
@@ -334,7 +334,7 @@ final class S06Current001PluginCleanupAdmission {
     record AutomaticPreflight(List<Expected> plugins, Path output, String classificationSha256) {}
 
     static AutomaticPreflight automaticPreflight(Path input, String expectedHash, ObjectMapper json) throws Exception {
-        Path evidence = EVIDENCE.toRealPath();
+        Path evidence = evidence().toRealPath();
         Path original = automaticIntentPath(input, expectedHash);
         JsonNode intent = automaticStrict(original, json);
         automaticOriginalTimestamp(intent.path("pluginRosterCapturedAtUtc").asText(), java.time.Instant.now());
@@ -342,7 +342,7 @@ final class S06Current001PluginCleanupAdmission {
     }
 
     static Path automaticIntentPath(Path input, String expectedHash) throws Exception {
-        return owned(input.toString(), expectedHash, EVIDENCE.toRealPath());
+        return owned(input.toString(), expectedHash, evidence().toRealPath());
     }
 
     static void automaticOriginalTimestamp(String value, java.time.Instant now) {
@@ -605,7 +605,7 @@ final class S06Current001PluginCleanupAdmission {
                 && seal.path("actualReady").isBoolean() && !seal.path("actualReady").booleanValue()
                 && binding.path("sourceSet").equals(proof.path("sourceSet")), "CLEANUP_AUTOMATIC_COMPILED_SEAL_INVALID");
         Path app = Path.of(proof.path("appRoot").asText()).toRealPath();
-        require(app.startsWith(Path.of("/Users/ghj/work/auraboot/.workspace/worktrees").toRealPath())
+        require(app.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/worktrees").toRealPath())
                 && automaticGit(app, "rev-parse", "HEAD").equals(proof.path("appCommit").asText())
                 && automaticGit(app, "status", "--porcelain").isEmpty(), "CLEANUP_AUTOMATIC_APP_NOT_CLEAN");
         Path testClasses = app.resolve("platform/build/classes/java/test").toRealPath();

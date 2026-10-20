@@ -21,8 +21,8 @@ import java.util.Map;
 /** Test-only admission. Runtime profiles are evidence, not the Native application's profile identity. */
 public final class S06NativeEncryptionAdmission {
     static final String KEY = "S06_NATIVE_FIELD_ENCRYPTION_KEY";
-    private static final Path PRIVATE_PROPERTIES = Path.of("/Users/ghj/work/auraboot/.workspace/private/"
-            + "procurement-web-stack-20261010/field-encryption.properties");
+    private static Path privateProperties() { return NativeProcurementWorkspace.root()
+            .resolve(".workspace/private/procurement-web-stack-20261010/field-encryption.properties"); }
     private static final Set<String> OVERRIDES = Set.of("jvmFieldEncryptionKey", "commandLineFieldEncryptionKey",
             "springApplicationJson", "profileSpecificFieldEncryptionKey", "environmentConfigLocation");
     private static final Set<String> PRIVATE_SOURCE_FIELDS = Set.of("schemaVersion", "kind", "runtime", "backendPid",
@@ -43,7 +43,7 @@ public final class S06NativeEncryptionAdmission {
         Path app = Path.of(required(environment, "S06_NATIVE_APPLICATION_ROOT")).toRealPath();
         require(Files.isSameFile(Path.of(testClass.getProtectionDomain().getCodeSource().getLocation().toURI()),
                 app.resolve("platform/build/classes/java/test")), "S06_NATIVE_APPLICATION_CODE_SOURCE_MISMATCH");
-        Path evidence = Path.of("/Users/ghj/work/auraboot/.workspace/evidence/" + RUNTIME).toRealPath();
+        Path evidence = NativeProcurementWorkspace.root().resolve(".workspace/evidence").resolve(RUNTIME).toRealPath();
         Path proofPath = Path.of(required(environment, "S06_NATIVE_ENCRYPTION_PROOF_PATH")).toRealPath();
         require(proofPath.startsWith(evidence), "S06_ENCRYPTION_PROOF_NOT_OWNED");
         String proofHash = hash(proofPath);
@@ -74,7 +74,7 @@ public final class S06NativeEncryptionAdmission {
         if (proof.path("keySource").asText().equals("private-additional-properties")) {
             privateBackend(proof, runtime, envProof, profiles);
             JsonNode source = privateSourceEvidence(proof, evidence, json);
-            privateSource(proof, source, PRIVATE_PROPERTIES, key);
+            privateSource(proof, source, privateProperties(), key);
         }
         probe(mode, bean);
         return Map.of("mode", mode, "proofPath", proofPath.toString(), "proofSha256", proofHash,

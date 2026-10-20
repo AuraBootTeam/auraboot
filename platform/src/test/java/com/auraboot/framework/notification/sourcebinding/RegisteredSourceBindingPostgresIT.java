@@ -125,7 +125,7 @@ class RegisteredSourceBindingPostgresIT {
         String directory = System.getenv("S06_NATIVE_PRODUCT_PLUGIN_DIR");
         ProductQuoteNativePluginDirectory.select(selected, file == null ? null : Path.of(file),
                 System.getenv("S06_NATIVE_PRODUCT_INPUT_SHA256"), directory == null ? null : Path.of(directory),
-                Path.of("/Users/ghj/work/auraboot/.workspace/runtimes/procurement-web-stack-20261010"))
+                NativeProcurementWorkspace.root().resolve(".workspace/runtimes/procurement-web-stack-20261010"))
                 .ifPresent(path -> properties.add("aura.plugins.dir", path::toString));
     }
 

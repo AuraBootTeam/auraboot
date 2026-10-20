@@ -123,7 +123,7 @@ class RegisteredSourceNativeFixtureCleanupIT {
                 JsonNode row = SourceBindingCanonical.parse(mapper.lockOutbox(item.tenant(), item.id(), item.event()));
                 validate(item, row);
                 Path tracePath = Path.of(admission.path("tracePaths").path(row.path("payload").path("sourceType").asText()).asText()).toRealPath();
-                Path native006 = Path.of("/Users/ghj/work/auraboot/.workspace/evidence/procurement-web-stack-20261010/parallel-web-20261013-s06-authority-audit/host-source-native-attempt-006").toRealPath();
+                Path native006 = NativeProcurementWorkspace.root().resolve(".workspace/evidence/procurement-web-stack-20261010/parallel-web-20261013-s06-authority-audit/host-source-native-attempt-006").toRealPath();
                 assertThat(tracePath.getParent()).isEqualTo(native006.resolve("test-traces"));
                 Path classificationPath = native006.resolve("classification.json");
                 assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(classificationPath))))

@@ -78,14 +78,14 @@ class ProcurementReminderTickNativeIT {
         properties.add("security.field-encryption.key", () -> key);
         ProductQuoteNativePluginDirectory.select(true, Path.of(required("S06_NATIVE_PRODUCT_INPUT")),
                 required("S06_NATIVE_PRODUCT_INPUT_SHA256"), Path.of(required("S06_NATIVE_PRODUCT_PLUGIN_DIR")),
-                Path.of("/Users/ghj/work/auraboot/.workspace/runtimes/procurement-web-stack-20261010"))
+                NativeProcurementWorkspace.root().resolve(".workspace/runtimes/procurement-web-stack-20261010"))
                 .ifPresent(path -> properties.add("aura.plugins.dir", path::toString));
     }
 
     @Test
     void actualControlledTickQueuesOnceAndDeliversTwoExplicitInAppRecipients() throws Exception {
         Path evidence = Path.of(required("PROCUREMENT_REMINDER_TICK_EVIDENCE_DIR")).toRealPath();
-        assertThat(evidence.startsWith(Path.of("/Users/ghj/work/auraboot/.workspace/evidence/procurement-web-stack-20261010").toRealPath())).isTrue();
+        assertThat(evidence.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath())).isTrue();
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();
         assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
@@ -413,7 +413,7 @@ class ProcurementReminderTickNativeIT {
     @Test
     void actualPf4jRegisteredTimerQueuesQuoteAndShipmentAndDeliversOnlySyntheticInApp() throws Exception {
         Path parent = Path.of(required("PROCUREMENT_REMINDER_TICK_EVIDENCE_DIR")).toRealPath();
-        assertThat(parent.startsWith(Path.of("/Users/ghj/work/auraboot/.workspace/evidence/procurement-web-stack-20261010").toRealPath())).isTrue();
+        assertThat(parent.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath())).isTrue();
         Path evidence = Files.createDirectory(parent.resolve("pf4j-automatic-native"));
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();

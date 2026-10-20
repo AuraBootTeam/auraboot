@@ -199,9 +199,9 @@ class S06Current001PluginRegistryCleanupIT {
         Path errors = output.resolve("actual-runtime-paused-verification.stderr");
         Files.createFile(fresh);
         Files.createFile(errors);
-        Process process = new ProcessBuilder("/Users/ghj/work/auraboot/aura", "runtime", "verify",
+        Process process = new ProcessBuilder(NativeProcurementWorkspace.root().resolve("aura").toString(), "runtime", "verify",
                 S06Current001PluginCleanupAdmission.RUNTIME, "--json")
-                .directory(Path.of("/Users/ghj/work/auraboot").toFile())
+                .directory(NativeProcurementWorkspace.root().toFile())
                 .redirectOutput(fresh.toFile()).redirectError(errors.toFile()).start();
         if (!process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
             process.destroyForcibly();
