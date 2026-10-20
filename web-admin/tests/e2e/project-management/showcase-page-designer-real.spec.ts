@@ -176,6 +176,8 @@ test('mature project creation and editing preserve customer owner dates budget a
 }, info) => {
   const identity = await loginDeliveryMember(page);
   await projects(page);
+  await expect(page.getByRole('row').filter({ hasText: '华辰制造 · 供应链协同平台' })).toHaveCount(1);
+  await expect(page.getByRole('columnheader', { name: '负责人', exact: true })).toBeVisible();
   await shot(page, 'PJ01-mature-project-list');
   await page.getByRole('button', { name: '新建项目', exact: true }).click();
   const name = `华辰制造 · 服务交付二期 · ${Date.now().toString(36)}`;
@@ -247,6 +249,7 @@ test('mature project creation and editing preserve customer owner dates budget a
   await page
     .locator('main[data-aura-scroll-container="page-content"]')
     .evaluate((element) => element.scrollTo({ top: 0 }));
+  await expect(page.getByText('保存成功', { exact: true })).toHaveCount(0);
   await shot(page, 'PJ04-mature-project-edit');
   const updating = page.waitForResponse(
     (response) =>
@@ -272,6 +275,8 @@ test('mature project creation and editing preserve customer owner dates budget a
   expect(JSON.stringify(persisted.tpm_pj_files)).toContain(String(file.fileId));
   await expect(page.getByTestId('object-summary')).toContainText('286,000');
   await expect(page.getByRole('main')).toContainText('范围已确认，11月8日开始接口联调。');
+  const summary = await page.getByTestId('object-summary').locator(':scope > div').evaluateAll(items => items.map(item => item.getBoundingClientRect().top));
+  expect(summary).toHaveLength(5); expect(new Set(summary).size).toBe(1);
   await shot(page, 'PJ05-mature-project-reopened');
   await writeFile(
     join(evidence!, 'mature-project-identity.json'),

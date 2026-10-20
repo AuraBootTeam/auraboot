@@ -693,6 +693,7 @@ export default function FormDialog() {
                           ? (firstInputRef as React.RefObject<HTMLTextAreaElement>)
                           : undefined
                       }
+                      aria-label={label}
                       data-testid={`form-dialog-field-${field.field}`}
                       value={formData[field.field] ?? ''}
                       onChange={(e) => updateField(field.field, e.target.value)}
