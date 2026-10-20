@@ -1,0 +1,33 @@
+[
+  {
+    "code": "tdv_viewer",
+    "name:zh-CN": "交付核验只读",
+    "name:en": "Verification viewer",
+    "permissions": [
+      "tdv.check.read",
+      "model.tdv_check.read",
+      "tpm.acceptance.read",
+      "model.tpm_acceptance.read",
+      "tpm.project.read",
+      "model.tpm_project.read"
+    ]
+  },
+  {
+    "code": "tdv_manager",
+    "name:zh-CN": "交付核验负责人",
+    "name:en": "Verification manager",
+    "permissions": [
+      "tdv.check.read",
+      "model.tdv_check.read",
+      "tpm.acceptance.read",
+      "model.tpm_acceptance.read",
+      "tpm.project.read",
+      "model.tpm_project.read",
+      "tdv.check.manage",
+      "meta.command.execute",
+      "model.tdv_check.create",
+      "model.tdv_check.update",
+      "tdv.delivery.register"
+    ]
+  }
+]

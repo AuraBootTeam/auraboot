@@ -88,6 +88,7 @@ export interface ReportDocumentContextValue {
 
   // Lifecycle
   loadDocument: (dsl: ReportDsl) => void;
+  importDocument: (dsl: ReportDsl) => void;
   markSaved: () => void;
   setDirty: (dirty: boolean) => void;
 
@@ -268,6 +269,14 @@ export const ReportDocumentProvider: React.FC<{ children: React.ReactNode }> = (
     [update],
   );
 
+  const importDocument = useCallback(
+    (dsl: ReportDsl) => {
+      update(() => ensurePageConfig(dsl));
+      selection.setSelectedBlockId(null);
+    },
+    [update, selection],
+  );
+
   // ── Lifecycle ───────────────────────────────────────────────────────────────
   const loadDocument = useCallback(
     (dsl: ReportDsl) => {
@@ -329,6 +338,7 @@ export const ReportDocumentProvider: React.FC<{ children: React.ReactNode }> = (
       canUndo: doc.canUndo,
       canRedo: doc.canRedo,
       loadDocument,
+      importDocument,
       markSaved,
       setDirty,
       mutateNoHistory,
@@ -356,6 +366,7 @@ export const ReportDocumentProvider: React.FC<{ children: React.ReactNode }> = (
       doc.canUndo,
       doc.canRedo,
       loadDocument,
+      importDocument,
       markSaved,
       setDirty,
       mutateNoHistory,

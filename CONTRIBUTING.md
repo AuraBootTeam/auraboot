@@ -60,6 +60,27 @@ cd web-admin && NO_PROXY=localhost npx playwright test
 
 `./gradlew test` covers the main backend suite, but AI runtime packages are intentionally isolated behind `./gradlew testAi` because they require a heavier Spring context and additional fixtures. If your change touches AuraBot, agents, RAG, intent routing, or shared AI infrastructure, run both commands before opening a PR.
 
+### Dependency Locking
+
+Gradle dependency versions are pinned by `gradle.lockfile` files (one per project under `platform/`, the same way `pnpm-lock.yaml` pins front-end dependencies). If you add, remove, or bump a dependency in `platform/build.gradle`, regenerate the affected lockfiles and commit them together with your change:
+
+```bash
+cd platform && ./gradlew :compileTestJava :test --tests '<one small test>' --write-locks
+```
+
+Include every project whose dependencies you touched, e.g.
+`./gradlew dependencies :platform-storage-minio:dependencies --write-locks`.
+Builds fail when a lockfile does not match the declared dependencies — that is
+the point: resolved versions cannot drift silently between environments.
+
+> Regenerate from a **real build task** (compile/test), not only the
+> `dependencies` report: the report resolves a superset graph and records
+> entries the actual build never resolves, which then fails lock enforcement
+> (that is how a phantom `testRuntimeClasspath` entry broke `./gradlew test`).
+> Integration-test runtime configurations are locked best-effort; if running
+> ITs reports a lock mismatch, refresh with `--write-locks` on the
+> integrationTest tasks and commit.
+
 ---
 
 ## Code Style
@@ -107,13 +128,14 @@ chore: upgrade Spring Boot to 3.5.1
 
 ### CI & Validation
 
-> **GitHub Actions are disabled for this repository.** Pull requests will not
-> show CI checks, and that is expected. Validation runs through the
-> repository's self-contained local gates instead: the `scripts/check-*.sh`
-> suite (boundary, scope, schema, docs), the Gradle test gates
+> **GitHub Actions runs on this repository** (public repo — Actions are free).
+> Pull requests show the repository's workflow gates as checks, and pushes to
+> `main` run them too. For fast local feedback before pushing, the
+> self-contained gates remain available: the `scripts/check-*.sh` suite
+> (boundary, scope, schema, docs), the Gradle test gates
 > (`./gradlew test` / `check`), and the Playwright suites under `tests/e2e`.
-> Please run the relevant gates locally before submitting — the review
-> process re-runs them on the maintainer side.
+> If a CI check fails, fix the workflow or the code — either is a normal pull
+> request change.
 
 ### Workflow
 
@@ -190,7 +212,7 @@ See the [plugin development guide](https://docs.auraboot.com) for details.
 
 ## Contributor License Agreement
 
-AuraBoot is dual-licensed (the [source-available AuraBoot License](LICENSE.txt) for the community edition + a separate commercial license for enterprise customers). To distribute your contribution under both licenses, we need a signed [Contributor License Agreement (CLA)](CLA.md).
+AuraBoot Community uses [Apache License 2.0 with trademark and commercial-contact supplements](LICENSE.txt). The supplements do not restrict Apache-2.0 rights; proprietary enterprise code and official services have separate commercial agreements. Contributions may be used in the community and commercial editions under the signed [Contributor License Agreement (CLA)](CLA.md); contributors retain their copyright.
 
 **On your first pull request**, the CLA Assistant bot will comment with a one-click sign-off instruction. You sign by replying:
 

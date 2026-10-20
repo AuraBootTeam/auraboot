@@ -127,10 +127,16 @@ function RenderedWidget({
   // (xField/yField/etc. live there). Renderer-supplied props (linkageFilters,
   // emit callbacks, h-full className) come last so config can never clobber
   // them.
+  // Preserve persisted designer keys while adapting them to chart props.
+  const piePresentation = chartType === 'pie' ? {
+    ring: config.visualization?.donut ?? config.ring,
+    showLabel: config.visualization?.showLabels ?? config.showLabel,
+  } : {};
   const componentProps = {
     ...config,
     ...(config.visualization || {}),
     ...(config.style || {}),
+    ...piePresentation,
     linkageFilters,
     onLinkageEmit,
     onDrillDown,

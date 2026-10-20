@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildToolbarConditionContext } from '~/framework/meta/rendering/pages/ListPageContent';
+import { buildToolbarConditionContext } from '~/framework/meta/rendering/pages/list/listSchemaPolicy';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';

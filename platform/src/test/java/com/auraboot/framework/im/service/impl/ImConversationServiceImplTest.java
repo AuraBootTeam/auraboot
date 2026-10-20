@@ -1,7 +1,7 @@
 package com.auraboot.framework.im.service.impl;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
-import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.im.service.ImAgentDirectory;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationLastMessageRow;
@@ -53,7 +53,7 @@ class ImConversationServiceImplTest {
     @Mock private ImConversationMemberMapper memberMapper;
     @Mock private ImMessageMapper messageMapper;
     @Mock private ImMessageService imMessageService;
-    @Mock private AgentDefinitionMapper agentDefinitionMapper;
+    @Mock private ImAgentDirectory agentDirectory;
 
     private ImConversationServiceImpl service;
 
@@ -65,7 +65,7 @@ class ImConversationServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ImConversationServiceImpl(conversationMapper, memberMapper, messageMapper,
-                imMessageService, agentDefinitionMapper);
+                imMessageService, agentDirectory);
     }
 
     private ConversationCreateRequest req(String type) {
@@ -181,7 +181,7 @@ class ImConversationServiceImplTest {
         AgentDefinition agent = new AgentDefinition();
         agent.setName("Bot");
         agent.setEmployeeId(99L);
-        when(agentDefinitionMapper.selectById(50L)).thenReturn(agent);
+        when(agentDirectory.findById(50L)).thenReturn(new ImAgentDirectory.Profile(agent.getName(), agent.getEmployeeId()));
 
         service.create(r, USER_ID, TENANT_ID);
 
@@ -314,7 +314,7 @@ class ImConversationServiceImplTest {
                 .thenReturn(null);
         AgentDefinition agent = new AgentDefinition();
         agent.setName("Aurabot");
-        when(agentDefinitionMapper.selectById(9L)).thenReturn(agent);
+        when(agentDirectory.findById(9L)).thenReturn(new ImAgentDirectory.Profile(agent.getName(), agent.getEmployeeId()));
 
         service.addAgentMembers(CONV_ID, List.of(9L), TENANT_ID);
         verify(memberMapper).insert(any(ImConversationMember.class));
@@ -572,7 +572,7 @@ class ImConversationServiceImplTest {
         when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_GROUP, OTHER_ID));
         when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
                 .thenReturn(new ImConversationMember());
-        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
+        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
                 ConversationMemberInfo.builder()
                         .memberType(ImConstants.MEMBER_TYPE_HUMAN)
                         .memberId(USER_ID)
@@ -594,7 +594,7 @@ class ImConversationServiceImplTest {
         when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_GROUP, OTHER_ID));
         when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
                 .thenReturn(new ImConversationMember());
-        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of());
+        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of());
         when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID))
                 .thenReturn(List.of(OTHER_ID));
 
@@ -640,7 +640,7 @@ class ImConversationServiceImplTest {
         when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_GROUP, USER_ID));
         when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
                 .thenReturn(new ImConversationMember());
-        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
+        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
                 ConversationMemberInfo.builder()
                         .memberType(ImConstants.MEMBER_TYPE_HUMAN)
                         .memberId(USER_ID)
@@ -677,10 +677,10 @@ class ImConversationServiceImplTest {
 
     @Test
     void getMembers_delegatesToMapper() {
-        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID))
+        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID))
                 .thenReturn(new ArrayList<>());
         service.getMembers(CONV_ID, TENANT_ID);
-        verify(memberMapper).findMembersWithInfo(CONV_ID, TENANT_ID);
+        verify(agentDirectory).findMembersWithInfo(CONV_ID, TENANT_ID);
     }
 
     @Test

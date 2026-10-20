@@ -698,10 +698,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // 5. 生成MODIFY COLUMN DDL (根据数据库方言)
             String columnDef = generateColumnDefinition(tableName, field);
             DdlDialect dialect = ddlDialectProvider.getDialect();
-            String ddl;
-            
-            // PostgreSQL使用ALTER COLUMN语法
-            if (dialect.getClass().getSimpleName().contains("Postgres")) {
+
+            {
                 // PostgreSQL需要分多个语句修改列
                 List<String> ddls = new ArrayList<>();
                 
@@ -761,28 +759,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                         .operationTime(DateUtil.getCurrentLocalDateTimeUtc())
                         .build();
                 
-            } else {
-                // MySQL/其他数据库使用MODIFY COLUMN
-                ddl = "ALTER TABLE " + tableName + " MODIFY COLUMN " + columnDef;
-                
-                // 执行DDL
-                dynamicDataMapper.alterTable(ddl);
-                
-                log.info("Successfully updated field {} in model {}, table: {}", 
-                        logSafe(fieldCode), logSafe(modelCode), logSafe(tableName));
-                
-                return SchemaOperationResult.builder()
-                        .success(true)
-                        .operationType(SchemaOperationResult.SchemaOperationType.UPDATE_FIELD)
-                        .modelCode(modelCode)
-                        .tableName(tableName)
-                        .executedDDL(List.of(ddl))
-                        .affectedFields(List.of(fieldCode))
-                        .message("Field updated successfully")
-                        .operationTime(DateUtil.getCurrentLocalDateTimeUtc())
-                        .build();
             }
-            
+
         } catch (Exception e) {
             log.error("Failed to update field {} in model {}: {}", logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
@@ -1015,15 +993,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
      * 生成DROP INDEX DDL
      */
     private String generateDropIndexDDL(String tableName, String indexName) {
-        DdlDialect dialect = ddlDialectProvider.getDialect();
-        
-        // PostgreSQL使用 DROP INDEX index_name
-        if (dialect.getClass().getSimpleName().contains("Postgres")) {
-            return "DROP INDEX IF EXISTS " + indexName;
-        }
-        
-        // MySQL使用 DROP INDEX index_name ON table_name
-        return "DROP INDEX " + indexName + " ON " + tableName;
+        return "DROP INDEX IF EXISTS " + indexName;
     }
 
     @Override

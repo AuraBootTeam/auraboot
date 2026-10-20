@@ -18,15 +18,17 @@ vi.mock('~/utils/i18n', () => ({
   useSmartText: () => (key: string, fallback?: string) => fallback ?? key,
 }));
 
-const { fetchFieldOptionsMock, fetchDictOptionsMock, useFlowStoreMock } = vi.hoisted(() => ({
+const { fetchFieldOptionsMock, fetchDictOptionsMock, fetchFieldDictOptionsMock, useFlowStoreMock } = vi.hoisted(() => ({
   fetchFieldOptionsMock: vi.fn(),
   fetchDictOptionsMock: vi.fn(),
+  fetchFieldDictOptionsMock: vi.fn(),
   useFlowStoreMock: vi.fn(),
 }));
 
 vi.mock('~/shared/services/resourceSelectService', () => ({
   fetchFieldOptions: fetchFieldOptionsMock,
   fetchDictOptions: fetchDictOptionsMock,
+  fetchFieldDictOptions: fetchFieldDictOptionsMock,
 }));
 
 vi.mock('~/plugins/core-designer/components/flow-designer-sdk/store', () => ({
@@ -51,6 +53,7 @@ const NODE_WITH_MODEL = {
 beforeEach(() => {
   fetchFieldOptionsMock.mockReset();
   fetchDictOptionsMock.mockReset();
+  fetchFieldDictOptionsMock.mockReset();
   useFlowStoreMock.mockReturnValue({ nodes: [NODE_WITH_MODEL], selectedNodeId: 'node-1' });
 });
 
@@ -162,5 +165,28 @@ describe('DependentMultiSelect — error state', () => {
     );
     // The tag input should be present
     expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+});
+
+describe('DependentMultiSelect model dictionary cascade', () => {
+  it('resolves model and state field and prevents stale options after a model switch', async () => {
+    let resolveOld!: (options: unknown[]) => void;
+    fetchFieldDictOptionsMock.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }))
+      .mockResolvedValueOnce([{label: 'Approved', value: 'approved'}]);
+    const setValue = vi.fn();
+    const adapter = makeAdapter(['in_review'], setValue);
+    useFlowStoreMock.mockReturnValue({nodes: [{id: 'node-1', data: {config: {modelCode: 'task', stateField: 'status'}}}], selectedNodeId: 'node-1'});
+    const view = render(<DependentMultiSelect adapter={adapter} dependsOnKey="stateField" optionSource="dict" />);
+    await waitFor(() => expect(fetchFieldDictOptionsMock).toHaveBeenCalledWith('task', 'status'));
+    useFlowStoreMock.mockReturnValue({nodes: [{id: 'node-1', data: {config: {modelCode: 'approval', stateField: 'status'}}}], selectedNodeId: 'node-1'});
+    view.rerender(<DependentMultiSelect adapter={adapter} dependsOnKey="stateField" optionSource="dict" />);
+    await waitFor(() => expect(fetchFieldDictOptionsMock).toHaveBeenCalledWith('approval', 'status'));
+    fireEvent.focus(screen.getByRole('textbox'));
+    await screen.findByRole('button', {name: 'Approved'});
+    await act(async () => resolveOld([{label: 'Stale task state', value: 'old'}]));
+    expect(screen.queryByText('Stale task state')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Approved'})).toBeInTheDocument();
+    expect(setValue).toHaveBeenCalledWith([]);
+    expect(fetchDictOptionsMock).not.toHaveBeenCalled();
   });
 });

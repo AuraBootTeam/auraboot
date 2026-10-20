@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.controller;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.constant.CommandStage;
 import com.auraboot.framework.meta.service.impl.CommandPhaseRegistry;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +16,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/meta")
 @RequiredArgsConstructor
+@AuthenticatedAccess("read-only command pipeline phase introspection for IDE tooling, debugging, and admin UIs")
 public class CommandPipelineController {
 
     private final CommandPhaseRegistry pipelineRegistry;

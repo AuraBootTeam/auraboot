@@ -98,6 +98,7 @@ export function createEventPolicyPresentation(locale: string) {
   };
 
   const ACTION_LABELS: Record<string, string> = {
+    EXECUTE_COMMAND: copy('execute_business_operation'),
     NOTIFY: copy('send_in_app_notification'),
     SEND_SMS: copy('send_sms'),
     SEND_IM: copy('send_im_message'),
@@ -122,6 +123,7 @@ export function createEventPolicyPresentation(locale: string) {
     invalidTarget: copy('invalid_recipient'),
     sentCount: copy('sent_count'),
     recipientCount: copy('recipient_count'),
+    title: copy('notification_title'),
     targetUserIds: copy('recipient_users'),
     assigneeUserIds: copy('assignees'),
     createdCount: copy('created_count'),
@@ -237,6 +239,7 @@ export function createEventPolicyPresentation(locale: string) {
     payload_title_missing: copy('title_is_missing'),
     tenant_context_missing: copy('tenant_context_is_missing'),
     target_invalid: copy('invalid_recipient_format'),
+    recipient_unavailable: copy('recipient_unavailable'),
     target_role_code_missing: copy('role_code_is_missing'),
     target_value_missing: copy('recipient_value_is_missing'),
     sms_delivery_failed: copy('sms_delivery_failed'),
@@ -262,6 +265,7 @@ export function createEventPolicyPresentation(locale: string) {
     'payload.processDefinitionId': copy('process_definition'),
     'payload.fields': copy('updated_fields'),
     'payload.content': copy('comment_content'),
+    EXECUTE_COMMAND: copy('execute_business_operation'),
     NOTIFY: copy('send_in_app_notification'),
     SEND_SMS: copy('send_sms'),
     SEND_IM: copy('send_im_message'),

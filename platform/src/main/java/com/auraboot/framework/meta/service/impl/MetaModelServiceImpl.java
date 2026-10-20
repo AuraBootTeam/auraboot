@@ -180,8 +180,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private Optional<ModelDefinition> loadModelDefinition(String modelCode) {
         logOperation("getModelDefinition", modelCode);
 
-        // 直接使用 findCurrentByCode 方法，租户拦截器会自动添加 tenant_id 条件
-        Model model = metaModelMapper.findCurrentByCode(modelCode);
+        // Prefer the explicit-tenant lookup: background threads (plugin schedulers)
+        // must resolve deterministically even when the pooled connection's session
+        // tenant is stale, and on request threads the bound tenant equals what the
+        // interceptor would add.
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Model model = tenantId != null
+                ? metaModelMapper.findCurrentByCodeForTenant(tenantId, modelCode)
+                : metaModelMapper.findCurrentByCode(modelCode);
 
         if (model != null) {
             // 转换Entity为DTO

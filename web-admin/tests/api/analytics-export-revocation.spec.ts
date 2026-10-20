@@ -1,3 +1,4 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** Stored artifacts must reauthorize their source before streaming bytes. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -87,7 +88,7 @@ for (const boundary of ['resource', 'root'] as const) {
     const jwt = (await login.json()).data.jwt;
     expect(jwt).toBeTruthy();
     const owner = await requestFactory.newContext({
-      baseURL: process.env.BACKEND_URL,
+      baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
       extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
     });
     try {

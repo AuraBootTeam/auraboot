@@ -1,0 +1,18 @@
+{
+  "pluginId": "com.test.twophase.plugin-e-dangling-role",
+  "namespace": "tpe",
+  "version": "1.0.0",
+  "displayName": "Two-Phase Cycle Plugin E (dangling role permission)",
+  "description": "Fixture: role declaring tp_nonexistent_permission which NO plugin provides. The post-publication role-permission reconcile fails the import with a locatable error instead of the historic warn+skip.",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "roles": [
+    {
+      "code": "tpe_dangling_role",
+      "name": "TPE Dangling Role",
+      "permissions": [
+        "tp_nonexistent_permission"
+      ]
+    }
+  ]
+}

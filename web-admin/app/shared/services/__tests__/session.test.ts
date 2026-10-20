@@ -31,7 +31,14 @@ describe('session recovery', () => {
     emptySession.get.mockReset();
     destroySessionMock.mockResolvedValue('__session=; Max-Age=0');
     commitSessionMock.mockResolvedValue('__session=updated');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: '0', data: null }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
   });
 
   it('preserves and restores the operator session around impersonation', async () => {
@@ -118,13 +125,64 @@ describe('session recovery', () => {
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'http://127.0.0.1:6443/api/user/sessions/current',
-      {
+      expect.objectContaining({
         method: 'DELETE',
-        headers: {
+        signal: expect.any(AbortSignal),
+        headers: expect.objectContaining({
           Authorization: 'Bearer header.payload.signature',
-        },
-      },
+        }),
+      }),
     );
     expect(validSession.unset).toHaveBeenCalledWith('jwtToken');
+  });
+  for (const failure of ['refused', 'network']) {
+    it(`still clears the local session when exact backend revocation is ${failure}`, async () => {
+      const session = {
+        get: vi.fn((key: string) => (key === 'jwtToken' ? 'header.payload.signature' : undefined)),
+        set: vi.fn(),
+        unset: vi.fn(),
+      };
+      getSessionMock.mockResolvedValue(session);
+      const fetchMock = vi.mocked(globalThis.fetch);
+      if (failure === 'network') fetchMock.mockRejectedValueOnce(new Error('offline'));
+      else
+        fetchMock.mockResolvedValueOnce(
+          new Response(JSON.stringify({ code: '401', data: null }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      const { logout } = await import('~/shared/services/session');
+      await logout(
+        new Request('http://localhost/logout', { headers: { Cookie: '__session=valid' } }),
+      );
+      expect(session.unset).toHaveBeenCalledWith('jwtToken');
+      expect(destroySessionMock).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:6443/api/user/sessions/current');
+    });
+  }
+  it('keeps the explicit native backend and the three-second logout deadline', async () => {
+    const session = {
+      get: vi.fn((key: string) => (key === 'jwtToken' ? 'header.payload.signature' : undefined)),
+      set: vi.fn(),
+      unset: vi.fn(),
+    };
+    getSessionMock.mockResolvedValue(session);
+    vi.stubEnv('SPRING_BOOT_URL', 'http://127.0.0.1:9999');
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      const { logout } = await import('~/shared/services/session');
+      await logout(
+        new Request('http://admin.example.test/logout', { headers: { Cookie: '__session=valid' } }),
+      );
+      expect(vi.mocked(globalThis.fetch).mock.calls[0][0]).toBe(
+        'http://127.0.0.1:9999/api/user/sessions/current',
+      );
+      expect(timeout).toHaveBeenCalledWith(3000);
+    } finally {
+      vi.unstubAllEnvs();
+      timeout.mockRestore();
+    }
   });
 });

@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useMemo, useEffect } from 'react';
-import { startActiveSessionRenewal } from '~/shared/services/active-session';
+import React, { createContext, useContext, useMemo } from 'react';
 import { useLoaderData } from 'react-router';
 import type { User, UserPermissions, Preferences } from '~/utils/type';
 import type { ImpersonationSessionInfo } from '~/shared/services/session';
@@ -86,19 +85,16 @@ export function AdditionalPermissionsProvider({
  * 2. Uses initialData to ensure SSR/CSR consistency
  * 3. Permission check functions use useMemo for performance optimization
  */
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  data: currentData,
+}: {
+  children: React.ReactNode;
+  data?: AuthLoaderData;
+}) {
   // SSR-safe: get initial data from loader
-  const data = useLoaderData() as AuthLoaderData | undefined;
-
-  useEffect(() => {
-    if (!data?.user || data.impersonation) return;
-    return startActiveSessionRenewal(window, document, () =>
-      fetch('/api/auth/session-renew', {
-        method: 'POST',
-        credentials: 'same-origin',
-      }),
-    );
-  }, [Boolean(data?.user), Boolean(data?.impersonation)]);
+  const initialData = useLoaderData() as AuthLoaderData | undefined;
+  const data = currentData ?? initialData;
 
   // Permission check functions
   // Supports two formats:
@@ -110,12 +106,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Prefer permissionCodes (string array)
       const permissionCodes = data.permissions.permissionCodes;
       if (Array.isArray(permissionCodes)) {
-        return permissionCodes.includes(permissionCode);
+        return permissionCodes.includes('*') || permissionCodes.includes(permissionCode);
       }
       // Support legacy format: permissions object array
       const permissions = data.permissions.permissions;
       if (Array.isArray(permissions)) {
-        return permissions.some((p) => p.code === permissionCode);
+        return permissions.some((p) => p.code === '*' || p.code === permissionCode);
       }
       return false;
     };

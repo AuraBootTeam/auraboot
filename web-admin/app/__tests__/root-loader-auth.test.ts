@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   destroySession: vi.fn(),
   fetchBootstrapStatus: vi.fn(),
+  fetchAccessPolicy: vi.fn(),
   getI18nData: vi.fn(),
   getSessionFromRequest: vi.fn(),
   getTokenFromRequest: vi.fn(),
@@ -14,6 +15,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('~/shared/services/session', () => ({
   getSessionFromRequest: mocks.getSessionFromRequest,
+  getImpersonationFromRequest: vi.fn(async () => null),
+  restoreOperatorSession: vi.fn(),
+  maybeRenewSession: vi.fn(async () => ({ renewed: false })),
   getTokenFromRequest: mocks.getTokenFromRequest,
   sessionStorage: {
     destroySession: mocks.destroySession,
@@ -35,6 +39,8 @@ vi.mock('~/shared/services/menu', () => ({
 vi.mock('~/services/bootstrapStatus', () => ({
   fetchBootstrapStatus: mocks.fetchBootstrapStatus,
 }));
+
+vi.mock('~/services/accessPolicy', () => ({ fetchAccessPolicy: mocks.fetchAccessPolicy }));
 
 vi.mock('~/utils/ssr-cache', () => ({
   ssrCacheKey: (pathname: string, locale: string) => `${pathname}:${locale}`,
@@ -102,6 +108,7 @@ describe('root loader authentication guard', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mocks.fetchBootstrapStatus.mockResolvedValue(null);
+    mocks.fetchAccessPolicy.mockResolvedValue({ userRegistrationPolicy: 'closed' });
     mocks.getI18nData.mockResolvedValue({});
     mocks.getSessionFromRequest.mockResolvedValue({ get: vi.fn() });
     mocks.getUserInfo.mockResolvedValue({ user: null, permissions: null, preferences: null });
@@ -112,6 +119,24 @@ describe('root loader authentication guard', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+  });
+
+  it('starts independent shell reads before bootstrap finishes', async () => {
+    let release!: (value: null) => void;
+    const pendingBootstrap = new Promise<null>((resolve) => {
+      release = resolve;
+    });
+    mocks.fetchBootstrapStatus.mockReturnValue(pendingBootstrap);
+    mocks.getTokenFromRequest.mockResolvedValue(null);
+    const { loader } = await import('~/root');
+    const pending = loader({ request: new Request('http://localhost/login') } as any);
+    await vi.waitFor(() => expect(mocks.fetchBootstrapStatus).toHaveBeenCalledTimes(1));
+    try {
+      expect(mocks.fetchAccessPolicy).toHaveBeenCalledTimes(1);
+    } finally {
+      release(null);
+      await pending;
+    }
   });
 
   it('redirects anonymous private routes even when route middleware is bypassed', async () => {
@@ -139,6 +164,30 @@ describe('root loader authentication guard', () => {
     await expect(
       loader({ request: new Request('http://localhost/p/inv_fg_pack_rule/edit/record-1') } as any),
     ).rejects.toThrow('Network error: fetch failed');
+    expect(mocks.destroySession).not.toHaveBeenCalled();
+  });
+
+  it('marks dependency timeouts as 503 with a correlated stage without destroying the session', async () => {
+    vi.stubEnv('EDITION', 'standard');
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        ),
+    );
+    const { loader } = await import('~/root');
+    await expect(
+      loader({
+        request: new Request('http://localhost/xy/display', {
+          headers: { 'X-Request-Id': 'timeout-test' },
+        }),
+      } as any),
+    ).rejects.toMatchObject({
+      data: { code: 'root_dependency_unavailable', requestId: 'timeout-test', stage: 'branding' },
+      init: { status: 503 },
+    });
     expect(mocks.destroySession).not.toHaveBeenCalled();
   });
 
@@ -247,26 +296,91 @@ describe('root loader authentication guard', () => {
     const { resolveDeploymentBrandingFromBff } = await import('~/root');
     await expect(
       resolveDeploymentBrandingFromBff({ EDITION: 'standard', BFF_PORT: '4001' }),
-    ).rejects.toThrow('Unable to resolve deployment branding from BFF (503).');
+    ).rejects.toMatchObject({
+      name: 'RootDependencyUnavailableError',
+      dependency: 'branding',
+      upstreamStatus: 503,
+    });
   });
 
   it('refreshes published branding on a public-route cache hit without mutating the cached locale bundle', async () => {
     vi.stubEnv('EDITION', 'standard');
     mocks.getTokenFromRequest.mockResolvedValue(null);
-    const cached = { locale: 'en-US', branding: { productName: 'Stale release' }, i18n: { retained: true } };
+    const cached = {
+      locale: 'en-US',
+      branding: { productName: 'Stale release' },
+      i18n: { retained: true },
+    };
     mocks.ssrCacheGet.mockReturnValue(cached);
-    const appearance = { version: 1, template: 'split', defaultLocale: 'zh-CN', content: { headline: { mode: 'hidden' } } };
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(
-      String(url).endsWith('/api/runtime/branding')
-        ? { branding: { mode: 'commercial', productName: 'Northstar', authAppearance: appearance } }
-        : { code: '0', data: {} },
-    ), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const appearance = {
+      version: 1,
+      template: 'split',
+      defaultLocale: 'zh-CN',
+      content: { headline: { mode: 'hidden' } },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              String(url).includes('/api/runtime/branding')
+                ? {
+                    branding: {
+                      mode: 'commercial',
+                      productName: 'Northstar',
+                      authAppearance: appearance,
+                    },
+                  }
+                : { code: '0', data: {} },
+            ),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      ),
+    );
     const { loader } = await import('~/root');
-    const result = await loader({ request: new Request('http://localhost/login', { headers: { Cookie: 'locale=en-US' } }) } as any);
-    expect(result).toMatchObject({ i18n: { retained: true }, branding: { productName: 'Northstar', authAppearance: appearance } });
+    const result = await loader({
+      request: new Request('http://localhost/login', { headers: { Cookie: 'locale=en-US' } }),
+    } as any);
+    expect(result).toMatchObject({
+      i18n: { retained: true },
+      branding: { productName: 'Northstar', authAppearance: appearance },
+    });
     expect(cached.branding.productName).toBe('Stale release');
     expect(mocks.getI18nData).not.toHaveBeenCalled();
   });
+
+  it.each(['/login', '/admin-login', '/signup', '/forgot-password', '/reset-password'])(
+    'requests published appearance only on authentication page %s',
+    async (pathname) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ branding: { mode: 'commercial' } })));
+      vi.stubGlobal('fetch', fetchMock);
+      const { resolveDeploymentBrandingFromBff } = await import('~/root');
+      await resolveDeploymentBrandingFromBff({ EDITION: 'standard' }, 'branding-route', pathname);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:3500/api/runtime/branding?include=auth-appearance',
+        expect.anything(),
+      );
+    },
+  );
+
+  it.each(['/xy/display', '/xy/display/class-123', '/home', '/login-other'])(
+    'does not request login appearance for application route %s',
+    async (pathname) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ branding: { mode: 'commercial' } })));
+      vi.stubGlobal('fetch', fetchMock);
+      const { resolveDeploymentBrandingFromBff } = await import('~/root');
+      await resolveDeploymentBrandingFromBff({ EDITION: 'standard' }, 'branding-route', pathname);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:3500/api/runtime/branding',
+        expect.anything(),
+      );
+    },
+  );
 
   it('always emits a stable product title when ICP mode is disabled', async () => {
     const { COMMUNITY_BRANDING } = await import('~/config/branding');
@@ -324,8 +438,7 @@ describe('root loader authentication guard', () => {
       locale: 'zh-CN',
       runtimeProfile: 'storefront',
     });
-    expect(mocks.getI18nData).toHaveBeenCalledWith(
-      'zh-CN', expect.any(Request), false);
+    expect(mocks.getI18nData).toHaveBeenCalledWith('zh-CN', expect.any(Request), false);
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
   });

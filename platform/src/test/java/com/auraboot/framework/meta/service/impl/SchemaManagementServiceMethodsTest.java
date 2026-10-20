@@ -538,11 +538,11 @@ class SchemaManagementServiceMethodsTest {
     // ==================== updateModelField 测试 ====================
 
     @Test
-    @DisplayName("updateModelField - 成功更新字段(非PostgreSQL)")
-    void testUpdateModelField_Success_NonPostgres() {
+    @DisplayName("updateModelField - PostgreSQL ALTER COLUMN contract")
+    void testUpdateModelField_Success_PostgresAlterColumn() {
         // Given
-        // 创建一个非Postgres的Dialect mock
-        DdlDialect mysqlDialect = mock(DdlDialect.class, withSettings().name("MySQLDialect"));
+        // PostgreSQL is the only supported platform database.
+        DdlDialect mysqlDialect = mock(DdlDialect.class, withSettings().name("PostgreSQLDialect"));
         when(ddlDialectProvider.getDialect()).thenReturn(mysqlDialect);
         when(mysqlDialect.mapDataType(any())).thenReturn("VARCHAR(255)");
         
@@ -561,7 +561,7 @@ class SchemaManagementServiceMethodsTest {
         assertTrue(result.getSuccess());
         assertEquals(SchemaOperationResult.SchemaOperationType.UPDATE_FIELD, result.getOperationType());
         assertNotNull(result.getExecutedDDL());
-        assertTrue(result.getExecutedDDL().get(0).contains("MODIFY COLUMN"));
+        assertEquals("ALTER TABLE tb_test ALTER COLUMN test_column TYPE VARCHAR(255)", result.getExecutedDDL().get(0));
     }
 
     @Test

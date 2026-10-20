@@ -9,6 +9,7 @@ import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -42,6 +43,7 @@ import java.util.Map;
 @RequestMapping("/api/tenant")
 @Tag(name = "Tenant Invitations")
 @RequiredArgsConstructor
+@AuthenticatedAccess("invitation acceptance: the Bearer JWT is parsed and validated in-controller to resolve the caller, membership and invitation-defined roles are created server-side, and a tenant-scoped session is issued")
 public class TenantInvitationAcceptanceController {
 
     private final TenantInviteService tenantInviteService;
@@ -52,6 +54,9 @@ public class TenantInvitationAcceptanceController {
     private final com.auraboot.framework.auth.util.JwtUtil jwtUtil;
     private final TenantService tenantService;
     private final UserApplicationPreferenceService userApplicationPreferenceService;
+
+    @org.springframework.beans.factory.annotation.Value("${aura.tenant.invitation-display-name-required:true}")
+    private boolean invitationDisplayNameRequired = true;
 
     public record InvitationAcceptanceRequest(
             String inviteCode,
@@ -88,10 +93,10 @@ public class TenantInvitationAcceptanceController {
         // A profile display name is never a globally unique login identifier.
         boolean needsName = user.getNickName() == null || user.getNickName().isBlank()
                 || "微信用户".equals(user.getNickName());
-        if (needsName && (request.displayName() == null || request.displayName().isBlank())) {
+        if (invitationDisplayNameRequired && needsName && (request.displayName() == null || request.displayName().isBlank())) {
             throw new BusinessException(ResponseCode.BadParam, "请填写显示名称");
         }
-        if (needsName) {
+        if (needsName && request.displayName() != null && !request.displayName().isBlank()) {
             String displayName = request.displayName().trim();
             if (displayName.length() > 24) {
                 throw new BusinessException(ResponseCode.BadParam, "显示名称不能超过24个字");

@@ -1,12 +1,9 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import static com.auraboot.framework.plugin.service.PluginResourceRecords.createResourceRecord;
+
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
-import com.auraboot.framework.agent.entity.AgentDefinition;
-import com.auraboot.framework.agent.entity.AgentEvalCase;
-import com.auraboot.framework.agent.eval.EvalCaseStructureValidator;
-import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
-import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.menu.entity.Menu;
@@ -32,6 +29,7 @@ import com.auraboot.framework.meta.dto.NamedQueryUpdateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaCreateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaUpdateRequest;
 import com.auraboot.framework.meta.entity.Field;
+import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
@@ -99,6 +97,8 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -107,6 +107,8 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -125,6 +127,24 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class PluginResourceImporterImpl implements PluginResourceImporter {
+    private static final ThreadLocal<Set<String>> FIELD_BATCH_MODELS = new ThreadLocal<>();
+
+    @Override
+    public void beginFieldImportBatch() {
+        if (FIELD_BATCH_MODELS.get() != null) {
+            throw new PluginException("Nested field import schema batch");
+        }
+        FIELD_BATCH_MODELS.set(new LinkedHashSet<>());
+    }
+
+    @Override
+    public void endFieldImportBatch(boolean completed) {
+        Set<String> models = FIELD_BATCH_MODELS.get();
+        FIELD_BATCH_MODELS.remove();
+        if (completed && models != null && !models.isEmpty()) {
+            syncReimportedModels(new ArrayList<>(models), "field batch");
+        }
+    }
 
     // Service layer dependencies
     private final MetaModelService metaModelService;
@@ -167,8 +187,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final PageSchemaMapper pageSchemaMapper;
     private final DictMapper dictMapper;
     private final NamedQueryMapper namedQueryMapper;
-    private final AgentDefinitionMapper agentDefinitionMapper;
-    private final AgentEvalCaseMapper agentEvalCaseMapper;
+    private final com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources;
+    // Provider-plugin resolution for fail-closed role permission errors (model owner naming).
+    private final PluginRecordMapper pluginRecordMapper;
 
     /**
      * Tracks menu code → database ID mappings within a single import session.
@@ -181,6 +202,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final MetaFieldMapper metaFieldMapper;
     private final ExtensionConverter extensionConverter;
     private final PluginResourceMapper pluginResourceMapper;
+    private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
 
     // Optional dependency - may not be configured in all environments
@@ -191,12 +213,20 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     @Override
     public boolean checkModelExists(Long tenantId, String code) {
-        return metaModelService.isModelExists(code);
+        // Deliberately a DB-current probe, not the runtime definition lookup: the
+        // definition cache and the application-release catalog can both report a
+        // model this import cannot see or load (a draft row cached by a
+        // rolled-back import attempt, a catalog-only model), which deadlocked
+        // importModel into "Model exists but cannot be loaded for update" on the
+        // retry. The probe must resolve exactly what the update branch resolves.
+        return metaModelMapper.findCurrentByCodeForTenant(tenantId, code) != null;
     }
 
     @Override
     public boolean checkFieldExists(Long tenantId, String code) {
-        return metaFieldService.isFieldExists(code);
+        // Same DB-current contract as checkModelExists; updateFieldForReimport
+        // resolves the existing row through this very query.
+        return metaFieldMapper.findCurrentByCode(code) != null;
     }
 
     @Override
@@ -263,7 +293,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     @Override
     public boolean checkAgentDefinitionExists(Long tenantId, String agentCode) {
-        return findActiveAgentDefinition(tenantId, agentCode) != null;
+        return agentDefinitionResources.exists(tenantId, agentCode);
     }
 
     // ==================== OVERWRITE_SAFE Helper ====================
@@ -324,6 +354,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public PluginResource importModel(ModelDefinitionDTO dto, String pluginPid, String importId,
                                        Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                        Boolean autoPublish) {
+        registerModelCacheRollbackEviction(dto.getCode());
         boolean exists = checkModelExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
@@ -426,6 +457,30 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     created.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),
                     ResourceAction.CREATE, null, extension);
         }
+    }
+
+    /**
+     * The meta definition cache is a read-through Spring cache: an entry loaded
+     * while the import transaction is still open survives that transaction's
+     * rollback, leaving a phantom definition for a model the database no longer
+     * has (misleading retries, and any runtime reader between rollback and the
+     * next eviction). Evict on rollback so the cache converges with the
+     * database; commits keep the entry, which is then accurate.
+     */
+    void registerModelCacheRollbackEviction(String modelCode) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    log.warn("Import rolled back; evicting cached definitions of model {}",
+                            logSafe(modelCode));
+                    metaModelService.clearAllCache();
+                }
+            }
+        });
     }
 
     @Override
@@ -575,6 +630,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             return;
         }
 
+        Set<String> batch = FIELD_BATCH_MODELS.get();
+        if (batch != null) {
+            batch.addAll(modelCodes);
+            return;
+        }
+        syncReimportedModels(modelCodes, fieldCode);
+    }
+
+    private void syncReimportedModels(List<String> modelCodes, String fieldCode) {
         for (String modelCode : modelCodes) {
             SchemaOperationResult schemaResult = schemaManagementService.updateTableByModel(modelCode);
             if (schemaResult == null || !schemaResult.isSuccess()) {
@@ -669,6 +733,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private Map<String, Object> buildFieldFeature(FieldDefinitionDTO dto) {
         Map<String, Object> feature = dto.getFeature() != null ? new LinkedHashMap<>(dto.getFeature()) : new LinkedHashMap<>();
+        // The DSL's top-level default is persisted in the canonical field feature used by DDL.
+        if (dto.getDefaultValue() != null) feature.put("defaultValue", dto.getDefaultValue());
         if (dto.getConstraints() == null) return feature.isEmpty() ? null : feature;
 
         // GAP-259 regression guard: field-level `constraints.required` MUST NOT propagate to
@@ -986,6 +1052,20 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         boolean exists = checkCommandExists(tenantId, dto.getCode());
+        if (!exists) {
+            // A previous uninstall leaves the command soft-deleted; the idempotent
+            // insert (ON CONFLICT (tenant_id, code, version) DO NOTHING) would then
+            // silently skip the insert and the auto-publish would fail on the
+            // never-persisted pid. Resurrect the retired row so the update path
+            // refreshes and republishes it in place.
+            String resurrectedPid = resurrectSoftDeleted("ab_command_definition", "code",
+                    dto.getCode(), tenantId, pluginPid, dto.getEffectiveExtension());
+            if (resurrectedPid != null) {
+                log.info("Resurrected soft-deleted command {} as {} for plugin reimport",
+                        logSafe(dto.getCode()), logSafe(resurrectedPid));
+                exists = checkCommandExists(tenantId, dto.getCode());
+            }
+        }
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Command already exists: " + dto.getCode());
@@ -1056,8 +1136,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             com.auraboot.framework.meta.dto.CommandDefinitionDTO created = commandService.create(request);
 
-            // Auto-publish if requested
-            if (Boolean.TRUE.equals(autoPublish)) {
+            // Auto-publish if requested — an adopted (resurrected) row may already be
+            // PUBLISHED; republishing it would trip the DRAFT-only guard.
+            if (Boolean.TRUE.equals(autoPublish)
+                    && !StatusConstants.PUBLISHED.equals(created.getStatus())) {
                 commandService.publish(created.getPid());
             }
 
@@ -1424,11 +1506,13 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
         Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
         if (roleId == null) {
-            log.warn("Role not found for permission reconciliation: {}", logSafe(dto.getCode()));
-            return false;
+            // Fail-closed: a declared role that cannot be resolved during strict
+            // reconciliation is an inconsistent import, not a skippable gap.
+            throw new PluginException("Role permission reconciliation failed: declared role '"
+                    + dto.getCode() + "' does not exist in this tenant");
         }
         int before = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
-        updateRolePermissions(roleId, dto, tenantId, null);
+        updateRolePermissions(roleId, dto, tenantId, null, true);
         int after = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
         if (after > before) {
             log.info("Role permission reconciliation bound {} additional codes for role {}",
@@ -1438,20 +1522,53 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     private void updateRolePermissions(Long roleId, RoleDefinitionDTO dto, Long tenantId, String pluginPid) {
+        updateRolePermissions(roleId, dto, tenantId, pluginPid, false);
+    }
+
+    /**
+     * Bind a role's declared permissions.
+     *
+     * <p>Two strictness modes:</p>
+     * <ul>
+     *   <li><b>Role-import stage (deferred, {@code strictResolution=false})</b>: permissions
+     *       generated by this plugin's own model publication ({@code model.<code>.<action>})
+     *       do not exist yet, because the ROLE import stage runs before auto-publish.
+     *       Unresolved codes are logged with role and code and left to the strict
+     *       post-publication reconcile; binding failures on resolvable codes are
+     *       re-attempted there.</li>
+     *   <li><b>Post-publication reconcile ({@code strictResolution=true})</b>: every declared
+     *       code must resolve to a registered permission and bind, otherwise the plugin
+     *       import fails with a locatable error (role + code + missing-provider analysis).
+     *       A stack whose composition cannot satisfy the declarations is rejected instead of
+     *       silently degrading the role — the historic warn+skip swallowed bad combinations
+     *       until they surfaced rounds later as missing-access findings.</li>
+     * </ul>
+     *
+     * <p>Platform-registered codes (source=system built-ins such as {@code meta.command.execute}
+     * and {@code dashboard.read}, and data-view permissions with {@code resource_type=data})
+     * need no exemption here: they are registered rows in ab_permission, so they resolve and
+     * bind like any other code — declared codes are never exempted from binding.</p>
+     */
+    void updateRolePermissions(Long roleId, RoleDefinitionDTO dto, Long tenantId, String pluginPid,
+                               boolean strictResolution) {
         List<String> permissionCodes = dto.getPermissions();
         if (permissionCodes == null || permissionCodes.isEmpty()) {
             return;
         }
         Map<String, RolePermissionPolicyDefinitionDTO> policyByPermission = rolePermissionPoliciesByCode(dto);
 
+        List<String> deferred = new ArrayList<>();
         for (String permCode : permissionCodes) {
-            try {
-                PermissionDTO perm = permissionService.findByCode(permCode);
-                if (perm == null) {
-                    log.warn("Permission not found for role binding: {}", logSafe(permCode));
-                    continue;
+            PermissionDTO perm = findRegisteredPermissionOrNull(permCode);
+            if (perm == null || perm.getId() == null) {
+                if (strictResolution) {
+                    throw new PluginException(unresolvedDeclaredPermissionMessage(dto.getCode(), permCode, tenantId));
                 }
+                deferred.add(permCode);
+                continue;
+            }
 
+            try {
                 // Check if binding exists
                 int count = rolePermissionMapper.countByRoleAndPermission(roleId, perm.getId(), tenantId);
 
@@ -1463,12 +1580,100 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 }
                 applyRolePermissionPolicy(roleId, perm, policyByPermission.get(permCode));
             } catch (Exception e) {
-                // Bind loop is per-permission best-effort: a single failed binding
-                // (missing perm, race with another import) must not block the rest
-                // of the role's permission set. Failure surfaced via warn log only.
-                log.warn("Failed to bind permission {} to role: {}", logSafe(permCode), logSafe(e.getMessage()), e);
+                if (strictResolution) {
+                    throw new PluginException("Failed to bind declared permission '" + permCode
+                            + "' to role '" + dto.getCode() + "': " + e.getMessage(), e);
+                }
+                // Role-import stage stays best-effort for already-resolvable codes: the
+                // strict post-publication reconcile re-binds every declaration and fails
+                // the import if anything remains unbound, so a transient race with another
+                // import gets a second chance instead of aborting the whole plugin here.
+                log.warn("Failed to bind permission {} to role {} at role-import stage; strict reconcile will re-attempt: {}",
+                        logSafe(permCode), logSafe(dto.getCode()), logSafe(e.getMessage()), e);
             }
         }
+        if (!deferred.isEmpty()) {
+            log.info("Role {} defers {} declared permission code(s) that are not registered yet "
+                            + "(own-plugin model actions are generated after the role stage); the strict "
+                            + "post-publication reconcile must resolve them: {}",
+                    logSafe(dto.getCode()), deferred.size(), String.join(", ", deferred));
+        }
+    }
+
+    /**
+     * Resolve a declared permission code to its registered row, or null when the code is
+     * not registered for the tenant. The permission service signals an unregistered code
+     * by throwing a not-found exception rather than returning null — both shapes mean
+     * "not registered" here; any other failure inside the service is treated the same
+     * way, so the strict reconcile reports the declaration as unresolvable (with the
+     * provider analysis) instead of aborting with a bare service error.
+     */
+    private PermissionDTO findRegisteredPermissionOrNull(String permCode) {
+        try {
+            return permissionService.findByCode(permCode);
+        } catch (Exception absent) {
+            return null;
+        }
+    }
+
+    /**
+     * Build a locatable error for a declared role permission that does not resolve.
+     * Names the role and code, and for the dominant {@code model.<code>.<action>} family
+     * checks the backing model to separate "provider plugin missing from the stack" from
+     * "model present but its permission never registered" — the former names the missing
+     * provider gap, the latter points at the owning plugin.
+     */
+    private String unresolvedDeclaredPermissionMessage(String roleCode, String permCode, Long tenantId) {
+        StringBuilder message = new StringBuilder("Role '").append(roleCode)
+                .append("' declares permission '").append(permCode)
+                .append("' which does not resolve to a registered permission in this tenant");
+        String modelCode = modelCodeOfGeneratedActionPermission(permCode);
+        if (modelCode != null) {
+            List<Model> models = metaModelMapper.selectList(new QueryWrapper<Model>()
+                    .eq("tenant_id", tenantId)
+                    .eq("code", modelCode)
+                    .eq("is_current", true)
+                    .eq("deleted_flag", false));
+            Model model = models.isEmpty() ? null : models.get(0);
+            if (model == null) {
+                message.append(". The referenced model '").append(modelCode)
+                        .append("' does not exist either, so the provider plugin that publishes it is missing "
+                        + "from this stack; import that provider plugin and declare it in plugin.json "
+                        + "dependencies, or fix the declared permission code");
+            } else {
+                String ownerPluginId = null;
+                if (model.getPluginPid() != null && pluginRecordMapper.findByPid(model.getPluginPid()) != null) {
+                    ownerPluginId = pluginRecordMapper.findByPid(model.getPluginPid()).getPluginId();
+                }
+                message.append(". The referenced model '").append(modelCode).append("' exists");
+                if (ownerPluginId != null) {
+                    message.append(" (owned by plugin '").append(ownerPluginId).append("')");
+                }
+                message.append(" but its permission was never registered; re-import the owning plugin "
+                        + "or fix the declared permission code");
+            }
+        } else {
+            message.append("; the provider plugin that registers it is missing from this stack or the "
+                    + "declared code is wrong; import the provider plugin and declare it in plugin.json "
+                    + "dependencies, or fix the declared permission code");
+        }
+        return message.toString();
+    }
+
+    /**
+     * Extract the model code from a generated model-action permission code
+     * ({@code model.<modelCode>.<action>}); returns null for other code shapes.
+     */
+    static String modelCodeOfGeneratedActionPermission(String permCode) {
+        if (permCode == null || !permCode.startsWith("model.")) {
+            return null;
+        }
+        String rest = permCode.substring("model.".length());
+        int lastDot = rest.lastIndexOf('.');
+        if (lastDot <= 0 || lastDot >= rest.length() - 1) {
+            return null;
+        }
+        return rest.substring(0, lastDot);
     }
 
     /**
@@ -1590,10 +1795,16 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // First check in-memory map (populated during same import session)
             parentId = menuCodeToIdMap.get(dto.getParentCode());
             if (parentId == null) {
-                // Strict lookup by code only.
+                // Strict lookup by code only; cross-plugin parents resolve from tenants
+                // whose provider plugin was imported earlier.
                 parentId = menuMapper.findIdByCode(tenantId, dto.getParentCode());
                 if (parentId == null) {
-                    log.warn("Parent menu not found by code '{}'", logSafe(dto.getParentCode()));
+                    // Fail-closed: a menu silently re-parented to root hides the broken
+                    // reference until navigation looks wrong rounds later.
+                    throw new PluginException("Menu '" + dto.getCode() + "' declares parentCode '"
+                            + dto.getParentCode() + "' but no menu with that code exists in this tenant; "
+                            + "import the plugin that owns the parent menu first (declare it as a "
+                            + "dependency) or fix the declaration");
                 }
             }
         }
@@ -1895,6 +2106,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (exists) {
+            // A previous uninstall leaves the dict soft-deleted while
+            // findCurrentByCode (no deleted_flag filter) still reports it as
+            // existing — the update-in-place below would silently refresh a dead
+            // row. Revive it first so the reimport lands on a live dict.
+            int revived = dictMapper.reviveRetiredByCode(dto.getCode());
+            if (revived > 0) {
+                log.info("Revived soft-deleted dict {} for plugin reimport", logSafe(dto.getCode()));
+            }
+
             // Update existing dict
             DictDTO existingDict = dictService.findByCode(dto.getCode());
 
@@ -1908,18 +2128,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Update dict items using new replaceItems service method
             if (dto.getItems() != null && !dto.getItems().isEmpty()) {
                 List<DictCreateRequest.DictItemCreateRequest> itemRequests = dto.getItems().stream()
-                    .map(item -> {
-                        DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
-                        itemReq.setValue(item.getValue());
-                        itemReq.setLabel(item.getEffectiveLabel());
-                        itemReq.setSortOrder(item.getSortNo());
-                        itemReq.setParentValue(item.getParentValue());
-                        itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
-                        if (item.getExtra() != null) {
-                            itemReq.setExtension(objectMapper.convertValue(item.getExtra(), JsonNode.class));
-                        }
-                        return itemReq;
-                    })
+                    .map(this::toDictItemRequest)
                     .toList();
                 dictService.replacePluginItems(updated.getPid(), itemRequests);
             }
@@ -1940,18 +2149,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 DictDTO resurrected = dictService.findByCode(dto.getCode());
                 if (resurrected != null && dto.getItems() != null && !dto.getItems().isEmpty()) {
                     List<DictCreateRequest.DictItemCreateRequest> itemRequests = dto.getItems().stream()
-                        .map(item -> {
-                            DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
-                            itemReq.setValue(item.getValue());
-                            itemReq.setLabel(item.getEffectiveLabel());
-                            itemReq.setSortOrder(item.getSortNo());
-                            itemReq.setParentValue(item.getParentValue());
-                            itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
-                            if (item.getExtra() != null) {
-                                itemReq.setExtension(objectMapper.convertValue(item.getExtra(), JsonNode.class));
-                            }
-                            return itemReq;
-                        })
+                        .map(this::toDictItemRequest)
                         .toList();
                     dictService.replaceItems(resurrected.getPid(), itemRequests);
                 }
@@ -1973,18 +2171,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Convert items
             if (dto.getItems() != null) {
                 request.setItems(dto.getItems().stream()
-                    .map(item -> {
-                        DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
-                        itemReq.setValue(item.getValue());
-                        itemReq.setLabel(item.getEffectiveLabel());
-                        itemReq.setSortOrder(item.getSortNo());
-                        itemReq.setParentValue(item.getParentValue());
-                        itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
-                        if (item.getExtra() != null) {
-                            itemReq.setExtension(objectMapper.convertValue(item.getExtra(), JsonNode.class));
-                        }
-                        return itemReq;
-                    })
+                    .map(this::toDictItemRequest)
                     .toList());
             }
 
@@ -1994,6 +2181,34 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     created.getPid(), created.getId(), dto.getCode(), dto.getEffectiveName(),
                     ResourceAction.CREATE, null, null);
         }
+    }
+
+    /**
+     * Maps one manifest dict item onto its persistence request. The manifest's
+     * localized "label:*" entries ride along as a "labels" map inside the item
+     * extension so the render-time dict reads can serve the label for the
+     * request locale (see DictLabelLocalizationHelper); the stored label keeps
+     * the effective single-locale value for dictionaries without translations.
+     */
+    private DictCreateRequest.DictItemCreateRequest toDictItemRequest(DictDefinitionDTO.DictItemDTO item) {
+        DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
+        itemReq.setValue(item.getValue());
+        itemReq.setLabel(item.getEffectiveLabel());
+        itemReq.setSortOrder(item.getSortNo());
+        itemReq.setParentValue(item.getParentValue());
+        itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
+        Map<String, String> localizedLabels = item.getAllLocalizedLabels();
+        if (item.getExtra() != null || (localizedLabels != null && !localizedLabels.isEmpty())) {
+            com.fasterxml.jackson.databind.node.ObjectNode extension = item.getExtra() != null
+                    ? (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.convertValue(
+                            item.getExtra(), JsonNode.class)
+                    : objectMapper.createObjectNode();
+            if (localizedLabels != null && !localizedLabels.isEmpty()) {
+                extension.set("labels", objectMapper.valueToTree(localizedLabels));
+            }
+            itemReq.setExtension(extension);
+        }
+        return itemReq;
     }
 
     @Override
@@ -2241,188 +2456,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     @Override
     public PluginResource importAgentDefinition(AgentDefinitionDTO dto, String pluginPid, String importId,
                                                 Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        AgentDefinition existing = findActiveAgentDefinition(tenantId, dto.getAgentCode());
-        boolean exists = existing != null;
-
-        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
-            throw new PluginException("Agent definition already exists: " + dto.getAgentCode());
-        }
-
-        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                    null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
-        }
-
-        if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.AGENT_DEFINITION, dto.getAgentCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.AGENT_DEFINITION, logSafe(dto.getAgentCode()));
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                    null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
-        }
-
-        Map<String, Object> currentState = buildAgentDefinitionState(dto);
-        Instant now = Instant.now();
-
-        if (exists) {
-            applyAgentDefinition(existing, dto);
-            existing.setUpdatedAt(now);
-            existing.setDeletedFlag(false);
-            agentDefinitionMapper.updateById(existing);
-
-            replaceEvalCases(tenantId, dto, pluginPid);
-
-            AgentDefinition updated = findActiveAgentDefinition(tenantId, dto.getAgentCode());
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                    updated.getPid(), updated.getId(), dto.getAgentCode(), dto.getEffectiveName(),
-                    ResourceAction.UPDATE, null, currentState);
-        }
-
-        AgentDefinition created = new AgentDefinition();
-        created.setPid(UlidGenerator.generate());
-        created.setTenantId(tenantId);
-        applyAgentDefinition(created, dto);
-        created.setCreatedAt(now);
-        created.setUpdatedAt(now);
-        created.setDeletedFlag(false);
-        agentDefinitionMapper.insert(created);
-
-        replaceEvalCases(tenantId, dto, pluginPid);
-
-        return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
-                created.getPid(), created.getId(), dto.getAgentCode(), dto.getEffectiveName(),
-                ResourceAction.CREATE, null, currentState);
-    }
-
-    private AgentDefinition findActiveAgentDefinition(Long tenantId, String agentCode) {
-        if (tenantId == null || agentCode == null || agentCode.isBlank()) {
-            return null;
-        }
-        return agentDefinitionMapper.selectOne(new QueryWrapper<AgentDefinition>()
-                .eq("tenant_id", tenantId)
-                .eq("agent_code", agentCode)
-                .apply("(deleted_flag = FALSE OR deleted_flag IS NULL)")
-                .last("LIMIT 1"));
-    }
-
-    private void applyAgentDefinition(AgentDefinition target, AgentDefinitionDTO dto) {
-        target.setAgentCode(dto.getAgentCode());
-        target.setName(dto.getEffectiveName());
-        target.setDescription(dto.getDescription());
-        target.setAvatarUrl(dto.getAvatarUrl());
-        target.setAgentType(defaultString(dto.getAgentType(), "reactive"));
-        target.setModel(dto.getModel());
-        target.setSystemPrompt(dto.getSystemPrompt());
-        target.setTools(toJsonText(dto.getTools()));
-        target.setSkills(toJsonText(dto.getSkills()));
-        target.setGuardrails(toJsonText(dto.getGuardrails()));
-        target.setSoulProfile(dto.getSoulProfile());
-        target.setPersonality(dto.getPersonality());
-        target.setExpertise(dto.getExpertise());
-        target.setCommunicationStyle(dto.getCommunicationStyle());
-        target.setBoundaries(dto.getBoundaries());
-        target.setSoulGoals(dto.getSoulGoals());
-        target.setAllowedModels(dto.getAllowedModels());
-        target.setAllowedOperations(dto.getAllowedOperations() != null
-                ? dto.getAllowedOperations()
-                : List.of("query", "create", "update", "delete", "transition"));
-        target.setKnowledgeBaseIds(dto.getKnowledgeBaseIds() != null
-                ? dto.getKnowledgeBaseIds()
-                : List.of());
-        target.setMaxTools(dto.getMaxTools() != null ? dto.getMaxTools() : 20);
-        target.setMaxConcurrentRuns(dto.getMaxConcurrentRuns() != null ? dto.getMaxConcurrentRuns() : 3);
-        target.setExecutionTimeoutSeconds(dto.getExecutionTimeoutSeconds() != null
-                ? dto.getExecutionTimeoutSeconds()
-                : 300);
-        target.setEventTriggers(dto.getEventTriggers());
-        target.setAutoReplyMode(defaultString(dto.getAutoReplyMode(), "mention"));
-        target.setStatus(defaultString(dto.getStatus(), "active"));
-        target.setStats(dto.getStats());
-        target.setVisibility(defaultString(dto.getVisibility(), "private"));
-    }
-
-    private Map<String, Object> buildAgentDefinitionState(AgentDefinitionDTO dto) {
-        Map<String, Object> state = new HashMap<>();
-        state.put("agentCode", dto.getAgentCode());
-        state.put("name", dto.getEffectiveName());
-        state.put("description", dto.getDescription());
-        state.put("agentType", defaultString(dto.getAgentType(), "reactive"));
-        state.put("model", dto.getModel());
-        state.put("systemPrompt", dto.getSystemPrompt());
-        state.put("tools", dto.getTools());
-        state.put("skills", dto.getSkills());
-        state.put("guardrails", dto.getGuardrails());
-        state.put("soulProfile", dto.getSoulProfile());
-        state.put("allowedModels", dto.getAllowedModels());
-        state.put("allowedOperations", dto.getAllowedOperations());
-        state.put("knowledgeBaseIds", dto.getKnowledgeBaseIds());
-        state.put("maxTools", dto.getMaxTools());
-        state.put("maxConcurrentRuns", dto.getMaxConcurrentRuns());
-        state.put("executionTimeoutSeconds", dto.getExecutionTimeoutSeconds());
-        state.put("eventTriggers", dto.getEventTriggers());
-        state.put("autoReplyMode", defaultString(dto.getAutoReplyMode(), "mention"));
-        state.put("status", defaultString(dto.getStatus(), "active"));
-        state.put("visibility", defaultString(dto.getVisibility(), "private"));
-        return state;
-    }
-
-    /**
-     * Replace all eval cases for {@code (tenantId, dto.agentCode)} with the cases
-     * declared in the DTO (physical DELETE + INSERT). This is an overwrite-on-import
-     * sub-resource: the caller's transaction absorbs the DELETE+INSERT atomically with
-     * the agent row write that precedes this call.
-     *
-     * <p>Validates case structure before touching the DB; throws {@link PluginException}
-     * (import fails, {@code success:false}) if any violation is found.
-     */
-    private void replaceEvalCases(Long tenantId, AgentDefinitionDTO dto, String pluginPid) {
-        List<CapabilityEvalCase> cases =
-                dto.getEvalCases() == null ? List.of() : dto.getEvalCases();
-        List<String> violations = EvalCaseStructureValidator.validate(cases);
-        if (!violations.isEmpty()) {
-            throw new PluginException(
-                    "Invalid eval cases for agent " + dto.getAgentCode() + ": " + violations);
-        }
-        // Clean slate for this agent — cases are an overwrite-on-import sub-resource.
-        jdbcTemplate.update(
-                "DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?",
-                tenantId, dto.getAgentCode());
-        Instant now = Instant.now();
-        for (CapabilityEvalCase c : cases) {
-            AgentEvalCase row = new AgentEvalCase();
-            row.setPid(UlidGenerator.generate());
-            row.setTenantId(tenantId);
-            row.setAgentCode(dto.getAgentCode());
-            row.setCaseId(c.getCaseId());
-            row.setCategory(c.getCategory());
-            row.setTaskDescription(c.getTaskDescription());
-            row.setExpectedToolCodes(c.getExpectedToolCodes());
-            row.setForbiddenToolCodes(c.getForbiddenToolCodes());
-            row.setExpectedInputKeys(c.getExpectedInputKeys());
-            row.setExpectedRiskLevel(c.getExpectedRiskLevel());
-            row.setExpectsConfirmation(c.isExpectsConfirmation());
-            row.setPluginSource(pluginPid);
-            row.setDeletedFlag(false);
-            row.setCreatedAt(now);
-            row.setUpdatedAt(now);
-            agentEvalCaseMapper.insert(row);
-        }
-    }
-
-    private String toJsonText(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof String text) {
-            return text;
-        }
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new PluginException("Failed to serialize agent definition field: " + e.getMessage(), e);
-        }
-    }
-
-    private String defaultString(String value, String fallback) {
-        return value != null && !value.isBlank() ? value : fallback;
+        return agentDefinitionResources.importAgentDefinition(dto, pluginPid, importId, tenantId, conflictStrategy);
     }
 
     // ==================== Rollback Operations ====================
@@ -2446,6 +2480,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         ResourceType type = resource.getResourceTypeEnum();
 
         switch (type) {
+            case PUBLIC_RESOURCE, PUBLIC_QUERY -> publicPublicationLifecycle.restore(resource);
             case MODEL -> {
                 if (resource.getResourcePid() != null) {
                     try {
@@ -2542,20 +2577,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     }
                 }
             }
-            case AGENT_DEFINITION -> {
-                if (resource.getResourcePid() != null) {
-                    jdbcTemplate.update("""
-                            UPDATE ab_agent_definition
-                            SET deleted_flag = TRUE, updated_at = NOW()
-                            WHERE pid = ?
-                            """, resource.getResourcePid());
-                }
-                jdbcTemplate.update("""
-                        UPDATE ab_agent_eval_case
-                        SET deleted_flag = TRUE, updated_at = NOW()
-                        WHERE tenant_id = ? AND agent_code = ?
-                        """, resource.getTenantId(), resource.getResourceCode());
-            }
+            case AGENT_DEFINITION -> agentDefinitionResources.rollback(resource);
             default -> log.warn("Rollback not implemented for resource type: {}", type);
         }
     }
@@ -2564,19 +2586,12 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public void restoreResource(PluginResource resource) {
         log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
         ResourceType type = resource.getResourceTypeEnum();
+        if (type.isPublicPublication()) {
+            publicPublicationLifecycle.restore(resource);
+            return;
+        }
         if (type == ResourceType.AGENT_DEFINITION) {
-            if (resource.getResourcePid() != null) {
-                jdbcTemplate.update("""
-                        UPDATE ab_agent_definition
-                        SET deleted_flag = FALSE, updated_at = NOW()
-                        WHERE pid = ?
-                        """, resource.getResourcePid());
-            }
-            jdbcTemplate.update("""
-                    UPDATE ab_agent_eval_case
-                    SET deleted_flag = FALSE, updated_at = NOW()
-                    WHERE tenant_id = ? AND agent_code = ?
-                    """, resource.getTenantId(), resource.getResourceCode());
+            agentDefinitionResources.restore(resource);
             return;
         }
         if (resource.getPreviousState() == null) {
@@ -2584,48 +2599,129 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
     }
 
-    // ==================== Helper Methods ====================
+    // ==================== Stale Menu Reconciliation ====================
 
-    private PluginResource createResourceRecord(String pluginPid, String importId, Long tenantId,
-                                                ResourceType type, String resourcePid, Long resourceId,
-                                                String code, String name, ResourceAction action,
-                                                Map<String, Object> previousState, Map<String, Object> currentState) {
-        return createResourceRecord(pluginPid, importId, tenantId, type, resourcePid, resourceId,
-                code, name, action, previousState, currentState, null);
-    }
-
-    private PluginResource createResourceRecord(String pluginPid, String importId, Long tenantId,
-                                                ResourceType type, String resourcePid, Long resourceId,
-                                                String code, String name, ResourceAction action,
-                                                Map<String, Object> previousState, Map<String, Object> currentState,
-                                                String pluginVersion) {
-        OwnershipType ownership = type.getDefaultOwnership();
-        if (action == ResourceAction.SKIP) {
-            ownership = null;
+    @Override
+    public int pruneStaleMenus(String pluginPid, String importId, Long tenantId,
+                               java.util.Collection<String> configuredMenuCodes) {
+        java.util.Set<String> configured = configuredMenuCodes == null
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(configuredMenuCodes);
+        List<String> staleCodes = trackedMenuCodes(pluginPid, tenantId).stream()
+                .filter(code -> !configured.contains(code))
+                .toList();
+        if (staleCodes.isEmpty()) {
+            return 0;
         }
-
-        return PluginResource.builder()
-                .pid(UlidGenerator.generate())
-                .tenantId(tenantId)
-                .pluginPid(pluginPid)
-                .importId(importId)
-                .resourceType(type.code())
-                .resourcePid(resourcePid)
-                .resourceId(resourceId)
-                .resourceCode(code)
-                .resourceName(name)
-                .action(action.code())
-                .previousState(previousState)
-                .currentState(currentState)
-                .ownershipType(ownership != null ? ownership.code() : OwnershipType.SHARED.code())
-                .importSnapshot(currentState)
-                .userModified(false)
-                .lastSyncVersion(pluginVersion)
-                .sequence(type.getImportOrder())
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
+        int pruned = deleteTrackedMenus(pluginPid, importId, tenantId, staleCodes);
+        log.info("Pruned {} stale menu(s) dropped from plugin {} declaration: {}",
+                pruned, logSafe(pluginPid), staleCodes);
+        return pruned;
     }
+
+    @Override
+    public int deactivateAllPluginMenus(String pluginPid, Long tenantId) {
+        List<String> codes = trackedMenuCodes(pluginPid, tenantId);
+        if (codes.isEmpty()) {
+            return 0;
+        }
+        int deactivated = deleteTrackedMenus(pluginPid, null, tenantId, codes);
+        log.info("Deactivated {} imported menu(s) of uninstalled plugin {}: {}",
+                deactivated, logSafe(pluginPid), codes);
+        return deactivated;
+    }
+
+    /**
+     * Menu codes this plugin family (same plugin_id across installs) previously imported,
+     * per tenant. Scoped to ab_plugin_resource tracking and explicitly excludes
+     * authoring-managed rows, so tenant-owned and dashboard-created menus are never touched.
+     */
+    private List<String> trackedMenuCodes(String pluginPid, Long tenantId) {
+        return jdbcTemplate.queryForList("""
+                SELECT DISTINCT r.resource_code
+                FROM ab_plugin_resource r
+                JOIN ab_plugin p ON p.pid = r.plugin_pid
+                JOIN ab_menu m ON m.tenant_id = r.tenant_id AND m.code = r.resource_code
+                               AND m.deleted_flag = FALSE
+                WHERE p.plugin_id = (SELECT plugin_id FROM ab_plugin WHERE pid = ?)
+                  AND r.tenant_id = ?
+                  AND r.resource_type = ?
+                  AND COALESCE(m.extension ->> 'authoringManaged', 'false') <> 'true'
+                """, String.class, pluginPid, tenantId, ResourceType.MENU.code()).stream()
+                .filter(Objects::nonNull)
+                .filter(code -> !code.isBlank())
+                .toList();
+    }
+
+    /**
+     * Soft-delete tracked menu rows through {@link #rollbackResource}, appending an audit
+     * row per pruned code. rollbackResource falls back to a direct soft delete when the
+     * menu service refuses a parent with active children, so a stale subtree converges in
+     * one pass. A code whose active menu row is already gone is silently accepted
+     * (idempotent re-run).
+     */
+    private int deleteTrackedMenus(String pluginPid, String importId, Long tenantId, List<String> codes) {
+        int pruned = 0;
+        for (String code : codes) {
+            Long menuId = menuMapper.findIdByCode(tenantId, code);
+            if (menuId == null) {
+                continue;
+            }
+            PluginResource record = new PluginResource();
+            record.setResourceType(ResourceType.MENU.code());
+            record.setResourceCode(code);
+            record.setResourceId(menuId);
+            record.setResourcePid(menuMapper.findPidByCode(tenantId, code));
+            try {
+                rollbackResource(record);
+            } catch (Exception e) {
+                log.warn("Failed to prune stale menu {}: {}", logSafe(code),
+                        logSafe(e.getMessage()));
+                continue;
+            }
+            pruned++;
+            if (pluginPid != null) {
+                upsertResourceRecord(createResourceRecord(pluginPid, importId, tenantId,
+                        ResourceType.MENU, record.getResourcePid(), menuId, code, null,
+                        ResourceAction.DELETE, null, null));
+            }
+        }
+        return pruned;
+    }
+
+    /**
+     * ab_plugin_resource enforces one tracking row per (tenant, plugin, type, code), so
+     * prune audits follow the import chain's persistence contract: update the existing
+     * row in place (re-homing it to the current plugin install), insert only when the
+     * code was never tracked.
+     */
+    private void upsertResourceRecord(PluginResource record) {
+        PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
+                record.getTenantId(), record.getPluginPid(), record.getResourceType(), record.getResourceCode());
+        if (existing == null) {
+            existing = pluginResourceMapper.findByTypeAndCode(
+                    record.getTenantId(), record.getResourceType(), record.getResourceCode());
+        }
+        if (existing == null) {
+            pluginResourceMapper.insert(record);
+            return;
+        }
+        existing.setPluginPid(record.getPluginPid());
+        existing.setImportId(record.getImportId());
+        existing.setResourcePid(record.getResourcePid());
+        existing.setResourceId(record.getResourceId());
+        existing.setResourceName(record.getResourceName());
+        existing.setAction(record.getAction());
+        existing.setPreviousState(record.getPreviousState());
+        existing.setCurrentState(record.getCurrentState());
+        existing.setImportSnapshot(record.getImportSnapshot());
+        existing.setUserModified(false);
+        existing.setUserModifiedAt(null);
+        existing.setUpdatedAt(record.getUpdatedAt());
+        pluginResourceMapper.updateById(existing);
+    }
+
+    // ==================== Helper Methods ====================
 
     private String toJson(Object obj) {
         try {

@@ -1,4 +1,6 @@
 import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
@@ -85,7 +87,6 @@ import { ViewAnalysisDrawer } from './list/ViewAnalysisDrawer';
 import {
   buildColumnSettingsRows,
   serializeColumnSettings,
-  type ColumnSettingsDefinition,
   type ColumnSettingsSavePayload,
 } from '~/framework/smart/components/view/ColumnSettingsPanel';
 import { ListTable } from './list/ListTable';
@@ -160,12 +161,115 @@ import {
 } from '~/framework/smart/utils/savedViewPersistence';
 import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
 
+import {
+  getListFieldValueWithAlias,
+  resolveFieldMetaDisplayName,
+  resolveFieldMetaDataType,
+  resolveFieldMetaRenderComponent,
+  renderComponentToValueType,
+  resolveColumnCapabilityDataType,
+  buildListFilterFieldMetadata,
+  buildViewManageFieldOptions,
+  buildListColumnSettingsDefinitions,
+  getSystemFieldI18nKey,
+  translateOrFallback,
+} from './list/listFieldMetadata';
+import {
+  buildListReferenceDisplayCacheKey,
+  resolveListSystemReferenceDisplayConfig,
+  shouldResolveListSystemReferenceValue,
+  pickSystemReferenceLabel,
+  collectListReferenceDisplayConfigs,
+  collectListReferenceValues,
+  resolveListReferenceFilterLabel,
+} from './list/listReferenceDisplay';
+import {
+  resolveSavedViewFilterExpressions,
+  collectListSchemaFieldNames,
+  collectListBareParamFilters,
+  type ListQueryFilterCondition,
+  resolveUserFilterCondition,
+  viewFilterToQueryCondition,
+  tabFilterToQueryCondition,
+  queryConditionToExportCondition,
+} from './list/listFilterConditions';
+import {
+  type ListSortFilterQuery,
+  findPersonalPresetSavedView,
+  areListSortFilterQueriesEqual,
+  isListQuerySettled,
+  pruneNoopViewConfigPatch,
+  resolveListSavedViewPageKey,
+  resolveUrlStateSyncAction,
+} from './list/listViewConfig';
+import {
+  buildBulkFieldCommandPayload,
+  resolveInitialListTabKey,
+  resolveTableBlockRowActions,
+  collectListMiscBlocks,
+  buildToolbarConditionContext,
+  shouldSkipListData,
+  shouldSkipModelFieldMeta,
+  resolveListMiscBlocksPosition,
+} from './list/listSchemaPolicy';
+
+export {
+  getListFieldValueWithAlias,
+  resolveFieldMetaDisplayName,
+  resolveFieldMetaDataType,
+  resolveFieldMetaRenderComponent,
+  renderComponentToValueType,
+  resolveColumnCapabilityDataType,
+  type ListFilterFieldMetadata,
+  buildListFilterFieldMetadata,
+  type ViewManageFieldOption,
+  buildViewManageFieldOptions,
+  buildListColumnSettingsDefinitions,
+  getSystemFieldI18nKey,
+} from './list/listFieldMetadata';
+export {
+  type ListReferenceDisplayConfig,
+  buildListReferenceDisplayCacheKey,
+  resolveListSystemReferenceDisplayConfig,
+  shouldResolveListSystemReferenceValue,
+  collectListReferenceDisplayConfigs,
+  collectListReferenceValues,
+  resolveListReferenceFilterLabel,
+} from './list/listReferenceDisplay';
+export {
+  viewConfigFiltersToRuntimeFilters,
+  type SavedViewFilterExpressionContext,
+  resolveSavedViewFilterExpressions,
+  collectListSchemaFieldNames,
+  collectListBareParamFilters,
+  type ListQueryFilterCondition,
+  resolveUserFilterCondition,
+  viewFilterToQueryCondition,
+  tabFilterToQueryCondition,
+  queryConditionToExportCondition,
+} from './list/listFilterConditions';
+export {
+  findPersonalPresetSavedView,
+  areListSortFilterQueriesEqual,
+  isListQuerySettled,
+  pruneNoopViewConfigPatch,
+  resolveListSavedViewPageKey,
+  resolveUrlStateSyncAction,
+} from './list/listViewConfig';
+export {
+  buildBulkFieldCommandPayload,
+  resolveInitialListTabKey,
+  resolveTableBlockRowActions,
+  collectListMiscBlocks,
+  buildToolbarConditionContext,
+  shouldSkipListData,
+  shouldSkipModelFieldMeta,
+  type ListMiscBlocksPosition,
+  resolveListMiscBlocksPosition,
+} from './list/listSchemaPolicy';
+
 // Dict data item type
-interface DictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, any>;
-}
+type DictItem = Pick<import('~/types/dict').DictItemData, 'value' | 'label' | 'extension'>;
 
 interface DynamicEntity {
   [key: string]: any;
@@ -248,142 +352,10 @@ interface BulkFieldCommandState {
   operationType: 'UPDATE' | 'DELETE';
 }
 
-export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown) {
-  return { [field.field]: value };
-}
-
-export function resolveInitialListTabKey(blocks: unknown): string {
-  if (!Array.isArray(blocks)) return 'all';
-  const tabsBlock = blocks.find(
-    (block): block is { blockType: string; tabs?: Array<{ key?: unknown }> } =>
-      Boolean(block && typeof block === 'object' && (block as any).blockType === 'tabs'),
-  );
-  const tabs = Array.isArray(tabsBlock?.tabs) ? tabsBlock.tabs : [];
-  const allTab = tabs.find((tab) => tab?.key === 'all');
-  const initialKey = allTab?.key ?? tabs[0]?.key;
-  return typeof initialKey === 'string' && initialKey.length > 0 ? initialKey : 'all';
-}
-
-export interface ListReferenceDisplayConfig {
-  field: string;
-  modelCode: string;
-  valueField: string;
-  displayField: string;
-  displayKey: string;
-}
-
-export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayConfig): string {
-  return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
-}
-
-interface ListSystemReferenceDisplayConfig {
-  detailEndpoint: string;
-  labelFields: string[];
-}
-
-const LIST_SYSTEM_REFERENCE_DISPLAY_MODELS: Record<string, ListSystemReferenceDisplayConfig> = {
-  sys_user: {
-    detailEndpoint: '/api/admin/users',
-    labelFields: ['displayName', 'realName', 'username', 'email'],
-  },
-};
-
-export function resolveListSystemReferenceDisplayConfig(
-  modelCode: string,
-): ListSystemReferenceDisplayConfig | undefined {
-  return LIST_SYSTEM_REFERENCE_DISPLAY_MODELS[modelCode];
-}
-
-/**
- * System-reference detail endpoints accept public identifiers, not projected
- * display labels. Some list APIs already return a label in the raw reference
- * field; whitespace cannot occur in a path-style public PID, so such values
- * should render directly instead of generating guaranteed 404 lookups.
- */
-export function shouldResolveListSystemReferenceValue(value: string): boolean {
-  const normalized = value.trim();
-  return normalized.length > 0 && !/\s/u.test(normalized);
-}
-
-function pickSystemReferenceLabel(
-  row: Record<string, any>,
-  configuredDisplayField: string,
-  labelFields: string[],
-): string | undefined {
-  for (const field of [configuredDisplayField, ...labelFields]) {
-    const value = row[field];
-    if (value === null || value === undefined) continue;
-    const text = String(value).trim();
-    if (text) return text;
-  }
-  return undefined;
-}
-
-export function findPersonalPresetSavedView(
-  savedViews: Array<Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'>>,
-  presetKey: QuickFilterPresetKey,
-): Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'> | undefined {
-  return savedViews.find(
-    (view) =>
-      String(view.scope).toLowerCase() === 'personal' &&
-      view.viewConfig?.meta?.originPresetKey === presetKey,
-  );
-}
-
-export function viewConfigFiltersToRuntimeFilters(
-  filters: ViewFilterConfig[] | undefined,
-): Record<string, any> {
-  const restoredFilters: Record<string, any> = {};
-  for (const filter of filters ?? []) {
-    restoredFilters[filter.fieldCode] = filter.value;
-  }
-  return restoredFilters;
-}
-
-export interface SavedViewFilterExpressionContext {
-  /** Public user PID used by reference fields such as an opportunity owner. */
-  currentUserPid?: string;
-}
-
-const CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = {
-  $currentDepartmentOwnerPids: { includeSubDepartments: true },
-} as const;
-
-const CURRENT_SHARED_RECORD_PIDS_RESOLVER = {
-  $currentSharedRecordPids: { action: 'read' },
-} as const;
-
-/**
- * Resolve the deliberately small, documented set of SavedView filter expressions.
- *
- * SavedView expressions are convenience filters, not an authorization boundary;
- * backend data-scope policies remain authoritative. Unknown expressions are left
- * inactive instead of accidentally reusing a stale static value.
- */
-export function resolveSavedViewFilterExpressions(
-  filters: ViewFilterConfig[] | undefined,
-  context: SavedViewFilterExpressionContext,
-): ViewFilterConfig[] {
-  return (filters ?? []).map((filter) => {
-    if (!filter.isExpression) return filter;
-
-    const expression = String(filter.expression ?? '').trim();
-    const resolvedValue =
-      expression === '#currentUser' || expression === '${system.currentUser}'
-        ? context.currentUserPid?.trim() || undefined
-        : expression === '#currentDepartmentOwners' ||
-            expression === '${system.currentDepartmentOwners}'
-          ? CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER
-          : expression === '#currentSharedRecords' ||
-              expression === '${system.currentSharedRecords}'
-            ? CURRENT_SHARED_RECORD_PIDS_RESOLVER
-            : undefined;
-
-    return { ...filter, value: resolvedValue };
-  });
-}
-
-function clearTransientViewSearchParams(params: URLSearchParams): void {
+function clearTransientViewSearchParams(
+  params: URLSearchParams,
+  knownFieldNames?: ReadonlySet<string>,
+): void {
   for (const key of Array.from(params.keys())) {
     if (
       key === 'sort' ||
@@ -391,15 +363,12 @@ function clearTransientViewSearchParams(params: URLSearchParams): void {
       key === 'filters' ||
       key === 'preset' ||
       key === 'pageNum' ||
-      key.startsWith('filter_')
+      key.startsWith('filter_') ||
+      (knownFieldNames?.has(key) ?? false)
     ) {
       params.delete(key);
     }
   }
-}
-
-function stableConfigString(value: unknown): string {
-  return JSON.stringify(value ?? null);
 }
 
 /**
@@ -410,104 +379,9 @@ function stableConfigString(value: unknown): string {
  * only the most recently started request may update data, pagination, errors,
  * or loading state.
  */
-type ListSortFilterQuery = { activeSorts: SortConfig[]; chipFilters: ViewFilterConfig[] };
-
-export function areListSortFilterQueriesEqual(
-  left: ListSortFilterQuery,
-  right: ListSortFilterQuery | undefined,
-): boolean {
-  return Boolean(right && areSortsEqual(left.activeSorts, right.activeSorts)
-    && areFiltersEqual(left.chipFilters, right.chipFilters));
-}
-
-export function isListQuerySettled(
-  current: ListSortFilterQuery,
-  debounced: ListSortFilterQuery,
-  scheduled: ListSortFilterQuery | undefined,
-): boolean {
-  return areListSortFilterQueriesEqual(current, debounced)
-    && areListSortFilterQueriesEqual(current, scheduled);
-}
-
 export function beginLatestListRequest(sequenceRef: { current: number }): () => boolean {
   const requestSequence = ++sequenceRef.current;
   return () => requestSequence === sequenceRef.current;
-}
-
-function isNoopViewConfigPatchEntry(
-  key: keyof ViewConfig,
-  value: unknown,
-  baseValue: unknown,
-): boolean {
-  if (value === undefined) {
-    return true;
-  }
-  if (key === 'sorts') {
-    return areSortsEqual(
-      Array.isArray(baseValue) ? (baseValue as SortConfig[]) : [],
-      Array.isArray(value) ? (value as SortConfig[]) : [],
-    );
-  }
-  if (Array.isArray(value)) {
-    const normalizedBase = Array.isArray(baseValue) ? baseValue : [];
-    return stableConfigString(value) === stableConfigString(normalizedBase);
-  }
-  return stableConfigString(value) === stableConfigString(baseValue);
-}
-
-export function pruneNoopViewConfigPatch(
-  base: ViewConfig | Partial<ViewConfig> | null | undefined,
-  patch: Partial<ViewConfig> | null | undefined,
-): Partial<ViewConfig> | null {
-  if (!patch) {
-    return null;
-  }
-
-  const pruned: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(patch) as Array<[keyof ViewConfig, unknown]>) {
-    if (!isNoopViewConfigPatchEntry(key, value, base?.[key])) {
-      pruned[key] = value;
-    }
-  }
-
-  return Object.keys(pruned).length > 0 ? (pruned as Partial<ViewConfig>) : null;
-}
-
-export function resolveListSavedViewPageKey(
-  schema: { pageKey?: string | null } | null | undefined,
-  routeTableName: string,
-): string {
-  return schema?.pageKey || routeTableName;
-}
-
-function snakeToCamel(value: string): string {
-  return value.replace(/_([a-zA-Z0-9])/g, (_, char: string) => char.toUpperCase());
-}
-
-function camelToSnake(value: string): string {
-  return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
-}
-
-export function getListFieldValueWithAlias(
-  record: Record<string, any>,
-  fieldCode: string | undefined,
-): unknown {
-  // A bare-string column shorthand (e.g. `columns: ['name', 'pageKey']`) reaches the
-  // legacy list runtime without a resolved `field`, so `column.field` can be undefined.
-  // Guard the alias lookup here so such a column renders empty instead of throwing
-  // `Cannot read properties of undefined (reading 'includes')`, which would blank the
-  // whole page behind the render error boundary ("Oops!").
-  if (!record || typeof fieldCode !== 'string' || fieldCode.length === 0) {
-    return undefined;
-  }
-  if (Object.prototype.hasOwnProperty.call(record, fieldCode)) {
-    return record[fieldCode];
-  }
-  const alias = fieldCode.includes('_') ? snakeToCamel(fieldCode) : camelToSnake(fieldCode);
-  if (alias !== fieldCode && Object.prototype.hasOwnProperty.call(record, alias)) {
-    return record[alias];
-  }
-  return undefined;
 }
 
 export function useRestoreSavedViewFromUrl({
@@ -576,245 +450,6 @@ export function useSerializedSearchParamsUpdater(
   );
 }
 
-export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
-  const blockRowActions = Array.isArray(tableBlock?.rowActions) ? tableBlock.rowActions : [];
-  const tableRowActions = Array.isArray(tableBlock?.table?.rowActions)
-    ? tableBlock.table.rowActions
-    : [];
-  const rowActions = [...blockRowActions];
-  for (const action of tableRowActions) {
-    if (!rowActions.some((existing: any) => existing.code === action.code)) {
-      rowActions.push(action);
-    }
-  }
-  return rowActions;
-}
-
-function readRefTargetConfig(
-  column: ColumnConfig,
-  meta?: Record<string, any>,
-): Record<string, any> {
-  return {
-    ...(meta?.extension?.refTarget || {}),
-    ...(meta?.refTarget || {}),
-    ...((column as any).extension?.refTarget || {}),
-    ...((column as any).props?.refTarget || {}),
-    ...((column as any).refTarget || {}),
-  };
-}
-
-/**
- * Resolve a header/filter label from the model field metadata (field-meta API).
- * The importer denormalises the field's effective displayName (zh-CN first)
- * into the field extension, so dynamic pages can label columns even when the
- * page config carries no explicit label and no i18n resource exists. Returns
- * undefined when metadata is missing so callers keep their own fallbacks.
- */
-export function resolveFieldMetaDisplayName(
-  fieldCode: string,
-  modelFieldMap: Map<string, any> | undefined,
-): string | undefined {
-  if (!fieldCode || !modelFieldMap) return undefined;
-  const meta = modelFieldMap.get(fieldCode);
-  if (!meta) return undefined;
-  const candidate = meta.displayName ?? meta.extension?.displayName;
-  if (typeof candidate !== 'string') return undefined;
-  const trimmed = candidate.trim();
-  return trimmed && trimmed !== fieldCode ? trimmed : undefined;
-}
-
-function normalizeFieldDataType(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed ? trimmed.toLowerCase() : undefined;
-}
-
-export function resolveFieldMetaDataType(
-  fieldCode: string,
-  modelFieldMap: Map<string, any> | undefined,
-): string | undefined {
-  if (!fieldCode || !modelFieldMap) return undefined;
-  const meta = modelFieldMap.get(fieldCode);
-  if (!meta) return undefined;
-  return (
-    normalizeFieldDataType(meta.dataType) ??
-    normalizeFieldDataType(meta.fieldType) ??
-    normalizeFieldDataType(meta.extension?.dataType) ??
-    normalizeFieldDataType(meta.extension?.fieldType)
-  );
-}
-
-/**
- * A field's visual control lives in `extension.renderComponent` (colorpicker / progress /
- * rating / moneyinput / ...), NOT in its dataType. List cell-type resolution used to ignore
- * it, so those columns fell back to raw text/number. Surface it so the cell renderer can
- * pick the right presentation. Mirrors the designer's `platformTablePreview.inferColumnValueType`.
- */
-export function resolveFieldMetaRenderComponent(
-  fieldCode: string,
-  modelFieldMap: Map<string, any> | undefined,
-): string | undefined {
-  if (!fieldCode || !modelFieldMap) return undefined;
-  const meta = modelFieldMap.get(fieldCode);
-  if (!meta) return undefined;
-  const raw =
-    meta.extension?.renderComponent ??
-    meta.renderComponent ??
-    meta.extension?.component ??
-    meta.uiSchema?.component;
-  return typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : undefined;
-}
-
-/** Map a renderComponent / DSL renderType to a list cell valueType (undefined = no override). */
-export function renderComponentToValueType(
-  component: string | undefined,
-): ColumnConfig['valueType'] | undefined {
-  switch (component) {
-    case 'colorpicker':
-    case 'color':
-      return 'color';
-    case 'progress':
-    case 'progressfield':
-      return 'progress';
-    case 'rating':
-    case 'ratingfield':
-      return 'rating';
-    case 'moneyinput':
-    case 'money':
-      return 'currency';
-    default:
-      return undefined;
-  }
-}
-
-export function resolveColumnCapabilityDataType(
-  column: { field?: string; dataType?: unknown; valueType?: unknown; sorter?: unknown },
-  modelFieldMap: Map<string, any> | undefined,
-): string {
-  return (
-    resolveFieldMetaDataType(column.field ?? '', modelFieldMap) ??
-    normalizeFieldDataType(column.dataType) ??
-    normalizeFieldDataType(column.valueType) ??
-    normalizeFieldDataType(column.sorter) ??
-    'text'
-  );
-}
-
-export interface ListFilterFieldMetadata {
-  fieldCode: string;
-  label: string;
-  fieldType: string;
-  dictCode?: string;
-  referenceModelCode?: string;
-  referenceValueField?: string;
-  referenceDisplayField?: string;
-}
-
-/**
- * Build the typed metadata shared by the filter picker, filter chips and value editor.
- *
- * A table column is primarily a presentation contract, so many DSL pages omit its
- * data type. The model field metadata remains the source of truth for filter
- * operators and editors (money must expose numeric comparisons, enums their dict,
- * and references their target model).
- */
-export function buildListFilterFieldMetadata(
-  tableColumns: ColumnConfig[],
-  modelFieldMap: Map<string, any> | undefined,
-  resolveLabel: (column: ColumnConfig) => string,
-): ListFilterFieldMetadata[] {
-  return tableColumns
-    .filter((column) => !column.isActionColumn && Boolean(column.field))
-    .map((column) => {
-      const meta = modelFieldMap?.get(column.field);
-      const refTarget = readRefTargetConfig(column, meta);
-      const referenceModelCode = String(
-        refTarget.modelCode ||
-          refTarget.targetModel ||
-          refTarget.targetEntity ||
-          meta?.referenceModelCode ||
-          meta?.extension?.referenceModelCode ||
-          '',
-      ).trim();
-      return {
-        fieldCode: column.field,
-        label: resolveLabel(column),
-        fieldType: resolveColumnCapabilityDataType(column, modelFieldMap),
-        dictCode: column.dictCode || meta?.dictCode || meta?.extension?.dictCode || undefined,
-        referenceModelCode: referenceModelCode || undefined,
-        referenceValueField: String(
-          refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
-        ),
-        referenceDisplayField:
-          String(
-            refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
-          ).trim() || undefined,
-      };
-    });
-}
-
-export interface ListQueryFilterCondition {
-  fieldName: string;
-  operator: string;
-  value?: unknown;
-  values?: unknown[];
-}
-
-/** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
-export function viewFilterToQueryCondition(
-  filter: ViewFilterConfig,
-): ListQueryFilterCondition | null {
-  if (!filter.fieldCode) return null;
-  const operator = (filter.operator || 'eq').toUpperCase();
-  if (operator === 'ISNULL' || operator === 'ISNOTNULL') {
-    return { fieldName: filter.fieldCode, operator, value: null };
-  }
-  if (filter.value == null || filter.value === '') return null;
-  if (operator === 'IN' || operator === 'BETWEEN') {
-    const values = Array.isArray(filter.value) ? filter.value : [filter.value];
-    if (values.length === 0) return null;
-    return { fieldName: filter.fieldCode, operator, values };
-  }
-  return {
-    fieldName: filter.fieldCode,
-    operator,
-    value: operator === 'LIKE' ? `%${String(filter.value)}%` : filter.value,
-  };
-}
-
-/** Normalize a DSL list-tab filter through the same array-aware query contract as saved views. */
-export function tabFilterToQueryCondition(filter: any): ListQueryFilterCondition | null {
-  if (!filter || typeof filter !== 'object') return null;
-  const fieldCode = filter.fieldName || filter.field;
-  if (!fieldCode) return null;
-  return viewFilterToQueryCondition({
-    fieldCode,
-    operator: String(filter.operator || 'EQ').toLowerCase() as ViewFilterConfig['operator'],
-    value: filter.value,
-  });
-}
-
-/** Convert the dynamic-list condition shape to the export endpoint shape. */
-export function queryConditionToExportCondition(condition: ListQueryFilterCondition): {
-  field: string;
-  operator: string;
-  value: unknown;
-} {
-  return {
-    field: condition.fieldName,
-    operator: condition.operator,
-    value: condition.values ?? condition.value ?? null,
-  };
-}
-
-export function resolveUrlStateSyncAction(
-  pendingLocalEncoding: string | null | undefined,
-  currentUrlEncoding: string | null,
-): 'apply-url' | 'ack-local' | 'wait-for-local' {
-  if (pendingLocalEncoding === undefined) return 'apply-url';
-  return pendingLocalEncoding === currentUrlEncoding ? 'ack-local' : 'wait-for-local';
-}
-
 export function applyLocalSortUpdate(
   previous: SortConfig[],
   update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[]),
@@ -825,277 +460,12 @@ export function applyLocalSortUpdate(
   return next;
 }
 
-export interface ViewManageFieldOption {
-  code: string;
-  name: string;
-  dataType: string;
-}
-
-export function buildViewManageFieldOptions(
-  tableColumns: ColumnConfig[],
-  modelFieldMap: Map<string, any> | undefined,
-): ViewManageFieldOption[] {
-  const byCode = new Map<string, ViewManageFieldOption>();
-
-  for (const [fieldCode] of modelFieldMap?.entries() ?? []) {
-    if (!fieldCode) continue;
-    byCode.set(fieldCode, {
-      code: fieldCode,
-      name: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
-      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'string',
-    });
-  }
-
-  for (const column of tableColumns) {
-    if (!column.field || column.isActionColumn) continue;
-    const fallbackName =
-      typeof column.label === 'string'
-        ? column.label
-        : (byCode.get(column.field)?.name ?? column.field);
-    byCode.set(column.field, {
-      code: column.field,
-      name: fallbackName,
-      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
-    });
-  }
-
-  return Array.from(byCode.values());
-}
-
-export function buildListColumnSettingsDefinitions(
-  baseColumns: ColumnConfig[],
-  modelFieldMap: Map<string, any> | undefined,
-  systemColumns: ColumnConfig[],
-  resolveLabel: (column: ColumnConfig) => string,
-): ColumnSettingsDefinition[] {
-  const definitions = new Map<string, ColumnSettingsDefinition>();
-
-  for (const column of baseColumns) {
-    if (!column.field || column.isActionColumn) continue;
-    definitions.set(column.field, {
-      field: column.field,
-      label: resolveLabel(column),
-      ...(column.mandatory === true ? { mandatory: true } : {}),
-      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
-      group: 'business',
-      defaultVisible: true,
-      defaultWidth:
-        typeof column.width === 'number'
-          ? column.width
-          : typeof column.width === 'string'
-            ? Number.parseInt(column.width, 10) || undefined
-            : undefined,
-      defaultFrozenPosition: column.fixed,
-    });
-  }
-
-  for (const [fieldCode, meta] of modelFieldMap?.entries() ?? []) {
-    if (!fieldCode || meta?.visible === false || definitions.has(fieldCode)) continue;
-    definitions.set(fieldCode, {
-      field: fieldCode,
-      label: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
-      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'text',
-      group: 'business',
-      defaultVisible: false,
-    });
-  }
-
-  for (const column of systemColumns) {
-    if (!column.field || definitions.has(column.field)) continue;
-    definitions.set(column.field, {
-      field: column.field,
-      label: resolveLabel(column),
-      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
-      group: 'system',
-      defaultVisible: false,
-    });
-  }
-
-  return Array.from(definitions.values());
-}
-
-export function collectListReferenceDisplayConfigs(
-  columns: ColumnConfig[],
-  modelFieldMap: Map<string, any>,
-): ListReferenceDisplayConfig[] {
-  const configs: ListReferenceDisplayConfig[] = [];
-  const seen = new Set<string>();
-
-  for (const column of columns) {
-    if (!column.field || column.isActionColumn) continue;
-    const meta = modelFieldMap.get(column.field);
-    const refTarget = readRefTargetConfig(column, meta);
-    const dataType = String(
-      (column as any).dataType ||
-        column.valueType ||
-        meta?.dataType ||
-        meta?.extension?.dataType ||
-        '',
-    ).toLowerCase();
-    const hasReferenceShape =
-      dataType === 'reference' ||
-      column.valueType === 'reference' ||
-      column.field.endsWith('_id') ||
-      Object.keys(refTarget).length > 0;
-    if (!hasReferenceShape) continue;
-
-    const modelCode = String(
-      refTarget.modelCode ||
-        refTarget.targetModel ||
-        refTarget.targetEntity ||
-        meta?.referenceModelCode ||
-        meta?.extension?.referenceModelCode ||
-        '',
-    ).trim();
-    const displayField = String(
-      refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
-    ).trim();
-    const valueField = String(
-      refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
-    ).trim();
-    if (!modelCode || !displayField || !valueField) continue;
-
-    const config: ListReferenceDisplayConfig = {
-      field: column.field,
-      modelCode,
-      valueField,
-      displayField,
-      displayKey: `${column.field}_display`,
-    };
-    const key = buildListReferenceDisplayCacheKey(config);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    configs.push(config);
-  }
-
-  return configs;
-}
-
-export function collectListReferenceValues(
-  config: ListReferenceDisplayConfig,
-  records: Record<string, any>[],
-  filters: ViewFilterConfig[],
-  cached: Record<string, string>,
-): string[] {
-  const rowValues = records
-    .filter((record) => !record[config.displayKey])
-    .map((record) => record[config.field]);
-  const filterValues = filters
-    .filter((filter) => filter.fieldCode === config.field && !filter.isExpression)
-    .flatMap((filter) => (Array.isArray(filter.value) ? filter.value : [filter.value]));
-  return Array.from(
-    new Set(
-      [...rowValues, ...filterValues]
-        .filter((value) => value !== null && value !== undefined && value !== '')
-        .map(String),
-    ),
-  ).filter((value) => cached[value] === undefined);
-}
-
-export function resolveListReferenceFilterLabel(
-  filter: ViewFilterConfig,
-  configs: ListReferenceDisplayConfig[],
-  cache: Record<string, Record<string, string>>,
-  fallback: string,
-): string | undefined {
-  const config = configs.find((candidate) => candidate.field === filter.fieldCode);
-  if (!config || filter.operator === 'isNull' || filter.operator === 'isNotNull') return undefined;
-  const labels = cache[buildListReferenceDisplayCacheKey(config)] || {};
-  const values = Array.isArray(filter.value) ? filter.value : [filter.value];
-  return values
-    .filter((value) => value !== null && value !== undefined && value !== '')
-    .map((value) => labels[String(value)] || fallback)
-    .join('、');
-}
-
 interface PaginationResult<T> {
   records: T[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
-}
-
-const SYSTEM_FIELD_I18N_KEYS: Record<string, string> = {
-  created_at: 'common.created_at',
-  updated_at: 'common.updated_at',
-  created_by: 'common.creator',
-  updated_by: 'common.modifier',
-};
-
-export function getSystemFieldI18nKey(fieldCode: string): string | undefined {
-  return SYSTEM_FIELD_I18N_KEYS[fieldCode];
-}
-
-function translateOrFallback(t: (key: string) => string, key: string, fallback: string): string {
-  const resolved = t(key);
-  return resolved && resolved !== key ? resolved : fallback;
-}
-
-/**
- * Build the expression context exposed to toolbar `visibleWhen` conditions.
- * Adds the loaded list's `recordCount` (length of currently loaded rows) and
- * `total` (server total), so conditions like `visibleWhen: "recordCount == 0"`
- * (e.g. a singleton "新建" button that hides once a record exists) evaluate.
- */
-export function buildToolbarConditionContext(
-  list: { total: number; records: unknown[] },
-  base: Record<string, any>,
-  runtimeContext: Record<string, any> = {},
-): Record<string, any> {
-  return {
-    ...base, ...runtimeContext,
-    state: { ...runtimeContext.state, ...base.state },
-    recordCount: list.records?.length ?? 0, total: list.total ?? 0,
-  };
-}
-
-export function shouldSkipListData(
-  schema: { blocks?: BlockConfig[]; extension?: Record<string, any> } | null | undefined,
-): boolean {
-  if (!schema) return false;
-  const extension = schema.extension ?? {};
-  if (extension.skipListData === true || extension.customOnly === true) {
-    return true;
-  }
-  const blocks = Array.isArray(schema.blocks) ? schema.blocks : [];
-  if (blocks.length === 0) return false;
-  const hasTableBlock = blocks.some((block: any) => block.blockType === 'table');
-  const hasCustomBlock = blocks.some((block: any) => block.blockType === 'custom');
-  return hasCustomBlock && !hasTableBlock;
-}
-
-export function shouldSkipModelFieldMeta(
-  schema:
-    | { blocks?: BlockConfig[]; extension?: Record<string, any>; dataSource?: Record<string, any> }
-    | null
-    | undefined,
-  skipListData = shouldSkipListData(schema),
-): boolean {
-  if (skipListData) return true;
-  const extension = schema?.extension ?? {};
-  return extension.skipFieldMeta === true || extension.skipDynamicFieldMeta === true;
-}
-
-export type ListMiscBlocksPosition = 'beforeTable' | 'afterTable';
-
-/** Custom-only lists still render declared external tables, without enabling native model reads. */
-export function collectListMiscBlocks(schema: any, skipListData = shouldSkipListData(schema)): any[] {
-  if (!Array.isArray(schema?.blocks)) return [];
-  const specialized = new Set(['table', 'filters', 'toolbar', 'tabs', 'form-buttons', 'form-section']);
-  return schema.blocks.filter((block: any) => {
-    if (skipListData && block.blockType === 'table' && typeof block.dataSource === 'string') {
-      const source = schema.dataSources?.[block.dataSource];
-      return source?.type === 'api' && typeof source.endpoint === 'string' && source.endpoint.trim() !== '';
-    }
-    return !specialized.has(block.blockType);
-  });
-}
-
-export function resolveListMiscBlocksPosition(
-  schema: { extension?: Record<string, any> } | null | undefined,
-): ListMiscBlocksPosition {
-  return schema?.extension?.miscBlocksPosition === 'beforeTable' ? 'beforeTable' : 'afterTable';
 }
 
 const INVITE_LABELS = {
@@ -1184,6 +554,11 @@ function ListPageContentInner(props: PageContentProps) {
     routerSetSearchParams,
     listUrlWritesEnabledRef,
   );
+  const listSchemaFieldNames = useMemo(() => collectListSchemaFieldNames(schema), [schema]);
+  const listSchemaFieldNameSet = useMemo(
+    () => new Set(listSchemaFieldNames),
+    [listSchemaFieldNames],
+  );
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -1192,8 +567,13 @@ function ListPageContentInner(props: PageContentProps) {
         filters[fieldName] = value;
       }
     });
-    return filters;
-  }, [searchParams]);
+    // Drill-down bare params (e.g. fin_cfw_week_start written by a dashboard
+    // drillDown paramMapping) seed row filters too; filter_* keeps precedence.
+    return {
+      ...collectListBareParamFilters(searchParams, listSchemaFieldNames),
+      ...filters,
+    };
+  }, [searchParams, listSchemaFieldNames]);
   const urlPageNum = useMemo(() => {
     const raw = searchParams.get('pageNum');
     if (!raw) return null;
@@ -1938,6 +1318,14 @@ function ListPageContentInner(props: PageContentProps) {
   }, [modelCode, skipModelFieldMeta]);
 
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
+  // Call-time mirror of modelFieldMap: loadData / handleTabChange read it when a
+  // request fires, so a filter request that waited on fieldMetaReadyRef sees the
+  // settled metadata even though its closure was created before the re-render.
+  const modelFieldMapRef = useRef<Map<string, any>>(new Map());
+  // Resolves once the field metadata for the current model has settled (loaded
+  // or failed). The initial list load awaits it when URL-sourced filters are
+  // present, so their operators are typed before the first request.
+  const fieldMetaReadyRef = useRef<Promise<void>>(Promise.resolve());
   const [referenceDisplayCache, setReferenceDisplayCache] = useState<
     Record<string, Record<string, string>>
   >({});
@@ -1946,11 +1334,13 @@ function ListPageContentInner(props: PageContentProps) {
     let cancelled = false;
     const pageKey = schema?.modelCode || tableName;
     if (!pageKey || skipModelFieldMeta) {
+      modelFieldMapRef.current = new Map();
       setModelFieldMap(new Map());
+      fieldMetaReadyRef.current = Promise.resolve();
       return;
     }
 
-    async function loadModelFields(): Promise<void> {
+    const ready = (async () => {
       try {
         const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
           method: 'get',
@@ -1958,6 +1348,7 @@ function ListPageContentInner(props: PageContentProps) {
         });
         if (cancelled) return;
         if (!ResultHelper.isSuccess(fieldsRes) || !fieldsRes.data) {
+          modelFieldMapRef.current = new Map();
           setModelFieldMap(new Map());
           return;
         }
@@ -1965,16 +1356,17 @@ function ListPageContentInner(props: PageContentProps) {
         for (const field of fieldsRes.data) {
           if (field?.code) map.set(field.code, field);
         }
+        modelFieldMapRef.current = map;
         setModelFieldMap(map);
       } catch (error) {
         if (!cancelled) {
+          modelFieldMapRef.current = new Map();
           setModelFieldMap(new Map());
           console.warn('[ListPageContent] Failed to load model field metadata:', error);
         }
       }
-    }
-
-    loadModelFields();
+    })();
+    fieldMetaReadyRef.current = ready;
     return () => {
       cancelled = true;
     };
@@ -2097,15 +1489,12 @@ function ListPageContentInner(props: PageContentProps) {
     const loadDictData = async () => {
       const promises = unloadedCodes.map(async (code: string) => {
         try {
-          const result = await fetchResult(`/api/meta/dict/by-code/${code}/data`, {
-            method: 'get',
-            token: token || undefined,
+          const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+            path: { code },
+            options: { token: token || undefined },
           });
-          if (ResultHelper.isSuccess(result) && result.data) {
-            // Adapt dict data format
-            const data = result.data as { items?: DictItem[] } | DictItem[];
-            const items: DictItem[] = Array.isArray(data) ? data : data.items || [];
-            dictDataCache.current.set(code, items);
+          if (result.code === '0' && result.data) {
+            dictDataCache.current.set(code, dictionaryData(result.data).items);
           }
         } catch (error) {
           console.error(`[ListPageContent] Failed to load dict: ${code}`, error);
@@ -2153,8 +1542,8 @@ function ListPageContentInner(props: PageContentProps) {
     if (!tabsBlock?.tabs) return null;
     const currentTab = (tabsBlock.tabs as any[]).find((tab: any) => tab.key === activeTab);
     if (!currentTab?.filter) return null;
-    return tabFilterToQueryCondition(currentTab.filter);
-  }, [schema, activeTab]);
+    return tabFilterToQueryCondition(currentTab.filter, user?.pid);
+  }, [schema, activeTab, user?.pid]);
 
   const displayData = useMemo(() => {
     const tabCondition = getTabFilter();
@@ -2192,39 +1581,16 @@ function ListPageContentInner(props: PageContentProps) {
       tabCondition: ListQueryFilterCondition | null,
       userFilters?: Record<string, any>,
       chipFiltersList?: ViewFilterConfig[],
+      filterFieldMap?: Map<string, any>,
     ) => {
       const conditions: ListQueryFilterCondition[] = [];
       if (tabCondition) conditions.push(tabCondition);
       // Convert user filters (key-value from filters) to QueryCondition format
       if (userFilters) {
         for (const [key, value] of Object.entries(userFilters)) {
-          if (value == null || value === '') continue;
-          // Handle date range objects { start, end }
-          if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-            if (value.start) {
-              conditions.push({ fieldName: key, operator: 'gte', value: String(value.start) });
-            }
-            if (value.end) {
-              conditions.push({ fieldName: key, operator: 'lte', value: String(value.end) });
-            }
-          } else {
-            const fieldConfig = ((filterBlock?.fields || []) as FieldConfig[]).find(
-              (field) => field.field === key,
-            );
-            const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
-            const operator =
-              typeof explicitOperator === 'string' && explicitOperator.trim()
-                ? explicitOperator.trim().toUpperCase()
-                : fieldConfig?.component === 'SmartInput'
-                  ? 'LIKE'
-                  : 'EQ';
-            const textValue = String(value);
-            conditions.push({
-              fieldName: key,
-              operator,
-              value: operator === 'LIKE' ? `%${textValue}%` : textValue,
-            });
-          }
+          conditions.push(
+            ...resolveUserFilterCondition(key, value, filterBlock?.fields as FieldConfig[] | undefined, filterFieldMap),
+          );
         }
       }
       // Merge chip filters (from FilterChipBar) into conditions
@@ -2237,6 +1603,8 @@ function ListPageContentInner(props: PageContentProps) {
       }
       return conditions.length > 0 ? JSON.stringify(conditions) : undefined;
     },
+    // NOTE: filterBlock is declared later in the component; reads resolve at call time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -2377,6 +1745,18 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
           }
+        } else {
+          // For standard dynamic tables, use JSON filters array
+          const tabCondition = getTabFilter();
+          const filtersParam = buildFiltersParam(
+            tabCondition,
+            params?.filters,
+            params?.chipFilters ?? chipFiltersRef.current,
+            modelFieldMapRef.current,
+          );
+          if (filtersParam) {
+            queryParams.filters = filtersParam;
+          }
 
           // Pass keyword search to backend (supported by DynamicController)
           // Use ref to get latest value — avoids stale closure when Enter triggers
@@ -2501,7 +1881,7 @@ function ListPageContentInner(props: PageContentProps) {
       (prev) => {
         const p = new URLSearchParams(prev);
         p.delete('view');
-        clearTransientViewSearchParams(p);
+        clearTransientViewSearchParams(p, listSchemaFieldNameSet);
         return p;
       },
       { replace: true },
@@ -2579,26 +1959,41 @@ function ListPageContentInner(props: PageContentProps) {
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
     if (schema && !skipListData) {
-      // Restore an active preset view from ?preset= so it survives reload —
-      // a SavedView (?view=) takes precedence and carries its own filters.
-      const initialPreset = urlViewPid ? null : urlPreset;
-      if (initialPreset) {
-        const presetFilters =
-          buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
-        setActiveQuickFilter(initialPreset);
-        setFilters(presetFilters);
-        // The debounced sort/filter effect would otherwise re-fetch once on
-        // mount with the still-empty `filters` state and clobber this preset
-        // load — skip exactly that first run so the preset filter wins.
-        skipFirstSortFilterEffectRef.current = true;
-        loadDataRef.current?.({
-          page: pagination.current - 1,
-          size: pagination.pageSize,
-          filters: presetFilters,
+      const runInitialLoad = () => {
+        // Restore an active preset view from ?preset= so it survives reload —
+        // a SavedView (?view=) takes precedence and carries its own filters.
+        const initialPreset = urlViewPid ? null : urlPreset;
+        if (initialPreset) {
+          const presetFilters =
+            buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
+          setActiveQuickFilter(initialPreset);
+          setFilters(presetFilters);
+          // The debounced sort/filter effect would otherwise re-fetch once on
+          // mount with the still-empty `filters` state and clobber this preset
+          // load — skip exactly that first run so the preset filter wins.
+          skipFirstSortFilterEffectRef.current = true;
+          loadDataRef.current?.({
+            page: pagination.current - 1,
+            size: pagination.pageSize,
+            filters: presetFilters,
+          });
+        } else {
+          loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+        }
+      };
+      // URL-sourced filters (filter_* / drill-down bare params) are typed by the
+      // model field metadata; awaiting it here prevents the first request from
+      // going out with the un-typed legacy operator (e.g. LIKE on a date).
+      if (Object.keys(urlFilters).length > 0) {
+        let cancelled = false;
+        void fieldMetaReadyRef.current.then(() => {
+          if (!cancelled) runInitialLoad();
         });
-      } else {
-        loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+        return () => {
+          cancelled = true;
+        };
       }
+      runInitialLoad();
     }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
@@ -2635,7 +2030,7 @@ function ListPageContentInner(props: PageContentProps) {
         const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
         const tabDef = (tabsBlock?.tabs as any[])?.find((t: any) => t.key === tabKey);
         if (tabDef?.filter) {
-          tabCondition = tabFilterToQueryCondition(tabDef.filter);
+          tabCondition = tabFilterToQueryCondition(tabDef.filter, user?.pid);
         }
       }
 
@@ -2693,11 +2088,17 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
           } else {
-            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters);
+            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters, modelFieldMapRef.current);
             if (filtersParam) {
               queryParams.filters = filtersParam;
             }
           }
+          if (!isApiDatasource) {
+            if (activeSorts.length > 1) queryParams.sortFields = activeSorts.map(sort => `${sort.fieldCode}:${sort.direction}`).join(',');
+            else if (activeSorts.length === 1) { queryParams.sortField = activeSorts[0].fieldCode; queryParams.sortOrder = activeSorts[0].direction; }
+            else if (tableBlock?.defaultSort?.field) { queryParams.sortField = tableBlock.defaultSort.field; queryParams.sortOrder = tableBlock.defaultSort.order || 'desc'; }
+          }
+          if (keywordRef.current.trim()) queryParams.keyword = keywordRef.current.trim();
 
           const result = await fetchResult<PaginationResult<DynamicEntity>>(endpoint, {
             method,
@@ -3440,9 +2841,9 @@ function ListPageContentInner(props: PageContentProps) {
             // to render a leading icon instead of the semantic color dot.
             return (
               <StatusDot
-                tone={resolveStatusTone(item.extension?.color)}
+                tone={resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined)}
                 label={item.label}
-                icon={(item.extension as any)?.icon}
+                icon={typeof item.extension?.icon === 'string' ? item.extension.icon : undefined}
               />
             );
           }
@@ -3467,7 +2868,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
 
       // Use CellRendererRegistry for valueType-based rendering
-      const rendererType = (column as any).cellRenderer || effectiveValueType;
+      const rendererType = column.presentation ? 'workspace' : (column as any).cellRenderer || effectiveValueType;
       return cellRendererRegistry.render(rendererType, {
         value,
         record: recordForRenderer,
@@ -3481,6 +2882,7 @@ function ListPageContentInner(props: PageContentProps) {
           timezone: effectiveTimezone,
           render: column.render,
           tagMap: (column as any).tagMap,
+          presentation: column.presentation,
         },
         expressionContext: pageContext,
         locale,
@@ -3674,7 +3076,14 @@ function ListPageContentInner(props: PageContentProps) {
     const found = allBlocks.find(
       (block: any) => block.blockType === 'form-buttons' || block.blockType === 'toolbar',
     );
-    return found;
+    if (!found) return found;
+    // Toolbar DSL may declare its entries as `actions` (localized-label navigate
+    // / command entries) instead of `buttons`; the chrome consumes `buttons`
+    // only, so merge both shapes into one renderable list.
+    const actions = Array.isArray(found.actions) ? found.actions : [];
+    const buttons = Array.isArray(found.buttons) ? found.buttons : [];
+    if (actions.length === 0) return found;
+    return { ...found, buttons: [...buttons, ...actions] };
   }, [allBlocks]);
 
   // System fields on every dynamic entity — not in DSL but available in API response
@@ -4214,7 +3623,7 @@ function ListPageContentInner(props: PageContentProps) {
       (prev) => {
         const p = new URLSearchParams(prev);
         p.set('view', currentView.pid);
-        clearTransientViewSearchParams(p);
+        clearTransientViewSearchParams(p, listSchemaFieldNameSet);
         return p;
       },
       { replace: true },
@@ -4599,7 +4008,7 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Row height from current view config (with fallback)
-  const effectiveRowHeight: RowHeight = effectiveViewConfig?.rowHeight || DEFAULT_ROW_HEIGHT;
+  const effectiveRowHeight: RowHeight = effectiveViewConfig?.rowHeight || schemaExtension.rowHeight || DEFAULT_ROW_HEIGHT;
 
   // Handle row height change -> update SavedView
   const handleRowHeightChange = useCallback(
@@ -4620,7 +4029,7 @@ function ListPageContentInner(props: PageContentProps) {
           const p = new URLSearchParams(prev);
           if (key) {
             p.delete('view');
-            clearTransientViewSearchParams(p);
+            clearTransientViewSearchParams(p, listSchemaFieldNameSet);
             p.set('preset', key);
           } else {
             p.delete('preset');
@@ -4703,7 +4112,7 @@ function ListPageContentInner(props: PageContentProps) {
         (prev) => {
           const p = new URLSearchParams(prev);
           p.set('view', pid);
-          clearTransientViewSearchParams(p);
+          clearTransientViewSearchParams(p, listSchemaFieldNameSet);
           return p;
         },
         { replace: true },
@@ -4979,6 +4388,117 @@ function ListPageContentInner(props: PageContentProps) {
     }
     return tableName;
   })();
+  const [workspaceTabCounts, setWorkspaceTabCounts] = useState<Record<string, number>>({});
+  const [workspaceTabCountError, setWorkspaceTabCountError] = useState(false);
+  useEffect(() => {
+    if (!listTabsBlock?.showCounts || !schema?.modelCode || !dataReady) return;
+    let current = true;
+    setWorkspaceTabCounts({});
+    setWorkspaceTabCountError(false);
+    Promise.all((listTabsBlock.tabs as any[]).map(async tab => {
+      const condition = tabFilterToQueryCondition(tab.filter, user?.pid);
+      const queryFilters = buildFiltersParam(condition, filters, chipFilters, modelFieldMapRef.current);
+      const result = await fetchResult<PaginationResult<DynamicEntity>>(`${buildApiEndpoint(schema.modelCode!)}/list`, {
+        method: 'get', token: token || undefined,
+        params: { pageNum: 1, pageSize: 1, ...(keywordRef.current.trim() ? { keyword: keywordRef.current.trim() } : {}), ...(queryFilters ? { filters: queryFilters } : {}) },
+      });
+      if (!ResultHelper.isSuccess(result) || !result.data || Array.isArray(result.data)) throw new Error('View count query failed.');
+      const total = Number(result.data.total);
+      if (!Number.isFinite(total)) throw new Error('View count is invalid.');
+      return [tab.key, total] as const;
+    })).then(entries => { if (current) setWorkspaceTabCounts(Object.fromEntries(entries)); })
+      .catch(() => { if (current) setWorkspaceTabCountError(true); });
+    return () => { current = false; };
+  }, [listTabsBlock, schema?.modelCode, data, dataReady, filters, chipFilters, token, user?.pid]);
+  const workspace = schemaExtension.presentation === 'workspace';
+  const pageHeader = (
+          <ListPageHeader
+            title={
+              (() => {
+                // Import writes page titles into the tenant i18n bundle as
+                // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
+                // follows the UI locale; schema.title/schema.name are stored as
+                // plain zh strings and would otherwise pin the title to zh.
+                const listPageKey = schema.pageKey || tableName;
+                const keyedTitle = t(`page.${listPageKey}.title`);
+                if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
+                  return keyedTitle;
+                }
+                if (schema.title) return getLocalizedText(schema.title, locale, t);
+                if (schema.name && schema.name.trim()) {
+                  return getLocalizedText(schema.name, locale, t);
+                }
+                return tableName;
+              })()
+            }
+            workspace={workspace}
+            description={getLocalizedText(schemaExtension.pageDescription || {}, locale, t)}
+            modelCode={modelCode}
+            savedViews={savedViews}
+            currentView={currentView}
+            viewsLoading={viewsLoading}
+            activeViewType={activeViewType}
+            onSelectDefaultView={handleSelectDefaultView}
+            onSelectView={handleSelectView}
+            onCreateView={(viewType) => {
+              if (viewType) {
+                setActiveViewType(viewType);
+              }
+              setStartCreateViewMode(true);
+              setViewManageOpen(true);
+            }}
+            onManageViews={() => {
+              setStartCreateViewMode(false);
+              setViewManageOpen(true);
+            }}
+            onViewTypeChange={(vt) => {
+              setActiveViewType(vt);
+            }}
+            enableMultiView={Boolean(schemaExtension.enableMultiView)}
+            availableViewTypes={availableViewTypes}
+            buttons={actionBlock?.buttons || []}
+            toolbarActions={effectiveViewConfig?.toolbarActions}
+            onAction={handleAction}
+            onToolbarConfigChange={handleToolbarConfigChange}
+            resolveLabel={resolveButtonLabel}
+            t={t}
+            evaluateVisible={evaluateButtonVisible}
+            onImport={() => setImportOpen(true)}
+            onExport={handleExport}
+            exportFilters={exportFilterConditions}
+            isTenantMemberPage={isTenantMemberPage}
+            onInvite={
+              canInviteMembers
+                ? () => {
+                    inviteTriggerRef.current =
+                      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                    setInviteDialogOpen(true);
+                  }
+                : undefined
+            }
+            onImportMembers={
+              canManageMemberAccounts ? () => setMemberImportDialogOpen(true) : undefined
+            }
+            hideSavedViews={hideSavedViews}
+            hideBuiltInImport={
+              skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
+            }
+            hideBuiltInExport={
+              skipListData
+                ? true
+                : (listExtensions?.hideBuiltInExport ??
+                  (schema as any)?.extension?.hideBuiltInExport ??
+                  (schema as any)?.extension?.hideToolbarMore)
+            }
+            hideBuiltInPrint={
+              skipListData
+                ? true
+                : (listExtensions?.hideBuiltInPrint ??
+                  (schema as any)?.extension?.hideBuiltInPrint ??
+                  (schema as any)?.extension?.hideToolbarMore)
+            }
+          />
+  );
 
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
   if (error) {
@@ -5007,13 +4527,15 @@ function ListPageContentInner(props: PageContentProps) {
     <DataSourceProvider manager={dataSourceManager}>
       <div
         className="bg-subtle min-h-[calc(100vh-3.5rem)] w-full px-4 py-5 sm:px-6 lg:px-8"
+        style={workspace ? { backgroundColor: '#F7F7F8' } : undefined}
         data-testid="dynamic-list"
         data-model-code={modelCode}
         data-ready={dataReady && !loading && !viewsLoading && listQuerySettled}
         aria-busy={!dataReady || loading || viewsLoading || !listQuerySettled}
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
-        <div className="rounded-card border-border bg-panel relative overflow-hidden border shadow-sm">
+        {workspace && pageHeader}
+        <div className={`rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}>
           {/* §3: quiet auto-save confirmation — appears briefly after a
               sort/filter/column/row-height change is persisted to the view. */}
           {viewSavedHintOn && (
@@ -5139,73 +4661,7 @@ function ListPageContentInner(props: PageContentProps) {
             t={translateCommon}
           />
           {/* Page title, view selector, and action buttons */}
-          <ListPageHeader
-            title={listPageTitle}
-            modelCode={modelCode}
-            savedViews={savedViews}
-            currentView={currentView}
-            viewsLoading={viewsLoading}
-            activeViewType={activeViewType}
-            onSelectDefaultView={handleSelectDefaultView}
-            onSelectView={handleSelectView}
-            onCreateView={(viewType) => {
-              if (viewType) {
-                setActiveViewType(viewType);
-              }
-              setStartCreateViewMode(true);
-              setViewManageOpen(true);
-            }}
-            onManageViews={() => {
-              setStartCreateViewMode(false);
-              setViewManageOpen(true);
-            }}
-            onViewTypeChange={(vt) => {
-              setActiveViewType(vt);
-            }}
-            enableMultiView={Boolean(schemaExtension.enableMultiView)}
-            availableViewTypes={availableViewTypes}
-            buttons={actionBlock?.buttons || []}
-            toolbarActions={effectiveViewConfig?.toolbarActions}
-            onAction={handleAction}
-            onToolbarConfigChange={handleToolbarConfigChange}
-            resolveLabel={resolveButtonLabel}
-            t={t}
-            evaluateVisible={evaluateButtonVisible}
-            onImport={() => setImportOpen(true)}
-            onExport={handleExport}
-            exportFilters={exportFilterConditions}
-            isTenantMemberPage={isTenantMemberPage}
-            onInvite={
-              canInviteMembers
-                ? () => {
-                    inviteTriggerRef.current =
-                      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-                    setInviteDialogOpen(true);
-                  }
-                : undefined
-            }
-            onImportMembers={
-              canManageMemberAccounts ? () => setMemberImportDialogOpen(true) : undefined
-            }
-            hideSavedViews={hideSavedViews}
-            hideBuiltInImport={
-              skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
-            }
-            hideBuiltInExport={
-              skipListData
-                ? true
-                : (listExtensions?.hideBuiltInExport ??
-                  (schema as any)?.extension?.hideBuiltInExport ??
-                  (schema as any)?.extension?.hideToolbarMore)
-            }
-            hideBuiltInPrint={
-              skipListData
-                ? true
-                : (listExtensions?.hideBuiltInPrint ??
-                  (schema as any)?.extension?.hideBuiltInPrint ??
-                  (schema as any)?.extension?.hideToolbarMore)
-            }
-          />
+          {!workspace && pageHeader}
 
           {actionError && (
             <div
@@ -5342,7 +4798,7 @@ function ListPageContentInner(props: PageContentProps) {
           {listTabsBlock?.tabs && (listTabsBlock.tabs as any[]).length > 0 && (
             <div data-aura-block-id={listTabsBlock.id} data-aura-element-id={listTabsBlock.id}>
               <ListTabs
-                tabs={listTabsBlock.tabs as any[]}
+                tabs={(listTabsBlock.tabs as any[]).map(tab => ({ ...tab, ...(listTabsBlock.showCounts ? { count: workspaceTabCounts[tab.key] } : {}) }))}
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 locale={locale}
@@ -5351,6 +4807,7 @@ function ListPageContentInner(props: PageContentProps) {
             </div>
           )}
 
+          {workspaceTabCountError && <p role="status" className="text-status-amber px-6 py-2 text-xs">{getLocalizedText({ 'zh-CN': '视图数量暂不可用，请刷新重试。', en: 'View counts are unavailable. Refresh to try again.' }, locale, t)}</p>}
           {/* Filter area - Using Smart Components with collapse/expand (hidden in print) */}
           {filterFormVisible &&
             filterBlock &&
@@ -5553,6 +5010,7 @@ function ListPageContentInner(props: PageContentProps) {
 
               {!schemaExtension.hideListToolbar && (
                 <ListToolbar
+                  workspace={workspace}
                   keyword={keyword}
                   searchPlaceholder={tableSearchPlaceholder}
                   onKeywordChange={setKeyword}
@@ -5601,7 +5059,7 @@ function ListPageContentInner(props: PageContentProps) {
                   onRowHeightChange={handleRowHeightChange}
                   onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
                   onAnalysisOpen={
-                    namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
+                    schemaExtension.hideViewAnalysis || namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
                   }
                   chipFilters={chipFilters}
                   onChipFiltersChange={(nextChipFilters) => {
@@ -5735,6 +5193,7 @@ function ListPageContentInner(props: PageContentProps) {
                 loading={loading}
                 activeSorts={activeSorts}
                 selectedIds={selectedIds}
+                workspace={workspace}
                 rowHeight={effectiveRowHeight}
                 modelCode={modelCode}
                 columnOrder={columnOrder}
@@ -5792,6 +5251,7 @@ function ListPageContentInner(props: PageContentProps) {
               {/* Pagination + Bulk Action Toolbar */}
               {!loading && (
               <ListPagination
+                workspace={workspace}
                 current={pagination.current}
                 pageSize={pagination.pageSize}
                 total={pagination.total}
@@ -5891,7 +5351,7 @@ function ListPageContentInner(props: PageContentProps) {
                   (prev) => {
                     const p = new URLSearchParams(prev);
                     p.set('view', view.pid);
-                    clearTransientViewSearchParams(p);
+                    clearTransientViewSearchParams(p, listSchemaFieldNameSet);
                     return p;
                   },
                   { replace: true },
@@ -5918,7 +5378,7 @@ function ListPageContentInner(props: PageContentProps) {
                 (prev) => {
                   const p = new URLSearchParams(prev);
                   p.set('view', pid);
-                  clearTransientViewSearchParams(p);
+                  clearTransientViewSearchParams(p, listSchemaFieldNameSet);
                   return p;
                 },
                 { replace: true },

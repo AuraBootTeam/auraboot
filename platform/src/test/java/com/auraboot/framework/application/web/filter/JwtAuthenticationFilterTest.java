@@ -24,7 +24,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.slf4j.MDC;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import com.auraboot.framework.auth.service.UnifiedUserDetailsService;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
@@ -46,7 +46,7 @@ import static org.mockito.Mockito.*;
 class JwtAuthenticationFilterTest {
 
     @Mock JwtUtil jwtUtil;
-    @Mock UserDetailsService userDetailsService;
+    @Mock UnifiedUserDetailsService userDetailsService;
     @Mock UserService userService;
     @Mock SessionManagementService sessionManagementService;
     @Mock SystemModeService systemModeService;
@@ -198,14 +198,14 @@ class JwtAuthenticationFilterTest {
     @Test
     void tokenForDeletedUser_returns401_notA500() throws Exception {
         // A correctly signed, unexpired token whose user row is gone (deactivated,
-        // deleted, or a database that has since been reset). loadUserByUsername throws
+        // deleted, or a database that has since been reset). loadUserByPid throws
         // UsernameNotFoundException; that used to escape this filter uncaught and Spring
         // rendered a raw 500 "Internal Server Error" page — a credential that no longer
         // identifies anyone was being reported as a platform fault.
         MockHttpServletRequest req = req();
         req.addHeader("Authorization", "Bearer valid.but.orphaned");
         when(jwtUtil.extractIdentifier("valid.but.orphaned")).thenReturn("01ORPHANEDUSERPID000000000");
-        when(userDetailsService.loadUserByUsername("01ORPHANEDUSERPID000000000"))
+        when(userDetailsService.loadUserByPid("01ORPHANEDUSERPID000000000"))
                 .thenThrow(new org.springframework.security.core.userdetails.UsernameNotFoundException(
                         "Invalid identifier: 01ORPHANEDUSERPID000000000"));
         MockHttpServletResponse resp = new MockHttpServletResponse();
@@ -226,12 +226,9 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("valid.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(ud);
         when(jwtUtil.validateToken(eq("valid.token"), eq(ud))).thenReturn(true);
         when(jwtUtil.extractSecurityVersion("valid.token")).thenReturn(0);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("valid.token")).thenReturn(true);
         when(jwtUtil.extractTenantId("valid.token")).thenReturn(100L);
         when(jwtUtil.extractMemberId("valid.token")).thenReturn(55L);
@@ -248,6 +245,7 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(req, resp, chain);
 
         verify(chain).doFilter(req, resp);
+        verify(userService, never()).findByPid(anyString());
         verify(sessionManagementService).updateLastActive("valid.token");
         // After chain completes the filter clears MetaContext in finally.
         assertFalse(MetaContext.exists());
@@ -261,11 +259,8 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails details = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("i18n.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(details);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(details);
         when(jwtUtil.validateToken("i18n.token", details)).thenReturn(true);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("i18n.token")).thenReturn(true);
         when(jwtUtil.extractTenantId("i18n.token")).thenReturn(100L);
         doAnswer(invocation -> {
@@ -333,11 +328,8 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("party.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(ud);
         when(jwtUtil.validateToken("party.token", ud)).thenReturn(true);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("party.token")).thenReturn(true);
         when(jwtUtil.extractTenantId("party.token")).thenReturn(100L);
         when(jwtUtil.extractMemberId("party.token")).thenReturn(55L);
@@ -375,11 +367,8 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("onboarding.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(ud);
         when(jwtUtil.validateToken("onboarding.token", ud)).thenReturn(true);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("onboarding.token")).thenReturn(true);
         when(jwtUtil.extractSessionStage("onboarding.token")).thenReturn("onboarding");
 
@@ -398,11 +387,8 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("onboarding.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(ud);
         when(jwtUtil.validateToken("onboarding.token", ud)).thenReturn(true);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("onboarding.token")).thenReturn(true);
         when(jwtUtil.extractSessionStage("onboarding.token")).thenReturn("onboarding");
 
@@ -422,11 +408,8 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("onboarding.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(ud);
         when(jwtUtil.validateToken("onboarding.token", ud)).thenReturn(true);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("onboarding.token")).thenReturn(true);
         when(jwtUtil.extractSessionStage("onboarding.token")).thenReturn("onboarding");
 
@@ -445,12 +428,9 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("valid.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(ud);
         when(jwtUtil.validateToken(eq("valid.token"), eq(ud))).thenReturn(true);
         when(jwtUtil.extractSecurityVersion("valid.token")).thenReturn(0);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("valid.token")).thenReturn(true);
         when(jwtUtil.extractTenantId("valid.token")).thenReturn(100L);
         when(jwtUtil.extractMemberId("valid.token")).thenReturn(55L);
@@ -479,12 +459,10 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("bob", "p", 1L, "bob_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("v.token")).thenReturn("bob_pid");
-        when(userDetailsService.loadUserByUsername("bob_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("bob_pid")).thenReturn(ud);
         when(jwtUtil.validateToken(anyString(), eq(ud))).thenReturn(true);
         when(jwtUtil.extractSecurityVersion("v.token")).thenReturn(1);
-        User user = new User();
-        user.setSecurityVersion(2); // db ahead of token
-        when(userService.findByPid("bob_pid")).thenReturn(user);
+        ud.setSecurityVersion(2); // Fresh database snapshot is ahead of the token.
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(req, resp, chain);
@@ -501,12 +479,9 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("c", "p", 1L, "c_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("s.token")).thenReturn("c_pid");
-        when(userDetailsService.loadUserByUsername("c_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("c_pid")).thenReturn(ud);
         when(jwtUtil.validateToken(anyString(), eq(ud))).thenReturn(true);
         when(jwtUtil.extractSecurityVersion("s.token")).thenReturn(0);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("c_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("s.token")).thenReturn(false);
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
@@ -524,12 +499,9 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("c", "p", 1L, "c_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("s.token")).thenReturn("c_pid");
-        when(userDetailsService.loadUserByUsername("c_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("c_pid")).thenReturn(ud);
         when(jwtUtil.validateToken(anyString(), eq(ud))).thenReturn(true);
         when(jwtUtil.extractSecurityVersion("s.token")).thenReturn(0);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("c_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("s.token"))
                 .thenThrow(new RuntimeException("redis down"));
 
@@ -607,12 +579,9 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("x", "p", 1L, "x_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("t.token")).thenReturn("x_pid");
-        when(userDetailsService.loadUserByUsername("x_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("x_pid")).thenReturn(ud);
         when(jwtUtil.validateToken(anyString(), eq(ud))).thenReturn(true);
         when(jwtUtil.extractSecurityVersion("t.token")).thenReturn(0);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("x_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("t.token")).thenReturn(true);
         when(jwtUtil.extractTenantId("t.token")).thenReturn(10L);
         when(jwtUtil.extractMemberId("t.token")).thenReturn(99L);
@@ -634,12 +603,9 @@ class JwtAuthenticationFilterTest {
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
         when(jwtUtil.extractIdentifier("valid.token")).thenReturn("alice_pid");
-        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(userDetailsService.loadUserByPid("alice_pid")).thenReturn(ud);
         when(jwtUtil.validateToken(eq("valid.token"), eq(ud))).thenReturn(true);
         when(jwtUtil.extractSecurityVersion("valid.token")).thenReturn(0);
-        User user = new User();
-        user.setSecurityVersion(0);
-        when(userService.findByPid("alice_pid")).thenReturn(user);
         when(sessionManagementService.isSessionValid("valid.token")).thenReturn(true);
         when(jwtUtil.extractTenantId("valid.token")).thenReturn(100L);
         when(jwtUtil.extractMemberId("valid.token")).thenReturn(55L);

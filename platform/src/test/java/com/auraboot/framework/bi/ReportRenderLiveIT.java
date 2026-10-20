@@ -145,6 +145,26 @@ class ReportRenderLiveIT {
         }
     }
 
+    @Test
+    @EnabledIf("rendererAvailable")
+    void rendersHtmlThroughTheRealCliWithChineseDataAndVectorCharts() {
+        ReportRenderProperties props = new ReportRenderProperties();
+        props.setEnabled(true);
+        props.setCommand(List.of(tsx().toString(), cli().toString()));
+        ReportRenderClient client = new ReportRenderClient(new ObjectMapper(), props);
+        Map<String, Object> report = Map.of("title", "客户分析报告", "body", List.of(
+                Map.of("blockType", "rich-text", "content", "华辰客户需要跟进 <script>alert(1)</script>"),
+                Map.of("blockType", "chart", "title", "客户收入", "dataSource", "customers",
+                        "chartType", "bar", "categoryField", "name", "valueField", "revenue", "aggregation", "sum"),
+                Map.of("blockType", "table", "dataSource", "customers",
+                        "columns", List.of(Map.of("field", "name", "label", "客户名称"),
+                                Map.of("field", "revenue", "label", "收入")))));
+        String html = new String(client.renderHtml(report,
+                Map.of("customers", List.of(Map.of("name", "华辰", "revenue", 120)))), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(html).startsWith("<!doctype html>").contains("客户分析报告", "华辰", "120", "<svg", "&lt;script&gt;")
+                .doesNotContain("<script>", "<script src=");
+    }
+
     private static int countOccurrences(String text, String sub) {
         int count = 0;
         int idx = 0;

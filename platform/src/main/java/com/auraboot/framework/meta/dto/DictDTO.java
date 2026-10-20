@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.entity.payload.DataSourceItemBean;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -35,6 +36,7 @@ public class DictDTO extends AbstractResponse {
     /**
      * 字典描述
      */
+    @Schema(nullable = true)
     private String description;
 
     /**
@@ -46,6 +48,7 @@ public class DictDTO extends AbstractResponse {
     /**
      * 字典项数据（兼容原数据源格式）
      */
+    @Schema(nullable = true)
     private List<DataSourceItemBean> items;
 
     /**
@@ -56,6 +59,7 @@ public class DictDTO extends AbstractResponse {
     /**
      * 固定版本号
      */
+    @Schema(nullable = true)
     private String pinnedVersion;
 
     /**
@@ -81,6 +85,7 @@ public class DictDTO extends AbstractResponse {
     /**
      * 标签
      */
+    @Schema(nullable = true)
     private String tags;
 
     /**
@@ -101,25 +106,30 @@ public class DictDTO extends AbstractResponse {
     /**
      * 发布时间
      */
+    @Schema(nullable = true)
     private LocalDateTime publishedAt;
 
     /**
      * 版本说明
      */
+    @Schema(nullable = true)
     private String versionNote;
 
     /**
      * Response remark or hint message
      */
+    @Schema(nullable = true)
     private String remark;
 
     /**
      * 创建者
      */
+    @Schema(nullable = true)
     private String createdBy;
 
     /**
      * 更新者
      */
+    @Schema(nullable = true)
     private String updatedBy;
 }

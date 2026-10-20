@@ -12,17 +12,13 @@ import {
   useLocation,
   type LoaderFunctionArgs,
 } from 'react-router';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import tz from 'dayjs/plugin/timezone';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 import { dictService } from '~/shared/services/dictService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useTimezone } from '~/contexts/TimezoneContext';
+import { StatusBadge } from '~/ui/common/StatusBadge';
 import type { DictDTO, DictItemData, DictTreeNode } from '~/types/dict';
-
-dayjs.extend(utc);
-dayjs.extend(tz);
 
 type TabType = 'basic' | 'items' | 'versions';
 type EditableItem = DictItemData & { _id: string };
@@ -60,14 +56,6 @@ const parseTabFromHash = (hash: string): TabType => {
   return VALID_TABS.includes(tab as TabType) ? (tab as TabType) : 'basic';
 };
 
-function formatDisplayDateTime(value: string | null | undefined, userTimezone: string): string {
-  if (!value) return '-';
-  const d = dayjs(value);
-  if (!d.isValid()) return '-';
-  const effectiveTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return d.tz(effectiveTz).format('YYYY-MM-DD HH:mm:ss');
-}
-
 const flattenTreeNodes = (root: DictTreeNode | undefined): DictItemData[] => {
   if (!root) return [];
   const rows: DictItemData[] = [];
@@ -102,28 +90,16 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   try {
     const dict = await dictService.findByPid(pid, request);
-    const versions = await dictService.getVersionHistory(dict.code, request).catch((error) => {
-      console.warn('Failed to load dictionary version history:', error);
-      return [];
-    });
-    const data = await dictService.loadData(pid, 'latest', undefined, request).catch((error) => {
-      console.warn('Failed to load dictionary data:', error);
-      return { items: [] } as { items: DictItemData[] };
-    });
+    const versions = await dictService.getVersionHistory(dict.code, request);
+    const data = await dictService.loadData(pid, 'latest', undefined, request);
     if (dict.dictType === 'tree') {
-      const tree = await dictService.buildCascadeTree(pid, request).catch((error) => {
-        console.warn('Failed to build dictionary tree:', error);
-        return undefined;
-      });
-      if (tree) {
-        data.items = flattenTreeNodes(tree);
-      }
+      data.items = flattenTreeNodes(await dictService.buildCascadeTree(pid, request));
     }
 
     return { dict, versions, data };
   } catch (error) {
     console.error('Failed to load dictionary:', error);
-    throw new Response('Dictionary not found', { status: 404 });
+    throw new Response('Failed to load dictionary', { status: 500 });
   }
 };
 
@@ -140,7 +116,7 @@ export default function DictDetailPage() {
     data: initialData,
   } = useLoaderData<typeof loader>();
   const { showSuccessToast, showErrorToast } = useToastContext();
-  const { timezone: userTimezone } = useTimezone();
+  const { timezone: userTimezone, formats } = useTimezone();
 
   const [activeTab, setActiveTab] = useState<TabType>(() => parseTabFromHash(location.hash));
   const [dict, setDict] = useState<DictDTO>(initialDict);
@@ -451,43 +427,20 @@ export default function DictDetailPage() {
     }
   };
 
-  /**
-   * Get status badge
-   */
-  const getStatusBadge = (status: string) => {
-    const colors = {
-      published: 'bg-green-100 text-green-800',
-      draft: 'bg-yellow-100 text-yellow-800',
-      archived: 'bg-gray-100 text-gray-800',
-    };
-    const labels = {
-      published: '已发布',
-      draft: '草稿',
-      archived: '已归档',
-    };
-    return (
-      <span
-        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${colors[status as keyof typeof colors] || colors.draft}`}
-      >
-        {labels[status as keyof typeof labels] || status}
-      </span>
-    );
-  };
-
   return (
-    <div className="mx-auto max-w-7xl p-6">
+    <div className="mx-auto w-full max-w-7xl min-w-0 p-6">
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{dict.name}</h1>
-          <p className="mt-1 text-sm text-gray-500">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-bold break-words text-gray-900">{dict.name}</h1>
+          <p className="mt-1 text-sm break-all text-gray-500" data-testid="dictionary-code-header">
             字典编码: <span className="font-mono text-blue-600">{dict.code}</span>
             {dict.description && ` · ${dict.description}`}
           </p>
         </div>
 
-        <div className="flex gap-2">
-          {dict.status === 'draft' && (
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {(dict.status === 'draft' || dict.status === 'deprecated') && (
             <button
               onClick={handlePublish}
               className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
@@ -582,7 +535,9 @@ export default function DictDetailPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">状态</label>
-                  <div className="text-sm">{getStatusBadge(dict.status)}</div>
+                  <div className="text-sm">
+                    <StatusBadge status={dict.status} />
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">版本号</label>
@@ -600,15 +555,23 @@ export default function DictDetailPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">创建时间</label>
-                  <div className="text-sm text-gray-900">
-                    {formatDisplayDateTime(dict.createdAt, userTimezone)}
-                  </div>
+                  <time
+                    dateTime={dict.createdAt}
+                    data-testid="dict-created-at"
+                    className="text-sm text-gray-900"
+                  >
+                    {formatInTimezone(dict.createdAt, formats.datetime, userTimezone)}
+                  </time>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">更新时间</label>
-                  <div className="text-sm text-gray-900">
-                    {formatDisplayDateTime(dict.updatedAt, userTimezone)}
-                  </div>
+                  <time
+                    dateTime={dict.updatedAt}
+                    data-testid="dict-updated-at"
+                    className="text-sm text-gray-900"
+                  >
+                    {formatInTimezone(dict.updatedAt, formats.datetime, userTimezone)}
+                  </time>
                 </div>
               </div>
             </div>
@@ -619,7 +582,7 @@ export default function DictDetailPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500">
-                  支持新增、删除、改父级与同级排序；TREE 字典可新增子节点。
+                  支持新增、删除、改父级与同级排序；树形字典可新增子节点。
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -794,11 +757,15 @@ export default function DictDetailPage() {
                                 当前版本
                               </span>
                             )}
-                            {getStatusBadge(version.status)}
+                            <StatusBadge status={version.status} />
                           </div>
-                          <p className="mt-1 text-xs text-gray-400">
-                            {formatDisplayDateTime(version.createdAt, userTimezone)}
-                          </p>
+                          <time
+                            dateTime={version.createdAt}
+                            data-testid={`dict-version-created-at-${version.pid}`}
+                            className="mt-1 block text-xs text-gray-400"
+                          >
+                            {formatInTimezone(version.createdAt, formats.datetime, userTimezone)}
+                          </time>
                         </div>
                       </div>
                     </div>

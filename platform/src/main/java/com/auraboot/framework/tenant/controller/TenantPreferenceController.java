@@ -2,6 +2,7 @@ package com.auraboot.framework.tenant.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.tenant.service.TenantPreferenceService;
@@ -15,6 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/tenant-preferences")
 @RequiredArgsConstructor
+@AuthenticatedAccess("unguarded handler is a read-only lookup of the current tenant's preference values")
 public class TenantPreferenceController {
 
     private final TenantPreferenceService tenantPreferenceService;

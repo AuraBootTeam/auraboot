@@ -52,6 +52,11 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
 ADMIN_NAME="${ADMIN_NAME:-Admin User}"
 COMPANY_NAME="${COMPANY_NAME:-AuraBoot}"
 PLUGINS_PATH="${PLUGINS_PATH:-/app/plugins}"
+SYSTEM_MODE="${SYSTEM_MODE:-single}"
+case "$SYSTEM_MODE" in
+  single|multi|hybrid) ;;
+  *) printf '%s\n' 'SYSTEM_MODE must be single, multi or hybrid.' >&2; exit 2 ;;
+esac
 
 # Dependency order matters: core-meta defines the metadata the rest build on.
 # One pass is not always enough — a plugin can reference something imported
@@ -101,7 +106,7 @@ else
     \"adminEmail\": \"${ADMIN_EMAIL}\",
     \"adminPassword\": \"${ADMIN_PASSWORD}\",
     \"adminDisplayName\": \"${ADMIN_NAME}\",
-    \"systemMode\": \"single\"
+    \"systemMode\": \"${SYSTEM_MODE}\"
   }")"
   ok="$(echo "${resp}" | json "print(d.get('data',{}).get('success'))")"
   if [[ "${ok}" != "True" ]]; then

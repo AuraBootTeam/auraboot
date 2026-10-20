@@ -13,6 +13,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // when vi.mock factory runs.
 // ---------------------------------------------------------------------------
 const { fetchResultMock } = vi.hoisted(() => ({ fetchResultMock: vi.fn() }));
+const { workflowProvider } = vi.hoisted(() => ({ workflowProvider: vi.fn() }));
+
+vi.mock('~/framework/bootstrap', () => ({
+  getKernel: () => ({ contributionRegistry: { getPrimaryService: workflowProvider } }),
+}));
+
+vi.mock('~/shared/services/http-client/HttpClient', () => ({ fetchResult: fetchResultMock }));
 
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: fetchResultMock,
@@ -25,9 +32,41 @@ import {
   fetchCommandOptions,
   fetchModelOptions,
   fetchFieldOptions,
+  fetchFieldDictOptions,
   fetchDictOptions,
   fetchSemanticModelOptions,
+  fetchWorkflowOptions,
 } from '../resourceSelectService';
+
+describe('product-owned workflow discovery', () => {
+  beforeEach(() => {
+    fetchResultMock.mockReset();
+    workflowProvider.mockReset();
+  });
+
+  it('does not issue product HTTP requests when no workflow provider is installed', async () => {
+    expect(await fetchWorkflowOptions()).toEqual([]);
+    expect(workflowProvider).toHaveBeenCalledWith('aura.resource.workflow');
+    expect(fetchResultMock).not.toHaveBeenCalled();
+  });
+
+  it('delegates to the installed product provider without a platform fallback', async () => {
+    const options = [{ label: 'Approval', value: 'approval' }];
+    const fetchOptions = vi.fn().mockResolvedValue(options);
+    workflowProvider.mockReturnValue({ provider: { fetchOptions } });
+    expect(await fetchWorkflowOptions()).toEqual(options);
+    expect(fetchOptions).toHaveBeenCalledOnce();
+    expect(fetchResultMock).not.toHaveBeenCalled();
+  });
+
+  it('propagates provider failures without claiming an empty list or retrying', async () => {
+    const fetchOptions = vi.fn().mockRejectedValue(new Error('Product unavailable'));
+    workflowProvider.mockReturnValue({ provider: { fetchOptions } });
+    await expect(fetchWorkflowOptions()).rejects.toThrow('Product unavailable');
+    expect(fetchOptions).toHaveBeenCalledOnce();
+    expect(fetchResultMock).not.toHaveBeenCalled();
+  });
+});
 
 describe('resourceSelectService — error propagation', () => {
   beforeEach(() => {
@@ -83,9 +122,7 @@ describe('resourceSelectService — error propagation', () => {
   it('fetchModelOptions: returns mapped options on success', async () => {
     fetchResultMock.mockResolvedValue({
       data: {
-        records: [
-          { pid: 'p1', code: 'order', displayName: 'Order', description: 'Sales order' },
-        ],
+        records: [{ pid: 'p1', code: 'order', displayName: 'Order', description: 'Sales order' }],
       },
     });
     const result = await fetchModelOptions();
@@ -111,5 +148,40 @@ describe('resourceSelectService — error propagation', () => {
       .mockResolvedValueOnce({ data: { pid: 'model-pid-1' } })
       .mockRejectedValueOnce(new Error('Fields fetch failed'));
     await expect(fetchFieldOptions('order')).rejects.toThrow('Fields fetch failed');
+  });
+});
+
+describe('model field dictionary resolution', () => {
+  beforeEach(() => fetchResultMock.mockReset());
+  it('loads the declared dictionary instead of assuming the field code is a dictionary code', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({ code: '0', data: { pid: 'task-model' } })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: [{ code: 'task_state', dataType: 'enum', dictCode: 'task_lifecycle' }],
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { items: [{ value: 'in_review', label: '审核中' }] },
+      });
+    expect(await fetchFieldDictOptions('task', 'task_state')).toEqual([
+      { value: 'in_review', label: '审核中', description: undefined },
+    ]);
+    expect(fetchResultMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/meta/models/code/task',
+      '/api/meta/models/task-model/fields',
+      '/api/meta/dict/by-code/task_lifecycle/data',
+    ]);
+  });
+  it('rejects an unbound field without falling back to its field code', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({ data: { pid: 'task-model' } })
+      .mockResolvedValueOnce({ data: [{ code: 'task_state', dataType: 'enum' }] });
+    await expect(fetchFieldDictOptions('task', 'task_state')).rejects.toThrow('no dictionary');
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+  });
+  it('surfaces a business-error envelope instead of claiming an empty dictionary', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '1', data: null, context: 'missing dictionary' });
+    await expect(fetchDictOptions('missing')).rejects.toThrow('could not be loaded');
   });
 });

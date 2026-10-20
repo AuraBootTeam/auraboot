@@ -28,9 +28,19 @@ final class PluginResourceParsePolicy {
     /**
      * Resource types whose files must never be silently dropped on a parse failure.
      */
-    private static final Set<Class<?>> FAIL_CLOSED_TYPES = Set.of(CommandDefinitionDTO.class);
+    private static final Set<Class<?>> FAIL_CLOSED_TYPES = Set.of(CommandDefinitionDTO.class,
+            com.auraboot.framework.openplatform.service.OpenApiResourceContract.class,
+            com.auraboot.framework.openplatform.service.OpenApiQueryContract.class);
 
     private PluginResourceParsePolicy() {
+    }
+
+    static <T> List<T> requirePublicDefinitions(List<T> definitions, Class<T> clazz, String resource) {
+        if (requiresFailClosed(clazz) && clazz != CommandDefinitionDTO.class
+                && (definitions == null || definitions.stream().anyMatch(java.util.Objects::isNull))) {
+            throw new PluginException("Public publication file " + resource + " requires non-null definitions");
+        }
+        return definitions;
     }
 
     static boolean requiresFailClosed(Class<?> resourceType) {
@@ -46,6 +56,10 @@ final class PluginResourceParsePolicy {
      */
     static <T> List<T> onResourceParseFailure(String resource, Class<T> clazz, Exception cause) {
         if (requiresFailClosed(clazz)) {
+            if (clazz != CommandDefinitionDTO.class) {
+                throw new PluginException("Public publication resource file " + resource + " failed to parse as List<"
+                        + clazz.getSimpleName() + ">; public contracts must not be silently dropped", cause);
+            }
             throw new PluginException("Plugin command resource file " + resource + " failed to parse as List<"
                     + clazz.getSimpleName() + "> and commands must not be silently dropped: "
                     + cause.getMessage());

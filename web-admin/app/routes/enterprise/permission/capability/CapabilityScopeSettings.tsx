@@ -1,3 +1,4 @@
+import { getLocalizedText } from '~/utils/i18n';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -25,7 +26,7 @@ export default function CapabilityScopeSettings({
   onBusy: (busy: boolean) => void;
   onReadFailure: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [pending, setPending] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -90,27 +91,45 @@ export default function CapabilityScopeSettings({
     let current = true;
     setNamesLoading(true);
     setNamesError(false);
-    const codes = [...new Set(rows.filter((row) => row.code.startsWith('model.'))
-      .map((row) => row.resourceCode))];
-    void Promise.all(codes.map(async (code) => {
-      const model = await modelService.findByCode(code);
-      if (!model.displayName || model.displayName === code)
-        throw new Error('Model has no business display name');
-      const scope = model.extension?.dataScope;
-      const teamField = scope && typeof scope === 'object' && !Array.isArray(scope)
-        ? (scope as Record<string, unknown>).teamField : null;
-      return { code, name: model.displayName, teamSupported: teamField != null && String(teamField).trim() !== '' };
-    })).then((models) => {
-      if (current) {
-        setModelNames(Object.fromEntries(models.map((model) => [model.code, model.name])));
-        setModelTeams(Object.fromEntries(models.map((model) => [model.code, model.teamSupported])));
-      }
-    }).catch(() => {
-      if (current) setNamesError(true);
-    }).finally(() => {
-      if (current) setNamesLoading(false);
-    });
-    return () => { current = false; };
+    const codes = [
+      ...new Set(
+        rows.filter((row) => row.code.startsWith('model.')).map((row) => row.resourceCode),
+      ),
+    ];
+    void Promise.all(
+      codes.map(async (code) => {
+        const model = await modelService.findByCode(code);
+        if (!model.displayName || model.displayName === code)
+          throw new Error('Model has no business display name');
+        const scope = model.extension?.dataScope;
+        const teamField =
+          scope && typeof scope === 'object' && !Array.isArray(scope)
+            ? (scope as Record<string, unknown>).teamField
+            : null;
+        return {
+          code,
+          name: model.displayName,
+          teamSupported: teamField != null && String(teamField).trim() !== '',
+        };
+      }),
+    )
+      .then((models) => {
+        if (current) {
+          setModelNames(Object.fromEntries(models.map((model) => [model.code, model.name])));
+          setModelTeams(
+            Object.fromEntries(models.map((model) => [model.code, model.teamSupported])),
+          );
+        }
+      })
+      .catch(() => {
+        if (current) setNamesError(true);
+      })
+      .finally(() => {
+        if (current) setNamesLoading(false);
+      });
+    return () => {
+      current = false;
+    };
   }, [rows]);
   const actionNames: Record<string, string> = {
     read: t('common.view', undefined, 'View'),
@@ -120,16 +139,27 @@ export default function CapabilityScopeSettings({
     import: t('action.import', undefined, 'Import'),
     export: t('action.export', undefined, 'Export'),
   };
-  const rowLabel = (row: typeof rows[number]) => row.code.startsWith('model.')
-    ? `${modelNames[row.resourceCode]} · ${actionNames[row.action] ?? row.label}`
-    : row.label;
-  const teamUnavailable = (row: typeof rows[number]) => row.code.startsWith('model.') && !modelTeams[row.resourceCode];
+  const rowLabel = (row: (typeof rows)[number]) =>
+    row.code.startsWith('model.')
+      ? `${modelNames[row.resourceCode]} · ${actionNames[row.action] ?? row.label}`
+      : row.label;
+  const teamUnavailable = (row: (typeof rows)[number]) =>
+    row.code.startsWith('model.') && !modelTeams[row.resourceCode];
   const apply = async () => {
     const changes = rows.filter(
       (row) => pending[row.code] != null && pending[row.code] !== row.scopeType,
     );
-    if (!changes.length || saving || namesLoading || namesError || changes.some((row) =>
-      !isValidScope(pending[row.code]) || (pending[row.code] === 'team' && teamUnavailable(row))))
+    if (
+      !changes.length ||
+      saving ||
+      namesLoading ||
+      namesError ||
+      changes.some(
+        (row) =>
+          !isValidScope(pending[row.code]) ||
+          (pending[row.code] === 'team' && teamUnavailable(row)),
+      )
+    )
       return;
     setSaving(true);
     onBusy(true);
@@ -183,7 +213,8 @@ export default function CapabilityScopeSettings({
         className="rounded-card bg-panel max-h-[85vh] w-full max-w-xl overflow-auto p-5"
       >
         <h3 id="capability-scope-title" className="text-text font-semibold">
-          {capability.label} · {t('admin.permission.capability.scopeV2', undefined, 'Record scope')}
+          {getLocalizedText(capability.localizedLabels, locale, t) || capability.label} ·{' '}
+          {t('admin.permission.capability.scopeV2', undefined, 'Record scope')}
         </h3>
         <p className="text-text-2 my-3 text-xs">
           {t(
@@ -193,45 +224,70 @@ export default function CapabilityScopeSettings({
           )}
         </p>
         {namesLoading && <p role="status">{t('common.loading', undefined, 'Loading…')}</p>}
-        {namesError && <p role="alert">{t('admin.permission.capability.scopeNamesErrorV2', undefined, 'Could not load business names. Close and reopen to try again.')}</p>}
+        {namesError && (
+          <p role="alert">
+            {t(
+              'admin.permission.capability.scopeNamesErrorV2',
+              undefined,
+              'Could not load business names. Close and reopen to try again.',
+            )}
+          </p>
+        )}
         <div className="flex flex-col gap-3">
-          {!namesLoading && !namesError && rows.map((row) => {
-            const value = pending[row.code] ?? row.scopeType ?? '';
-            const option = scopeOption(pending[row.code] ?? row.scopeType);
-            return (
-              <div key={row.code} className="text-sm">
-                <div className="flex items-center justify-between gap-3">
-                <span>{rowLabel(row)}</span>
-                <select
-                  aria-label={rowLabel(row)}
-                  aria-describedby={teamUnavailable(row) ? `scope-team-note-${row.code}` : undefined}
-                  data-testid={`capability-scope-${row.code}`}
-                  disabled={saving}
-                  value={value}
-                  onChange={(event) =>
-                    setPending((current) => ({ ...current, [row.code]: event.target.value }))
-                  }
-                  className="border-border rounded-control border p-2"
-                >
-                  {!isValidScope(value) && (
-                    <option value={value} disabled>
-                      {t(option.labelKey, undefined, option.labelFallback)}
-                    </option>
+          {!namesLoading &&
+            !namesError &&
+            rows.map((row) => {
+              const value = pending[row.code] ?? row.scopeType ?? '';
+              const option = scopeOption(pending[row.code] ?? row.scopeType);
+              return (
+                <div key={row.code} className="text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{rowLabel(row)}</span>
+                    <select
+                      aria-label={rowLabel(row)}
+                      aria-describedby={
+                        teamUnavailable(row) ? `scope-team-note-${row.code}` : undefined
+                      }
+                      data-testid={`capability-scope-${row.code}`}
+                      disabled={saving}
+                      value={value}
+                      onChange={(event) =>
+                        setPending((current) => ({ ...current, [row.code]: event.target.value }))
+                      }
+                      className="border-border rounded-control border p-2"
+                    >
+                      {!isValidScope(value) && (
+                        <option value={value} disabled>
+                          {t(option.labelKey, undefined, option.labelFallback)}
+                        </option>
+                      )}
+                      {SCOPE_OPTIONS.map((scope) => (
+                        <option
+                          key={scope.value}
+                          value={scope.value}
+                          disabled={scope.value === 'team' && teamUnavailable(row)}
+                        >
+                          {t(scope.labelKey, undefined, scope.labelFallback)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {teamUnavailable(row) && (
+                    <p
+                      id={`scope-team-note-${row.code}`}
+                      data-testid={`capability-scope-team-note-${row.code}`}
+                      className="text-text-2 mt-1 text-xs"
+                    >
+                      {t(
+                        'admin.permission.capability.teamUnavailableV2',
+                        undefined,
+                        'This record type has no team association configured, so My teams cannot be selected. An existing My teams scope grants no records by itself; other roles or valid shares may still allow access.',
+                      )}
+                    </p>
                   )}
-                  {SCOPE_OPTIONS.map((scope) => (
-                    <option key={scope.value} value={scope.value} disabled={scope.value === 'team' && teamUnavailable(row)}>
-                      {t(scope.labelKey, undefined, scope.labelFallback)}
-                    </option>
-                  ))}
-                </select>
                 </div>
-                {teamUnavailable(row) && <p id={`scope-team-note-${row.code}`} data-testid={`capability-scope-team-note-${row.code}`} className="text-text-2 mt-1 text-xs">
-                  {t('admin.permission.capability.teamUnavailableV2', undefined,
-                    'This record type has no team association configured, so My teams cannot be selected. An existing My teams scope grants no records by itself; other roles or valid shares may still allow access.')}
-                </p>}
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
         {rows.length === 0 && (
           <p className="text-text-2 my-3 text-sm">
@@ -255,7 +311,9 @@ export default function CapabilityScopeSettings({
             type="button"
             data-testid="capability-scope-apply"
             disabled={
-              saving || namesLoading || namesError ||
+              saving ||
+              namesLoading ||
+              namesError ||
               !rows.some((row) => pending[row.code] && pending[row.code] !== row.scopeType)
             }
             onClick={() => void apply()}

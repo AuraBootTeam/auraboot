@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
 import {
   clickRowActionByLocator,
@@ -291,6 +292,7 @@ async function openEditForm(page: Page, name: string): Promise<void> {
   await clickRowActionByLocator(page, row, 'edit', '编辑');
   await page.waitForURL(new RegExp(`/p/${MODEL_CODE}/edit/.+`), { timeout: 10_000 });
   await waitForFormReady(page, 15_000);
+  await expandFormSections(page);
   await expect(page.locator(`${field('sc_name')} input`).first()).toHaveValue(name, {
     timeout: 15_000,
   });

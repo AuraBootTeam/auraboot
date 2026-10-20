@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.entity.Activity;
 import com.auraboot.framework.meta.service.ActivityService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/activities")
 @RequiredArgsConstructor
+@AuthenticatedAccess("activity timeline read/create/count scoped to the caller's tenant with the actor taken from MetaContext")
 public class ActivityController {
 
     private final ActivityService activityService;

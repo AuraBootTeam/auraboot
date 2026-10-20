@@ -55,6 +55,28 @@ class ExternalEventIngressServiceTest {
 
     @Test
     void claimsIdempotencyAndEnqueuesTenantBoundReliableEnvelope() {
+        assertEquals("invalid_source_code", assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+                () -> service.accept(principal, "ERP", "idempotency-0001", body("evt-1"))).getMessage());
+        assertEquals("invalid_idempotency_key", assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+                () -> service.accept(principal, "erp", null, body("evt-1"))).getMessage());
+        var invalidBodies = java.util.Map.of(
+                "invalid_event_body", "not-json",
+                "invalid_id", body(" "),
+                "invalid_event_type", body("evt-1").replace("order.created", "!"),
+                "invalid_schema_version", body("evt-1").replace("schemaVersion\":1", "schemaVersion\":0"),
+                "invalid_occurred_at", body("evt-1").replace("2026-09-14T08:00:00Z", "yesterday"),
+                "invalid_pid", body("evt-1").replace("ord_1", ""),
+                "invalid_sequence", body("evt-1").replace("\"data\":", "\"sequence\":-1,\"data\":"),
+                "invalid_data", body("evt-1").replace("{\"amount\":10}", "[]"));
+        invalidBodies.forEach((code, value) -> assertEquals(code,
+                assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+                        () -> service.accept(principal, "erp", "idempotency-0001", value)).getMessage()));
+        var installation = installationMapper.findByTenantAndPid(42L, "inst");
+        installation.setStatus("disabled");
+        assertEquals("installation_not_active", assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+                () -> service.accept(principal, "erp", "idempotency-0001", body("evt-1"))).getMessage());
+        installation.setStatus("active");
+        org.mockito.Mockito.verifyNoInteractions(idempotencyMapper, accessor);
         when(idempotencyMapper.claim(eq(42L), eq(9L), eq("external-event:erp"),
                 eq("idempotency-0001"), anyString(), any())).thenReturn(1);
 

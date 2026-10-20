@@ -104,6 +104,27 @@ describe('SubTableViewer', () => {
     toolbarRendererMock.mockReset();
   });
 
+  it('renders a generic delivery collection from actual rows without conflating reported progress', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: [
+      { pid: 'checkpoint-1', taskName: 'Requirements agreed', status: 'reached', criteria: 'Signed scope' },
+      { pid: 'checkpoint-2', taskName: 'Core integration', status: 'pending', criteria: 'Procurement and receiving' },
+    ] } });
+    render(<SubTableViewer config={{ ...buildConfig(), presentation: { kind: 'collection', titleField: 'taskName', descriptionField: 'criteria', statusField: 'status', completedValues: ['reached'] } }} parentRecordPid="project-1" parentRecordData={{ progress: 68 }} locale="en" />);
+    expect(await screen.findByTestId('collection-completion')).toHaveTextContent('1 / 2 completed');
+    expect(screen.getByRole('row', { name: /Core integration/ })).toHaveTextContent('Procurement and receiving');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('selects the first pending checkpoint for the declarative focus presentation', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: [
+      { pid: 'checkpoint-1', taskName: 'Requirements agreed', status: 'reached' },
+      { pid: 'checkpoint-2', taskName: 'Core integration', status: 'pending', criteria: 'Procurement and receiving' },
+    ] } });
+    render(<SubTableViewer config={{ ...buildConfig(), presentation: { kind: 'focus', titleField: 'taskName', descriptionField: 'criteria', statusField: 'status', completedValues: ['reached'] } }} parentRecordPid="project-1" locale="en" />);
+    expect(await screen.findByTestId('collection-focus')).toHaveTextContent('Core integration');
+    expect(screen.getByTestId('collection-focus')).not.toHaveTextContent('Requirements agreed');
+  });
+
   it.each([
     { code: '403', message: 'Approval history access denied', data: null },
     { code: '1', message: 'Approval history unavailable', data: null },
@@ -515,11 +536,23 @@ describe('SubTableViewer', () => {
     expect(screen.getByTestId('subtable-add-row').textContent).toContain('添加联系人');
   });
 
+  it('sends the configured milestone date ordering to the child query', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: [] } });
+    render(<SubTableViewer config={{ ...buildConfig(), defaultSort: { field: 'due_date', order: 'asc' } }}
+      parentRecordPid="project" />);
+    await waitFor(() => expect(fetchResultMock).toHaveBeenCalledWith(
+      expect.stringContaining('/list'), expect.objectContaining({
+        params: expect.objectContaining({ sortField: 'due_date', sortOrder: 'asc' }),
+      }),
+    ));
+  });
+
   it('merges configured default values into create payloads with parent record templates', async () => {
-    fetchResultMock
-      .mockResolvedValueOnce({ code: '0', data: { records: [] } })
-      .mockResolvedValueOnce({ code: '0', data: {} })
-      .mockResolvedValueOnce({ code: '0', data: { records: [] } });
+    fetchResultMock.mockImplementation(async (endpoint: string) => {
+      if (endpoint.endsWith('/field-meta')) return { code: '0', data: [] };
+      if (endpoint.includes('/commands/execute/')) return { code: '0', data: {} };
+      return { code: '0', data: { records: [] } };
+    });
 
     render(
       <SubTableViewer

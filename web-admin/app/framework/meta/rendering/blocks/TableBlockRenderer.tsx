@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * TableBlockRenderer - 表格块渲染器
  * 支持新的列配置特性: valueType, render, ellipsis 等
@@ -14,8 +16,6 @@ import type {
 } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
-import { fetchResult } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
@@ -41,11 +41,7 @@ export interface TableBlockRendererProps {
 }
 
 // 字典数据项类型
-interface DictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, any>;
-}
+type DictItem = Pick<import('~/types/dict').DictItemData, 'value' | 'label' | 'extension'>;
 
 interface GroupedSelectionItem {
   row: any;
@@ -236,14 +232,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     const loadDictData = async () => {
       const promises = unloadedCodes.map(async (code) => {
         try {
-          const result = await fetchResult(`/api/meta/dict/by-code/${code}/data`, {
-            method: 'get',
+          const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+            path: { code },
           });
-          if (ResultHelper.isSuccess(result) && result.data) {
-            // 适配字典数据格式
-            const data = result.data as { items?: DictItem[] } | DictItem[];
-            const items: DictItem[] = Array.isArray(data) ? data : data.items || [];
-            dictDataCache.current.set(code, items);
+          if (result.code === '0' && result.data) {
+            dictDataCache.current.set(code, dictionaryData(result.data).items);
             failedDictRequests.current.delete(code);
           } else {
             failedDictRequests.current.add(code);
@@ -719,10 +712,25 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           </span>
         );
       }
+      if (dictItems && column.dictValueSeparator) {
+        const codes = String(value)
+          .split(column.dictValueSeparator)
+          .map((code) => code.trim())
+          .filter(Boolean);
+        const labels = codes.map(
+          (code) => dictItems.find((item) => String(item.value) === code)?.label,
+        );
+        if (
+          labels.length > 0 &&
+          labels.every((label) => typeof label === 'string' && label.trim())
+        ) {
+          return <span>{labels.join(locale.toLowerCase().startsWith('zh') ? '、' : ', ')}</span>;
+        }
+      }
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
         if (item && typeof item.label === 'string' && item.label.trim()) {
-          const tone = resolveStatusTone(item.extension?.color);
+          const tone = resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined);
           if (column.renderType === 'status-pill') {
             return renderStatusPill(tone, item.label);
           }

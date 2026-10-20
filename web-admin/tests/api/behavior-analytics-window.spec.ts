@@ -1,3 +1,4 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** Real collect-to-rollup coverage with isolated event-time fixtures. */
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -147,7 +148,7 @@ test('anonymous site-key collect rejects server provenance and records a genuine
   const siteKey = rows[0].site_key;
   expect(siteKey).toMatch(/^abk_/);
   const anonymous = await playwright.request.newContext({
-    baseURL: process.env.BACKEND_URL,
+    baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
     storageState: { cookies: [], origins: [] },
   });
   try {

@@ -123,6 +123,7 @@ public class DynamicController {
      */
     private static final ObjectMapper filterMapper = new ObjectMapper();
 
+    @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "dynamic.list", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.RESOURCE_LIST, version = "1", name = "List records", chineseName = "查询记录列表")
     @GetMapping("/{pageKey}/list")
     @Operation(summary = "分页查询数据", description = "根据页面定义进行分页查询。当页面DSL指定dataSource.type='namedQuery'时，前端传入queryCode参数直接执行NamedQuery。")
     @RequirePermission("model.{pageKey}.read")
@@ -513,6 +514,7 @@ public class DynamicController {
     /**
      * 根据 PID 获取单条数据
      */
+    @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "dynamic.get", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.RESOURCE_GET, version = "1", name = "Read record", chineseName = "读取记录")
     @GetMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "获取单条数据", description = "根据记录 PID 获取单条数据")
     @RequirePermission("model.{pageKey}.read")
@@ -553,6 +555,7 @@ public class DynamicController {
     /**
      * 创建数据
      */
+    @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "dynamic.create", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.RESOURCE_CREATE, version = "1", name = "Create record", chineseName = "创建记录")
     @PostMapping("/{pageKey}/create")
     @Operation(summary = "创建数据", description = "根据页面定义创建新数据")
     @RequirePermission("model.{pageKey}.create")
@@ -581,6 +584,7 @@ public class DynamicController {
     /**
      * 更新数据
      */
+    @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "dynamic.update", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.RESOURCE_UPDATE, version = "1", name = "Update record", chineseName = "修改记录")
     @PutMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "更新数据", description = "根据页面定义更新数据")
     @RequirePermission("model.{pageKey}.update")
@@ -605,6 +609,7 @@ public class DynamicController {
     /**
      * 删除数据
      */
+    @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "dynamic.delete", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.RESOURCE_DELETE, version = "1", name = "Delete record", chineseName = "删除记录")
     @DeleteMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "删除数据", description = "根据页面定义删除数据")
     @RequirePermission("model.{pageKey}.delete")

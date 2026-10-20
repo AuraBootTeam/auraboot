@@ -582,6 +582,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     value != null &&
     value !== '';
 
+  const readOnlyDisplay = context.form?.[`${field.field}_display`] ?? value;
+  const safeReadOnlyDisplay = typeof readOnlyDisplay === 'object' || /^[0-9A-HJKMNP-TV-Z]{26}$/.test(String(readOnlyDisplay)) ? '—' : String(readOnlyDisplay);
+
   return (
     <>
       <div
@@ -596,7 +599,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         )}
         {shouldRenderAsText ? (
           <div className="text-text py-2 text-sm">
-            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+            {safeReadOnlyDisplay}
           </div>
         ) : (
           <>

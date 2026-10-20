@@ -114,7 +114,7 @@ public class DefaultDecisionRuntime implements DecisionRuntime {
         return new DecisionResult(traceId, r.decisionCode(), r.decisionVersion(), r.kind(), r.engineType(),
                 r.resultType(), r.status(), r.matched(), r.outputs(), r.violations(), r.actionPlans(),
                 r.matchedRules(), r.errors(), r.unknownReasons(),
-                DecisionResult.DecisionMetrics.of(durationMs, durationMs));
+                DecisionResult.DecisionMetrics.of(durationMs, durationMs), r.conditionTrace());
     }
 
     private DecisionAdapter select(ResolvedDecision decision) {

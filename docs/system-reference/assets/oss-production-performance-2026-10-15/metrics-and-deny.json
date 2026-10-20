@@ -1,0 +1,319 @@
+{
+  "anonymous /api/menu/user": {
+    "status": 401
+  },
+  "anonymous /api/dynamic/showcase_all_fields_list/list?pageNum=1&pageSize=20": {
+    "status": 401
+  },
+  "cache.gets?tag=cache:modelDefinitions&tag=result:hit": {
+    "status": 200,
+    "data": {
+      "name": "cache.gets",
+      "description": "The number of times cache lookup methods have returned a cached (hit) or uncached (newly loaded or null) value (miss).",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 8270.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "cache.manager",
+          "values": [
+            "cacheManager"
+          ]
+        },
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "name",
+          "values": [
+            "modelDefinitions"
+          ]
+        }
+      ]
+    }
+  },
+  "cache.gets?tag=cache:modelDefinitions&tag=result:miss": {
+    "status": 200,
+    "data": {
+      "name": "cache.gets",
+      "description": "The number of times cache lookup methods have returned a cached (hit) or uncached (newly loaded or null) value (miss).",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 1898.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "cache.manager",
+          "values": [
+            "cacheManager"
+          ]
+        },
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "name",
+          "values": [
+            "modelDefinitions"
+          ]
+        }
+      ]
+    }
+  },
+  "cache.size?tag=cache:modelDefinitions": {
+    "status": 200,
+    "data": {
+      "name": "cache.size",
+      "description": "The number of entries in this cache. This may be an approximation, depending on the type of cache.",
+      "measurements": [
+        {
+          "statistic": "VALUE",
+          "value": 5.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "cache.manager",
+          "values": [
+            "cacheManager"
+          ]
+        },
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "name",
+          "values": [
+            "modelDefinitions"
+          ]
+        }
+      ]
+    }
+  },
+  "cache.evictions": {
+    "status": 200,
+    "data": {
+      "name": "cache.evictions",
+      "description": "The number of times the cache was evicted.",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 0.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "cache.manager",
+          "values": [
+            "cacheManager",
+            "permission"
+          ]
+        },
+        {
+          "tag": "cache",
+          "values": [
+            "fieldMaskConfig",
+            "user-role-snapshots",
+            "permission-catalog",
+            "cascadeDict",
+            "viewModelFields",
+            "dataPermissionMaskRules",
+            "dataScopeCondition",
+            "role-permission-snapshots",
+            "user-permissions",
+            "metaField",
+            "viewModelSummary",
+            "bindingRules",
+            "namedQuery",
+            "commandDefinitions",
+            "stateGraphDefinitions",
+            "secureQuery",
+            "baseline-role-snapshots",
+            "dictData",
+            "namedQueries",
+            "userDataDomainIds",
+            "aggregateQuery",
+            "modelFieldBindings",
+            "modelDefinitions",
+            "cascadeTree"
+          ]
+        },
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "name",
+          "values": [
+            "fieldMaskConfig",
+            "user-role-snapshots",
+            "permission-catalog",
+            "cascadeDict",
+            "viewModelFields",
+            "dataPermissionMaskRules",
+            "dataScopeCondition",
+            "role-permission-snapshots",
+            "user-permissions",
+            "metaField",
+            "viewModelSummary",
+            "bindingRules",
+            "namedQuery",
+            "commandDefinitions",
+            "stateGraphDefinitions",
+            "secureQuery",
+            "baseline-role-snapshots",
+            "dictData",
+            "namedQueries",
+            "userDataDomainIds",
+            "aggregateQuery",
+            "modelFieldBindings",
+            "modelDefinitions",
+            "cascadeTree"
+          ]
+        }
+      ]
+    }
+  },
+  "hikaricp.connections.pending": {
+    "status": 200,
+    "data": {
+      "name": "hikaricp.connections.pending",
+      "description": "Pending threads",
+      "measurements": [
+        {
+          "statistic": "VALUE",
+          "value": 0.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "pool",
+          "values": [
+            "AuraBootPool"
+          ]
+        }
+      ]
+    }
+  },
+  "hikaricp.connections.timeout": {
+    "status": 200,
+    "data": {
+      "name": "hikaricp.connections.timeout",
+      "description": "Connection timeout total count",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 0.0
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "pool",
+          "values": [
+            "AuraBootPool"
+          ]
+        }
+      ]
+    }
+  },
+  "hikaricp.connections.acquire": {
+    "status": 200,
+    "data": {
+      "name": "hikaricp.connections.acquire",
+      "description": "Connection acquire time",
+      "baseUnit": "seconds",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 59110.0
+        },
+        {
+          "statistic": "TOTAL_TIME",
+          "value": 0.113
+        },
+        {
+          "statistic": "MAX",
+          "value": 0.005
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "pool",
+          "values": [
+            "AuraBootPool"
+          ]
+        }
+      ]
+    }
+  },
+  "hikaricp.connections.usage": {
+    "status": 200,
+    "data": {
+      "name": "hikaricp.connections.usage",
+      "description": "Connection usage time",
+      "baseUnit": "seconds",
+      "measurements": [
+        {
+          "statistic": "COUNT",
+          "value": 59113.0
+        },
+        {
+          "statistic": "TOTAL_TIME",
+          "value": 32.992
+        },
+        {
+          "statistic": "MAX",
+          "value": 0.077
+        }
+      ],
+      "availableTags": [
+        {
+          "tag": "application",
+          "values": [
+            "auraboot"
+          ]
+        },
+        {
+          "tag": "pool",
+          "values": [
+            "AuraBootPool"
+          ]
+        }
+      ]
+    }
+  }
+}

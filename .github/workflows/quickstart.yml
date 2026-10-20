@@ -26,6 +26,9 @@ jobs:
     name: docker compose --profile full + smoke
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      AURA_GRADLE_REPOSITORY_POLICY: central
+      MAVEN_CENTRAL_FIRST: 'true'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,7 +51,7 @@ jobs:
           head="${{ github.event.pull_request.head.sha }}"
 
           if git diff --name-only "$base" "$head" \
-            | grep -E '^(docker-compose(\..*)?\.yml|platform/Dockerfile|web-admin/Dockerfile|web-admin/app/server/|web-admin/package\.json|pnpm-lock\.yaml|platform/build\.gradle|platform/gradle/wrapper/|plugins/|scripts/quickstart\.sh|scripts/docker-bootstrap\.sh|scripts/dev/plugin-import-profiles\.json|scripts/dev/verify-quickstart\.sh|\.github/workflows/quickstart\.yml)' >/dev/null; then
+            | grep -E '^(platform/src/|contracts/internal-web-admin/|scripts/internal-api/|scripts/ci/gradle-repositories\.init\.gradle|docker-compose(\..*)?\.yml|platform/Dockerfile|web-admin/Dockerfile|web-admin/app/server/|web-admin/package\.json|pnpm-lock\.yaml|platform/build\.gradle|platform/gradle/wrapper/|plugins/|scripts/quickstart\.sh|scripts/prepare-quickstart-env(\.test)?\.py|\.env\.example|scripts/docker-bootstrap\.sh|scripts/dev/plugin-import-profiles\.json|scripts/dev/verify-quickstart\.sh|\.github/workflows/quickstart\.yml)' >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -59,9 +62,25 @@ jobs:
         if: steps.changes.outputs.run == 'true'
         uses: docker/setup-buildx-action@v4
 
+      - name: Prepare private protocol signing key
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          python3 - <<'PY'
+          import os
+          import secrets
+          with os.fdopen(os.open('.env', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as output:
+              output.write('OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=' + secrets.token_hex(48) + '\n')
+          PY
+
       - name: Build & start full stack
         if: steps.changes.outputs.run == 'true'
         run: docker compose --profile full up --build -d
+
+      - name: Set up Node.js for contract comparison
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
 
       - name: Wait for backend healthy
         if: steps.changes.outputs.run == 'true'
@@ -121,6 +140,45 @@ jobs:
         # and this goes red.
         run: ./scripts/quickstart.sh
 
+      - name: Internal contract capture and cleanup self-tests
+        if: steps.changes.outputs.run == 'true'
+        run: python3 scripts/ci/capture-internal-document.test.py
+
+      - name: Internal API contract drift from the built backend
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/internal-api-live"
+          # Community keeps documentation authenticated; use the just-provisioned admin.
+          token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
+            | python3 -c 'import json,re,sys; token=json.load(sys.stdin).get("data", {}).get("jwt"); assert isinstance(token,str) and re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",token), "Missing session token"; print(token)')
+          echo "::add-mask::$token"
+          # Revoke only this capture's session, including when the drift gate fails.
+          capture_session_cleanup() {
+            local original_status=$?
+            trap - EXIT
+            curl -fsS -m 15 -X DELETE http://localhost:3000/api/user/sessions/current \
+              -H "Authorization: Bearer $token" -H "Origin: http://localhost:3000" \
+              > /dev/null || exit 1
+            local identity_status
+            identity_status=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' \
+              http://localhost:3000/api/auth/me -H "Authorization: Bearer $token") || exit 1
+            [[ "$identity_status" == 401 ]] || { echo "Capture session remained authorized" >&2; exit 1; }
+            printf '%s\n' '{"claim":"capture-session-cleanup-only","sessionRevoked":true,"identityAfterRevocation":401}' \
+              > "$RUNNER_TEMP/internal-api-live/session-cleanup.json"
+            exit "$original_status"
+          }
+          trap capture_session_cleanup EXIT
+          printf '%s\n' "$token" | docker compose exec -T backend sh -c '
+            IFS= read -r token
+            exec wget -q -O - --header="Authorization: Bearer $token" \
+              http://localhost:6443/v3/api-docs/internal-web-admin
+          ' > "$RUNNER_TEMP/internal-api-live/openapi.json"
+          node scripts/internal-api/drift.mjs "$RUNNER_TEMP/internal-api-live/openapi.json" \
+            "$RUNNER_TEMP/internal-api-live/drift-receipt.json"
+
       - name: The platform is not empty
         if: steps.changes.outputs.run == 'true'
         # Health is UP and login works on a platform with zero models and zero
@@ -150,9 +208,7 @@ jobs:
           response=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
             -H "Content-Type: application/json" \
             -d '{"email":"admin@auraboot.com","password":"Test2026x"}')
-          echo "$response" | head -c 200
-          echo
-          echo "$response" | grep -q '"jwt"' || {
+          printf '%s' "$response" | python3 -c 'import json,sys; token=json.load(sys.stdin).get("data", {}).get("jwt"); assert isinstance(token, str) and token, "Login did not return a session token"' || {
             echo "login did not return a JWT"
             docker compose logs --tail 100 backend
             docker compose logs --tail 100 frontend
@@ -162,10 +218,9 @@ jobs:
       - name: Authenticated API smoke (real endpoints)
         if: steps.changes.outputs.run == 'true'
         run: |
-          token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
-            -H "Content-Type: application/json" \
-            -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
-            | sed -n 's/.*"jwt":"\([^"]*\)".*/\1/p')
+          token=$(AURA_CORE_BASE_URL=http://localhost:3000 \
+            ADMIN_EMAIL=admin@auraboot.com ADMIN_PASSWORD=Test2026x \
+            python3 scripts/application/core-admin-session.py)
           [ -n "$token" ] || { echo "no token"; exit 1; }
           # Stick to endpoints that any authenticated user can hit without
           # specific permission grants — the smoke test asserts BFF proxy +
@@ -193,3 +248,11 @@ jobs:
       - name: Tear down
         if: always() && steps.changes.outputs.run == 'true'
         run: docker compose --profile full down -v
+
+      - name: Retain observed internal API contract
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: internal-api-live
+          path: ${{ runner.temp }}/internal-api-live
+          if-no-files-found: ignore

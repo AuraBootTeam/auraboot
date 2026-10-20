@@ -24,6 +24,7 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -53,6 +54,7 @@ import java.util.Map;
 @RequestMapping("/api/test")
 @Profile("test")
 @RequiredArgsConstructor
+@AuthenticatedAccess("test-profile E2E seed fixture: never registered outside the test profile; seeds a dedicated e2e tenant")
 public class TestSeedController {
 
     private static final String TEST_TENANT_NAME = "e2e_test";
@@ -113,7 +115,8 @@ public class TestSeedController {
      */
     @PostMapping("/seed")
     public ResponseEntity<SeedResult> seed(
-            @RequestParam(value = "testRunId", required = false) String testRunId) {
+            @RequestParam(value = "testRunId", required = false) String testRunId,
+            @RequestParam(value = "identityOnly", defaultValue = "false") boolean identityOnly) {
         String runId = testRunId != null ? testRunId : generateTestRunId("api");
         log.info("Test seed requested: testRunId={}", runId);
 
@@ -168,18 +171,25 @@ public class TestSeedController {
 
         // 5.5 Install test-fixtures plugin into the new test tenant so iOS/Playwright
         // tests can navigate to browse_e2et_order_list without manual intervention.
-        ensureModelPermissionsExist(tenant, user);
-        installE2eTestPlugin(tenant, user);
-        repairDynamicTableIdentitySequences(tenant);
-        // Fixed analytics view fixture belongs to the test-profile initializer only.
-        jdbcTemplate.execute("""
-                CREATE OR REPLACE VIEW public.v_e2et_analytics_order AS
-                SELECT pid, tenant_id, created_by, e2et_order_title AS label FROM public.mt_e2et_order
-                """);
+        if (!identityOnly) {
+            ensureModelPermissionsExist(tenant, user);
+            installE2eTestPlugin(tenant, user);
+            repairDynamicTableIdentitySequences(tenant);
+            // Fixed analytics view fixture belongs to the test-profile initializer only.
+            jdbcTemplate.execute("""
+                    CREATE OR REPLACE VIEW public.v_e2et_analytics_order AS
+                    SELECT pid, tenant_id, created_by, e2et_order_title AS label FROM public.mt_e2et_order
+                    """);
+        } else {
+            // Product browser gates need a real foreign identity, not unrelated demo plugins.
+            ensureTestAdminCanUseImportedResources(tenant, user);
+        }
 
         // 5.6 Ensure a second "colleague" user exists in the test tenant so that
         // mobile user-search (which excludes self) returns at least one result.
-        ensureChatColleagueExists(tenant, user);
+        if (!identityOnly) {
+            ensureChatColleagueExists(tenant, user);
+        }
 
         // 6. Generate JWT
         String jwt = generateJwt(user, tenant.getId());
@@ -249,7 +259,7 @@ public class TestSeedController {
         }
 
         // 3. Re-run seed
-        return seed(null);
+        return seed(null, false);
     }
 
     /**

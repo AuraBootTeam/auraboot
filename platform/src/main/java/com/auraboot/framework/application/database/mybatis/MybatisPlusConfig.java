@@ -7,6 +7,9 @@ import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal;
+import com.baomidou.mybatisplus.extension.parser.cache.JdkSerialCaffeineJsqlParseCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
@@ -180,6 +183,15 @@ public class MybatisPlusConfig {
                                                           ApplicationContext applicationContext,
                                                           org.springframework.core.env.Environment environment) {
         guardTenantBypassPrefixes(environment);
+        // Interceptors mutate ASTs while adding current tenant/env predicates.
+        // Cache serialized syntax only; each lookup deserializes an independent
+        // tree, never a prior caller's authority or rewritten SQL.
+        var parsedSql = Caffeine.newBuilder().maximumWeight(16L * 1024 * 1024)
+                .weigher((String sql, byte[] ast) -> (int) Math.min(Integer.MAX_VALUE,
+                        (long) sql.length() * 2 + ast.length))
+                .expireAfterAccess(java.time.Duration.ofMinutes(5))
+                .build();
+        JsqlParserGlobal.setJsqlParseCache(new SqlSyntaxCache(parsedSql));
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
         // env-layering #19 — UPDATE/DELETE write-side lock guard. Registered FIRST so it sees
@@ -292,10 +304,7 @@ public class MybatisPlusConfig {
         interceptor.addInnerInterceptor(envInterceptor);
 
         // Configure pagination with the correct database type
-        DbType dbType = databaseDialect.getType() == DatabaseType.MYSQL
-                ? DbType.MYSQL
-                : DbType.POSTGRE_SQL;
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(dbType));
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.POSTGRE_SQL));
 
         return interceptor;
     }
@@ -345,6 +354,23 @@ public class MybatisPlusConfig {
                 active, tenantBypassTablePrefixes);
     }
 
+
+    /** Single and multi parsing can consume identical SQL, but produce different AST types. */
+    static final class SqlSyntaxCache extends JdkSerialCaffeineJsqlParseCache {
+        SqlSyntaxCache(com.github.benmanes.caffeine.cache.Cache<String, byte[]> storage) { super(storage); }
+        @Override public net.sf.jsqlparser.statement.Statement getStatement(String sql) {
+            return super.getStatement("single:" + sql);
+        }
+        @Override public void putStatement(String sql, net.sf.jsqlparser.statement.Statement ast) {
+            super.putStatement("single:" + sql, ast);
+        }
+        @Override public net.sf.jsqlparser.statement.Statements getStatements(String sql) {
+            return super.getStatements("multi:" + sql);
+        }
+        @Override public void putStatements(String sql, net.sf.jsqlparser.statement.Statements ast) {
+            super.putStatements("multi:" + sql, ast);
+        }
+    }
 
     /**
      * Tenant/env line interceptor that skips host-owned mapper statements entirely,

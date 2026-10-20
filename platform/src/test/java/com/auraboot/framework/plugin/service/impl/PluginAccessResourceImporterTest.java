@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.service.impl;
 import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.entity.PluginResource;
+import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.meta.service.FieldMaskService;
 import com.auraboot.framework.permission.capability.CapabilityRegistryService;
 import com.auraboot.framework.permission.service.*;
@@ -95,13 +96,28 @@ class PluginAccessResourceImporterTest {
         order.verify(resources).importMenu(eq(parent),eq("p"),eq("i"),eq(42L),any()); order.verify(resources).importMenu(eq(child),eq("p"),eq("i"),eq(42L),any());
         verify(menuI18n).execute(List.of(parent,child),42L); verify(permissionI18n).execute(m.getPermissions(),42L);
     }
-    @Test void cyclicMenusRemainVisibleAndOneBrokenRoleDoesNotSuppressTheNext() {
+    @Test void cyclicMenusRemainVisibleAndAllRolesAttemptedBeforeFailingClosed() {
         var a=MenuDefinitionDTO.builder().code("a").parentCode("b").build(); var b=MenuDefinitionDTO.builder().code("b").parentCode("a").build();
         assertThat(importer.topologicalSortMenus(List.of(a,b))).containsExactly(a,b);
         var r1=RoleDefinitionDTO.builder().code("one").build(); var r2=RoleDefinitionDTO.builder().code("two").build();
-        var m=new PluginManifestExtended(); m.setRoles(Arrays.asList(null,new RoleDefinitionDTO(),r1,r2));
+        var m=new PluginManifestExtended(); m.setPluginId("com.auraboot.demo"); m.setRoles(Arrays.asList(null,new RoleDefinitionDTO(),r1,r2));
         doThrow(new IllegalStateException("stale")).when(resources).reconcileRolePermissions(r1,42L);
-        importer.reconcileRolePermissionBindings(m,42L); verify(resources).reconcileRolePermissions(r2,42L);
+        // Every declared role is still attempted (one broken role does not suppress the
+        // next), then the reconciliation fails closed naming the plugin and each failure.
+        assertThatThrownBy(() -> importer.reconcileRolePermissionBindings(m,42L))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("com.auraboot.demo")
+                .hasMessageContaining("role 'one'")
+                .hasMessageContaining("stale");
+        verify(resources).reconcileRolePermissions(r2,42L);
+    }
+
+    @Test void reconcileRolePermissionBindingsPassesWhenEveryDeclaredRoleBinds() {
+        var r1=RoleDefinitionDTO.builder().code("one").build(); var r2=RoleDefinitionDTO.builder().code("two").build();
+        var m=new PluginManifestExtended(); m.setPluginId("com.auraboot.demo"); m.setRoles(List.of(r1,r2));
+        assertThatCode(() -> importer.reconcileRolePermissionBindings(m,42L)).doesNotThrowAnyException();
+        verify(resources).reconcileRolePermissions(r1,42L);
+        verify(resources).reconcileRolePermissions(r2,42L);
     }
     @Test void masksAndCapabilitiesKeepExemptionsAndSkipInvalidSeeds() {
         var mask=FieldMaskDefinitionDTO.builder().modelCode("invoice").fieldCode("amount").maskType("PARTIAL").maskPattern("last4")
@@ -115,5 +131,31 @@ class PluginAccessResourceImporterTest {
         importer.importCapabilities(m);
         verify(masks).saveConfig(argThat(c -> c.getModelCode().equals("invoice") && c.getFieldCode().equals("amount") && c.getReplacementChar().equals("#") && !c.getApplyToExport() && c.getExemptRoles().equals("finance_admin") && c.getExemptPermissionCodes().equals("invoice.unmask")));
         verify(capabilities).saveDefinition(capability);
+    }
+
+    @Test void importMenusPrunesStaleCodesNoLongerDeclared() {
+        var m=new PluginManifestExtended();
+        m.setMenus(List.of(MenuDefinitionDTO.builder().code("kept").build()));
+        when(resources.importMenu(any(),eq("p"),eq("i"),eq(42L),any()))
+                .thenReturn(trackedResource("CREATE",301L,"kept"));
+        when(resources.pruneStaleMenus(eq("p"),eq("i"),eq(42L),any())).thenReturn(2);
+        var result=new ImportExecuteResult();
+        importer.importMenus(m,new ImportRequest(),result,"p","i",42L);
+        verify(resources).pruneStaleMenus("p","i",42L,List.of("kept"));
+        assertThat(result.getResourceCounts()).containsEntry("MENU",Map.of("CREATE",1,"DELETE",2));
+    }
+    @Test void importMenusWithoutMenuDeclarationNeverPrunes() {
+        importer.importMenus(new PluginManifestExtended(), new ImportRequest(), new ImportExecuteResult(), "p", "i", 42L);
+        verify(resources, never()).pruneStaleMenus(any(), any(), any(), any());
+    }
+    @Test void importMenusWithZeroPruneDoesNotCountDeletes() {
+        var m=new PluginManifestExtended();
+        m.setMenus(List.of(MenuDefinitionDTO.builder().code("kept").build()));
+        when(resources.importMenu(any(),eq("p"),eq("i"),eq(42L),any()))
+                .thenReturn(trackedResource("UPDATE",301L,"kept"));
+        when(resources.pruneStaleMenus(eq("p"),eq("i"),eq(42L),any())).thenReturn(0);
+        var result=new ImportExecuteResult();
+        importer.importMenus(m,new ImportRequest(),result,"p","i",42L);
+        assertThat(result.getResourceCounts()).containsEntry("MENU",Map.of("UPDATE",1));
     }
 }

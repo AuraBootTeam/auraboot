@@ -55,5 +55,8 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Test registration-source parsing
+        run: node --test scripts/permission-sql-registrations.test.mjs
+
       - name: Validate permission codes (strict — every reference must resolve)
         run: node scripts/validate-permission-codes.mjs --oss-only

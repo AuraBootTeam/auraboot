@@ -10,7 +10,7 @@
  * Logic lives in cli-core.ts (unit-tested); this file is just the process shell.
  */
 import { writeFileSync } from 'node:fs';
-import { renderRequestToPdf } from './cli-core';
+import { renderRequestToPdf, renderRequestToHtml } from './cli-core';
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -25,7 +25,11 @@ async function main(): Promise<void> {
   const outPath = outFlagIndex >= 0 ? process.argv[outFlagIndex + 1] : undefined;
 
   const requestJson = await readStdin();
-  const pdf = await renderRequestToPdf(requestJson);
+  const formatIndex = process.argv.indexOf('--format');
+  const format = formatIndex >= 0 ? process.argv[formatIndex + 1] : 'pdf';
+  if (format !== 'pdf' && format !== 'html') throw new Error('Unsupported report format');
+  const pdf =
+    format === 'html' ? renderRequestToHtml(requestJson) : await renderRequestToPdf(requestJson);
 
   if (outPath) {
     writeFileSync(outPath, pdf);

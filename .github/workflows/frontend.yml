@@ -5,10 +5,17 @@ on:
     branches: [main]
     paths:
       - 'web-admin/**'
+      - 'contracts/internal-web-admin/**'
+      - 'scripts/internal-api/**'
+      - 'platform/src/main/java/**'
+      - 'platform/src/main/resources/**'
+      - 'platform/build.gradle'
       - 'packages/**'
       - 'plugins/**/config/dashboards/**'
       - 'plugins/schemas/dashboards.schema.json'
       - 'scripts/validate-plugin-dashboards.mjs'
+      - 'scripts/oss-specialized-profiles.test.mjs'
+      - 'oss-scope.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -17,10 +24,17 @@ on:
     branches: [main]
     paths:
       - 'web-admin/**'
+      - 'contracts/internal-web-admin/**'
+      - 'scripts/internal-api/**'
+      - 'platform/src/main/java/**'
+      - 'platform/src/main/resources/**'
+      - 'platform/build.gradle'
       - 'packages/**'
       - 'plugins/**/config/dashboards/**'
       - 'plugins/schemas/dashboards.schema.json'
       - 'scripts/validate-plugin-dashboards.mjs'
+      - 'scripts/oss-specialized-profiles.test.mjs'
+      - 'oss-scope.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -57,12 +71,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install locked internal API toolchain
+        run: npm ci --prefix scripts/internal-api/toolchain --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/ --replace-registry-host=registry.npmmirror.com
+
+      - name: Internal API snapshot and generated type gate
+        run: node scripts/internal-api/foundation.mjs --evidence "$RUNNER_TEMP/internal-api-foundation"
+
       - name: Build workspace packages
         run: pnpm build:packages
 
       - name: Lint web-admin
         working-directory: web-admin
         run: pnpm lint
+
+      - name: Test environment contract
+        working-directory: web-admin
+        run: node --test scripts/test-environments.test.mjs
 
       - name: Env-drift gate (tests/)
         working-directory: web-admin
@@ -78,3 +102,14 @@ jobs:
 
       - name: Validate dashboard contracts
         run: node scripts/validate-plugin-dashboards.mjs
+
+      - name: Validate E2E profile collection and prerequisites
+        run: node --test scripts/oss-specialized-profiles.test.mjs
+
+      - name: Retain internal API consistency evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: internal-api-foundation
+          path: ${{ runner.temp }}/internal-api-foundation
+          if-no-files-found: ignore

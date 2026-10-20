@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '~/utils/cn';
+import { useSmartText } from '~/utils/i18n';
 
 /**
  * Relation type
@@ -76,6 +77,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
   error,
   className,
 }) => {
+  const st = useSmartText();
   const [options, setOptions] = useState<RelationOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -167,7 +169,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
     if (isMultiple) {
       const values = Array.isArray(normalizedValue) ? normalizedValue : [];
       if (values.length === 0) {
-        return <span className="text-text-3">{placeholder || 'Select...'}</span>;
+        return <span className="text-text-3">{placeholder || st({zh: '请选择', en: 'Select...'})}</span>;
       }
       return (
         <div className="flex flex-wrap gap-1">
@@ -195,7 +197,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
       );
     } else {
       if (!normalizedValue) {
-        return <span className="text-text-3">{placeholder || 'Select...'}</span>;
+        return <span className="text-text-3">{placeholder || st({zh: '请选择', en: 'Select...'})}</span>;
       }
       return <span>{getDisplayLabel(normalizedValue as string)}</span>;
     }
@@ -251,7 +253,7 @@ export const RelationField: React.FC<RelationFieldProps> = ({
               <input
                 type="text"
                 className="w-full rounded border px-2 py-1 text-sm"
-                placeholder="Search..."
+                placeholder={st({zh: '搜索记录名称', en: 'Search records...'})}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
@@ -259,9 +261,9 @@ export const RelationField: React.FC<RelationFieldProps> = ({
             </div>
 
             {loading ? (
-              <div className="text-text-2 p-4 text-center">Loading...</div>
+              <div className="text-text-2 p-4 text-center">{st({zh: '正在读取…', en: 'Loading...'})}</div>
             ) : options.length === 0 ? (
-              <div className="text-text-2 p-4 text-center">No options</div>
+              <div role={error ? 'alert' : undefined} className={cn('p-4 text-center text-sm', error ? 'text-status-red' : 'text-text-2')}>{error || st({zh: '暂无可选记录', en: 'No records available'})}</div>
             ) : (
               options.map((option) => {
                 const optValue = String(option[valueField]);
@@ -291,11 +293,8 @@ export const RelationField: React.FC<RelationFieldProps> = ({
         )}
       </div>
 
-      {error && <p className="text-status-red text-sm">{error}</p>}
+      {error && !isOpen && <p role="alert" className="text-status-red text-sm">{error}</p>}
 
-      <p className="text-text-3 text-xs">
-        {relationType.replace('_', ' ')} relation to {targetModelCode}
-      </p>
     </div>
   );
 };

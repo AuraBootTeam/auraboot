@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
  * Covers permission ID resolution via RBAC, hasPermission by ID and code,
  * cache eviction, and batch operations.
  *
- * Uses real PostgreSQL and Redis – no mocks, no H2.
+ * Uses real PostgreSQL and local Caffeine caches; Redis is optional.
  *
  * @author AuraBoot Platform
  * @since V4
@@ -100,6 +100,9 @@ class UserPermissionServiceIntegrationTest {
 
     @Autowired
     private RolePermissionService rolePermissionService;
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     // Test context data – created once per class
     private String testSuffix;
@@ -504,6 +507,32 @@ class UserPermissionServiceIntegrationTest {
         rolePermissionMapper.insert(binding);
         permissionSnapshotCache.clearAll();
 
+        assertThat(userPermissionService.hasPermission(testUser.getId(), permission.getCode())).isFalse();
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("UP-15: revocation evicts after commit, while rollback keeps the valid grant")
+    void up15_revocationCommitAndRollbackRespectTheCacheBoundary() {
+        Permission permission = createTestPermission("up_tx_revoke");
+        rolePermissionService.assignPermissionsToRole(testRole.getId(), List.of(permission.getId()));
+        assertThat(userPermissionService.hasPermission(testUser.getId(), permission.getCode())).isTrue();
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        long epoch = com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current();
+
+        transaction.executeWithoutResult(status -> {
+            rolePermissionService.removePermission(testRole.getId(), permission.getId());
+            assertThat(com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current()).isEqualTo(epoch);
+            status.setRollbackOnly();
+        });
+        assertThat(com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current()).isEqualTo(epoch);
+        assertThat(userPermissionService.hasPermission(testUser.getId(), permission.getCode())).isTrue();
+
+        transaction.executeWithoutResult(status -> {
+            rolePermissionService.removePermission(testRole.getId(), permission.getId());
+            assertThat(com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current()).isEqualTo(epoch);
+        });
+        assertThat(com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current()).isGreaterThan(epoch);
         assertThat(userPermissionService.hasPermission(testUser.getId(), permission.getCode())).isFalse();
     }
 

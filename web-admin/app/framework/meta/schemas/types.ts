@@ -229,6 +229,8 @@ export interface EventConfig {
 
 // Column 配置（用于列表）
 export interface ColumnConfig {
+  /** Structured, reusable business cell presentation. */
+  presentation?: import('../runtime/renderers/WorkspaceCells').WorkspaceCellPresentation;
   field: string;
   label?: string | LocalizedText; // optional: resolved by i18n Resolver from model displayName
   /** Runtime personalization may reorder but never hide this baseline field. */
@@ -242,6 +244,8 @@ export interface ColumnConfig {
 
   // Format
   format?: string; // 'currency' | 'percent' | 'number'
+  /** Maximum displayed fractional digits for numeric cells; defaults to 2 when omitted. */
+  precision?: number;
   readOnly?: boolean;
 
   /**
@@ -308,6 +312,7 @@ export interface ColumnConfig {
 
   // 字典配置
   dictCode?: string; // 绑定的字典编码，自动显示字典标签而非原始值
+  dictValueSeparator?: string; // Opt-in delimiter for multiple dictionary values
 
   // Currency code for valueType: 'currency' (default: 'cny')
   currencyCode?: string;
@@ -424,7 +429,7 @@ export interface ButtonConfig {
   // Unified action definition (new DSL format)
   /** Confirmation prompt i18n key — shown before executing the action. */
   confirm?: string | LocalizedText;
-  /** Confirmation style; omitted preserves the legacy danger presentation. */
+  /** Explicit confirmation style; omitted follows the button danger/variant intent. */
   confirmVariant?: 'default' | 'danger';
 
   // Business shortcut properties (legacy — migrate to action: ActionDef)
@@ -551,6 +556,16 @@ export interface SummaryFieldConfig {
 
 // Sub-table configuration (for master-detail forms)
 export interface SubTableConfig {
+  presentation?: {
+    kind: 'collection' | 'focus';
+    title?: string | LocalizedText;
+    titleField: string;
+    descriptionField?: string;
+    dateField?: string;
+    statusField: string;
+    completedValues: string[];
+    ownerField?: string;
+  };
   childModel: string;
   parentField: string;
   readOnly?: boolean;

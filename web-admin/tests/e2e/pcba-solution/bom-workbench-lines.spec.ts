@@ -46,9 +46,8 @@ async function listLines(page: Page): Promise<any[]> {
 
 function isConfirmedWithCode(line: any, candidateCode: string): boolean {
   return (
-    line?.bom_std_manual_confirmed === true ||
-    line?.bom_std_manual_confirmed === 'true' ||
-    String(line?.bom_std_material_code || '').includes(candidateCode)
+    (line?.bom_std_manual_confirmed === true || line?.bom_std_manual_confirmed === 'true') &&
+    String(line?.bom_std_material_code || '') === candidateCode
   );
 }
 

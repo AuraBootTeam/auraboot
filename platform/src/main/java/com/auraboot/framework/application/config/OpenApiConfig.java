@@ -1,5 +1,8 @@
 package com.auraboot.framework.application.config;
 
+import com.auraboot.framework.application.annotation.CurrentUserId;
+import com.auraboot.framework.application.annotation.CurrentMemberId;
+import org.springdoc.core.utils.SpringDocUtils;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
@@ -23,6 +26,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+    public OpenApiConfig() {
+        SpringDocUtils.getConfig().addAnnotationsToIgnore(CurrentUserId.class, CurrentMemberId.class);
+    }
+
+
     @Bean
     public OpenAPI auraBootOpenApi() {
         return new OpenAPI()
@@ -45,6 +53,27 @@ public class OpenApiConfig {
                                         .description("JWT token obtained from POST /api/auth/login → data.jwt")));
     }
 
+    /** Internal transport catalog; frontend consumers select explicit operations from this group. */
+    @Bean
+    public GroupedOpenApi internalWebAdminApi() {
+        return GroupedOpenApi.builder()
+                .group("internal-web-admin")
+                .addOpenApiCustomizer(new NullableReferenceOpenApiCustomizer())
+                .packagesToScan("com.auraboot.framework", "com.auraboot.module")
+                .pathsToMatch("/api/**")
+                .pathsToExclude("/api/open/v1/**", "/api/test/**", "/api/mobile/**",
+                        "/api/auth/verify-code/dev/**")
+                .addOpenApiCustomizer(api -> {
+                    api.setServers(java.util.List.of(new Server().url("/")));
+                    api.setInfo(new Info().title("AuraBoot Internal Web Admin API")
+                            .version("1.0.0")
+                            .description("Internal session-authenticated transport catalog. "
+                                    + "Operation authorization is enforced by the platform; "
+                                    + "this document does not grant external integration access."));
+                })
+                .build();
+    }
+
     /** Separate developer contract; internal controllers never enter this document by default. */
     @Bean
     public GroupedOpenApi openPlatformApi() {
@@ -57,7 +86,10 @@ public class OpenApiConfig {
                             .title("AuraBoot Open Platform API")
                             .version("v1")
                             .description("Explicitly published machine-to-machine APIs."));
-                    api.setSecurity(java.util.List.of(new SecurityRequirement().addList("oauth2ClientCredentials")));
+                    api.setSecurity(java.util.List.of(new SecurityRequirement().addList("integrationToken"),
+                            new SecurityRequirement().addList("oauth2ClientCredentials")));
+                    api.getComponents().addSecuritySchemes("integrationToken", new SecurityScheme().type(SecurityScheme.Type.HTTP)
+                            .scheme("bearer").bearerFormat("opaque").description("Direct integration token; current installation authority applies"));
                     api.getComponents().addSecuritySchemes("oauth2ClientCredentials",
                             new SecurityScheme()
                                     .type(SecurityScheme.Type.OAUTH2)

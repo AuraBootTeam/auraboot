@@ -40,5 +40,19 @@
     "name:en": "View Milestones",
     "resourceType": "data",
     "module": "tpm"
+  },
+  {
+    "code": "tpm.acceptance.read",
+    "name:zh-CN": "查看交付验收",
+    "name:en": "Read acceptance",
+    "resourceType": "data",
+    "module": "tpm"
+  },
+  {
+    "code": "tpm.acceptance.manage",
+    "name:zh-CN": "管理交付验收",
+    "name:en": "Manage acceptance",
+    "resourceType": "operation",
+    "module": "tpm"
   }
 ]

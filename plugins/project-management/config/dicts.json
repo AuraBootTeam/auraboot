@@ -8,7 +8,7 @@
       {
         "value": "planning",
         "label": "Planning",
-        "label:zh-CN": "规划中",
+        "label:zh-CN": "需求确认",
         "sortNo": 10,
         "color": "#1890ff",
         "status": "enabled",
@@ -19,12 +19,12 @@
       {
         "value": "active",
         "label": "Active",
-        "label:zh-CN": "进行中",
+        "label:zh-CN": "实施中",
         "sortNo": 20,
         "color": "#52c41a",
         "status": "enabled",
         "extension": {
-          "color": "green"
+          "color": "blue"
         }
       },
       {
@@ -41,7 +41,7 @@
       {
         "value": "completed",
         "label": "Completed",
-        "label:zh-CN": "已完成",
+        "label:zh-CN": "已交付",
         "sortNo": 40,
         "color": "#d9d9d9",
         "status": "enabled",
@@ -58,6 +58,16 @@
         "status": "enabled",
         "extension": {
           "color": "red"
+        }
+      },
+      {
+        "value": "acceptance",
+        "label": "Acceptance",
+        "label:zh-CN": "待验收",
+        "sortNo": 35,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
         }
       }
     ]
@@ -206,5 +216,106 @@
         }
       }
     ]
+  },
+  {
+    "code": "tpm_project_type",
+    "name:zh-CN": "项目类型",
+    "name:en": "Project type",
+    "items": [
+      {
+        "value": "custom_application",
+        "label:zh-CN": "企业应用定制",
+        "label:en": "Custom business application",
+        "label": "Custom business application",
+        "sortNo": 10,
+        "status": "enabled"
+      }
+    ],
+    "name": "Project type",
+    "dictType": "static"
+  },
+  {
+    "code": "tpm_acceptance_status",
+    "name:zh-CN": "验收状态",
+    "name:en": "Acceptance status",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "label:en": "Draft",
+        "sortNo": 0,
+        "extension": {
+          "color": "gray"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "submitted",
+        "label": "In review",
+        "label:zh-CN": "审批中",
+        "label:en": "In review",
+        "sortNo": 1,
+        "extension": {
+          "color": "blue"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "returned",
+        "label": "Needs revision",
+        "label:zh-CN": "待补正",
+        "label:en": "Needs revision",
+        "sortNo": 2,
+        "extension": {
+          "color": "orange"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "验收通过",
+        "label:en": "Accepted",
+        "sortNo": 3,
+        "extension": {
+          "color": "green"
+        },
+        "status": "enabled"
+      }
+    ],
+    "name": "Acceptance status",
+    "dictType": "static"
+  },
+  {
+    "code": "tpm_acceptance_risk",
+    "name:zh-CN": "验收风险",
+    "name:en": "Acceptance risk",
+    "items": [
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "普通",
+        "label:en": "Normal",
+        "sortNo": 0,
+        "extension": {
+          "color": "blue"
+        },
+        "status": "enabled"
+      },
+      {
+        "value": "high",
+        "label": "High risk",
+        "label:zh-CN": "高风险",
+        "label:en": "High risk",
+        "sortNo": 1,
+        "extension": {
+          "color": "red"
+        },
+        "status": "enabled"
+      }
+    ],
+    "name": "Acceptance risk",
+    "dictType": "static"
   }
 ]

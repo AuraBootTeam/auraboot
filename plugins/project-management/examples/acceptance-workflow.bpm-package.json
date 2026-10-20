@@ -1,0 +1,213 @@
+{
+  "format": "aura-bpm-package",
+  "version": "1.0",
+  "processKey": "tpm_delivery_acceptance",
+  "processDefinition": {
+    "processKey": "tpm_delivery_acceptance",
+    "processName": "客户交付验收 · 风险分级与时限",
+    "bpmnContent": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:smart=\"http://smartengine.org/schema/process\" targetNamespace=\"http://auraboot.com/bpm\">\n<process id=\"tpm_delivery_acceptance\" name=\"客户交付验收 · 风险分级与时限\" isExecutable=\"true\">\n<startEvent id=\"start\" name=\"提交交付材料\"/>\n<exclusiveGateway id=\"risk_route\" name=\"风险与金额分级\"><extensionElements><smart:properties><smart:property name=\"aura.ruleBinding\" value=\"{&quot;consumerType&quot;: &quot;BPM&quot;, &quot;consumerCode&quot;: &quot;tpm_delivery_acceptance&quot;, &quot;consumerNodeId&quot;: &quot;risk_route&quot;, &quot;bindingKind&quot;: &quot;DECISION_REF&quot;, &quot;enabled&quot;: true, &quot;decisionBinding&quot;: {&quot;decisionCode&quot;: &quot;tpm_acceptance_route&quot;, &quot;versionPolicy&quot;: &quot;LATEST_PUBLISHED&quot;, &quot;inputMappings&quot;: [{&quot;input&quot;: &quot;tpm_ac_amount&quot;, &quot;source&quot;: {&quot;kind&quot;: &quot;FIELD&quot;, &quot;scope&quot;: &quot;record&quot;, &quot;path&quot;: &quot;data.tpm_ac_amount&quot;}}, {&quot;input&quot;: &quot;tpm_ac_risk&quot;, &quot;source&quot;: {&quot;kind&quot;: &quot;FIELD&quot;, &quot;scope&quot;: &quot;record&quot;, &quot;path&quot;: &quot;data.tpm_ac_risk&quot;}}, {&quot;input&quot;: &quot;tpm_ac_open_issues&quot;, &quot;source&quot;: {&quot;kind&quot;: &quot;FIELD&quot;, &quot;scope&quot;: &quot;record&quot;, &quot;path&quot;: &quot;data.tpm_ac_open_issues&quot;}}, {&quot;input&quot;: &quot;tpm_ac_materials_complete&quot;, &quot;source&quot;: {&quot;kind&quot;: &quot;FIELD&quot;, &quot;scope&quot;: &quot;record&quot;, &quot;path&quot;: &quot;data.tpm_ac_materials_complete&quot;}}], &quot;outputMappings&quot;: [{&quot;output&quot;: &quot;route&quot;, &quot;target&quot;: {&quot;kind&quot;: &quot;PROCESS_VARIABLE&quot;, &quot;path&quot;: &quot;route&quot;}}], &quot;fallbackPolicy&quot;: {&quot;mode&quot;: &quot;FAIL_CLOSED&quot;}, &quot;traceMode&quot;: &quot;ALWAYS&quot;, &quot;enabled&quot;: true}}\"/></smart:properties></extensionElements></exclusiveGateway>\n<userTask id=\"tpm_standard_review\" name=\"交付负责人 · 常规验收\" smart:assigneeType=\"expression\" smart:assignee=\"#tpm_ac_reviewer\"/>\n<userTask id=\"tpm_enhanced_review\" name=\"验收负责人 · 加强审核\" smart:assigneeType=\"expression\" smart:assignee=\"#tpm_ac_reviewer\"/>\n<exclusiveGateway id=\"review_result\" name=\"验收结果\"/>\n<serviceTask id=\"accepted\" name=\"回写验收通过\" smart:class=\"commandServiceTaskDelegate\" smart:commandCode=\"tpm:accept_acceptance\" smart:operationType=\"update\" smart:targetRecordPid=\"${processBusinessKey}\"/>\n<serviceTask id=\"returned\" name=\"退回补正材料\" smart:class=\"commandServiceTaskDelegate\" smart:commandCode=\"tpm:return_acceptance\" smart:operationType=\"update\" smart:targetRecordPid=\"${processBusinessKey}\"/>\n<endEvent id=\"end\" name=\"保存结果与关闭时限\"/>\n<sequenceFlow id=\"f0\" sourceRef=\"start\" targetRef=\"risk_route\"></sequenceFlow>\n<sequenceFlow id=\"f1\" sourceRef=\"risk_route\" targetRef=\"tpm_standard_review\"><conditionExpression xsi:type=\"tFormalExpression\"><![CDATA[${route == 'standard'}]]></conditionExpression></sequenceFlow>\n<sequenceFlow id=\"f2\" sourceRef=\"risk_route\" targetRef=\"tpm_enhanced_review\"><conditionExpression xsi:type=\"tFormalExpression\"><![CDATA[${route == 'enhanced'}]]></conditionExpression></sequenceFlow>\n<sequenceFlow id=\"f3\" sourceRef=\"tpm_standard_review\" targetRef=\"review_result\"></sequenceFlow>\n<sequenceFlow id=\"f4\" sourceRef=\"tpm_enhanced_review\" targetRef=\"review_result\"></sequenceFlow>\n<sequenceFlow id=\"f5\" sourceRef=\"review_result\" targetRef=\"accepted\"><conditionExpression xsi:type=\"tFormalExpression\"><![CDATA[${_action == 'approve'}]]></conditionExpression></sequenceFlow>\n<sequenceFlow id=\"f6\" sourceRef=\"review_result\" targetRef=\"returned\"><conditionExpression xsi:type=\"tFormalExpression\"><![CDATA[${_action == 'reject'}]]></conditionExpression></sequenceFlow>\n<sequenceFlow id=\"f7\" sourceRef=\"accepted\" targetRef=\"end\"></sequenceFlow>\n<sequenceFlow id=\"f8\" sourceRef=\"returned\" targetRef=\"end\"></sequenceFlow>\n</process>\n</definitions>",
+    "extension": {
+      "designerJson": "{\"key\":\"tpm_delivery_acceptance\",\"name\":\"客户交付验收 · 风险分级与时限\",\"nodes\":[{\"id\":\"start\",\"type\":\"startEvent\",\"position\":{\"x\":80,\"y\":220},\"data\":{\"label\":\"提交交付材料\",\"config\":{},\"type\":\"startEvent\"}},{\"id\":\"risk_route\",\"type\":\"exclusiveGateway\",\"position\":{\"x\":320,\"y\":220},\"data\":{\"label\":\"风险与金额分级\",\"config\":{\"ruleBinding\":{\"consumerType\":\"BPM\",\"consumerCode\":\"tpm_delivery_acceptance\",\"consumerNodeId\":\"risk_route\",\"bindingKind\":\"DECISION_REF\",\"enabled\":true,\"decisionBinding\":{\"decisionCode\":\"tpm_acceptance_route\",\"versionPolicy\":\"LATEST_PUBLISHED\",\"inputMappings\":[{\"input\":\"tpm_ac_amount\",\"source\":{\"kind\":\"FIELD\",\"scope\":\"record\",\"path\":\"data.tpm_ac_amount\"}},{\"input\":\"tpm_ac_risk\",\"source\":{\"kind\":\"FIELD\",\"scope\":\"record\",\"path\":\"data.tpm_ac_risk\"}},{\"input\":\"tpm_ac_open_issues\",\"source\":{\"kind\":\"FIELD\",\"scope\":\"record\",\"path\":\"data.tpm_ac_open_issues\"}},{\"input\":\"tpm_ac_materials_complete\",\"source\":{\"kind\":\"FIELD\",\"scope\":\"record\",\"path\":\"data.tpm_ac_materials_complete\"}}],\"outputMappings\":[{\"output\":\"route\",\"target\":{\"kind\":\"PROCESS_VARIABLE\",\"path\":\"route\"}}],\"fallbackPolicy\":{\"mode\":\"FAIL_CLOSED\"},\"traceMode\":\"ALWAYS\",\"enabled\":true}}},\"type\":\"exclusiveGateway\"}},{\"id\":\"tpm_standard_review\",\"type\":\"userTask\",\"position\":{\"x\":590,\"y\":110},\"data\":{\"label\":\"常规验收 · 8小时\",\"config\":{\"assignee\":{\"type\":\"expression\",\"expression\":\"#tpm_ac_reviewer\"}},\"taskActions\":[{\"key\":\"approve\",\"label\":\"通过\",\"type\":\"complete\",\"resultVariable\":\"_action\",\"resultValue\":\"approve\",\"requireComment\":false},{\"key\":\"reject\",\"label\":\"驳回\",\"type\":\"complete\",\"resultVariable\":\"_action\",\"resultValue\":\"reject\",\"requireComment\":true}],\"type\":\"userTask\"}},{\"id\":\"tpm_enhanced_review\",\"type\":\"userTask\",\"position\":{\"x\":590,\"y\":340},\"data\":{\"label\":\"加强审核 · 2小时\",\"config\":{\"assignee\":{\"type\":\"expression\",\"expression\":\"#tpm_ac_reviewer\"}},\"taskActions\":[{\"key\":\"approve\",\"label\":\"通过\",\"type\":\"complete\",\"resultVariable\":\"_action\",\"resultValue\":\"approve\",\"requireComment\":false},{\"key\":\"reject\",\"label\":\"驳回\",\"type\":\"complete\",\"resultVariable\":\"_action\",\"resultValue\":\"reject\",\"requireComment\":true}],\"type\":\"userTask\"}},{\"id\":\"review_result\",\"type\":\"exclusiveGateway\",\"position\":{\"x\":870,\"y\":220},\"data\":{\"label\":\"验收结果\",\"config\":{},\"type\":\"exclusiveGateway\"}},{\"id\":\"accepted\",\"type\":\"serviceTask\",\"position\":{\"x\":1120,\"y\":110},\"data\":{\"label\":\"回写验收通过\",\"config\":{\"commandCode\":\"tpm:accept_acceptance\",\"operationType\":\"update\",\"targetRecordPid\":\"${processBusinessKey}\",\"serviceType\":\"command\"},\"type\":\"serviceTask\"}},{\"id\":\"returned\",\"type\":\"serviceTask\",\"position\":{\"x\":1120,\"y\":340},\"data\":{\"label\":\"退回补正材料\",\"config\":{\"commandCode\":\"tpm:return_acceptance\",\"operationType\":\"update\",\"targetRecordPid\":\"${processBusinessKey}\",\"serviceType\":\"command\"},\"type\":\"serviceTask\"}},{\"id\":\"end\",\"type\":\"endEvent\",\"position\":{\"x\":1410,\"y\":220},\"data\":{\"label\":\"结果留痕 · 时限关闭\",\"config\":{},\"type\":\"endEvent\"}}],\"edges\":[{\"id\":\"f0\",\"source\":\"start\",\"target\":\"risk_route\",\"data\":{\"label\":\"\"}},{\"id\":\"f1\",\"source\":\"risk_route\",\"target\":\"tpm_standard_review\",\"data\":{\"label\":\"常规\",\"condition\":{\"type\":\"expression\",\"content\":\"${route == 'standard'}\"}}},{\"id\":\"f2\",\"source\":\"risk_route\",\"target\":\"tpm_enhanced_review\",\"data\":{\"label\":\"加强\",\"condition\":{\"type\":\"expression\",\"content\":\"${route == 'enhanced'}\"}}},{\"id\":\"f3\",\"source\":\"tpm_standard_review\",\"target\":\"review_result\",\"data\":{\"label\":\"\"}},{\"id\":\"f4\",\"source\":\"tpm_enhanced_review\",\"target\":\"review_result\",\"data\":{\"label\":\"\"}},{\"id\":\"f5\",\"source\":\"review_result\",\"target\":\"accepted\",\"data\":{\"label\":\"通过\",\"condition\":{\"type\":\"expression\",\"content\":\"${_action == 'approve'}\"}}},{\"id\":\"f6\",\"source\":\"review_result\",\"target\":\"returned\",\"data\":{\"label\":\"补正\",\"condition\":{\"type\":\"expression\",\"content\":\"${_action == 'reject'}\"}}},{\"id\":\"f7\",\"source\":\"accepted\",\"target\":\"end\",\"data\":{\"label\":\"\"}},{\"id\":\"f8\",\"source\":\"returned\",\"target\":\"end\",\"data\":{\"label\":\"\"}}]}"
+    },
+    "formBindings": {
+      "tpm_standard_review": {
+        "nodeId": "tpm_standard_review",
+        "formType": "PAGE_DSL",
+        "formRef": "tpm_acceptance_form",
+        "versionStrategy": "LATEST",
+        "saveStrategy": "variable_only",
+        "permissionMode": "merge",
+        "fieldPermissions": {
+          "tpm_ac_name": "readonly",
+          "tpm_ac_project": "readonly",
+          "tpm_ac_scope": "readonly",
+          "tpm_ac_amount": "readonly",
+          "tpm_ac_risk": "readonly",
+          "tpm_ac_reviewer": "readonly",
+          "tpm_ac_files": "readonly",
+          "tpm_ac_open_issues": "readonly",
+          "tpm_ac_materials_complete": "readonly"
+        },
+        "builtinVariables": {
+          "decision": "_action",
+          "comment": "_comment"
+        }
+      },
+      "tpm_enhanced_review": {
+        "nodeId": "tpm_enhanced_review",
+        "formType": "PAGE_DSL",
+        "formRef": "tpm_acceptance_form",
+        "versionStrategy": "LATEST",
+        "saveStrategy": "variable_only",
+        "permissionMode": "merge",
+        "fieldPermissions": {
+          "tpm_ac_name": "readonly",
+          "tpm_ac_project": "readonly",
+          "tpm_ac_scope": "readonly",
+          "tpm_ac_amount": "readonly",
+          "tpm_ac_risk": "readonly",
+          "tpm_ac_reviewer": "readonly",
+          "tpm_ac_files": "readonly",
+          "tpm_ac_open_issues": "readonly",
+          "tpm_ac_materials_complete": "readonly"
+        },
+        "builtinVariables": {
+          "decision": "_action",
+          "comment": "_comment"
+        }
+      }
+    }
+  },
+  "nodeHooks": [],
+  "slaConfigs": [
+    {
+      "name": "交付验收 · 常规验收",
+      "targetType": "node",
+      "targetKey": "tpm_standard_review",
+      "deadlineMode": "RULE",
+      "deadlineValue": "tpm_acceptance_deadline",
+      "suspendPolicy": "pause",
+      "businessCalendar": false,
+      "enabled": true,
+      "warningRules": [
+        {
+          "threshold": "50%",
+          "action": "notify",
+          "recipients": "assignee"
+        },
+        {
+          "threshold": "100%",
+          "action": "escalate",
+          "recipients": "assignee"
+        }
+      ],
+      "slaKey": "tpm_standard_acceptance_sla",
+      "ruleBinding": {
+        "consumerType": "SLA",
+        "consumerCode": "tpm_standard_acceptance_sla",
+        "consumerNodeId": "tpm_standard_review",
+        "bindingKind": "DECISION_REF",
+        "enabled": true,
+        "decisionBinding": {
+          "decisionCode": "tpm_acceptance_deadline",
+          "versionPolicy": "LATEST_PUBLISHED",
+          "enabled": true,
+          "traceMode": "ALWAYS",
+          "fallbackPolicy": {
+            "mode": "FAIL_CLOSED"
+          },
+          "inputMappings": [
+            {
+              "input": "targetKey",
+              "source": {
+                "kind": "FIELD",
+                "scope": "record",
+                "path": "data.targetKey"
+              }
+            }
+          ],
+          "outputMappings": [
+            {
+              "output": "deadlineMinutes",
+              "target": {
+                "kind": "SLA_FIELD",
+                "path": "deadlineMinutes"
+              }
+            }
+          ]
+        }
+      },
+      "actionPolicy": {
+        "trigger": "SLA_TIMEOUT",
+        "failureStrategy": "FAIL_FAST",
+        "actions": [
+          {
+            "type": "NOTIFY",
+            "target": "ROLE:tenant_admin",
+            "order": 10,
+            "payload": {
+              "title": "交付验收审批已超时",
+              "content": "${sla.configName} 已超时，请在流程监控中查看并跟进待处理审批。"
+            },
+            "idempotencyKeyTemplate": "${sla.recordPid}:timeout:notify-admin"
+          }
+        ]
+      }
+    },
+    {
+      "name": "交付验收 · 加强审核",
+      "targetType": "node",
+      "targetKey": "tpm_enhanced_review",
+      "deadlineMode": "RULE",
+      "deadlineValue": "tpm_acceptance_deadline",
+      "suspendPolicy": "pause",
+      "businessCalendar": false,
+      "enabled": true,
+      "warningRules": [
+        {
+          "threshold": "50%",
+          "action": "notify",
+          "recipients": "assignee"
+        },
+        {
+          "threshold": "100%",
+          "action": "escalate",
+          "recipients": "assignee"
+        }
+      ],
+      "slaKey": "tpm_enhanced_acceptance_sla",
+      "ruleBinding": {
+        "consumerType": "SLA",
+        "consumerCode": "tpm_enhanced_acceptance_sla",
+        "consumerNodeId": "tpm_enhanced_review",
+        "bindingKind": "DECISION_REF",
+        "enabled": true,
+        "decisionBinding": {
+          "decisionCode": "tpm_acceptance_deadline",
+          "versionPolicy": "LATEST_PUBLISHED",
+          "enabled": true,
+          "traceMode": "ALWAYS",
+          "fallbackPolicy": {
+            "mode": "FAIL_CLOSED"
+          },
+          "inputMappings": [
+            {
+              "input": "targetKey",
+              "source": {
+                "kind": "FIELD",
+                "scope": "record",
+                "path": "data.targetKey"
+              }
+            }
+          ],
+          "outputMappings": [
+            {
+              "output": "deadlineMinutes",
+              "target": {
+                "kind": "SLA_FIELD",
+                "path": "deadlineMinutes"
+              }
+            }
+          ]
+        }
+      },
+      "actionPolicy": {
+        "trigger": "SLA_TIMEOUT",
+        "failureStrategy": "FAIL_FAST",
+        "actions": [
+          {
+            "type": "NOTIFY",
+            "target": "ROLE:tenant_admin",
+            "order": 10,
+            "payload": {
+              "title": "交付验收审批已超时",
+              "content": "${sla.configName} 已超时，请在流程监控中查看并跟进待处理审批。"
+            },
+            "idempotencyKeyTemplate": "${sla.recordPid}:timeout:notify-admin"
+          }
+        ]
+      }
+    }
+  ],
+  "permissions": []
+}

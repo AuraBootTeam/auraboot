@@ -12,14 +12,6 @@ class DialectAutoConfigurationTest {
     // ── Explicit configuration ───────────────────────────────────────
 
     @Test
-    void explicitMysql_createsMySqlDialect() {
-        DialectAutoConfiguration config = makeConfig("mysql", "");
-        DatabaseDialect dialect = config.databaseDialect();
-        assertEquals(DatabaseType.MYSQL, dialect.getType());
-        assertInstanceOf(MySqlDialect.class, dialect);
-    }
-
-    @Test
     void explicitPostgresql_createsPostgresDialect() {
         DialectAutoConfiguration config = makeConfig("postgresql", "");
         DatabaseDialect dialect = config.databaseDialect();
@@ -50,14 +42,6 @@ class DialectAutoConfigurationTest {
     // ── Auto-detection from URL ──────────────────────────────────────
 
     @Test
-    void mysqlUrl_autoDetectsMysql() {
-        DialectAutoConfiguration config = makeConfig("",
-                "jdbc:mysql://localhost:3306/mydb");
-        DatabaseDialect dialect = config.databaseDialect();
-        assertEquals(DatabaseType.MYSQL, dialect.getType());
-    }
-
-    @Test
     void postgresUrl_autoDetectsPostgresql() {
         DialectAutoConfiguration config = makeConfig("",
                 "jdbc:postgresql://localhost:5432/mydb?charSet=UTF8");
@@ -74,15 +58,13 @@ class DialectAutoConfigurationTest {
         assertEquals(DatabaseType.POSTGRESQL, dialect.getType());
     }
 
-    // ── Explicit overrides URL ───────────────────────────────────────
+    // ── Explicit rejects unknown dialects ────────────────────────────
 
     @Test
-    void explicitOverridesUrl() {
-        // URL says PostgreSQL, but explicit says MySQL → MySQL wins
+    void explicitMysql_rejectedAsUnsupported() {
         DialectAutoConfiguration config = makeConfig("mysql",
                 "jdbc:postgresql://localhost:5432/mydb");
-        DatabaseDialect dialect = config.databaseDialect();
-        assertEquals(DatabaseType.MYSQL, dialect.getType());
+        assertThrows(IllegalArgumentException.class, config::databaseDialect);
     }
 
     // ── Helper ───────────────────────────────────────────────────────

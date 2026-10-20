@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
+import { hydrateRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
-import WorkbenchPage from '../index';
+import WorkbenchPage, { loader } from '../index';
+import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
+
+vi.mock('react-router', async importOriginal => ({
+  ...(await importOriginal<typeof import('react-router')>()),
+  useLoaderData: () => ({ dashboard: { id: 'wb', widgets: [{ id: 'w1' }] }, loadError: null }),
+}));
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
+  normalizeDashboard: (raw: unknown) => raw,
   dashboardService: {
     getWorkbench: vi.fn(async () => ({ id: 'wb', widgets: [{ id: 'w1' }] })),
   },
@@ -32,6 +41,7 @@ const getMock = vi.fn(async (_url: string, _params?: Record<string, string>) => 
 }));
 vi.mock('~/shared/services/http-client', () => ({
   get: (url: string, params?: Record<string, string>) => getMock(url, params),
+  fetchResult: vi.fn(async () => ({ code: '0', data: { id: 'wb', widgets: [{ id: 'w1' }] } })),
 }));
 
 const listInboxMock = vi.fn(async (_params?: { pageSize?: number }) => ({
@@ -76,10 +86,45 @@ describe('WorkbenchPage header', () => {
     vi.clearAllMocks();
   });
 
+  it('renders the loader workbench immediately without a second browser request', async () => {
+    renderPage();
+    expect(screen.getByTestId('dashboard-viewer')).toBeInTheDocument();
+    await act(async () => {});
+    expect(dashboardService.getWorkbench).not.toHaveBeenCalled();
+  });
+
+  it('loads workbench configuration with the incoming SSR request', async () => {
+    const { fetchResult } = await import('~/shared/services/http-client');
+    const request = new Request('http://localhost/home');
+    const result = await loader({ request } as any);
+    expect(fetchResult).toHaveBeenCalledWith('/api/dashboards/workbench', {}, request);
+    expect(result.dashboard?.widgets).toHaveLength(1);
+    expect(result.loadError).toBeNull();
+  });
+
   it('renders a page title and dated subline', async () => {
     renderPage();
     expect(await screen.findByRole('heading', { name: 'workbench.title' })).toBeInTheDocument();
     expect(screen.getByTestId('workbench-subline').textContent).toMatch(/\d/);
+  });
+
+  it('hydrates without a date mismatch when server and browser calendar days differ', async () => {
+    const dateLabel = vi.spyOn(Date.prototype, 'toLocaleDateString').mockReturnValue('服务端10月11日');
+    const page = <MemoryRouter><WorkbenchPage /></MemoryRouter>;
+    const host = document.createElement('div');
+    host.innerHTML = renderToString(page);
+    const errors: unknown[] = [];
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      expect(host.querySelector('[data-testid="workbench-subline"]')?.textContent).not.toContain('服务端10月11日');
+      dateLabel.mockReturnValue('客户端10月10日');
+      await act(async () => { root = hydrateRoot(host, page, { onRecoverableError: error => errors.push(error) }); });
+      await waitFor(() => expect(host.querySelector('[data-testid="workbench-subline"]')?.textContent).toContain('客户端10月10日'));
+      expect(errors).toEqual([]);
+    } finally {
+      if (root) await act(async () => root?.unmount());
+      dateLabel.mockRestore();
+    }
   });
 
   it('renders Open-in-Dashboard / Export / New actions', async () => {

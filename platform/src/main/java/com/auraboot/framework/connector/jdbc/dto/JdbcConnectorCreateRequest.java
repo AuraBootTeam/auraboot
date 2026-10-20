@@ -10,8 +10,8 @@ public class JdbcConnectorCreateRequest {
     private String name;
 
     @NotBlank
-    @Pattern(regexp = "^jdbc:(mysql|postgresql)://.+$",
-             message = "jdbcUrl must start with jdbc:mysql:// or jdbc:postgresql://")
+    @Pattern(regexp = "^jdbc:postgresql://.+$",
+             message = "jdbcUrl must start with jdbc:postgresql://")
     private String jdbcUrl;
 
     @NotBlank

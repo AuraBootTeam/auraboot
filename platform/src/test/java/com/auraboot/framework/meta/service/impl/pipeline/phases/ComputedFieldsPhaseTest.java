@@ -21,7 +21,7 @@ class ComputedFieldsPhaseTest {
     final DynamicDataMapper mapper = mock(DynamicDataMapper.class);
     final RecordSnapshotReader snapshots = mock(RecordSnapshotReader.class);
     final ComputedFieldsPhase phase = new ComputedFieldsPhase(metadata, new CommandSpelEvaluator(), mapper,
-        mock(ChangeTracker.class), snapshots, new CommandFieldMapExecutor(mapper, metadata, null, null, null));
+        mock(ChangeTracker.class), snapshots, new CommandFieldMapExecutor(mapper, metadata, null, null, null, mock(CommandModelMutationSupport.class)));
     ModelDefinition model(boolean owned) {
         var fields = List.of(FieldDefinition.builder().code("qty").dataType("decimal").build(),
             FieldDefinition.builder().code("price").dataType("decimal").build(),

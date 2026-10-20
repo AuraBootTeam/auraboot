@@ -15,7 +15,7 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--no-frontend] [--no-warm] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--web-mode development|production] [--no-frontend] [--no-warm] [--no-redis] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #       --system-mode: bootstrap mode (default single). An initialized database
 #                      must already have this mode; retained data is never converted.
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
@@ -323,6 +323,19 @@ poll_http_up() {  # poll_http_up <url> <timeout-s>
 
 spawn_detached() {  # spawn_detached <pid-file> <work-dir> <log-file> <cmd> [args...]
   local pid_file="$1" work_dir="$2" log_file="$3"; shift 3
+  if [ "${pid_file##*/}" = frontend.pid ]; then
+    [ "${1:-}" = env ] || die "frontend launch requires explicit runtime environment"
+    shift
+    local frontend_env=() frontend_name="" assignment
+    while [ $# -gt 0 ] && [[ "$1" = *=* ]]; do
+      assignment="$1"; shift
+      frontend_env+=("$assignment")
+      case "$assignment" in AURA_RUNTIME_NAME=*) frontend_name="${assignment#*=}";; esac
+    done
+    [ -n "$frontend_name" ] && [ $# -gt 0 ] || die "frontend launch identity missing"
+    set -- env "${frontend_env[@]}" node "$SCRIPT_DIR/lib/golden-frontend-supervisor.mjs" \
+      "$frontend_name" "$REPO_ROOT" "$DEV" -- "$@"
+  fi
   local py; py="$(command -v python3 2>/dev/null || true)"
   if [ -n "$py" ]; then
     "$py" - "$pid_file" "$work_dir" "$log_file" "$@" <<'PY'
@@ -364,7 +377,7 @@ cmd_up() {
   local workspace_source_root="" report_renderer=0 renderer_env_args=()
   local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
-  local parallel_reason=""
+  local parallel_reason="" redis_host="127.0.0.1" web_mode="development"
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
@@ -387,8 +400,10 @@ cmd_up() {
       shift
       ;;
     --system-mode) system_mode="${2:-}"; [ $# -ge 2 ] || die "--system-mode requires a value"; shift 2;;
+    --web-mode) web_mode="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
+    --no-redis) redis_host=""; shift;;
     --fresh-db) fresh_db=1; shift;;
     --require-new-db) require_new_db=1; shift;;
     --product-migration-root)
@@ -424,6 +439,10 @@ cmd_up() {
       ;;
     *) die "unknown arg: $1";;
   esac; done
+  case "$web_mode" in development|production) ;; *) die "invalid --web-mode";; esac
+  if [ "$web_mode" = production ]; then
+    [ -n "${SESSION_SECRET_FILE:-}" ] && [ -r "$SESSION_SECRET_FILE" ] || die "production requires explicit SESSION_SECRET_FILE"
+  fi
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
   [ "$fresh_db$require_new_db" != "11" ] || die "--fresh-db and --require-new-db are mutually exclusive"
   [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] || [ "$require_new_db" = "1" ] \
@@ -464,6 +483,9 @@ Repair the shell environment (e.g. export PATH=\"\$JAVA_HOME/bin:\$PATH\") and r
   [ -z "$parallel_reason" ] || allocation_args+=(--parallel-reason "$parallel_reason")
   AURA_RUNTIME_AUTO_GC_BEFORE_ALLOCATE=false "$DEV" runtime ensure auraboot "$name" "${allocation_args[@]}" >/dev/null
   sd="$(prepare_state_dir "$name")" || die "cannot prepare stable stack state"
+  if [ "$web_mode" = production ]; then
+    printf '%s\n' "$SESSION_SECRET_FILE" >"$sd/session-secret.path"
+  fi
   local evidence_root
   evidence_root="$("$DEV" runtime evidence begin "$name" --purpose "OSS golden stack rebuild")" \
     || die "cannot create a separate evidence round"
@@ -643,10 +665,10 @@ XML
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/logs/backend-console.log" \
-    env MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
-      SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
+      SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
@@ -754,10 +776,15 @@ XML
       "$REPO_ROOT/web-admin/.vite/"*) rm -rf "$vite_cache_dir" ;;
       *) die "refusing to clear unexpected Vite cache path: $vite_cache_dir" ;;
     esac
+    if [ "$web_mode" = production ]; then
+      log "    build production client and SSR from the frozen checkout"
+      ( cd "$REPO_ROOT/web-admin" && NODE_ENV=production pnpm build ) >"$sd/logs/web-build.log" 2>&1 \
+        || die "production Web build failed — see $sd/logs/web-build.log"
+    fi
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/logs/frontend.log" \
       env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
-      BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
-      pnpm dev:full
+      BFF_INTERNAL_URL="http://127.0.0.1:$server_port" AURA_WEB_MODE="$web_mode" SESSION_SECRET_FILE="${SESSION_SECRET_FILE:-}" \
+      bash "$SCRIPT_DIR/dev/start-web-stack.sh" fresh
     node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
       || die "frontend supervisor registration failed"
     # Wait for Vite to start accepting connections (302 → /login is fine). Poll
@@ -989,6 +1016,10 @@ export PG_DB=${pg_db:-aura_boot}
 #       'up' is therefore reliable. Fallback if a brand-new route ever cold-reopts:
 #       curl --noproxy '*' -s \$PLAYWRIGHT_BASE_URL/<route> once before running.
 EOF
+  if [ -f "$sd/session-secret.path" ]; then
+    printf 'export SESSION_SECRET_FILE=%q\n' "$(cat "$sd/session-secret.path")"
+    printf '%s\n' 'export SESSION_SECRET="$(cat "$SESSION_SECRET_FILE")"'
+  fi
 }
 
 # ---- status --------------------------------------------------------------------------
@@ -1017,7 +1048,7 @@ cmd_lifecycle_resume() {
 }
 
 cmd_resume_retained() {
-  local name="$1" sd recipe run_jar llm_stub_mode logging_config runtime_token server_port vite_port bff_port pg_db redis_db
+  local name="$1" sd recipe run_jar llm_stub_mode logging_config runtime_token server_port vite_port bff_port pg_db redis_db redis_host
   sd="$(state_dir "$name")"
   recipe="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load "$name" "$REPO_ROOT" "$DEV")" \
     || die "retained launch inputs changed; resume refused"
@@ -1027,6 +1058,10 @@ cmd_resume_retained() {
   if [ -n "$logging_config" ]; then
     logging_args=("LOGGING_CONFIG=file:$logging_config" "LOGGING_FILE_NAME=$sd/logs/backend.log")
   fi
+  redis_host="$(printf '%s\n' "$recipe" | sed -n '4p')"
+  local telemetry_env_args=() telemetry_env_text
+  telemetry_env_text="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load-env "$name" "$REPO_ROOT" "$DEV")" || die "retained telemetry configuration refused"
+  while IFS= read -r line; do [ -z "$line" ] || telemetry_env_args+=("$line"); done <<< "$telemetry_env_text"
   llm_stub_mode="$(printf '%s\n' "$recipe" | sed -n '2p')"
   server_port="$(runtime_env "$name" SERVER_PORT)"
   vite_port="$(runtime_env "$name" VITE_PORT)"
@@ -1041,10 +1076,10 @@ cmd_resume_retained() {
     while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
   fi
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env "${logging_args[@]}" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env "${logging_args[@]}" ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
-      SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
+      SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
@@ -1065,9 +1100,9 @@ cmd_resume_retained() {
     || die "resumed backend listener identity mismatch"
   # Execute the existing frontend commands directly; dev:full would sync/generate plugins.
   spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
-    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 \
-      SPRING_BOOT_URL="http://127.0.0.1:$server_port" BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
-      pnpm exec concurrently --names "web,bff" --prefix-colors "cyan,green" --restart-tries 20 --restart-after 2000 "pnpm dev:web" "pnpm dev:bff"
+    env ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 \
+      SPRING_BOOT_URL="http://127.0.0.1:$server_port" BFF_INTERNAL_URL="http://127.0.0.1:$server_port" \
+      bash "$SCRIPT_DIR/dev/start-web-stack.sh" retained
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
     || die "resumed supervisor registration failed"
   poll_http_up "http://127.0.0.1:$vite_port/" 120 || die "retained Web did not become reachable"

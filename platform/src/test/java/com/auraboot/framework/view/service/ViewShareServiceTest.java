@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -29,18 +30,19 @@ class ViewShareServiceTest {
 
     @Mock private SavedViewMapper savedViewMapper;
     @Mock private SavedViewService savedViewService;
+    @Mock private PasswordEncoder passwordEncoder;
     @InjectMocks private ViewShareService service;
 
     @Test
     void createShareLink_generatesTokenAndUrl() {
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
 
-        Map<String, Object> result = service.createShareLink("v1", null, 24);
+        var result = service.createShareLink("v1", null, 24);
 
-        assertNotNull(result.get("token"));
-        assertTrue(((String) result.get("shareUrl")).startsWith("/api/views/shared/"));
-        assertNotNull(result.get("expiresAt"));
-        assertEquals(false, result.get("passwordProtected"));
+        assertNotNull(result.token());
+        assertTrue(result.shareUrl().startsWith("/api/views/shared/"));
+        assertNotNull(result.expiresAt());
+        assertEquals(false, result.passwordProtected());
         var ordered = inOrder(savedViewService, savedViewMapper);
         ordered.verify(savedViewService).checkPublicShareAccess("v1");
         ordered.verify(savedViewMapper).selectRawViewConfigJson("v1");
@@ -48,21 +50,22 @@ class ViewShareServiceTest {
     }
 
     @Test
-    void createShareLink_withPasswordSetsHash() {
+    void createShareLink_withPasswordStoresBcryptHash() {
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
+        when(passwordEncoder.encode("secret")).thenReturn("$2a$10$storedhashvalue");
 
-        Map<String, Object> result = service.createShareLink("v1", "secret", null);
+        var result = service.createShareLink("v1", "secret", null);
 
-        assertEquals(true, result.get("passwordProtected"));
-        assertNull(result.get("expiresAt"));
-        verify(savedViewMapper).updateViewConfigJson(eq("v1"), contains("passwordHash"));
+        assertEquals(true, result.passwordProtected());
+        assertNull(result.expiresAt());
+        verify(savedViewMapper).updateViewConfigJson(eq("v1"), contains("$2a$10$storedhashvalue"));
     }
 
     @Test
     void createShareLink_blankPasswordTreatedAsNoPassword() {
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
-        Map<String, Object> result = service.createShareLink("v1", "  ", null);
-        assertEquals(false, result.get("passwordProtected"));
+        var result = service.createShareLink("v1", "  ", null);
+        assertEquals(false, result.passwordProtected());
     }
 
     @Test
@@ -88,29 +91,39 @@ class ViewShareServiceTest {
     @Test
     void getShareStatus_returnsSharedFalseWhenAbsent() {
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
-        Map<String, Object> r = service.getShareStatus("v1");
-        assertEquals(false, r.get("shared"));
-        assertNull(r.get("token"));
+        var r = service.getShareStatus("v1");
+        assertEquals(false, r.shared());
+        assertNull(r.token());
     }
 
     @Test
     void getShareStatus_returnsSharedTrueWithMeta() {
         when(savedViewMapper.selectRawViewConfigJson("v1"))
                 .thenReturn("{\"__share\":{\"token\":\"abc\",\"active\":true,\"passwordHash\":\"h\",\"expiresAt\":\"2099-01-01T00:00:00Z\"}}");
-        Map<String, Object> r = service.getShareStatus("v1");
-        assertEquals(true, r.get("shared"));
-        assertEquals("abc", r.get("token"));
+        var r = service.getShareStatus("v1");
+        assertEquals(true, r.shared());
+        assertEquals("abc", r.token());
         var ordered = inOrder(savedViewService, savedViewMapper);
         ordered.verify(savedViewService).checkPublicShareAccess("v1");
         ordered.verify(savedViewMapper).selectRawViewConfigJson("v1");
-        assertEquals(true, r.get("passwordProtected"));
+        assertEquals(true, r.passwordProtected());
     }
 
-    @Test
-    void getShareStatus_handlesInvalidJsonGracefully() {
-        when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("not-json");
-        Map<String, Object> r = service.getShareStatus("v1");
-        assertEquals(false, r.get("shared"));
+    @ParameterizedTest
+    @ValueSource(strings = {"not-json", "[]", "\"not-an-object\"", "null"})
+    void getShareStatus_rejectsCorruptConfigurationWithoutWritingAnEmptyReplacement(String raw) {
+        when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn(raw);
+        assertThrows(IllegalStateException.class, () -> service.getShareStatus("v1"));
+        verify(savedViewMapper, never()).updateViewConfigJson(anyString(), anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-json", "[]", "\"not-an-object\"", "null"})
+    void corruptConfigurationCannotBeOverwrittenByShareOrRevoke(String raw) {
+        when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn(raw);
+        assertThrows(IllegalStateException.class, () -> service.createShareLink("v1", null, null));
+        assertThrows(IllegalStateException.class, () -> service.revokeShareLink("v1"));
+        verify(savedViewMapper, never()).updateViewConfigJson(anyString(), anyString());
     }
 
     @Test
@@ -169,24 +182,45 @@ class ViewShareServiceTest {
         meta.put("viewconfigraw", "{\"__share\":{\"active\":true},\"foo\":\"bar\"}");
         when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(meta);
 
-        Map<String, Object> r = service.accessSharedView("t", null);
-        assertEquals("Saved", r.get("name"));
+        var r = service.accessSharedView("t", null);
+        assertEquals("Saved", r.name());
         verifyNoInteractions(savedViewService);
-        assertEquals("User", r.get("modelCode"));
-        assertEquals("list", r.get("viewType"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> cfg = (Map<String, Object>) r.get("viewConfig");
+        assertEquals("User", r.modelCode());
+        assertEquals("list", r.viewType());
+        Map<String, Object> cfg = r.viewConfig();
         assertFalse(cfg.containsKey("__share"));
         assertEquals("bar", cfg.get("foo"));
     }
 
     @Test
-    void accessSharedView_correctPasswordSucceeds() {
+    void accessSharedView_bcryptPasswordVerified() {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("viewconfigraw", "{\"__share\":{\"active\":true,\"passwordHash\":\"$2a$10$stored\"}}");
+        when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(meta);
+        when(passwordEncoder.matches("pw", "$2a$10$stored")).thenReturn(true);
+
+        assertNotNull(service.accessSharedView("t", "pw"));
+    }
+
+    @Test
+    void accessSharedView_bcryptPasswordMismatchThrows() {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("viewconfigraw", "{\"__share\":{\"active\":true,\"passwordHash\":\"$2a$10$stored\"}}");
+        when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(meta);
+        when(passwordEncoder.matches("wrong", "$2a$10$stored")).thenReturn(false);
+
+        RuntimeException e = assertThrows(RuntimeException.class, () -> service.accessSharedView("t", "wrong"));
+        assertTrue(e.getMessage().contains("Invalid password"));
+    }
+
+    @Test
+    void accessSharedView_legacyHexHashStillAccepted() {
         Map<String, Object> meta = new HashMap<>();
         meta.put("viewconfigraw", "{\"__share\":{\"active\":true,\"passwordHash\":\"" + Integer.toHexString("pw".hashCode()) + "\"}}");
         when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(meta);
-        Map<String, Object> r = service.accessSharedView("t", "pw");
-        assertNotNull(r);
+
+        assertNotNull(service.accessSharedView("t", "pw"));
+        verifyNoInteractions(passwordEncoder);
     }
 
     @Test

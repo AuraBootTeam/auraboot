@@ -2,6 +2,7 @@ package com.auraboot.module.bitemporal.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.module.bitemporal.dto.BiTemporalRequest;
 import com.auraboot.module.bitemporal.entity.BiTemporalRecord;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
@@ -22,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/bitemporal")
 @RequiredArgsConstructor
+@AuthenticatedAccess("generic bi-temporal versioning API over caller-supplied entity types; writes are stamped with the caller's MetaContext userId")
 public class BiTemporalController {
 
     private final BiTemporalService biTemporalService;

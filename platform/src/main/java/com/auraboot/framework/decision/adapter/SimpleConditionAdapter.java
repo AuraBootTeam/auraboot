@@ -93,7 +93,8 @@ public class SimpleConditionAdapter implements DecisionAdapter {
                 .status(status)
                 .matched(t == Truth.TRUE)
                 .outputs(outputs)
-                .unknownReasons(trace.unknownReasons());
+                .unknownReasons(trace.unknownReasons())
+                .conditionTrace(options.explain() ? trace : null);
         return b.build();
     }
 

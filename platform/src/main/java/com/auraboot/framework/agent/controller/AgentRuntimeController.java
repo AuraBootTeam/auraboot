@@ -2,7 +2,7 @@ package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.auraboot.framework.agent.dto.CapabilityView;
 import com.auraboot.framework.agent.eval.AgentOnlineEvalService;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
@@ -32,6 +32,7 @@ import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,6 +46,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/agent")
 @RequiredArgsConstructor
+@AuthenticatedAccess("tenant-scoped metadata reads for the authenticated caller; write operations carry method-level @RequirePermission")
 public class AgentRuntimeController {
 
     private final AgentProperties agentProperties;

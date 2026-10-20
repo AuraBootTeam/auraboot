@@ -8,6 +8,7 @@ import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 class AgentChatToolRuntimeAdapterFactory {
@@ -19,7 +20,7 @@ class AgentChatToolRuntimeAdapterFactory {
     private final AgentChatToolExecutionAdapter toolExecutionAdapter;
 
     ChatTurnRuntime.ChatToolLoopCallbacks callbacks(AgentChatPortImpl owner,
-                                                    List<AgentContextBlock> contextBlocks) {
+                                                    List<AgentContextBlock> contextBlocks, Set<String> allowedToolCodes) {
         return new AgentChatToolRuntimeAdapter(
                 owner,
                 runtimeStateFactory,
@@ -27,7 +28,8 @@ class AgentChatToolRuntimeAdapterFactory {
                 pendingToolSnapshotFactory,
                 contextBlocks,
                 outcomeAdapter,
-                toolExecutionAdapter)
+                toolExecutionAdapter,
+                allowedToolCodes)
                 .callbacks();
     }
 }

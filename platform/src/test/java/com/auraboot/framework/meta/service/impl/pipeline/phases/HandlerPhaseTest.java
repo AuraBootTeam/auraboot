@@ -121,6 +121,10 @@ class HandlerPhaseTest {
 
     @Test
     void execute_usesConfiguredPluginHandlerAndPassesHandlerParamsAsSettings() throws Exception {
+        var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.AiProviderAccessorFactory.class);
+        var accessor = org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.AiProviderAccessor.class);
+        when(factory.create(1L)).thenReturn(accessor);
+        ReflectionTestUtils.setField(phase, "aiProviderAccessorFactory", factory);
         RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
         when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
         when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
@@ -158,6 +162,8 @@ class HandlerPhaseTest {
                 .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY)
                 .containsKey(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY);
         assertThat(handler.capturedContext.get().fileAccessor()).isInstanceOf(FileAccessor.class);
+        assertThat(handler.capturedContext.get().aiProviderAccessor()).isSameAs(accessor);
+        verify(factory).create(1L);
         assertThat(handler.capturedContext.get().expectedVersion()).isEqualTo(5L);
         assertThat(handler.capturedContext.get().clientRequestId()).isEqualTo("client-request-1");
         assertThat(handler.capturedContext.get().independentTransactionAccessor()).isNotNull();

@@ -8,10 +8,13 @@ import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { dictService } from '~/shared/services/dictService';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 import type { DictCreateRequest, DictItemData } from '~/types/dict';
 
 export default function DictCreatePage() {
   const navigate = useNavigate();
+  const { t, locale } = useI18n();
+  const [showRequiredErrors, setShowRequiredErrors] = useState(false);
   const { showSuccessToast, showErrorToast } = useToastContext();
 
   const [loading, setLoading] = useState(false);
@@ -81,7 +84,7 @@ export default function DictCreatePage() {
                   value: item.value,
                   label: item.label,
                   sortOrder: item.order || 0,
-                  parentValue: item.parentValue,
+                  parentValue: item.parentValue ?? undefined,
                   disabled: item.disabled || false,
                   extension: item.extension,
                 }))
@@ -117,39 +120,75 @@ export default function DictCreatePage() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="rounded-lg bg-white p-6 shadow">
+      <form
+        onSubmit={handleSubmit}
+        onInvalid={(event) => {
+          event.preventDefault();
+          setShowRequiredErrors(true);
+          event.currentTarget.querySelector<HTMLElement>(':invalid')?.focus();
+        }}
+        className="rounded-lg bg-white p-6 shadow"
+      >
         <div className="space-y-6">
           {/* Basic Info */}
           <div>
             <h2 className="mb-4 text-lg font-medium text-gray-900">基本信息</h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label htmlFor="dict-code" className="mb-1 block text-sm font-medium text-gray-700">
                   字典编码 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="dict-code"
                   value={formData.code}
+                  aria-invalid={showRequiredErrors && !formData.code}
+                  aria-describedby={
+                    showRequiredErrors && !formData.code ? 'dict-code-required' : undefined
+                  }
                   onChange={(e) => handleFieldChange('code', e.target.value)}
                   placeholder="例如: user_status"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   required
                 />
+                {showRequiredErrors && !formData.code && (
+                  <p id="dict-code-required" role="alert" className="mt-1 text-sm text-red-600">
+                    {t(
+                      'dict.validation.codeRequired',
+                      undefined,
+                      locale.startsWith('zh') ? '请输入字典编码' : 'Enter a dictionary code',
+                    )}
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-gray-500">使用小写字母、数字和下划线</p>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label htmlFor="dict-name" className="mb-1 block text-sm font-medium text-gray-700">
                   字典名称 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="dict-name"
                   value={formData.name}
+                  aria-invalid={showRequiredErrors && !formData.name}
+                  aria-describedby={
+                    showRequiredErrors && !formData.name ? 'dict-name-required' : undefined
+                  }
                   onChange={(e) => handleFieldChange('name', e.target.value)}
                   placeholder="例如: 用户状态"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   required
                 />
+                {showRequiredErrors && !formData.name && (
+                  <p id="dict-name-required" role="alert" className="mt-1 text-sm text-red-600">
+                    {t(
+                      'dict.validation.nameRequired',
+                      undefined,
+                      locale.startsWith('zh') ? '请输入字典名称' : 'Enter a dictionary name',
+                    )}
+                  </p>
+                )}
               </div>
 
               <div>

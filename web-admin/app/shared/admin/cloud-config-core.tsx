@@ -18,6 +18,7 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { get, post, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { useSmartText } from '~/utils/i18n';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +53,9 @@ export interface ProviderFieldDef {
   sensitive: boolean;
   required: boolean;
   placeholder?: string;
+  labelZh?: string;
+  helpText?: { zh: string; en: string };
+  valueType?: 'json-array';
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +68,7 @@ export const SERVICE_TYPES: { key: ServiceType; label: string }[] = [
   { key: 'oauth', label: 'OAuth 登录' },
   { key: 'storage', label: '对象存储' },
   { key: 'cdn', label: 'CDN 加速' },
-  { key: 'im', label: 'IM Webhook' },
+  { key: 'im', label: 'IM' },
   { key: 'llm', label: 'AI 模型供应商' },
   { key: 'prompt_template', label: 'Prompt 模板' },
 ];
@@ -85,7 +89,8 @@ export const PROVIDER_LABELS: Record<string, string> = {
   minio: 'MinIO',
   cloudfront: 'AWS CloudFront',
   aliyun_cdn: '阿里云 CDN',
-  lark: 'Lark (飞书)',
+  lark: 'Feishu webhook (one-way notifications)',
+  feishu_bot: 'Feishu application bot (read-only queries)',
   dingtalk: 'DingTalk (钉钉)',
   wecom: 'WeCom (企业微信)',
   // LLM providers
@@ -108,7 +113,7 @@ export const PROVIDERS_BY_TYPE: Record<ServiceType, string[]> = {
   oauth: ['wechat_web', 'wechat_mp', 'wechat_miniapp', 'google', 'apple'],
   storage: ['local', 's3', 'oss', 'minio'],
   cdn: ['cloudfront', 'aliyun_cdn'],
-  im: ['lark', 'dingtalk', 'wecom'],
+  im: ['lark', 'feishu_bot', 'dingtalk', 'wecom'],
   llm: ['anthropic', 'openai', 'deepseek', 'minimaxi', 'qianwen', 'zhipu', 'moonshot'],
   prompt_template: ['aurabot_system', 'aurabot_context', 'aurabot_tool_hint'],
 };
@@ -299,6 +304,70 @@ export const PROVIDER_FIELDS: Record<string, ProviderFieldDef[]> = {
       placeholder: 'Optional signing secret',
     },
   ],
+  feishu_bot: [
+    {
+      key: 'appId',
+      label: 'Application ID',
+      labelZh: '应用 ID',
+      sensitive: false,
+      required: true,
+      placeholder: 'cli_…',
+    },
+    {
+      key: 'appSecret',
+      label: 'Application secret',
+      labelZh: '应用密钥',
+      sensitive: true,
+      required: true,
+    },
+    {
+      key: 'verificationToken',
+      label: 'Verification token',
+      labelZh: '事件验证 Token',
+      sensitive: true,
+      required: true,
+    },
+    {
+      key: 'encryptKey',
+      label: 'Encrypt key',
+      labelZh: '事件加密密钥',
+      sensitive: true,
+      required: true,
+    },
+    {
+      key: 'botOpenId',
+      label: 'Bot open ID',
+      labelZh: '机器人 Open ID',
+      sensitive: false,
+      required: true,
+      placeholder: 'ou_…',
+    },
+    {
+      key: 'agentCode',
+      label: 'Read-only agent code',
+      labelZh: '只读智能体代码',
+      sensitive: false,
+      required: true,
+      helpText: {
+        zh: '使用已发布的只读智能体。机器人仅开放有权限的模型或命名查询，不允许写入、原始 SQL 或外部工具。',
+        en: 'Use a published read-only agent. Only authorized model or named queries are available; writes, raw SQL and external tools are blocked.',
+      },
+    },
+    {
+      key: 'bindings',
+      label: 'Identity bindings (JSON array)',
+      labelZh: '身份绑定（JSON 数组）',
+      sensitive: false,
+      required: true,
+      valueType: 'json-array',
+      placeholder:
+        '[{"openId":"ou_…","chatId":"oc_…","userPid":"…","conversationPid":"…"}]',
+      helpText: {
+        zh: '每项填写飞书用户 Open ID、会话 Chat ID、AuraBoot 用户 PID 和专属会话 PID。同一飞书用户与群聊只能有一项绑定；不同用户或群聊不能共用 AuraBoot 会话。',
+        en: 'Each entry needs openId, chatId, userPid and conversationPid. Bind each Feishu sender/chat once, with a separate AuraBoot conversation for every sender/chat.',
+      },
+    },
+  ],
   dingtalk: [
     {
       key: 'webhookUrl',
@@ -411,6 +480,77 @@ export const PROVIDER_FIELDS: Record<string, ProviderFieldDef[]> = {
 // Utility functions
 // ---------------------------------------------------------------------------
 
+export function cloudProviderLabel(code: string, locale: string): string {
+  if (locale === 'zh-CN') {
+    if (code === 'lark') return '飞书 Webhook（单向通知）';
+    if (code === 'feishu_bot') return '飞书应用机器人（只读查询）';
+  }
+  return PROVIDER_LABELS[code] || code;
+}
+
+export class ProviderConfigValidationError extends Error {}
+
+/** Keep form controls textual while preserving structured values in the persisted JSON. */
+export function providerFormValues(config: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(safeParseJSON(config)).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? value : JSON.stringify(value),
+    ]),
+  );
+}
+
+export function serializeProviderConfig(
+  providerCode: string,
+  values: Record<string, string>,
+): Record<string, unknown> {
+  if (providerCode !== 'feishu_bot') return values;
+  let bindings: unknown;
+  try {
+    bindings = JSON.parse(values.bindings);
+  } catch {
+    throw new ProviderConfigValidationError('bindings');
+  }
+  if (!Array.isArray(bindings) || bindings.length === 0)
+    throw new ProviderConfigValidationError('bindings');
+  const contexts = new Set<string>();
+  const conversations = new Set<string>();
+  const normalized = bindings.map((binding: unknown) => {
+    if (!binding || typeof binding !== 'object' || Array.isArray(binding))
+      throw new ProviderConfigValidationError('bindings');
+    const row = binding as Record<string, unknown>;
+    for (const key of ['openId', 'chatId', 'userPid', 'conversationPid']) {
+      if (
+        typeof row[key] !== 'string' ||
+        !row[key].trim() ||
+        row[key].length > 4096
+      )
+        throw new ProviderConfigValidationError('bindings');
+    }
+    const item = Object.fromEntries(
+      ['openId', 'chatId', 'userPid', 'conversationPid'].map((key) => [
+        key,
+        (row[key] as string).trim(),
+      ]),
+    );
+    const context = JSON.stringify([item.openId, item.chatId]);
+    if (contexts.has(context) || conversations.has(item.conversationPid))
+      throw new ProviderConfigValidationError('bindings');
+    contexts.add(context);
+    conversations.add(item.conversationPid);
+    return item;
+  });
+  const fields: Record<string, unknown> = {};
+  for (const field of PROVIDER_FIELDS.feishu_bot) {
+    if (field.key === 'bindings') continue;
+    const value = values[field.key];
+    if (typeof value !== 'string' || !value.trim() || value.length > 4096)
+      throw new ProviderConfigValidationError('required');
+    fields[field.key] = value.trim();
+  }
+  return { ...fields, bindings: normalized };
+}
+
 export function maskValue(value: string): string {
   if (!value || value.length <= 4) return '****';
   return value.slice(0, 2) + '*'.repeat(Math.min(value.length - 4, 12)) + value.slice(-2);
@@ -460,6 +600,7 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
   const apiBase = options.apiBase ?? '/api/admin/cloud-config';
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { t } = useI18n();
+  const st = useSmartText();
   const [configs, setConfigs] = useState<CloudConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [level, setLevel] = useState<ConfigLevel>(options.initialLevel ?? 'platform');
@@ -538,6 +679,10 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
   };
 
   const handleTest = async (config: CloudConfig) => {
+    if (config.providerCode === 'feishu_bot') {
+      showErrorToast(st({ zh: '应用机器人需要通过真实签名事件回调验证；通用连接测试不验证飞书消息收发。', en: 'Application bots require a real signed callback. The generic connection test does not verify Feishu messaging.' }));
+      return;
+    }
     setTestingPid(config.pid);
     try {
       const result = await post<{ status: string; message: string }>(
@@ -591,11 +736,24 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
       return false;
     }
     try {
+      if (data.providerCode === 'feishu_bot' && data.configLevel !== 'tenant') {
+        showErrorToast(
+          st({
+            zh: '飞书应用机器人必须使用租户级配置。',
+            en: 'Feishu application bots require tenant-level configuration.',
+          }),
+        );
+        return false;
+      }
+      const providerConfig = serializeProviderConfig(
+        data.providerCode,
+        data.config,
+      );
       const body: any = {
         configLevel: data.configLevel,
         serviceType: data.serviceType,
         providerCode: data.providerCode,
-        config: JSON.stringify(data.config),
+        config: JSON.stringify(providerConfig),
         enabled: data.enabled,
         priority: data.priority,
       };
@@ -611,7 +769,14 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
         showErrorToast(result.desc || '保存失败');
       }
     } catch (e: any) {
-      showErrorToast(e.message || '保存失败');
+      showErrorToast(
+        e instanceof ProviderConfigValidationError
+          ? st({
+              zh: '请检查必填配置及身份绑定：绑定必须是非空 JSON 数组，且用户、群聊和会话不能重复或共用。',
+              en: 'Check required fields and bindings: use a non-empty JSON array with unique sender/chat pairs and separate conversations.',
+            })
+          : e.message || '保存失败',
+      );
     }
     return false;
   };
@@ -657,6 +822,7 @@ export function ConfigCard({
   onToggle: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const { locale } = useI18n();
   const parsed = safeParseJSON(config.config);
   const fields = PROVIDER_FIELDS[config.providerCode] || [];
 
@@ -691,7 +857,7 @@ export function ConfigCard({
 
           <div>
             <span className="text-sm font-medium text-gray-900 dark:text-white">
-              {PROVIDER_LABELS[config.providerCode] || config.providerCode}
+              {cloudProviderLabel(config.providerCode, locale)}
             </span>
             <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
               {config.providerCode}
@@ -714,9 +880,9 @@ export function ConfigCard({
           </button>
           <button
             onClick={onTest}
-            disabled={testing || !config.enabled}
+            disabled={testing || !config.enabled || config.providerCode === 'feishu_bot'}
             className="rounded p-1.5 text-gray-400 transition-colors hover:text-green-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-green-400"
-            title="测试连接"
+            title={config.providerCode === 'feishu_bot' ? (locale === 'zh-CN' ? '请使用真实签名事件回调验证' : 'Verify with a real signed callback') : '测试连接'}
             data-testid={`cloud-config-test-${config.providerCode}`}
           >
             {testing ? (
@@ -749,12 +915,18 @@ export function ConfigCard({
         <div className="border-t border-gray-100 px-4 pt-3 pb-3 dark:border-gray-700">
           <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
             {fields.map((f) => {
-              const rawVal = parsed[f.key] || '';
+              const value = parsed[f.key];
+              const rawVal =
+                typeof value === 'string'
+                  ? value
+                  : value == null
+                    ? ''
+                    : JSON.stringify(value);
               const display = f.sensitive && rawVal ? maskValue(rawVal) : rawVal || '-';
               return (
                 <div key={f.key} className="flex items-baseline gap-2 text-sm">
                   <span className="w-32 shrink-0 text-right text-gray-500 dark:text-gray-400">
-                    {f.label}:
+                    {locale === 'zh-CN' ? f.labelZh || f.label : f.label}:
                   </span>
                   <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-200">
                     {display}
@@ -814,6 +986,9 @@ export function ConfigEditorModal({
     priority: number;
   }) => void;
 }) {
+  const { locale } = useI18n();
+  const st = useSmartText();
+  const [configError, setConfigError] = useState('');
   const isEdit = !!config;
   const visibleServiceTypes = serviceTypes || SERVICE_TYPES;
 
@@ -823,7 +998,7 @@ export function ConfigEditorModal({
   );
   const [providerCode, setProviderCode] = useState(config?.providerCode || '');
   const [configValues, setConfigValues] = useState<Record<string, string>>(
-    config ? safeParseJSON(config.config) : {},
+    config ? providerFormValues(config.config) : {},
   );
   const [enabled, setEnabled] = useState(config?.enabled ?? true);
   const [priority, setPriority] = useState(config?.priority ?? 0);
@@ -833,6 +1008,12 @@ export function ConfigEditorModal({
   // When provider changes, reset config values (but keep if editing)
   const handleProviderChange = (code: string) => {
     setProviderCode(code);
+    setConfigError('');
+    setShowSensitive({});
+    if (code === 'feishu_bot' && !isEdit) {
+      setConfigLevel('tenant');
+      setEnabled(false);
+    }
     if (!isEdit) {
       setConfigValues({});
     }
@@ -841,6 +1022,8 @@ export function ConfigEditorModal({
   // When service type changes, reset provider
   const handleServiceTypeChange = (st: ServiceType) => {
     setServiceType(st);
+    setConfigError('');
+    setShowSensitive({});
     if (!isEdit) {
       setProviderCode('');
       setConfigValues({});
@@ -860,6 +1043,20 @@ export function ConfigEditorModal({
       }
     }
 
+    setConfigError('');
+    try {
+      if (providerCode === 'feishu_bot' && configLevel !== 'tenant')
+        throw new ProviderConfigValidationError('level');
+      serializeProviderConfig(providerCode, configValues);
+    } catch {
+      setConfigError(
+        st({
+          zh: '请使用租户级配置并检查身份绑定：需要非空 JSON 数组，每项包含 openId、chatId、userPid、conversationPid；用户与群聊不能重复，会话不能共用。',
+          en: 'Use tenant-level configuration and a non-empty bindings JSON array. Each entry needs openId, chatId, userPid and conversationPid, with unique sender/chat pairs and separate conversations.',
+        }),
+      );
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -913,7 +1110,7 @@ export function ConfigEditorModal({
                     checked={configLevel === lv}
                     onChange={() => setConfigLevel(lv)}
                     className="text-blue-600 focus:ring-blue-500"
-                    disabled={isEdit}
+                    disabled={isEdit || (providerCode === 'feishu_bot' && lv === 'platform')}
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">
                     {lv === 'platform' ? '平台级' : '租户级'}
@@ -930,6 +1127,7 @@ export function ConfigEditorModal({
             </label>
             <select
               value={serviceType}
+              data-testid="cloud-config-service-type"
               onChange={(e) => handleServiceTypeChange(e.target.value as ServiceType)}
               disabled={isEdit}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -949,6 +1147,7 @@ export function ConfigEditorModal({
             </label>
             <select
               value={providerCode}
+              data-testid="cloud-config-provider"
               onChange={(e) => handleProviderChange(e.target.value)}
               disabled={isEdit}
               required
@@ -957,12 +1156,40 @@ export function ConfigEditorModal({
               <option value="">-- 请选择 --</option>
               {availableProviders.map((code) => (
                 <option key={code} value={code}>
-                  {PROVIDER_LABELS[code] || code}
+                  {cloudProviderLabel(code, locale)}
                 </option>
               ))}
             </select>
           </div>
 
+          {serviceType === 'im' && (
+            <p
+              className="text-sm text-gray-600 dark:text-gray-300"
+              data-testid="cloud-config-im-guidance"
+            >
+              {st({
+                zh: 'Webhook 仅发送通知。应用机器人可接收私聊或群聊提及，并以绑定用户身份进行只读查询；需要配置应用事件回调。',
+                en: 'Webhooks only send notifications. Application bots receive direct messages or group mentions and run read-only queries as the bound user; application event callbacks are required.',
+              })}
+            </p>
+          )}
+          {providerCode === 'feishu_bot' && (
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {st({
+                zh: '保存后将配置 PID 填入回调路径 /api/public/integrations/feishu/{connectionPid}/events，并在服务端启用 aura.feishu.bot.enabled。此处保存配置不会验证公网回调或发送测试消息。',
+                en: 'After saving, use the configuration PID in /api/public/integrations/feishu/{connectionPid}/events and enable aura.feishu.bot.enabled on the server. Saving does not verify a public callback or send a test message.',
+              })}
+            </p>
+          )}
+          {configError && (
+            <p
+              role="alert"
+              data-testid="cloud-config-validation-error"
+              className="text-sm text-red-600"
+            >
+              {configError}
+            </p>
+          )}
           {/* Dynamic config fields */}
           {fields.length > 0 && (
             <div className="space-y-3 pt-2">
@@ -972,8 +1199,10 @@ export function ConfigEditorModal({
               {fields.map((f) => (
                 <div key={f.key}>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {f.label}
-                    {f.required && <span className="ml-0.5 text-red-500">*</span>}
+                    {locale === 'zh-CN' ? f.labelZh || f.label : f.label}
+                    {f.required && (
+                      <span className="ml-0.5 text-red-500">*</span>
+                    )}
                     {f.sensitive && (
                       <span className="ml-1 text-[10px] font-normal text-amber-600 dark:text-amber-400">
                         (敏感)
@@ -981,9 +1210,13 @@ export function ConfigEditorModal({
                     )}
                   </label>
                   <div className="relative">
-                    {f.key === 'template' ? (
+                    {f.key === 'template' || f.valueType === 'json-array' ? (
                       <textarea
-                        rows={10}
+                        rows={f.valueType === 'json-array' ? 6 : 10}
+                        data-testid={`cloud-config-field-${f.key}`}
+                        aria-label={
+                          locale === 'zh-CN' ? f.labelZh || f.label : f.label
+                        }
                         value={configValues[f.key] || ''}
                         onChange={(e) =>
                           setConfigValues((prev) => ({
@@ -997,7 +1230,15 @@ export function ConfigEditorModal({
                       />
                     ) : (
                       <input
-                        type={f.sensitive && !showSensitive[f.key] ? 'password' : 'text'}
+                        type={
+                          f.sensitive && !showSensitive[f.key]
+                            ? 'password'
+                            : 'text'
+                        }
+                        data-testid={`cloud-config-field-${f.key}`}
+                        aria-label={
+                          locale === 'zh-CN' ? f.labelZh || f.label : f.label
+                        }
                         value={configValues[f.key] || ''}
                         onChange={(e) =>
                           setConfigValues((prev) => ({
@@ -1026,6 +1267,11 @@ export function ConfigEditorModal({
                       </button>
                     )}
                   </div>
+                  {f.helpText && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {st(f.helpText)}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -1044,7 +1290,9 @@ export function ConfigEditorModal({
               onChange={(e) => setPriority(Number(e.target.value))}
               className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
-            <span className="ml-2 text-xs text-gray-400">数字越大优先级越高</span>
+            <span className="ml-2 text-xs text-gray-400">
+              数字越大优先级越高
+            </span>
           </div>
 
           {/* Enabled */}

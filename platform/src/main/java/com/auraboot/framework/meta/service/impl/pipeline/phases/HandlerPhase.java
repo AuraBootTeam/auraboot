@@ -6,7 +6,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.plugin.extension.DataAccessorException;
 import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
-import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.plugin.extension.AiProviderAccessorFactory;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
@@ -44,7 +44,6 @@ import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
-import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.BackgroundDataAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.TenantProjectionAccessorImpl;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
@@ -102,7 +101,7 @@ public class HandlerPhase implements CommandPhase {
     private WorkflowCapabilityRegistry workflowCapabilities;
 
     @Autowired(required = false)
-    private LlmProviderFactory llmProviderFactory;
+    private AiProviderAccessorFactory aiProviderAccessorFactory;
 
     @Autowired(required = false)
     private FileService fileService;
@@ -668,9 +667,9 @@ public class HandlerPhase implements CommandPhase {
                 pluginSettings.put("__biTemporalAccessor",
                         new BiTemporalAccessorImpl(biTemporalService, objectMapper));
             }
-            if (llmProviderFactory != null) {
+            if (aiProviderAccessorFactory != null) {
                 pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
-                        new LlmProviderAccessorImpl(llmProviderFactory, objectMapper, tenantId));
+                        aiProviderAccessorFactory.create(tenantId));
             }
             if (fileService != null && storageProvider != null) {
                 pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,

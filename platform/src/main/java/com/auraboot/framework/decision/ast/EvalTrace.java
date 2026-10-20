@@ -2,13 +2,15 @@ package com.auraboot.framework.decision.ast;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * Explain trace for a single condition evaluation (docs/1.md §17.2 test-run explain).
  * Captures the three-valued result of the root and a flat list of leaf steps, plus any
  * reasons a node resolved to UNKNOWN (so callers can surface why a rule did not match).
  */
-public record EvalTrace(Truth result, List<Step> steps, List<String> unknownReasons) {
+public record EvalTrace(Truth result, List<Step> steps, List<String> unknownReasons, Map<String, Truth> nodeResults) {
 
     /** One evaluated leaf: the rendered expression, resolved left/right, and outcome. */
     public record Step(String expr, Object left, Object right, Truth result) {}
@@ -23,6 +25,12 @@ public record EvalTrace(Truth result, List<Step> steps, List<String> unknownReas
 
     /** Mutable accumulator used while walking the AST. */
     public static final class Collector {
+        private final Map<String, Truth> nodeResults = new LinkedHashMap<>();
+
+        public void addNode(String path, Truth result) {
+            nodeResults.put(path, result);
+        }
+
         private final List<Step> steps = new ArrayList<>();
         private final List<String> unknownReasons = new ArrayList<>();
 
@@ -35,7 +43,7 @@ public record EvalTrace(Truth result, List<Step> steps, List<String> unknownReas
         }
 
         public EvalTrace finish(Truth result) {
-            return new EvalTrace(result, List.copyOf(steps), List.copyOf(unknownReasons));
+            return new EvalTrace(result, List.copyOf(steps), List.copyOf(unknownReasons), Map.copyOf(nodeResults));
         }
     }
 }

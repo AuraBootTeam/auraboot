@@ -495,7 +495,7 @@ function PermissionManagementContent() {
               }`}
             >
               <ClockIcon className="mr-1.5 h-4 w-4" />
-              {t('admin.permission.tab.audit', undefined, '审计')}
+              {t('admin.permission.tab.audit', undefined, 'Audit')}
             </button>
           </nav>
         </div>
@@ -507,7 +507,12 @@ function PermissionManagementContent() {
                 {selectedRole.name}
               </h2>
               <p className="mt-1 text-xs text-gray-500">
-                {t(
+                {activeRightTab === 'members' ? t(
+                  canAssignMembers ? 'admin.permission.members.manageHint' : 'admin.permission.members.readOnlyHint',
+                  undefined,
+                  canAssignMembers ? 'Manage membership and access periods for this role.'
+                    : 'View members and access periods. Membership changes require permission.',
+                ) : t(
                   canManageRoles ? 'admin.permission.editor.roleHint' : 'admin.permission.editor.readOnlyHint',
                   undefined,
                   canManageRoles

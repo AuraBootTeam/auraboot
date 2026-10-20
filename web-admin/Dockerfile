@@ -106,6 +106,8 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g pnpm@9
 
 USER appuser
+RUN mkdir -p /app/logs/traces && chmod 700 /app/logs/traces
+ENV AURA_TRACE_LOG_DIR=/app/logs/traces
 
 # 1. Workspace manifests + lockfile (so `pnpm install --prod` resolves the
 #    same dependency graph used at build time).
@@ -132,6 +134,7 @@ RUN --mount=type=cache,target=/home/appuser/.local/share/pnpm/store,uid=1001,gid
 COPY --chown=appuser:appuser --from=builder /app/web-admin/build ./web-admin/build
 COPY --chown=appuser:appuser web-admin/app ./web-admin/app
 COPY --chown=appuser:appuser web-admin/tsconfig.json ./web-admin/tsconfig.json
+COPY --chown=appuser:appuser web-admin/instrumentation.server.mjs ./web-admin/instrumentation.server.mjs
 
 WORKDIR /app/web-admin
 
@@ -144,4 +147,4 @@ ENV SPRING_BOOT_URL=http://backend:6443
 # BFF serves as single entry point: /api/* proxy + static files + SPA fallback.
 # Use the workspace-local tsx (node_modules/.bin/tsx) so it picks up the
 # workspace tsconfig.json and resolves `~/*` path aliases correctly.
-CMD ["./node_modules/.bin/tsx", "app/server/bff.server.ts"]
+CMD ["./node_modules/.bin/tsx", "--import", "./instrumentation.server.mjs", "app/server/bff.server.ts"]

@@ -3,7 +3,7 @@
 # Internal process docs belong in the team's private documentation repos.
 set -euo pipefail
 
-BANNED=(docs/backlog docs/handover docs/plans docs/retro docs/superpowers docs/mockups docs/standards)
+BANNED=(docs/archive docs/backlog docs/handover docs/plans docs/retro docs/superpowers docs/mockups docs/standards)
 
 tracked="$(git ls-files -- "${BANNED[@]}" 2>/dev/null || true)"
 if [ -n "$tracked" ]; then

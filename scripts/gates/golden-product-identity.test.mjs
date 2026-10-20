@@ -67,3 +67,12 @@ test('preserves the registered Core source key for an existing retained stack', 
   f.report.sources[0].expected.root = '/foreign';
   assert.throws(() => verifyGoldenProduct(f), /source identity mismatch/);
 });
+
+
+test('production proof requires both live frontend listeners to run in production mode', () => {
+  const f = fixture();
+  for (const key of ['web', 'bff']) Object.assign(f.environments[key], { AURA_WEB_MODE: 'production', NODE_ENV: 'production' });
+  assert.equal(verifyGoldenProduct(f).frontendMode, 'production');
+  f.environments.bff.NODE_ENV = 'development';
+  assert.throws(() => verifyGoldenProduct(f), /mode drift/);
+});

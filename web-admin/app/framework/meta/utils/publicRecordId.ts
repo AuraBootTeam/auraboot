@@ -27,3 +27,19 @@ export function buildCommandTargetParams(target: unknown): Record<string, string
   const pid = toPublicRecordPid(target);
   return pid ? { targetRecordPid: pid } : {};
 }
+
+/** Resolve a saved record from a command result envelope. */
+export function getCommandResultRecordPid(value: unknown): string | undefined {
+  let current = value;
+  const seen = new Set<object>();
+  while (current && typeof current === 'object' && !Array.isArray(current)) {
+    if (seen.has(current)) return undefined;
+    seen.add(current);
+    const record = current as Record<string, unknown>;
+    for (const candidate of [record.recordPid, record.pid]) {
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    }
+    current = record.data;
+  }
+  return undefined;
+}

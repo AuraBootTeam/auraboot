@@ -1,0 +1,167 @@
+[
+  {
+    "code": "tpm_ac_code",
+    "displayName:zh-CN": "验收编号",
+    "displayName:en": "Acceptance number",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 60
+    },
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tpm_ac_name",
+    "displayName:zh-CN": "验收名称",
+    "displayName:en": "Acceptance name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "extension": {
+      "placeholder:zh-CN": "例如：会员协作门户 · 第一阶段验收",
+      "placeholder:en": "e.g. Member portal · Phase one acceptance"
+    }
+  },
+  {
+    "code": "tpm_ac_project",
+    "displayName:zh-CN": "所属项目",
+    "displayName:en": "Project",
+    "dataType": "reference",
+    "constraints": {
+      "required": true
+    },
+    "refTarget": {
+      "targetEntity": "tpm_project",
+      "targetField": "pid",
+      "displayField": "tpm_pj_name",
+      "valueField": "pid"
+    },
+    "extension": {
+      "referenceModelCode": "tpm_project"
+    }
+  },
+  {
+    "code": "tpm_ac_amount",
+    "displayName:zh-CN": "交付金额（元）",
+    "displayName:en": "Delivery amount (CNY)",
+    "dataType": "decimal",
+    "constraints": {
+      "required": true,
+      "min": 0
+    },
+    "extension": {
+      "placeholder:zh-CN": "例如：68000",
+      "placeholder:en": "e.g. 68000"
+    }
+  },
+  {
+    "code": "tpm_ac_risk",
+    "displayName:zh-CN": "风险等级",
+    "displayName:en": "Risk level",
+    "dataType": "enum",
+    "dictCode": "tpm_acceptance_risk",
+    "constraints": {
+      "required": true
+    },
+    "defaultValue": "normal"
+  },
+  {
+    "code": "tpm_ac_scope",
+    "displayName:zh-CN": "验收范围与完成标准",
+    "displayName:en": "Scope and completion criteria",
+    "dataType": "text",
+    "constraints": {
+      "maxLength": 5000
+    },
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "例如：完成客户导入、权限联调和操作培训",
+      "placeholder:en": "e.g. Complete data import, permissions and training"
+    }
+  },
+  {
+    "code": "tpm_ac_files",
+    "displayName:zh-CN": "交付材料",
+    "displayName:en": "Delivery materials",
+    "dataType": "jsonb",
+    "extension": {
+      "multiple": true,
+      "maxCount": 5,
+      "renderComponent": "fileattachment"
+    }
+  },
+  {
+    "code": "tpm_ac_status",
+    "displayName:zh-CN": "验收状态",
+    "displayName:en": "Acceptance status",
+    "dataType": "enum",
+    "dictCode": "tpm_acceptance_status",
+    "defaultValue": "draft",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tpm_ac_process",
+    "displayName:zh-CN": "关联审批",
+    "displayName:en": "Approval reference",
+    "dataType": "string",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tpm_ac_result",
+    "displayName:zh-CN": "处理结果",
+    "displayName:en": "Outcome",
+    "dataType": "text",
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tpm_ac_reviewer",
+    "displayName:zh-CN": "验收审批人",
+    "displayName:en": "Acceptance reviewer",
+    "dataType": "reference",
+    "constraints": {
+      "required": true
+    },
+    "refTarget": {
+      "targetEntity": "sys_user",
+      "targetField": "pid",
+      "displayField": "nick_name",
+      "valueField": "pid"
+    },
+    "extension": {
+      "renderComponent": "userselect"
+    }
+  },
+  {
+    "code": "tpm_ac_registered",
+    "displayName:zh-CN": "已登记项目交付",
+    "displayName:en": "Registered project delivery",
+    "dataType": "boolean",
+    "defaultValue": false,
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "tpm_ac_open_issues",
+    "displayName:zh-CN": "未解决问题数",
+    "displayName:en": "Unresolved issues",
+    "dataType": "integer",
+    "defaultValue": 0
+  },
+  {
+    "code": "tpm_ac_materials_complete",
+    "displayName:zh-CN": "材料内容已齐全",
+    "displayName:en": "Evidence content complete",
+    "dataType": "boolean",
+    "defaultValue": true
+  }
+]

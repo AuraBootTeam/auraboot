@@ -544,8 +544,8 @@
     "en": "Ready for the publish check"
   },
   "dmnOutputTitle": {
-    "zh-CN": "DMN 决策输出",
-    "en": "DMN decision output"
+    "zh-CN": "判断逻辑与处理结果",
+    "en": "Decision logic and outcomes"
   },
   "fragmentLibraryTitle": {
     "zh-CN": "条件片段库",
@@ -594,5 +594,129 @@
   "checkImpactConfirmed": {
     "zh-CN": "影响面已确认",
     "en": "Impact confirmed"
+  },
+  "checksRequired": {
+    "zh-CN": "待检查：先保存草稿，再运行发布检查",
+    "en": "Checks required: save a draft, then run publication checks"
+  },
+  "draftCheckPending": {
+    "zh-CN": "草稿尚未验证或已修改",
+    "en": "Draft not validated or changed"
+  },
+  "fragmentNotUsed": {
+    "zh-CN": "未使用条件片段",
+    "en": "No condition fragment used"
+  },
+  "fragmentUnpublished": {
+    "zh-CN": "条件片段尚未发布",
+    "en": "Condition fragment is not published"
+  },
+  "impactCheckPending": {
+    "zh-CN": "影响面尚未检查或已修改",
+    "en": "Impact not checked or changed"
+  },
+  "checkReadiness": {
+    "zh-CN": "检查发布条件",
+    "en": "Check publication readiness"
+  },
+  "checkingReadiness": {
+    "zh-CN": "正在检查…",
+    "en": "Checking…"
+  },
+  "checksFinished": {
+    "zh-CN": "检查完成；请核对影响面后发布",
+    "en": "Checks complete; review impact before publishing"
+  },
+  "checksFailed": {
+    "zh-CN": "检查未通过 · {message}。请保存有效草稿并重试。",
+    "en": "Checks failed · {message}. Save a valid draft and try again."
+  },
+  "selectBusinessDecision": {
+    "zh-CN": "业务决策",
+    "en": "Business decision"
+  },
+  "scenarioTemplate": {
+    "zh-CN": "场景模板（尚未发布）",
+    "en": "Scenario template (not published)"
+  },
+  "structuredOutput": {
+    "zh-CN": "结构化输出（见执行追踪）",
+    "en": "Structured output (see execution trace)"
+  },
+  "tableUnavailable": {
+    "zh-CN": "此决策没有可读取的决策表版本，已停止加载。",
+    "en": "This decision has no readable decision table version."
+  },
+  "tableLoading": {
+    "zh-CN": "正在读取真实决策版本…",
+    "en": "Loading the saved decision version…"
+  },
+  "backToTemplate": {
+    "zh-CN": "返回场景模板",
+    "en": "Back to scenario templates"
+  },
+  "metricOutputs": {
+    "zh-CN": "决策输出",
+    "en": "Decision outputs"
+  },
+  "actualUsageHint": {
+    "zh-CN": "查看影响面，确认已登记的实际引用",
+    "en": "Inspect impact for registered consumers"
+  },
+  "actualOutputHint": {
+    "zh-CN": "由消费方绑定解释并执行",
+    "en": "Interpreted and executed by consumer bindings"
+  },
+  "testPanelTitle": {
+    "zh-CN": "测试与发布检查",
+    "en": "Test and readiness"
+  },
+  "testPanelHint": {
+    "zh-CN": "使用当前草稿验证业务输入与决策结果。",
+    "en": "Evaluate business inputs against the current draft."
+  },
+  "contextTitle": {
+    "zh-CN": "消费场景与上下文",
+    "en": "Consumers and context"
+  },
+  "tableSettings": {
+    "zh-CN": "字段与输出配置",
+    "en": "Inputs and outputs"
+  },
+  "xmlTools": {
+    "zh-CN": "DMN 交换与高级工具",
+    "en": "DMN exchange and advanced tools"
+  },
+  "expressionTitle": {
+    "zh-CN": "表达式",
+    "en": "Expression"
+  },
+  "anyValue": {
+    "zh-CN": "任意值",
+    "en": "Any value"
+  },
+  "testTraceTitle": {
+    "zh-CN": "执行标识",
+    "en": "Execution reference"
+  },
+  "readOnlyNotice": {
+    "zh-CN": "只读查看：可查看判断逻辑与历史版本，修改和发布需相应权限。",
+    "en": "Read-only access. Editing and publishing require additional permissions."
+  },
+  "matchExplanation": {
+    "zh-CN": "为什么得到这个结果",
+    "en": "Why this result"
+  },
+  "matchedTableRow": {
+    "zh-CN": "命中第 {row} 条判断",
+    "en": "Matched decision row {row}"
+  },
+  "conditionAnd": {
+    "zh-CN": "，且 ",
+    "en": ", and "
+  },
+  "explanationUnavailable": {
+    "zh-CN": "本次结果未提供可核对的逐条命中依据，请查看专业诊断。",
+    "en": "No verifiable per-row explanation was returned. Inspect the diagnostics."
   }
 }

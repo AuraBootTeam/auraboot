@@ -5,6 +5,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.entity.UserProjectBinding;
 import com.auraboot.framework.meta.service.UserProjectBindingService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
+@AuthenticatedAccess("project membership management scoped to the caller's tenant with the acting user resolved via @CurrentUserId")
 public class UserProjectBindingController {
 
     private final UserProjectBindingService bindingService;

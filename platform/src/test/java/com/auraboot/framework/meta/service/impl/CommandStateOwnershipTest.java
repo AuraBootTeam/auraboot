@@ -16,7 +16,7 @@ import static org.mockito.Mockito.*;
 class CommandStateOwnershipTest {
     final DynamicDataMapper mapper=mock(DynamicDataMapper.class);
     final MetaModelService metadata=mock(MetaModelService.class);
-    final CommandStateCheckExecutor executor=new CommandStateCheckExecutor(mapper,metadata,null,null,new CommandSpelEvaluator());
+    final CommandStateCheckExecutor executor=new CommandStateCheckExecutor(mapper,metadata,null,null,new CommandSpelEvaluator(),mock(com.auraboot.framework.meta.service.DataPermissionEngine.class),mock(com.auraboot.framework.meta.service.DataDomainService.class),mock(CommandModelMutationSupport.class),null);
     void setup(boolean managedParent) {
         MetaContext.setContext(1L,7L,null,"system");
         org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
@@ -32,7 +32,7 @@ class CommandStateOwnershipTest {
             .thenReturn(List.of(Map.of("managed",managedParent)));
         lenient().when(mapper.selectRecordWriterTargetsForUpdate(eq("mt_child"),eq("managed_flag"),eq("managed"),anyMap()))
             .thenReturn(List.of(Map.of("id",7L,"pid","line-a","managed",false)));
-        lenient().when(mapper.update(anyString(),anyMap(),anyMap())).thenReturn(1);
+        lenient().when(mapper.updateByQuery(anyString(),anyMap())).thenReturn(1);
     }
     String transition() {
         var command=new CommandDefinition();command.setCode("app:save");command.setModelCode("line");
@@ -42,15 +42,15 @@ class CommandStateOwnershipTest {
     @AfterEach void clear() { MetaContext.clear();org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); }
     @Test void genericTransitionCannotChangeChildOfManagedParent() {
         setup(true);assertThatThrownBy(this::transition).hasMessageContaining("RECORD_WRITER_DENIED");
-        verify(mapper,never()).update(anyString(),anyMap(),anyMap());
+        verify(mapper,never()).updateByQuery(anyString(),anyMap());
     }
     @Test void ordinaryParentRetainsTransition() {
         setup(false);assertThat(transition()).isEqualTo("approved");
-        verify(mapper).update("mt_child",Map.of("status","approved"),Map.of("tenant_id",1L,"pid","line-a"));
+        verify(mapper).updateByQuery(contains("UPDATE mt_child"),argThat(params -> params.containsValue("approved") && params.containsValue("line-a") && params.containsValue(1L)));
     }
     @Test void exactWriterMayTransitionChildOfManagedParent() {
         setup(true);MetaContext.runWithCommandPermitPlan("ALL",null,"line","line-a",()->
             MetaContext.runWithAuthorizedCommandCode("app:save",()->assertThat(transition()).isEqualTo("approved")));
-        verify(mapper).update("mt_child",Map.of("status","approved"),Map.of("tenant_id",1L,"pid","line-a"));
+        verify(mapper).updateByQuery(contains("UPDATE mt_child"),argThat(params -> params.containsValue("approved") && params.containsValue("line-a") && params.containsValue(1L)));
     }
 }

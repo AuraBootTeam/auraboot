@@ -176,6 +176,8 @@ export function resolveCommandTargetRecordId(
   return (
     toNonBlankString(explicitTarget) ||
     getLegacyCompatibleRecordPid(record) ||
+    getLegacyCompatibleRecordPid(context.record) ||
+    getLegacyCompatibleRecordPid(context.row) ||
     getLegacyCompatibleRecordPid(context.data)
   );
 }
@@ -183,7 +185,17 @@ export function resolveCommandTargetRecordId(
 function resolveNavigationRecord(
   candidates: Array<Record<string, any> | null | undefined>,
   pageRecordPid: unknown,
+  target: string,
 ): Record<string, any> | undefined {
+  // Static card rows carry route fields rather than entity identifiers.
+  // Preserve those fields before falling back to a surrounding detail record.
+  const routeFields = [...target.matchAll(/\{(\w+)\}/g)]
+    .map((match) => match[1]).filter((field) => field !== 'pid' && field !== 'id');
+  const templateRecord = routeFields.length > 0
+    ? candidates.find((candidate) => candidate && routeFields.every((field) => field in candidate))
+    : undefined;
+  if (templateRecord) return templateRecord;
+
   const recordWithPublicPid = candidates.find((candidate) =>
     Boolean(getLegacyCompatibleRecordPid(candidate)),
   );
@@ -686,8 +698,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     async (button: ButtonConfig, record?: Record<string, any>) => {
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
-      // Confirmation intent is independent of the button's visual variant.
-      const confirmVariant = normalizedButton.confirmVariant ?? 'danger';
+      const confirmVariant = normalizedButton.confirmVariant
+        ?? (normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default');
       const confirmKey = (normalizedButton as any).confirm || normalizedButton.confirmMessageKey;
 
       try {
@@ -991,11 +1003,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // resolves an edit route for the target model.
             const isContextualCreate = Boolean(actionDef.command) && !isEditAction;
             const runtimeContext = runtime?.getContext?.();
+            const target = String(actionDef.to ?? '');
             // Detail blocks can render before SchemaRuntime has synchronized the
             // loaded record. In that frame `form` is an empty object, which must
-            // not hide the live record available by click time. Only a record
-            // carrying a public PID is valid navigation context; `$page.recordPid`
-            // remains a safe source-link fallback for contextual create actions.
+            // not hide the live record available by click time. Route-field
+            // templates can also use static rows without a public PID;
+            // `$page.recordPid` remains the contextual create source fallback.
             const navigationRecord = resolveNavigationRecord(
               [
                 record,
@@ -1006,8 +1019,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 runtimeContext?.form,
               ],
               runtimeContext?.$page?.recordPid,
+              target,
             );
-            const target = String(actionDef.to ?? '');
             const path = resolveNavigateTo(
               actionDef.to,
               isContextualCreate && !target.startsWith('/') ? undefined : navigationRecord,
@@ -1084,7 +1097,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               navigate(-1 as any);
               return;
             }
-            if (dataSourceManager) {
+            // Form pages have no dataSourceManager; the registry's refresh
+            // handler falls back to context.loadData (reload the edit record).
+            if (dataSourceManager || actionDef.name === 'refresh') {
               const { actionRegistry } =
                 await import('~/framework/meta/runtime/actions/ActionRegistry');
               if (actionRegistry.has(actionDef.name)) {

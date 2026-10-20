@@ -445,7 +445,7 @@ function ComparisonList({
   return (
     <div className="space-y-2">
       {value.map((comparison, index) => {
-        const key = formatValue(comparison.label ?? comparison.key, `#${index + 1}`);
+        const key = humanizeComparisonField(comparison.label ?? comparison.key, locale, t) || `#${index + 1}`;
         const sourceValue = formatValue(comparison.sourceValue, '');
         const candidateValue = formatValue(comparison.candidateValue, '');
         const reason = formatValue(comparison.reason, '');
@@ -479,9 +479,10 @@ function ComparisonList({
                 <div className="text-text mt-0.5 break-words">{candidateValue || '-'}</div>
               </div>
               {reason && (
-                <div className="text-text-2 min-w-0 break-words md:col-span-2">
-                  {localized(locale, t, '原因', 'Reason')}: {reason}
-                </div>
+                <details className="text-text-2 min-w-0 break-words md:col-span-2">
+                  <summary>{localized(locale, t, '技术详情', 'Technical details')}</summary>
+                  <div>{localized(locale, t, '原因代码', 'Reason code')}: {reason}</div>
+                </details>
               )}
             </div>
           </section>
@@ -1773,7 +1774,10 @@ function DrawerEditForm({
   canEditRef.current = canEdit;
   const permissionEpoch = useRef({ allowed: canEdit, generation: 0 });
   if (permissionEpoch.current.allowed !== canEdit) {
-    permissionEpoch.current = { allowed: canEdit, generation: permissionEpoch.current.generation + 1 };
+    permissionEpoch.current = {
+      allowed: canEdit,
+      generation: permissionEpoch.current.generation + 1,
+    };
   }
   useEffect(() => {
     if (canEdit) return;
@@ -1858,7 +1862,8 @@ function DrawerEditForm({
           reload: isTwoPhase ? [] : Array.isArray(config.reload) ? config.reload : [],
         },
       });
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       if (isTwoPhase) {
         if (!result || typeof result !== 'object') {
           throw new Error(
@@ -1893,7 +1898,8 @@ function DrawerEditForm({
         onOpenChange?.(false);
       }
     } catch (e: any) {
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       setError(e?.message || String(e));
     } finally {
       setSaving(false);
@@ -1933,7 +1939,8 @@ function DrawerEditForm({
           reload: Array.isArray(config.reload) ? config.reload : [],
         },
       });
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       // A delayed reload must not reopen a closed drawer or replace a newly selected row.
       if (isRecordSelected && !isRecordSelected()) return;
       for (const selection of Array.isArray(config.afterConfirmSelections)
@@ -1951,7 +1958,8 @@ function DrawerEditForm({
       setOpen(false);
       onOpenChange?.(false);
     } catch (e: any) {
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       setError(e?.message || String(e));
     } finally {
       setSaving(false);
@@ -2493,6 +2501,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const candidateDataSource = candidatesConfig.dataSource;
   const exportDataSource = exportConfig.dataSource;
   const contextStateBinding = stateBindingFromExpression(contextExpression);
+  const candidateContextFields = Array.isArray(candidatesConfig.contextFields)
+    ? candidatesConfig.contextFields
+    : [];
   const selectedCandidateFields = Array.isArray(candidatesConfig.selectedFields)
     ? candidatesConfig.selectedFields
     : [];
@@ -2513,6 +2524,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const layoutStorageKey = drawerLayoutStorageKey(runtime, block, context);
   const configuredDefaultLayout: DrawerLayoutState = {
     ...DEFAULT_DRAWER_LAYOUT,
+    ...(isCompactReview ? { height: Math.round(getViewportSize().height * 0.85) } : {}),
     ...((block as any).defaultLayout || {}),
   };
   const initialLayoutRef = useRef<DrawerLayoutState | null>(null);
@@ -2740,6 +2752,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : [];
   const resolvedCanonicalGroups = compareConfig.canonicalFieldProfiles
     ? resolveProfiledFieldGroups({
+        locale,
         item: {
           fieldColumns: canonicalFields,
           fieldProfiles: compareConfig.canonicalFieldProfiles,
@@ -2775,6 +2788,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const decisionFields = Array.isArray(candidatesConfig.decisionFields)
     ? candidatesConfig.decisionFields
     : [];
+  const visibleCandidateContextFields = candidateContextFields.filter(
+    (field: any) => !field.hideWhenEmpty || !isEmptyValue(readFieldValue(record, field)),
+  );
   const summaryBadges = Array.isArray((block as any).summaryBadges)
     ? (block as any).summaryBadges
     : [];
@@ -3001,7 +3017,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
           className={`grid h-full min-h-0 min-w-0 gap-3 ${
             hasLeftRail && hasCandidatesConfig
               ? isCompactReview
-                ? 'xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,1fr)]'
+                ? 'grid-rows-[minmax(0,0.25fr)_minmax(0,0.75fr)] md:grid-cols-[minmax(260px,0.34fr)_minmax(0,1fr)] md:grid-rows-1 xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,1fr)]'
                 : 'xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]'
               : 'grid-cols-1'
           }`}
@@ -3138,11 +3154,13 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   className="rounded-card border-border bg-panel overflow-hidden border"
                 >
                   <summary className="bg-panel text-text cursor-pointer px-3 py-2 text-sm font-semibold">
-                    {localized(
+                    {getLocalizedText(
+                      sourceConfig.detailsTitle || {
+                        'zh-CN': '解析证据与 Profile / LLM Policy',
+                        en: 'Parse evidence and Profile / LLM policy',
+                      },
                       locale,
                       t,
-                      '解析证据与 Profile / LLM Policy',
-                      'Parse evidence and Profile / LLM policy',
                     )}
                   </summary>
                   <div className="border-border space-y-3 border-t p-3">
@@ -3151,6 +3169,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       locale={locale}
                       t={t}
                       title={sourceConfig.resolutionTitle}
+                      fieldLabels={sourceConfig.resolutionLabels}
                     />
                     {sourceCards.length > 0 && (
                       <div
@@ -3382,7 +3401,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               <div
                 data-testid="review-drawer-candidate-list"
                 aria-busy={candidateState?.loading ? true : undefined}
-                className={`relative min-h-0 flex-1 [scrollbar-gutter:stable] overflow-auto ${
+                className={`relative flex-1 [scrollbar-gutter:stable] overflow-auto ${
+                  isCompactReview ? 'min-h-[160px]' : 'min-h-0'
+                } ${
                   usesCandidateComparisonTable ? 'p-0' : 'space-y-1.5 p-2'
                 }`}
               >
@@ -3472,6 +3493,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       ? readPath(candidate, item.statusColorField)
                       : undefined;
                     const fieldColumns = resolveCandidateFieldColumns({
+                      locale,
                       item,
                       candidate,
                       referenceRecord: {
@@ -3628,14 +3650,27 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   })
                 )}
               </div>
-              {(shouldShowDecisionStatus ||
+              {(visibleCandidateContextFields.length > 0 ||
+                shouldShowDecisionStatus ||
                 (shouldShowSelectedCandidateDetail &&
                   selectedCandidate &&
                   (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0))) && (
                 <section
                   data-testid="review-drawer-decision-panel"
-                  className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
+                  className={`bg-subtle border-border shrink-0 overflow-auto border-t p-2.5 ${
+                    isCompactReview ? 'max-h-[28%]' : 'max-h-[48%]'
+                  }`}
                 >
+                  {visibleCandidateContextFields.length > 0 && (
+                    <section data-testid="review-drawer-context-evidence">
+                      <FieldRows
+                        fields={visibleCandidateContextFields}
+                        record={record}
+                        locale={locale}
+                        t={t}
+                      />
+                    </section>
+                  )}
                   {shouldShowDecisionStatus && (
                     <section data-testid="review-drawer-decision-status">
                       <h3 className="text-text text-sm font-semibold">

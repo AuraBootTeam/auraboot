@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * FilterValuePopover — popover for editing a filter condition (operator + value).
  *
@@ -228,15 +230,21 @@ export function FilterValuePopover({
     if (!dictCode || !open) return;
     let cancelled = false;
     (async () => {
-      const result = await fetchResult<any>(`/api/meta/dict/by-code/${dictCode}/data`, {
-        token: undefined,
+      const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+        path: { code: dictCode },
       });
       if (cancelled) return;
-      if (ResultHelper.isSuccess(result) && result.data) {
-        const items = Array.isArray(result.data) ? result.data : result.data.items || [];
-        setDictOptions(items.map((i: any) => ({ value: i.value, label: i.label || i.value })));
+      if (result.code === '0' && result.data) {
+        setDictOptions(
+          dictionaryData(result.data).items.map((item) => ({
+            value: item.value,
+            label: item.label || item.value,
+          })),
+        );
       }
-    })();
+    })().catch(() => {
+      if (!cancelled) setDictOptions([]);
+    });
     return () => {
       cancelled = true;
     };

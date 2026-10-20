@@ -35,6 +35,9 @@ public class ApplicationReleaseController {
     public record PrepareTenantBindingRequest(String expectedReleaseId, String operationId) {}
     public record ActivateTenantBindingRequest(String expectedReleaseId, Long expectedVersion, String operationId) {}
 
+    public record UpgradeTenantBindingRequest(String expectedCurrentReleaseId, Long expectedVersion,
+                                              String targetReleaseId, String targetDigest, String operationId) {}
+
     @PostMapping
     public ApiResponse<ApplicationReleaseRegistrationService.Application> createApplication(
             @RequestBody CreateApplicationRequest request) {
@@ -105,6 +108,24 @@ public class ApplicationReleaseController {
         }
         return ApiResponse.success(control.activateStableShadow(tenantId, applicationCode,
                 request.expectedReleaseId(), request.expectedVersion(), actor(), request.operationId()));
+    }
+
+    public record UpgradeTenantBindingResponse(String tenantId, String applicationId, String releaseId,
+                                                String releaseDigest, int compatibilityEpoch, String status, long version) {
+        static UpgradeTenantBindingResponse from(ApplicationReleaseControlService.Binding binding) {
+            return new UpgradeTenantBindingResponse(Long.toString(binding.tenantId()), Long.toString(binding.applicationId()),
+                    binding.releaseId(), binding.releaseDigest(), binding.compatibilityEpoch(), binding.status(), binding.version());
+        }
+    }
+
+    @PostMapping("/{applicationCode}/tenant-bindings/{tenantId}/upgrade")
+    @RequirePermission(MetaPermission.APPLICATION_BINDING_ACTIVATE)
+    public ApiResponse<UpgradeTenantBindingResponse> upgradeTenantBinding(
+            @PathVariable String applicationCode, @PathVariable long tenantId,
+            @RequestBody UpgradeTenantBindingRequest request) {
+        return ApiResponse.success(UpgradeTenantBindingResponse.from(control.upgradeStableActive(tenantId, applicationCode,
+                request.expectedCurrentReleaseId(), request.expectedVersion(), request.targetReleaseId(),
+                request.targetDigest(), actor(), request.operationId())));
     }
 
     private static String actor() {

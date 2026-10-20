@@ -2,8 +2,7 @@ package com.auraboot.framework.automation.listener;
 
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
-import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +40,7 @@ public class AutomationCommandEventBridge {
 
     private final AutomationTriggerService automationTriggerService;
     private final CommandStateCheckExecutor commandStateCheckExecutor;
+    private final ThreadContextScopes contexts;
 
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -61,19 +61,8 @@ public class AutomationCommandEventBridge {
         MetaContext.Snapshot identity = new MetaContext.Snapshot(event.getTenantId(), actorId,
                 metadataString(metadata, "actorPid"), metadataString(metadata, "actorName"),
                 java.util.Set.of(), null, null, null, null);
-        var previousPrincipal = ExecutionPrincipalContext.current().orElse(null);
-        var previousEnvelope = ContextEnvelopeContext.current().orElse(null);
-        MetaContext.runWithSnapshot(identity, () -> {
-            // Event identity cannot inherit another worker's runtime authority or envelope.
-            ExecutionPrincipalContext.clear();
-            ContextEnvelopeContext.clear();
-            try {
-                dispatch(event);
-            } finally {
-                ContextEnvelopeContext.restore(previousEnvelope);
-                ExecutionPrincipalContext.restore(previousPrincipal);
-            }
-        });
+        // Event identity must not inherit another worker's domain authority.
+        MetaContext.runWithSnapshot(identity, () -> contexts.runCleared(() -> dispatch(event)));
     }
 
     private static String metadataString(Map<String, Object> metadata, String key) {
@@ -98,7 +87,13 @@ public class AutomationCommandEventBridge {
         try {
             switch (operationType.toLowerCase()) {
                 case "create" -> handleCreate(event, modelCode, recordPid);
-                case "update" -> handleUpdate(event, modelCode, recordPid);
+                case "update" -> {
+                    if (configuredTransition(event) != null) {
+                        handleStateTransition(event, modelCode, recordPid);
+                    } else {
+                        handleUpdate(event, modelCode, recordPid);
+                    }
+                }
                 case "state_transition" -> handleStateTransition(event, modelCode, recordPid);
                 case "delete" -> {
                     // delete triggers are not currently modelled in AutomationTriggerService;
@@ -155,15 +150,27 @@ public class AutomationCommandEventBridge {
         }
     }
 
+    private static Map<?, ?> configuredTransition(CommandCompletedEvent event) {
+        Object value = event.getMetadata() == null ? null : event.getMetadata().get("commandStateTransition");
+        if (value instanceof Map<?, ?> transition
+                && transition.get("stateField") instanceof String stateField && StringUtils.hasText(stateField)
+                && transition.get("toState") instanceof String toState && StringUtils.hasText(toState)) {
+            return transition;
+        }
+        return null;
+    }
+
     private void handleStateTransition(CommandCompletedEvent event, String modelCode, String recordPid) {
         Map<String, Object> metadata = event.getMetadata();
         Map<String, Object> payload = event.getPayload();
 
         // Determine the state field for this model so we can extract from/to state values.
-        String stateField = commandStateCheckExecutor.getStateFieldForModel(modelCode);
+        Map<?, ?> transition = configuredTransition(event);
+        String stateField = transition != null ? (String) transition.get("stateField")
+                : commandStateCheckExecutor.getStateFieldForModel(modelCode);
 
         String fromState = null;
-        String toState = null;
+        String toState = transition != null ? (String) transition.get("toState") : null;
 
         if (StringUtils.hasText(stateField)) {
             @SuppressWarnings("unchecked")
@@ -174,7 +181,7 @@ public class AutomationCommandEventBridge {
             if (beforeSnapshot != null && beforeSnapshot.get(stateField) != null) {
                 fromState = String.valueOf(beforeSnapshot.get(stateField));
             }
-            if (payload != null && payload.get(stateField) != null) {
+            if (toState == null && payload != null && payload.get(stateField) != null) {
                 toState = String.valueOf(payload.get(stateField));
             }
         }

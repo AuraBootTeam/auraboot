@@ -1,8 +1,10 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.event.config.TenantAwareTaskDecorator;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.security.CsvSafetyUtils;
 import com.auraboot.framework.meta.service.DataDomainService;
@@ -119,6 +121,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
     private final FieldPermissionService fieldPermissionService;
     private final ExecutorRegistry executorRegistry;
+    private final ThreadContextScopes threadContexts;
     private static final Set<String> SYSTEM_COLUMNS = SystemFieldConstants.QUERY_TRANSPARENT;
 
     private static String logSafe(Object value) {
@@ -180,7 +183,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private void triggerAutomationAfterCommit(String description, Runnable trigger) {
         // Capture before the request scope ends; AFTER_COMMIT can run after identity cleanup.
-        Runnable scopedTrigger = new TenantAwareTaskDecorator().decorate(trigger);
+        Runnable scopedTrigger = new TenantAwareTaskDecorator(threadContexts).decorate(trigger);
         Runnable safeTrigger = () -> {
             try {
                 scopedTrigger.run();
@@ -381,7 +384,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         String primaryKeyColumn = primaryKey.getColumnName() != null
                 ? primaryKey.getColumnName()
                 : primaryKey.getCode();
-        Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+        Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
         int updated = executeScopedUpdate(
                 model,
                 modelCode,
@@ -395,7 +398,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (updated > 1) {
             throw new MetaServiceException("compareAndSet updated more than one record");
         }
-        if (updated == 1 && planExpectedVersion != null) {
+        if (updated == 1) {
+            notifyModelMutation(model, recordId, ModelMutationObserver.Operation.UPDATED);
             MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
         }
         return updated == 1;
@@ -531,6 +535,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (affected != updates.size()) {
             throw new MetaServiceException("CAS batch conflict: no partial batch may commit");
         }
+        for (var update : updates) {
+            notifyModelMutation(model, update.recordId(), ModelMutationObserver.Operation.UPDATED);
+        }
         for (int i = 0; i < updates.size(); i++) {
             if (versions.get(i) != null) MetaContext.advanceCommandExpectedVersion(modelCode, updates.get(i).recordId());
         }
@@ -577,6 +584,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertMutable(model, "incremented");
         FieldWriterGuard.assertFieldWriteAllowed(model, counterCode);
+        if (MachineDataAccessContext.isActive()) {
+            var decision = MachineDataAccessContext.requireDecision(modelCode);
+            decision.requireAction("update");
+            MachineDataAccessGuards.requireWritable(modelCode, Map.of(counterCode, delta));
+            if (!decision.readableFields().contains(counterCode)
+                    || (capCode != null && !decision.readableFields().contains(capCode))) {
+                throw new AccessDeniedException("Machine counter and cap fields must be readable");
+            }
+        }
         String counterCol = resolveNumericColumn(model, counterCode);
         String capCol = null;
         if (capCode != null) {
@@ -590,12 +606,43 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 pkField.getColumnName(), "primary key column");
         long tenantId = getCurrentTenantId();
         Long currentUserId = getCurrentUserId();
+        var scopeParameters = new LinkedHashMap<String, Object>();
+        var scopePredicate = new StringBuilder("1 = 1");
+        appendAggregateBindingGuard(scopePredicate, scopeParameters, model);
+        dynamicScopedWriteSupport().appendScopedWriteGuards(scopePredicate, tenantId, modelCode,
+                currentUserId, "update", scopeParameters);
+        if (MachineDataAccessContext.isActive()) {
+            var decision = MachineDataAccessContext.requireDecision(modelCode);
+            // An increment cannot move the row outside its current installation authority.
+            int constraintIndex = 0;
+            for (var constraint : decision.constraints()) {
+                int guardIndex = constraintIndex++;
+                if (!counterCode.equals(constraint.field())) continue;
+                scopePredicate.append(" AND COALESCE(").append(counterCol).append(", 0) + #{delta} IN (");
+                for (int index = 0; index < constraint.values().size(); index++) {
+                    if (index > 0) scopePredicate.append(", ");
+                    String key = "atomic_future_" + guardIndex + "_" + index;
+                    scopeParameters.put(key, constraint.values().get(index));
+                    scopePredicate.append("#{params.").append(key).append("}");
+                }
+                scopePredicate.append(")");
+            }
+            Long expected = MachineDataAccessContext.expectedVersion(modelCode, recordId);
+            if (expected != null) {
+                scopeParameters.put("atomic_expected_version", expected);
+                scopePredicate.append(" AND row_version = #{params.atomic_expected_version}");
+            }
+        }
         List<Map<String, Object>> rows = dynamicDataMapper.atomicIncrementReturning(
                 model.getTableName(), counterCol, capCol, pkColumn,
-                softDeleteClause, delta, recordId, tenantId, currentUserId);
+                softDeleteClause, delta, recordId, tenantId, currentUserId,
+                PhysicalRowVersionSupport.isVersioned(model, dynamicDataMapper),
+                scopePredicate.toString().replace("#{params.", "#{scopeParameters."), scopeParameters);
         if (rows == null || rows.isEmpty()) {
             return Optional.empty();
         }
+        if (rows.size() != 1) throw new MetaServiceException("Atomic increment affected more than one record");
+        notifyModelMutation(model, recordId, ModelMutationObserver.Operation.UPDATED);
         Object val = rows.get(0).get("new_value");
         if (val instanceof Number n) {
             return Optional.of(n.longValue());
@@ -624,6 +671,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-by-id")
     public Map<String, Object> getById(String modelCode, String recordId) {
         validateModelCode(modelCode);
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
+        }
         if (recordId == null || recordId.trim().isEmpty()) {
             throw new MetaServiceException("Record ID cannot be null or empty");
         }
@@ -660,6 +710,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 .build());
 
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
+        MachineDataAccessGuards.constrain(modelCode, queryBuilder);
 
         String sql = queryBuilder.getSql();
         Map<String, Object> paramMap = queryBuilder.getParameterMap();
@@ -674,7 +725,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
         JsonbFieldHelper.normalizeJsonReadValues(model, record);
 
-        boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode);
+        boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode) || MachineDataAccessContext.isActive();
         if (commandPermitInForce
                 && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
             throw new AccessDeniedException("Access denied: command permit scope does not include this record");
@@ -758,8 +809,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!commandPermitInForce) {
-            // Apply field-level permission filtering — remove hidden fields
+        if (!commandPermitInForce || MachineDataAccessContext.isActive()) {
+            // Human and machine field policies are independent of command permit grades.
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
 
@@ -801,6 +852,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
+        if (MachineDataAccessContext.isActive()) MachineDataAccessContext.requireDecision(modelCode).requireAction("create");
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (data == null || data.isEmpty()) {
@@ -848,6 +900,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // 数据类型转换
         enrichedData = convertDataTypes(model, enrichedData);
+        if (MachineDataAccessContext.isActive() && !MachineDataAccessContext.requireDecision(modelCode).permits(enrichedData)) {
+            throw new AccessDeniedException("Machine creation exceeds the installation row policy");
+        }
 
         // Filter out non-writable virtual fields (COMPUTED_READONLY, TRANSIENT)
         List<String> changedFields = new ArrayList<>(enrichedData.keySet());
@@ -869,6 +924,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Materialize computed fields after insert
         String recordIdValue = enrichedData.get(primaryKey.getCode()).toString();
         virtualFieldEngine.materialize(modelCode, recordIdValue, changedFields);
+        notifyModelMutation(model, recordIdValue, ModelMutationObserver.Operation.CREATED);
 
         // Record change log.
         //
@@ -983,6 +1039,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private Set<String> stripNonWritableFields(String modelCode, Map<String, Object> data) {
         if (data == null || data.isEmpty()) {
+            return Collections.emptySet();
+        }
+        if (MachineDataAccessContext.isActive()) {
+            MachineDataAccessGuards.requireWritable(modelCode, data);
             return Collections.emptySet();
         }
         if (MetaContext.hasCommandPermitScopeFor(modelCode)) {
@@ -1131,6 +1191,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // permissions: admin and system handlers are bound by them, and a command that
             // inherited an aggregate's authority does not get to waive them.
             validationService.validateImmutabilityAndThrow(model, data, existingRecord);
+            if (MachineDataAccessContext.isActive()) {
+                Map<String, Object> prospective = new LinkedHashMap<>(existingRecord);
+                prospective.putAll(data);
+                if (!MachineDataAccessContext.requireDecision(modelCode).permits(prospective)) {
+                    throw new AccessDeniedException("Machine update exceeds the installation row policy");
+                }
+            }
             // Validation intentionally works with java.time domain types. Convert
             // them to JDBC-native values only afterwards, matching the CREATE
             // path and preventing MyBatis from binding Instant as an untyped
@@ -1167,7 +1234,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // authorization boundary. Direct non-command callers retain the legacy payload
             // contract for compatibility.
             Object clientExpectedVersion = enrichedData.remove("_expectedVersion");
-            Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+            Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
             Object expectedVersion =
                     planExpectedVersion != null ? planExpectedVersion : clientExpectedVersion;
 
@@ -1189,12 +1256,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
                 throw new MetaServiceException("Failed to update record");
             }
-            if (planExpectedVersion != null) {
-                MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
-            }
-
             // Materialize computed fields after update
             virtualFieldEngine.materialize(modelCode, recordId, changedFields);
+            notifyModelMutation(model, recordId, ModelMutationObserver.Operation.UPDATED);
 
             // Record change log. Same platform-internal read-back as create():
             // the caller's read permissions must not gate the row we just wrote.
@@ -1229,6 +1293,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     () -> getAutomationTriggerService().onRecordUpdate(
                             modelCode, recordId, automationBefore, automationAfter));
 
+            MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
             return updatedRecord;
 
         } catch (AccessDeniedException e) {
@@ -1261,7 +1326,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
         RecordCommandWriterGuard.assertStoredAllowed(model, existingRecord, "delete");
-        Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+        Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
 
         // 构建删除条件
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1269,6 +1334,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 ? primaryKey.getColumnName()
                 : primaryKey.getCode();
 
+        // Capture the delete snapshot while the source row still exists. The outbox
+        // insert shares this transaction and rolls back if the guarded delete fails.
+        notifyModelMutation(model, recordId, ModelMutationObserver.Operation.DELETED);
         int result;
         if (model.isSoftDelete()) {
             // Soft delete: UPDATE deleted_flag = true
@@ -1308,6 +1376,22 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
     }
 
+    private <T> T inRowTransaction(java.util.function.Supplier<T> operation) {
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(
+                applicationContext.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        // Outside a transaction this starts one; inside bulk/import it provides a per-row savepoint.
+        // A caught row failure therefore cannot leave the source mutation without its event.
+        transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        return transaction.execute(status -> operation.get());
+    }
+
+    private void notifyModelMutation(ModelDefinition model, String pid, ModelMutationObserver.Operation operation) {
+        // Lazy resolution prevents model services and publication validators from forming a cycle.
+        // Observer failures deliberately propagate: a published event is part of the business fact.
+        applicationContext.getBeansOfType(ModelMutationObserver.class).values()
+                .forEach(observer -> observer.observe(model, pid, operation));
+    }
+
     private int executeScopedUpdate(
             ModelDefinition model,
             String modelCode,
@@ -1317,6 +1401,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Set<String> jsonbColumns,
             Object expectedVersion) {
         return dynamicScopedWriteSupport().executeScopedUpdate(model,modelCode,primaryKeyColumn,recordId,columnData,jsonbColumns,expectedVersion);
+    }
+
+    private Long expectedWriteVersion(String modelCode, String recordPid) {
+        Long machineVersion = MachineDataAccessContext.expectedVersion(modelCode, recordPid);
+        return machineVersion == null ? MetaContext.getCommandExpectedVersion(modelCode, recordPid) : machineVersion;
     }
 
     private int executeScopedUpdate(
@@ -1690,15 +1779,43 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicDataTransferSupport dynamicDataTransferSupport() {
-        return new DynamicDataTransferSupport(queryBuilderService, dynamicDataMapper, objectMapper, dataPermissionEngine, fieldMaskService, dataDomainService, fieldPermissionService, DynamicDataServiceImpl::buildFieldLabelMap, DynamicDataServiceImpl::materializeReferenceDisplayValues, this::applyFieldPermissionFilter, this::currentMemberIdForFieldPermissions, this::resolveEnrichmentTarget, this::enrichReferenceDisplayFields, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::mapSortFields);
+        return new DynamicDataTransferSupport(queryBuilderService, dynamicDataMapper, objectMapper, dataPermissionEngine, fieldMaskService, dataDomainService, fieldPermissionService, DynamicDataServiceImpl::buildFieldLabelMap, DynamicDataServiceImpl::materializeReferenceDisplayValues, this::applyFieldPermissionFilter, this::currentMemberIdForFieldPermissions, this::resolveEnrichmentTarget, this::enrichReferenceDisplayFields, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::mapSortFields, (code, input) -> inRowTransaction(() -> create(code, input)));
     }
 
     private DynamicJointSaveSupport dynamicJointSaveSupport() {
-        return new DynamicJointSaveSupport(metadataService, dynamicDataMapper, this::create, this::update, this::getModelDefinition, this::assertWritable);
+        return new DynamicJointSaveSupport(metadataService, dynamicDataMapper,
+                (code, input) -> inRowTransaction(() -> create(code, input)),
+                (code, pid, input) -> inRowTransaction(() -> update(code, pid, input)),
+                this::getModelDefinition, this::assertWritable, this::deleteJointChildren);
+    }
+
+    private void deleteJointChildren(RelationDefinition relation, String masterId) {
+        inRowTransaction(() -> {
+            String code = relation.getTargetModel();
+            ModelDefinition model = getModelDefinition(code);
+            ModelMutationGuard.assertDeleteAllowed(model);
+            FieldDefinition field = model.getFields().stream()
+                    .filter(candidate -> relation.getTargetField().equals(candidate.getCode()))
+                    .findFirst().orElseThrow(() -> new MetaServiceException("Unknown joint replacement field"));
+            if (field.isVirtual() || field.isJsonbVirtual()) {
+                throw new MetaServiceException("Joint replacement requires a stored relation field");
+            }
+            String column = field.getColumnName() != null ? field.getColumnName() : field.getCode();
+            String table = metadataService.getTableName(code);
+            SqlSafetyUtils.validateIdentifier(table, "joint replacement table");
+            SqlSafetyUtils.validateIdentifier(column, "joint replacement column");
+            var rows = dynamicDataMapper.selectRelationChildrenForUpdate(
+                    table, column, getCurrentTenantId(), masterId, model.isSoftDelete());
+            for (var row : rows) {
+                if (row.get("pid") == null) throw new MetaServiceException("Joint replacement row has no PID");
+                delete(code, row.get("pid").toString());
+            }
+            return null;
+        });
     }
 
     private DynamicDataBatchSupport dynamicDataBatchSupport() {
-        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, this::create, this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, this::update, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData);
+        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, (code, input) -> inRowTransaction(() -> create(code, input)), this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, (code, inputId, input) -> inRowTransaction(() -> update(code, inputId, input)), this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::notifyModelMutation, this::delete);
     }
 
     private DynamicDataListingSupport dynamicDataListingSupport() {

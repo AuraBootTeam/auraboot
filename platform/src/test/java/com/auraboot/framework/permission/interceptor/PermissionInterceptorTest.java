@@ -75,7 +75,7 @@ class PermissionInterceptorTest {
         var rollback = new HandlerMethod(controller, controller.getClass().getMethod("rollback", String.class, String.class));
         var sharing = new com.auraboot.framework.view.controller.ViewShareController(
                 mock(com.auraboot.framework.view.service.ViewShareService.class));
-        var share = new HandlerMethod(sharing, sharing.getClass().getMethod("shareView", String.class, Map.class));
+        var share = new HandlerMethod(sharing, sharing.getClass().getMethod("shareView", String.class, com.auraboot.framework.view.dto.ViewShareRequest.class));
         var revokeShare = new HandlerMethod(sharing, sharing.getClass().getMethod("revokeShare", String.class));
         var shareStatus = new HandlerMethod(sharing, sharing.getClass().getMethod("getShareStatus", String.class));
         var shareHandlers = List.of(share, revokeShare, shareStatus);
@@ -187,7 +187,9 @@ class PermissionInterceptorTest {
     }
 
     @Test
-    void preHandle_noAnnotation_allowsAccess() throws Exception {
+    void preHandle_allowMode_noAnnotation_allowsAccess() throws Exception {
+        // Default mode is deny (default-deny flip); this test pins the legacy allow mode.
+        interceptor.setUnannotatedMode("allow");
         HandlerMethod hm = handlerMethod(StaticHandler.class, "noAnnotation");
         boolean ok = interceptor.preHandle(request, response, hm);
         assertThat(ok).isTrue();

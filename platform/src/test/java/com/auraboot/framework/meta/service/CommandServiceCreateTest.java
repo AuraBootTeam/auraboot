@@ -28,6 +28,13 @@ class CommandServiceCreateTest {
         when(mapper.insertIdempotent(any())).thenReturn(0);
         assertThatThrownBy(()->service.create(request())).hasMessageContaining("concurrently created");verifyNoInteractions(cache);
     }
+    @Test void retiredCommandKeepsTheAdoptedIdentityAndLifecycleStatus(){
+        var adopted=new CommandDefinition();adopted.setPid("restored-command");adopted.setStatus("published");
+        when(mapper.findCurrentByCode("app:create")).thenReturn(null,adopted);
+        when(mapper.insertIdempotent(any())).thenReturn(0);when(mapper.adoptRetired(any())).thenReturn(1);
+        var result=service.create(request());assertThat(result.getPid()).isEqualTo("restored-command");
+        assertThat(result.getStatus()).isEqualTo("published");verify(cache).evictCommandDefinitions();
+    }
     @Test void anExistingLiveCommandIsStillRejected(){
         when(mapper.findCurrentByCode("app:create")).thenReturn(new CommandDefinition());
         assertThatThrownBy(()->service.create(request())).hasMessageContaining("already exists");verify(mapper,never()).insertIdempotent(any());verifyNoInteractions(cache);

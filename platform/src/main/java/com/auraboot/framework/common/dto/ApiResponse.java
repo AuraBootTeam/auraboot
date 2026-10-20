@@ -3,6 +3,7 @@ package com.auraboot.framework.common.dto;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.io.Serializable;
 
@@ -16,6 +17,7 @@ public class ApiResponse<T> implements Serializable {
     private String message;
 
     /** 成功时的业务数据 */
+    @Schema(nullable = true)
     private T data;
 
     /** 错误上下文（结构化） */

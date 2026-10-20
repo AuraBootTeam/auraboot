@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -53,6 +54,7 @@ class PluginManagerServiceImplTest {
     @Mock private ExtensionRegistry extensionRegistry;
     @Mock private BackgroundComponentRegistry backgroundComponentRegistry;
     @Mock private ApplicationModuleRegistry applicationModuleRegistry;
+    @Mock private PluginResourceImporter pluginResourceImporter;
     @Mock private AdminEventLogService adminEventLogService;
 
     @InjectMocks private PluginManagerServiceImpl service;
@@ -271,6 +273,32 @@ class PluginManagerServiceImplTest {
         assertThat(result.isSuccess()).isTrue();
         verify(pluginRecordMapper).softDelete("PID-1");
         verify(adminEventLogService).record(any(AdminEventLog.class));
+    }
+
+    @Test
+    @DisplayName("uninstall deactivates the plugin's imported menu surface (tenant-scoped)")
+    void uninstallShouldDeactivateImportedMenus() {
+        when(pluginRecordMapper.findByTenantAndPluginId("com.example.p"))
+                .thenReturn(recordWithStatus(PluginStatus.INSTALLED));
+        when(pluginResourceImporter.deactivateAllPluginMenus("PID-1", 100L)).thenReturn(7);
+
+        PluginOperationResult result = service.uninstall("com.example.p", true);
+
+        assertThat(result.isSuccess()).isTrue();
+        verify(pluginResourceImporter).deactivateAllPluginMenus("PID-1", 100L);
+    }
+
+    @Test
+    @DisplayName("uninstall fails (and rolls back transactionally) when menu deactivation fails")
+    void uninstallShouldFailWhenMenuDeactivationFails() {
+        when(pluginRecordMapper.findByTenantAndPluginId("com.example.p"))
+                .thenReturn(recordWithStatus(PluginStatus.INSTALLED));
+        when(pluginResourceImporter.deactivateAllPluginMenus("PID-1", 100L))
+                .thenThrow(new IllegalStateException("menu cleanup failed"));
+
+        assertThatThrownBy(() -> service.uninstall("com.example.p", true))
+                .isInstanceOf(PluginLifecycleException.class);
+        verify(adminEventLogService).record(argThat((AdminEventLog log) -> !Boolean.TRUE.equals(log.getSuccess())));
     }
 
     @Test

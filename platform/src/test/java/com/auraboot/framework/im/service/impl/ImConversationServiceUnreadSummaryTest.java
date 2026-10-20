@@ -1,6 +1,6 @@
 package com.auraboot.framework.im.service.impl;
 
-import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.im.service.ImAgentDirectory;
 import com.auraboot.framework.im.dto.ConversationUnreadRow;
 import com.auraboot.framework.im.dto.UnreadSummary;
 import com.auraboot.framework.im.mapper.ImConversationMapper;
@@ -37,7 +37,7 @@ class ImConversationServiceUnreadSummaryTest {
     @Mock private ImConversationMemberMapper memberMapper;
     @Mock private ImMessageMapper messageMapper;
     @Mock private ImMessageService imMessageService;
-    @Mock private AgentDefinitionMapper agentDefinitionMapper;
+    @Mock private ImAgentDirectory agentDirectory;
 
     @InjectMocks private ImConversationServiceImpl service;
 

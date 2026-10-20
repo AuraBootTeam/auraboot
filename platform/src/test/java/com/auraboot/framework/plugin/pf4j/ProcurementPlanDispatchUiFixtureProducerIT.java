@@ -62,7 +62,7 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
     @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualEncryption;
     private JsonNode input;
     private String encryptionMode;
-    
+
     private final List<Map<String, Object>> sourceCommandProofs = new ArrayList<>();
     private String controlToken;
     private URI controlBase;

@@ -85,7 +85,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
   beforeEach(() => { fetchResultMock.mockReset(); confirmMock.mockReset(); });
 
   it.each([
-    [{}, 'danger'],
+    [{}, 'default'],
     [{ confirmVariant: 'default' }, 'default'],
     [{ danger: true }, 'danger'],
     [{ variant: 'danger' }, 'danger'],
@@ -941,6 +941,23 @@ describe('useActionHandler - handlerParams.async polling', () => {
     openSpy.mockRestore();
   });
 
+  it('resolves a static card route without requiring a record PID', async () => {
+    const navigate = vi.fn();
+    const { result } = renderHook(() => useActionHandler({
+      runtime: makeRuntime({ record: { pid: 'PARENT-1' } }),
+      navigate: navigate as any,
+      tableName: 'settings',
+      locale: 'en-US',
+      t: key => key,
+    }));
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'open', action: { type: 'navigate', to: '{target}' },
+      } as unknown as ButtonConfig, { title: 'Providers', target: '/aurabot/providers' });
+    });
+    expect(navigate).toHaveBeenCalledWith('/aurabot/providers');
+  });
+
   it('opens a contextual command form in create mode and carries the source record pid', async () => {
     const navigate = vi.fn();
     const { result } = renderHook(() =>
@@ -1776,13 +1793,14 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
 describe('useActionHandler - explicit confirmation style', () => {
   it.each([
-    [undefined, 'danger', {}],
-    ['default', 'default', {}],
-    ['danger', 'danger', {}],
-    ['default', 'default', { danger: true }],
-    ['default', 'default', { variant: 'danger' }],
-    ['danger', 'danger', { variant: 'default' }],
-  ] as const)('uses %s confirmation style and preserves cancellation with legacy flags %j', async (variant, expected, legacy) => {
+    [{}, 'default'],
+    [{ confirmVariant: 'default' }, 'default'],
+    [{ confirmVariant: 'danger' }, 'danger'],
+    [{ danger: true }, 'danger'],
+    [{ variant: 'danger' }, 'danger'],
+    [{ danger: true, confirmVariant: 'default' }, 'default'],
+    [{ variant: 'default', confirmVariant: 'danger' }, 'danger'],
+  ] as const)('uses %j confirmation intent and preserves cancellation', async (intent, expected) => {
     fetchResultMock.mockReset();
     const confirm = vi.spyOn(confirmations, 'confirmDialog').mockResolvedValue(false);
     try {
@@ -1792,7 +1810,7 @@ describe('useActionHandler - explicit confirmation style', () => {
       }));
       await act(async () => {
         await result.current.handleAction({
-          code: 'restore', confirm: 'Restore this member?', ...legacy, confirmVariant: variant,
+          code: 'restore', confirm: 'Restore this member?', ...intent,
           action: { type: 'command', command: 'admin:restore_member' },
         } as unknown as ButtonConfig, { pid: 'MEMBER-1' });
       });

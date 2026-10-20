@@ -1,0 +1,114 @@
+[
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_code",
+    "sequence": 1,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_project",
+    "sequence": 3,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_amount",
+    "sequence": 4,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_risk",
+    "sequence": 5,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_scope",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_files",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_status",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_process",
+    "sequence": 9,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_result",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_reviewer",
+    "sequence": 11,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_registered",
+    "sequence": 40,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_open_issues",
+    "sequence": 42,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "tpm_acceptance",
+    "fieldCode": "tpm_ac_materials_complete",
+    "sequence": 43,
+    "required": false,
+    "visible": true,
+    "editable": true
+  }
+]

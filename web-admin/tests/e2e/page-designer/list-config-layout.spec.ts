@@ -88,7 +88,9 @@ test.describe('List Designer Layout', () => {
     await expect(page.locator('[data-testid="list-config-panel"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="list-designer-summary"]')).toBeVisible();
     await expect(page.locator('[data-testid="list-designer-workspace"]')).toBeVisible();
-    await expect(page.locator('[data-testid="list-preview-pane"]')).toBeHidden();
+    // The container-query layout reflows the preview below the editor on narrow
+    // viewports (grid-column: 1/-1) instead of hiding it (#2188).
+    await expect(page.locator('[data-testid="list-preview-pane"]')).toBeVisible();
 
     await page.locator('[data-testid="list-tab-toolbar"]').click();
     await expect(page.locator('[data-testid="toolbar-tab"]')).toBeVisible();

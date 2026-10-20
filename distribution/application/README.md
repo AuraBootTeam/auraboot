@@ -118,6 +118,20 @@ pnpm application emit-route-manifest \
 Client and SSR runs must produce the same graph digest.
 Source paths stay outside the graph identity and are never valid release inputs.
 
+### Core ownership and product capabilities
+
+`core-owned-surfaces.json` explicitly inventories platform routes, bootstrap
+permission modules and public assets. Customer impersonation controls and the
+external integration guides are platform surfaces. Product HTTP endpoints and
+test directories remain outside Core; the unchanged ownership gate enforces both.
+
+The BPM contribution owns `workflow.start` and the `aura.resource.workflow`
+service. Core invokes registered capabilities without issuing BPM HTTP requests
+as a fallback. Missing workflow discovery produces no options; a registered
+provider's failure propagates. The platform stage-rail browser fixture stays in
+`tests/e2e/dynamic`, preserving its original four cases and assertions; it does
+not qualify the CRM product's business pipeline.
+
 ## Publishing the AuraBoot platform artifact set
 
 Build the runtime and public plugin API, commit the exact source state, then stage a
@@ -138,6 +152,23 @@ Downstream applications consume only this directory (or the same bytes published
 immutable Maven, npm, migration/config, and OCI registries). A downstream release
 must never resolve an AuraBoot sibling checkout, Maven Local, `workspace:` link,
 `SNAPSHOT`, `latest`, or branch reference.
+
+### Staging independent Web package updates
+
+For an application consuming a separately pinned backend, stage a clean Web source
+commit as npm artifacts without rebuilding or relabeling the runtime:
+
+```bash
+node scripts/application/stage-core-only-artifacts.mjs \
+  --web-only --output /absolute/new/path/to/auraboot-web-packages
+```
+
+This produces the eight npm tarballs, their SHA-256 artifact catalog and a
+`web-packages-only` receipt. It does not emit a runtime, application lock, built
+application, OCI image or deployment approval. Consumers retain the backend's
+original source identity, explicitly admit the new npm hashes, and build and
+verify their application with those exact packages. A dirty source tree is rejected
+by the same staging boundary as the full artifact set.
 
 ## Publishing an application release for tenant binding
 

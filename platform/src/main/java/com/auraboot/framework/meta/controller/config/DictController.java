@@ -1,18 +1,24 @@
 package com.auraboot.framework.meta.controller.config;
 
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.DictService;
+import com.auraboot.framework.meta.service.impl.DictLabelLocalizationHelper;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.service.PluginResourceTracker;
 import com.auraboot.framework.meta.service.DictVersionService;
 import com.auraboot.framework.meta.service.DictCascadeService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,12 +50,24 @@ import java.util.List;
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "字典管理", description = "字典数据的增删改查、版本管理和级联查询")
+@ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Authentication required", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permission denied", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Resource not found", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version conflict", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "Invalid business configuration", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class)))
+})
+@AuthenticatedAccess("render-time dict data and cascade reads for form dropdowns are baseline-readable application structure for any authenticated user")
 public class DictController {
 
     private final DictService dictService;
     private final DictVersionService dictVersionService;
     private final DictCascadeService dictCascadeService;
     private final PluginResourceTracker pluginResourceTracker;
+    private final I18nLocaleResolver i18nLocaleResolver;
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -147,7 +165,8 @@ public class DictController {
     public ApiResponse<DictDataResult> loadDictDataByCode(
             @Parameter(description = "字典编码") @PathVariable @NotBlank String code,
             @Parameter(description = "版本策略") @RequestParam(defaultValue = "latest") String versionStrategy,
-            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion) {
+            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("根据编码加载字典数据: code={}, strategy={}, version={}",
                 logSafe(code), logSafe(versionStrategy), logSafe(pinnedVersion));
 
@@ -159,7 +178,19 @@ public class DictController {
 
         // 加载数据
         DictDataResult result = dictService.loadDictData(code, versionStrategy, pinnedVersion);
+        localizeDictLabels(result, request);
         return ApiResponse.success(result);
+    }
+
+    /**
+     * Resolve served item labels per the request locale. Localized labels ride
+     * along in the item extension "labels" map (written at plugin import /
+     * release bind time); the stored label keeps only one locale. Resolution
+     * happens here, post dictData cache, so the cached payload stays
+     * locale-independent and dictionaries without translations are unchanged.
+     */
+    private void localizeDictLabels(DictDataResult result, jakarta.servlet.http.HttpServletRequest request) {
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(request));
     }
 
 
@@ -207,18 +238,20 @@ public class DictController {
     public ApiResponse<DictDataResult> loadDictData(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
             @Parameter(description = "版本策略") @RequestParam(defaultValue = "latest") String versionStrategy,
-            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion) {
+            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("加载字典数据: pid={}, strategy={}, version={}",
                 logSafe(pid), logSafe(versionStrategy), logSafe(pinnedVersion));
-        
+
         // 通过 PID 获取字典
         DictDTO dict = dictService.findByPid(pid);
         if (dict == null) {
             return ApiResponse.failure("字典不存在: " + pid);
         }
-        
+
         // 使用 code 加载数据
         DictDataResult result = dictService.loadDictData(dict.getCode(), versionStrategy, pinnedVersion);
+        localizeDictLabels(result, request);
         return ApiResponse.success(result);
     }
 
@@ -228,10 +261,13 @@ public class DictController {
     @PostMapping("/data/batch")
     @Operation(summary = "批量加载字典数据", description = "批量根据版本策略加载字典数据")
     public ApiResponse<List<DictDataResult>> batchLoadDictData(
-            @Valid @RequestBody List<DictLoadRequest> requests) {
+            @Valid @RequestBody List<DictLoadRequest> requests,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("批量加载字典数据: count={}", requests.size());
-        
+
         List<DictDataResult> results = dictService.batchLoadDictData(requests);
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        results.forEach(result -> DictLabelLocalizationHelper.localize(result, locale));
         return ApiResponse.success(results);
     }
 
@@ -289,34 +325,43 @@ public class DictController {
 
     // Cascade dict reads (children / tree / query) drive cascading form
     // dropdowns at render time — baseline, same rationale as getDictByCode.
+    // Labels resolve per the request locale post service cache, mirroring the
+    // by-code reads above (query param > X-Locale > Accept-Language; stored
+    // label kept when the extension carries no matching "labels" entry).
     @GetMapping("/{pid}/cascade/children")
     @Operation(summary = "获取级联字典子项", description = "获取级联字典的子项列表")
     public ApiResponse<List<DictItemData>> getCascadeChildren(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
-            @Parameter(description = "父级值") @RequestParam(required = false) String parentValue) {
+            @Parameter(description = "父级值") @RequestParam(required = false) String parentValue,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("获取级联字典子项: pid={}, parentValue={}", logSafe(pid), logSafe(parentValue));
-        
+
         List<DictItemData> result = dictService.getCascadeChildren(pid, parentValue);
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(request));
         return ApiResponse.success(result);
     }
 
     @GetMapping("/{pid}/cascade/tree")
     @Operation(summary = "构建级联字典树", description = "构建完整的级联字典树结构")
     public ApiResponse<DictTreeNode> buildCascadeTree(
-            @Parameter(description = "字典PID") @PathVariable @NotBlank String pid) {
+            @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("构建级联字典树: pid={}", logSafe(pid));
-        
+
         DictTreeNode result = dictService.buildCascadeTree(pid);
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(request));
         return ApiResponse.success(result);
     }
 
     @PostMapping("/cascade/query")
     @Operation(summary = "查询级联字典", description = "根据条件查询级联字典数据")
     public ApiResponse<CascadeDictResult> queryCascadeDict(
-            @Valid @RequestBody CascadeDictRequest request) {
+            @Valid @RequestBody CascadeDictRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         log.info("查询级联字典: dictCode={}", logSafe(request.getDictCode()));
-        
+
         CascadeDictResult result = dictCascadeService.queryCascadeDict(request);
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(httpRequest));
         return ApiResponse.success(result);
     }
 
@@ -375,14 +420,14 @@ public class DictController {
         return ApiResponse.success(result);
     }
 
-    @GetMapping("/{code}/validate")
+    @GetMapping("/{pid}/validate")
     @Operation(summary = "验证字典配置", description = "验证字典配置的正确性")
     @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<DictValidationResult> validateDictConfig(
-            @Parameter(description = "字典PID") @PathVariable @NotBlank String code) {
-        log.info("验证字典配置: code={}", logSafe(code));
+            @Parameter(description = "Dictionary PID") @PathVariable @NotBlank String pid) {
+        log.info("Validating dictionary configuration: pid={}", logSafe(pid));
         
-        DictValidationResult result = dictService.validateConfig(code);
+        DictValidationResult result = dictService.validateConfig(pid);
         return ApiResponse.success(result);
     }
 

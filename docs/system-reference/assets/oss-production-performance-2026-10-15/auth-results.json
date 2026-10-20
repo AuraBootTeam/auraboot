@@ -1,0 +1,501 @@
+{
+  "config": {
+    "configFile": "$SOURCE_ROOT/web-admin/playwright.oss.config.ts",
+    "rootDir": "$SOURCE_ROOT/web-admin/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": "$SOURCE_ROOT/web-admin/tests/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "$EVIDENCE_ROOT/runs/2026-10-15T12-26-14-897Z-858ddfe3-a213-42e3-90a0-dceabf0d5a71/playwright/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "$SOURCE_ROOT/web-admin/tests/api/setup",
+        "testIgnore": [
+          "**/mcp-cursor-demo.spec.ts"
+        ],
+        "testMatch": [
+          "/\\/\\d{2}-.*\\.spec\\.ts$/"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "$EVIDENCE_ROOT/runs/2026-10-15T12-26-14-897Z-858ddfe3-a213-42e3-90a0-dceabf0d5a71/playwright/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "auth",
+        "name": "auth",
+        "testDir": "$SOURCE_ROOT/web-admin/tests",
+        "testIgnore": [
+          "**/mcp-cursor-demo.spec.ts"
+        ],
+        "testMatch": [
+          "/auth\\.setup\\.ts/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "$EVIDENCE_ROOT/runs/2026-10-15T12-26-14-897Z-858ddfe3-a213-42e3-90a0-dceabf0d5a71/playwright/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "oss",
+        "name": "oss",
+        "testDir": "$SOURCE_ROOT/web-admin/tests/e2e",
+        "testIgnore": [
+          "/.*-deep\\.spec\\.ts$/",
+          "/.*\\/(amos-lenses|annual-plan|asset-management|construction-process|contract-cost|doc-knowledge|dual-prevention|enterprise|finance|finance-accounting|inventory|license|logistics|maintenance|marketplace|pcba|pcba-solution|payment|procurement|product-catalog|project-management|quality|quarry|sales|sales-templates|tax|templates)\\/.*\\.spec\\.ts$/",
+          "/.*\\/aurabot\\/pcba-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/asset-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/pcba-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/pm-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/plugin-all-packages-smoke\\.spec\\.ts$/",
+          "/.*\\/(action-system|activity|agent-control-plane|approval|bpm|command|dashboard|data-tools|e2et-order|integration|model|named-query|plugin|query-builder|scheduler|search|smart-components)\\/.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-designer\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-designer-deep\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-widget-types\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-charts\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-export\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/dashboard-designer-deep\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/report-designer-deep\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-error-branches\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-master-data\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-member-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-my-tasks\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-project-lifecycle\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-smoke\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-task-associations\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-workspace-interactions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pcba-plugin\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/designer-unified-architecture\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/designer-lifecycle\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-interactions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/plugin-all-packages-smoke\\.spec\\.ts$/",
+          "/tests\\/e2e\\/organization\\/member-detail\\.spec\\.ts$/",
+          "/tests\\/e2e\\/organization\\/org-department\\.spec\\.ts$/",
+          "/tests\\/e2e\\/saved-view\\/saved-view-column-settings\\.spec\\.ts$/",
+          "/tests\\/e2e\\/user\\/user-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/bpm\\/bpm-form-integration\\.spec\\.ts$/",
+          "/tests\\/e2e\\/approval\\/approval-workflow\\.spec\\.ts$/",
+          "/tests\\/e2e\\/approval\\/inline-approval-panel\\.spec\\.ts$/",
+          "/tests\\/e2e\\/model\\/model-publish-governance\\.spec\\.ts$/",
+          "/tests\\/e2e\\/platform\\/command-pipeline\\.spec\\.ts$/",
+          "/tests\\/e2e\\/platform\\/multi-tenant-isolation\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/form-draft-fill\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-base-smoke\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-embedding-visibility-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-ingestion-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-legacy-office-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-provider-select-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-url-ingestion-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/prompt-to-app-dynamic-form-submit-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-agent-suggestions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-render-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-save-report\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-suggestion-revocation\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-suggestions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/behavior-analytics-page\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/behavior-analytics-permission\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/behavior-execution-page\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/competitive-intelligence-agent-scenario\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/competitive-intelligence-orchestration\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/competitive-intelligence-workbench\\.spec\\.ts$/",
+          "/tests\\/e2e\\/admin\\/platform-admin-crud\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-designer\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-enhanced\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-action-points-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/llm-call-node\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/report-analytics-permission\\.spec\\.ts$/",
+          "/tests\\/e2e\\/page-designer\\/zz-probe-inspector-fields\\.spec\\.ts$/"
+        ],
+        "testMatch": [
+          "/tests\\/e2e\\/auth\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/permission\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/rbac\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/org\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/organization\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/user\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/community\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/i18n\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/model\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/named-query\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/query-builder\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/formula\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/page-designer\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/block-renderer\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/studio\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/command\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin-lifecycle\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/saved-view\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/list-ux\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/approval\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/inbox\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/notification\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/activity\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/action-system\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/data-tools\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/search\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/header\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/admin\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/platform\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/settings\\/open-platform\\.golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/settings\\/open-platform-collaboration\\.golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/settings\\/open-platform-multi-user\\.golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/integration\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/cross-field-validation\\.spec\\.ts$/",
+          "/tests\\/e2e\\/cross-module\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/setup\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/agent-control-plane\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/showcase\\/(?:.*\\/)?.*\\.spec\\.ts$/"
+        ],
+        "timeout": 15000
+      },
+      {
+        "outputDir": "$EVIDENCE_ROOT/runs/2026-10-15T12-26-14-897Z-858ddfe3-a213-42e3-90a0-dceabf0d5a71/playwright/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "oss-deep",
+        "name": "oss-deep",
+        "testDir": "$SOURCE_ROOT/web-admin/tests/e2e",
+        "testIgnore": [
+          "/.*\\/(amos-lenses|annual-plan|asset-management|construction-process|contract-cost|doc-knowledge|dual-prevention|enterprise|finance|finance-accounting|inventory|license|logistics|maintenance|marketplace|pcba|pcba-solution|payment|procurement|product-catalog|project-management|quality|quarry|sales|sales-templates|tax|templates)\\/.*\\.spec\\.ts$/",
+          "/.*\\/aurabot\\/pcba-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/asset-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/pcba-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/pm-.*\\.spec\\.ts$/",
+          "/.*\\/plugin\\/plugin-all-packages-smoke\\.spec\\.ts$/",
+          "/.*\\/(action-system|activity|agent-control-plane|approval|bpm|command|dashboard|data-tools|e2et-order|integration|model|named-query|plugin|query-builder|scheduler|search|smart-components)\\/.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-designer\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-designer-deep\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-widget-types\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-charts\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-export\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/dashboard-designer-deep\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/report-designer-deep\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-error-branches\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-master-data\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-member-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-my-tasks\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-project-lifecycle\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-smoke\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-task-associations\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pm-workspace-interactions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/pcba-plugin\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/designer-unified-architecture\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/designer-lifecycle\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-interactions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/dashboard-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/plugin-all-packages-smoke\\.spec\\.ts$/",
+          "/tests\\/e2e\\/organization\\/member-detail\\.spec\\.ts$/",
+          "/tests\\/e2e\\/organization\\/org-department\\.spec\\.ts$/",
+          "/tests\\/e2e\\/saved-view\\/saved-view-column-settings\\.spec\\.ts$/",
+          "/tests\\/e2e\\/user\\/user-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/bpm\\/bpm-form-integration\\.spec\\.ts$/",
+          "/tests\\/e2e\\/approval\\/approval-workflow\\.spec\\.ts$/",
+          "/tests\\/e2e\\/approval\\/inline-approval-panel\\.spec\\.ts$/",
+          "/tests\\/e2e\\/model\\/model-publish-governance\\.spec\\.ts$/",
+          "/tests\\/e2e\\/platform\\/command-pipeline\\.spec\\.ts$/",
+          "/tests\\/e2e\\/platform\\/multi-tenant-isolation\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/form-draft-fill\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-base-smoke\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-embedding-visibility-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-ingestion-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-legacy-office-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-provider-select-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/knowledge-url-ingestion-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/prompt-to-app-dynamic-form-submit-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-agent-suggestions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-render-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-save-report\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-suggestion-revocation\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/chat-bi-suggestions\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/behavior-analytics-page\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/behavior-analytics-permission\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/behavior-execution-page\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/competitive-intelligence-agent-scenario\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/competitive-intelligence-orchestration\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/competitive-intelligence-workbench\\.spec\\.ts$/",
+          "/tests\\/e2e\\/admin\\/platform-admin-crud\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-designer\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-enhanced\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-management\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/automation-action-points-golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/llm-call-node\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/report-analytics-permission\\.spec\\.ts$/",
+          "/tests\\/e2e\\/page-designer\\/zz-probe-inspector-fields\\.spec\\.ts$/"
+        ],
+        "testMatch": [
+          "/tests\\/e2e\\/auth\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/permission\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/rbac\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/org\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/organization\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/user\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/community\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/i18n\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/model\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/named-query\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/query-builder\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/formula\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/dashboard\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/page-designer\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/designer\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/block-renderer\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/studio\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/command\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/plugin-lifecycle\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/saved-view\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/list-ux\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/automation\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/approval\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/inbox\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/notification\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/activity\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/action-system\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/data-tools\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/search\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/header\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/admin\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/platform\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/settings\\/open-platform\\.golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/settings\\/open-platform-collaboration\\.golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/settings\\/open-platform-multi-user\\.golden\\.spec\\.ts$/",
+          "/tests\\/e2e\\/integration\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/cross-field-validation\\.spec\\.ts$/",
+          "/tests\\/e2e\\/cross-module\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/setup\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/aurabot\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/ai\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/agent-control-plane\\/(?:.*\\/)?.*\\.spec\\.ts$/",
+          "/tests\\/e2e\\/showcase\\/(?:.*\\/)?.*\\.spec\\.ts$/"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "$EVIDENCE_ROOT/verification/auth-html"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "$EVIDENCE_ROOT/verification/auth-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "auth.setup.ts",
+      "file": "auth.setup.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "authenticate as admin",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 159,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "   [admin@auraboot.com] Warning: admin API login auto-select failed\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T12:28:56.652Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-7525b0ba342817970c43",
+          "file": "auth.setup.ts",
+          "line": 397,
+          "column": 1
+        },
+        {
+          "title": "authenticate as operator",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 49,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T12:28:56.899Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-88b84c42d378e8dda1f9",
+          "file": "auth.setup.ts",
+          "line": 442,
+          "column": 1
+        },
+        {
+          "title": "ensure e2et test pages dsl",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 271,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T12:28:56.953Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-dc8d7cd76ef08632eabb",
+          "file": "auth.setup.ts",
+          "line": 471,
+          "column": 1
+        },
+        {
+          "title": "authenticate as viewer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 46,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T12:28:57.228Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-e53e23fddf11a51daafb",
+          "file": "auth.setup.ts",
+          "line": 530,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-15T12:28:56.284Z",
+    "duration": 1112.858,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

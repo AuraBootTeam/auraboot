@@ -44,8 +44,8 @@ public class FieldMapPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        // Before-snapshot for change tracking
-        if (ctx.getRequest() != null && StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+        // Preserve an original snapshot captured before state-check persistence.
+        if (ctx.getBeforeSnapshot() == null && ctx.getRequest() != null && StringUtils.hasText(ctx.getRequest().getTargetRecordId())
                 && StringUtils.hasText(ctx.getCommand().getModelCode())) {
             ctx.setBeforeSnapshot(snapshotReader.readRecordSnapshot(
                     ctx.getTenantId(), ctx.getCommand().getModelCode(), ctx.getRequest().getTargetRecordId()));

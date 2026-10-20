@@ -3,6 +3,9 @@ package com.auraboot.framework.aurabot.service;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.trace.AiTraceService;
+import com.auraboot.framework.agent.trace.TraceContext;
+import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
@@ -46,6 +49,8 @@ class AuraBotChatToolRuntimeAdapter {
     private final ObjectMapper objectMapper;
     private final ReadOnlyProfilePolicy readOnlyProfilePolicy;
     private final int maxToolRounds;
+    private final AiTraceService aiTraceService;
+    private final TraceContext trace;
 
     TurnOutcome run(TurnContext ctx,
                     String providerCode,
@@ -98,7 +103,7 @@ class AuraBotChatToolRuntimeAdapter {
                         false,
                         maxToolRounds,
                         null,
-                        null,
+                        trace != null ? trace.getTraceId() : null,
                         objectMapper),
                 callbacks(ctx, modelCode, sessionId, contextBundle, envelope, userMessage));
     }
@@ -109,6 +114,29 @@ class AuraBotChatToolRuntimeAdapter {
                                                             AgentContextBundle contextBundle,
                                                             ExecutionEnvelope envelope, String sourceText) {
         return new ChatTurnRuntime.ChatToolLoopCallbacks() {
+            @Override
+            public Object beforeProviderCall(ChatTurnRuntime.ChatToolLoopRound round, LlmChatRequest request) {
+                Map<String, Object> identity = new java.util.LinkedHashMap<>();
+                identity.put("model", request.getModel());
+                identity.put("provider", round.providerCode());
+                return aiTraceService.startSpan(trace, null, "generation", "llm_round_" + round.round(), identity);
+            }
+
+            @Override
+            public void afterProviderResponse(ChatTurnRuntime.ChatToolLoopRound round, Object span, LlmChatResponse response) {
+                SpanContext generation = (SpanContext) span;
+                aiTraceService.recordGeneration(generation, round.model(), response.getInputTokens(),
+                        response.getOutputTokens(), null, response.getStopReason(), round.tools(),
+                        response.getContent() == null ? List.of() : response.getContent().stream()
+                                .filter(block -> "tool_use".equals(block.getType())).toList());
+                aiTraceService.endSpan(generation, Map.of("stopReason", String.valueOf(response.getStopReason())), "success");
+            }
+
+            @Override
+            public void afterProviderFailure(ChatTurnRuntime.ChatToolLoopRound round, Object span, String message, Exception error) {
+                aiTraceService.endSpan((SpanContext) span, message, "error");
+            }
+
             @Override
             public AgentExecutionState buildRoundState(ChatTurnRuntime.ChatToolLoopRound round) {
                 return null;

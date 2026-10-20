@@ -1,0 +1,164 @@
+{
+  "format": "auraboot.report-template",
+  "version": 1,
+  "dsl": {
+    "$schema": "auraboot://schemas/report/v1",
+    "version": "1.0.0",
+    "title": "客户项目交付简报",
+    "description": "基于当前空间可读业务记录的交付事实简报；全部示例为虚构数据，未调用AI。",
+    "page": {
+      "size": "A4",
+      "orientation": "landscape",
+      "margin": {
+        "top": 15,
+        "right": 15,
+        "bottom": 15,
+        "left": 15
+      }
+    },
+    "dataSources": {
+      "projects": {
+        "type": "namedQuery",
+        "queryCode": "tpm_delivery_brief"
+      },
+      "customers": {
+        "type": "model",
+        "modelCode": "tpm_customer"
+      }
+    },
+    "header": {
+      "height": 14,
+      "elements": [
+        {
+          "type": "text",
+          "content": "客户项目交付简报",
+          "align": "left",
+          "style": {
+            "fontSize": 20,
+            "fontWeight": "bold"
+          }
+        }
+      ]
+    },
+    "footer": {
+      "height": 10,
+      "elements": [
+        {
+          "type": "page-number",
+          "align": "right"
+        }
+      ]
+    },
+    "body": [
+      {
+        "id": "intro",
+        "blockType": "rich-text",
+        "content": "面向交付负责人的项目进展、风险与行动清单。数据按当前账号权限实时查询；进度为负责人汇报，项目预算不是收入。示例业务为虚构数据。",
+        "style": {
+          "fontSize": 11
+        }
+      },
+      {
+        "id": "count",
+        "blockType": "stat-card",
+        "dataSource": "projects",
+        "valueField": "pid",
+        "aggregation": "count",
+        "label": "客户项目数"
+      },
+      {
+        "id": "budget",
+        "blockType": "stat-card",
+        "dataSource": "projects",
+        "valueField": "budget",
+        "aggregation": "sum",
+        "label": "项目预算合计（元）"
+      },
+      {
+        "id": "overview",
+        "blockType": "table",
+        "title": "一、项目交付概况",
+        "dataSource": "projects",
+        "columns": [
+          {
+            "field": "project_name",
+            "label": "客户与项目",
+            "width": 240
+          },
+          {
+            "field": "owner_name",
+            "label": "负责人",
+            "width": 90
+          },
+          {
+            "field": "delivery_stage",
+            "label": "阶段",
+            "width": 85
+          },
+          {
+            "field": "progress",
+            "label": "进度（%）",
+            "width": 80
+          },
+          {
+            "field": "delivery_date",
+            "label": "计划交付",
+            "width": 100
+          },
+          {
+            "field": "budget",
+            "label": "预算（元）",
+            "width": 100
+          }
+        ],
+        "showHeader": true,
+        "stripe": true
+      },
+      {
+        "id": "actions",
+        "blockType": "table",
+        "title": "二、交付风险与下一步行动",
+        "dataSource": "projects",
+        "columns": [
+          {
+            "field": "project_name",
+            "label": "客户与项目",
+            "width": 200
+          },
+          {
+            "field": "risk_summary",
+            "label": "交付风险",
+            "width": 260
+          },
+          {
+            "field": "next_action",
+            "label": "下一步行动",
+            "width": 340
+          }
+        ],
+        "showHeader": true,
+        "stripe": true
+      },
+      {
+        "id": "contacts",
+        "blockType": "table",
+        "title": "三、客户联系信息",
+        "dataSource": "customers",
+        "columns": [
+          {
+            "field": "tpm_cu_name",
+            "label": "客户名称",
+            "width": 250
+          },
+          {
+            "field": "tpm_cu_contact",
+            "label": "客户联系人",
+            "width": 400
+          }
+        ],
+        "showHeader": true,
+        "stripe": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "pageKey": "tpm_customer_form",
+  "name:zh-CN": "客户",
+  "name:en": "Customer",
+  "modelCode": "tpm_customer",
+  "kind": "form",
+  "schemaVersion": 4,
+  "title": {
+    "zh-CN": "客户",
+    "en": "Customers"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "customer",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "客户信息",
+        "en": "Customer information"
+      },
+      "fields": [
+        {
+          "field": "tpm_cu_name",
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：华辰制造",
+              "en": "e.g. Acorn Manufacturing"
+            }
+          }
+        },
+        {
+          "field": "tpm_cu_contact",
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：张经理 · 采购部",
+              "en": "e.g. Alex · Procurement"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "area": "footer",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tpm:create_customer",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存客户",
+            "en": "Save customer"
+          },
+          "visibleWhen": "!form.pid"
+        },
+        {
+          "code": "update",
+          "action": "save",
+          "commandCode": "tpm:update_customer",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存客户",
+            "en": "Save customer"
+          },
+          "visibleWhen": "!!form.pid"
+        },
+        {
+          "code": "cancel",
+          "action": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          }
+        }
+      ]
+    }
+  ]
+}

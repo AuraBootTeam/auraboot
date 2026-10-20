@@ -1,0 +1,16 @@
+[
+  {
+    "code": "tdv_check",
+    "displayName:zh-CN": "交付核验",
+    "displayName:en": "Delivery verification",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "description": "An explicit verification snapshot; never substitutes for human approval.",
+    "extension": {
+      "titleField": "tdv_ck_name",
+      "icon": "ClipboardCheck",
+      "category": "project-management",
+      "activityTimelineEnabled": true
+    }
+  }
+]

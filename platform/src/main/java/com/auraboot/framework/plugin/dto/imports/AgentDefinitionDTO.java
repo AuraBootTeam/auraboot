@@ -1,6 +1,6 @@
 package com.auraboot.framework.plugin.dto.imports;
 
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
@@ -60,7 +60,7 @@ public class AgentDefinitionDTO {
     /**
      * Optional capability eval cases to persist as agent sub-resources on import.
      * On every import the existing cases for (tenant_id, agent_code) are replaced
-     * (DELETE + INSERT). Validated by {@link com.auraboot.framework.agent.eval.EvalCaseStructureValidator}
+     * (DELETE + INSERT). Validated by the agent resource provider
      * before the agent row is written; invalid cases abort the import with an exception.
      */
     private List<CapabilityEvalCase> evalCases;

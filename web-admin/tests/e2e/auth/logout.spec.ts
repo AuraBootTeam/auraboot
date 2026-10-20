@@ -128,7 +128,8 @@ test.describe('Logout Functionality', () => {
    */
   test('LO-001: should logout via user menu @smoke', async ({ page }) => {
     const header = await loginViaForm(page);
-
+    await header.openUserMenu();
+    await page.screenshot({ path: test.info().outputPath('dashboard-http-user-menu.png'), fullPage: true });
     await header.logout();
 
     await expect(page.locator('input#identifier, input#email').first()).toBeVisible({

@@ -452,6 +452,26 @@ class CommandTargetScopePhaseTest {
         verifyNoInteractions(permissionFacade);
     }
 
+    @Test
+    void machineTargetUsesItsExplicitDecisionRegardlessOfHumanMembership() {
+        givenRecordIsReadable(false);
+        MetaContext.setContext(1L, null, "token", "machine");
+        MetaContext.setMemberId(99L);
+        var principal = new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                1L, "token", "app", java.util.Set.of(), "app", "install", "staging", "token");
+        var decision = new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(
+                1L, "install", "qo_quote_common", java.util.Set.of("update"), java.util.Set.of("pid", "name"), java.util.Set.of("name"),
+                List.of(new com.auraboot.framework.application.security.MachineDataAccessContext.Constraint("pid", "pid", List.of("REC-1"))));
+        try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+             var approved = com.auraboot.framework.application.security.MachineDataAccessContext.authorize(Map.of("qo_quote_common", decision))) {
+            var ctx = context("qo_quote_common", "REC-1"); ctx.setExecConfig(Map.of("type", "state_transition"));
+            phase().execute(ctx);
+            assertThat(ctx.getTargetRecordReadable()).isTrue();
+            assertThat(ctx.getTargetRecordVersion()).isEqualTo(13L);
+            verifyNoInteractions(permissionFacade);
+        }
+    }
+
     private void givenRecordIsReadable(boolean readable) {
         when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
         givenPermission(readable);

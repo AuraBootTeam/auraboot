@@ -22,6 +22,18 @@ class AssertPhaseTest {
     private final AssertPhase phase = new AssertPhase(null, null, null, null, null);
 
     @Test
+    void requiredEvidenceRejectsNullBlankAndEmptyCollectionsButAcceptsActualContent() {
+        for (Object empty : List.of("", "  \n\t", "[]", "{}", "null", List.of(), Map.of(), new String[0])) {
+            assertFalse(phase.evaluatePrecondition("not_empty", empty, null));
+        }
+        assertFalse(phase.evaluatePrecondition("not_empty", null, null));
+        assertFalse(phase.evaluatePrecondition("not_empty", 0, null));
+        assertTrue(phase.evaluatePrecondition("not_empty", "Delivery checklist", null));
+        assertTrue(phase.evaluatePrecondition("not_empty", List.of(Map.of("filePid", "owned-file")), null));
+        assertTrue(phase.evaluatePrecondition("not_empty", "[{\"fileId\":\"owned-file\"}]", null));
+    }
+
+    @Test
     void normalizesConfigStyleAndCanonicalOperators() {
         // config-style (QueryOperator op-codes)
         assertEquals("NOT_NULL", AssertPhase.normalizeOperator("is_not_null"));
@@ -103,6 +115,7 @@ class AssertPhaseTest {
                 Map.entry("not_in", new Object[]{"z", List.of("a", "b")}),
                 Map.entry("is_null", new Object[]{null, null}),
                 Map.entry("is_not_null", new Object[]{"x", null}),
+                Map.entry("not_empty", new Object[]{List.of("evidence"), null}),
                 Map.entry("between", new Object[]{5, List.of(1, 10)}),
                 Map.entry("like", new Object[]{"hello", "h%o"}),
                 Map.entry("not_like", new Object[]{"hello", "h%x"}),

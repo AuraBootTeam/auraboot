@@ -93,7 +93,7 @@ class PluginResourceImporterFieldReimportTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"type", "precision", "feature", "reference"})
+    @ValueSource(strings = {"type", "precision", "feature", "reference", "default"})
     void changedDefinitionStillSynchronizesPublishedModels(String change) {
         var dto = definition();
         switch (change) {
@@ -101,10 +101,29 @@ class PluginResourceImporterFieldReimportTest {
             case "precision" -> dto.getConstraints().setPrecision(20);
             case "feature" -> dto.setFeature(Map.of("unique", true));
             case "reference" -> dto.setRefTarget(Map.of("targetEntity", "supplier"));
+            case "default" -> dto.setDefaultValue("0");
             default -> throw new IllegalArgumentException(change);
         }
         assertThat(reimport(dto).getResourcePid()).isEqualTo("field-pid");
         verify(schemas).updateTableByModel("quote_line");
+    }
+
+    @Test
+    void topLevelDslDefaultSurvivesImportWithoutConstraints() {
+        var dto = new FieldDefinitionDTO(); dto.setCode("tasset_as_status"); dto.setDataType("enum");
+        dto.setDefaultValue("available"); dto.setFeature(Map.of("filterable", true));
+        Map<String, Object> feature = ReflectionTestUtils.invokeMethod(importer, "buildFieldFeature", dto);
+        assertThat(feature).containsEntry("defaultValue", "available").containsEntry("filterable", true);
+        var persisted = json.convertValue(feature, com.auraboot.framework.meta.entity.payload.FieldFeatureBean.class);
+        assertThat(persisted.getDefaultValue()).isEqualTo("available");
+    }
+
+    @Test
+    void FeatureDefaultRemainsWhenTopLevelDefaultIsAbsent() {
+        var dto = new FieldDefinitionDTO(); dto.setCode("tasset_as_status"); dto.setDataType("enum");
+        dto.setFeature(Map.of("defaultValue", "available"));
+        Map<String, Object> feature = ReflectionTestUtils.invokeMethod(importer, "buildFieldFeature", dto);
+        assertThat(feature).containsEntry("defaultValue", "available");
     }
 
     @Test
@@ -115,5 +134,31 @@ class PluginResourceImporterFieldReimportTest {
                 .thenReturn(SchemaOperationResult.builder().success(false).errorMessage("schema unavailable").build());
         assertThatThrownBy(() -> reimport(dto)).isInstanceOf(PluginException.class)
                 .hasMessageContaining("schema unavailable");
+    }
+
+    @Test
+    void fieldBatchSynchronizesEachModelOnlyAfterAllDefinitionsAreUpdated() {
+        importer.beginFieldImportBatch();
+        try {
+            var first = definition(); first.getConstraints().setScale(7);
+            reimport(first);
+            verifyNoInteractions(schemas);
+            var second = definition(); second.getConstraints().setScale(8);
+            reimport(second);
+            verifyNoInteractions(schemas);
+        } finally {
+            importer.endFieldImportBatch(true);
+        }
+        verify(schemas, times(1)).updateTableByModel("quote_line");
+    }
+
+    @Test
+    void abortedBatchDoesNotApplyPartialSchemaAndReleasesThreadState() {
+        importer.beginFieldImportBatch();
+        var changed = definition(); changed.getConstraints().setScale(7);
+        try { reimport(changed); } finally { importer.endFieldImportBatch(false); }
+        verifyNoInteractions(schemas);
+        reimport(changed);
+        verify(schemas).updateTableByModel("quote_line");
     }
 }

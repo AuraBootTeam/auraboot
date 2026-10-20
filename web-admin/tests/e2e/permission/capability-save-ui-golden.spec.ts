@@ -78,12 +78,13 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await expect(page.getByTestId('data-scope-default')).toBeInViewport();
   await page.screenshot({ path: info.outputPath('rbac-initial.png'), fullPage: true });
   await diagnostics.locator(':scope > summary').click();
-  await diagnostics.locator('input').fill('model.qo_quote_common.read');
-  const diagnosticRow = diagnostics.getByTestId('diagnostic-action-model.qo_quote_common.read');
+  // the diagnostics table renders ~2000 rows; give the input time to settle
+  await diagnostics.locator('input').fill('model.tenant_member.read', { timeout: 15_000 });
+  const diagnosticRow = diagnostics.getByTestId('diagnostic-action-model.tenant_member.read');
   await expect(diagnosticRow).toBeVisible();
-  const quoteReadCapability = view.flatMap(group => group.capabilities)
-    .find(item => item.code === 'qo.cap.quote_view');
-  expect(quoteReadCapability).toBeTruthy();
+  const memberViewCapability = view.flatMap(group => group.capabilities)
+    .find(item => item.code === 'org.cap.member_view');
+  expect(memberViewCapability).toBeTruthy();
   await expect(diagnostics.locator('input[type="checkbox"]')).toHaveCount(0);
   await expect(diagnostics.locator('select')).toHaveCount(0);
   await expect(diagnostics.locator('button')).toHaveCount(0);
@@ -267,9 +268,13 @@ test('① capability save persists through the browser on a snowflake-id role', 
     await expect(reader.page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', readerRole.pid);
     await expect(reader.page.getByTestId('capability-checkbox-org.cap.role_view')).toBeChecked();
     await expect(reader.page.getByTestId('capability-checkbox-org.cap.role_view')).toBeDisabled();
-    await expect(reader.page.getByText('当前为角色只读访问，修改需具备对应管理权限。', { exact: true })).toBeVisible();
+    await expect(reader.page.getByText(/仅可查看角色|Read-only role access/)).toBeVisible();
+    // PermissionGuard fail-closed semantics: destructive row actions (toggle/delete,
+    // gated on org.role.update) are not rendered for a read-only viewer at all.
+    for (const id of [`role-action-toggle-${readerRole.code}`, `role-action-delete-${readerRole.code}`]) {
+      await expect(reader.page.getByTestId(id)).toHaveCount(0);
+    }
     for (const id of ['role-create-btn', `role-action-edit-${readerRole.code}`,
-      `role-action-toggle-${readerRole.code}`, `role-action-delete-${readerRole.code}`,
       'capability-save', 'data-scope-modify-btn', 'permission-right-tab-audit']) {
       await expect(reader.page.getByTestId(id)).toBeDisabled();
     }
@@ -425,9 +430,9 @@ test('capability grant readback failure blocks stale editing and retry reads the
     'data-role-pid',
     role.pid,
   );
-  const capabilityCode = 'qo.cap.quote_view';
+  const capabilityCode = 'org.cap.member_view';
   const checkbox = page.getByTestId(`capability-checkbox-${capabilityCode}`);
-  const code = 'qo.quote.read';
+  const code = 'model.tenant_member.read';
   await expect(checkbox).not.toBeChecked();
   const matrixPath = `/api/permissions/matrix/${role.pid}`;
   await page.route(`**${matrixPath}`, async (route) => {

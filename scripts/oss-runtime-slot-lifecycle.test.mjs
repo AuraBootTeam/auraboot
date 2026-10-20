@@ -140,8 +140,8 @@ test('default Bash handles empty source arrays and preserves incomplete-operatio
   const fixture = mkdtempSync(join(tmpdir(), 'oss-bash-contract-'));
   try {
     const prefix = `set -euo pipefail\nREPO_ROOT="$1"\nTMPDIR="$1"\n${lockFunctions}\nacquire_stack_lock\n`;
-    const arrayLoop = source.slice(source.indexOf('  local runtime_source_args='), source.indexOf('  local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass', source.indexOf('  local runtime_source_args=')));
-    const normal = spawnSync('/bin/bash', ['-c', `${prefix}\ndeclare -a extra_plugin_roots=() product_migration_roots=()\nWORKSPACE="$1"\nname=sample\ngolden_runtime_bind_sources() { :; }\nfreeze_sources() {\n${arrayLoop}\n}\nfreeze_sources\nprintf 'freeze-reached'\nSTACK_OPERATION_COMPLETE=1`, 'fixture', fixture], { encoding: 'utf8' });
+    const arrayLoop = source.slice(source.indexOf('  local binding_args='), source.indexOf('  local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass', source.indexOf('  local binding_args=')));
+    const normal = spawnSync('/bin/bash', ['-c', `${prefix}\ndeclare -a source_specs=("core=/fixture")\nWORKSPACE="$1"\nname=sample\nSCRIPT_DIR=/fixture\nDEV=true\ndie() { echo "$*" >&2; exit 1; }\nfreeze_sources() {\n${arrayLoop}\n}\nfreeze_sources\nprintf 'freeze-reached'\nSTACK_OPERATION_COMPLETE=1`, 'fixture', fixture], { encoding: 'utf8' });
     assert.equal(normal.status, 0, normal.stderr);
     assert.equal(normal.stdout, 'freeze-reached');
     const red = spawnSync('/bin/bash', ['-c', `${prefix}\nprintf '%s' "$MISSING_REQUIRED_VALUE"`, 'fixture', fixture], { encoding: 'utf8' });
@@ -209,4 +209,26 @@ test('OSS gate includes the independent deep project instead of silently droppin
   assert.ok(args.includes('--project=oss-deep'));
   assert.ok(args.includes('--no-deps'), 'canonical setup is already audited separately');
   assert.ok(args.includes('--retries=0'));
+});
+
+test('production auth fixtures receive the exact session key through a file reference without printing its value', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'oss-production-auth-env-'));
+  try {
+    const state = join(fixture, 'state'), evidence = join(fixture, 'evidence');
+    const stack = join(state, 'golden', 'sample');
+    mkdirSync(stack, { recursive: true }); mkdirSync(join(state, 'env'));
+    writeFileSync(join(fixture, 'dev.sh'), '#!/bin/bash\n');
+    writeFileSync(join(fixture, 'aura'), '#!/bin/bash\nexit 1\n', { mode: 0o755 });
+    const secret = join(fixture, 'session key');
+    writeFileSync(secret, 'fixture-private-session-key', { mode: 0o600 });
+    writeFileSync(join(stack, 'session-secret.path'), secret + '\n');
+    writeFileSync(join(stack, 'ports'), '6683 5383 6383\n');
+    writeFileSync(join(state, 'env/sample.env'), `AURA_EVIDENCE_ROOT=${evidence}\n`);
+    registerFixtureWorkspace(fixture, join(fixture, 'product'));
+    const result = spawnSync('/bin/bash', [stackPath, 'env', 'sample'], { encoding: 'utf8', env: { ...process.env, AURA_WORKSPACE_ROOT: fixture, AURA_WORKSPACE_STATE_DIR: state } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, /fixture-private-session-key/);
+    const check = spawnSync('/bin/bash', ['-c', `${result.stdout}\ntest "$SESSION_SECRET" = fixture-private-session-key`], { encoding: 'utf8' });
+    assert.equal(check.status, 0, check.stderr);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
 });

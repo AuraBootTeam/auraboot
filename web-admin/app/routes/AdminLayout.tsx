@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import Header from '~/routes/Header';
+import { PagePresentationProvider, usePagePresentation } from '~/shared/layout/PagePresentationContext';
 import LeftSidebar from '~/routes/LeftSidebar';
 import PageContent from '~/routes/PageContent';
 import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
@@ -31,6 +32,11 @@ function inferModelCodeFromPath(pathname: string): string | undefined {
 }
 
 export default function AdminLayout() {
+  return <PagePresentationProvider><AdminLayoutContent /></PagePresentationProvider>;
+}
+
+function AdminLayoutContent() {
+  const workspace = usePagePresentation()?.mode === 'workspace';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { state } = useAuraBot();
   const aiPanelOpen = state.panelState === 'expanded';
@@ -66,15 +72,15 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      <div className="flex h-screen pt-14">
+      <div className={`flex h-screen ${workspace ? '' : 'pt-14'}`}>
         <LeftSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden" data-print="content">
+        <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${workspace ? 'pt-14' : ''}`} data-print="content">
           <ImpersonationBanner />
           <PageContent />
         </div>
 
-        <div className={aiPanelOpen ? 'contents' : 'hidden'}>
+        <div className={aiPanelOpen ? `flex min-h-0 shrink-0 ${workspace ? 'pt-14' : ''}` : 'hidden'} data-testid="ai-panel-dock">
           <AuraBotPanel />
         </div>
       </div>

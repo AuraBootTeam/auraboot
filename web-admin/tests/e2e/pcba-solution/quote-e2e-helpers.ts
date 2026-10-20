@@ -1,8 +1,11 @@
+import { requireRuntimeUrl } from '../../helpers/environments';
 import type { Browser, BrowserContext, Locator, Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { utils as XLSXUtils, write } from 'xlsx';
-import { expect } from '../../fixtures';
+import { expect, test } from '../../fixtures';
+import { FixtureCleanupJournal, type FixtureRow } from './fixture-cleanup';
 import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   clickRowActionByLocator,
@@ -16,6 +19,32 @@ export type CreatedRows = {
   quoteCode: string;
   rows: Array<{ model: string; pid: string }>;
 };
+
+const fixtureJournals = new WeakMap<Page, FixtureCleanupJournal>();
+
+export function fixtureJournal(page: Page): FixtureCleanupJournal {
+  let journal = fixtureJournals.get(page);
+  if (!journal) {
+    const origin = requireRuntimeUrl('base');
+    if (!origin) throw new Error('PLAYWRIGHT_BASE_URL is required before fixture creation');
+    if (page.url().startsWith('http') && new URL(page.url()).origin !== new URL(origin).origin) {
+      throw new Error('Fixture page belongs to a different runtime origin');
+    }
+    journal = new FixtureCleanupJournal(test.info().outputPath(`fixture-cleanup-${randomUUID()}.json`), origin);
+    fixtureJournals.set(page, journal);
+  }
+  return journal;
+}
+
+export function trackFixtureRow(page: Page, rows: CreatedRows['rows'], row: FixtureRow): void {
+  fixtureJournal(page).track(row);
+  rows.push(row);
+}
+
+export async function cleanupTrackedFixtureRows(page: Page): Promise<void> {
+  const journal = fixtureJournals.get(page);
+  if (journal) await journal.cleanup(page.request);
+}
 
 export type DynamicFilter = {
   fieldName: string;
@@ -264,6 +293,7 @@ export async function createQuoteFromReviewedBom(page: Page, created: CreatedRow
   const id = String(body.data?.data?.recordId ?? body.data?.data?.quoteId ?? '');
   expect(id, 'create command returns persisted quote').toBeTruthy();
   created.quoteId = id;
+  fixtureJournal(page).track({ model: 'qo_quote_common', pid: id });
   const record = await readDynamicRecord(page, 'qo_quote_common', id);
   created.quoteCode = String(record.qo_quote_code ?? '');
   expect(created.quoteCode).toBeTruthy();
@@ -616,6 +646,7 @@ export async function dynamicCreate(
   data: Record<string, unknown>,
   rows: CreatedRows['rows'],
 ): Promise<string> {
+  fixtureJournal(page);
   if (model === 'qo_price_evidence_common' && !data.qo_pe_quote_id && data.qo_pe_quote_line_id) {
     // Evidence rows must carry the denormalized quote anchor: the record-share row
     // surface (extension.recordShare) grants collaborators visibility through the quote
@@ -642,7 +673,7 @@ export async function dynamicCreate(
   >;
   const pid = String(record.pid ?? record.recordId ?? record.id ?? '');
   expect(pid, `${model} create should return pid`).toBeTruthy();
-  rows.push({ model, pid });
+  trackFixtureRow(page, rows, { model, pid });
   return pid;
 }
 
@@ -651,6 +682,7 @@ async function createCustomerRequest(
   data: Record<string, unknown>,
   rows: CreatedRows['rows'],
 ): Promise<string> {
+  fixtureJournal(page);
   const result = await executeCommand(
     page,
     'crm:create_customer_request',
@@ -660,7 +692,7 @@ async function createCustomerRequest(
   );
   const pid = String(result.recordId ?? result.recordPid ?? result.pid ?? result.id ?? '');
   expect(pid, 'crm:create_customer_request should return customer request id').toBeTruthy();
-  rows.push({ model: 'crm_customer_request_common', pid });
+  trackFixtureRow(page, rows, { model: 'crm_customer_request_common', pid });
   return pid;
 }
 
@@ -742,11 +774,20 @@ export async function queryNamedDataSourceRecords(
 }
 
 export async function cleanupRows(page: Page, created: CreatedRows): Promise<void> {
-  for (const row of [...created.rows].reverse()) {
-    await page.request.delete(`/api/dynamic/${row.model}/${row.pid}`).catch(() => {});
-  }
+  const journal = fixtureJournal(page);
+  const rows = [...created.rows];
   if (created.quoteId) {
-    await page.request.delete(`/api/dynamic/qo_quote_common/${created.quoteId}`).catch(() => {});
+    rows.push({ model: 'qo_quote_common', pid: created.quoteId });
+  }
+  for (const row of rows) journal.track(row);
+  await journal.cleanup(page.request, rows);
+}
+
+async function cleanupAfterSeedFailure(page: Page, created: CreatedRows, original: unknown): Promise<void> {
+  try {
+    await cleanupRows(page, created);
+  } catch (cleanupError) {
+    throw new AggregateError([original, cleanupError], 'Fixture creation and cleanup both failed');
   }
 }
 
@@ -846,6 +887,37 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[], action
   return [...out];
 }
 
+export async function ensureTenantAdminRegisteredPermissions(page: Page, codes: string[]): Promise<void> {
+  const treeResponse = await page.request.get('/api/permissions/tree');
+  expect(treeResponse.ok(), 'registered permission tree must be readable').toBe(true);
+  const tree = await treeResponse.json();
+  const byCode = new Map<string, string>();
+  const collect = (value: unknown): void => {
+    if (Array.isArray(value)) return value.forEach(collect);
+    if (!value || typeof value !== 'object') return;
+    const node = value as Record<string, unknown>;
+    if (node.code && node.pid) byCode.set(String(node.code), String(node.pid));
+    Object.values(node).forEach(collect);
+  };
+  collect(tree.data);
+  const required = codes.map((code) => {
+    expect(byCode.has(code), `${code} must be imported; fixtures cannot invent it`).toBe(true);
+    return byCode.get(code)!;
+  });
+  const role = await fetchTenantAdminRole(page);
+  const endpoint = `/api/roles/${encodeURIComponent(String(role.pid))}/permissions`;
+  const currentResponse = await page.request.get(endpoint);
+  expect(currentResponse.ok()).toBe(true);
+  const current = (await currentResponse.json()).data;
+  expect(Array.isArray(current)).toBe(true);
+  const existing = current.map(String) as string[];
+  const missing = required.filter((pid) => !existing.includes(pid));
+  if (!missing.length) return;
+  const response = await page.request.post(endpoint, { data: [...existing, ...missing] });
+  expect(response.ok(), 'prepare the authorized admin fixture through the role API').toBe(true);
+  expect(String((await response.json()).code)).toBe('0');
+}
+
 export async function ensureTenantAdminModelPermissions(
   page: Page,
   modelCodes: string[] = BOM_INTERNAL_FIXTURE_MODELS,
@@ -889,7 +961,7 @@ export async function ensureTenantAdminModelPermissions(
   ).toBe(true);
 }
 
-export function createCorrectedBomWorkbook(filePath: string): string {
+export function createCorrectedBomWorkbook(filePath: string, thirdMpn = ''): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const workbook = XLSXUtils.book_new();
   // Standard BOM shape (matches StandardBomTemplateWriter / ImportCorrectedBomHandler's
@@ -929,7 +1001,7 @@ export function createCorrectedBomWorkbook(filePath: string): string {
       '',
     ],
     ['2', '1', 'STM32F103C8T6', 'MCU', 'LQFP48 MCU', 'pcs', 200, 'U1', '', '', '', ''],
-    ['3', '1', '', 'missing mpn row', '0603', 'pcs', 10, 'C1', '', '', '', ''],
+    ['3', '1', thirdMpn, thirdMpn ? 'MLCC capacitor' : 'missing mpn row', '0603', 'pcs', 10, 'C1', '', '', '', ''],
   ]);
   XLSXUtils.book_append_sheet(workbook, worksheet, 'BOM');
   const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
@@ -943,6 +1015,7 @@ export async function seedQuoteScaffold(
   lines: QuoteLineSeed[],
   factoryClass = 'consumer',
 ): Promise<CreatedRows> {
+  fixtureJournal(page);
   const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
   const quoteCode = `QO-E2E-${marker}-${suffix}`;
   const created: CreatedRows = { quoteId: '', quoteCode, rows: [] };
@@ -961,7 +1034,7 @@ export async function seedQuoteScaffold(
     );
     const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
-    created.rows.push({ model: 'crm_account_common', pid: accountId });
+    trackFixtureRow(page, created.rows, { model: 'crm_account_common', pid: accountId });
 
     const projectId = await dynamicCreate(
       page,
@@ -1102,7 +1175,7 @@ export async function seedQuoteScaffold(
 
     return created;
   } catch (error) {
-    await cleanupRows(page, created);
+    await cleanupAfterSeedFailure(page, created, error);
     throw error;
   }
 }
@@ -1217,6 +1290,7 @@ export async function seedBomWorkbench(
   page: Page,
   opts: { ownerEmail?: string; candidateCodes?: [string, string] } = {},
 ): Promise<BomWorkbenchSeed> {
+  fixtureJournal(page);
   await ensureTenantAdminModelPermissions(page);
   const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
   const marker = `E2E-BOM-${suffix}`;
@@ -1240,6 +1314,31 @@ export async function seedBomWorkbench(
   } as BomWorkbenchSeed;
 
   try {
+    for (const [code, brand, mpn] of [
+      [created.candidateCode, 'Yageo', 'RC0603FR-0710KL'],
+      [created.secondaryCandidateCode, 'UniOhm', '0603WAF1002T5E'],
+    ]) {
+      const existing = await queryDynamicRecords(page, 'bom_material_master', [
+        { fieldName: 'bom_mm_material_code', operator: 'EQ', value: code },
+      ]);
+      if (existing.length > 0) {
+        expect(existing).toHaveLength(1);
+        expect(existing[0].bom_mm_enabled, `material ${code} must be enabled`).toBe(true);
+        continue;
+      }
+      await executeCommand(page, 'bom:create_material', {
+        bom_mm_material_code: code, bom_mm_material_name: '贴片电阻',
+        bom_mm_spec_model: '10K 1% 0603', bom_mm_category: 'resistor',
+        bom_mm_package: '0603', bom_mm_brand: brand, bom_mm_mpn: mpn,
+        bom_mm_unit: 'PCS', bom_mm_enabled: true,
+      });
+      const persisted = await queryDynamicRecords(page, 'bom_material_master', [
+        { fieldName: 'bom_mm_material_code', operator: 'EQ', value: code },
+      ]);
+      expect(persisted, `candidate ${code} must have a persisted master record`).toHaveLength(1);
+      expect(persisted[0].bom_mm_enabled).toBe(true);
+      trackFixtureRow(page, created.rows, { model: 'bom_material_master', pid: String(persisted[0].pid) });
+    }
     const accountResult = await executeCommand(
       page,
       'crm:create_account',
@@ -1253,7 +1352,7 @@ export async function seedBomWorkbench(
     );
     const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
-    created.rows.push({ model: 'crm_account_common', pid: accountId });
+    trackFixtureRow(page, created.rows, { model: 'crm_account_common', pid: accountId });
 
     created.projectId = await dynamicCreate(
       page,
@@ -1531,7 +1630,7 @@ export async function seedBomWorkbench(
 
     return created;
   } catch (error) {
-    await cleanupRows(page, created);
+    await cleanupAfterSeedFailure(page, created, error);
     throw error;
   }
 }
@@ -1581,7 +1680,7 @@ export async function seedDownloadableQuote(page: Page): Promise<CreatedRows> {
     await executeCommand(page, 'qo_quote_common:rollup_cost', {}, created.quoteId, 'update');
     return created;
   } catch (error) {
-    await cleanupRows(page, created);
+    await cleanupAfterSeedFailure(page, created, error);
     throw error;
   }
 }
@@ -1643,7 +1742,7 @@ export async function seedProcessFeeReviewQuote(page: Page): Promise<CreatedRows
     );
     return created;
   } catch (error) {
-    await cleanupRows(page, created);
+    await cleanupAfterSeedFailure(page, created, error);
     throw error;
   }
 }
@@ -1723,7 +1822,7 @@ export async function seedBomPriceManualReviewQuote(page: Page): Promise<BomPric
 
     return created;
   } catch (error) {
-    await cleanupRows(page, created);
+    await cleanupAfterSeedFailure(page, created, error);
     throw error;
   }
 }
@@ -1800,7 +1899,7 @@ export async function seedBomPriceYunhanQuote(page: Page): Promise<BomPriceYunha
 
     return created;
   } catch (error) {
-    await cleanupRows(page, created);
+    await cleanupAfterSeedFailure(page, created, error);
     throw error;
   }
 }
@@ -1915,7 +2014,7 @@ export async function seedBomPriceLadderMoqQuote(page: Page): Promise<BomPriceLa
 
     return created;
   } catch (error) {
-    await cleanupRows(page, created);
+    await cleanupAfterSeedFailure(page, created, error);
     throw error;
   }
 }

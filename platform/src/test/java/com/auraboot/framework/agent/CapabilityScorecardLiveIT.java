@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent;
 
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.auraboot.framework.agent.entity.AbCapabilityEvalRun;
 import com.auraboot.framework.agent.eval.CapabilityEvalRegressionGate;
 import com.auraboot.framework.agent.eval.GenericEvalCaseFixture;

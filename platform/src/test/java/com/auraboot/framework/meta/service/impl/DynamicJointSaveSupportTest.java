@@ -22,7 +22,8 @@ class DynamicJointSaveSupportTest {
     final DynamicJointSaveSupport.UpdateOperation update = mock(DynamicJointSaveSupport.UpdateOperation.class);
     final DynamicJointSaveSupport.GetModelDefinitionOperation lookup = mock(DynamicJointSaveSupport.GetModelDefinitionOperation.class);
     final DynamicJointSaveSupport.AssertWritableOperation writable = mock(DynamicJointSaveSupport.AssertWritableOperation.class);
-    final DynamicJointSaveSupport service = new DynamicJointSaveSupport(metadata, mapper, create, update, lookup, writable);
+    final DynamicJointSaveSupport.DeleteChildrenOperation deleteChildren = mock(DynamicJointSaveSupport.DeleteChildrenOperation.class);
+    final DynamicJointSaveSupport service = new DynamicJointSaveSupport(metadata, mapper, create, update, lookup, writable, deleteChildren);
 
     @BeforeEach void context() { MetaContext.setContext(42L, 43L, "user-43", "tester"); }
     @AfterEach void clearContext() { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); }
@@ -54,8 +55,13 @@ class DynamicJointSaveSupportTest {
         assertThat(result.getSubTableCounts()).containsEntry("lines", 1);
         assertThat(result.getSavedRecords().get("lines").get(0)).containsEntry("parent_id", "invoice-42");
         assertThat(child).containsEntry("parent_id", "forged");
-        verify(mapper).delete("ONE_TO_MANY".equals(type) ? "invoice_lines" : "invoice_links",
-                Map.of("ONE_TO_MANY".equals(type) ? "parent_id" : "invoice_id", "invoice-42", "tenant_id", 42L));
+        if ("ONE_TO_MANY".equals(type)) {
+            verify(deleteChildren).execute(any(RelationDefinition.class), eq("invoice-42"));
+            verifyNoInteractions(mapper);
+        } else {
+            verify(mapper).delete("invoice_links", Map.of("invoice_id", "invoice-42", "tenant_id", 42L));
+            verifyNoInteractions(deleteChildren);
+        }
     }
 
     @Test
@@ -121,7 +127,7 @@ class DynamicJointSaveSupportTest {
         when(mapper.selectRecordWriterTargetsForUpdate(anyString(),anyString(),anyString(),anyMap())).thenReturn(List.of(Map.of("managed",false)));
         service.deleteExistingChildRecords(relation,"invoice-42");
         verify(mapper).selectRelationTargetsForUpdate("invoice_links","invoice_id","parent_id",42L,"invoice-42");
-        verify(mapper).selectRecordWriterTargetsForUpdate("invoice_lines","managed","managed",Map.of("id","line-1","tenant_id",42L,"deleted_flag",false));
+        verify(mapper).selectRecordWriterTargetsForUpdate("invoice_lines","managed","managed",Map.of("id","line-1","tenant_id",42L));
         verify(mapper).delete("invoice_links",Map.of("invoice_id","invoice-42","tenant_id",42L));
     }
 

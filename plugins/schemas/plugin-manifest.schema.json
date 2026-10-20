@@ -333,6 +333,14 @@
         },
         "sla": {
           "type": "string"
+        },
+        "publicResources": {
+          "type": "string",
+          "description": "Explicit public resource contracts; publication lifecycle import is required"
+        },
+        "publicQueries": {
+          "type": "string",
+          "description": "Explicit pinned public NamedQuery contracts; publication lifecycle import is required"
         }
       },
       "additionalProperties": false
@@ -624,6 +632,20 @@
           "type": "string"
         }
       }
+    },
+    "publicResources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/publicResourceContract"
+      },
+      "description": "Explicit external publication contracts, separate from internal model/query publication"
+    },
+    "publicQueries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/publicQueryContract"
+      },
+      "description": "Explicit external publication contracts, separate from internal model/query publication"
     }
   },
   "$defs": {
@@ -1132,6 +1154,9 @@
               "description": "Enable AI Next Best Action suggestions on detail pages for this model. Overrides global ai.nba.enabled config."
             }
           }
+        },
+        "capabilities": {
+          "$ref": "#/$defs/modelCapabilities"
         }
       },
       "additionalProperties": false
@@ -2825,6 +2850,397 @@
         "checkPermissions": {
           "type": "boolean",
           "description": "Whether to check permissions on import"
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicContractField": {
+      "type": "object",
+      "required": [
+        "source",
+        "type"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "pid",
+            "integer",
+            "decimal",
+            "boolean",
+            "date",
+            "datetime",
+            "object",
+            "array"
+          ]
+        },
+        "readable": {
+          "type": "boolean"
+        },
+        "writable": {
+          "type": "boolean"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "sortable": {
+          "type": "boolean"
+        },
+        "operators": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "EQ",
+              "NE",
+              "GT",
+              "GE",
+              "LT",
+              "LE",
+              "IN",
+              "LIKE",
+              "IS_NULL"
+            ]
+          }
+        },
+        "referenceResource": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z][a-z0-9.-]{1,99}$"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/publicContractField"
+          }
+        },
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/publicContractField"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicResourceContract": {
+      "type": "object",
+      "required": [
+        "code",
+        "modelCode",
+        "schemaVersion",
+        "operations",
+        "scopes",
+        "dataPolicy",
+        "fields",
+        "maxPageSize",
+        "maxConditions",
+        "timeoutMs",
+        "events"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]{1,99}$"
+        },
+        "modelCode": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "list",
+              "get",
+              "create",
+              "update",
+              "delete"
+            ]
+          }
+        },
+        "scopes": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": [
+              "list",
+              "get",
+              "create",
+              "update",
+              "delete"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.:-]{1,159}$"
+          }
+        },
+        "dataPolicy": {
+          "enum": [
+            "tenant_wide",
+            "installation_filter"
+          ]
+        },
+        "fields": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]{0,99}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/publicContractField"
+          }
+        },
+        "maxPageSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "maxConditions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        },
+        "events": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "created",
+              "updated",
+              "deleted"
+            ]
+          }
+        },
+        "sourceResources": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]{1,99}$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicQueryContract": {
+      "type": "object",
+      "required": [
+        "code",
+        "queryCode",
+        "schemaVersion",
+        "sourceFingerprint",
+        "scopes",
+        "sourceResources",
+        "parameters",
+        "fields",
+        "maxPageSize",
+        "maxRows",
+        "timeoutMs",
+        "maxConcurrent"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]{1,93}$"
+        },
+        "queryCode": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sourceFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "scopes": {
+          "type": "object",
+          "required": [
+            "execute"
+          ],
+          "properties": {
+            "execute": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9.:-]{1,159}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "sourceResources": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]{1,99}$"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "maxProperties": 32,
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "pid",
+                  "integer",
+                  "decimal",
+                  "boolean",
+                  "date",
+                  "datetime",
+                  "array"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "nullable": {
+                "type": "boolean"
+              },
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/publicContractField"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "fields": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]{0,99}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/publicContractField"
+          }
+        },
+        "maxPageSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        },
+        "maxConcurrent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
+      },
+      "additionalProperties": false
+    },
+    "modelCapabilities": {
+      "type": "object",
+      "description": "Explicit runtime capabilities; field whitelists are normalized from final model field declarations.",
+      "properties": {
+        "list": {
+          "type": "boolean"
+        },
+        "detail": {
+          "type": "boolean"
+        },
+        "create": {
+          "type": "boolean"
+        },
+        "update": {
+          "type": "boolean"
+        },
+        "delete": {
+          "type": "boolean"
+        },
+        "bulkDelete": {
+          "type": "boolean"
+        },
+        "export": {
+          "type": "boolean"
+        },
+        "sort": {
+          "type": "boolean"
+        },
+        "filter": {
+          "type": "boolean"
+        },
+        "paginate": {
+          "type": "boolean"
+        },
+        "sortableFields": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+          }
+        },
+        "filterableFields": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+          }
+        },
+        "detailKeyField": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
         }
       },
       "additionalProperties": false

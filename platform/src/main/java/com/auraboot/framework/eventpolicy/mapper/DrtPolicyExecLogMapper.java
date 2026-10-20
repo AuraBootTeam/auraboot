@@ -22,6 +22,10 @@ import java.util.List;
 @Mapper
 public interface DrtPolicyExecLogMapper extends BaseMapper<DrtPolicyExecLogEntity> {
 
+    @Select("SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(#{key}, 0))) held")
+    @InterceptorIgnore(tenantLine = "true")
+    Integer lockAction(@Param("key") String key);
+
     @Select("SELECT * FROM ab_drt_policy_exec_log WHERE tenant_id = #{tenantId} AND idempotency_key = #{key}")
     @Results(id = "policyExecLogMap", value = {
             @Result(column = "id", property = "id"),
@@ -52,14 +56,23 @@ public interface DrtPolicyExecLogMapper extends BaseMapper<DrtPolicyExecLogEntit
     DrtPolicyExecLogEntity findByTenantAndKey(@Param("tenantId") Long tenantId, @Param("key") String key);
 
     @Select("""
+            <script>
             SELECT * FROM ab_drt_policy_exec_log
             WHERE tenant_id = #{tenantId}
-              AND (
-                (#{correlationId} IS NOT NULL AND #{correlationId} <> '' AND correlation_id = #{correlationId})
-                OR
-                (#{decisionTraceId} IS NOT NULL AND #{decisionTraceId} <> '' AND decision_trace_id = #{decisionTraceId})
-              )
+            <choose>
+              <when test="correlationId != null and correlationId != '' and decisionTraceId != null and decisionTraceId != ''">
+                AND (correlation_id = #{correlationId} OR decision_trace_id = #{decisionTraceId})
+              </when>
+              <when test="correlationId != null and correlationId != ''">
+                AND correlation_id = #{correlationId}
+              </when>
+              <when test="decisionTraceId != null and decisionTraceId != ''">
+                AND decision_trace_id = #{decisionTraceId}
+              </when>
+              <otherwise>AND 1 = 0</otherwise>
+            </choose>
             ORDER BY executed_at ASC, id ASC
+            </script>
             """)
     @ResultMap("policyExecLogMap")
     List<DrtPolicyExecLogEntity> findByTraceLink(

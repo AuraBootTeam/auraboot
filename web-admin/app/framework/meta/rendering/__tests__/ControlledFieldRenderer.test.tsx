@@ -39,6 +39,16 @@ describe('ControlledFieldRenderer', () => {
     expect(document.querySelector('input[name="category"]')).toHaveValue('');
   });
 
+  it('uses server-resolved labels for readonly pickers without exposing public identifiers', async () => {
+    vi.resetModules();
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    render(<ControlledFieldRenderer field={{field:'reviewer',component:'userselect',readOnly:true} as any}
+      value="01M57GMGY1NA6D7B2RAKRP9M5B" onChange={vi.fn()}
+      context={{locale:'zh-CN',t:(key:string)=>key,form:{reviewer_display:'Delivery reviewer'}} as any} />);
+    expect(screen.getByText('Delivery reviewer')).toBeInTheDocument();
+    expect(screen.queryByText('01M57GMGY1NA6D7B2RAKRP9M5B')).not.toBeInTheDocument();
+  });
+
   it.each([['zh-CN', '选择来源类型，或留空手工登记'], ['en', 'Choose a source type or leave empty']])(
     'forwards the localized DSL placeholder for %s', async (locale, expected) => {
       vi.resetModules();

@@ -49,6 +49,45 @@ public final class DefinitionShadowComparisonService {
         this.mapper = mapper;
     }
 
+    public record UpgradeAdmission(long tenantId, String applicationCode, String sourceReleaseId,
+                                   String targetReleaseId, String targetDigest, int comparedResources) {}
+
+    /** Shared-definition tenants have no legacy import rows; never create copies to make a shadow test pass. */
+    public UpgradeAdmission admitActiveUpgrade(long tenantId, String applicationCode,
+                                               String sourceReleaseId, String targetReleaseId, String targetDigest) {
+        require(tenantId > 0, "Positive tenant ID required");
+        var source = resolver.boundRelease(tenantId, applicationCode);
+        var target = resolver.publishedStableRelease(applicationCode);
+        require("active".equals(source.release().bindingStatus())
+                        && sourceReleaseId.equals(source.release().releaseId())
+                        && targetReleaseId.equals(target.release().releaseId())
+                        && targetDigest.equals(target.release().releaseDigest()),
+                "Exact active source and published target definitions required");
+        Set<String> targetPlugins = new java.util.HashSet<>();
+        int count = 0;
+        boolean hasLegacyDefinitions = false;
+        for (var component : target.components()) {
+            String pluginId = component.manifest().getPluginId();
+            require(pluginId != null && targetPlugins.add(pluginId), "Unique target plugin identity required");
+            hasLegacyDefinitions |= definitions.findTenantPlugin(tenantId, pluginId) != null;
+            for (var type : TYPES) count += resolver.resources(component.manifest(), type).size();
+            if (component.manifest().getDashboards() != null) count += component.manifest().getDashboards().size();
+        }
+        require(count > 0, "Nonempty target release definitions required");
+        for (var component : source.components()) {
+            require(targetPlugins.contains(component.manifest().getPluginId()),
+                    "Removing an owned plugin requires a separately admitted migration");
+        }
+        if (hasLegacyDefinitions) {
+            var report = comparePublishedStable(tenantId, applicationCode);
+            require(report.classification() == Classification.EXACT_MATCH && report.comparedResources() > 0
+                            && targetReleaseId.equals(report.releaseId()) && targetDigest.equals(report.releaseDigest())
+                            && report.differences().isEmpty(),
+                    "Tenant-local definitions must exactly match the target before upgrade");
+        }
+        return new UpgradeAdmission(tenantId, applicationCode, sourceReleaseId, targetReleaseId, targetDigest, count);
+    }
+
     public Report comparePublishedStable(long tenantId, String applicationCode) {
         require(tenantId > 0, "Positive tenant ID required");
         var release = resolver.publishedStableRelease(applicationCode);

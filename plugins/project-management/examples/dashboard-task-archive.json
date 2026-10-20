@@ -1,0 +1,128 @@
+{
+  "format": "auraboot.dashboard",
+  "version": 1,
+  "dashboard": {
+    "title": "客户项目交付 · 自动化看板",
+    "description": "三个指标绑定同一专属演示任务。完成前为 1 / 0 / 0，完成且自动化执行后为 1 / 1 / 1。请先替换任务 PID。",
+    "layoutConfig": {
+      "columns": 12,
+      "rowHeight": 100,
+      "gap": 16,
+      "compactType": "vertical"
+    },
+    "widgets": [
+      {
+        "id": "demo-tasks",
+        "type": "smart-number-card",
+        "componentType": "smart-number-card",
+        "props": {},
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 2,
+        "config": {
+          "title": {
+            "zh-CN": "演示任务",
+            "en": "demo-tasks"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_task",
+            "metrics": [
+              {
+                "field": "id",
+                "aggregation": "count",
+                "alias": "n"
+              }
+            ],
+            "filters": [
+              {
+                "field": "pid",
+                "operator": "eq",
+                "value": "REPLACE_WITH_OWN_DEMO_TASK_PID"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "completed-tasks",
+        "type": "smart-number-card",
+        "componentType": "smart-number-card",
+        "props": {},
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 2,
+        "config": {
+          "title": {
+            "zh-CN": "已完成",
+            "en": "completed-tasks"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_task",
+            "metrics": [
+              {
+                "field": "id",
+                "aggregation": "count",
+                "alias": "n"
+              }
+            ],
+            "filters": [
+              {
+                "field": "pid",
+                "operator": "eq",
+                "value": "REPLACE_WITH_OWN_DEMO_TASK_PID"
+              },
+              {
+                "field": "tpm_ts_status",
+                "operator": "eq",
+                "value": "done"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "archived-tasks",
+        "type": "smart-number-card",
+        "componentType": "smart-number-card",
+        "props": {},
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 2,
+        "config": {
+          "title": {
+            "zh-CN": "自动归档",
+            "en": "archived-tasks"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_task",
+            "metrics": [
+              {
+                "field": "id",
+                "aggregation": "count",
+                "alias": "n"
+              }
+            ],
+            "filters": [
+              {
+                "field": "pid",
+                "operator": "eq",
+                "value": "REPLACE_WITH_OWN_DEMO_TASK_PID"
+              },
+              {
+                "field": "tpm_ts_description",
+                "operator": "eq",
+                "value": "[AuraBoot demo] Archived after delivery confirmation"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

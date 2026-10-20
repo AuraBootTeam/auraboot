@@ -6,45 +6,127 @@
   "kind": "form",
   "schemaVersion": 4,
   "title": {
-    "zh-CN": "任务表单",
-    "en": "Task Form"
+    "zh-CN": "任务信息",
+    "en": "Task information"
   },
   "layout": {
     "type": "stack"
   },
   "blocks": [
     {
-      "id": "basic",
+      "id": "task",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "任务信息",
-        "en-US": "Task Information"
+        "zh-CN": "任务与项目",
+        "en": "Task and project"
       },
       "fields": [
         {
           "field": "tpm_ts_title",
           "colSpan": 12,
-          "required": true
+          "required": true,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：交付材料检查",
+              "en": "e.g. Delivery material review"
+            },
+            "helpText": {
+              "zh-CN": "用明确的交付动作命名，便于在自动化中搜索。",
+              "en": "Use a delivery action that is easy to find in automation."
+            }
+          }
         },
         {
           "field": "tpm_ts_project_id",
-          "colSpan": 6
-        },
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "按名称选择所属项目",
+              "en": "Select a project by name"
+            },
+            "helpText": {
+              "zh-CN": "仅选择当前空间可读的项目；保存后可在项目任务中核对。",
+              "en": "Choose a readable project in this space and verify the association after saving."
+            }
+          }
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "schedule",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "执行安排",
+        "en": "Execution plan"
+      },
+      "fields": [
         {
           "field": "tpm_ts_priority",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "选择处理优先级",
+              "en": "Choose a priority"
+            },
+            "helpText": {
+              "zh-CN": "按交付影响选择，避免所有任务都标为高优先级。",
+              "en": "Choose the priority based on delivery impact."
+            }
+          }
         },
         {
           "field": "tpm_ts_assignee",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：林晓",
+              "en": "e.g. Lin Xiao"
+            },
+            "helpText": {
+              "zh-CN": "此字段记录负责人姓名，不会自动授予账号权限。",
+              "en": "This name records ownership; it does not grant account access."
+            }
+          }
         },
         {
           "field": "tpm_ts_due_date",
-          "colSpan": 6
-        },
+          "colSpan": 6,
+          "props": {
+            "placeholder": {
+              "zh-CN": "选择计划完成日期",
+              "en": "Choose a target date"
+            },
+            "helpText": {
+              "zh-CN": "与项目交付计划一致，留空表示尚未确定。",
+              "en": "Align with the project plan; leave blank if undecided."
+            }
+          }
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "notes",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "完成标准与说明",
+        "en": "Completion criteria"
+      },
+      "fields": [
         {
           "field": "tpm_ts_description",
-          "colSpan": 12
+          "colSpan": 12,
+          "props": {
+            "placeholder": {
+              "zh-CN": "例如：核对验收清单、交付附件与培训安排",
+              "en": "e.g. Review acceptance checklist, attachments and training"
+            },
+            "helpText": {
+              "zh-CN": "用于记录完成标准；演示归档自动化会覆盖所选任务的说明。",
+              "en": "Record completion criteria; the demo archival automation replaces this description."
+            }
+          }
         }
       ],
       "area": "main"
@@ -59,8 +141,8 @@
           "commandCode": "tpm:create_task",
           "primary": true,
           "label": {
-            "zh-CN": "提交",
-            "en": "Submit"
+            "zh-CN": "保存任务",
+            "en": "Save task"
           }
         },
         {

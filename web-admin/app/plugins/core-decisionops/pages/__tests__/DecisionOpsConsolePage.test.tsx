@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe('DecisionOpsConsolePage', () => {
-  it('renders the Strategy Studio product entry instead of redirecting to a DSL page', () => {
+  it('opens the business rule catalogue as the primary product entry', () => {
     window.history.pushState({}, '', '/decision-ops');
     render(
       <BrowserRouter>
@@ -43,7 +43,7 @@ describe('DecisionOpsConsolePage', () => {
     );
 
     expect(screen.getByTestId('decisionops-console')).toHaveTextContent(
-      'studio:3:api-ready',
+      'definitions:3:api-ready',
     );
     expect(getApiService).toHaveBeenCalled();
     expect(createDecisionApi).toHaveBeenCalledWith(

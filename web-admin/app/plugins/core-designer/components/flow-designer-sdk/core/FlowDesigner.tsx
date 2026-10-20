@@ -463,6 +463,7 @@ export function FlowDesigner({
                 readOnly={readOnly}
                 showMinimap={config.showMinimap}
                 showControls={config.showControls}
+                fitExistingGraph={Boolean(initialData?.nodes.length)}
               />
             }
             propertyPanel={<FlowPropertyPanel readOnly={readOnly} />}

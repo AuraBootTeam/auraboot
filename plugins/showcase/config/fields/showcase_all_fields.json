@@ -393,8 +393,8 @@
       "valueField": "pid"
     },
     "extension": {
-      "placeholder:zh-CN": "请选择负责人",
-      "placeholder:en": "Select owner"
+      "placeholder:zh-CN": "按姓名搜索空间成员",
+      "placeholder:en": "Search space members by name"
     }
   },
   {

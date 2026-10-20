@@ -71,7 +71,10 @@ public class OpenPlatformManagementService {
 
     public OpenPlatformAccessView getAccess() {
         boolean platformAdmin = isPlatformAdmin();
-        return new OpenPlatformAccessView(platformAdmin, platformAdmin);
+        Long userId = MetaContext.getCurrentUserId();
+        boolean canManageNotifications = platformAdmin && userId != null
+                && userPermissionService.hasPermission(userId, MetaPermission.SYS_WEBHOOK_MANAGE);
+        return new OpenPlatformAccessView(platformAdmin, platformAdmin, canManageNotifications);
     }
 
     public List<ApplicationView> listApplications() {
@@ -182,9 +185,7 @@ public class OpenPlatformManagementService {
         Long tenantId = requireTenant();
         ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
         requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canManageRuntime);
-        if (!"active".equals(installation.getStatus())) {
-            throw new IllegalStateException("Installation is not active");
-        }
+        requireActiveCredentialInstallation(tenantId, installation);
         String clientSecret = secretCodec.newClientSecret();
         Instant now = Instant.now();
         ApplicationCredential credential = new ApplicationCredential();
@@ -215,6 +216,7 @@ public class OpenPlatformManagementService {
         Long tenantId = requireTenant();
         ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
         requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canManageRuntime);
+        requireActiveCredentialInstallation(tenantId, installation);
         ApplicationCredential previous = credentialMapper.findByInstallation(tenantId, installation.getId()).stream()
                 .filter(item -> credentialPid.equals(item.getPid()) && "active".equals(item.getStatus()))
                 .findFirst().orElseThrow(() -> new IllegalArgumentException("Active credential not found"));
@@ -251,8 +253,18 @@ public class OpenPlatformManagementService {
         return auditMapper.findForOperations(tenantId, installationPid, normalizedRequestId, status,
                         Math.max(1, Math.min(limit, 200))).stream()
                 .map(item -> new CallAuditView(item.getRequestId(), item.getHttpMethod(), item.getRequestPath(),
-                        item.getResponseStatus(), item.getDurationMs(), item.getOccurredAt()))
+                        item.getResponseStatus(), item.getDurationMs(), item.getOccurredAt(),
+                        auditText(item, "actorKind"), item.getApplicationPid(), item.getInstallationPid(),
+                        auditText(item, "capability"), auditText(item, "resource"), auditText(item, "operation"),
+                        auditText(item, "recordPid"), item.getBusinessDetails() != null
+                            && item.getBusinessDetails().path("idempotentReplay").isBoolean()
+                            ? item.getBusinessDetails().path("idempotentReplay").booleanValue() : null))
                 .toList();
+    }
+
+    private String auditText(com.auraboot.framework.openplatform.entity.OpenApiCallAudit item, String key) {
+        var value = item.getBusinessDetails() == null ? null : item.getBusinessDetails().get(key);
+        return value != null && value.isTextual() ? value.textValue() : null;
     }
 
     public List<WebhookDeliveryView> listWebhookDeliveries(String installationPid, String status, int limit) {
@@ -264,7 +276,7 @@ public class OpenPlatformManagementService {
                         Math.max(1, Math.min(limit, 200))).stream()
                 .map(item -> new WebhookDeliveryView(item.pid(), item.subscriptionName(), item.eventId(), item.requestId(),
                         item.deliveryStatus(), item.retryCount(), item.maxRetries(), item.responseStatus(),
-                        safeFailureReason(item.deliveryStatus(), item.responseStatus()),
+                        safeFailureReason(item.deliveryStatus(), item.responseStatus(), item.errorMessage()),
                         item.nextRetryAt(), item.lastAttemptAt(), item.deliveredAt(),
                         item.replayCount(), item.lastReplayedAt(), item.createdAt(),
                         "dead_letter".equals(item.deliveryStatus()) || "failed".equals(item.deliveryStatus())))
@@ -305,7 +317,10 @@ public class OpenPlatformManagementService {
                 Boolean.TRUE.equals(subscription.getEnabled()));
     }
 
-    private String safeFailureReason(String status, Integer responseStatus) {
+    private String safeFailureReason(String status, Integer responseStatus, String errorMessage) {
+        if ("Published model event authority revoked or unavailable".equals(errorMessage)) {
+            return "authority_revoked";
+        }
         if (responseStatus != null && responseStatus >= 400) {
             return "HTTP " + responseStatus;
         }
@@ -482,6 +497,14 @@ public class OpenPlatformManagementService {
         ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
         requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canManageRuntime);
         return installation;
+    }
+
+    private void requireActiveCredentialInstallation(Long tenantId, ApplicationInstallation installation) {
+        ExternalApplication application = applicationMapper.selectById(installation.getApplicationId());
+        if (!"active".equals(installation.getStatus()) || application == null
+                || !tenantId.equals(application.getOwnerTenantId()) || !"active".equals(application.getStatus())) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Installation not found");
+        }
     }
 
     private ApplicationInstallation requireInstallation(Long tenantId, String pid) {

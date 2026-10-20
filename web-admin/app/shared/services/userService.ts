@@ -8,10 +8,12 @@
  * 4. ✅ 权限信息实时从API获取（避免过期）
  */
 
+import { createContext, type RouterContextProvider } from 'react-router';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import { ResultHelper, type User, type UserPermissions, type Preferences } from '~/utils/type';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
+import { SSR_LOADER_FETCH_TIMEOUT_MS } from '~/utils/fetchTimeout';
 
 export class UserInfoUnavailableError extends Error {
   readonly code: string;
@@ -52,7 +54,11 @@ export async function fetchUserInfo(request: Request): Promise<{
       user: User;
       permissions?: UserPermissions;
       preferences?: Preferences | null;
-    }>('/api/auth/me', { token }, request);
+    }>(
+      '/api/auth/me',
+      { token, timeout: SSR_LOADER_FETCH_TIMEOUT_MS, signal: request.signal },
+      request,
+    );
 
     // 后端返回格式: { code: "0", data: { user: {...}, permissions: {...} } }
     if (!ResultHelper.isSuccess(result) || !result.data) {
@@ -93,12 +99,27 @@ export async function fetchUserInfo(request: Request): Promise<{
  * - 始终从后端API获取（安全第一）
  * - 不解析JWT（零信任原则）
  */
-export async function getUserInfo(request: Request): Promise<{
+const userInfoLoaderContext = createContext<ReturnType<typeof fetchUserInfo> | null>(null);
+
+export async function getUserInfo(
+  request: Request,
+  loaderContext?: Readonly<RouterContextProvider>,
+): Promise<{
   user: User | null;
   permissions: UserPermissions | null;
   preferences: Preferences | null;
 }> {
-  const fullInfo = await fetchUserInfo(request);
+  // React Router may clone Request objects for parent/child loaders. Its per-request
+  // RouterContext is the stable identity; it is never shared between HTTP requests.
+  let pending = loaderContext?.get(userInfoLoaderContext);
+  if (!pending) {
+    pending = fetchUserInfo(request).catch((error) => {
+      loaderContext?.set(userInfoLoaderContext, null);
+      throw error;
+    });
+    loaderContext?.set(userInfoLoaderContext, pending);
+  }
+  const fullInfo = await pending;
 
   if (!fullInfo) {
     return { user: null, permissions: null, preferences: null };
@@ -122,11 +143,11 @@ export function hasPermission(
     return false;
   }
 
-  if (permissions.permissionCodes?.includes(permissionCode)) {
+  if (permissions.permissionCodes?.includes('*') || permissions.permissionCodes?.includes(permissionCode)) {
     return true;
   }
 
-  return permissions.permissions?.some((p) => p.code === permissionCode) ?? false;
+  return permissions.permissions?.some((p) => p.code === '*' || p.code === permissionCode) ?? false;
 }
 
 /**

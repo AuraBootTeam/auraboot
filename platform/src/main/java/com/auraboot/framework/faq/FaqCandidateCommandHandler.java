@@ -5,7 +5,6 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.DataAccessor;
-import com.auraboot.framework.rag.service.KbTextIngestService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -48,10 +47,10 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
     private static final String STATUS_APPROVED = "approved";
     private static final String STATUS_PUBLISHED = "published";
 
-    private final KbTextIngestService kbTextIngestService;
+    private final FaqKnowledgePublisher kbTextIngestService;
     private final FaqCandidateService faqCandidateService;
 
-    public FaqCandidateCommandHandler(KbTextIngestService kbTextIngestService,
+    public FaqCandidateCommandHandler(FaqKnowledgePublisher kbTextIngestService,
                                       FaqCandidateService faqCandidateService) {
         this.kbTextIngestService = kbTextIngestService;
         this.faqCandidateService = faqCandidateService;

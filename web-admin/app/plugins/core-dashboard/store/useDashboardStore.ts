@@ -19,6 +19,7 @@ import type {
   ValidationError,
 } from '../types';
 import { dashboardService } from '../services/dashboardService';
+import { parseDashboardDocument } from '../utils/dashboardDocument';
 import { aggregateModelField, hasAggregateModel } from '~/framework/smart/utils/aggregateModel';
 
 /**
@@ -70,6 +71,7 @@ interface DashboardStore {
   // Actions - Dashboard
   loadDashboard: (pid: string) => Promise<void>;
   createDashboard: (title: string, scope?: DashboardScope) => void;
+  importDocument: (text: string) => void;
   updateDashboardMeta: (meta: {
     title?: string;
     description?: string;
@@ -112,8 +114,11 @@ interface DashboardStore {
 }
 
 // In-flight dashboard loads keyed by pid: concurrent loadDashboard calls share
-// one fetch instead of racing two responses into the same widgets array.
-const loadDashboardInFlight = new Map<string, Promise<void>>();
+// one fetch instead of racing two responses into the same widgets array. The
+// entry records the generation the fetch started under — once that generation
+// is superseded (reset, local edits) the response is guaranteed to be dropped,
+// so the entry must stop being handed out and a new caller refetches for real.
+const loadDashboardInFlight = new Map<string, { promise: Promise<void>; generation: number }>();
 
 const initialState = {
   dashboard: null as Dashboard | null,
@@ -141,14 +146,24 @@ export const useDashboardStore = create<DashboardStore>()(
         // remounts) must share one fetch: a later response would otherwise
         // clobber widgets saved by actions that ran between the two responses.
         const inFlight = loadDashboardInFlight.get(pid);
-        if (inFlight) return inFlight;
+        if (inFlight) {
+          if (inFlight.generation === get().mutationGeneration) return inFlight.promise;
+          // The generation moved on (remount reset, local edits): the shared
+          // response is already sentenced to the stale check. Drop the entry
+          // and fall through to a real fetch under the current generation.
+          loadDashboardInFlight.delete(pid);
+        }
 
         const requestedGeneration = get().mutationGeneration;
         set((state) => {
           state.isLoading = true;
         });
 
-        const load = (async () => {
+        // The finally below compares against `load` itself so a stale load can
+        // never evict a newer entry for the same pid; the definite-assignment
+        // assertion is safe because finally only runs once the promise exists.
+        let load!: Promise<void>;
+        load = (async () => {
           try {
             const dashboard = await dashboardService.findByPid(pid);
             set((state) => {
@@ -176,10 +191,11 @@ export const useDashboardStore = create<DashboardStore>()(
             });
             throw error;
           } finally {
-            loadDashboardInFlight.delete(pid);
+            const entry = loadDashboardInFlight.get(pid);
+            if (entry && entry.promise === load) loadDashboardInFlight.delete(pid);
           }
         })();
-        loadDashboardInFlight.set(pid, load);
+        loadDashboardInFlight.set(pid, { promise: load, generation: requestedGeneration });
         return load;
       },
 
@@ -198,6 +214,21 @@ export const useDashboardStore = create<DashboardStore>()(
           state.isDirty = true;
           state.selectedWidgetId = null;
           state.history = [[]];
+          state.historyIndex = 0;
+        });
+      },
+
+      importDocument: (text: string) => {
+        const { dashboard: draft } = parseDashboardDocument(text);
+        set((state) => {
+          state.dashboard = { ...draft, scope: 'personal', status: 'draft' };
+          state.widgets = draft.widgets;
+          state.layoutConfig = draft.layoutConfig;
+          state.selectedWidgetId = null;
+          state.isDirty = true;
+          state.mutationGeneration += 1;
+          state.validationResult = null;
+          state.history = [JSON.parse(JSON.stringify(draft.widgets))];
           state.historyIndex = 0;
         });
       },
@@ -389,8 +420,20 @@ export const useDashboardStore = create<DashboardStore>()(
       // ==================== Layout Actions ====================
 
       updateLayout: (widgets: Widget[]) => {
+        const positions = new Map(widgets.map((widget) => [widget.id, widget]));
+        const changed = get().widgets.some((widget) => {
+          const next = positions.get(widget.id);
+          return next && (widget.x !== next.x || widget.y !== next.y || widget.w !== next.w || widget.h !== next.h);
+        });
+        // GridLayout also emits on mount. An unchanged layout is not an edit
+        // and must not disable publishing immediately after a successful save.
+        if (!changed) return;
         set((state) => {
-          state.widgets = widgets;
+          state.widgets = state.widgets.map((widget) => {
+            const next = positions.get(widget.id);
+            // A delayed layout callback only owns geometry, never newer config.
+            return next ? { ...widget, x: next.x, y: next.y, w: next.w, h: next.h } : widget;
+          });
           state.isDirty = true;
           state.mutationGeneration += 1;
 
@@ -546,10 +589,13 @@ export const useDashboardStore = create<DashboardStore>()(
         // immer middleware a returned value diverges from the set(initialState)
         // semantics and broke palette adds after an unmount reset (verified by
         // bisect). The generation must only move forward so a fetch that started
-        // before the reset lands as stale.
+        // before the reset lands as stale — capture the successor BEFORE the
+        // initialState assign overwrites it, otherwise the counter snaps back
+        // to 1 and a pre-reset load would compare equal again.
         set((state) => {
+          const nextGeneration = state.mutationGeneration + 1;
           Object.assign(state, initialState);
-          state.mutationGeneration = state.mutationGeneration + 1;
+          state.mutationGeneration = nextGeneration;
         });
       },
 

@@ -7,6 +7,7 @@ type SemanticResolutionEvidenceProps = {
   locale: string;
   t: (key: string) => string;
   title?: string | LocalizedText | null;
+  fieldLabels?: Record<string, LocalizedText>;
 };
 
 function parseJsonValue(value: unknown): unknown {
@@ -105,6 +106,7 @@ export const SemanticResolutionEvidence: React.FC<SemanticResolutionEvidenceProp
   locale,
   t,
   title,
+  fieldLabels,
 }) => {
   if (traces.length === 0) return null;
   return (
@@ -145,7 +147,14 @@ export const SemanticResolutionEvidence: React.FC<SemanticResolutionEvidenceProp
               className="rounded-control border-border bg-subtle border p-3"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-text text-sm font-semibold">{field}</span>
+                <span className="text-text text-sm font-semibold">
+                  {getLocalizedText(
+                    fieldLabels?.[field] ||
+                      (fieldLabels ? { 'zh-CN': '其他字段', en: 'Other field' } : field),
+                    locale,
+                    t,
+                  )}
+                </span>
                 <span
                   className={`rounded-pill border px-2 py-0.5 text-xs font-medium ${
                     stateToneClass[state] || stateToneClass.unparsed
@@ -164,18 +173,20 @@ export const SemanticResolutionEvidence: React.FC<SemanticResolutionEvidenceProp
                 <div>
                   <dt className="text-text-2">{localized(locale, '来源', 'Source')}</dt>
                   <dd className="text-text mt-0.5 [overflow-wrap:anywhere]">
-                    {formatValue(selected.sourceColumn)} · {formatValue(selected.sourceRole)}
-                    {Number.isFinite(span.startOffset) && Number.isFinite(span.endOffset)
-                      ? ` [${span.startOffset}, ${span.endOffset})`
-                      : ''}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-text-2">
-                    {localized(locale, '规则 / 版本', 'Rule / Version')}
-                  </dt>
-                  <dd className="text-text mt-0.5 [overflow-wrap:anywhere]">
-                    {formatValue(selected.ruleId)} @ {formatValue(selected.ruleVersion)}
+                    {formatValue(selected.sourceColumn)} ·{' '}
+                    {getLocalizedText(
+                      (
+                        {
+                          mixed: { 'zh-CN': '混合描述', en: 'Mixed description' },
+                          dedicated: { 'zh-CN': '专用字段', en: 'Dedicated field' },
+                        } as Record<string, LocalizedText>
+                      )[String(selected.sourceRole || '').toLowerCase()] || {
+                        'zh-CN': '其他来源',
+                        en: 'Other source',
+                      },
+                      locale,
+                      t,
+                    )}
                   </dd>
                 </div>
                 <div>
@@ -189,11 +200,28 @@ export const SemanticResolutionEvidence: React.FC<SemanticResolutionEvidenceProp
                   </dd>
                 </div>
               </dl>
-              {vetoes.length > 0 && (
-                <div className="border-status-red bg-status-red-bg text-status-red rounded-control mt-3 border px-2.5 py-2 text-xs">
-                  {localized(locale, '阻断原因', 'Vetoes')}: {vetoes.join(', ')}
-                </div>
-              )}
+              <details className="text-text-2 mt-3 text-xs">
+                <summary className="cursor-pointer">
+                  {localized(locale, '技术追溯', 'Technical lineage')}
+                </summary>
+                <dl className="mt-2 space-y-1">
+                  <dt>{localized(locale, '规则 / 版本', 'Rule / Version')}</dt>
+                  <dd className="[overflow-wrap:anywhere]">
+                    {formatValue(selected.ruleId)} @ {formatValue(selected.ruleVersion)}
+                  </dd>
+                  {Number.isFinite(span.startOffset) && Number.isFinite(span.endOffset) && (
+                    <dd>
+                      {localized(locale, '文本位置', 'Text offsets')}: [{span.startOffset},{' '}
+                      {span.endOffset})
+                    </dd>
+                  )}
+                </dl>
+                {vetoes.length > 0 && (
+                  <div className="border-status-red bg-status-red-bg text-status-red rounded-control mt-3 border px-2.5 py-2 text-xs">
+                    {localized(locale, '阻断原因', 'Vetoes')}: {vetoes.join(', ')}
+                  </div>
+                )}
+              </details>
             </article>
           );
         })}

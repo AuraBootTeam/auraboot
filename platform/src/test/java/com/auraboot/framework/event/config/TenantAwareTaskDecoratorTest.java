@@ -187,7 +187,8 @@ class TenantAwareTaskDecoratorTest {
         AtomicReference<ExecutionPrincipal> workerPrincipal = new AtomicReference<>();
         AtomicReference<ContextEnvelope> workerEnvelope = new AtomicReference<>();
         AtomicBoolean clearedAfter = new AtomicBoolean(false);
-        Runnable decorated = new TenantAwareTaskDecorator().decorate(() -> {
+        Runnable decorated = new TenantAwareTaskDecorator(new com.auraboot.framework.event.context.ThreadContextScopes(
+                List.of(new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor()))).decorate(() -> {
             workerPrincipal.set(ExecutionPrincipalContext.requireCurrent());
             workerEnvelope.set(ContextEnvelopeContext.current().orElseThrow());
         });

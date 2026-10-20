@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -73,6 +74,9 @@ final class DynamicDataReadSupport {
         if (records == null || records.isEmpty()) {
             return records;
         }
+        if (MachineDataAccessContext.isActive()) {
+            return records.stream().map(record -> MachineDataAccessGuards.filterFields(modelCode, record)).toList();
+        }
         try {
             Long memberId = currentMemberIdForFieldPermissions();
             FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(memberId, modelCode);
@@ -109,6 +113,7 @@ final class DynamicDataReadSupport {
         if (record == null) {
             return record;
         }
+        if (MachineDataAccessContext.isActive()) return MachineDataAccessGuards.filterFields(modelCode, record);
         try {
             Long memberId = currentMemberIdForFieldPermissions();
             FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(memberId, modelCode);

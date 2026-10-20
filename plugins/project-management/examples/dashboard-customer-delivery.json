@@ -1,0 +1,259 @@
+{
+  "format": "auraboot.dashboard",
+  "version": 1,
+  "dashboard": {
+    "title": "客户项目交付总览",
+    "description": "项目数量、预算与交付阶段实时取自当前账号可见的客户项目；客户名称读取项目关联记录。",
+    "layoutConfig": {
+      "columns": 12,
+      "rowHeight": 100,
+      "gap": 16,
+      "compactType": "vertical"
+    },
+    "widgets": [
+      {
+        "id": "project-count",
+        "type": "smart-number-card",
+        "componentType": "smart-number-card",
+        "props": {},
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 2,
+        "config": {
+          "title": {
+            "zh-CN": "客户项目",
+            "en-US": "Customer projects"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_project",
+            "metrics": [
+              {
+                "field": "id",
+                "aggregation": "count",
+                "alias": "value"
+              }
+            ]
+          },
+          "color": "#2563eb",
+          "precision": 0
+        }
+      },
+      {
+        "id": "project-budget",
+        "type": "smart-number-card",
+        "componentType": "smart-number-card",
+        "props": {},
+        "x": 3,
+        "y": 0,
+        "w": 3,
+        "h": 2,
+        "config": {
+          "title": {
+            "zh-CN": "项目预算合计",
+            "en-US": "Total project budget"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_project",
+            "metrics": [
+              {
+                "field": "tpm_pj_budget",
+                "aggregation": "sum",
+                "alias": "value"
+              }
+            ]
+          },
+          "color": "#7c3aed",
+          "precision": 0,
+          "format": "currency",
+          "currency": "CNY"
+        }
+      },
+      {
+        "id": "awaiting-acceptance",
+        "type": "smart-number-card",
+        "componentType": "smart-number-card",
+        "props": {},
+        "x": 6,
+        "y": 0,
+        "w": 3,
+        "h": 2,
+        "config": {
+          "title": {
+            "zh-CN": "待验收",
+            "en-US": "Awaiting acceptance"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_project",
+            "metrics": [
+              {
+                "field": "id",
+                "aggregation": "count",
+                "alias": "value"
+              }
+            ],
+            "filters": [
+              {
+                "field": "tpm_pj_status",
+                "operator": "eq",
+                "value": "acceptance"
+              }
+            ]
+          },
+          "color": "#d97706",
+          "precision": 0
+        }
+      },
+      {
+        "id": "delivered-projects",
+        "type": "smart-number-card",
+        "componentType": "smart-number-card",
+        "props": {},
+        "x": 9,
+        "y": 0,
+        "w": 3,
+        "h": 2,
+        "config": {
+          "title": {
+            "zh-CN": "已交付",
+            "en-US": "Delivered"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_project",
+            "metrics": [
+              {
+                "field": "id",
+                "aggregation": "count",
+                "alias": "value"
+              }
+            ],
+            "filters": [
+              {
+                "field": "tpm_pj_status",
+                "operator": "eq",
+                "value": "completed"
+              }
+            ]
+          },
+          "color": "#059669",
+          "precision": 0
+        }
+      },
+      {
+        "id": "delivery-stages",
+        "type": "smart-pie-chart",
+        "componentType": "smart-pie-chart",
+        "props": {},
+        "x": 0,
+        "y": 2,
+        "w": 4,
+        "h": 5,
+        "config": {
+          "title": {
+            "zh-CN": "交付阶段分布",
+            "en-US": "Delivery stages"
+          },
+          "dataSource": {
+            "type": "aggregate",
+            "modelCode": "tpm_project",
+            "metrics": [
+              {
+                "field": "id",
+                "aggregation": "count",
+                "alias": "value"
+              }
+            ],
+            "dimensions": [
+              "tpm_pj_status"
+            ]
+          },
+          "showLabel": true,
+          "ring": true,
+          "labelPosition": "inside"
+        }
+      },
+      {
+        "id": "delivery-projects",
+        "type": "smart-table-chart",
+        "componentType": "smart-table-chart",
+        "props": {},
+        "x": 4,
+        "y": 2,
+        "w": 8,
+        "h": 5,
+        "config": {
+          "title": {
+            "zh-CN": "客户项目交付清单",
+            "en-US": "Customer project delivery"
+          },
+          "table": {
+            "columns": [
+              {
+                "field": "project_name",
+                "label": {
+                  "zh-CN": "项目",
+                  "en-US": "Project"
+                }
+              },
+              {
+                "field": "customer_name",
+                "label": {
+                  "zh-CN": "客户",
+                  "en-US": "Customer"
+                }
+              },
+              {
+                "field": "delivery_stage",
+                "label": {
+                  "zh-CN": "阶段",
+                  "en-US": "Stage"
+                }
+              },
+              {
+                "field": "delivery_date",
+                "label": {
+                  "zh-CN": "计划交付",
+                  "en-US": "Target delivery"
+                },
+                "format": "date"
+              },
+              {
+                "field": "budget",
+                "label": {
+                  "zh-CN": "预算",
+                  "en-US": "Budget"
+                },
+                "format": "currency",
+                "currency": "CNY",
+                "precision": 0,
+                "align": "right"
+              }
+            ]
+          },
+          "defaultSort": {
+            "field": "delivery_date",
+            "order": "asc"
+          },
+          "pageSize": 10,
+          "striped": false,
+          "dataSource": {
+            "type": "namedQuery",
+            "queryCode": "tpm_delivery_brief",
+            "dimensions": [
+              "project_name",
+              "customer_name",
+              "delivery_stage",
+              "delivery_date",
+              "budget"
+            ],
+            "limit": 100
+          }
+        }
+      }
+    ]
+  }
+}

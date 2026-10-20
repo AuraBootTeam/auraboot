@@ -1,0 +1,16 @@
+
+Running 4 tests using 1 worker
+
+(node:72648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+   [admin@auraboot.com] Warning: admin API login auto-select failed
+  ✓  1 [auth] › tests/auth.setup.ts:397:1 › authenticate as admin (159ms)
+  ✓  2 [auth] › tests/auth.setup.ts:442:1 › authenticate as operator (49ms)
+  ✓  3 [auth] › tests/auth.setup.ts:471:1 › ensure e2et test pages dsl (271ms)
+  ✓  4 [auth] › tests/auth.setup.ts:530:1 › authenticate as viewer (46ms)
+🧹 Running global teardown...
+✅ Global teardown complete
+
+  4 passed (1.1s)

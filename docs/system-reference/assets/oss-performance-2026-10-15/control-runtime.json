@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "runtime": "oss-performance-control",
+  "generatedAt": "2026-10-15T10:50:25.743Z",
+  "sourceCommit": "700d77b54e539b1c2ad5eec3f420d72fc331b3eb",
+  "artifactHash": "2dbe58485678ada42ea7f73473a619a736dd12bdb6b8c0d71036cb850cbf2639",
+  "sourceRoots": [
+    {
+      "key": "core",
+      "root": "$WORKSPACE/.workspace/worktrees/oss-performance/control",
+      "branch": "detached",
+      "commit": "700d77b54e539b1c2ad5eec3f420d72fc331b3eb",
+      "dirtyFingerprint": "clean"
+    },
+    {
+      "key": "workspace",
+      "root": "$WORKSPACE/.workspace/worktrees/oss-performance/workspace",
+      "branch": "detached",
+      "commit": "5c687fd22d84ae339090a1f1d6765fe7c4cb8d61",
+      "dirtyFingerprint": "clean"
+    }
+  ],
+  "backendArtifact": {
+    "path": "$WORKSPACE/.workspace/runtimes/oss-performance-control/artifacts/backend/AuraBoot-1.0.0-boot.jar",
+    "hash": "2dbe58485678ada42ea7f73473a619a736dd12bdb6b8c0d71036cb850cbf2639"
+  },
+  "processes": [
+    {
+      "key": "backend-launch",
+      "pid": 57207,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/control/platform",
+      "commandHash": "2ac360a87a8e377bbec0cfdb8234e694790e9cbc4ef4e9f45007e93e641ab1d0"
+    },
+    {
+      "key": "backend",
+      "pid": 57207,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/control/platform",
+      "commandHash": "2ac360a87a8e377bbec0cfdb8234e694790e9cbc4ef4e9f45007e93e641ab1d0"
+    },
+    {
+      "key": "bff",
+      "pid": 58397,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/control/web-admin",
+      "commandHash": "893fbba0c1cb4e7c297c8fac126a0d1a561e140a2f9d099b117cd035391b5755"
+    },
+    {
+      "key": "frontend-launch",
+      "pid": 58259,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/control/web-admin",
+      "commandHash": "614e81d106a2121a4ff1b24c44cb56fc8cf5ec96ae629a6d50a2b99578382480"
+    },
+    {
+      "key": "web",
+      "pid": 58391,
+      "cwd": "$WORKSPACE/.workspace/worktrees/oss-performance/control/web-admin",
+      "commandHash": "e8bab9f4ad90eb34d533c838a20f6677b48ab26fe618d999edd59a5f8d59b83b"
+    }
+  ],
+  "ports": {
+    "backend": {
+      "port": 6682,
+      "status": "listening",
+      "pids": [
+        57207
+      ]
+    },
+    "web": {
+      "port": 5382,
+      "status": "listening",
+      "pids": [
+        58391
+      ]
+    },
+    "bff": {
+      "port": 6382,
+      "status": "listening",
+      "pids": [
+        58397
+      ]
+    }
+  },
+  "database": "auraboot_282",
+  "redisDatabase": "8",
+  "backendUrl": "http://127.0.0.1:6682",
+  "webUrl": "http://127.0.0.1:5382",
+  "bffUrl": "http://127.0.0.1:6382",
+  "scope": "OSS source, staged backend, live Web/BFF/backend identity and service namespaces; plugin import and browser acceptance are separate"
+}

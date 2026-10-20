@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * Covers:
  * - handles() routing logic
- * - discover() returns all 3 platform tools
+ * - discover() returns the supported platform tools
  * - execute() for platform.list_models returns a valid model list
  * - execute() for platform.execute_sql rejects invalid SQL (DML guard)
  * - execute() for unknown tool code returns error without throwing
@@ -59,13 +59,14 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
     // ========== discover() ==========
 
     @Test
-    void discover_returnsAllThreePlatformTools() {
+    void discover_returnsSupportedPlatformTools() {
         var ctx = ToolDiscoveryContext.builder().tenantId(testTenant.getId()).build();
         var tools = provider.discover(ctx);
 
-        assertThat(tools).hasSize(5);
+        assertThat(tools).hasSize(6);
         assertThat(tools.stream().map(ToolDefinition::getToolCode))
                 .containsExactlyInAnyOrder(
+                        "platform.resolve_reference",
                         "platform.execute_sql",
                         "platform.list_models",
                         "platform.model_suggest",
@@ -161,10 +162,9 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
     /**
      * SEC-001: the SQL is authored by the LLM from a tool-call param, so a
      * caller-declared {@code tenant_id = <foreign>} must never stand alone. The
-     * server-side current-tenant predicate is injected unconditionally and AND-ed
-     * onto the caller's condition, intersecting the result down to the current
-     * tenant. Falsifiable against the old "already mentions tenant_id → skip
-     * injection" behaviour: that path would leave the foreign literal unqualified.
+     * server-side current-tenant predicate scopes the physical source before
+     * applying the caller's condition, so foreign literals cannot widen access.
+     * The actual query must return no records for a foreign tenant.
      */
     @Test
     void execute_executeSql_injectsServerTenantEvenWhenSqlDeclaresForeignTenant() {
@@ -176,9 +176,9 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
         String rewritten = result.getData().get("sql").toString();
         // Server-side current-tenant predicate is ALWAYS present...
         assertThat(rewritten).contains("tenant_id = #{params.tenantId}");
-        // ...AND-ed with the caller-declared literal, so it cannot stand alone.
         assertThat(rewritten).contains(String.valueOf(foreignTenant));
-        assertThat(rewritten.toLowerCase()).contains(" and ");
+        assertThat(rewritten.toLowerCase()).contains(
+                "from (select * from \"public\".\"ab_meta_model\" where (tenant_id = #{params.tenantid})) as ab_meta_model");
         // The foreign tenant is intersected with the current tenant → no rows leak.
         assertThat(result.getData().get("records")).isInstanceOf(java.util.List.class);
         assertThat((java.util.List<?>) result.getData().get("records")).isEmpty();

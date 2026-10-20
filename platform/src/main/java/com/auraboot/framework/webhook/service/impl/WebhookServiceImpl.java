@@ -55,11 +55,12 @@ public class WebhookServiceImpl implements WebhookService {
         entity.setEventVersion(validateEventVersion(entity.getInstallationPid(), request));
         entity.setModelCode(request.getModelCode());
         entity.setFilterExpression(request.getFilterExpression());
+        requireModelSigningSecret(entity.getEventType(), request.getSecret());
         entity.setSecret(fieldEncryptionService.encrypt(request.getSecret()));
         entity.setSecretRotatedAt(hasSecret(request.getSecret()) ? now : null);
         entity.setHeaders(request.getHeaders());
         entity.setMaxRetries(request.getMaxRetries());
-        entity.setTimeoutMs(request.getTimeoutMs());
+        entity.setTimeoutMs(validateTimeout(request.getTimeoutMs()));
         entity.setEnabled(request.isEnabled());
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
@@ -106,6 +107,8 @@ public class WebhookServiceImpl implements WebhookService {
         existing.setFilterExpression(request.getFilterExpression());
         // If masked value sent back, keep existing encrypted secret
         String newSecret = request.getSecret();
+        requireModelSigningSecret(existing.getEventType(),
+                newSecret != null && newSecret.startsWith("****") ? existing.getSecret() : newSecret);
         if (newSecret != null && newSecret.startsWith("****")) {
             // Client sent back masked value — keep DB value unchanged
         } else {
@@ -114,7 +117,7 @@ public class WebhookServiceImpl implements WebhookService {
         }
         existing.setHeaders(request.getHeaders());
         existing.setMaxRetries(request.getMaxRetries());
-        existing.setTimeoutMs(request.getTimeoutMs());
+        existing.setTimeoutMs(validateTimeout(request.getTimeoutMs()));
         existing.setEnabled(request.isEnabled());
         existing.setUpdatedAt(Instant.now());
 
@@ -178,6 +181,19 @@ public class WebhookServiceImpl implements WebhookService {
         return replayed == 1;
     }
 
+    @Override
+    public boolean replayDelivery(String subscriptionPid, String deliveryPid) {
+        return deliveryLogMapper.replayForSubscription(MetaContext.getCurrentTenantId(), subscriptionPid,
+                deliveryPid, MetaContext.getCurrentUserPid()) == 1;
+    }
+
+    private int validateTimeout(Integer timeout) {
+        int value = timeout == null ? 10000 : timeout;
+        if (value < 1000 || value > 60000)
+            throw new IllegalArgumentException("Webhook timeout must be between 1000 and 60000 milliseconds");
+        return value;
+    }
+
     private String validateInstallation(Long tenantId, String installationPid) {
         if (installationPid == null || installationPid.isBlank()) {
             return null;
@@ -197,6 +213,12 @@ public class WebhookServiceImpl implements WebhookService {
             eventCatalog.requireExternal(request.getEventType(), version);
         }
         return version;
+    }
+
+    private void requireModelSigningSecret(String eventType, String secret) {
+        if (OpenApiEventCatalog.isModelEvent(eventType) && !hasSecret(secret)) {
+            throw new IllegalArgumentException("Published model notifications require a signing secret");
+        }
     }
 
     private boolean hasSecret(String value) {

@@ -17,6 +17,7 @@ import type { QuickFilterChip } from './quickFilterChips';
 type QuickFilterKey = QuickFilterPresetKey;
 
 export interface ListToolbarProps {
+  workspace?: boolean;
   /** Current keyword search value */
   keyword: string;
   /** Localized search guidance supplied by the table configuration. */
@@ -78,6 +79,7 @@ export interface ListToolbarProps {
 }
 
 export function ListToolbar({
+  workspace = false,
   keyword,
   searchPlaceholder,
   onKeywordChange,
@@ -136,12 +138,12 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className="print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6"
+        className={`print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:sm:mr-auto' : ''}`}
         data-print="hide"
         data-testid="list-toolbar"
       >
         {/* Search input */}
-        {!hideSearch && <div className="relative min-w-0 flex-1 basis-full sm:flex-none sm:basis-auto">
+        {!hideSearch && <div className="relative min-w-0 flex-1 basis-full sm:flex-none sm:basis-auto" style={workspace ? { marginInlineEnd: 'auto' } : undefined}>
           <input
             type="text"
             value={keyword}
@@ -167,7 +169,7 @@ export function ListToolbar({
         </div>}
 
         {/* Separator */}
-        {!hideSearch && showInlineControls && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}
+        {!hideSearch && showInlineControls && !workspace && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}
 
         {/* Sort popover trigger */}
         {!hideSort && (
@@ -184,6 +186,7 @@ export function ListToolbar({
                   : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
               }`}
               data-testid="sort-popover-trigger"
+            style={workspace ? { order: 3 } : undefined}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -210,6 +213,7 @@ export function ListToolbar({
             onClick={onColumnSettingsOpen}
             className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
             data-testid="column-settings-btn"
+            style={workspace ? { order: 4 } : undefined}
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -299,6 +303,7 @@ export function ListToolbar({
             onClick={(e) => onAddFilter(e)}
             className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
             data-testid="add-filter-btn"
+            style={workspace ? { order: 2 } : undefined}
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -313,7 +318,7 @@ export function ListToolbar({
         )}
 
         {/* Spacer */}
-        <div className="hidden flex-1 sm:block" />
+        {!workspace && <div className="hidden flex-1 sm:block" />}
 
         {/* Quick filter chips */}
         {!hideQuickFilters && (

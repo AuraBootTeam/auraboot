@@ -24,11 +24,22 @@ class CommandLocalizedNameImportTest {
     private final CommandDefinitionMapper mapper = mock(CommandDefinitionMapper.class);
     private final CommandMetadataCacheService cache = mock(CommandMetadataCacheService.class);
     private final PluginResourceImporterImpl importer = mock(PluginResourceImporterImpl.class, CALLS_REAL_METHODS);
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc =
+            mock(org.springframework.jdbc.core.JdbcTemplate.class);
     CommandLocalizedNameImportTest() {
         ReflectionTestUtils.setField(importer, "commandService", commands);
         ReflectionTestUtils.setField(importer, "commandDefinitionMapper", mapper);
         ReflectionTestUtils.setField(importer, "commandMetadataCache", cache);
         ReflectionTestUtils.setField(importer, "objectMapper", new ObjectMapper());
+        // resurrectSoftDeleted (soft-delete revive on plugin reimport) probes the dynamic
+        // table through JdbcTemplate; an empty probe means no retired row to resurrect.
+        try {
+            when(jdbc.queryForList(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(Object[].class)))
+                    .thenReturn(java.util.List.of());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        ReflectionTestUtils.setField(importer, "jdbcTemplate", jdbc);
     }
     private CommandDefinitionDTO resource() {
         return JsonUtil.parse("{\"code\":\"member:create\",\"modelCode\":\"tenant_member\",\"displayName:zh-CN\":\"Source name\",\"displayName:en\":\"Create member\",\"extension\":{\"backendOnly\":true,\"localizedDescriptions\":{\"en-US\":\"Creates a member\"}}}", CommandDefinitionDTO.class);

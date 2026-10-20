@@ -2,6 +2,7 @@ package com.auraboot.framework.file.dto;
 
 import com.auraboot.framework.file.constant.StorageType;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +19,7 @@ public class FileUploadResponseDTO {
     /**
      * 存储文件名
      */
+    @Schema(nullable = true)
     private String fileName;
     
     /**
@@ -33,11 +35,13 @@ public class FileUploadResponseDTO {
     /**
      * MIME类型
      */
+    @Schema(nullable = true)
     private String mimeType;
     
     /**
      * 云存储路径
      */
+    @Schema(nullable = true)
     private String cloudPath;
     
     /**
@@ -53,6 +57,7 @@ public class FileUploadResponseDTO {
     /**
      * 创建用户
      */
+    @Schema(nullable = true)
     private Long createdBy;
     
     /**

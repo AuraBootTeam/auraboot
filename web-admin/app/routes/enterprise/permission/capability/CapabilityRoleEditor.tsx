@@ -1,3 +1,4 @@
+import { getLocalizedText } from '~/utils/i18n';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -40,7 +41,7 @@ export default function CapabilityRoleEditor({
   readOnly = false,
   scopeReadOnly = readOnly,
 }: CapabilityRoleEditorProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [groups, setGroups] = useState<CapabilityGroup[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -131,11 +132,14 @@ export default function CapabilityRoleEditor({
     };
   }, [load]);
 
-  const onToggle = useCallback((code: string) => {
-    if (readOnly) return;
-    setRevokedPartial((current) => current.filter((item) => item !== code));
-    setSelected((current) => toggleCapability(current, code));
-  }, [readOnly]);
+  const onToggle = useCallback(
+    (code: string) => {
+      if (readOnly) return;
+      setRevokedPartial((current) => current.filter((item) => item !== code));
+      setSelected((current) => toggleCapability(current, code));
+    },
+    [readOnly],
+  );
 
   const applyPreset = useCallback(
     (tier: string) => {
@@ -189,7 +193,16 @@ export default function CapabilityRoleEditor({
     } finally {
       setSaving(false);
     }
-  }, [rolePid, selected, primarySelected, revokedPartial, showSuccessToast, showErrorToast, t, readOnly]);
+  }, [
+    rolePid,
+    selected,
+    primarySelected,
+    revokedPartial,
+    showSuccessToast,
+    showErrorToast,
+    t,
+    readOnly,
+  ]);
 
   const reviewChanges = async () => {
     if (readOnly || !dirty || saving || previewLoading) return;
@@ -245,7 +258,9 @@ export default function CapabilityRoleEditor({
     .map((group) => ({
       ...group,
       capabilities: group.capabilities.filter((cap) =>
-        `${group.group} ${cap.label}`.toLowerCase().includes(query.trim().toLowerCase()),
+        `${group.group === null ? '' : t(`permission.module.${group.group}`, undefined, group.group)} ${getLocalizedText(cap.localizedLabels, locale, t) || cap.label}`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase()),
       ),
     }))
     .filter((group) => group.capabilities.length > 0);
@@ -279,7 +294,7 @@ export default function CapabilityRoleEditor({
   const noneCount = resulting.filter((cap) => cap.authorizationState === 'none').length;
   const renderImpact = (cap: Capability) => (
     <li key={cap.code} data-testid={`capability-preview-impact-${cap.code}`}>
-      {cap.label}:{' '}
+      {getLocalizedText(cap.localizedLabels, locale, t) || cap.label}:{' '}
       {t(
         `admin.permission.capability.${cap.authorizationState}V2`,
         undefined,
@@ -295,7 +310,7 @@ export default function CapabilityRoleEditor({
             {selected.includes(cap.code)
               ? t('admin.permission.editor.add', undefined, 'Grant')
               : t('admin.permission.editor.remove', undefined, 'Revoke')}
-            : {cap.label}
+            : {getLocalizedText(cap.localizedLabels, locale, t) || cap.label}
           </li>
         ))}
       </ul>
@@ -312,7 +327,10 @@ export default function CapabilityRoleEditor({
       </p>
       {resulting.length > 0 && (
         <div className="space-y-1">
-          <p data-testid="capability-preview-state-guidance" className="text-text-2 text-xs leading-5">
+          <p
+            data-testid="capability-preview-state-guidance"
+            className="text-text-2 text-xs leading-5"
+          >
             {t(
               'admin.permission.capability.partialGuidanceV2',
               undefined,
@@ -445,18 +463,21 @@ export default function CapabilityRoleEditor({
         </div>
         <div data-testid="capability-presets" className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-500">
-            {t('permission.capability.preset.label', undefined, '预设')}
+            {t('permission.capability.preset.label', undefined, 'Presets')}
           </span>
           {[
             {
               tier: 'viewer',
-              label: t('permission.capability.preset.viewer', undefined, '查看者'),
+              label: t('permission.capability.preset.viewer', undefined, 'Viewer'),
             },
             {
               tier: 'editor',
-              label: t('permission.capability.preset.editor', undefined, '编辑者'),
+              label: t('permission.capability.preset.editor', undefined, 'Editor'),
             },
-            { tier: 'admin', label: t('permission.capability.preset.admin', undefined, '管理员') },
+            {
+              tier: 'admin',
+              label: t('permission.capability.preset.admin', undefined, 'Administrator'),
+            },
           ].map((p) => (
             <button
               key={p.tier}

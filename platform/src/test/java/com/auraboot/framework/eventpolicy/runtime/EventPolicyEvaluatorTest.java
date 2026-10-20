@@ -137,9 +137,9 @@ class EventPolicyEvaluatorTest {
     @Test
     void conflict_rejectOnConflict_whenTwoRulesPatchSameFieldDifferently() {
         PolicyAction patchHigh = new PolicyAction("PATCH_RECORD", "record", 10,
-                Map.of("fieldPath", "priority", "value", "HIGH"), "${rule.ruleCode}:patch");
+                Map.of("fields", Map.of("priority", "HIGH")), "${rule.ruleCode}:patch");
         PolicyAction patchLow = new PolicyAction("PATCH_RECORD", "record", 10,
-                Map.of("fieldPath", "priority", "value", "LOW"), "${rule.ruleCode}:patch");
+                Map.of("fields", Map.of("priority", "LOW")), "${rule.ruleCode}:patch");
         EventPolicy p = policy(MatchMode.COLLECT_ALL, List.of(
                 rule("R-1", 100, gt("amount", 10000), patchHigh),
                 rule("R-2", 200, eq("customerLevel", "VIP", DataType.ENUM), patchLow)));

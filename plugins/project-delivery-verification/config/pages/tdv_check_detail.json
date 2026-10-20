@@ -1,0 +1,224 @@
+{
+  "modelCode": "tdv_check",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "pageKey": "tdv_check_detail",
+  "name:zh-CN": "交付核验详情",
+  "name:en": "Verification detail",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "交付核验",
+    "en": "Delivery verification"
+  },
+  "blocks": [
+    {
+      "id": "actions",
+      "blockType": "toolbar",
+      "area": "header",
+      "buttons": [
+        {
+          "code": "verify_delivery",
+          "commandCode": "tdv:verify_delivery",
+          "permissionCode": "tdv.check.manage",
+          "primary": true,
+          "label": {
+            "zh-CN": "执行交付核验",
+            "en": "Verify delivery"
+          }
+        }
+      ]
+    },
+    {
+      "id": "checks",
+      "blockType": "detail-section",
+      "area": "main",
+      "title": {
+        "zh-CN": "核验结果",
+        "en": "Verification results"
+      },
+      "fields": [
+        {
+          "field": "tdv_ck_materials",
+          "colSpan": 6
+        },
+        {
+          "field": "tdv_ck_scope",
+          "colSpan": 6
+        },
+        {
+          "field": "tdv_ck_amount_check",
+          "colSpan": 6
+        },
+        {
+          "field": "tdv_ck_budget_check",
+          "colSpan": 6
+        }
+      ],
+      "extension": {
+        "displayVariant": "object"
+      }
+    },
+    {
+      "id": "budget",
+      "blockType": "detail-section",
+      "area": "main",
+      "title": {
+        "zh-CN": "核验时的预算快照",
+        "en": "Budget snapshot at verification"
+      },
+      "fields": [
+        {
+          "field": "tdv_ck_budget",
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
+        },
+        {
+          "field": "tdv_ck_accepted",
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
+        },
+        {
+          "field": "tdv_ck_available",
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
+        },
+        {
+          "field": "tdv_ck_amount",
+          "colSpan": 6,
+          "presentation": {
+            "kind": "currency",
+            "currencyCode": "CNY",
+            "precision": 2
+          }
+        }
+      ],
+      "extension": {
+        "displayVariant": "object"
+      }
+    },
+    {
+      "id": "source",
+      "blockType": "detail-section",
+      "area": "aside",
+      "title": {
+        "zh-CN": "核验对象与时间",
+        "en": "Target and time"
+      },
+      "fields": [
+        {
+          "field": "tdv_ck_status",
+          "colSpan": 12
+        },
+        {
+          "field": "tdv_ck_acceptance",
+          "colSpan": 12,
+          "props": {
+            "helpText": {
+              "zh-CN": "结果是上次执行时的快照。验收材料或预算变化后，请重新执行核验。",
+              "en": "This is the last execution snapshot. Rerun after evidence or budget changes."
+            }
+          }
+        },
+        {
+          "field": "tdv_ck_checked_at",
+          "colSpan": 12
+        }
+      ],
+      "extension": {
+        "displayVariant": "object"
+      }
+    },
+    {
+      "id": "activity",
+      "blockType": "activity-timeline",
+      "area": "main",
+      "title": {
+        "zh-CN": "核验操作记录",
+        "en": "Verification activity"
+      },
+      "permissionCode": "audit.field_audit.read",
+      "extension": {
+        "density": "compact"
+      }
+    }
+  ],
+  "extension": {
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目交付",
+      "en": "Project delivery"
+    },
+    "headerTitleField": "tdv_ck_name",
+    "headerStatusField": "tdv_ck_status",
+    "headerSubtitleFields": [
+      "tdv_ck_acceptance"
+    ],
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showPdfExport": false,
+    "detailAsideBlockIds": [
+      "source"
+    ],
+    "objectSummary": [
+      {
+        "field": "tdv_ck_acceptance_display",
+        "label": {
+          "zh-CN": "关联验收单",
+          "en": "Acceptance"
+        },
+        "presentation": {
+          "kind": "object"
+        }
+      },
+      {
+        "field": "tdv_ck_passed",
+        "label": {
+          "zh-CN": "通过项数 / 4",
+          "en": "Passed / 4"
+        },
+        "presentation": {
+          "kind": "object"
+        }
+      },
+      {
+        "field": "tdv_ck_amount",
+        "label": {
+          "zh-CN": "本次验收金额",
+          "en": "Current amount"
+        },
+        "presentation": {
+          "kind": "currency",
+          "currencyCode": "CNY",
+          "precision": 2
+        }
+      },
+      {
+        "field": "tdv_ck_available",
+        "label": {
+          "zh-CN": "本次可用预算",
+          "en": "Available budget"
+        },
+        "presentation": {
+          "kind": "currency",
+          "currencyCode": "CNY",
+          "precision": 2
+        }
+      }
+    ]
+  }
+}

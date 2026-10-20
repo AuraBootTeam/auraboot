@@ -4,6 +4,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.plugin.marketplace.dto.MarketplacePaidDtos.PaymentEventResponse;
 import com.auraboot.framework.plugin.marketplace.service.MarketplaceStripeWebhookService;
 import com.auraboot.framework.plugin.marketplace.service.MarketplaceStripeWebhookService.StripeWebhookException;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/marketplace/paid/webhooks/stripe")
 @RequiredArgsConstructor
 @Tag(name = "Marketplace Stripe Webhook", description = "Signed Stripe webhook endpoint for paid Marketplace events")
+@AuthenticatedAccess("Stripe webhook endpoint; the Stripe-Signature HMAC is verified against the raw payload before the event is processed")
 public class MarketplaceStripeWebhookController {
 
     private final MarketplaceStripeWebhookService stripeWebhookService;

@@ -307,6 +307,14 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           columns: effectiveColumns.map((field) => ({ field, label: columnLabels[field] })),
         },
       ];
+      if (interpretation?.trim()) {
+        report.body.push({
+          id: 'analysis-summary',
+          blockType: 'rich-text',
+          title: text({ 'zh-CN': '分析说明', 'en-US': 'Analysis summary' }),
+          content: interpretation.trim(),
+        });
+      }
       const pid = await reportDesignerService.save(report, undefined, result.analysisId);
       if (!pid) throw new Error('Saved report identity is missing');
       setSavedReportPid(pid);
@@ -366,6 +374,8 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         ref={resultViewRef}
         data-testid="chatbi-result-card"
         data-analysis-id={result.analysisId}
+        data-model-code={result.modelCode || result.dataSource?.modelCode}
+        data-dimensions={(result.dimensions || result.dataSource?.dimensions || []).join(',')}
         data-chart-type={chartType}
         data-row-count={records.length}
         className="w-full max-w-[95%] overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-700 dark:bg-gray-800"

@@ -1,0 +1,212 @@
+[
+  {
+    "decisionCode": "tpm_acceptance_route",
+    "decisionName": "交付验收 · 审批分级",
+    "scopeType": "BPM",
+    "ownerModule": "tpm",
+    "enabled": true,
+    "kind": "DECISION_TABLE",
+    "runtimeAdapter": "PLATFORM_DECISION_TABLE",
+    "contentJson": {
+      "hitPolicy": "FIRST",
+      "inputs": [
+        {
+          "id": "amount",
+          "label": "交付金额",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_amount",
+            "dataType": "decimal"
+          }
+        },
+        {
+          "id": "risk",
+          "label": "风险等级",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_risk",
+            "dataType": "enum"
+          },
+          "allowedValues": [
+            "normal",
+            "high"
+          ],
+          "valueLabels": {
+            "normal": "普通",
+            "high": "高风险"
+          }
+        },
+        {
+          "id": "issues",
+          "label": "未解决问题数",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_open_issues",
+            "dataType": "integer"
+          }
+        },
+        {
+          "id": "materials",
+          "label": "材料内容已齐全",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.tpm_ac_materials_complete",
+            "dataType": "boolean"
+          },
+          "allowedValues": [
+            true,
+            false
+          ],
+          "valueLabels": {
+            "true": "齐全",
+            "false": "待补充"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "route",
+          "label": "审批路径",
+          "dataType": "string",
+          "allowedValues": [
+            "standard",
+            "enhanced"
+          ],
+          "valueLabels": {
+            "standard": "常规审核",
+            "enhanced": "加强审核"
+          }
+        }
+      ],
+      "rules": [
+        {
+          "ruleId": "high-risk",
+          "priority": 10,
+          "when": {
+            "risk": {
+              "operator": "EQ",
+              "value": "high"
+            }
+          },
+          "then": {
+            "route": "enhanced"
+          }
+        },
+        {
+          "ruleId": "incomplete-evidence",
+          "priority": 15,
+          "when": {
+            "materials": {
+              "operator": "EQ",
+              "value": false
+            }
+          },
+          "then": {
+            "route": "enhanced"
+          }
+        },
+        {
+          "ruleId": "large-amount",
+          "priority": 20,
+          "when": {
+            "amount": {
+              "operator": "GTE",
+              "value": 100000
+            },
+            "issues": {
+              "operator": "GT",
+              "value": 0
+            }
+          },
+          "then": {
+            "route": "enhanced"
+          }
+        },
+        {
+          "ruleId": "standard",
+          "priority": 30,
+          "when": {
+            "amount": {
+              "operator": "GTE",
+              "value": 0
+            },
+            "risk": {
+              "operator": "EQ",
+              "value": "normal"
+            }
+          },
+          "then": {
+            "route": "standard"
+          }
+        }
+      ]
+    },
+    "publish": true,
+    "description": "根据风险、材料完整性，以及金额与未解决问题的组合，决定审核路径。"
+  },
+  {
+    "decisionCode": "tpm_acceptance_deadline",
+    "decisionName": "交付验收 · 处理时限",
+    "scopeType": "SLA",
+    "ownerModule": "tpm",
+    "enabled": true,
+    "kind": "DECISION_TABLE",
+    "runtimeAdapter": "PLATFORM_DECISION_TABLE",
+    "contentJson": {
+      "hitPolicy": "FIRST",
+      "inputs": [
+        {
+          "id": "node",
+          "label": "审批节点",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.targetKey",
+            "dataType": "string"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "deadlineMinutes",
+          "label": "截止分钟",
+          "dataType": "integer"
+        }
+      ],
+      "rules": [
+        {
+          "ruleId": "enhanced",
+          "priority": 10,
+          "when": {
+            "node": {
+              "operator": "EQ",
+              "value": "tpm_enhanced_review"
+            }
+          },
+          "then": {
+            "deadlineMinutes": 120
+          }
+        },
+        {
+          "ruleId": "standard",
+          "priority": 20,
+          "when": {
+            "node": {
+              "operator": "EQ",
+              "value": "tpm_standard_review"
+            }
+          },
+          "then": {
+            "deadlineMinutes": 480
+          }
+        }
+      ]
+    },
+    "publish": true,
+    "description": "为不同审核节点确定处理时限，供 SLA 自动计时与提醒。"
+  }
+]

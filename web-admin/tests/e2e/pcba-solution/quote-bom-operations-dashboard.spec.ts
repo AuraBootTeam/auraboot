@@ -115,16 +115,21 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
     const samples = rendered.points.slice(1).flatMap((end: number[], i: number) =>
       [0.25, 0.5, 0.75].map((fraction) => [
         rendered.points[i][0] + (end[0] - rendered.points[i][0]) * fraction,
-        rendered.points[i][1] + (end[1] - rendered.points[i][1]) * fraction,
+        Math.min(rendered.points[i][1], end[1]),
+        Math.max(rendered.points[i][1], end[1]),
       ]));
     await expect.poll(() => chart.evaluate((element, positions: number[][]) => {
       const canvases = [...element.querySelectorAll('canvas')];
-      return positions.filter(([x, y]) => canvases.some((canvas) => {
+      // Smooth series follow curves rather than the straight chord between data points.
+      // Inspect a narrow interior x strip across each segment's y range; marker-only
+      // rendering still fails because samples exclude both endpoints and area fill.
+      return positions.filter(([x, minY, maxY]) => canvases.some((canvas) => {
         const scaleX = canvas.width / canvas.clientWidth;
         const scaleY = canvas.height / canvas.clientHeight;
         const left = Math.max(0, Math.round(x * scaleX) - 3);
-        const top = Math.max(0, Math.round(y * scaleY) - 3);
-        const pixels = canvas.getContext('2d')!.getImageData(left, top, 7, 7).data;
+        const top = Math.max(0, Math.round(minY * scaleY) - 3);
+        const height = Math.min(canvas.height - top, Math.ceil((maxY - minY) * scaleY) + 7);
+        const pixels = canvas.getContext('2d')!.getImageData(left, top, 7, height).data;
         for (let i = 0; i < pixels.length; i += 4) {
           if (pixels[i + 2] > pixels[i] + 40 && pixels[i + 2] > pixels[i + 1] + 30 && pixels[i + 3] > 100) return true;
         }
@@ -224,6 +229,8 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
     await expectFourCharts(page, DASHBOARD_PATH);
     await expect(page.getByText('查看报价与 BOM 的创建趋势及人员贡献。', { exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('dashboard-weekly-order.png'), fullPage: true });
+    await page.locator('canvas').nth(3).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('dashboard-personnel-count.png'), fullPage: true });
 
     for (const code of TREND_QUERIES) {
       const records = await queryRecords(page, code);
@@ -245,7 +252,7 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
 
   test('ordinary employee sees home contribution without admin menu and personnel data is self-only', async ({
     browser,
-  }) => {
+  }, testInfo) => {
     await withUserPage(browser, ordinaryUser, async (page) => {
       await expectFourCharts(page, '/home');
       await ensureSidebarExpanded(page);
@@ -258,8 +265,24 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
       for (const code of PEOPLE_QUERIES) {
         const records = await queryRecords(page, code);
         expect(records, `${code} ordinary employee must receive only one self row`).toHaveLength(1);
-        expect(String(records[0]?.creator_name ?? '')).toBeTruthy();
+        expect(String(records[0]?.creator_name ?? ''), `${code} must identify the authenticated employee`).toBe(ordinaryUser.displayName);
+        // This freshly provisioned employee owns no seeded quote or BOM; admin seeds must stay excluded.
+        expect(Number(records[0]?.quote_count ?? records[0]?.created_count)).toBe(0);
       }
+      await expect(page.locator('canvas')).toHaveCount(4);
+      for (const index of [2, 3]) {
+        const chart = page.locator('[_echarts_instance_]').nth(index);
+        await expect.poll(() => chart.evaluate((element) => {
+          const fiberKey = Object.keys(element).find((key) => key.startsWith('__reactFiber'));
+          let fiber = (element as any)[fiberKey!];
+          while (fiber && !fiber.stateNode?.getEchartsInstance) fiber = fiber.return;
+          if (!fiber) throw new Error('Personnel chart instance missing');
+          const option = fiber.stateNode.getEchartsInstance().getOption();
+          return { names: option.xAxis[0].data, values: option.series[0].data };
+        })).toEqual({ names: [ordinaryUser.displayName], values: [0] });
+      }
+      await page.locator('canvas').nth(3).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath('home-ordinary-self-only.png'), fullPage: true });
     });
   });
 });

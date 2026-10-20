@@ -1,6 +1,7 @@
 package com.auraboot.framework.promotion.reference.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.promotion.reference.dao.entity.ResourceReference;
 import com.auraboot.framework.promotion.reference.service.ResourceReferenceService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/references")
 @RequiredArgsConstructor
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; read-only reverse-reference impact analysis for models and fields")
 public class ResourceReferenceController {
 
     private final ResourceReferenceService referenceService;

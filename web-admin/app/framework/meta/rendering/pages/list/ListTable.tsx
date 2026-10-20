@@ -64,6 +64,7 @@ function isAutoFillColumn(column: ColumnConfig): boolean {
 }
 
 export interface ListTableProps {
+  workspace?: boolean;
   columns: ColumnConfig[];
   data: Record<string, any>[];
   loading: boolean;
@@ -119,6 +120,7 @@ export interface ListTableProps {
 
 export const ListTable = React.memo(function ListTable({
   columns,
+  workspace = false,
   data,
   loading,
   activeSorts,
@@ -157,7 +159,7 @@ export const ListTable = React.memo(function ListTable({
   treeConfig,
 }: ListTableProps) {
   const effectiveRowHeight = normalizeRowHeight(rowHeight);
-  const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
+  const rowHeightCfg = workspace ? { ...ROW_HEIGHT_CONFIG[effectiveRowHeight], px: 64, pyClass: 'py-3' } : ROW_HEIGHT_CONFIG[effectiveRowHeight];
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 

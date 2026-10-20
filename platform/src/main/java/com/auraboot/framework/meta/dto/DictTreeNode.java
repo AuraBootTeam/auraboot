@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,21 +17,25 @@ public class DictTreeNode {
     /**
      * 节点值
      */
+    @Schema(nullable = true)
     private String value;
 
     /**
      * 节点标签
      */
+    @Schema(nullable = true)
     private String label;
 
     /**
      * 节点描述
      */
+    @Schema(nullable = true)
     private String description;
 
     /**
      * 父节点值
      */
+    @Schema(nullable = true)
     private String parentValue;
 
     /**
@@ -162,6 +167,7 @@ public class DictTreeNode {
      * 获取显示文本
      * @return 显示文本
      */
+    @Schema(nullable = true)
     public String getDisplayText() {
         return label != null ? label : value;
     }
@@ -170,6 +176,7 @@ public class DictTreeNode {
      * 获取完整路径（从根到当前节点）
      * @return 路径字符串
      */
+    @Schema(nullable = true)
     public String getPath() {
         if (isRoot()) {
             return value;

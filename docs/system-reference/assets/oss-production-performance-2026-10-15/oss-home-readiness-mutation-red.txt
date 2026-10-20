@@ -1,0 +1,28 @@
+✖ a missing widget cannot become ready, and delayed runner observation does not inflate the browser timestamp (521.016208ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 784.541708
+
+✖ failing tests:
+
+test at scripts/performance/home-readiness.test.mjs:9:1
+✖ a missing widget cannot become ready, and delayed runner observation does not inflate the browser timestamp (521.016208ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(first.ready > 0 && first.stats >= first.structure)
+
+      at TestContext.<anonymous> (file://$SOURCE_ROOT/scripts/performance/home-readiness.test.mjs:21:12)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

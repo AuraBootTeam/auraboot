@@ -118,5 +118,17 @@
   "candidateFailure": {
     "zh-CN": "可选成员加载失败",
     "en-US": "Unable to load available members"
+  },
+  "viewSubtitle": {
+    "zh-CN": "查看团队成员与团队角色",
+    "en-US": "View team members and roles"
+  },
+  "viewEmptyHint": {
+    "zh-CN": "此团队尚未添加成员。",
+    "en-US": "This team has no members yet."
+  },
+  "memberFallback": {
+    "zh-CN": "该成员",
+    "en-US": "this member"
   }
 }

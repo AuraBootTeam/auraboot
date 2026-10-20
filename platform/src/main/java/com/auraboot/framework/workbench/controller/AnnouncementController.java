@@ -1,6 +1,7 @@
 package com.auraboot.framework.workbench.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.workbench.dto.AnnouncementDTO;
@@ -22,6 +23,7 @@ import java.util.List;
 @RequestMapping("/api/announcements")
 @RequiredArgsConstructor
 @Tag(name = "Announcements", description = "Workbench announcement management")
+@AuthenticatedAccess("unguarded handler is the read-only listing of active workbench announcements")
 public class AnnouncementController {
 
     private final AnnouncementService announcementService;

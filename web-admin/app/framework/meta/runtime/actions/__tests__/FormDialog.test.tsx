@@ -1,3 +1,4 @@
+import type { TenantMemberSearchRecord } from '~/shared/services/tenantMemberSearchService';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
@@ -22,21 +23,29 @@ describe('FormDialog choice fields', () => {
 
   it('renders a MemberPicker command input and submits the selected user pid', async () => {
     const onSubmit = vi.fn();
+    const member = {
+      pid: 'member-sales-1',
+      status: 'active',
+      user: {
+        pid: 'user-sales-1',
+        username: null,
+        realName: 'Sales One',
+        email: 'sales@example.com',
+        avatar: null,
+      },
+    } satisfies TenantMemberSearchRecord;
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          code: '0',
-          data: {
-            records: [
-              {
-                displayName: 'Sales One',
-                user: { pid: 'user-sales-1', email: 'sales@example.com' },
-              },
-            ],
-          },
-        }),
+      vi.fn().mockImplementation(async (input: string | URL) => {
+        const path = new URL(String(input), window.location.origin).pathname;
+        if (!path.startsWith('/api/i18n/') && path !== '/api/tenant/members/search') {
+          throw new Error(`Unexpected command picker request: ${path}`);
+        }
+        const data = path.startsWith('/api/i18n/') ? { common: {} } : { records: [member] };
+        return new Response(JSON.stringify({ code: '0', data }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }),
     );
     renderDialog({
@@ -59,6 +68,13 @@ describe('FormDialog choice fields', () => {
     expect(screen.getByRole('dialog', { name: '分配线索' })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('member-picker-add'));
     fireEvent.click(await screen.findByTestId('member-picker-option-user-sales-1'));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `${window.location.origin}/api/tenant/members/search`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ pageNum: 1, pageSize: 20, status: 'active' }),
+      }),
+    );
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
 
     expect(onSubmit).toHaveBeenCalledWith({ crm_lpi_claimed_by: 'user-sales-1' });

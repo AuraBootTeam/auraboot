@@ -1,0 +1,176 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+Configuration on demand is an incubating feature.
+> Task :platform-storage-cos:processResources NO-SOURCE
+> Task :platform-mq-kafka:processResources NO-SOURCE
+> Task :platform-storage-s3:processResources NO-SOURCE
+> Task :platform-storage-minio:processResources NO-SOURCE
+> Task :platform-storage-oss:processResources NO-SOURCE
+> Task :bootBuildInfo UP-TO-DATE
+> Task :platform-plugin-api:compileJava UP-TO-DATE
+> Task :platform-plugin-api:processResources NO-SOURCE
+> Task :platform-plugin-api:classes UP-TO-DATE
+> Task :platform-plugin-api:jar UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :compileJava FROM-CACHE
+> Task :classes UP-TO-DATE
+> Task :jar
+> Task :platform-mq-kafka:compileJava UP-TO-DATE
+> Task :platform-mq-kafka:classes UP-TO-DATE
+> Task :platform-mq-kafka:jar UP-TO-DATE
+> Task :platform-storage-cos:compileJava UP-TO-DATE
+> Task :platform-storage-cos:classes UP-TO-DATE
+> Task :platform-storage-s3:compileJava UP-TO-DATE
+> Task :platform-storage-s3:classes UP-TO-DATE
+> Task :platform-storage-oss:compileJava UP-TO-DATE
+> Task :platform-storage-oss:classes UP-TO-DATE
+> Task :platform-storage-cos:jar UP-TO-DATE
+> Task :platform-storage-s3:jar UP-TO-DATE
+> Task :platform-storage-oss:jar UP-TO-DATE
+> Task :platform-storage-minio:compileJava UP-TO-DATE
+> Task :platform-storage-minio:classes UP-TO-DATE
+> Task :platform-storage-minio:jar UP-TO-DATE
+> Task :compileTestJava UP-TO-DATE
+> Task :instrumentMainOffline
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+UnifiedUserDetailsServiceTest > missingPidFailsClosedWithoutAnAliasFallback() PASSED
+
+UnifiedUserDetailsServiceTest > loadUserById_existingUser_returnsDetails() PASSED
+
+UnifiedUserDetailsServiceTest > loadUserByUsername_userNameIdentifier_resolvesViaUserNameBeforePid() PASSED
+
+UnifiedUserDetailsServiceTest > pidSnapshotsObserveChangedSecurityStateOnTheNextRequest() PASSED
+
+UnifiedUserDetailsServiceTest > loadUserByUsername_phoneIdentifier_throwsUnsupported() PASSED
+
+UnifiedUserDetailsServiceTest > loadUserByUsername_pidIdentifier_resolvesViaPid() PASSED
+
+UnifiedUserDetailsServiceTest > loadUserByUsername_emailIdentifier_resolvesViaEmail() PASSED
+
+UnifiedUserDetailsServiceTest > loadUserById_missingUser_throws() PASSED
+
+UnifiedUserDetailsServiceTest > loadUserByUsername_userNotFound_throws() PASSED
+
+UnifiedUserDetailsServiceTest > jwtPidLookupReadsOnceAndNeverResolvesAliases() PASSED
+
+CacheConfigTest > productionCachesHaveBoundedPassiveExpiryWithoutRedis() PASSED
+
+JwtAuthenticationFilterTest > securityVersionMismatch_rejects() PASSED
+
+JwtAuthenticationFilterTest > shouldNotFilter_optionsMethodSkips() PASSED
+
+JwtAuthenticationFilterTest > validToken_setsAuthentication_andChainsForward() PASSED
+
+JwtAuthenticationFilterTest > appearanceAssetsAreAnonymousButManagementAndSiblingPathsRequireJwt() PASSED
+
+JwtAuthenticationFilterTest > validToken_putsTenantAndUserIntoMdc_andClearsAfter() PASSED
+
+JwtAuthenticationFilterTest > onboardingStageCannotReachOrdinaryBusinessApi() PASSED
+
+JwtAuthenticationFilterTest > sessionInvalid_rejects() PASSED
+
+JwtAuthenticationFilterTest > unrelatedPublicHealthRequest_preservesItsAuthenticationBypass() PASSED
+
+JwtAuthenticationFilterTest > shouldNotFilter_pluginPublicSubpathSkipsJwtAuth_butNonPublicDoesNot() PASSED
+
+JwtAuthenticationFilterTest > languagePackRejectsMalformedCredentialsInsteadOfReturningAnonymousData() PASSED
+
+JwtAuthenticationFilterTest > invalidJwt_returns401() PASSED
+
+JwtAuthenticationFilterTest > sessionCheckThrows_failsClosed() PASSED
+
+JwtAuthenticationFilterTest > rbacLookupFailure_doesNotPropagate() PASSED
+
+JwtAuthenticationFilterTest > languagePacksAllowAnonymousRequestsButValidateSuppliedCredentials() PASSED
+
+JwtAuthenticationFilterTest > shouldNotFilter_automationWebhookSkipsJwtAuth_butOtherAutomationRoutesDoNot() PASSED
+
+JwtAuthenticationFilterTest > shouldNotFilter_goodsTicketMobileApiSkipsJwtAuth() PASSED
+
+JwtAuthenticationFilterTest > anonymousI18nRemainsPublicWithoutInventingTenantContext() PASSED
+
+JwtAuthenticationFilterTest > anonymousI18nRequests_remainPublicWithoutTenantContext() PASSED
+
+JwtAuthenticationFilterTest > tokenForDeletedUser_returns401_notA500() PASSED
+
+JwtAuthenticationFilterTest > partyTokenRevalidatesMembershipAndAddsOnlyPartyScopedRoles() PASSED
+
+JwtAuthenticationFilterTest > invalidI18nCredentialsCannotFallBackToAnonymousSuccess() PASSED
+
+JwtAuthenticationFilterTest > invalidI18nBearer_isRejectedBeforeDictionaryAccess() PASSED
+
+JwtAuthenticationFilterTest > validI18nTokenBindsItsTenantBeforeLoadingTranslations() PASSED
+
+JwtAuthenticationFilterTest > i18nWithCredentialsMustRunJwtValidation() PASSED
+
+JwtAuthenticationFilterTest > expiredJwt_returns401() PASSED
+
+JwtAuthenticationFilterTest > onboardingStage_reachesLegacyBindSchoolCompatibilityRoute() PASSED
+
+JwtAuthenticationFilterTest > missingAuthorizationHeader_returns401AndDoesNotChain() PASSED
+
+JwtAuthenticationFilterTest > authenticatedI18nRequest_exposesVerifiedTenantOnlyInsideTheChain() PASSED
+
+JwtAuthenticationFilterTest > onboardingStage_reachesTenantInvitationAcceptance() PASSED
+
+PermissionCacheEvictionListenerTest > definitionEventEvictsTenantCatalogIncludingNegativeEntries() PASSED
+
+PermissionCacheEvictionListenerTest > userRoleEventEvictsOnlyTheTenantUserSnapshot() PASSED
+
+PermissionCacheEvictionListenerTest > permissionEventsBumpTheDataAccessCacheEpoch() PASSED
+
+PermissionCacheEvictionListenerTest > legacyEventsFallBackToCurrentContextMethods() PASSED
+
+PermissionCacheEvictionListenerTest > rolePermissionEventEvictsTenantRoleAndDerivedSnapshots() PASSED
+
+PermissionSnapshotCacheTest > usersSharingRoleReuseRoleGrantSnapshot() PASSED
+
+PermissionSnapshotCacheTest > returnedSnapshotsAreImmutable() PASSED
+
+PermissionSnapshotCacheTest > permissionCodesPreserveCanonicalDatabaseCase() PASSED
+
+PermissionSnapshotCacheTest > permissionCatalogLoadsOnceAndIncludesNegativeLookups() PASSED
+
+PermissionSnapshotCacheTest > permissionCatalogEvictionRefreshesPreviouslyMissingCode() PASSED
+
+PermissionSnapshotCacheTest > tenantAndUserKeysPreventCrossTenantSnapshotReuse() PASSED
+
+PermissionSnapshotCacheTest > permissionCatalogKeysAreTenantIsolated() PASSED
+
+PermissionSnapshotCacheTest > roleEvictionRefreshesPreviouslyMissingBaselineRole() PASSED
+
+PermissionSnapshotCacheTest > permissionCatalogIgnoresDefinitionsOwnedByOtherTenants() PASSED
+
+PermissionSnapshotCacheTest > repeatedEffectiveResolutionLoadsEveryDatabaseLayerOnce() PASSED
+
+PermissionSnapshotCacheTest > contributedRolesJoinDirectRolesAndAreCached() PASSED
+
+PermissionSnapshotCacheTest > passiveExpiryRefreshesNegativeCatalogWithoutAnEvent() PASSED
+
+PermissionSnapshotCacheTest > emptyRoleAndPermissionResultsAreCachedFailClosed() PASSED
+
+PermissionSnapshotCacheTest > concurrentMissesCollapseIntoSingleDatabaseLoad() PASSED
+
+PermissionSnapshotCacheTest > permissionCatalogPreservesTheCompleteDefinitionForPolicyEvaluation() PASSED
+
+PermissionSnapshotCacheTest > roleEvictionReloadsGrantAndDerivedEffectiveSnapshot() PASSED
+
+PermissionSnapshotCacheTest > userEvictionReloadsMembershipButReusesUnchangedRoleGrant() PASSED
+
+> Task :jacocoTestReport
+
+[Incubating] Problems report is available at: file://$SOURCE_ROOT/platform/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 25s
+21 actionable tasks: 4 executed, 1 from cache, 16 up-to-date

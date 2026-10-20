@@ -9,6 +9,7 @@ import {
   createCorrectedBomWorkbook,
   dynamicCreate,
   executeCommand,
+  ensureTenantAdminRegisteredPermissions,
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
   queryDynamicRecords,
@@ -151,7 +152,7 @@ async function unwrapCommandResponseData(
   page: Page,
   body: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const commandData = ((body as any).data?.data ?? {}) as Record<string, unknown>;
+  const commandData = ((body as any).data?.data ?? body.data ?? {}) as Record<string, unknown>;
   if (commandData.async === true && typeof commandData.taskCode === 'string') {
     return pollAsyncTaskResult(page, commandData.taskCode);
   }
@@ -169,6 +170,68 @@ async function tableHeaders(page: Page): Promise<string[]> {
 test.describe('PCBA quote minimal create regression', () => {
   test.describe.configure({ timeout: 120_000 });
 
+  test.beforeEach(async ({ page }) => {
+    await ensureTenantAdminRegisteredPermissions(page, ['qo.quote.read', 'qo.quote.create', 'qo.quote.manage', 'qo.price.manage']);
+  });
+
+  test('Q01-02 creates customer and linked project inside quote reference dropdowns', async ({ page }, testInfo) => {
+    const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+    const accountName = `内联客户 ${suffix}`;
+    const projectName = `内联项目 ${suffix}`;
+    const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
+    try {
+      await openQuoteCreateFormFromList(page);
+      await waitForFormReady(page, 20_000);
+      await page.getByTestId('select-trigger-qo_quote_crm_account_id').click();
+      await page.getByTestId('select-create-new-qo_quote_crm_account_id').click();
+      const customerDialog = page.getByRole('dialog', { name: '新建', exact: true });
+      await expect(customerDialog).toBeVisible();
+      await customerDialog.getByTestId('form-field-crm_acc_name').locator('input').fill(accountName);
+      const customerResponse = page.waitForResponse((response) =>
+        response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/crm:create_account'));
+      await customerDialog.getByTestId('form-btn-submit').click();
+      const customerCreated = await customerResponse;
+      expect(customerCreated.ok()).toBe(true);
+      const customerBody = await customerCreated.json();
+      expect(String(customerBody.code)).toBe('0');
+      const customerData = await unwrapCommandResponseData(page, customerBody);
+      const accountId = String(customerData.recordId ?? customerData.recordPid ?? customerData.pid ?? customerData.id ?? '');
+      expect(accountId).toBeTruthy();
+      created.rows.push({ model: 'crm_account_common', pid: accountId });
+      await expect(customerDialog).toHaveCount(0);
+      await expect(page.getByTestId('select-trigger-qo_quote_crm_account_id')).toContainText(accountName);
+      expect((await readDynamicRecord(page, 'crm_account_common', accountId)).crm_acc_name).toBe(accountName);
+
+      await page.getByTestId('select-trigger-qo_quote_project_id').click();
+      await page.getByTestId('select-create-new-qo_quote_project_id').click();
+      const projectDialog = page.getByRole('dialog', { name: '新建', exact: true });
+      await expect(projectDialog).toBeVisible();
+      await expect(projectDialog.getByTestId('select-trigger-bom_project_customer_id')).toContainText(accountName);
+      await projectDialog.getByTestId('form-field-bom_project_name').locator('input').fill(projectName);
+      const projectResponse = page.waitForResponse((response) =>
+        response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/bom:create_project'));
+      await projectDialog.getByTestId('form-btn-create').click();
+      const projectCreated = await projectResponse;
+      expect(projectCreated.ok()).toBe(true);
+      const projectPayload = projectCreated.request().postDataJSON();
+      expect((projectPayload.payload ?? projectPayload.params?.payload).bom_project_customer_id).toBe(accountId);
+      const projectBody = await projectCreated.json();
+      expect(String(projectBody.code)).toBe('0');
+      const projectData = await unwrapCommandResponseData(page, projectBody);
+      const projectId = String(projectData.recordId ?? projectData.recordPid ?? projectData.pid ?? projectData.projectId ?? '');
+      expect(projectId).toBeTruthy();
+      created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
+      await expect(projectDialog).toHaveCount(0);
+      await expect(page.getByTestId('select-trigger-qo_quote_project_id')).toContainText(projectName);
+      const persistedProject = await readDynamicRecord(page, 'req_requirement_set_pcba_bom', projectId);
+      expect(persistedProject.bom_project_customer_id).toBe(accountId);
+      expect(persistedProject.bom_project_name).toBe(projectName);
+      await page.screenshot({ path: testInfo.outputPath('quote-inline-customer-project-selected.png'), fullPage: true });
+    } finally {
+      await cleanupRows(page, created);
+    }
+  });
+
   test('creates a quote from customer, linked BOM project and converted BOM while preserving hidden RFQ links', async ({
     page,
   }, testInfo) => {
@@ -183,6 +246,7 @@ test.describe('PCBA quote minimal create regression', () => {
     const notes = `Minimal quote note ${suffix}`;
     const workbookPath = createCorrectedBomWorkbook(
       testInfo.outputPath('create-quote-converted-bom.xlsx'),
+      'GRM188R71C104KA01D',
     );
     const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
 
@@ -224,18 +288,17 @@ test.describe('PCBA quote minimal create regression', () => {
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
       // This golden owns the create/RFQ linkage contract, not the external-source contract. Seed
-      // fresh Yunhan evidence for the workbook's two MPNs so the create task deterministically
+      // fresh unbound Yunhan evidence (the quote-line binding is optional) for all three MPNs so the create task deterministically
       // exercises cache reuse and does not consume Yunhan's shared 1-call/minute batch allowance.
       // Dedicated Yunhan goldens below this suite still exercise the real upload/search lanes.
       const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000)
         .toISOString()
         .slice(0, 10);
-      for (const mpn of ['RC0603FR-0710KL', 'STM32F103C8T6']) {
+      for (const mpn of ['RC0603FR-0710KL', 'STM32F103C8T6', 'GRM188R71C104KA01D']) {
         await dynamicCreate(
           page,
           'qo_price_evidence_common',
           {
-            qo_pe_quote_line_id: `GOLDEN-MINIMAL-CREATE-CACHE-${suffix}-${mpn}`,
             qo_pe_part_no: mpn,
             qo_pe_source: 'yunhan',
             qo_pe_source_ref: 'golden:minimal-create-cache',
@@ -410,12 +473,16 @@ test.describe('PCBA quote minimal create regression', () => {
       const quoteLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
         { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId },
       ]);
-      expect(quoteLines.length, 'converted BOM upload should create quote lines').toBeGreaterThan(
-        0,
-      );
+      // This standard-import journey supplies three valid material rows.
+      // Missing-MPN provenance remains covered by the existing invalid/quick import specialists.
+      expect(quoteLines, 'all three standard BOM rows must create quote lines').toHaveLength(3);
       const importRows = await queryDynamicRecords(page, 'qo_bom_import_row_common', [
         { fieldName: 'qo_bir_quote_id', operator: 'EQ', value: quoteId },
       ]);
+      expect(importRows, 'all three standard BOM rows must retain import provenance').toHaveLength(3);
+      expect(importRows.filter((row) => row.qo_bir_validation_status === 'error')).toHaveLength(0);
+      expect(importRows.filter((row) => row.qo_bir_validation_status === 'valid').map((row) => row.qo_bir_quote_line_id).sort())
+        .toEqual(quoteLines.map((row) => row.pid).sort());
       const importHeaders = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: quoteId },
       ]);
@@ -485,6 +552,17 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(page.url()).toBe(detailUrlBeforeDownload);
       expect(page.context().pages()).toHaveLength(openPagesBeforeDownload);
       await page.screenshot({ path: testInfo.outputPath('created-quote-upload-readback.png'), fullPage: true });
+
+      await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
+      const priceTable = page.getByTestId('table-block').filter({
+        has: page.getByTestId(`table-row-${String(quoteLines[0].pid)}`),
+      });
+      await expect(priceTable, 'price workbench must contain the complete imported BOM').toHaveCount(1);
+      await expect(priceTable.locator('[data-testid^="table-row-"]')).toHaveCount(3);
+      for (const line of quoteLines) {
+        await expect(priceTable.getByTestId(`table-row-${String(line.pid)}`)).toBeVisible();
+      }
+      await page.screenshot({ path: testInfo.outputPath('created-quote-price-full-row-count.png'), fullPage: true });
 
       // Materials upload is create-only now: the detail toolbar keeps only the
       // pricing-input mutation, and no upload buttons may reappear.

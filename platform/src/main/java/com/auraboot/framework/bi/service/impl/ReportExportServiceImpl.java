@@ -10,6 +10,7 @@ import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.branding.BrandingProvider;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.SortField;
@@ -185,6 +186,156 @@ public class ReportExportServiceImpl implements ReportExportService {
         return file;
     }
 
+    @Override
+    public ReportExportFile exportMarkdown(ReportExportRequest request) {
+        return exportTextArtifact(request, false);
+    }
+
+    @Override
+    public ReportExportFile exportHtml(ReportExportRequest request) {
+        return exportTextArtifact(request, true);
+    }
+
+    private ReportExportFile exportTextArtifact(ReportExportRequest request, boolean html) {
+        if (request == null || !StringUtils.hasText(request.getReportPid())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "reportPid is required");
+        }
+        Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
+        Map<String, Object> appliedDsl = ReportParameterBindings.apply(reportDsl, request.getParameters());
+        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(appliedDsl);
+        String title = stringValue(reportDsl.get("title"), "report");
+        String format = html ? "html" : "markdown";
+        byte[] bytes;
+        if (html) {
+            bytes = reportRenderClient.renderHtml(reportDsl, dataSets);
+        } else {
+            bytes = renderMarkdown(reportDsl, dataSets, title).getBytes(StandardCharsets.UTF_8);
+        }
+        ReportExportFile file = new ReportExportFile(bytes, safeFilename(title) + (html ? ".html" : ".md"),
+                html ? "text/html;charset=UTF-8" : "text/markdown;charset=UTF-8");
+        recordExportAudit(request.getReportPid(), html ? "EXPORT_HTML" : "EXPORT_MARKDOWN", format, file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(appliedDsl), request.getUsageId(), format);
+        return file;
+    }
+
+    /** Markdown keeps table structure; PDF's flattened display lines are not a serialization format. */
+    @SuppressWarnings("unchecked")
+    private String renderMarkdown(Map<String, Object> dsl, Map<String, List<Map<String, Object>>> dataSets,
+                                  String title) {
+        StringBuilder out = new StringBuilder("# ").append(escapeMarkdown(title)).append("\n\n");
+        if (dsl.get("body") instanceof List<?> body) {
+            for (Object entry : body) {
+                if (!(entry instanceof Map<?, ?> raw)) continue;
+                Map<String, Object> block = (Map<String, Object>) raw;
+                String type = stringValue(block.get("blockType"), "");
+                String heading = stringValue(block.get("title"), "");
+                // Only user-facing, explicit titles become headings, never implementation types.
+                switch (type) {
+                    case "rich-text" -> {
+                        appendMarkdownHeading(out, heading, 2);
+                        for (String paragraph : stringValue(block.get("content"), "").split("\\R")) {
+                            if (StringUtils.hasText(paragraph)) out.append(escapeMarkdown(paragraph)).append("\n\n");
+                        }
+                    }
+                    case "table", "grouped-table" -> {
+                        appendMarkdownHeading(out, heading, 2);
+                        List<Map<String, Object>> rows = rowsForBlock(block, dataSets);
+                        List<ReportColumn> columns = resolveColumns(block, rows);
+                        String groupField = "grouped-table".equals(type)
+                                ? stringValue(block.get("groupByField"), "") : "";
+                        if (StringUtils.hasText(groupField)) {
+                            for (var group : groupRows(rows, groupField).entrySet()) {
+                                appendMarkdownHeading(out, group.getKey(), 3);
+                                appendMarkdownDataTable(out, columns, group.getValue(), block);
+                            }
+                        } else appendMarkdownDataTable(out, columns, rows, block);
+                    }
+                    case "cross-tab" -> {
+                        appendMarkdownHeading(out, heading, 2);
+                        CrossTabProjection projection = crossTabProjection(block, rowsForBlock(block, dataSets));
+                        List<String> header = new ArrayList<>(List.of("Category"));
+                        header.addAll(projection.columns());
+                        if (projection.showRowTotal()) header.add("Total");
+                        List<List<String>> values = new ArrayList<>();
+                        for (String row : projection.rows()) {
+                            List<String> cells = new ArrayList<>(List.of(row));
+                            for (String column : projection.columns()) cells.add(formatExportValue(projection.value(row, column)));
+                            if (projection.showRowTotal()) cells.add(formatExportValue(projection.rowTotal(row)));
+                            values.add(cells);
+                        }
+                        if (projection.showColumnTotal()) {
+                            List<String> cells = new ArrayList<>(List.of("Total"));
+                            for (String column : projection.columns()) cells.add(formatExportValue(projection.columnTotal(column)));
+                            if (projection.showRowTotal()) cells.add(formatExportValue(projection.grandTotal()));
+                            values.add(cells);
+                        }
+                        appendMarkdownTable(out, header, values);
+                    }
+                    case "chart" -> {
+                        appendMarkdownHeading(out, heading, 2);
+                        appendMarkdownTable(out, List.of("Category", "Value"),
+                                aggregateChartMetrics(block, rowsForBlock(block, dataSets)).stream()
+                                        .map(metric -> List.of(metric.label(), formatExportValue(metric.value()))).toList());
+                    }
+                    case "stat-card" -> {
+                        appendMarkdownHeading(out, heading, 2);
+                        String label = stringValue(block.get("label"), "");
+                        if (StringUtils.hasText(label)) out.append(escapeMarkdown(label)).append(": ");
+                        out.append(escapeMarkdown(formatExportValue(aggregateStat(block, rowsForBlock(block, dataSets)))))
+                                .append("\n\n");
+                    }
+                    case "barcode", "watermark", "page-header", "page-footer" -> {
+                        ReportTextArtifact artifact = textArtifactForBlock(block, dataSets);
+                        if (artifact != null) {
+                            appendMarkdownHeading(out, heading, 2);
+                            out.append(escapeMarkdown(artifact.value())).append("\n\n");
+                        }
+                    }
+                    default -> { /* Unknown visual blocks have no established Markdown semantics. */ }
+                }
+            }
+        }
+        return out.append(escapeMarkdown(brandingProvider.current().generatedByText())).append("\n").toString();
+    }
+
+    private void appendMarkdownHeading(StringBuilder out, String title, int level) {
+        if (StringUtils.hasText(title)) out.append("#".repeat(level)).append(' ')
+                .append(escapeMarkdown(title)).append("\n\n");
+    }
+
+    private void appendMarkdownDataTable(StringBuilder out, List<ReportColumn> columns,
+                                         List<Map<String, Object>> rows, Map<String, Object> block) {
+        List<String> headers = columns.stream().map(column -> Boolean.FALSE.equals(block.get("showHeader"))
+                ? "" : column.label()).toList();
+        appendMarkdownTable(out, headers, rows.stream().map(row -> columns.stream()
+                .map(column -> formatExportValue(row.get(column.field()))).toList()).toList());
+    }
+
+    private void appendMarkdownTable(StringBuilder out, List<String> headers, List<List<String>> rows) {
+        if (headers.isEmpty()) return;
+        appendMarkdownRow(out, headers);
+        out.append("| ").append(String.join(" | ", java.util.Collections.nCopies(headers.size(), "---")))
+                .append(" |\n");
+        for (List<String> row : rows) appendMarkdownRow(out, row);
+        out.append('\n');
+    }
+
+    private void appendMarkdownRow(StringBuilder out, List<String> cells) {
+        List<String> escaped = cells.stream().map(value -> String.join("<br>",
+                java.util.Arrays.stream(value.split("\\R", -1)).map(this::escapeMarkdown).toList())).toList();
+        // Only cell contents are escaped; delimiters and the separator remain GFM syntax.
+        out.append("| ").append(String.join(" | ", escaped)).append(" |\n");
+    }
+
+    private String escapeMarkdown(String value) {
+        // Source values are data, never executable HTML or model-authored links.
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\\", "\\\\").replace("`", "\\`").replace("*", "\\*")
+                .replace("_", "\\_").replace("[", "\\[").replace("]", "\\]")
+                .replace("#", "\\#").replace("!", "\\!").replace("|", "\\|")
+                .replace("\r", " ").replace("\n", " ");
+    }
+
     /**
      * Phase 3 (DDR-2026-06-21): render the report to a real WYSIWYG PDF (vector
      * charts + running header/footer/watermark) via the Node renderer, falling
@@ -326,7 +477,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private Map<String, Object> loadReportDsl(String reportPid) {
         ReportEntity report = reportStorageService.findByPid(reportPid);
         if (report == null || !java.util.Objects.equals(MetaContext.getCurrentTenantId(), report.getTenantId())) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found");
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Report not found");
         }
         if (!StringUtils.hasText(report.getDsl())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Report DSL not found");

@@ -221,6 +221,14 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
   if (block.blockType === 'chart' || block.blockType === 'stat-card') {
     return migrateWidgetLikeBlock(block);
   }
+  // Dashboard storage keeps widget blocks verbatim (blockType 'widget' +
+  // widgetType). Restore the editor widget with its declared type.
+  if (block.blockType === 'widget') {
+    return migrateWidgetLikeBlock({
+      ...block,
+      blockType: String(block.widgetType ?? 'widget'),
+    });
+  }
 
   const blockId = block.id || toStableBlockId(block.blockType);
   const migrated = {

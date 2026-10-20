@@ -133,7 +133,11 @@ class GlobalExceptionHandlerI18nTest {
                 "$i18n:meta_record.duplicate", new DuplicateKeyException("INSERT INTO private_table"));
         when(registry.getAllPhases()).thenThrow(businessFailure)
                 .thenThrow(new DataAccessResourceFailureException("Database private_connection unavailable"));
-        var metaAdvice = new MetaApiExceptionHandler();
+        // The meta advice has @Order(1) so it receives meta-package exceptions FIRST and
+        // delegates them to the host handler (c63233dd5). Standalone MockMvc performs no
+        // dependency injection — without wiring the delegate the advice NPEs and the raw
+        // BusinessException escapes as a 500 ServletException.
+        MetaApiExceptionHandler metaAdvice = new MetaApiExceptionHandler();
         ReflectionTestUtils.setField(metaAdvice, "globalExceptionHandler", handler);
         var mvc = MockMvcBuilders.standaloneSetup(new CommandPipelineController(registry))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())

@@ -6,6 +6,9 @@ import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
 
+const TELEMETRY_KEYS = ['SESSION_SECRET_FILE', 'AURA_WEB_MODE', 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED',
+  'MANAGEMENT_TRACING_SAMPLING_PROBABILITY', 'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG',
+  'VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'VITE_OTEL_TRACES_SAMPLE_RATE'];
 const need = (condition, message) => { if (!condition) throw new Error(message); };
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 function run(cli, args) {
@@ -32,7 +35,7 @@ export function fingerprintDirectory(root) {
   return { root: realpathSync(root), hash: digest.digest('hex') };
 }
 
-export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins, logging = null }) {
+export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins, logging = null, frontendBuild = null, sessionSecretFile = null }) {
   need(report.verdict === 'ok', 'Workspace identity verification failed');
   need(plan.schemaVersion === 1 && plan.runtime === report.runtime && plan.repo === repo,
     'Resume plan owner mismatch');
@@ -60,7 +63,19 @@ export function verifyResumeState({ report, repo, plan, planHash, manifest, depe
   need(!/[\r\n]/.test(plan.backend.path), 'Unsupported backend path');
   if (plan.logging || logging) need(plan.logging && logging && plan.logging.path === logging.path &&
     plan.logging.hash === logging.hash, 'Retained logging input changed');
+  if (plan.frontendBuild) {
+    need(plan.telemetryEnvironment?.AURA_WEB_MODE === 'production' && frontendBuild &&
+      plan.frontendBuild.root === frontendBuild.root && plan.frontendBuild.hash === frontendBuild.hash,
+      'Retained production frontend changed');
+    need(plan.sessionSecretFile && sessionSecretFile && plan.sessionSecretFile.root === sessionSecretFile.root &&
+      plan.sessionSecretFile.hash === sessionSecretFile.hash, 'Retained production session configuration changed');
+  }
+  need(typeof (plan.redisHost ?? '127.0.0.1') === 'string' && !/[\r\n]/.test(plan.redisHost || ''), 'Invalid Redis host');
+  for (const [key, value] of Object.entries(plan.telemetryEnvironment || {})) {
+    need(TELEMETRY_KEYS.includes(key) && typeof value === 'string' && !/[\r\n]/.test(value), 'Invalid telemetry environment');
+  }
   return { backend: plan.backend.path, llmStubMode: plan.llmStubMode,
+    redisHost: plan.redisHost ?? '127.0.0.1', telemetryEnvironment: plan.telemetryEnvironment || {},
     ...(plan.logging ? { loggingConfig: plan.logging.path } : {}) };
 }
 
@@ -83,19 +98,30 @@ export function recordResumeState(name, repo, cli) {
   const file = join(root, 'manifest.json'), manifest = JSON.parse(readFileSync(file, 'utf8'));
   const backend = report.processes.find(item => item.key === 'backend');
   need(backend?.status === 'ok', 'Verified backend is missing');
-  const llmStubMode = liveEnvironment(backend.expected.pid).AGENT_LLM_STUB_MODE;
+  const backendEnv = liveEnvironment(backend.expected.pid);
+  const web = report.processes.find(item => item.key === 'web');
+  const liveEnv = { ...backendEnv, ...(web ? liveEnvironment(web.expected.pid) : {}) };
+  const llmStubMode = backendEnv.AGENT_LLM_STUB_MODE;
   need(['true', 'false'].includes(llmStubMode), 'Live LLM mode is not reproducible');
   const plan = { schemaVersion: 1, runtime: name, repo, sourceCommit: manifest.sourceCommit,
     backend: manifest.backendArtifact, llmStubMode,
     ports: Object.fromEntries(Object.entries(report.ports).map(([key, item]) => [key, item.port])),
     database: manifest.database, redisDatabase: manifest.redisDatabase,
+    redisHost: backendEnv.SPRING_DATA_REDIS_HOST ?? '',
+    telemetryEnvironment: Object.fromEntries(TELEMETRY_KEYS.filter(key => liveEnv[key] !== undefined).map(key => [key, liveEnv[key]])),
     logging: loggingInput(report, name),
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
     plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')) };
+  if (liveEnv.AURA_WEB_MODE === 'production') {
+    plan.frontendBuild = fingerprintDirectory(join(repo, 'web-admin/build'));
+    need(Boolean(liveEnv.SESSION_SECRET_FILE), 'Production session input missing');
+    plan.sessionSecretFile = fingerprintDirectory(liveEnv.SESSION_SECRET_FILE);
+    manifest.frontendBuild = plan.frontendBuild;
+  }
   const planFile = join(root, 'resume.json');
   const planHash = hash(JSON.stringify(plan, null, 2) + '\n');
   verifyResumeState({ report, repo, plan, planHash, manifest: { ...manifest, resumePlan: { hash: planHash } },
-    dependencies: plan.dependencies, plugins: plan.plugins, logging: plan.logging });
+    dependencies: plan.dependencies, plugins: plan.plugins, logging: plan.logging, frontendBuild: plan.frontendBuild, sessionSecretFile: plan.sessionSecretFile });
   atomicJson(planFile, plan);
   manifest.resumePlan = { hash: hash(readFileSync(planFile)) };
   atomicJson(file, manifest);
@@ -113,15 +139,19 @@ export function loadResumeState(name, repo, cli) {
   return verifyResumeState({ report, repo, plan, planHash: hash(bytes), manifest,
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
     plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')),
-    logging: loggingInput(report, name) });
+    logging: loggingInput(report, name), frontendBuild: plan.frontendBuild ? fingerprintDirectory(join(repo, 'web-admin/build')) : null,
+    sessionSecretFile: plan.sessionSecretFile ? fingerprintDirectory(plan.sessionSecretFile.root) : null });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [action, name, repo, cli] = process.argv.slice(2);
     if (action === 'record') recordResumeState(name, repo, cli);
-    else if (action === 'load') {
+    else if (action === 'load-env') {
       const state = loadResumeState(name, repo, cli);
-      console.log(state.backend); console.log(state.llmStubMode); console.log(state.loggingConfig || '');
+      for (const [key,value] of Object.entries(state.telemetryEnvironment)) console.log(`${key}=${value}`);
+    } else if (action === 'load') {
+      const state = loadResumeState(name, repo, cli);
+      console.log(state.backend); console.log(state.llmStubMode); console.log(state.loggingConfig || ''); console.log(state.redisHost);
     } else throw new Error('Unknown resume action');
   } catch { console.error('Retained golden launch identity refused; no database initialization performed'); process.exitCode = 1; }
 }

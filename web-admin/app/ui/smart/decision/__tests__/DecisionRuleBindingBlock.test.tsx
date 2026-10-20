@@ -48,6 +48,15 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByTestId('decision-binding-preview')).not.toHaveTextContent('data.amount');
   });
 
+  it('does not silently activate a disabled consumer binding when opening or editing its mapping', async () => {
+    const updateField=vi.fn();
+    render(<DecisionRuleBindingBlock runtime={{getFieldValue:()=>undefined,updateField}} block={{props:{mode:'decision',valueField:'rule_binding',initialDecisionCode:'',initialValue:JSON.stringify({bindingKind:'DECISION_REF',enabled:false,decisionBinding:{decisionCode:'',enabled:false}})}}}/>);
+    await waitFor(()=>expect(updateField).toHaveBeenCalled());
+    expect(updateField.mock.calls.at(-1)?.[1]).toMatchObject({enabled:false,decisionBinding:{decisionCode:'',enabled:false}});
+    fireEvent.change(screen.getByLabelText('version-policy'),{target:{value:'ROLLOUT'}});
+    expect(updateField.mock.calls.at(-1)?.[1]).toMatchObject({enabled:false,decisionBinding:{enabled:false}});
+  });
+
   it('loads live decision definitions into the decision picker for DSL-hosted consumers', async () => {
     const api = {
       getDecisionImpact: vi.fn(),
@@ -927,7 +936,9 @@ describe('DecisionRuleBindingBlock', () => {
     expect(api.getModelFields).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('cb-add'));
-    fireEvent.change(await screen.findByLabelText('field-0'), {
+    await waitFor(() => expect(screen.getByLabelText('field-0')
+      .querySelector('option[value="record:data.wd_leave_type"]')).toHaveTextContent('请假类型'));
+    fireEvent.change(screen.getByLabelText('field-0'), {
       target: { value: 'record:data.wd_leave_type' },
     });
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
@@ -1136,7 +1147,7 @@ describe('DecisionRuleBindingBlock', () => {
     });
 
     fireEvent.click(screen.getByTestId('cb-add-group'));
-    fireEvent.click(screen.getByTestId('op-or-1'));
+    fireEvent.change(screen.getByLabelText('group-op-1'), { target: { value: 'OR' } });
     fireEvent.change(screen.getByLabelText('field-1-0'), {
       target: { value: 'record:data.amount' },
     });
@@ -1180,7 +1191,7 @@ describe('DecisionRuleBindingBlock', () => {
                   type: 'compare',
                   operator: 'GT',
                   left: { scope: 'record', path: 'data.amount' },
-                  right: { value: '5000' },
+                  right: { value: 5000 },
                 },
               ],
             },

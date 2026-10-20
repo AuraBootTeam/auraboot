@@ -5,13 +5,16 @@ import {
   Scripts,
   ScrollRestoration,
   redirect,
+  data as routeData,
   Link,
   useRouteLoaderData,
   useLoaderData,
   type LoaderFunctionArgs,
 } from 'react-router';
+import { context as traceContext, propagation as tracePropagation } from '@opentelemetry/api';
 import React, { useEffect, useState } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
+import { startActiveSessionRenewal } from '~/shared/services/active-session';
 
 import { I18nProvider, useI18n } from '~/contexts/I18nContext';
 import { ThemeProvider } from '~/contexts/ThemeContext';
@@ -38,7 +41,7 @@ import {
   resolveCommunityBranding,
   type BrandingConfig,
 } from '~/config/branding';
-import { useRootLoaderData, type RootLoaderData } from '~/root-data';
+import { RootLoaderDataProvider, useRootLoaderData, type RootLoaderData } from '~/root-data';
 
 import '~/app.css';
 import '~/styles/print.css';
@@ -67,7 +70,11 @@ import { fetchBootstrapStatus } from '~/services/bootstrapStatus';
 import { fetchAccessPolicy } from '~/services/accessPolicy';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
-import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
+import { SessionMaintenance } from '~/components/SessionMaintenance';
+import {
+  mergeSessionContext,
+  type SessionContextSnapshot,
+} from '~/shared/services/session-context';
 import {
   formatClientReportMessage,
   generateErrorId,
@@ -78,6 +85,10 @@ import {
 } from '~/error/root-error-view';
 import { reportClientError } from '~/shared/observability/clientErrorReporter';
 import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
+import {
+  RootDependencyUnavailableError,
+  ROOT_DEPENDENCY_UNAVAILABLE,
+} from '~/shared/observability/rootReadErrors';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -107,6 +118,8 @@ function getTimezoneFromRequest(request: Request): string {
 
 export async function resolveDeploymentBrandingFromBff(
   environment: Record<string, string | undefined>,
+  requestId?: string,
+  pathname = '/',
 ): Promise<BrandingConfig> {
   if (!isCommercialEdition(environment.EDITION)) {
     return resolveCommunityBranding();
@@ -118,10 +131,27 @@ export async function resolveDeploymentBrandingFromBff(
   // fetches, and hitting it yields a bare 401 from Spring. Always call the
   // loopback BFF.
   const bffUrl = `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
-  const response = await fetch(`${bffUrl}/api/runtime/branding`, {
-    signal: fetchTimeoutSignal(),
-  });
+  // Authentication appearance is unrelated to authenticated application refreshes.
+  // Keep its database read out of long-lived display/session revalidation.
+  const appearanceRoutes = [
+    '/login',
+    '/admin-login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+  ];
+  const includeAppearance = appearanceRoutes.includes(pathname.replace(/\/$/, ''));
+  const response = await fetch(
+    `${bffUrl}/api/runtime/branding${includeAppearance ? '?include=auth-appearance' : ''}`,
+    {
+      headers: requestId ? { 'X-Request-Id': requestId } : undefined,
+      signal: fetchTimeoutSignal(),
+    },
+  );
   if (!response.ok) {
+    if ([502, 503, 504].includes(response.status)) {
+      throw new RootDependencyUnavailableError('branding', response.status);
+    }
     throw new Error(`Unable to resolve deployment branding from BFF (${response.status}).`);
   }
   const payload = (await response.json()) as { branding?: BrandingConfig };
@@ -131,12 +161,42 @@ export async function resolveDeploymentBrandingFromBff(
   return payload.branding;
 }
 
-export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
+export async function loader(args: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
+  const { createLoaderDiagnostics, isRootDependencyUnavailable } =
+    await import('~/server/observability/loaderDiagnostics.server');
+  const diagnostics = createLoaderDiagnostics(args.request);
+  try {
+    return await diagnostics.stage('request', () => loadRoot(args, diagnostics));
+  } catch (error) {
+    if (!args.request.signal.aborted && isRootDependencyUnavailable(error)) {
+      throw routeData(
+        {
+          code: ROOT_DEPENDENCY_UNAVAILABLE,
+          requestId: diagnostics.correlation.requestId,
+          traceId: diagnostics.correlation.traceId,
+          stage: diagnostics.failedStage,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
+}
+
+async function loadRoot(
+  { request, context }: LoaderFunctionArgs,
+  diagnostics: Awaited<
+    ReturnType<
+      (typeof import('~/server/observability/loaderDiagnostics.server'))['createLoaderDiagnostics']
+    >
+  >,
+): Promise<RootLoaderData | Response> {
+  const stage = diagnostics.stage;
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const requestUrl = new URL(request.url);
   const { pathname } = requestUrl;
-  const impersonation = await getImpersonationFromRequest(request);
+  const impersonation = await stage('impersonation', () => getImpersonationFromRequest(request));
   if (impersonation && new Date(impersonation.expiresAt).getTime() <= Date.now()) {
     return redirect(pathname + requestUrl.search, {
       headers: { 'Set-Cookie': await restoreOperatorSession(request) },
@@ -144,13 +204,16 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
-  const branding = await resolveDeploymentBrandingFromBff(process.env);
   const buildIdentity = resolveBuildIdentity(process.env);
-
-  // Bootstrap status: never redirect; inject into loader data so the banner can render
-  const bootstrapStatus = await fetchBootstrapStatus();
-  const accessPolicy = await fetchAccessPolicy();
-  const token = await getTokenFromRequest(request);
+  // These reads are independent. Keep every request fresh without serial network waits.
+  const [branding, bootstrapStatus, accessPolicy, token] = await Promise.all([
+    stage('branding', () =>
+      resolveDeploymentBrandingFromBff(process.env, diagnostics.correlation.requestId, pathname),
+    ),
+    stage('bootstrap', () => fetchBootstrapStatus()),
+    stage('access-policy', () => fetchAccessPolicy()),
+    stage('session', () => getTokenFromRequest(request)),
+  ]);
 
   // Public runtime shells must never load admin user, permissions, or menus.
   // This includes logged-in browser sessions visiting a storefront or checkout
@@ -171,7 +234,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       return { ...cached, branding } as RootLoaderData;
     }
 
-    const i18nData = await getI18nData(locale, request, false);
+    const i18nData = await stage('i18n-public', () => getI18nData(locale, request, false));
     const edition = process.env.EDITION || 'enterprise';
     const result: RootLoaderData = {
       runtimeProfile,
@@ -208,6 +271,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       const apiUrl = process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:6443';
       const resp = await fetch(`${apiUrl}/api/tenant-selection/my-spaces`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: fetchTimeoutSignal(),
       });
       if (!resp.ok) return [];
       const result = await resp.json();
@@ -218,9 +282,9 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const [{ user, permissions, preferences }, i18nData, spaces] = await Promise.all([
-    getUserInfo(request),
-    getI18nData(locale, request),
-    fetchSpaces(),
+    stage('user-info', () => getUserInfo(request, context)),
+    stage('i18n', () => getI18nData(locale, request)),
+    stage('spaces', () => fetchSpaces()),
   ]);
 
   // Authoritative auth rejection: fetchUserInfo returns null only for a 401.
@@ -241,7 +305,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     }
   }
 
-  const menus = user ? await getUserMenus(request) : [];
+  const menus = user ? await stage('menus', () => getUserMenus(request)) : [];
 
   // Tenant guard: routes outside of auth/tenant-selection require a tenant
   if (!isPublicRoute(pathname) && pathname !== '/tenant-selection' && user && !user.tenantId) {
@@ -255,7 +319,10 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const edition = process.env.EDITION || 'enterprise';
+  const traceCarrier: Record<string, string> = {};
+  tracePropagation.inject(traceContext.active(), traceCarrier);
   const rootData: RootLoaderData = {
+    traceparent: traceCarrier.traceparent,
     runtimeProfile,
     user,
     permissions,
@@ -282,7 +349,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   // new token; failures are non-fatal (the current token stays valid until its
   // real deadline, then the normal 401 → login redirect applies).
   if (user && !impersonation) {
-    const renewal = await maybeRenewSession(request);
+    const renewal = await stage('session-renewal', () => maybeRenewSession(request));
     if (renewal.renewed && renewal.setCookie) {
       return new Response(JSON.stringify(rootData), {
         headers: {
@@ -318,13 +385,15 @@ export function resolveBrandingDocumentLinks(branding: BrandingConfig) {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
+  const rootData = useRootLoaderData();
+  const branding = rootData?.branding ?? COMMUNITY_BRANDING;
   return (
     <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
+        {rootData?.traceparent && <meta name="traceparent" content={rootData.traceparent} />}
         <Meta />
         <Links />
         {resolveBrandingDocumentLinks(branding).map((link) => (
@@ -373,10 +442,47 @@ function CorePluginBootstrap({ enabled }: { enabled: boolean }) {
   return null;
 }
 
+function SessionLoginRedirect() {
+  useEffect(() => {
+    window.location.replace(
+      `/login?redirectTo=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+    );
+  }, []);
+  return null;
+}
+
 export default function App() {
-  const data = useLoaderData<typeof loader>() as RootLoaderData;
+  const source = useLoaderData<typeof loader>() as RootLoaderData;
+  const [live, setLive] = useState<{
+    source: RootLoaderData;
+    data: RootLoaderData;
+    rejection?: 401 | 403;
+    error?: Error;
+  }>();
+  const current = live?.source === source ? live : undefined;
+  const data = current?.data ?? source;
+  const onRefresh = (snapshot: SessionContextSnapshot) =>
+    setLive((previous) => ({
+      source,
+      data: mergeSessionContext(previous?.source === source ? previous.data : source, snapshot),
+    }));
+  const onRejected = (rejection: 401 | 403) => setLive({ source, data, rejection });
+  const onError = (error: Error) => setLive({ source, data, error });
   const setFederationRuntimeProfile = useFederationStore((state) => state.setRuntimeProfile);
   const bootCoreRuntime = shouldBootCorePlugins(data.runtimeProfile);
+  const authenticated = Boolean(data.user);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    return startActiveSessionRenewal(window, document, async () => {
+      const response = await fetch('/api/auth/session-renew', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!response.ok) throw new Error('Active session renewal failed');
+    });
+  }, [authenticated]);
+
 
   useEffect(() => {
     setFederationRuntimeProfile(data.runtimeProfile);
@@ -389,6 +495,36 @@ export default function App() {
       ({ installClientErrorReporter }) => installClientErrorReporter(),
     );
   }, []);
+
+  if (current?.error) throw current.error;
+  if (current?.rejection === 401) {
+    return <SessionLoginRedirect />;
+  }
+  if (current?.rejection === 403) {
+    const locale = resolveErrorLocale(data.locale);
+    return (
+      <main
+        role="alert"
+        data-testid="session-access-denied"
+        className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-900"
+      >
+        <div className="max-w-md rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-800">
+          <h1 className="mb-3 text-xl font-semibold text-gray-900 dark:text-white">
+            {rootT('sessionAccessChangedTitle', locale)}
+          </h1>
+          <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+            {rootT('sessionAccessChangedDetail', locale)}
+          </p>
+          <Link
+            to="/home"
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-900 dark:bg-gray-700 dark:text-white"
+          >
+            {rootT('backHome', locale)}
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const appFrame = (
     <>
@@ -425,24 +561,30 @@ export default function App() {
   );
 
   return (
-    <QueryProvider>
-      <ThemeProvider>
-        {bootCoreRuntime ? (
-          <AuthProvider>
-            <AuthSessionRevalidator
-              enabled={bootCoreRuntime && !data.impersonation}
-              isAuthenticated={!!data.user}
-            />
-            <EntitlementProvider>
-              <CorePluginBootstrap enabled={bootCoreRuntime} />
-              <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
-            </EntitlementProvider>
-          </AuthProvider>
-        ) : (
-          sharedProviders
-        )}
-      </ThemeProvider>
-    </QueryProvider>
+    <RootLoaderDataProvider value={data}>
+      <QueryProvider>
+        <ThemeProvider>
+          {bootCoreRuntime ? (
+            <AuthProvider data={data}>
+              <SessionMaintenance
+                enabled={bootCoreRuntime && !data.impersonation}
+                source={source}
+                snapshot={data}
+                onRefresh={onRefresh}
+                onRejected={onRejected}
+                onError={onError}
+              />
+              <EntitlementProvider>
+                <CorePluginBootstrap enabled={bootCoreRuntime} />
+                <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
+              </EntitlementProvider>
+            </AuthProvider>
+          ) : (
+            sharedProviders
+          )}
+        </ThemeProvider>
+      </QueryProvider>
+    </RootLoaderDataProvider>
   );
 }
 

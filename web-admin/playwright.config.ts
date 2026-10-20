@@ -1,3 +1,4 @@
+import { BASE_URL as CONTRACT_BASE_URL } from './tests/helpers/environments';
 import { defineConfig, devices } from '@playwright/test';
 import dns from 'node:dns';
 import { isAbsolute, resolve } from 'node:path';
@@ -27,7 +28,7 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 }
 
 // Must use 'localhost' not '127.0.0.1' — the BFF returns 502 on direct IP.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
+const baseURL = CONTRACT_BASE_URL;
 const runProfile = process.env.PW_PROFILE || 'fast';
 // Cross-repository tests keep their source ownership and use explicit runtime roots.
 const enterpriseTestRoot = process.env.PW_ENTERPRISE_TEST_ROOT;
@@ -46,6 +47,9 @@ const enterpriseQuoteOpsGatePattern = new RegExp(
 
 const enableRoleProjects = process.env.PW_ROLE_PROJECTS === '1';
 const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
+const internalApiOwnedFixturesOnly = process.env.PW_INTERNAL_API_OWNED_FIXTURES_ONLY === '1';
+if (internalApiOwnedFixturesOnly && runProfile !== 'contract')
+  throw new Error('Owned internal API fixtures require PW_PROFILE=contract');
 const storageDir = process.env.PW_STORAGE_DIR;
 const storageStatePath = (envName: string, fileName: string, fallback: string) =>
   process.env[envName] || (storageDir ? `${storageDir}/${fileName}` : fallback);
@@ -228,7 +232,7 @@ export default defineConfig({
   outputDir: artifactDir,
 
   // Global teardown only (login moved to 'auth' setup project)
-  globalTeardown: './tests/global-teardown.ts',
+  globalTeardown: internalApiOwnedFixturesOnly ? undefined : './tests/global-teardown.ts',
 
   // Test execution settings
   fullyParallel: false,
@@ -433,6 +437,14 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+            },
+          },
+          {
+            name: 'internal-api-wire',
+            testDir: './tests/api/internal-api',
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: { cookies: [], origins: [] },
             },
           },
         ]

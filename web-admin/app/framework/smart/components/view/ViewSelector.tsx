@@ -269,7 +269,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   const displayCurrentView = currentView && !isImplicitSavedView(currentView) ? currentView : null;
   const isDefaultBaselineActive = !displayCurrentView;
   const currentScopeConfig = getScopeConfig(displayCurrentView?.scope ?? 'personal');
-  const isSharedPreset = displayCurrentView?.scope !== 'personal';
+  const isSharedPreset = isSavedViewLockedPreset(displayCurrentView);
   const CurrentScopeIcon = isSharedPreset ? Lock : currentScopeConfig.Icon;
   const isCurrentViewLockedPreset = isSavedViewLockedPreset(displayCurrentView);
   const isCurrentViewCapabilityBlocked = isSavedViewCapabilityBlocked(displayCurrentView);

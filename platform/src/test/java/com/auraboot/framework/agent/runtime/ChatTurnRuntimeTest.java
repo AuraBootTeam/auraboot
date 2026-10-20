@@ -17,6 +17,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Flux;
 
@@ -179,22 +181,28 @@ class ChatTurnRuntimeTest {
         assertThat(persisted).containsExactly(messages);
     }
 
-    @Test
+    @ParameterizedTest
+    @CsvSource({
+            "get_customer_update, DSL_COMMAND", "list_customer_update, DSL_COMMAND", "nq_customer_update, DSL_COMMAND",
+            "get_customer_update, API_CALL", "list_customer_update, API_CALL", "nq_customer_update, API_CALL",
+            "get_customer_update, MCP", "list_customer_update, MCP", "nq_customer_update, MCP"
+    })
     @DisplayName("runToolLoop trusts tool blocks over an inconsistent provider stop reason")
-    void runToolLoop_readOnlyEnvelopeDeniesWriteToolBeforeExecution() throws Exception {
+    void runToolLoop_readOnlyEnvelopeDeniesWriteToolBeforeExecution(String toolName, String toolType) throws Exception {
         LlmProvider provider = mock(LlmProvider.class);
         RecordingSink sink = new RecordingSink();
         List<LlmChatRequest.Message> messages = new ArrayList<>();
         messages.add(LlmChatRequest.Message.builder().role("user").content("delete customer C-1").build());
         LlmChatRequest.Tool writeTool = LlmChatRequest.Tool.builder()
-                .name("cmd:crm_customer_delete")
+                .name(toolName)
                 .description("Delete customer")
                 .inputSchema(Map.of("type", "object"))
                 .build();
         ToolDefinition writeDefinition = ToolDefinition.builder()
-                .toolCode("cmd:crm_customer_delete")
+                .toolCode(toolName)
                 .toolName("Delete customer")
-                .toolType("dsl_command")
+                .toolType(toolType)
+                .requiredPermissions(java.util.Set.of("customers.manage"))
                 .riskLevel("L2")
                 .requiresApproval(false)
                 .requiresConfirmation(false)
@@ -207,7 +215,7 @@ class ChatTurnRuntimeTest {
                 .content(List.of(LlmChatResponse.ContentBlock.builder()
                         .type("tool_use")
                         .id("tool-1")
-                        .name("cmd:crm_customer_delete")
+                        .name(toolName)
                         .input(Map.of("pid", "C-1"))
                         .build()))
                 .build();
@@ -233,7 +241,7 @@ class ChatTurnRuntimeTest {
                         messages,
                         List.of(writeTool),
                         List.of(writeDefinition),
-                        null,
+                        java.util.Set.of("customers.manage"),
                         null,
                         "session-1",
                         sink,

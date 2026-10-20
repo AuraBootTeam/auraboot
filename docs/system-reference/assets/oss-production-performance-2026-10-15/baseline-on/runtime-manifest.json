@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "runtime": "oss-performance-production",
+  "generatedAt": "2026-10-15T12:12:45.637Z",
+  "frontendMode": "production",
+  "sourceCommit": "19610df1bf7473695ca89a038052c70a13045719",
+  "artifactHash": "4410fd81e2869e8c1407038d912a573d57e713e0effc2aa7ad2708b7d3fb3df5",
+  "sourceRoots": [
+    {
+      "key": "core",
+      "root": "$SOURCE_ROOT",
+      "branch": "codex/oss-performance-production",
+      "commit": "19610df1bf7473695ca89a038052c70a13045719",
+      "dirtyFingerprint": "clean"
+    },
+    {
+      "key": "workspace",
+      "root": "$WORKSPACE_ROOT",
+      "branch": "detached",
+      "commit": "54f320f083a26a6f860abe137de9eaa8ce1b0265",
+      "dirtyFingerprint": "clean"
+    }
+  ],
+  "backendArtifact": {
+    "path": "$LOCAL_PATH",
+    "hash": "4410fd81e2869e8c1407038d912a573d57e713e0effc2aa7ad2708b7d3fb3df5"
+  },
+  "processes": [
+    {
+      "key": "backend-launch",
+      "pid": 32361,
+      "cwd": "$SOURCE_ROOT/platform",
+      "commandHash": "af27b431b759d5f369270dac2671a71d647f4d3872afafd8f8437a4147f5847c"
+    },
+    {
+      "key": "backend",
+      "pid": 32361,
+      "cwd": "$SOURCE_ROOT/platform",
+      "commandHash": "af27b431b759d5f369270dac2671a71d647f4d3872afafd8f8437a4147f5847c"
+    },
+    {
+      "key": "bff",
+      "pid": 33174,
+      "cwd": "$SOURCE_ROOT/web-admin",
+      "commandHash": "e9714c44e8ca6f024d1945da39b3766fee6231dae04574c51de7f1516e1b62cf"
+    },
+    {
+      "key": "frontend-launch",
+      "pid": 33069,
+      "cwd": "$SOURCE_ROOT/web-admin",
+      "commandHash": "8d63c957e215c44ad38d92df84c0081dfa0070c989c5486603a244b152fe1958"
+    },
+    {
+      "key": "web",
+      "pid": 33134,
+      "cwd": "$SOURCE_ROOT/web-admin",
+      "commandHash": "e74f8336ac779be0ed3ccd61286fb7485b60fc8205bfc7cade0a67117b64c5be"
+    }
+  ],
+  "ports": {
+    "backend": {
+      "port": 6683,
+      "status": "listening",
+      "pids": [
+        32361
+      ]
+    },
+    "web": {
+      "port": 5383,
+      "status": "listening",
+      "pids": [
+        33134
+      ]
+    },
+    "bff": {
+      "port": 6383,
+      "status": "listening",
+      "pids": [
+        33174
+      ]
+    }
+  },
+  "database": "auraboot_283",
+  "redisDatabase": "9",
+  "backendUrl": "http://127.0.0.1:6683",
+  "webUrl": "http://127.0.0.1:5383",
+  "bffUrl": "http://127.0.0.1:6383",
+  "scope": "OSS source, staged backend, live Web/BFF/backend identity and service namespaces; plugin import and browser acceptance are separate",
+  "frontendBuild": {
+    "root": "$SOURCE_ROOT/web-admin/build",
+    "hash": "a2d2e323ba22489a2134a8369524ebe204a8f298a97f9d9546efe748346eebb0"
+  },
+  "resumePlan": {
+    "hash": "cbc53ba20b68e699dbf2d08b370fa7ef8d1d6a778cbcf22b625fe47f2dba1fb3"
+  }
+}

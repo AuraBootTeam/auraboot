@@ -1,0 +1,2387 @@
+[
+  {
+    "batch": 1,
+    "sample": "median",
+    "request": {
+      "ms": 7.465500000000247,
+      "sqlCount": 15,
+      "traceId": "9794041f4372d25d9b808d58b496127e",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 4.701126,
+    "mapperCounts": {
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "00e640c501c11a67",
+        "parent": "6408b6dfa98d306b",
+        "ms": 0.56725,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "010a9626d93316fe",
+        "parent": "4a2d356ff6728b11",
+        "ms": 4.686667,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "4a2d356ff6728b11",
+        "parent": null,
+        "ms": 6.873417,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "475e52384d84b9e5",
+        "parent": "55d0b0fb3d3d1a2b",
+        "ms": 0.252833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "b17b2574d08315ef",
+        "parent": "55d0b0fb3d3d1a2b",
+        "ms": 0.243375,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "6ab6d25a43bfc5e5",
+        "parent": "010a9626d93316fe",
+        "ms": 0.260417,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "fdb826c88c1d38ce",
+        "parent": "4a2d356ff6728b11",
+        "ms": 0.027292,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "acfe246ebe5586d0",
+        "parent": "010a9626d93316fe",
+        "ms": 0.207833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "57593e938e4ad00e",
+        "parent": "55d0b0fb3d3d1a2b",
+        "ms": 0.026458,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "c42e20d8e71cf6ff",
+        "parent": "6408b6dfa98d306b",
+        "ms": 0.296292,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "62cfd71cfd6516fc",
+        "parent": "010a9626d93316fe",
+        "ms": 0.457709,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "2f0cd4f9fafd1a21",
+        "parent": "010a9626d93316fe",
+        "ms": 0.349625,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "55d0b0fb3d3d1a2b",
+        "parent": "4a2d356ff6728b11",
+        "ms": 1.932458,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "04ac13f82d2f2898",
+        "parent": "55d0b0fb3d3d1a2b",
+        "ms": 0.295041,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "cd08d653eeae9e2f",
+        "parent": "6408b6dfa98d306b",
+        "ms": 0.467042,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "2602c6e16ada7313",
+        "parent": "55d0b0fb3d3d1a2b",
+        "ms": 0.240167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "d2cd2876a97ade71",
+        "parent": "55d0b0fb3d3d1a2b",
+        "ms": 0.226792,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "1f24021c80d6b4f1",
+        "parent": "010a9626d93316fe",
+        "ms": 0.397167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "820dc6c376b85c75",
+        "parent": "55d0b0fb3d3d1a2b",
+        "ms": 0.235041,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "6408b6dfa98d306b",
+        "parent": "010a9626d93316fe",
+        "ms": 1.770959,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "f3905befb09b93d1",
+        "parent": "010a9626d93316fe",
+        "ms": 0.027292,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "369facb6bd066ccd",
+        "parent": "6408b6dfa98d306b",
+        "ms": 0.204542,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      }
+    ]
+  },
+  {
+    "batch": 1,
+    "sample": "p95",
+    "request": {
+      "ms": 10.991207999999915,
+      "sqlCount": 15,
+      "traceId": "eebc7a9d657a21a9a0eaacdb8b0a5758",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 6.099125000000001,
+    "mapperCounts": {
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "51294f5ff56b55e0",
+        "parent": "41c0cf7c4de933e1",
+        "ms": 0.367541,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "c48d4c374067357d",
+        "parent": "5965d7a62929e53a",
+        "ms": 0.361417,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "6e65ca76260a42f6",
+        "parent": "5965d7a62929e53a",
+        "ms": 2.601125,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "441890cf503d75b0",
+        "parent": "41c0cf7c4de933e1",
+        "ms": 0.230292,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "2e59ece8c42e161d",
+        "parent": "41c0cf7c4de933e1",
+        "ms": 0.271875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "52727a6db6731bf5",
+        "parent": "6e65ca76260a42f6",
+        "ms": 0.647875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "451051065e654fff",
+        "parent": "41c0cf7c4de933e1",
+        "ms": 0.225167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "616c26cf5fb4057c",
+        "parent": "6e65ca76260a42f6",
+        "ms": 0.478792,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "ba6fd849c7b7ccd5",
+        "parent": "5965d7a62929e53a",
+        "ms": 0.346625,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "1cb580d8937fd951",
+        "parent": "6e65ca76260a42f6",
+        "ms": 0.958583,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "57ad60f609f7547a",
+        "parent": "cbf42846a78e2a7f",
+        "ms": 0.034584,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "dd976367efe2d6a8",
+        "parent": "41c0cf7c4de933e1",
+        "ms": 0.029709,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e54a1c01fc7a52ab",
+        "parent": "41c0cf7c4de933e1",
+        "ms": 0.219417,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "bb5338963c6e26a8",
+        "parent": "5965d7a62929e53a",
+        "ms": 0.239708,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "cbf42846a78e2a7f",
+        "parent": null,
+        "ms": 10.411792,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "22d1085c0852233d",
+        "parent": "5965d7a62929e53a",
+        "ms": 0.02625,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "ab3b6f65d5905de5",
+        "parent": "6e65ca76260a42f6",
+        "ms": 0.245833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0e17c7aaee70511c",
+        "parent": "5965d7a62929e53a",
+        "ms": 0.649167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "41c0cf7c4de933e1",
+        "parent": "cbf42846a78e2a7f",
+        "ms": 2.038708,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "20f5556166436396",
+        "parent": "41c0cf7c4de933e1",
+        "ms": 0.253708,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "b6de242e52bc732d",
+        "parent": "5965d7a62929e53a",
+        "ms": 0.603125,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "5965d7a62929e53a",
+        "parent": "cbf42846a78e2a7f",
+        "ms": 8.110083,
+        "attributes": {}
+      }
+    ]
+  },
+  {
+    "batch": 1,
+    "sample": "max",
+    "request": {
+      "ms": 13.764417000000094,
+      "sqlCount": 15,
+      "traceId": "351b3318f99fc130fe3de89eb2d3fedd",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 10.495334,
+    "mapperCounts": {
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1,
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "8bf2d8b34f442eb2",
+        "parent": null,
+        "ms": 13.209625,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e821a857c4527625",
+        "parent": "436977b0ff021910",
+        "ms": 0.351084,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "79d2f4b5efbe69a6",
+        "parent": "c7b4d908f9702dc5",
+        "ms": 0.422375,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "68aecdaca95b2050",
+        "parent": "d10f2d6569f10909",
+        "ms": 0.222041,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "95c41ecbd1386fc7",
+        "parent": "436977b0ff021910",
+        "ms": 2.546375,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e5ce3f55e1794d08",
+        "parent": "c7b4d908f9702dc5",
+        "ms": 0.383,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "31e39f806629092d",
+        "parent": "d10f2d6569f10909",
+        "ms": 0.232167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "51ef75b69c8da040",
+        "parent": "d10f2d6569f10909",
+        "ms": 0.032833,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "f107855aa143f8d1",
+        "parent": "c7b4d908f9702dc5",
+        "ms": 0.028583,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "d10f2d6569f10909",
+        "parent": "8bf2d8b34f442eb2",
+        "ms": 3.066084,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "d178b228457dcac9",
+        "parent": "d10f2d6569f10909",
+        "ms": 0.344208,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "1cc604e218b5ee6c",
+        "parent": "436977b0ff021910",
+        "ms": 1.544708,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "436977b0ff021910",
+        "parent": "c7b4d908f9702dc5",
+        "ms": 5.755041,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "04c7a1cf40db5c6a",
+        "parent": "c7b4d908f9702dc5",
+        "ms": 0.670208,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "626cf10ac712fc57",
+        "parent": "d10f2d6569f10909",
+        "ms": 1.218959,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "2027d0aa61fe7a49",
+        "parent": "c7b4d908f9702dc5",
+        "ms": 0.311042,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "d366a840b244f6e2",
+        "parent": "d10f2d6569f10909",
+        "ms": 0.294792,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "c7b4d908f9702dc5",
+        "parent": "8bf2d8b34f442eb2",
+        "ms": 9.839417,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "ce4fcb9efb51f783",
+        "parent": "d10f2d6569f10909",
+        "ms": 0.262667,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "7b0912ac81b7542c",
+        "parent": "436977b0ff021910",
+        "ms": 1.036458,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "5c314dc35140ec1a",
+        "parent": "c7b4d908f9702dc5",
+        "ms": 0.65525,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "a43a64a3457b428e",
+        "parent": "8bf2d8b34f442eb2",
+        "ms": 0.03,
+        "attributes": {}
+      }
+    ]
+  },
+  {
+    "batch": 2,
+    "sample": "median",
+    "request": {
+      "ms": 6.044666999999663,
+      "sqlCount": 15,
+      "traceId": "046d95155b649c25ced55ae29eea4d35",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 3.750749,
+    "mapperCounts": {
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "7bbe222c378fed8f",
+        "parent": "7db708e74ac3f5ae",
+        "ms": 0.306,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "62f695435d916d0a",
+        "parent": "7db708e74ac3f5ae",
+        "ms": 0.381166,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "d5a815d725a21788",
+        "parent": "0edcec6e70ce6433",
+        "ms": 0.266875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e02ef3411db69cb5",
+        "parent": "0edcec6e70ce6433",
+        "ms": 0.197417,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "1f42bc4a6dc7ad6d",
+        "parent": "b59475e63ac32925",
+        "ms": 1.810417,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "0edcec6e70ce6433",
+        "parent": "b59475e63ac32925",
+        "ms": 3.50275,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "c7018d1e616e00e8",
+        "parent": "1f42bc4a6dc7ad6d",
+        "ms": 0.025667,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "75af729f06d2429f",
+        "parent": "1f42bc4a6dc7ad6d",
+        "ms": 0.226333,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "fa2a96457d02607d",
+        "parent": "0edcec6e70ce6433",
+        "ms": 0.199,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e6c07d23ee5799c7",
+        "parent": "1f42bc4a6dc7ad6d",
+        "ms": 0.284292,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0412f0ef2577c340",
+        "parent": "7db708e74ac3f5ae",
+        "ms": 0.282458,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "7db708e74ac3f5ae",
+        "parent": "0edcec6e70ce6433",
+        "ms": 1.337875,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "b59475e63ac32925",
+        "parent": null,
+        "ms": 5.565416,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "584e562e0581b0f7",
+        "parent": "1f42bc4a6dc7ad6d",
+        "ms": 0.238875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "08e22162a37dd1ac",
+        "parent": "1f42bc4a6dc7ad6d",
+        "ms": 0.2115,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0c10c50ed4166fc3",
+        "parent": "7db708e74ac3f5ae",
+        "ms": 0.164,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "6e270bf20c862a20",
+        "parent": "b59475e63ac32925",
+        "ms": 0.029125,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "fdffe4c242809523",
+        "parent": "1f42bc4a6dc7ad6d",
+        "ms": 0.241208,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "312942188221f0ac",
+        "parent": "0edcec6e70ce6433",
+        "ms": 0.036833,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "1d2630172c25a17b",
+        "parent": "0edcec6e70ce6433",
+        "ms": 0.2095,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "6c7b5ba75e5428eb",
+        "parent": "1f42bc4a6dc7ad6d",
+        "ms": 0.200583,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0295461985fe685d",
+        "parent": "0edcec6e70ce6433",
+        "ms": 0.341542,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      }
+    ]
+  },
+  {
+    "batch": 2,
+    "sample": "p95",
+    "request": {
+      "ms": 7.166082999999617,
+      "sqlCount": 15,
+      "traceId": "d63f8b222c8c0b9fd46116e19c8fcf30",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 4.277875000000001,
+    "mapperCounts": {
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e0d1b86594eb7960",
+        "parent": "e69bf52501a54237",
+        "ms": 0.208167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "209072b8555233b1",
+        "parent": "88f7564d5d2909a1",
+        "ms": 0.235125,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "f6fc5e2b30304f6f",
+        "parent": "88f7564d5d2909a1",
+        "ms": 0.03025,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "1bd6e9b0addf18bb",
+        "parent": "e69bf52501a54237",
+        "ms": 0.404875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0236a3ec916d4b7c",
+        "parent": "88f7564d5d2909a1",
+        "ms": 0.296042,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "75c21ed2d3b3f966",
+        "parent": "e69bf52501a54237",
+        "ms": 0.200375,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "88f7564d5d2909a1",
+        "parent": "12dc005d3a9df42c",
+        "ms": 2.230209,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e31ebbc85fe0073d",
+        "parent": "e69bf52501a54237",
+        "ms": 0.298208,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "b045ca93225c7540",
+        "parent": "e69bf52501a54237",
+        "ms": 0.251625,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "776fb82dc1065292",
+        "parent": "88f7564d5d2909a1",
+        "ms": 0.270959,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e7752c5655a5a6f3",
+        "parent": "88f7564d5d2909a1",
+        "ms": 0.273583,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "12dc005d3a9df42c",
+        "parent": null,
+        "ms": 6.554209,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "7391978f27e7c419",
+        "parent": "84979749ddf36609",
+        "ms": 0.183875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "89ec260bba29bf29",
+        "parent": "88f7564d5d2909a1",
+        "ms": 0.243542,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "a4c92ac4b3c9e587",
+        "parent": "e69bf52501a54237",
+        "ms": 0.031042,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "e69bf52501a54237",
+        "parent": "12dc005d3a9df42c",
+        "ms": 3.981209,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "90fc6934937b5960",
+        "parent": "84979749ddf36609",
+        "ms": 0.307708,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "84979749ddf36609",
+        "parent": "e69bf52501a54237",
+        "ms": 1.480209,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "cfcaaa3c16dcd033",
+        "parent": "84979749ddf36609",
+        "ms": 0.407083,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "85354521aa4c1051",
+        "parent": "84979749ddf36609",
+        "ms": 0.334833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "1e947d1f64889fe7",
+        "parent": "12dc005d3a9df42c",
+        "ms": 0.031583,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "f5d1fe598269fee1",
+        "parent": "88f7564d5d2909a1",
+        "ms": 0.361875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      }
+    ]
+  },
+  {
+    "batch": 2,
+    "sample": "max",
+    "request": {
+      "ms": 11.481166999999914,
+      "sqlCount": 15,
+      "traceId": "180d9e869839cd08cda87b82196ea34d",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 5.095956999999999,
+    "mapperCounts": {
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "21fe05454edc0aff",
+        "parent": null,
+        "ms": 10.591958,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "07facbf272e4226d",
+        "parent": "21fe05454edc0aff",
+        "ms": 8.4905,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "b243bd8a035e2725",
+        "parent": "07facbf272e4226d",
+        "ms": 1.457542,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "74917200ddfcc2be",
+        "parent": "07facbf272e4226d",
+        "ms": 0.344916,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "73215d51737d32bd",
+        "parent": "cb6b905bc9b6074b",
+        "ms": 0.310875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "f15bdeb09f1326b2",
+        "parent": "cb6b905bc9b6074b",
+        "ms": 0.235667,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "9081006006555faa",
+        "parent": "07facbf272e4226d",
+        "ms": 0.198708,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "cb6b905bc9b6074b",
+        "parent": "21fe05454edc0aff",
+        "ms": 1.86375,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0cade07a49a080a0",
+        "parent": "7a31faa52fab81c8",
+        "ms": 0.296958,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "ff06318be6e5c0e9",
+        "parent": "7a31faa52fab81c8",
+        "ms": 0.338667,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "259a6d0ab8b6c222",
+        "parent": "07facbf272e4226d",
+        "ms": 0.232708,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "8ca126649a259ef4",
+        "parent": "cb6b905bc9b6074b",
+        "ms": 0.23625,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "bbe6d0e6241b8066",
+        "parent": "cb6b905bc9b6074b",
+        "ms": 0.241541,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "d470492dfb6490ba",
+        "parent": "21fe05454edc0aff",
+        "ms": 0.03075,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "9b3d08ba2a639259",
+        "parent": "cb6b905bc9b6074b",
+        "ms": 0.02275,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "7a31faa52fab81c8",
+        "parent": "07facbf272e4226d",
+        "ms": 5.175583,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "c0d6ee8f934087c1",
+        "parent": "07facbf272e4226d",
+        "ms": 0.204125,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "1c21ebdba727eede",
+        "parent": "07facbf272e4226d",
+        "ms": 0.016167,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "991ac887d455372a",
+        "parent": "7a31faa52fab81c8",
+        "ms": 0.384084,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "7a3cf9f98ff358a4",
+        "parent": "cb6b905bc9b6074b",
+        "ms": 0.215583,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0a61a5cc74297a66",
+        "parent": "cb6b905bc9b6074b",
+        "ms": 0.209541,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "f80143479f4b5233",
+        "parent": "7a31faa52fab81c8",
+        "ms": 0.188792,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      }
+    ]
+  },
+  {
+    "batch": 3,
+    "sample": "median",
+    "request": {
+      "ms": 7.566332999999759,
+      "sqlCount": 15,
+      "traceId": "b5f5e809d46b762718dd86fc419127f3",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 5.436542,
+    "mapperCounts": {
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "94fbf71e15408e95",
+        "parent": "eeb0c2b6a18ba446",
+        "ms": 0.26225,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "05c9e18bcd5bd54c",
+        "parent": "eeb0c2b6a18ba446",
+        "ms": 0.33225,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "11bdc7f74e830add",
+        "parent": "311a107b078a011e",
+        "ms": 4.870541,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "5c976e829bc3c729",
+        "parent": "11bdc7f74e830add",
+        "ms": 0.237917,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "ff7ae202b19684f9",
+        "parent": "eeb0c2b6a18ba446",
+        "ms": 0.245334,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "a81f6dcd48453703",
+        "parent": "fc8e6c7a0fbeebf6",
+        "ms": 0.468291,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "9103e60cbd3a3261",
+        "parent": "11bdc7f74e830add",
+        "ms": 0.258833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "41b567546e29b75d",
+        "parent": "fc8e6c7a0fbeebf6",
+        "ms": 0.36325,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "6c48c40eb4d1189e",
+        "parent": "11bdc7f74e830add",
+        "ms": 0.299625,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "3bb315aae84cfccf",
+        "parent": "11bdc7f74e830add",
+        "ms": 0.239833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "eb4b725c7931bb37",
+        "parent": "fc8e6c7a0fbeebf6",
+        "ms": 0.440334,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "fc8e6c7a0fbeebf6",
+        "parent": "11bdc7f74e830add",
+        "ms": 1.661333,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "f7c37977eb0f39c4",
+        "parent": "11bdc7f74e830add",
+        "ms": 1.28925,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "311a107b078a011e",
+        "parent": null,
+        "ms": 7.077834,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "eeb0c2b6a18ba446",
+        "parent": "311a107b078a011e",
+        "ms": 1.993459,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e45c408f682ad84e",
+        "parent": "eeb0c2b6a18ba446",
+        "ms": 0.237375,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "4071e9cdf352502e",
+        "parent": "eeb0c2b6a18ba446",
+        "ms": 0.252125,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "26e558ea79527617",
+        "parent": "311a107b078a011e",
+        "ms": 0.024709,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "102fc406b7e52bef",
+        "parent": "11bdc7f74e830add",
+        "ms": 0.013583,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "fe61629dbcb9d041",
+        "parent": "eeb0c2b6a18ba446",
+        "ms": 0.314,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "1804b79df3fd8fa6",
+        "parent": "eeb0c2b6a18ba446",
+        "ms": 0.019,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "dc59c8d129bdaf9b",
+        "parent": "fc8e6c7a0fbeebf6",
+        "ms": 0.195875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      }
+    ]
+  },
+  {
+    "batch": 3,
+    "sample": "p95",
+    "request": {
+      "ms": 9.608250000000226,
+      "sqlCount": 15,
+      "traceId": "4bfca974ccd3fefcd1b1a973e9ef20f5",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 6.923167,
+    "mapperCounts": {
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "4c9b7680b01f6d09",
+        "parent": "871d16a5124c74ea",
+        "ms": 0.449167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "ec1efc7692c22039",
+        "parent": "871d16a5124c74ea",
+        "ms": 0.416959,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "9dd431ef4354a487",
+        "parent": "bc03046fe376c1d7",
+        "ms": 0.0265,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "f873811cd74f900d",
+        "parent": "bc03046fe376c1d7",
+        "ms": 0.221959,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "bc23636402409fa6",
+        "parent": "7c680f362a0a4c38",
+        "ms": 0.261833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "c64a450fcb01c8f8",
+        "parent": "7c680f362a0a4c38",
+        "ms": 1.116167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "a3359e9dde7c32ac",
+        "parent": "471c84731f45f9a8",
+        "ms": 0.031792,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "f0e638eaa86d4453",
+        "parent": "bc03046fe376c1d7",
+        "ms": 0.238917,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "85b067bcfa721d1e",
+        "parent": "871d16a5124c74ea",
+        "ms": 1.446292,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "992f2b559836b6c1",
+        "parent": "bc03046fe376c1d7",
+        "ms": 0.481875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "b8369707c00b9236",
+        "parent": "7c680f362a0a4c38",
+        "ms": 0.455167,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "871d16a5124c74ea",
+        "parent": "bc03046fe376c1d7",
+        "ms": 3.031625,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "4a3125b57bb2022b",
+        "parent": "7c680f362a0a4c38",
+        "ms": 0.2735,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "bc03046fe376c1d7",
+        "parent": "471c84731f45f9a8",
+        "ms": 5.608333,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e398275151a5ad1c",
+        "parent": "871d16a5124c74ea",
+        "ms": 0.480416,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "fa5218314b1ac4c1",
+        "parent": "7c680f362a0a4c38",
+        "ms": 0.032083,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "7c680f362a0a4c38",
+        "parent": "471c84731f45f9a8",
+        "ms": 3.200125,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "6813ca43be3dd9d0",
+        "parent": "bc03046fe376c1d7",
+        "ms": 0.215416,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "4bddcbfe564a1082",
+        "parent": "bc03046fe376c1d7",
+        "ms": 0.307875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "471c84731f45f9a8",
+        "parent": null,
+        "ms": 9.068084,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "084c18b5d2fb7922",
+        "parent": "7c680f362a0a4c38",
+        "ms": 0.223791,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "9eea3a1197977432",
+        "parent": "7c680f362a0a4c38",
+        "ms": 0.333833,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      }
+    ]
+  },
+  {
+    "batch": 3,
+    "sample": "max",
+    "request": {
+      "ms": 12.852750000000015,
+      "sqlCount": 15,
+      "traceId": "2e4ffb1c98965d2ae63b6cebf282903b",
+      "total": 1000,
+      "records": 20
+    },
+    "sqlSumMs": 8.01904,
+    "mapperCounts": {
+      "com.auraboot.framework.user.mapper.UserMapper.selectList": 3,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery": 1,
+      "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId": 1,
+      "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode": 1,
+      "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies": 1,
+      "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode": 1,
+      "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery": 1,
+      "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage": 1,
+      "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid": 1,
+      "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail": 1,
+      "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId": 1,
+      "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey": 1
+    },
+    "spans": [
+      {
+        "service": "auraboot-platform",
+        "name": "permission-check",
+        "id": "3646779d6499feaf",
+        "parent": "6f81c01370627370",
+        "ms": 0.016792,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "20d843b651340668",
+        "parent": "d2a3608512d2a98a",
+        "ms": 0.264875,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "f13afeb56c28dc56",
+        "parent": "6f81c01370627370",
+        "ms": 0.247666,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCodeForTenant"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "c77fcc34a2269725",
+        "parent": "9cd670eb84ca4172",
+        "ms": 0.488625,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "e08ed0d7e5f04337",
+        "parent": "9cd670eb84ca4172",
+        "ms": 0.211458,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.UserDataDomainMapper.findDomainIdsByUserId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "4801be1c6a18afcc",
+        "parent": "6f81c01370627370",
+        "ms": 0.2565,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.MetaModelMapper.findCurrentByCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "14c6fe852ebd9b93",
+        "parent": "9cd670eb84ca4172",
+        "ms": 0.390292,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.findEffectivePolicies"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "http get /api/dynamic/{pageKey}/list",
+        "id": "08ebadc7b66f8d78",
+        "parent": null,
+        "ms": 11.318083,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "authorize request",
+        "id": "ff2b453a674d46cc",
+        "parent": "d2a3608512d2a98a",
+        "ms": 0.019792,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain after",
+        "id": "9b545b5458a7eb80",
+        "parent": "08ebadc7b66f8d78",
+        "ms": 1.04925,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "ae13658c2e60f7ad",
+        "parent": "d2a3608512d2a98a",
+        "ms": 0.279458,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "261a861a7eac5642",
+        "parent": "d2a3608512d2a98a",
+        "ms": 1.988292,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.selectList"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "4a822df140737652",
+        "parent": "6f81c01370627370",
+        "ms": 0.265292,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.environment.dao.mapper.EnvironmentMapper.findByTenantAndCode"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "b5f86da333e2eb9a",
+        "parent": "9cd670eb84ca4172",
+        "ms": 1.909041,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "fd14b6ad92e34683",
+        "parent": "6f81c01370627370",
+        "ms": 0.321166,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.contribution.mapper.PageSchemaContributionMapper.findActiveForPage"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "secured request",
+        "id": "6f81c01370627370",
+        "parent": "08ebadc7b66f8d78",
+        "ms": 6.350458,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "757774c2d379dff1",
+        "parent": "d2a3608512d2a98a",
+        "ms": 0.259209,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.auth.mapper.UserSessionMapper.findByPid"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "dynamic-data-list",
+        "id": "9cd670eb84ca4172",
+        "parent": "6f81c01370627370",
+        "ms": 3.34025,
+        "attributes": {}
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "0c7ea8154da239ff",
+        "parent": "d2a3608512d2a98a",
+        "ms": 0.334417,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.user.mapper.UserMapper.findByNormalizedEmail"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "b00ab0eaf3be9287",
+        "parent": "d2a3608512d2a98a",
+        "ms": 0.257166,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.rbac.mapper.UserRoleMapper.findByMemberIdAndTenantId"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "mybatis -s-e-l-e-c-t",
+        "id": "cd25855dc265cf66",
+        "parent": "6f81c01370627370",
+        "ms": 0.545583,
+        "attributes": {
+          "db.operation": "SELECT",
+          "db.system": "postgresql",
+          "mybatis.mapper": "com.auraboot.framework.meta.mapper.PageSchemaMapper.selectByPageKey"
+        }
+      },
+      {
+        "service": "auraboot-platform",
+        "name": "security filterchain before",
+        "id": "d2a3608512d2a98a",
+        "parent": "08ebadc7b66f8d78",
+        "ms": 3.721417,
+        "attributes": {}
+      }
+    ]
+  }
+]

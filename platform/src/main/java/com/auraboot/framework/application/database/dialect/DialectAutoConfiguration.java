@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Auto-configures the correct {@link DatabaseDialect} bean based on:
  * <ol>
- *   <li>Explicit config: {@code aura.database.dialect=postgresql|mysql}</li>
+ *   <li>Explicit config: {@code aura.database.dialect=postgresql}</li>
  *   <li>Auto-detection from {@code spring.datasource.url}</li>
  * </ol>
  */
@@ -30,7 +30,6 @@ public class DialectAutoConfiguration {
         log.info("Database dialect resolved: {}", type);
 
         return switch (type) {
-            case MYSQL -> new MySqlDialect();
             case POSTGRESQL -> new PostgresDialect();
         };
     }
@@ -39,26 +38,22 @@ public class DialectAutoConfiguration {
         // 1. Explicit configuration takes precedence
         if (explicitDialect != null && !explicitDialect.isBlank()) {
             return switch (explicitDialect.trim().toLowerCase()) {
-                case "mysql" -> DatabaseType.MYSQL;
                 case "postgresql", "postgres", "pg" -> DatabaseType.POSTGRESQL;
                 default -> throw new IllegalArgumentException(
                         "Unsupported dialect: " + explicitDialect
-                                + ". Supported values: postgresql, mysql");
+                                + ". Supported values: postgresql");
             };
         }
 
         // 2. Auto-detect from datasource URL
         if (datasourceUrl != null && !datasourceUrl.isBlank()) {
             String lower = datasourceUrl.toLowerCase();
-            if (lower.startsWith("jdbc:mysql:") || lower.contains(":mysql:")) {
-                return DatabaseType.MYSQL;
-            }
             if (lower.startsWith("jdbc:postgresql:") || lower.contains(":postgresql:")) {
                 return DatabaseType.POSTGRESQL;
             }
         }
 
-        // 3. Default to PostgreSQL (current production database)
+        // 3. Default to PostgreSQL (the platform database)
         log.warn("Cannot detect database type from URL '{}', defaulting to PostgreSQL", datasourceUrl);
         return DatabaseType.POSTGRESQL;
     }

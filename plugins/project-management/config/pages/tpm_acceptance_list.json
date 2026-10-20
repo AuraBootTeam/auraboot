@@ -1,0 +1,212 @@
+{
+  "pageKey": "tpm_acceptance_list",
+  "name:zh-CN": "交付验收",
+  "name:en": "Delivery acceptance",
+  "modelCode": "tpm_acceptance",
+  "kind": "list",
+  "schemaVersion": 4,
+  "title": {
+    "zh-CN": "交付验收",
+    "en": "Delivery acceptance"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "tpm_pj_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "action": "create",
+          "primary": true,
+          "permissionCode": "tpm.acceptance.manage",
+          "label": {
+            "zh-CN": "新建验收",
+            "en": "New acceptance"
+          }
+        }
+      ],
+      "area": "toolbar"
+    },
+    {
+      "id": "tpm_pj_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          },
+          "filter": null
+        },
+        {
+          "key": "draft",
+          "label": {
+            "zh-CN": "草稿",
+            "en": "Draft"
+          },
+          "filter": {
+            "field": "tpm_ac_status",
+            "operator": "EQ",
+            "value": "draft"
+          }
+        },
+        {
+          "key": "submitted",
+          "label": {
+            "zh-CN": "审批中",
+            "en": "In review"
+          },
+          "filter": {
+            "field": "tpm_ac_status",
+            "operator": "EQ",
+            "value": "submitted"
+          }
+        },
+        {
+          "key": "returned",
+          "label": {
+            "zh-CN": "待补正",
+            "en": "Needs revision"
+          },
+          "filter": {
+            "field": "tpm_ac_status",
+            "operator": "EQ",
+            "value": "returned"
+          }
+        },
+        {
+          "key": "accepted",
+          "label": {
+            "zh-CN": "已通过",
+            "en": "Accepted"
+          },
+          "filter": {
+            "field": "tpm_ac_status",
+            "operator": "EQ",
+            "value": "accepted"
+          }
+        }
+      ],
+      "area": "list-tabs",
+      "showCounts": true
+    },
+    {
+      "id": "tpm_pj_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "tpm_ac_code",
+          "width": 180,
+          "sortable": true
+        },
+        {
+          "field": "tpm_ac_name",
+          "width": 280,
+          "sortable": true
+        },
+        {
+          "field": "tpm_ac_project",
+          "width": 220,
+          "sortable": true
+        },
+        {
+          "field": "tpm_ac_status",
+          "width": 120,
+          "sortable": true,
+          "dictCode": "tpm_acceptance_status",
+          "presentation": {
+            "kind": "badge"
+          }
+        },
+        {
+          "field": "tpm_ac_risk",
+          "width": 120,
+          "sortable": true,
+          "dictCode": "tpm_acceptance_risk",
+          "presentation": {
+            "kind": "badge"
+          }
+        },
+        {
+          "field": "tpm_ac_amount",
+          "width": 140,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "action": "detail",
+              "navigateTo": "tpm_acceptance_detail",
+              "label": {
+                "zh-CN": "查看",
+                "en": "View"
+              }
+            },
+            {
+              "code": "edit",
+              "action": "edit",
+              "navigateTo": "tpm_acceptance_form",
+              "permissionCode": "tpm.acceptance.manage",
+              "label": {
+                "zh-CN": "编辑",
+                "en": "Edit"
+              }
+            }
+          ],
+          "label": {
+            "zh-CN": "操作",
+            "en": "Actions"
+          }
+        }
+      ],
+      "searchFields": [
+        "tpm_ac_name",
+        "tpm_ac_code"
+      ],
+      "defaultSort": {
+        "field": "tpm_ac_code",
+        "order": "desc"
+      },
+      "area": "main",
+      "searchPlaceholder": {
+        "zh-CN": "搜索验收名称或编号",
+        "en": "Search acceptance name or number"
+      },
+      "empty": {
+        "title": {
+          "zh-CN": "还没有交付验收",
+          "en": "No acceptance records yet"
+        },
+        "description": {
+          "zh-CN": "为项目新建验收，准备材料后提交审批。",
+          "en": "Create an acceptance record and submit delivery evidence for review."
+        }
+      }
+    }
+  ],
+  "description": "Review delivery evidence, approval progress and outcomes.",
+  "extension": {
+    "hideQuickFilters": true,
+    "hideRowHeight": true,
+    "presentation": "workspace",
+    "workspaceLabel": {
+      "zh-CN": "项目协作",
+      "en": "Project collaboration"
+    },
+    "pageDescription": {
+      "zh-CN": "材料、风险、审批与处理结果，在同一张验收单上追踪。",
+      "en": "Track evidence, risk, approval and outcomes in one acceptance record."
+    },
+    "hideSavedViews": true,
+    "hideViewAnalysis": true,
+    "hideFilterChips": true,
+    "rowHeight": "tall"
+  }
+}

@@ -43,6 +43,43 @@ class PluginRequestMappingHandlerMappingTest {
         List<HandlerInterceptor> interceptors = chain.getInterceptorList();
         assertThat(interceptors).containsSubsequence(environment, authoring, permission);
         assertThat(interceptors).doesNotContain(admin);
+        var unrelated = org.springframework.web.servlet.mvc.method.RequestMappingInfo
+                .paths("/unrelated/{pid}").methods(org.springframework.web.bind.annotation.RequestMethod.GET)
+                .options(mapping.getBuilderConfiguration()).build();
+        var counted = new MethodCountingRequest("GET", "/api/plugin/secured");
+        ServletRequestPathUtils.parseAndCache(counted);
+        counted.methodReads = 0;
+        Object unrelatedMatch = org.springframework.test.util.ReflectionTestUtils.invokeMethod(mapping,
+                "getMatchingMapping", unrelated, counted);
+        assertThat(unrelatedMatch).isNull();
+        assertThat(counted.methodReads).as("Unrelated routes must be pruned before inspecting request methods").isZero();
+
+        var baseline = new org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping();
+        var constrained = org.springframework.web.servlet.mvc.method.RequestMappingInfo
+                .paths("/api/plugin/{pid}").methods(org.springframework.web.bind.annotation.RequestMethod.GET)
+                .params("mode=read").headers("X-Contract=1")
+                .options(mapping.getBuilderConfiguration()).build();
+        for (String method : List.of("GET", "POST", "OPTIONS")) {
+            for (String path : List.of("/api/plugin/secured", "/other/secured")) {
+                for (boolean parameter : List.of(false, true)) {
+                    for (boolean header : List.of(false, true)) {
+                        var candidate = new MockHttpServletRequest(method, path);
+                        if (parameter) candidate.setParameter("mode", "read");
+                        if (header) candidate.addHeader("X-Contract", "1");
+                        if ("OPTIONS".equals(method)) {
+                            candidate.addHeader("Origin", "https://example.test");
+                            candidate.addHeader("Access-Control-Request-Method", "GET");
+                        }
+                        ServletRequestPathUtils.parseAndCache(candidate);
+                        Object expected = org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                                baseline, "getMatchingMapping", constrained, candidate);
+                        Object actual = org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                                mapping, "getMatchingMapping", constrained, candidate);
+                        assertThat(actual != null).isEqualTo(expected != null);
+                    }
+                }
+            }
+        }
     }
 
     @Test
@@ -75,6 +112,12 @@ class PluginRequestMappingHandlerMappingTest {
         public String secured() {
             return "ok";
         }
+    }
+
+    private static final class MethodCountingRequest extends MockHttpServletRequest {
+        int methodReads;
+        MethodCountingRequest(String method, String path) { super(method, path); }
+        @Override public String getMethod() { methodReads++; return super.getMethod(); }
     }
 
     @RestController

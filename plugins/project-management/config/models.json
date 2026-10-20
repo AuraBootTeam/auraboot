@@ -10,7 +10,13 @@
     "domain_category": "project",
     "data_sensitivity": "internal",
     "lifecycle_description": "PLANNING → active → ON_HOLD (↔ active) → completed; also PLANNING/active → cancelled",
-    "extension": { "icon": "Briefcase", "category": "project-management", "titleField": "tpm_pj_name", "subtitleField": "tpm_pj_code" }
+    "extension": {
+      "icon": "Briefcase",
+      "category": "project-management",
+      "titleField": "tpm_pj_name",
+      "subtitleField": "tpm_pj_code",
+      "activityTimelineEnabled": true
+    }
   },
   {
     "code": "tpm_task",
@@ -23,7 +29,12 @@
     "domain_category": "project",
     "data_sensitivity": "internal",
     "lifecycle_description": "TODO → in_progress → in_review → DONE",
-    "extension": { "icon": "CheckSquare", "category": "project-management", "titleField": "tpm_ts_title", "subtitleField": "tpm_ts_code" }
+    "extension": {
+      "icon": "CheckSquare",
+      "category": "project-management",
+      "titleField": "tpm_ts_title",
+      "subtitleField": "tpm_ts_code"
+    }
   },
   {
     "code": "tpm_milestone",
@@ -36,6 +47,42 @@
     "domain_category": "project",
     "data_sensitivity": "internal",
     "lifecycle_description": "pending → REACHED / MISSED",
-    "extension": { "icon": "Flag", "category": "project-management", "titleField": "tpm_ms_name", "subtitleField": "tpm_ms_code" }
+    "extension": {
+      "icon": "Flag",
+      "category": "project-management",
+      "titleField": "tpm_ms_name",
+      "subtitleField": "tpm_ms_code",
+      "activityTimelineEnabled": true
+    }
+  },
+  {
+    "code": "tpm_customer",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Customer",
+    "description": "Customer reference for project delivery.",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "domain_category": "project",
+    "data_sensitivity": "internal",
+    "extension": {
+      "titleField": "tpm_cu_name",
+      "icon": "Building",
+      "category": "project-management"
+    }
+  },
+  {
+    "code": "tpm_acceptance",
+    "displayName:zh-CN": "交付验收",
+    "displayName:en": "Delivery acceptance",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "description": "Delivery acceptance with governed approval and SLA.",
+    "extension": {
+      "titleField": "tpm_ac_name",
+      "subtitleField": "tpm_ac_code",
+      "icon": "ClipboardCheck",
+      "category": "project-management",
+      "activityTimelineEnabled": true
+    }
   }
 ]

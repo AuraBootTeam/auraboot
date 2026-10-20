@@ -100,6 +100,62 @@ class DefinitionShadowComparisonServiceTest {
         assertTrue(report.differences().isEmpty());
     }
 
+    private static final String OLD_RELEASE = "01K60000000000000000000009";
+
+    private ApplicationDefinitionResolver.ReleaseDefinitions activeSource() {
+        var target = resolver.publishedStableRelease("aura-edu");
+        var selection = target.release();
+        var source = new ApplicationDefinitionResolver.ReleaseDefinitions(
+                new ApplicationDefinitionResolver.ReleaseSelection(selection.applicationId(), selection.applicationCode(),
+                        OLD_RELEASE, "sha256:" + "d".repeat(64), selection.sourceLockIdentity(), "active", 1L),
+                target.components());
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        return target;
+    }
+
+    @Test
+    void admitsSharedDefinitionUpgradeWithoutInventingTenantImportRows() {
+        var target = activeSource();
+        when(definitions.findTenantPlugin(42L, "com.auraboot.edu")).thenReturn(null);
+        var admission = comparison.admitActiveUpgrade(42, "aura-edu", OLD_RELEASE,
+                target.release().releaseId(), target.release().releaseDigest());
+        assertEquals(OLD_RELEASE, admission.sourceReleaseId());
+        assertEquals(1, admission.comparedResources());
+        org.mockito.Mockito.verify(definitions, org.mockito.Mockito.never())
+                .findComparableResources(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void requiresExactTenantLocalDefinitionsWhenLegacyImportsExist() {
+        var target = activeSource();
+        when(definitions.findComparableResources(42L, plugin.getPid())).thenReturn(List.of(resource(true)));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> comparison.admitActiveUpgrade(42, "aura-edu", OLD_RELEASE,
+                        target.release().releaseId(), target.release().releaseDigest()));
+        when(definitions.findComparableResources(42L, plugin.getPid())).thenReturn(List.of(resource(false)));
+        assertEquals(1, comparison.admitActiveUpgrade(42, "aura-edu", OLD_RELEASE,
+                target.release().releaseId(), target.release().releaseDigest()).comparedResources());
+    }
+
+    @Test
+    void rejectsWrongTargetDigestAndRemovalOfAnOwnedPlugin() {
+        var target = activeSource();
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> comparison.admitActiveUpgrade(42, "aura-edu", OLD_RELEASE,
+                        target.release().releaseId(), "sha256:" + "0".repeat(64)));
+        var source = resolver.boundRelease(42, "aura-edu");
+        var removed = objectMapper.convertValue(source.components().getFirst().manifest(),
+                com.auraboot.framework.plugin.dto.imports.PluginManifestExtended.class);
+        removed.setPluginId("com.auraboot.removed");
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(
+                new ApplicationDefinitionResolver.ReleaseDefinitions(source.release(), List.of(
+                        new ApplicationDefinitionResolver.ComponentDefinitions("removed", "1.2.3",
+                                "sha256:" + "c".repeat(64), removed))));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> comparison.admitActiveUpgrade(42, "aura-edu", OLD_RELEASE,
+                        target.release().releaseId(), target.release().releaseDigest()));
+    }
+
     private PluginResource resource(boolean modified) {
         return PluginResource.builder()
                 .pluginPid(plugin.getPid())

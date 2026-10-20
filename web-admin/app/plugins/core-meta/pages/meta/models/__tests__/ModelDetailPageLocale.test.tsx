@@ -7,7 +7,7 @@ import messages from '../modelDetail.i18n.json';
 
 // The locale contract under test: every chrome string on the model detail page
 // must come from the modelDetail catalog via useI18n().locale, while user data
-// (model displayName, codes, raw enum values like `draft`) keeps its source values.
+// (model displayName, codes and version notes) keeps its source values.
 const language = vi.hoisted(() => ({ locale: 'zh-CN' }));
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
@@ -73,6 +73,10 @@ const showSuccessToast = vi.hoisted(() => vi.fn());
 const showErrorToast = vi.hoisted(() => vi.fn());
 
 vi.mock('~/utils/confirmDialog', () => ({ confirmDialog }));
+// Positive page-state rendering fixture; real permissions are exercised by the browser journey.
+vi.mock('~/ui/PermissionGuard', () => ({
+  PermissionGuard: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showSuccessToast, showErrorToast }),
 }));
@@ -122,6 +126,27 @@ describe('ModelDetailPage locale contracts', () => {
 
   afterEach(() => {
     language.locale = 'zh-CN';
+    loaderData.pages.length = 0;
+  });
+
+  it('offers CRUD generation when published pages are only unconfigured placeholders', () => {
+    loaderData.pages.push(...['list', 'form', 'detail'].map((kind) => ({
+      pid: `placeholder-${kind}`, pageKey: `leave_request_${kind}`, modelCode: 'leave_request',
+      kind, extension: { auto_created: true },
+    } as never)));
+    renderPage();
+    expect(screen.getByTestId('model-primary-page-action')).toHaveTextContent('生成基础 CRUD');
+    expect(screen.queryByTestId('model-primary-page-preview')).not.toBeInTheDocument();
+  });
+
+  it('offers the configured page designer and preview after placeholder upgrade', () => {
+    loaderData.pages.push({
+      pid: 'configured-list', pageKey: 'leave_request_list', modelCode: 'leave_request',
+      kind: 'list', extension: {},
+    } as never);
+    renderPage();
+    expect(screen.getByTestId('model-primary-page-action')).toHaveTextContent('打开页面设计');
+    expect(screen.getByTestId('model-primary-page-preview')).toBeVisible();
   });
 
   it('keeps the default zh-CN chrome byte-identical to the previous literals', () => {
@@ -129,7 +154,7 @@ describe('ModelDetailPage locale contracts', () => {
     renderPage();
 
     // Header status + meta
-    expect(screen.getByText('草稿')).toBeInTheDocument();
+    expect(screen.getAllByText('草稿')).toHaveLength(2);
     expect(screen.getByText('模型编码:', { exact: false })).toBeInTheDocument();
     // Stat cards
     expect(screen.getByText('字段')).toBeInTheDocument();
@@ -185,16 +210,16 @@ describe('ModelDetailPage locale contracts', () => {
     expect(screen.getByText('创建人')).toBeInTheDocument();
   });
 
-  it('keeps the versions tab zh-CN chrome byte-identical and renders raw enum values', () => {
+  it('localizes version status labels while preserving version notes', () => {
     language.locale = 'zh-CN';
     renderPage();
     fireEvent.click(screen.getByText('版本 (2)'));
 
     expect(screen.getByText('版本 3')).toBeInTheDocument();
     expect(screen.getByText('当前版本')).toBeInTheDocument();
-    // Raw version.status enum values stay untranslated.
-    expect(screen.getByText('draft')).toBeInTheDocument();
-    expect(screen.getByText('published')).toBeInTheDocument();
+    // Version status is UI chrome; user-authored notes remain unchanged.
+    expect(screen.getByText('版本 3').parentElement).toHaveTextContent('草稿');
+    expect(screen.getByText('版本 2').parentElement).toHaveTextContent('已发布');
     expect(screen.getByText('无说明')).toBeInTheDocument();
     expect(screen.getByText('init')).toBeInTheDocument();
     expect(screen.getAllByText('查看')).toHaveLength(2);
@@ -226,7 +251,7 @@ describe('ModelDetailPage locale contracts', () => {
     language.locale = locale;
     renderPage();
 
-    expect(screen.getByText('Draft')).toBeInTheDocument();
+    expect(screen.getAllByText('Draft')).toHaveLength(2);
     expect(screen.getByText('Model code:', { exact: false })).toBeInTheDocument();
     expect(screen.getByTestId('model-primary-page-action')).toHaveTextContent('Generate basic CRUD');
     expect(screen.getByText('Edit model')).toBeInTheDocument();

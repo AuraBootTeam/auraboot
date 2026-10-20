@@ -86,3 +86,16 @@ describe('resolveCommandErrorMessage concurrency guidance', () => {
       .toBe('This record was updated by someone else. Refresh to review the latest data before saving.');
   });
 });
+
+describe('workflow configuration feedback', () => {
+  it('explains missing engine variables without exposing transport errors', () => {
+    const body={context:{detail:"Command execution failed: unable to resolve token: unable to resolve variable 'route'"}};
+    expect(resolveCommandErrorMessage(body,'any:submit',undefined,'zh-CN')).toContain('规则输出与流程变量映射');
+    expect(resolveCommandErrorMessage(body,'any:submit',undefined,'en-US')).toContain('Required workflow data is missing');
+  });
+  it('explains a rejected transaction and gives a recovery step', () => {
+    const body={message:'Transaction rolled back because it has been marked as rollback-only'};
+    expect(resolveCommandErrorMessage(body,'any:submit',undefined,'zh-CN')).toContain('数据已回滚');
+    expect(resolveCommandErrorMessage(body,'any:submit',undefined,'en-US')).toContain('rolled back');
+  });
+});

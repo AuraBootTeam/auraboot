@@ -9,6 +9,8 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { BASE_URL } from '../../helpers/environments';
+import { ensureSidebarExpanded, navigateToMenuByClick, findRowInPaginatedList } from '../helpers';
 import { createModelData } from '../../model-system/helpers/test-data';
 import { DynamicFormPage } from '../../pages';
 
@@ -215,56 +217,50 @@ test.describe('Model CRUD Operations', () => {
    * M-005: Model version management
    * Verify that publishing creates new version
    */
-  test('M-005: Model version management', async ({ page, api }) => {
-    const modelData = createModelData({ modelType: 'entity' });
+  for (const locale of ['zh-CN', 'en-US'] as const) {
+    test(`M-005: Model version management ${locale}`, async ({ page, context, api }, info) => {
+      test.setTimeout(90_000);
+      await context.addCookies([{ name: 'locale', value: locale, url: BASE_URL }]);
+      const modelData = createModelData({ modelType: 'entity' });
+      const created = await api.createModel(modelData);
+      expect(api.isSuccess(created)).toBe(true);
+      expect(created.data?.version).toBe(1);
+      const model = created.data!;
+      const published = await api.publishModel(model.pid);
+      expect(api.isSuccess(published)).toBe(true);
+      expect(published.data?.status).toBe('published');
+      const history = await api.getModelVersionHistory(model.code);
+      expect(api.isSuccess(history)).toBe(true);
+      expect(history.data).toEqual(expect.arrayContaining([expect.objectContaining({ version: 1, status: 'published' })]));
 
-    // Create model
-    const createResponse = await api.createModel(modelData);
-    expect(api.isSuccess(createResponse)).toBe(true);
-
-    const modelPid = createResponse.data!.pid;
-    const modelCode = createResponse.data!.code;
-
-    // Initial version should be 1
-    expect(createResponse.data!.version).toBe(1);
-    expect(createResponse.data!.isCurrent).toBe(true);
-
-    // Try to publish (may fail if no fields)
-    const publishResponse = await api.publishModel(modelPid, 'Version 1 - Initial');
-
-    if (api.isSuccess(publishResponse)) {
-      // Update the model
-      await api.updateModel(modelPid, {
-        displayName: 'Updated Model Name',
-        description: 'Updated description',
-      });
-
-      // Check version history
-      const historyResponse = await api.getModelVersionHistory(modelCode);
-      expect(api.isSuccess(historyResponse)).toBe(true);
-
-      if (historyResponse.data && historyResponse.data.length > 0) {
-        const versions = historyResponse.data.map((v: { version: number }) => v.version);
-        expect(versions).toContain(1);
-      }
-    }
-
-    // Verify in UI
-    await page.goto(`/meta/models/${modelPid}`);
-    await page.waitForLoadState('domcontentloaded');
-
-    // Look for version indicator — use force click to bypass nav overlay
-    const versionTab = page.locator('button:has-text("版本"), a:has-text("版本")');
-    if (
-      await versionTab
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false)
-    ) {
-      await versionTab.first().click({ force: true });
-      await page.waitForLoadState('domcontentloaded');
-    }
-  });
+      await page.goto('/home');
+      await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+      await ensureSidebarExpanded(page);
+      await navigateToMenuByClick(page, locale === 'zh-CN' ? ['元数据管理', '模型管理'] : ['Metadata Management', 'Model Management']);
+      const row = await findRowInPaginatedList(page, modelData.displayName, 15_000);
+      await row.getByRole('link', { name: model.code, exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`/meta/models/${model.pid}(?:[?#]|$)`));
+      await expect(page.getByRole('heading', { level: 1, name: modelData.displayName })).toBeVisible();
+      await expect(page.getByTestId('model-edit-action')).toHaveText(locale === 'zh-CN' ? '编辑模型' : 'Edit model');
+      await expect(page.getByTestId('model-more-actions')).toHaveText(locale === 'zh-CN' ? '更多' : 'More');
+      await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath(`m-001-detail-${locale}.png`), fullPage: true });
+      await page.getByTestId('model-more-actions').click();
+      await expect(page.getByRole('button', { name: locale === 'zh-CN' ? '取消发布' : 'Unpublish', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: locale === 'zh-CN' ? '刷新缓存' : 'Refresh cache', exact: true })).toBeVisible();
+      await page.screenshot({ path: info.outputPath(`m-001-more-${locale}.png`), fullPage: true });
+      await page.getByTestId('model-more-actions').click();
+      await page.getByRole('button', { name: locale === 'zh-CN' ? `版本 (${history.data!.length})` : `Versions (${history.data!.length})`, exact: true }).click();
+      const version = page.getByRole('heading', { level: 3, name: locale === 'zh-CN' ? '版本 1' : 'Version 1', exact: true });
+      await expect(version).toBeVisible();
+      await expect(version.locator('..')).toContainText(locale === 'zh-CN' ? '已发布' : 'Published');
+      await expect(page.getByText(locale === 'zh-CN' ? '无说明' : 'No notes', { exact: true })).toBeVisible();
+      await expect(page.getByTestId('model-version-view-1')).toBeEnabled();
+      await page.screenshot({ path: info.outputPath(`m-005-${locale}.png`), fullPage: true });
+      await page.reload();
+      await expect(page.getByText(locale === 'zh-CN' ? '无说明' : 'No notes', { exact: true })).toBeVisible();
+    });
+  }
 
   /**
    * M-006: Model rollback

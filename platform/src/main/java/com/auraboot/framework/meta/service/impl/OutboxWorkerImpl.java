@@ -39,6 +39,7 @@ import java.util.UUID;
 public class OutboxWorkerImpl {
 
     private static final int BATCH_SIZE = 50;
+    private static final int MAX_BATCHES_PER_POLL = 8;
     private static final Duration LEASE_DURATION = Duration.ofSeconds(30);
     private static final Duration CLEANUP_RETENTION = Duration.ofDays(7);
     private static final IntegrationBackoffPolicy BACKOFF =
@@ -60,6 +61,13 @@ public class OutboxWorkerImpl {
      * Scheduled via DatabaseSchedulerEngine (sys-outbox-poll, interval 5s).
      */
     public void pollAndDispatch() {
+        // Bound scheduler work; each batch retains its own original lease fence.
+        for (int batch = 0; batch < MAX_BATCHES_PER_POLL; batch++) {
+            if (dispatchReadyBatch() < BATCH_SIZE) return;
+        }
+    }
+
+    private int dispatchReadyBatch() {
         String leaseToken = UUID.randomUUID().toString();
         // Scope only the worker's own outbox-plane reads/writes; the consumer
         // dispatch below must keep running exactly as today (unscoped), so
@@ -69,7 +77,7 @@ public class OutboxWorkerImpl {
                 () -> outboxEventMapper.claimReadyEvents(
                         BATCH_SIZE, LEASE_OWNER, leaseToken, Instant.now().plus(LEASE_DURATION)));
         if (events.isEmpty()) {
-            return;
+            return 0;
         }
 
         log.debug("Outbox worker found {} events ready for dispatch", events.size());
@@ -101,6 +109,7 @@ public class OutboxWorkerImpl {
                 }
             }
         }
+        return events.size();
     }
 
     private void dispatchReliable(OutboxEvent event, String leaseToken) {
@@ -122,8 +131,11 @@ public class OutboxWorkerImpl {
 
     private IntegrationEventEnvelope toEnvelope(OutboxEvent event) {
         try {
-            Map<String, Object> payload = objectMapper.readValue(
-                    event.getPayload(), new TypeReference<Map<String, Object>>() {});
+            var reader = objectMapper.readerFor(new TypeReference<Map<String, Object>>() {});
+            if (event.getEventType().startsWith("open.resource.")) {
+                reader = reader.with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+            }
+            Map<String, Object> payload = reader.readValue(event.getPayload());
             Map<String, String> headers = event.getHeaders() == null
                     ? Map.of()
                     : objectMapper.readValue(event.getHeaders(), new TypeReference<Map<String, String>>() {});

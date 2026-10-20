@@ -19,7 +19,19 @@
 - **One-off migrations** (`migrate-*`, `*-split`, casing/backfill scripts) are **removed once the migration lands** — git history keeps them (`git log --all --full-history -- scripts/<name>`).
 - Before adding a script, check the tables below for an existing one to extend.
 
-## gate (43)
+### Owned OSS frontend restarts
+
+`oss-golden-stack.sh up` and retained `resume` launch a stable registered Node
+supervisor around the existing frontend command. Its inherited Node preload
+registers each actual Web/BFF entrypoint before it can listen, including children
+restarted by concurrently. pnpm/tsx helper processes never replace listener records.
+Registration requires the current supervisor generation, complete owned ancestry,
+the source cwd and runtime token; a still-live previous listener is not overwritten.
+Use Workspace `runtime suspend` / `runtime resume` for whole-stack lifecycle.
+Direct supervisor termination stops only its authenticated frontend tree and
+prevents further child restarts; runtime databases and evidence remain retained.
+
+## gate (44)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -33,6 +45,7 @@
 | `check-command-reachability.mjs` | 4 | 2026-07-23 | Gate: a declared command must have a way for a user to reach it. |
 | `check-command-reachability.sh` | 0 | 2026-07-23 | Pre-push gate: every declared command needs a UI entry point. |
 | `check-controller-authz.mjs` | 0 | 2026-07-15 | check-controller-authz.mjs — regression guard for the deep-review fail-open finding |
+| `check-controller-authz.sh` | 0 | 2026-10-15 | Pre-push controller-authz fail-open gate (wraps check-controller-authz.mjs; replaces the disabled GitHub Actions workflow). |
 | `check-airflow-provider-coverage.sh` | 0 | 2026-10-02 | Run hermetic provider tests and enforce 90% line and branch coverage per source file. |
 | `check-coverage-manifest-freshness.mjs` | 2 | 2026-07-23 | Gate: the committed coverage manifest must still describe reality. |
 | `check-cs-widget-bundle.mjs` | 0 | 2026-07-14 | The widget bundle served to customers is a build artifact that lives on the Java classpath, so |
@@ -44,7 +57,7 @@
 | `check-docs.sh` | 2 | 2026-07-02 | Documentation quality gate. |
 | `check-dsl-actions.mjs` | 3 | 2026-07-15 | check-dsl-actions.mjs — a workbench button may only ask for an action the runtime runs. |
 | `check-dsl-command-convention.mjs` | 0 | 2026-06-19 | check-dsl-command-convention.mjs — regression gate for convention CRUD routing. |
-| `check-dsl-render-types.mjs` | 1 | 2026-07-17 | check-dsl-render-types.mjs — a DSL page may only ask for a renderer that exists. |
+| `check-dsl-render-types.mjs` | 1 | 2026-10-19 | Parse registry and table-column renderer capabilities using the pinned internal-api toolchain; `--self-test` verifies fixed fixtures. |
 | `check-dsl-status-colors.mjs` | 1 | 2026-07-13 | check-dsl-status-colors.mjs — DSL dict status color semantics gate. |
 | `check-e2e-assertions.mjs` | 1 | 2026-07-14 | check-e2e-assertions — an assertion that something is ABSENT must be able to fail. |
 | `check-e2e-spec-registration.mjs` | 3 | 2026-07-23 | Gate: no E2E spec may exist without being selectable by some project. |
@@ -83,6 +96,8 @@
 | `gates/fixtures/workspace-control.mjs` | 0 | 2026-10-05 | Hermetic workspace-control fixture for gate tests. |
 | `lib/golden-new-database.sh` | 0 | 2026-10-05 | Create an absent owned golden database without replacement. |
 | `lib/golden-process-stop.mjs` | 0 | 2026-10-05 | Stop only identity-attested owned golden processes. |
+| `lib/golden-frontend-supervisor.mjs` | 1 | 2026-10-18 | Keep a stable owned frontend parent across automatic listener restarts. |
+| `lib/golden-frontend-registration.mjs` | 1 | 2026-10-18 | Register each authenticated Web/BFF generation before its entrypoint can listen. |
 | `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |
 | `lib/golden-resume-state.mjs` | 0 | 2026-10-05 | Validate saved golden state before resume. |
 | `lib/golden-runtime-identity.sh` | 0 | 2026-10-05 | Register declared golden source roots in workspace control. |
@@ -158,6 +173,7 @@
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `lib/capability-eval-junit.mjs` | 1 | 2026-07-25 | Fail-closed JUnit receipt for the explicit digital-employee capability suite inventory. |
+| `dev/start-web-stack.sh` | 0 | 2026-10-16 | Launch the existing Web/BFF stack in explicitly selected development or production mode. |
 | `dev/lib/env-loader.sh` | 7 | 2026-05-22 | env-loader.sh — shell counterpart to web-admin/tests/helpers/environments.ts. |
 | `dev/lib/env-registry.mjs` | 4 | 2026-05-22 |  |
 | `dev/lib/health.sh` | 3 | 2026-05-22 | Sourceable health helpers for per-worktree dev stacks. |
@@ -243,7 +259,13 @@
 | `perf-ci/compare-baseline.sh` | 2 | 2026-03-26 | compare-baseline.sh — Compare k6 summary JSON files against a baseline. |
 | `perf-ci/notify.sh` | 1 | 2026-03-26 | notify.sh — Send performance regression result notifications. |
 | `perf-ci/run-perf-regression.sh` | 2 | 2026-05-11 | run-perf-regression.sh — Orchestrate performance regression checks. |
+| `performance/home-readiness.mjs` | 0 | 2026-10-16 | Install browser-side complete-home readiness and timing observations. |
+| `performance/measure-api.mjs` | 0 | 2026-10-16 | Measure authenticated API response times against an explicit performance target. |
+| `performance/measure-crud.mjs` | 0 | 2026-10-16 | Measure authenticated CRUD operations on the isolated performance fixture. |
+| `performance/measure-home.mjs` | 0 | 2026-10-16 | Measure browser home readiness and retain the native performance evidence. |
+| `performance/seed-api.mjs` | 0 | 2026-10-16 | Seed fixtures through the explicit performance API target. |
 | `publish-repos.sh` | 1 | 2026-04-15 |  |
+| `prepare-quickstart-env.py` | 2 | 2026-10-18 | Prepare missing persistent protocol signing material without printing or rotating existing keys. |
 | `quickstart.sh` | 8 | 2026-07-13 | quickstart.sh — turn a freshly-started AuraBoot stack into a usable one. |
 | `release/bump-version.sh` | 1 | 2026-06-18 | Bump the release version. Single source of truth = VERSION at repo root. |
 | `reset-db.sh` | 13 | 2026-06-18 | AuraBoot Database Reset Script |
@@ -257,6 +279,12 @@
 
 ## test (20)
 
+Quickstart signing-key regression: `node --test scripts/quickstart-signing-key.test.mjs scripts/quickstart-session.test.mjs` checks key transport and private generation; it does not replace the Docker Quickstart real-stack workflow.
+
+| script | purpose |
+|---|---|
+| `quickstart-signing-key.test.mjs` | Hermetic key transport, private generation, no overwrite and no shared default contracts. |
+
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
 
 ## Package distribution self-tests
@@ -269,6 +297,68 @@ receiver, requires an invalid-signature mutation to fail, and verifies restorati
 
 | script | refs | updated | purpose |
 |---|---|---|---|
-| `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Nine consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |
+| `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Fourteen consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |
+| `fixtures/open-platform-consumer/real-backend.mjs` | 1 | 2026-10-13 | Run the fixed thirteen real-backend SDK cases against the verified fresh installation; accept credentials only on private stdin. |
+| `ci/prepare-open-platform-sdk.sh` | 1 | 2026-10-13 | Fresh-build, pack and install the SDK outside the checkout; execute the original fourteen loopback consumers and type positive/expected-error fixture. Never publishes. |
 
 T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/path/to/aura --runtime OWNED_RUNTIME --database-url jdbc:postgresql://127.0.0.1:5432/OWNED_TEST_DB --database-user TEST_USER --out /absolute/fresh/evidence-directory`. The executor supplies owned dependency homes. The database must already be migrated; this runner never resets or migrates it. `TEST_DATABASE_PASSWORD` is inherited without being recorded. Test skips are reported explicitly; a coverage pass proves the fixed family line target, not execution of skipped scenarios. Gate self-tests: `node --test scripts/check-oss-remediation-t3.test.mjs`.
+
+## Runtime and release gate support (2026-10-10 reconciliation)
+
+| script | refs | updated | purpose |
+|---|---:|---|---|
+| `application/dynamic-publication-role-policy.mjs` | 0 | 2026-10-10 | Build the isolated operator role policy for dynamic model publication. |
+| `application/verify-release-registration-payload.mjs` | 0 | 2026-10-10 | Verify the release registration payload and its image copy. |
+| `ci/isolated-release-network.sh` | 0 | 2026-10-10 | Allocate an isolated release-image network and record its subnet. |
+| `ci/sample-open-platform-db.sh` | 0 | 2026-10-10 | Sample job-scoped database waits without exporting query text. |
+| `db/snapshot-schema-contract.mjs` | 0 | 2026-10-10 | Validate deparsed snapshot schema resource-type constraints. |
+| `dev/oss-disk-preflight.mjs` | 0 | 2026-10-10 | Check the filesystem space floor before verification allocation. |
+| `dev/oss-gate-catalog-results.mjs` | 0 | 2026-10-10 | Reconcile collected test identities with the fixed gate catalog. |
+| `dev/oss-gate-results.mjs` | 0 | 2026-10-10 | Reject missing, failed, skipped or retried browser gate results. |
+| `dev/oss-runtime-contract.mjs` | 0 | 2026-10-10 | Bind and validate the OSS runtime source and artifact contract. |
+| `lib/oss-stack-identity.mjs` | 0 | 2026-10-10 | Verify runtime artifacts and listener ownership for the OSS stack. |
+| `lib/oss-stack-lifecycle.mjs` | 0 | 2026-10-10 | Manage registered OSS source mappings and stack lifecycle. |
+| `lib/web-admin-lock-contract.mjs` | 0 | 2026-10-10 | Compare installed Web dependency locks with the frozen source lock. |
+| `oss-e2e-fixture-backend.sh` | 0 | 2026-10-10 | Launch the unchanged backend with separately hashed E2E fixture artifacts. |
+
+| `ci/prepare_openapi_verifier.sh` | 1 | 2026-10-14 | Bootstrap exact hashed dependencies for the isolated OpenAPI verifier. |
+| `ci/verify_openapi_artifacts.py` | 1 | 2026-10-14 | Validate actual generated OpenAPI structure, component schemas, payloads and formats with a fixed case receipt. |
+
+| `ci/collect-open-platform-jfr.sh` | 1 | 2026-10-15 | Collect request-correlated JFR evidence from the owned Open Platform release container without changing latency thresholds. |
+
+## Scenario performance entry points
+
+These local measurement helpers require an explicitly configured runtime and credentials; this index does not certify performance results.
+
+| script | purpose |
+|---|---|
+| `performance/measure-api.mjs` | Measure authenticated API latency with recorded source identity. |
+| `performance/measure-crud.mjs` | Measure create, update, detail and delete request latency on test records. |
+| `performance/measure-home.mjs` | Measure browser home-page loading in the configured environment. |
+| `performance/seed-api.mjs` | Prepare the explicitly selected local API measurement fixture. |
+
+## Runtime and performance helpers (2026-10-16)
+
+| script | category | purpose |
+|---|---|---|
+| `dev/start-web-stack.sh` | tooling | Start the governed development or production Web/BFF entrypoint. |
+| `performance/home-readiness.mjs` | tooling | Observe browser readiness marks for the home performance runner. |
+
+## Internal Web Admin API contracts
+
+| script | category | purpose |
+|---|---|---|
+| `internal-api/contract.mjs` | contract | Validate, normalize and select explicit internal OpenAPI operations without removing schema constraints. |
+| `internal-api/discover.mjs` | contract | Reconcile frontend network-call candidates with a captured runtime catalog; retain unresolved and unmigrated entries. |
+| `internal-api/type-origins.mjs` | contract | Associate bound inventory calls with actual compiler types and declaration origins; retain casts, unknowns and unresolved symbols without claiming wire compatibility. |
+| `internal-api/source-graph.mjs` | contract | Trace Web Admin entries, router resources, source aliases and workspace package exports; retain dynamic/data boundaries and unproven candidates. |
+| `internal-api/export.mjs` | contract | Export or compare the internal OpenAPI group and create a fresh source-bound export receipt. |
+| `internal-api/toolchain/generate.mjs` | codegen | Generate or check TypeScript declarations using the isolated, locked OpenAPI toolchain. |
+
+| `internal-api/browser-catalog.mjs` | contract | Reconcile independently enumerated spec tests, scene captures and JSON evidence declarations with the fixed catalog. |
+| `internal-api/browser-evidence.mjs` | contract | Validate source/runtime/report identity, mandatory observations and exact original-image review; retain functional and visual verdicts separately. |
+| `internal-api/browser.mjs` | contract | Run owned catalog journeys against a verified managed stack and collect fresh source-bound functional or reviewed evidence. |
+| `internal-api/foundation.mjs` | contract | Verify canonical spec, generated declarations and the exact registered offline unit denominator; emit a fresh source-bound consistency receipt. |
+| `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
+| `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |
+| `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |

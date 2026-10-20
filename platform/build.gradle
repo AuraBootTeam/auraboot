@@ -9,6 +9,22 @@ plugins {
     id 'io.qameta.allure' version '2.12.0'
 }
 
+// ========== Dependency locking (supply chain) ==========
+// Pin the resolved version of every external dependency per configuration
+// (gradle.lockfile next to each build.gradle, root + subprojects). Front-end is
+// already pinned via pnpm-lock.yaml; this closes the Gradle side. Project
+// dependencies (project(':platform-plugin-api')) are not locked by design.
+// MUST stay ahead of any eager configuration resolution in this script (the
+// Test -javaagent setup resolves :mockitoAgent during evaluation) — applying
+// locking to an already-resolved configuration fails the build.
+// After changing dependencies in build.gradle, regenerate:
+//   ./gradlew dependencies --write-locks
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+}
+
 // Publish plain jar (not fat boot jar) for downstream modules
 jar {
     enabled = true
@@ -343,6 +359,7 @@ dependencies {
     runtimeOnly project(':platform-storage-minio')
     runtimeOnly project(':platform-storage-s3')
     runtimeOnly project(':platform-storage-oss')
+    runtimeOnly project(':platform-storage-cos')
 
     // XXL-JOB scheduler engine is opt-in only (-PwithSchedulerXxl=true): xxl-job-core
     // is GPL-3.0 and must never enter the default distribution. See
@@ -453,6 +470,17 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Anchor the JUnit BOM as an explicit node: whether the BOM imported by
+    // spring-boot-dependencies materializes as a resolved node differs between
+    // resolution environments (macOS vs Linux CI), and dependency locking
+    // requires an identical node set everywhere. See CONTRIBUTING lock notes.
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    // Same anchoring for the test-runtime XML validation trio: their presence
+    // in the resolved graph is also environment-dependent, and the lockfile
+    // lists them for testRuntimeClasspath.
+    testRuntimeOnly 'jaxen:jaxen:2.0.6'
+    testRuntimeOnly 'net.java.dev.msv:xsdlib:2013.6.1'
+    testRuntimeOnly 'relaxngDatatype:relaxngDatatype:20020414'
 
     // Swagger/OpenAPI 3
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
@@ -491,18 +519,13 @@ dependencies {
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.13'
 
-    // TestContainers — ephemeral MySQL for connector SDK tests
+    // TestContainers — PostgreSQL only for integration tests. MySQL appears in
+    // the product solely as an external data source for the connector feature
+    // (deployer-supplied drivers); the platform itself depends on PostgreSQL.
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
-    testImplementation 'org.testcontainers:mysql'
-    // Testcontainers' MySQL integration tests need the JDBC driver; it remains
-    // test-only and is not added to the production runtime archive.
-    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
-    // MySQL container readiness uses MariaDB's compatible driver only in tests.
-    // Production JDBC drivers remain deployer-supplied; the Oracle driver stays excluded.
-    testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
@@ -511,6 +534,9 @@ dependencies {
     testImplementation 'org.apache.avro:avro:1.12.2'
 
     // JUnit 5 Platform
+    // Keep the declared platform aligned with the existing locked JUnit 5.12.2 graph.
+    // Otherwise Gradle rejects testCompileClasspath because the locked BOM is never requested.
+    testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'
     testImplementation 'org.junit.platform:junit-platform-launcher'
@@ -672,7 +698,24 @@ test {
     }
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
-    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    // Task-owned CI may use a smaller worker under its enforced container budget.
+    // Development defaults remain unchanged; malformed explicit limits fail configuration.
+    def testMemory = [auraTestMaxHeap: '6g', auraTestMinHeap: '2g']
+    testMemory.each { key, fallback ->
+        def value = project.hasProperty(key) ? project.property(key).toString() : fallback
+        if (!(value ==~ /[1-9][0-9]*[mMgG]/)) {
+            throw new GradleException("Invalid test memory limit: ${key}")
+        }
+        testMemory[key] = value
+    }
+    jvmArgs "-Xmx${testMemory.auraTestMaxHeap}", "-Xms${testMemory.auraTestMinHeap}", '-XX:+UseG1GC'
+    if (project.hasProperty('auraTestMaxMetaspace')) {
+        def metaspace = project.property('auraTestMaxMetaspace').toString()
+        if (!(metaspace ==~ /[1-9][0-9]*[mMgG]/)) {
+            throw new GradleException('Invalid test memory limit: auraTestMaxMetaspace')
+        }
+        jvmArgs "-XX:MaxMetaspaceSize=${metaspace}"
+    }
 
     // TestContainers: Docker Desktop 29+ requires API v1.44+. The api.version
     // property in src/test/resources/docker-java.properties pins docker-java
@@ -1261,4 +1304,18 @@ tasks.register('integrationTest', Test) {
 // Ensure IT compile errors surface during `./gradlew check`.
 tasks.named('check').configure {
     dependsOn 'compileIntegrationTestJava'
+}
+
+// Local enforcement of the controller-authz fail-open ratchet: any `check` run (test chains
+// included) fails when a NEW write/sensitive controller appears with no @RequirePermission /
+// @AuthenticatedAccess / @RequirePlatformAdmin. Deliberately wired outside GitHub Actions —
+// Actions stays disabled on this repository; this is the enforcement point.
+tasks.register('controllerAuthzCheck', Exec) {
+    group = 'verification'
+    description = 'Fails when a new un-annotated write/sensitive controller appears (scripts/check-controller-authz.mjs).'
+    workingDir = rootDir.parentFile
+    commandLine 'node', 'scripts/check-controller-authz.mjs'
+}
+tasks.named('check').configure {
+    dependsOn 'controllerAuthzCheck'
 }

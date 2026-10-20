@@ -2224,6 +2224,40 @@ describe('ReviewDrawerBlockRenderer', () => {
     window.localStorage.clear();
   });
 
+  it('renders row context evidence without a selected candidate or repeated status', () => {
+    const runtime = makeRuntime({
+      data: { matchEvidence: [] },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (key: string) => key,
+        form: {},
+        global: {},
+        state: {
+          selectedBomLine: { ...selectedLine, note: '描述16V；型号25V；双方未找到可用候选' },
+        },
+      }),
+    });
+    render(
+      <ReviewDrawerBlockRenderer
+        block={
+          {
+            ...reviewDrawerBlock,
+            candidates: {
+              dataSource: 'matchEvidence',
+              showDecisionStatus: false,
+              contextFields: [{ key: 'notice', label: '来源与确认', field: 'note' }],
+            },
+          } as BlockConfig
+        }
+        runtime={runtime}
+      />,
+    );
+    expect(screen.getByTestId('review-drawer-context-evidence')).toHaveTextContent(
+      '描述16V；型号25V',
+    );
+    expect(screen.queryByTestId('review-drawer-decision-status')).not.toBeInTheDocument();
+  });
+
   it('renders the selected row in a unified floating review drawer', () => {
     const runtime = makeReviewDrawerRuntime(selectedLine, {
       bom_me_evidence_json:

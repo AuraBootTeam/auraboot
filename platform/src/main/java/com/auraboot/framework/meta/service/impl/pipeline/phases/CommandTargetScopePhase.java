@@ -196,6 +196,14 @@ public class CommandTargetScopePhase implements CommandPhase {
         }
         ctx.setTargetRecordVersion(resolveRecordVersion(record));
 
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            var decision = com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode);
+            String action = targetRecordAction(ctx);
+            if (action == null) action = "delete".equals(ctx.getExecConfig().get("type")) ? "delete" : "update";
+            decision.requireAction(action);
+            return decision.permits(record);
+        }
+
         // The authorization phase has already resolved this exact target (or its explicitly
         // declared aggregate reference) and verified an active record-share grant. Re-running
         // ordinary model RBAC here would erase that record-scoped grant for collaborator roles.

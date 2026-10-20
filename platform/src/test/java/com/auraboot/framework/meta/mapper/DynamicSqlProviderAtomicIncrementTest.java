@@ -16,6 +16,9 @@ class DynamicSqlProviderAtomicIncrementTest {
         p.put("counterCol", "cr_cj_discovered_count");
         p.put("pkColumn", "pid");
         p.put("softDeleteClause", " AND (deleted_flag = FALSE OR deleted_flag IS NULL)");
+        p.put("versioned", true);
+        p.put("scopePredicate", "1 = 1 AND zone = #{scopeParameters.zone}");
+        p.put("scopeParameters", Map.of("zone", "A"));
         return p;
     }
 
@@ -33,6 +36,7 @@ class DynamicSqlProviderAtomicIncrementTest {
         assertThat(sql).contains("updated_by = #{currentUserId}");
         assertThat(sql).contains("WHERE pid = #{recordId}");
         assertThat(sql).contains("AND tenant_id = #{tenantId}");
+        assertThat(sql).contains("AND (1 = 1 AND zone = #{scopeParameters.zone})");
         assertThat(sql).contains("AND COALESCE(cr_cj_discovered_count, 0) + #{delta} <= cr_cj_max_urls");
         assertThat(sql).contains("AND (deleted_flag = FALSE OR deleted_flag IS NULL)");
         assertThat(sql).endsWith("RETURNING cr_cj_discovered_count AS new_value");
@@ -53,4 +57,20 @@ class DynamicSqlProviderAtomicIncrementTest {
         assertThatThrownBy(() -> DynamicSqlProvider.atomicIncrementReturning(p))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void rejectsMissingOrUnsafeAuthority() {
+        for (String scope : new String[]{"", "1 = 1; DELETE FROM mt_x", "${unbound}", "x = #{params.x}"}) {
+            var params = baseParams(); params.put("scopePredicate", scope);
+            assertThatThrownBy(() -> DynamicSqlProvider.atomicIncrementReturning(params)).isInstanceOf(IllegalArgumentException.class);
+        }
+        var params = baseParams(); params.remove("versioned");
+        assertThatThrownBy(() -> DynamicSqlProvider.atomicIncrementReturning(params)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void versionContractAppliesToCustomTableAndCanExcludeUnversionedBinding() {
+        var params = baseParams(); params.put("tableName", "custom_counter");
+        assertThat(DynamicSqlProvider.atomicIncrementReturning(params)).contains("row_version = row_version + 1");
+        params.put("versioned", false);
+        assertThat(DynamicSqlProvider.atomicIncrementReturning(params)).doesNotContain("row_version");
+    }
+
 }

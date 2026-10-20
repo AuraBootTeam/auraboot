@@ -1,6 +1,7 @@
 package com.auraboot.framework.automation.workflow;
 
 import com.auraboot.framework.automation.entity.Automation;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationLog.ActionResult;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
@@ -8,6 +9,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,10 +35,13 @@ public class AutomationWorkflowRuntime {
         return String.valueOf(result.getOrDefault("processKey", compiled.processKey()));
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<ActionResult> run(Automation automation, String recordPid, Map<String, Object> triggerPayload) {
         return run(automation, recordPid, triggerPayload, null);
     }
 
+    // Failed action transactions must roll back without erasing the enclosing automation log.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<ActionResult> run(Automation automation, String recordPid,
                                   Map<String, Object> triggerPayload, Long automationLogId) {
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -45,6 +51,7 @@ public class AutomationWorkflowRuntime {
         if (automation.getModelCode() != null) payload.put("modelCode", automation.getModelCode());
         if (automation.getTenantId() != null) payload.put("automationTenantId", automation.getTenantId());
         if (automation.getCreatedBy() != null) payload.put("automationCreatedBy", automation.getCreatedBy());
+        payload.put("automationActor", trustedActor(automation));
         if (recordPid != null) payload.put("recordPid", recordPid);
         payload.put("triggerPayload", triggerPayload == null ? Map.of() : triggerPayload);
         if (automationLogId != null) payload.put("automationLogId", automationLogId);
@@ -64,9 +71,34 @@ public class AutomationWorkflowRuntime {
         }
     }
 
+    private Map<String, Object> trustedActor(Automation automation) {
+        if (!MetaContext.exists()) {
+            throw new IllegalStateException("Automation execution requires an authenticated actor context");
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        Long memberId = MetaContext.getCurrentMemberId();
+        String userPid = MetaContext.getCurrentUserPid();
+        if (tenantId == null || !tenantId.equals(automation.getTenantId())
+                || userId == null || userId <= 0 || memberId == null || memberId <= 0
+                || userPid == null || userPid.isBlank()) {
+            throw new IllegalStateException("Automation execution requires a valid actor in its owning tenant");
+        }
+        Map<String, Object> actor = new LinkedHashMap<>();
+        actor.put("tenantId", tenantId);
+        actor.put("userId", userId);
+        actor.put("userPid", userPid);
+        actor.put("memberId", memberId);
+        if (MetaContext.getCurrentUsername() != null) actor.put("username", MetaContext.getCurrentUsername());
+        return actor;
+    }
+
     private Map<String, Object> execute(String operation, Map<String, Object> payload) {
         return workflowCapabilities.execute(operation,
-                new WorkflowCapability.WorkflowRequest(null, null, payload)).payload();
+                new WorkflowCapability.WorkflowRequest(
+                        MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,
+                        MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                        payload)).payload();
     }
 
     private Map<String, Object> compiledActions(Automation automation) {

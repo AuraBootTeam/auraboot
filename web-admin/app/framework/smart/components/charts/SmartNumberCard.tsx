@@ -1,3 +1,5 @@
+import { useSmartText } from '~/utils/i18n';
+import { chartDataErrorLabel } from '../../utils/chartDataErrorLabel';
 import { hasAggregateModel } from '../../utils/aggregateModel';
 /**
  * SmartNumberCard Component
@@ -52,6 +54,12 @@ interface NumberCardItem {
   prefix?: string;
   suffix?: string;
   drillDown?: DrillDownConfig;
+  /**
+   * Row selector for multi-row responses: the card reads the first row whose
+   * fields equal every entry. Required when several cards share one `field`
+   * but must surface different rows (e.g. one metric per row).
+   */
+  matchRow?: Record<string, string | number | boolean>;
 }
 
 /**
@@ -180,6 +188,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   drillDown,
   onDrillDown,
 }) => {
+  const text = useSmartText();
   const isConfigured = isDataSourceConfigured(dataSource);
   const chartState = useChartData({
     dataSource,
@@ -337,9 +346,19 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
 
     return (
       <div className={cn('grid h-full gap-3', cardGridClass, className)} style={style}>
-        {effectiveCards.map((card) => {
+        {effectiveCards.map((card, cardIndex) => {
           const cardDrillDown = card.drillDown ?? drillDown;
           const cardClickable = Boolean(cardDrillDown?.enabled && onDrillDown);
+          const matchEntries = Object.entries(card.matchRow ?? {});
+          const rowForCard =
+            matchEntries.length && data?.rows?.length
+              ? (data.rows.find((row) =>
+                  matchEntries.every(([key, expected]) => row[key] === expected),
+                ) ?? {})
+              : firstRow;
+          const cardKey = `${card.field}:${cardIndex}`;
+          const fieldOccurrences = effectiveCards.filter((c) => c.field === card.field).length;
+          const cardTestId = `number-card-${fieldOccurrences > 1 ? cardKey : card.field}-drilldown`;
           const cardContent = (
             <>
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -350,7 +369,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
                   ? '...'
                   : error
                     ? 'Error'
-                    : formatCardValue(firstRow[card.field], card.format, card.prefix, card.suffix)}
+                    : formatCardValue(rowForCard[card.field], card.format, card.prefix, card.suffix)}
               </div>
               <div
                 className="mt-3 h-1 w-8 rounded-full"
@@ -365,16 +384,16 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           );
           return cardClickable ? (
             <button
-              key={card.field}
+              key={cardKey}
               type="button"
               className={cardClassName}
-              data-testid={`number-card-${card.field}-drilldown`}
+              data-testid={cardTestId}
               onClick={() => onDrillDown?.(cardDrillDown!)}
             >
               {cardContent}
             </button>
           ) : (
-            <div key={card.field} className={cardClassName}>
+            <div key={cardKey} className={cardClassName}>
               {cardContent}
             </div>
           );
@@ -406,7 +425,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           : undefined
       }
     >
-      <div className="flex h-full flex-col p-5">
+      <div className="flex h-full min-w-0 flex-col p-5" style={{ containerType: 'inline-size' }}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="block truncate text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400">
@@ -431,12 +450,11 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
               className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600"
               role="alert"
             >
-              <span className="font-medium">Error: </span>
-              {error.message || 'Failed to load data'}
+              {text(chartDataErrorLabel(error))}
             </div>
           ) : isEmpty ? (
             <div className="space-y-3">
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem] dark:text-slate-50">
+              <div className="font-semibold tracking-tight text-slate-950 tabular-nums dark:text-slate-50" style={{ fontSize: 'clamp(1rem, 14cqw, 2.65rem)', overflowWrap: 'anywhere' }}>
                 —
               </div>
               <div className="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
@@ -449,7 +467,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </div>
           ) : (
             <>
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem] dark:text-slate-50">
+              <div className="font-semibold tracking-tight text-slate-950 tabular-nums dark:text-slate-50" style={{ fontSize: 'clamp(1rem, 14cqw, 2.65rem)', overflowWrap: 'anywhere' }}>
                 {formattedValue}
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">

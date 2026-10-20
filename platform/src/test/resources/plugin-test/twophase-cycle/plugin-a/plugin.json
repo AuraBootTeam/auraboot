@@ -23,6 +23,6 @@
     { "code": "tpa:view", "name": "View A" }
   ],
   "menus": [
-    { "code": "tpa_child_menu", "name": "TPA Child Menu", "parentCode": "tpb_dir_menu" }
+    { "code": "tpa_child_menu", "name": "TPA Child Menu" }
   ]
 }

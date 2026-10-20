@@ -16,7 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UnifiedUserDetailsServiceTest {
@@ -80,6 +80,46 @@ class UnifiedUserDetailsServiceTest {
         when(userService.findByEmail("missing@x.com")).thenReturn(null);
         assertThatThrownBy(() -> service.loadUserByUsername("missing@x.com"))
                 .isInstanceOf(UsernameNotFoundException.class);
+    }
+
+    @Test
+    void jwtPidLookupReadsOnceAndNeverResolvesAliases() {
+        user.setSecurityVersion(3);
+        when(userService.findByPid(user.getPid())).thenReturn(user);
+
+        CustomUserDetails details = service.loadUserByPid(user.getPid());
+
+        assertThat(details.getUserPid()).isEqualTo(user.getPid());
+        assertThat(details.getSecurityVersion()).isEqualTo(3);
+        verify(userService).findByPid(user.getPid());
+        verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    void pidSnapshotsObserveChangedSecurityStateOnTheNextRequest() {
+        when(userService.findByPid(user.getPid())).thenReturn(user);
+        CustomUserDetails first = service.loadUserByPid(user.getPid());
+        user.setEnabled(false);
+        user.setSecurityVersion(2);
+        CustomUserDetails next = service.loadUserByPid(user.getPid());
+
+        assertThat(first.isEnabled()).isTrue();
+        assertThat(first.getSecurityVersion()).isZero();
+        assertThat(next.isEnabled()).isFalse();
+        assertThat(next.getSecurityVersion()).isEqualTo(2);
+        verify(userService, times(2)).findByPid(user.getPid());
+        verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    void missingPidFailsClosedWithoutAnAliasFallback() {
+        assertThatThrownBy(() -> service.loadUserByPid("missing"))
+                .isInstanceOf(UsernameNotFoundException.class);
+        verify(userService).findByPid("missing");
+        verifyNoMoreInteractions(userService);
+        assertThatThrownBy(() -> service.loadUserByPid(" "))
+                .isInstanceOf(UsernameNotFoundException.class);
+        verifyNoMoreInteractions(userService);
     }
 
     @Test

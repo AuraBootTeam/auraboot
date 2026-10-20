@@ -8,6 +8,12 @@ import type { DecisionApi } from '../../api/decisionApi';
 // The locale contract under test: every chrome string must come from the
 // strategyStudio catalog via useI18n().locale, while the built-in zh-CN demo
 // data (field labels, value labels, payload names) keeps its source values.
+const metadataFields: import('../ConditionBuilder').FieldOption[] = [
+  {scope:'record',path:'data.targetKey',label:'SLA 节点',dataType:'string'},
+  {scope:'record',path:'data.wd_req_applicant',label:'申请人',dataType:'user'},
+  {scope:'sla',path:'deadlineMinutes',label:'截止分钟',dataType:'integer'},
+];
+
 const language = vi.hoisted(() => ({ locale: 'zh-CN' }));
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
@@ -31,7 +37,8 @@ function createApi(): DecisionApi {
       outgoing: [],
       risk: { level: 'LOW', summary: 'no blockers' },
     })),
-    evaluate: vi.fn(async () => ({
+    validate: vi.fn(async () => ({ valid: true })),
+    testRun: vi.fn(async () => ({
       traceId: 'trace-locale',
       status: 'MATCHED',
       matched: true,
@@ -94,7 +101,7 @@ function createApi(): DecisionApi {
 }
 
 function renderWorkbench() {
-  return render(<StrategyStudioWorkbench api={createApi()} fields={[]} />);
+  return render(<StrategyStudioWorkbench api={createApi()} fields={metadataFields} />);
 }
 
 describe('StrategyStudioWorkbench locale contracts', () => {
@@ -128,7 +135,7 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(screen.getByTestId('strategy-workspace-tab-facts')).toHaveTextContent('事实目录');
     expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveTextContent('决策表');
     expect(screen.getByTestId('strategy-workspace-tab-review')).toHaveTextContent('片段与发布');
-    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('DMN 决策输出');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('判断逻辑与处理结果');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('请假审批 SLA 截止时间');
     expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('条件片段库');
     expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('暂无条件片段');
@@ -138,10 +145,10 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('消息');
     expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('治理');
     expect(screen.getByTestId('strategy-studio')).toHaveTextContent('发布检查');
-    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('就绪');
-    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('字段可解析');
-    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('片段版本可用');
-    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('影响面已确认');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('待检查');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('草稿尚未验证或已修改');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('未使用条件片段');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('影响面尚未检查或已修改');
   });
 
   it.each(['en', 'en-US', 'en-GB'])('localizes the chrome through the catalog for %s', (locale) => {
@@ -164,7 +171,7 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(screen.getByTestId('strategy-workspace-tab-facts')).toHaveTextContent('Fact catalog');
     expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveTextContent('Decision table');
     expect(screen.getByTestId('strategy-workspace-tab-review')).toHaveTextContent('Fragments & publish');
-    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('DMN decision output');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('Decision logic and outcomes');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('Leave approval SLA deadline');
     expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
       'Condition fragment library',
@@ -177,9 +184,9 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('Messaging');
     expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('Governance');
     expect(screen.getByTestId('strategy-studio')).toHaveTextContent('Publish check');
-    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('Ready');
-    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('Fields resolvable');
-    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('Impact confirmed');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('Checks required');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('Draft not validated or changed');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('Impact not checked or changed');
     expect(screen.queryByText('主管审批 SLA')).not.toBeInTheDocument();
     // Built-in field vocabulary is authored demo data and stays in its source language.
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('SLA 节点');
@@ -199,8 +206,8 @@ describe('StrategyStudioWorkbench locale contracts', () => {
   it('switches chrome with locale on rerender while scenario state and payloads stay stable', async () => {
     language.locale = 'zh-CN';
     const api = createApi();
-    const evaluate = api.evaluate as ReturnType<typeof vi.fn>;
-    const view = render(<StrategyStudioWorkbench api={api} fields={[]} />);
+    const evaluate = api.testRun as ReturnType<typeof vi.fn>;
+    const view = render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
 
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
     expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
@@ -211,12 +218,14 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     fireEvent.click(screen.getByText('测试运行'));
     await waitFor(() => expect(evaluate).toHaveBeenCalledOnce());
     expect(evaluate).toHaveBeenLastCalledWith(
-      expect.objectContaining({ callerType: 'BPM', callerRef: 'wd_leave_approval' }),
+      expect.objectContaining({ kind: 'DECISION_TABLE', runtimeAdapter: 'PLATFORM_DECISION_TABLE', contentJson: expect.any(Object) }),
     );
-    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过 · trace-locale');
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过');
+    expect(screen.getByTestId('strategy-operation-status')).not.toHaveTextContent('trace-locale');
+    expect(screen.getByText('trace-locale').closest('details')).not.toHaveAttribute('open');
 
     language.locale = 'en-US';
-    view.rerender(<StrategyStudioWorkbench api={api} fields={[]} />);
+    view.rerender(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
 
     expect(
       screen.getByTestId('strategy-studio').querySelector('.strategy-studio-header h3'),
@@ -228,10 +237,10 @@ describe('StrategyStudioWorkbench locale contracts', () => {
     fireEvent.click(screen.getByText('Run test'));
     await waitFor(() => expect(evaluate).toHaveBeenCalledTimes(2));
     expect(evaluate).toHaveBeenLastCalledWith(
-      expect.objectContaining({ callerType: 'BPM', callerRef: 'wd_leave_approval' }),
+      expect.objectContaining({ kind: 'DECISION_TABLE', runtimeAdapter: 'PLATFORM_DECISION_TABLE', contentJson: expect.any(Object) }),
     );
     expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent(
-      'Test matched · trace-locale',
+      'Test matched',
     );
   });
 });
@@ -291,5 +300,54 @@ describe('strategyStudio catalog contract', () => {
     expect(strategyStudioText('publishBlockedCount', 'en-US', { count: 3 })).toBe(
       'Publishing blocked · 3 item(s) pending',
     );
+  });
+});
+
+
+describe('Strategy Studio truthful readiness', () => {
+  it('starts unchecked, checks through the backend, and invalidates checks after an edit', async () => {
+    const api = createApi();
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('草稿尚未验证或已修改');
+    fireEvent.click(screen.getByTestId('strategy-check-readiness'));
+    await waitFor(() => expect(api.getDecisionImpact).toHaveBeenCalledOnce());
+    expect(api.validate).toHaveBeenCalledWith('DECISION_TABLE', 'PLATFORM_DECISION_TABLE', expect.any(Object));
+    await waitFor(() => expect(screen.getByTestId('strategy-studio')).toHaveTextContent('字段可解析'));
+    fireEvent.change(screen.getByLabelText('input-label-0'), { target: { value: 'Changed input' } });
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('草稿尚未验证或已修改');
+  });
+  it('keeps impact unchecked after failure and blocks publication', async () => {
+    const api = createApi();
+    vi.mocked(api.getDecisionImpact).mockRejectedValue(new Error('Save the decision first'));
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
+    fireEvent.click(screen.getByTestId('strategy-check-readiness'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Save the decision first'));
+    expect(screen.getByRole('alert')).toHaveAttribute('data-tone', 'error');
+    expect(screen.getByTestId('strategy-studio')).toHaveTextContent('影响面尚未检查或已修改');
+    fireEvent.click(screen.getByTestId('strategy-publish'));
+    expect(api.publishVersion).not.toHaveBeenCalled();
+  });
+  it('tests unsaved content and reports evaluator failure as an error', async () => {
+    const api = createApi();
+    vi.mocked(api.testRun).mockResolvedValue({ status: 'ERROR', matched: false, errors: ['Invalid decision input'] } as never);
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} />);
+    fireEvent.click(screen.getByTestId('strategy-run-test'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid decision input'));
+    expect(screen.getByRole('alert')).toHaveAttribute('data-tone', 'error');
+    expect(api.testRun).toHaveBeenCalledWith(expect.objectContaining({ contentJson: expect.any(Object) }));
+  });
+});
+
+describe('Strategy Studio saved decision load failures', () => {
+  it('never evaluates a template in place of an unreadable business decision', async () => {
+    const api = createApi();
+    vi.mocked(api.listVersions).mockRejectedValue(new Error('Decision access denied'));
+    render(<StrategyStudioWorkbench api={api} fields={metadataFields} decisions={[{code: 'owned_business_rule', name: 'Delivery review', scopeType: 'BPM'}]} />);
+    fireEvent.change(screen.getByTestId('strategy-business-decision'), {target: {value: 'owned_business_rule'}});
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Decision access denied'));
+    expect(screen.queryByTestId('strategy-run-test')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('strategy-publish')).not.toBeInTheDocument();
+    expect(api.testRun).not.toHaveBeenCalled();
+    expect(api.publishVersion).not.toHaveBeenCalled();
   });
 });

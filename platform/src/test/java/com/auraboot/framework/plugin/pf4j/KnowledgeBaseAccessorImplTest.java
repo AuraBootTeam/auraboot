@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.agent.integration.plugin.KnowledgeBaseAccessorImpl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.rag.service.KbTextIngestService;
 import org.junit.jupiter.api.AfterEach;

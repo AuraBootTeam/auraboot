@@ -76,11 +76,11 @@ export interface PropertySchema<TLabel = string | I18nText> {
    * type='multiselect' (DependentMultiSelect) only: where the cascading options
    * come from. 'fields' fetches the parent model's fields; 'dict' fetches dict
    * items. Defaults to 'fields'. For state filters (fromStates/toStates that
-   * dependOn a state field) use 'dict' — the parent's value (the state field
-   * code, which equals its dict code) is the dict to fetch.
+   * dependOn a state field) use 'dict' — resolve the field's dictCode from the
+   * selected model metadata. Field and dictionary codes can differ.
    */
   optionSource?: 'fields' | 'dict';
-  /** type='multiselect' optionSource='dict' only: explicit dict code (else the parent value is used). */
+  /** type='multiselect' optionSource='dict' only: explicit dict code (else resolve the parent model field's dictCode). */
   dictCode?: string;
 
   /** type='rule-binding' only: host mode for the shared rule-center binding editor. */

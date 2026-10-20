@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
@@ -44,41 +45,49 @@ public class DictValidationResult {
         /**
          * 编码验证结果
          */
+        @Schema(nullable = true)
         private Boolean codeValid;
 
         /**
          * 名称验证结果
          */
+        @Schema(nullable = true)
         private Boolean nameValid;
 
         /**
          * 数据源配置验证结果
          */
+        @Schema(nullable = true)
         private Boolean sourceConfigValid;
 
         /**
          * 级联配置验证结果
          */
+        @Schema(nullable = true)
         private Boolean cascadeConfigValid;
 
         /**
          * 缓存配置验证结果
          */
+        @Schema(nullable = true)
         private Boolean cacheConfigValid;
 
         /**
          * 版本策略验证结果
          */
+        @Schema(nullable = true)
         private Boolean versionStrategyValid;
 
         /**
          * 字典项验证结果
          */
+        @Schema(nullable = true)
         private Boolean itemsValid;
 
         /**
          * 依赖关系验证结果
          */
+        @Schema(nullable = true)
         private Boolean dependenciesValid;
     }
 

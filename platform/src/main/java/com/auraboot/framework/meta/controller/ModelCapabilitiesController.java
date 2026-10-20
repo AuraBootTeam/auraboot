@@ -127,11 +127,13 @@ public class ModelCapabilitiesController {
 
     /**
      * Primitive scalar data types that are sortable / filterable by default
-     * when a field doesn't carry an explicit per-field flag. Long-text /
-     * blob / json types are intentionally excluded.
+     * when a field doesn't carry an explicit per-field flag. `text` is the
+     * bounded scalar text type used by most name/title fields and the list
+     * designer offers contains/equals operators for it, so it defaults in;
+     * blob / json types remain intentionally excluded.
      */
     private static final Set<String> SORT_FILTER_DEFAULT_TYPES = Set.of(
-            "string", "integer", "int", "long", "bigint",
+            "string", "text", "integer", "int", "long", "bigint",
             "decimal", "numeric", "float", "double",
             "date", "datetime", "timestamp", "time",
             "enum", "dict", "boolean", "bool"

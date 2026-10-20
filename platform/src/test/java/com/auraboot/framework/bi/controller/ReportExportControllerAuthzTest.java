@@ -46,9 +46,9 @@ class ReportExportControllerAuthzTest {
     }
 
     @Test
-    void exposesTheThreeExportEndpoints() {
-        assertEquals(3, endpoints().size(),
-                "ReportExportController should expose exactly 3 mapped endpoints (excel/pdf/json)");
+    void exposesTheFiveExportEndpoints() {
+        assertEquals(5, endpoints().size(),
+                "ReportExportController should expose exactly 5 mapped endpoints (excel/pdf/json/markdown/html)");
     }
 
     @Test

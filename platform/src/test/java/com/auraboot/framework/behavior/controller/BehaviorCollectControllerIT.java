@@ -67,6 +67,17 @@ class BehaviorCollectControllerIT {
 
     @BeforeAll
     void seedSchema() {
+        // The authenticated request chain resolves the JWT's tenant claim through
+        // EnvironmentResolverInterceptor → EnvironmentService.findOrCreateDefaultId, which
+        // fail-closes with IllegalArgumentException("Tenant not found: …") when the tenant
+        // row is absent (a 500 that used to mask the whole collect path). Seed the real
+        // tenant row the JWT claims.
+        jdbc.update("""
+            INSERT INTO ab_tenant (id, pid, name, display_name, status, description, deleted_flag)
+            VALUES (?, ?, ?, ?, 'active', ?, FALSE)
+            ON CONFLICT (id) DO NOTHING
+            """, TENANT_ID, "collect-it-tenant-pid", "collect-it-tenant",
+                "Collect IT Tenant", "BehaviorCollectControllerIT seeded tenant");
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS ab_behavior_event (
                 id BIGSERIAL PRIMARY KEY,
@@ -149,6 +160,10 @@ class BehaviorCollectControllerIT {
     @AfterAll
     void tearDown() {
         cleanup();
+        // Remove the seeded tenant row (and its auto-created default environment) so the
+        // shared CI database stays pristine for the rest of the suite.
+        jdbc.update("DELETE FROM ab_environment WHERE tenant_id = ?", TENANT_ID);
+        jdbc.update("DELETE FROM ab_tenant WHERE id = ?", TENANT_ID);
     }
 
     @Test

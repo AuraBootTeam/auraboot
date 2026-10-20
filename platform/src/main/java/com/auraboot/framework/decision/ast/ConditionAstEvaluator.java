@@ -46,7 +46,7 @@ public final class ConditionAstEvaluator {
 
     public EvalTrace evaluate(ConditionNode root, DecisionContext ctx) {
         EvalTrace.Collector collector = new EvalTrace.Collector();
-        Truth result = eval(root, ctx, collector);
+        Truth result = eval(root, ctx, collector, "root");
         return collector.finish(result);
     }
 
@@ -54,23 +54,26 @@ public final class ConditionAstEvaluator {
         return functions.isRegistered(name);
     }
 
-    private Truth eval(ConditionNode node, DecisionContext ctx, EvalTrace.Collector trace) {
-        return switch (node) {
-            case ConditionNode.GroupNode g -> evalGroup(g, ctx, trace);
-            case ConditionNode.NotNode n -> eval(n.child(), ctx, trace).negate();
+    private Truth eval(ConditionNode node, DecisionContext ctx, EvalTrace.Collector trace, String path) {
+        Truth result = switch (node) {
+            case ConditionNode.GroupNode g -> evalGroup(g, ctx, trace, path);
+            case ConditionNode.NotNode n -> eval(n.child(), ctx, trace, path + ".0").negate();
             case ConditionNode.CompareNode c -> evalCompare(c, ctx, trace);
         };
+        trace.addNode(path, result);
+        return result;
     }
 
-    private Truth evalGroup(ConditionNode.GroupNode g, DecisionContext ctx, EvalTrace.Collector trace) {
+    private Truth evalGroup(ConditionNode.GroupNode g, DecisionContext ctx, EvalTrace.Collector trace, String path) {
         List<Truth> childResults = new ArrayList<>();
         if (g.children() != null) {
-            for (ConditionNode child : g.children()) {
+            for (int index = 0; index < g.children().size(); index++) {
+                ConditionNode child = g.children().get(index);
                 // a disabled leaf is treated as absent in its group
                 if (child instanceof ConditionNode.CompareNode c && !c.active()) {
                     continue;
                 }
-                childResults.add(eval(child, ctx, trace));
+                childResults.add(eval(child, ctx, trace, path + "." + index));
             }
         }
         if (childResults.isEmpty()) {
@@ -116,6 +119,10 @@ public final class ConditionAstEvaluator {
         }
 
         ResolvedOperand right = resolve(c.right(), ctx);
+        if (!right.present || right.value == null) {
+            trace.addUnknownReason("right operand not present or null in [" + expr + "]");
+            return step(trace, expr, left.value, null, Truth.UNKNOWN);
+        }
         Object rv = right.value;
         DataType dt = effectiveType(c.left());
         Truth r = switch (op) {

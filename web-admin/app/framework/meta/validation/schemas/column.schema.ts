@@ -45,6 +45,7 @@ export const columnSchema = z
       .record(z.string(), z.object({ label: localizedTextSchema, color: z.string() }))
       .optional(),
     dictCode: z.string().optional(),
+    dictValueSeparator: z.string().min(1).optional(),
     currencyCode: z.string().optional(),
   })
   .passthrough();

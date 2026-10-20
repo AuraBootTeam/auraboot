@@ -26,7 +26,12 @@ class DynamicDataImportParentTest {
         var support=new DynamicDataTransferSupport(null,mapper,new ObjectMapper(),null,null,null,null,
             null,null,null,null,null,null,null,code -> code.equals("order") ? parent : child,code -> {},
             (model,data) -> { var columns=new HashMap<>(data);columns.put("order_pid",columns.remove("order_link"));return columns; },
-            (model,sort) -> sort);
+            (model,sort) -> sort,(code,data) -> {
+                var columns=new HashMap<String,Object>(data);columns.put("order_pid",columns.remove("order_link"));
+                columns.put("tenant_id",1L);
+                RecordCommandWriterGuard.guardParentInput(mapper,child,key -> parent,columns);
+                mapper.insert("mt_child",columns);return columns;
+            });
         when(mapper.selectRecordWriterTargetsForUpdate(anyString(),anyString(),anyString(),anyMap())).thenReturn(parents);
         Path file=directory.resolve("lines.json");Files.writeString(file,"[{\"order_link\":\"parent-a\"}]");
         return support.importData("line",DataImportRequest.builder().filePath(file.toString()).format(DataImportRequest.ImportFormat.JSON).build());

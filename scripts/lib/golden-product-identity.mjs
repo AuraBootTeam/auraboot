@@ -3,8 +3,10 @@ import { readFileSync, realpathSync, mkdirSync, writeFileSync, renameSync } from
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const environmentKeys = ['AURA_RUNTIME_NAME', 'AURA_RUNTIME_OWNERSHIP_TOKEN',
-  'SERVER_PORT', 'SPRING_DATASOURCE_URL', 'SPRING_DATA_REDIS_DATABASE',
+const environmentKeys = ['SESSION_SECRET_FILE', 'NODE_ENV', 'AURA_WEB_MODE', 'AURA_RUNTIME_NAME', 'AURA_RUNTIME_OWNERSHIP_TOKEN',
+  'SERVER_PORT', 'SPRING_DATASOURCE_URL', 'SPRING_DATA_REDIS_DATABASE', 'SPRING_DATA_REDIS_HOST',
+  'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED', 'MANAGEMENT_TRACING_SAMPLING_PROBABILITY',
+  'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG', 'VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'VITE_OTEL_TRACES_SAMPLE_RATE',
   'VITE_PORT', 'BFF_PORT', 'SPRING_BOOT_URL', 'BFF_INTERNAL_URL', 'AGENT_LLM_STUB_MODE'];
 const requireIdentity = (condition, message) => { if (!condition) throw new Error(message); };
 
@@ -27,6 +29,12 @@ export function verifyGoldenProduct({ report, repo, environments, commands, toke
       environments[key].AURA_RUNTIME_OWNERSHIP_TOKEN === token && Boolean(token),
     `${key} live runtime ownership mismatch`);
   }
+  const webMode = environments.web?.AURA_WEB_MODE || 'development';
+  requireIdentity(['development', 'production'].includes(webMode), 'Unsupported frontend mode');
+  if (webMode === 'production') {
+    requireIdentity(environments.web.NODE_ENV === 'production' && environments.bff.NODE_ENV === 'production' &&
+      environments.bff.AURA_WEB_MODE === webMode, 'Production frontend mode drift');
+  }
   const backend = environments.backend;
   const jarIndex = commands.backend.indexOf('-jar');
   requireIdentity(jarIndex >= 0 && commands.backend[jarIndex + 1] === artifact.path,
@@ -47,7 +55,7 @@ export function verifyGoldenProduct({ report, repo, environments, commands, toke
     health.bff.services?.springBoot?.status === 'healthy' &&
     health.bff.services.springBoot.backend?.status === 'UP', 'Product health verification failed');
   return { schemaVersion: 1, runtime: report.runtime, generatedAt: new Date().toISOString(),
-    sourceCommit: source.expected.commit, artifactHash: artifact.expected.hash,
+    frontendMode: webMode, sourceCommit: source.expected.commit, artifactHash: artifact.expected.hash,
     sourceRoots: report.sources.map(item => ({ key: item.key, ...item.expected })),
     backendArtifact: { path: artifact.path, hash: artifact.expected.hash },
     processes: report.processes.map(item => ({ key: item.key, ...item.expected,

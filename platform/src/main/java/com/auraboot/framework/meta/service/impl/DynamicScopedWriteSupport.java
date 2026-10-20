@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.service.*;
@@ -10,7 +11,6 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
-import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import java.io.*;
@@ -37,7 +37,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
-            String recordId,
+            Object recordId,
             Map<String, Object> columnData,
             Set<String> jsonbColumns,
             Object expectedVersion){
@@ -57,7 +57,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
-            String recordId,
+            Object recordId,
             Map<String, Object> columnData,
             Set<String> jsonbColumns,
             Object expectedVersion,
@@ -66,7 +66,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         return executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion, compareColumn, compareValue, "update");
     }
 
-    int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation){
+    int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, Object recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation){
         RecordCommandWriterGuard.assertInputAllowed(model, columnData, "update");
         RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null), columnData);
         if (columnData == null || columnData.isEmpty()) {
@@ -107,14 +107,14 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             params.put(paramName, parameterValue);
             index++;
         }
-        if (tableName.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+        if (PhysicalRowVersionSupport.isVersioned(model, dynamicDataMapper)) {
             if (index > 0) {
                 sql.append(", ");
             }
             // Every successful dynamic-model mutation advances the public optimistic token,
             // including legacy callers that do not yet submit an expectedVersion. When a trusted
             // expectedVersion is present the WHERE predicate below additionally turns this into
-            // compare-and-swap. Externally managed ab_* tables retain their own version contracts.
+            // compare-and-swap. The physical column contract applies to human and machine writes.
             sql.append("row_version = row_version + 1");
         }
 
@@ -139,9 +139,9 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         appendAggregateBindingGuard(sql, params, model);
         RecordCommandWriterGuard.appendCounterStoredPredicate(sql, model, permissionOperation,
                 metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null),
-                recordId, expectedVersion, compareColumn, compareValue, columnData, params);
+                String.valueOf(recordId), expectedVersion, compareColumn, compareValue, columnData, params);
         RecordCommandWriterGuard.appendMarkerInvariant(sql, model, columnData);
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation, params);
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);
     }
@@ -150,7 +150,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
-            String recordId,
+            Object recordId,
             Long expectedVersion){
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
@@ -172,7 +172,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         }
         appendAggregateBindingGuard(sql, params, model);
         RecordCommandWriterGuard.appendStoredPredicate(sql, model, "delete", metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null));
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete", params);
 
         return dynamicDataMapper.deleteByQuery(sql.toString(), params);
     }
@@ -211,6 +211,9 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             String modelCode,
             Long userId,
             String operation){
+        if (MachineDataAccessContext.isActive()) {
+            throw new org.springframework.security.access.AccessDeniedException("Machine write requires bound policy parameters");
+        }
         String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             appendScopedBulkFilter(sql, permitFilter);
@@ -239,6 +242,15 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
 
     String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId){
         return resolveWriteRowFilter(tenantId, modelCode, userId, "update");
+    }
+
+    void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode,
+                                        Long userId, String operation, Map<String, Object> parameters) {
+        if (MachineDataAccessContext.isActive()) {
+            sql.append(" AND (").append(MachineDataAccessGuards.predicate(modelCode, operation, parameters, "machine_scope")).append(")");
+            return;
+        }
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, operation);
     }
 
     String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId, String operation){

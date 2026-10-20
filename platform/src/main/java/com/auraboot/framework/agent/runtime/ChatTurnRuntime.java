@@ -233,6 +233,10 @@ public class ChatTurnRuntime {
             return true;
         }
 
+        default boolean allowToolExecution(ChatToolCall call, ToolDefinition definition) {
+            return true;
+        }
+
         default boolean deferPolicyUntilToolResult(ChatToolCall call, ToolDefinition definition) {
             return false;
         }
@@ -601,6 +605,13 @@ public class ChatTurnRuntime {
                     ToolDefinition policyDef = def != null ? def : originalDef;
                     ChatToolCall toolCall = new ChatToolCall(spec.ctx(), spec.agentCode(), toolId, toolName, input,
                             spec.toolDefinitions());
+                    if (!callbacks.allowToolExecution(toolCall, policyDef)) {
+                        Map<String, Object> denied = deniedToolResult(ToolPolicyDecision.deny(
+                                "server_tool_boundary", "This tool is not permitted by the channel's query boundary."));
+                        spec.sink().onToolResult(toolId, denied, false);
+                        toolResultBlocks.add(LlmMessageTapeSupport.buildToolResultBlock(spec.objectMapper(), toolId, denied));
+                        continue;
+                    }
                     boolean policyDeferredUntilResult = callbacks.deferPolicyUntilToolResult(toolCall, policyDef);
                     if (spec.handoffToolName() != null && spec.handoffToolName().equals(toolName)) {
                         runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolUseRequested(

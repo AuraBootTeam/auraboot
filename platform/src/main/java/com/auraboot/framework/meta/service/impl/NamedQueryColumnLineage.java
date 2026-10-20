@@ -5,7 +5,7 @@ import com.auraboot.framework.meta.exception.MetaServiceException;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.ExpressionVisitorAdapter;
 import net.sf.jsqlparser.expression.Function;
-import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import com.baomidou.mybatisplus.extension.parser.JsqlParserGlobal;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.*;
@@ -14,6 +14,8 @@ import java.util.*;
 /** Resolves SQL output dependencies without pretending unresolved sources are unprotected. */
 final class NamedQueryColumnLineage {
     private final Map<String, String> views;
+    private boolean inspectConsumption;
+    private final Set<PhysicalColumn> consumed = new LinkedHashSet<>();
     NamedQueryColumnLineage() { this(Map.of()); }
     NamedQueryColumnLineage(Map<String, String> views) { this.views = Map.copyOf(views); }
 
@@ -27,6 +29,24 @@ final class NamedQueryColumnLineage {
     }
     private record Source(String qualifier, Projection projection) { }
 
+    /** Includes predicate, join, grouping and ordering dependencies, not just serialized outputs. */
+    Set<PhysicalColumn> resolveConsumed(String fromSql, List<NamedQueryField> fields) {
+        inspectConsumption = true;
+        consumed.clear();
+        resolve(fromSql, fields).values().forEach(origin -> consumed.addAll(origin.columns()));
+        return Set.copyOf(consumed);
+    }
+
+    Set<PhysicalColumn> resolveConsumedSql(String sql) {
+        inspectConsumption = true; consumed.clear();
+        try {
+            projection((Select) JsqlParserGlobal.parse(sql.replaceAll("#\\{params\\.[a-zA-Z0-9_]+}", "?")), Map.of());
+            return Set.copyOf(consumed);
+        } catch (net.sf.jsqlparser.JSQLParserException failure) {
+            throw new MetaServiceException("Cannot resolve complete named query dependencies", failure);
+        }
+    }
+
     Map<String, Origin> resolve(String fromSql, List<NamedQueryField> fields) {
         try {
             String source = fromSql.trim();
@@ -35,7 +55,7 @@ final class NamedQueryColumnLineage {
                     .map(field -> field.getColumnExpr() + " AS " + field.getFieldCode()).toList());
             String sql = ("SELECT " + outputs + " FROM " + source)
                     .replaceAll("#\\{params\\.[a-zA-Z0-9_]+}", "?");
-            Projection projection = projection((Select) CCJSqlParserUtil.parse(sql), Map.of());
+            Projection projection = projection((Select) JsqlParserGlobal.parse(sql), Map.of());
             Map<String, Origin> result = new LinkedHashMap<>();
             for (NamedQueryField field : fields) {
                 if (result.putIfAbsent(field.getFieldCode(), projection.resolve(identifier(field.getFieldCode()))) != null)
@@ -84,6 +104,19 @@ final class NamedQueryColumnLineage {
         List<Source> sources = new ArrayList<>();
         if (plain.getFromItem() != null) sources.add(source(plain.getFromItem(), ctes));
         if (plain.getJoins() != null) for (Join join : plain.getJoins()) sources.add(source(join.getRightItem(), ctes));
+        if (inspectConsumption) {
+            consume(plain.getWhere(), sources);
+            consume(plain.getHaving(), sources);
+            if (plain.getGroupBy() != null && plain.getGroupBy().getGroupByExpressionList() != null)
+                for (Object item : plain.getGroupBy().getGroupByExpressionList()) consume((Expression) item, sources);
+            if (plain.getOrderByElements() != null)
+                plain.getOrderByElements().forEach(order -> consume(order.getExpression(), sources));
+            if (plain.getJoins() != null) for (Join join : plain.getJoins()) {
+                if (join.getUsingColumns() != null && !join.getUsingColumns().isEmpty())
+                    throw unresolved("Machine joins require explicit column lineage");
+                if (join.getOnExpressions() != null) join.getOnExpressions().forEach(on -> consume(on, sources));
+            }
+        }
         Map<String, Origin> outputs = new LinkedHashMap<>();
         List<String> wildcards = new ArrayList<>();
         for (SelectItem<?> item : plain.getSelectItems()) {
@@ -99,7 +132,9 @@ final class NamedQueryColumnLineage {
             String alias = item.getAlias() != null ? identifier(item.getAlias().getName())
                     : expression instanceof Column column ? identifier(column.getColumnName()) : null;
             if (alias == null) throw unresolved("Computed projection requires an alias");
-            if (outputs.putIfAbsent(alias, expression(expression, sources)) != null)
+            Origin origin = expression(expression, sources);
+            if (inspectConsumption) consumed.addAll(origin.columns());
+            if (outputs.putIfAbsent(alias, origin) != null)
                 throw unresolved("Ambiguous output alias: " + alias);
         }
         return new Projection() {
@@ -116,6 +151,10 @@ final class NamedQueryColumnLineage {
         };
     }
 
+    private void consume(Expression value, List<Source> sources) {
+        if (value != null) consumed.addAll(expression(value, sources).columns());
+    }
+
     private Source source(FromItem item, Map<String, Projection> ctes) {
         String alias = item.getAlias() == null ? null : identifier(item.getAlias().getName());
         if (item instanceof Table table) {
@@ -125,7 +164,7 @@ final class NamedQueryColumnLineage {
             String definition = views.get(NamedQuerySourceModels.identity(tableName));
             if (definition != null) {
                 final Projection underlying;
-                try { underlying = projection((Select) CCJSqlParserUtil.parse(definition), Map.of()); }
+                try { underlying = projection((Select) JsqlParserGlobal.parse(definition), Map.of()); }
                 catch (net.sf.jsqlparser.JSQLParserException invalid) {
                     throw new MetaServiceException("Cannot resolve view column sources", invalid);
                 }
@@ -161,6 +200,9 @@ final class NamedQueryColumnLineage {
             }
             @Override public <S> Void visit(Function value, S context) {
                 opaque[0] = true;
+                // COUNT(*) reveals scoped row cardinality, not any protected column.
+                if ("count".equalsIgnoreCase(value.getName()) && value.getParameters() != null
+                        && value.getParameters().size() == 1 && value.getParameters().get(0) instanceof AllColumns) return null;
                 return super.visit(value, context);
             }
             @Override public <S> Void visit(Select value, S context) {

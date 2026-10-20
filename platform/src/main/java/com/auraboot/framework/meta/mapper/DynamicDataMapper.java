@@ -16,6 +16,14 @@ import java.util.Set;
 @Mapper
 public interface DynamicDataMapper {
 
+    /** Locks only registered relation children within the explicitly bound tenant. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectRelationChildrenForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String, Object>> selectRelationChildrenForUpdate(
+            @Param("tableName") String tableName, @Param("parentColumn") String parentColumn,
+            @Param("tenantId") Long tenantId, @Param("parentPid") String parentPid,
+            @Param("softDelete") boolean softDelete);
+
     /** Fixed tenant-scoped lock query for current-state command intents; never accepts raw SQL. */
     @SelectProvider(type = DynamicSqlProvider.class, method = "selectTargetVersionForUpdate")
     @InterceptorIgnore(tenantLine = "true")
@@ -128,7 +136,10 @@ public interface DynamicDataMapper {
             @Param("delta") long delta,
             @Param("recordId") String recordId,
             @Param("tenantId") long tenantId,
-            @Param("currentUserId") Long currentUserId);
+            @Param("currentUserId") Long currentUserId,
+            @Param("versioned") boolean versioned,
+            @Param("scopePredicate") String scopePredicate,
+            @Param("scopeParameters") Map<String, Object> scopeParameters);
 
     /**
      * PostgreSQL-native bounded lease claim. Tenant isolation is explicit in both the candidate

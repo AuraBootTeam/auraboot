@@ -27,6 +27,7 @@ import {
 } from '../userService';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
+import { RouterContextProvider } from 'react-router';
 import type { UserPermissions } from '~/utils/type';
 
 const FAKE_REQUEST = new Request('http://localhost/');
@@ -37,6 +38,22 @@ const role = (code: string, name: string) => ({ id: 1, code, name, type: 'role' 
 // ── hasPermission ─────────────────────────────────────────────────────────────
 
 describe('hasPermission', () => {
+  it.each(['codes', 'legacy'])('honors an explicitly granted wildcard in %s snapshots', (format) => {
+    const perms: UserPermissions = {
+      roles: [],
+      permissions: format === 'legacy' ? [permission('*', 'All permissions')] : [],
+      permissionCodes: format === 'codes' ? ['*'] : undefined,
+    };
+    expect(hasPermission(perms, 'model.tenant_member.suspend')).toBe(true);
+  });
+
+  it('does not infer a wildcard grant from a role name', () => {
+    const perms: UserPermissions = {
+      roles: [role('tenant_admin', 'Administrator')], permissions: [], permissionCodes: [],
+    };
+    expect(hasPermission(perms, 'model.tenant_member.suspend')).toBe(false);
+  });
+
   it('returns false when permissions is undefined', () => {
     expect(hasPermission(undefined, 'some.code')).toBe(false);
   });
@@ -190,6 +207,7 @@ describe('fetchUserInfo', () => {
       expect.stringContaining('/api/auth/me'),
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
+        signal: expect.any(AbortSignal),
       }),
     );
     expect(result!.user).toEqual({ id: 42, name: 'Alice' });
@@ -323,7 +341,7 @@ describe('getUserInfo', () => {
   it('returns nulls when no token', async () => {
     getTokenMock.mockResolvedValue(null);
 
-    const result = await getUserInfo(FAKE_REQUEST);
+    const result = await getUserInfo(new Request('http://localhost/home'));
 
     expect(result).toEqual({ user: null, permissions: null, preferences: null });
   });
@@ -340,10 +358,34 @@ describe('getUserInfo', () => {
       json: async () => ({ code: '0', data: userData }),
     } as any);
 
-    const result = await getUserInfo(FAKE_REQUEST);
+    const result = await getUserInfo(new Request('http://localhost/home'));
 
     expect(result.user).toEqual(userData.user);
     expect(result.permissions?.roles).toHaveLength(1);
     expect(result.preferences).toEqual({ theme: 'dark' });
+  });
+});
+
+describe('request scoped user info', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it('deduplicates concurrent parent/child loaders but never reuses another request identity', async () => {
+    getTokenMock.mockResolvedValue(TOKEN);
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: { user: { id: 42 }, permissions: { roles: [], permissions: [] } },
+      }),
+    } as any);
+    const request = new Request('http://localhost/home');
+    const loaderContext = new RouterContextProvider();
+    const [parent, child] = await Promise.all([
+      getUserInfo(request, loaderContext),
+      getUserInfo(request.clone(), loaderContext),
+    ]);
+    expect(parent.user).toEqual(child.user);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await getUserInfo(new Request('http://localhost/home'), new RouterContextProvider());
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

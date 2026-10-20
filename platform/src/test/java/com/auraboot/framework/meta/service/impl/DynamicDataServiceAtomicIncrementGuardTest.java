@@ -58,6 +58,8 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @Mock MetaModelService metadataService;
     @Mock DynamicDataMapper mapper;
+    @Mock com.auraboot.framework.meta.service.VirtualFieldEngine virtualFields;
+    @Mock org.springframework.context.ApplicationContext applicationContext;
 
     DynamicDataServiceImpl service;
 
@@ -73,9 +75,14 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         // Pass one null per constructor parameter — 22 nulls.
         service = new DynamicDataServiceImpl(
                 null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null,
+                new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
         ReflectionTestUtils.setField(service, "metadataService", metadataService);
         ReflectionTestUtils.setField(service, "dynamicDataMapper", mapper);
+        ReflectionTestUtils.setField(service, "virtualFieldEngine", virtualFields);
+        ReflectionTestUtils.setField(service, "applicationContext", applicationContext);
+        ReflectionTestUtils.setField(service, "dataPermissionEngine", mock(com.auraboot.framework.meta.service.DataPermissionEngine.class));
+        ReflectionTestUtils.setField(service, "dataDomainService", mock(com.auraboot.framework.meta.service.DataDomainService.class));
 
         testModel = ModelDefinition.builder()
                 .code("cr_cj_profile")
@@ -158,7 +165,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
                 .thenReturn(Optional.of(protectedModel));
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), isNull(), anyString(),
-                anyString(), anyLong(), anyString(), anyLong(), any()))
+                anyString(), anyLong(), anyString(), anyLong(), any(), anyBoolean(), anyString(), anyMap()))
                 .thenReturn(List.of(Map.of("new_value", 8L)));
 
         Optional<Long> result = MetaContext.runWithCommandPermitPlan(
@@ -171,7 +178,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         assertEquals(Optional.of(8L), result);
         verify(mapper).atomicIncrementReturning(
                 eq("cr_cj_profile"), eq("cr_cj_followed_count"), isNull(),
-                eq("pid"), anyString(), eq(1L), eq("rec-1"), eq(1L), eq(7L));
+                eq("pid"), anyString(), eq(1L), eq("rec-1"), eq(1L), eq(7L), eq(false), anyString(), anyMap());
     }
 
     @Test
@@ -195,10 +202,29 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     }
 
     @Test
+    void aggregate_command_binds_atomic_write_to_authorized_root() {
+        testModel.setAggregateBinding(ModelDefinition.AggregateBinding.builder()
+                .aggregateModel("customer").localField("customer_pid").build());
+        when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
+        when(mapper.atomicIncrementReturning(anyString(), anyString(), isNull(), anyString(),
+                anyString(), anyLong(), anyString(), anyLong(), any(), anyBoolean(), anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("new_value", 5L)));
+
+        Optional<Long> result = MetaContext.runWithCommandAggregate("customer-1",
+                () -> service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L, null));
+
+        assertEquals(Optional.of(5L), result);
+        verify(mapper).atomicIncrementReturning(anyString(), anyString(), isNull(), anyString(),
+                anyString(), anyLong(), anyString(), anyLong(), any(), anyBoolean(),
+                argThat(sql -> sql.contains("customer_pid = #{scopeParameters.authorizedAggregateId}")),
+                argThat(parameters -> "customer-1".equals(parameters.get("authorizedAggregateId"))));
+    }
+
+    @Test
     void increment_passes_null_cap_to_mapper() {
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), isNull(), anyString(),
-                anyString(), anyLong(), anyString(), anyLong(), any()))
+                anyString(), anyLong(), anyString(), anyLong(), any(), anyBoolean(), anyString(), anyMap()))
                 .thenReturn(List.of(Map.of("new_value", 5L)));
 
         Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L, null);
@@ -207,7 +233,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         assertEquals(5L, result.get());
         verify(mapper).atomicIncrementReturning(
                 eq("cr_cj_profile"), eq("cr_cj_followed_count"), isNull(),
-                eq("pid"), anyString(), eq(1L), eq("rec-1"), eq(1L), eq(7L));
+                eq("pid"), anyString(), eq(1L), eq("rec-1"), eq(1L), eq(7L), eq(false), anyString(), anyMap());
         verify(metadataService, never()).getDefinitionByCode(anyString());
     }
 
@@ -215,7 +241,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     void returns_new_value_from_mapper() {
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyLong(), anyString(), anyLong(), any()))
+                anyString(), anyLong(), anyString(), anyLong(), any(), anyBoolean(), anyString(), anyMap()))
                 .thenReturn(List.of(Map.of("new_value", 50L)));
 
         // Use distinct counter and cap fields
@@ -230,7 +256,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     void empty_mapper_result_returns_empty_optional() {
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyLong(), anyString(), anyLong(), any()))
+                anyString(), anyLong(), anyString(), anyLong(), any(), anyBoolean(), anyString(), anyMap()))
                 .thenReturn(List.of());
 
         Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1",

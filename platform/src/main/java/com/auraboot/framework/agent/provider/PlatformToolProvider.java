@@ -46,6 +46,7 @@ public class PlatformToolProvider implements ToolProvider {
 
     private static final int MAX_QUERY_ROWS = 100;
 
+    private final com.auraboot.framework.meta.service.ModelReferenceLookupService referenceLookup;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
     private final AiModelSuggestionService aiModelSuggestionService;
@@ -53,8 +54,14 @@ public class PlatformToolProvider implements ToolProvider {
     private final SubAgentRunner subAgentRunner;
     private final JdbcTemplate jdbcTemplate;
     private final DataPermissionEngine dataPermissionEngine;
+    private final com.auraboot.framework.meta.service.SecureSqlRewriter sqlRewriter;
 
     private static final List<ToolDefinition> PLATFORM_TOOLS = List.of(
+        ToolDefinition.builder().toolCode("platform.resolve_reference").toolName("Resolve reference label")
+            .description("Resolve an exact business label to its declared stored reference value. Call before filtering a reference by customer name; never infer customer membership from project names. Missing, ambiguous or denied labels fail closed.")
+            .providerCode("platform").toolType("platform").sourceCode("platform.resolve_reference")
+            .operationKind("query").riskLevel("L0").confirmationPolicy("none")
+            .parameterSchema(com.auraboot.framework.meta.service.ModelReferenceLookupService.inputSchema()).build(),
         ToolDefinition.builder()
             .toolCode("platform.execute_sql")
             .toolName("Execute SQL Query")
@@ -192,6 +199,8 @@ public class PlatformToolProvider implements ToolProvider {
             Map<String, Object> result = switch (toolCode) {
                 case "platform.execute_sql"    -> executeSql(params, tenantId);
                 case "platform.list_models"    -> listModels(params);
+                case "platform.resolve_reference" -> referenceLookup.resolve(getStringParam(params, "modelCode"),
+                        getStringParam(params, "fieldCode"), getStringParam(params, "displayValue"));
                 case "platform.model_suggest"  -> modelSuggest(params);
                 case "platform.create_model"   -> createModel(params);
                 case "platform.fill_form"     -> fillForm(params);
@@ -238,27 +247,22 @@ public class PlatformToolProvider implements ToolProvider {
         // Build params with tenantId for #{params.tenantId} placeholders
         Map<String, Object> queryParams = new LinkedHashMap<>();
         Long effectiveTenantId = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
-        if (effectiveTenantId == null) {
+        if (effectiveTenantId == null || effectiveTenantId <= 0
+                || (MetaContext.getCurrentTenantId() != null
+                    && !effectiveTenantId.equals(MetaContext.getCurrentTenantId()))) {
             return errorResult("Tenant context is required for SQL execution");
         }
         queryParams.put("tenantId", effectiveTenantId);
 
-        // Tenant isolation enforcement: ALWAYS inject the runtime tenant predicate
-        // for read-only SELECT statements. The SQL originates from an LLM tool-call
-        // param, so we must never trust a tenant_id the model wrote — the injected
-        // server-side predicate is AND-ed onto whatever the query already contains,
-        // which can only narrow the result set to the current tenant.
-        String isolatedSql = injectTenantFilter(sql);
-        if (isolatedSql == null) {
-            return errorResult("SQL requires tenant isolation. Prefer the available DSL/list/named-query tools, "
-                    + "or use a SELECT with a clear top-level FROM/WHERE clause so tenant_id can be injected.");
+        // Apply scope at every physical source before any caller-authored OR, join,
+        // aggregate or subquery can evaluate. Parsing failures must never execute raw SQL.
+        try {
+            sql = sqlRewriter.rewriteForTenant(sql);
+        } catch (RuntimeException invalid) {
+            return errorResult("SQL source scope could not be established. Use a DSL/list/named-query tool.");
         }
-        sql = isolatedSql;
-
-        // Enforce LIMIT to prevent unbounded queries
-        if (!LIMIT_REFERENCE.matcher(sql).find()) {
-            sql = sql + " LIMIT " + MAX_QUERY_ROWS;
-        }
+        // An outer bound also caps explicit and nested LIMIT clauses.
+        sql = "SELECT * FROM (" + sql + ") AS _tool_result LIMIT " + MAX_QUERY_ROWS;
 
         log.info("platform.execute_sql SQL: {}", sql);
 
@@ -519,7 +523,9 @@ public class PlatformToolProvider implements ToolProvider {
                     + "current thread.");
         }
         Long effectiveTenantId = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
-        if (effectiveTenantId == null) {
+        if (effectiveTenantId == null || effectiveTenantId <= 0
+                || (MetaContext.getCurrentTenantId() != null
+                    && !effectiveTenantId.equals(MetaContext.getCurrentTenantId()))) {
             return errorResult("Tenant context is required for platform.delegate_task");
         }
 
@@ -586,8 +592,6 @@ public class PlatformToolProvider implements ToolProvider {
     private static final Pattern FROM_TABLE = Pattern.compile(
             "\\bfrom\\s+(mt_\\w+)",
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern FROM_REFERENCE = Pattern.compile("\\bfrom\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern LIMIT_REFERENCE = Pattern.compile("\\blimit\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern MT_TABLE_REFERENCE = Pattern.compile("\\bmt_(\\w+)", Pattern.CASE_INSENSITIVE);
 
     /**
@@ -682,48 +686,13 @@ public class PlatformToolProvider implements ToolProvider {
     }
 
     /**
-     * Unconditionally inject the current-tenant predicate into a read-only SELECT.
-     *
-     * <p>The SQL is authored by the LLM from a tool-call param, so a
-     * prompt-injected {@code WHERE tenant_id = <other tenant>} must NOT be
-     * trusted. We always AND {@code tenant_id = #{params.tenantId}} onto the
-     * top-level WHERE (or add a WHERE when absent); when the caller already wrote
-     * a tenant_id the result is {@code server-condition AND caller-condition},
-     * which can only intersect down to the current tenant. Returns {@code null}
-     * when the statement has no place to attach the predicate (caller then
-     * rejects the query).
-     */
-    private static String injectTenantFilter(String sql) {
-        if (!FROM_REFERENCE.matcher(sql).find()) {
-            return sql;
-        }
-
-        int boundary = firstClauseBoundary(sql);
-        int whereIndex = indexOfKeywordBefore(sql, "\\bwhere\\b", boundary);
-        String predicate = "tenant_id = #{params.tenantId}";
-
-        if (whereIndex >= 0) {
-            int afterWhere = whereIndex + "where".length();
-            return sql.substring(0, afterWhere) + " " + predicate + " AND " + sql.substring(afterWhere).trim();
-        }
-
-        String head = boundary >= 0 ? sql.substring(0, boundary).trim() : sql.trim();
-        String tail = boundary >= 0 ? " " + sql.substring(boundary).trim() : "";
-        if (head.isBlank()) {
-            return null;
-        }
-        return head + " WHERE " + predicate + tail;
-    }
-
-    /**
      * SEC-005: apply the same row-level ACL + field masking that
      * {@code DynamicDataService} applies on the DSL list/get path.
      *
      * <p>Post-query filtering can only be attributed to a single model, so it is
      * applied when the query targets exactly one {@code mt_<model>} table. Cross-model
      * joins / aggregates / non-mt_ system tables cannot be mapped to one model's row
-     * policies; those rely on the unconditional tenant predicate (see
-     * {@link #injectTenantFilter}) as the isolation boundary. Any failure inside the
+     * policies; those rely on the physical-source tenant scopes as the isolation boundary. Any failure inside the
      * engine propagates to {@link #execute} and is surfaced as a failed result
      * (fail-secure: no rows leak).
      */
@@ -777,22 +746,4 @@ public class PlatformToolProvider implements ToolProvider {
         return first;
     }
 
-    private static int firstClauseBoundary(String sql) {
-        return List.of("\\bgroup\\s+by\\b", "\\bhaving\\b", "\\border\\s+by\\b",
-                        "\\blimit\\b", "\\boffset\\b", "\\bfetch\\b")
-                .stream()
-                .map(pattern -> indexOfKeywordBefore(sql, pattern, -1))
-                .filter(index -> index >= 0)
-                .min(Integer::compareTo)
-                .orElse(-1);
-    }
-
-    private static int indexOfKeywordBefore(String sql, String pattern, int boundary) {
-        Matcher matcher = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(sql);
-        if (!matcher.find()) {
-            return -1;
-        }
-        int index = matcher.start();
-        return boundary < 0 || index < boundary ? index : -1;
-    }
 }

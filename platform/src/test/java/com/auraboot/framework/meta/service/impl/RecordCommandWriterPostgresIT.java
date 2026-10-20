@@ -174,7 +174,11 @@ class RecordCommandWriterPostgresIT {
             var parent=RecordCommandWriterParentTest.parentModel("mt_procurement_parent_it");
             var support=new DynamicDataTransferSupport(null,mapper,new com.fasterxml.jackson.databind.ObjectMapper(),null,null,null,null,
                 null,null,null,null,null,null,null,code -> code.equals("order") ? parent : model,code -> {},
-                (definition,data) -> new HashMap<>(data),(definition,sort) -> sort);
+                (definition,data) -> new HashMap<>(data),(definition,sort) -> sort,(code,data) -> {
+                    var columns=new HashMap<String,Object>(data);columns.put("tenant_id",1L);
+                    RecordCommandWriterGuard.guardParentInput(mapper,model,key -> parent,columns);
+                    mapper.insert(TABLE,columns);return columns;
+                });
             java.nio.file.Path file;
             try { file=java.nio.file.Files.createTempFile("procurement-parent-it-",".json");
                 java.nio.file.Files.writeString(file,"[{\"id\":4,\"pid\":\"import-owned\",\"order_pid\":\"parent-owned\",\"amount\":40},{\"id\":5,\"pid\":\"import-ordinary\",\"order_pid\":\"parent-ordinary\",\"amount\":50}]");
@@ -209,7 +213,7 @@ class RecordCommandWriterPostgresIT {
             var phase=new com.auraboot.framework.meta.service.impl.pipeline.phases.ComputedFieldsPhase(metadata,
                 new CommandSpelEvaluator(),mapper,mock(com.auraboot.framework.meta.service.ChangeTracker.class),
                 mock(com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader.class),
-                new CommandFieldMapExecutor(mapper,metadata,null,null,null));
+                new CommandFieldMapExecutor(mapper,metadata,null,null,null,mock(CommandModelMutationSupport.class)));
             assertThatThrownBy(() -> phase.execute(context)).hasMessageContaining("RECORD_WRITER_DENIED");
             assertThat(jdbc.queryForObject("SELECT amount FROM " + TABLE + " WHERE pid='ordinary'",Integer.class)).isEqualTo(20);
             exact(() -> phase.execute(context));

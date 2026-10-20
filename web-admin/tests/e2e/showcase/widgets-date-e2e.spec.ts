@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 /**
  * GA B4 — Date-bucket widgets E2E (5 widgets × full props chain)
  *
@@ -211,9 +212,7 @@ async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: strin
 
   await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 5_000 });
 
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 
   const search = page
     .locator(
@@ -238,9 +237,7 @@ async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: strin
   const row = page.locator(`tr:has-text("${pageKey}")`).first();
   await expect(row).toBeVisible({ timeout: 5_000 });
 
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 
   const rowLink = row.locator(`a[href*="/page-designer/${pid}"]`).first();
   if (await rowLink.isVisible({ timeout: 1_500 }).catch(() => false)) {
@@ -695,6 +692,7 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
     // Give the form a moment to hydrate — we wait for the form tag, not
     // networkidle (SSE keeps network busy indefinitely).
     await expect(page.locator('form').first()).toBeVisible({ timeout: 5_000 });
+    await expandFormSections(page);
     // Then wait for at least one date/time input to mount — the form's
     // smart components hydrate after the form tag itself, and the inputs we
     // probe below are conditional on that hydration completing.

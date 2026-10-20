@@ -1,6 +1,6 @@
 package com.auraboot.framework.integration.agent;
 
-import com.auraboot.framework.application.bootstrap.seeder.AgentTemplateSeeder;
+import com.auraboot.framework.agent.integration.bootstrap.AgentTemplateSeeder;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.service.SkillAutoGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;

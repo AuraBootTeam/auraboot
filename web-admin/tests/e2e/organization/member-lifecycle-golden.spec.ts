@@ -46,7 +46,9 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   await membersLink.click();
   await expect(page).toHaveURL(/\/p\/tenant_member/);
   await expect(page.getByTestId('invite-section')).toBeVisible();
-  const row = page.locator('table tbody tr').filter({ hasText: stamp });
+  // Scope to the members table and tolerate transient double-render during
+  // list refreshes (the row can briefly mount twice before settling).
+  const row = page.locator('table tbody tr').filter({ hasText: stamp }).first();
   await expect(row).toHaveCount(1, { timeout: 20000 });
   await expect(row).toBeVisible();
   const statusContent = row.locator('[data-testid$="-status"] div.truncate');

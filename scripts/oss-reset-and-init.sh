@@ -65,6 +65,8 @@ for arg in "$@"; do
             echo "Env vars:"
             echo "  SKIP_SEED=1     Skip Playwright showcase seed (step 8)"
             echo "  PLUGIN_IMPORT_PROFILE=core|demo|e2e  Override plugin import profile"
+            echo "  SYSTEM_MODE=single|multi             Bootstrap posture (default single)"
+            echo "  AGENT_LLM_STUB_MODE=true|false       BE-side LLM stub provider (default true)"
             echo "  AURA_RESET_ALLOW_TARGETS=\"<pg_db>,<be_port>\"  REQUIRED allow-list: reset only proceeds when both the target PG_DB and BE_PORT appear in it (\"@any\" overrides)"
             echo "  AURABOOT_DEMO_SEED=false  Backward-compatible alias for PLUGIN_IMPORT_PROFILE=core"
             exit 0
@@ -357,6 +359,29 @@ echo -e "${YELLOW}Step 3: Resetting database...${NC}"
 echo "y" | "$SCRIPT_DIR/reset-db.sh"
 echo -e "${GREEN}   Database reset complete${NC}"
 
+# Step 3.5: Apply staged application-module migrations. The workflow app
+# (aura-bpm) ships as a PF4J jar under platform/plugins/ and loads at boot, but
+# jar-form modules never run plugin directory migrations — on a fresh database
+# its tables are absent, which used to poison unrelated plugin imports (usage
+# index rebuild touching a missing ab_sla_config) and kept the SLA scheduler
+# erroring forever. The migrations live in the sibling aura-bpm checkout; they
+# are plain DDL and always run against the freshly recreated database.
+AURA_BPM_MIGRATIONS_DIR="${AURA_BPM_MIGRATIONS_DIR:-$(cd "$PROJECT_ROOT/.." && pwd)/aura-bpm/migrations/bpm}"
+if [ -d "$AURA_BPM_MIGRATIONS_DIR" ]; then
+    echo -e "${YELLOW}Step 3.5: Applying application-module migrations (${AURA_BPM_MIGRATIONS_DIR})...${NC}"
+    for migration in "$AURA_BPM_MIGRATIONS_DIR"/*.sql; do
+        [ -e "$migration" ] || continue
+        if psql_run -v ON_ERROR_STOP=1 -f "$migration" > /dev/null; then
+            echo -e "${GREEN}   Applied $(basename "$migration")${NC}"
+        else
+            echo -e "${RED}   Migration failed: $migration${NC}" >&2
+            exit 1
+        fi
+    done
+else
+    echo -e "${YELLOW}Step 3.5: No application-module migrations dir found (skipped: ${AURA_BPM_MIGRATIONS_DIR})${NC}"
+fi
+
 # Step 4: Start backend service
 echo -e "${YELLOW}Step 4: Starting backend service...${NC}"
 cd "$PLATFORM_DIR"
@@ -415,6 +440,7 @@ BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" env \
     SERVER_PORT="$BE_PORT" \
     DATABASE_URL="jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DB}?charSet=UTF8" \
     AURA_SSRF_ALLOWED_PRIVATE_HOSTS="127.0.0.1,localhost" \
+    AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}" \
     java -jar "$BOOT_JAR")"
 aura_reset_register_process "backend" "$BACKEND_PID" "$BE_PORT" "$PLATFORM_DIR" "java -jar"
 
@@ -471,7 +497,7 @@ else
                 \"adminEmail\": \"admin@auraboot.com\",
                 \"adminPassword\": \"Test2026x\",
                 \"adminDisplayName\": \"Admin User\",
-                \"systemMode\": \"single\"
+                \"systemMode\": \"${SYSTEM_MODE:-single}\"
             }" 2>/dev/null)
 
         BOOTSTRAP_BODY=$(echo "$BOOTSTRAP_RESP" | sed '$d')

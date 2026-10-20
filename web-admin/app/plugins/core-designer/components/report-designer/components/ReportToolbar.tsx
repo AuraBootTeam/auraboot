@@ -17,6 +17,8 @@ interface ReportToolbarProps {
   onExportPdf: () => void;
   onExportExcel?: () => void;
   onExportJson?: () => void;
+  onExportMarkdown?: () => void;
+  onExportHtml?: () => void;
   onToggleVersionHistory?: () => void;
   versionCount?: number;
   exportReady?: boolean;
@@ -30,6 +32,8 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
   onExportPdf,
   onExportExcel,
   onExportJson,
+  onExportMarkdown,
+  onExportHtml,
   onToggleVersionHistory,
   versionCount,
   exportReady = true,
@@ -58,6 +62,8 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                   ['PDF', onExportPdf],
                   ['Excel', onExportExcel],
                   ['JSON', onExportJson],
+                  ['Markdown', onExportMarkdown],
+                  ['HTML', onExportHtml],
                 ] as const
               ).map(
                 ([format, action]) =>
@@ -98,7 +104,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
       title={report.title}
       aria-label={text({ zh: '报表标题', en: 'Report Title' })}
       onChange={(e) => updateTitle(e.target.value)}
-      className="w-64 min-w-0 max-w-full border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
+      className="w-80 max-w-full min-w-0 border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
       placeholder={text({ zh: '报表标题', en: 'Report Title' })}
     />
   );
@@ -145,6 +151,25 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         >
           {text({ zh: '导出 PDF', en: 'Export PDF' })}
         </button>
+
+        {(
+          [
+            ['Markdown', onExportMarkdown],
+            ['HTML', onExportHtml],
+          ] as const
+        ).map(([format, action]) =>
+          action ? (
+            <button
+              key={format}
+              onClick={action}
+              disabled={exportDisabled}
+              aria-describedby={exportDisabled ? 'report-export-status' : undefined}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {text({ zh: `导出 ${format}`, en: `Export ${format}` })}
+            </button>
+          ) : null,
+        )}
 
         {onExportExcel && (
           <button

@@ -1,3 +1,4 @@
+import { expandFormSections } from '../helpers/index';
 /**
  * Showcase Smart Component Fields — Deep Interaction E2E Tests
  *
@@ -85,6 +86,7 @@ async function openCreateForm(page: Page): Promise<void> {
     .waitForURL(/showcase.all.fields.*form|\/new|\/create/, { timeout: 15_000 })
     .catch(() => null);
   await waitForFormReady(page, 15_000);
+  await expandFormSections(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -786,11 +788,13 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
     expect(typedValue, 'Textarea should accept typed input').toBe('Test AI content for SCI-011');
 
     // Main AI button should exist with gradient styling
-    const aiButton = aiField.locator('button').filter({ hasText: /AI\s+(Generate|Summarize|Translate|Classify|Extract)/i }).first();
+    // Operation labels localize (生成/生成摘要/翻译/分类/提取 in zh-CN).
+    const opPattern = /AI\s+(Generate|Summarize|Translate|Classify|Extract|生成摘要|生成|翻译|分类|提取)/i;
+    const aiButton = aiField.locator('button').filter({ hasText: opPattern }).first();
     await expect(aiButton, 'Main AI action button should be visible').toBeVisible({ timeout: 3_000 });
     const aiButtonText = await aiButton.innerText();
     expect(
-      aiButtonText.match(/AI\s+(Generate|Summarize|Translate|Classify|Extract)/),
+      aiButtonText.match(opPattern),
       `AI button should show operation label, got: "${aiButtonText}"`,
     ).toBeTruthy();
 
@@ -805,9 +809,15 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
     const opsDropdown = aiField.locator('.min-w-\\[160px\\]').first();
     await expect(opsDropdown, 'Operations dropdown should open').toBeVisible({ timeout: 3_000 });
 
-    const expectedOps = ['Generate', 'Summarize', 'Translate', 'Classify', 'Extract'];
-    for (const op of expectedOps) {
-      const opButton = opsDropdown.locator('button').filter({ hasText: op }).first();
+    const expectedOps: Array<[string, RegExp]> = [
+      ['Generate', /生成(?!摘要)|Generate/],
+      ['Summarize', /生成摘要|Summarize/],
+      ['Translate', /翻译|Translate/],
+      ['Classify', /分类|Classify/],
+      ['Extract', /提取|Extract/],
+    ];
+    for (const [op, pattern] of expectedOps) {
+      const opButton = opsDropdown.locator('button').filter({ hasText: pattern }).first();
       await expect(opButton, `Operation "${op}" should be listed`).toBeVisible({ timeout: 2_000 });
     }
 

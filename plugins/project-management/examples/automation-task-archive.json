@@ -1,0 +1,115 @@
+{
+  "name": "客户项目任务归档（默认停用）",
+  "description": "仅用于独立演示环境。将条件中的任务 PID 替换为本次专属演示任务；启用后，该任务完成时会覆盖其任务描述为演示归档说明。其他任务不修改。使用原生修改记录动作，不授予业务命令权限。",
+  "enabled": false,
+  "flowConfig": {
+    "nodes": [
+      {
+        "id": "task_done",
+        "type": "trigger-state-change",
+        "position": {
+          "x": 60,
+          "y": 100
+        },
+        "data": {
+          "type": "trigger-state-change",
+          "label": "任务完成",
+          "config": {
+            "triggerType": "on_state_change",
+            "modelCode": "tpm_task",
+            "stateField": "tpm_ts_status",
+            "fromStates": [
+              "in_review"
+            ],
+            "toStates": [
+              "done"
+            ]
+          }
+        }
+      },
+      {
+        "id": "owned_task",
+        "type": "control-condition",
+        "position": {
+          "x": 320,
+          "y": 100
+        },
+        "data": {
+          "type": "control-condition",
+          "label": "仅本次演示任务",
+          "config": {
+            "controlType": "condition",
+            "expression": "recordId == 'REPLACE_WITH_OWN_DEMO_TASK_PID'"
+          }
+        }
+      },
+      {
+        "id": "archive",
+        "type": "action-update-record",
+        "position": {
+          "x": 580,
+          "y": 40
+        },
+        "data": {
+          "type": "action-update-record",
+          "label": "写入演示归档说明",
+          "config": {
+            "actionType": "update_record",
+            "modelCode": "tpm_task",
+            "recordPid": "${trigger.recordPid}",
+            "fields": {
+              "tpm_ts_description": "[AuraBoot demo] Archived after delivery confirmation"
+            }
+          }
+        }
+      },
+      {
+        "id": "ignore",
+        "type": "action-write-audit",
+        "position": {
+          "x": 580,
+          "y": 260
+        },
+        "data": {
+          "type": "action-write-audit",
+          "label": "其他任务保持不变",
+          "config": {
+            "actionType": "write_audit",
+            "message": "Skipped: task is outside this demonstration scope"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_to_guard",
+        "source": "task_done",
+        "target": "owned_task"
+      },
+      {
+        "id": "owned",
+        "source": "owned_task",
+        "sourceHandle": "true",
+        "target": "archive",
+        "data": {
+          "condition": {
+            "type": "expression",
+            "content": "recordId == 'REPLACE_WITH_OWN_DEMO_TASK_PID'"
+          }
+        }
+      },
+      {
+        "id": "others",
+        "source": "owned_task",
+        "sourceHandle": "false",
+        "target": "ignore",
+        "data": {
+          "condition": {
+            "type": "expression",
+            "content": "recordId != 'REPLACE_WITH_OWN_DEMO_TASK_PID'"
+          }
+        }
+      }
+    ]
+  }
+}

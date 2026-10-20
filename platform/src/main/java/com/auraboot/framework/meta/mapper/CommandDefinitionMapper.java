@@ -46,6 +46,26 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
     @Options(useGeneratedKeys = true, keyProperty = "id,version", keyColumn = "id,version")
     int insertIdempotent(CommandDefinition commandDefinition);
 
+    /**
+     * Adopt the row holding the (tenant, code, version) slot — whether it is still
+     * live (another layer may already have resurrected it) or retired — flipping it
+     * back to live and refreshing the business columns so the caller's generated pid
+     * resolution — insertIdempotent returns 0 on conflict — lands on a row that
+     * actually exists for publish and downstream reads.
+     */
+    @Update("""
+        UPDATE ab_command_definition SET
+          deleted_flag = FALSE, display_name = #{displayName}, description = #{description},
+          model_code = #{modelCode},
+          input_schema = #{inputSchema, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+          target_models = #{targetModels, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+          execution_config = #{executionConfig, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+          extension = #{extension, typeHandler=com.auraboot.framework.application.database.mybatis.ExtensionTypeHandler},
+          cmd_risk_level = #{cmdRiskLevel}, plugin_pid = #{pluginPid}, updated_at = NOW()
+        WHERE tenant_id = #{tenantId} AND code = #{code} AND version = #{version}
+        """)
+    int adoptRetired(CommandDefinition commandDefinition);
+
     @Select("SELECT * FROM ab_command_definition WHERE pid = #{pid} AND deleted_flag = false")
     CommandDefinition findByPid(@Param("pid") String pid);
 
