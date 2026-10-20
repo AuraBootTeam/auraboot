@@ -75,7 +75,8 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         // Pass one null per constructor parameter — 22 nulls.
         service = new DynamicDataServiceImpl(
                 null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null,
+                new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
         ReflectionTestUtils.setField(service, "metadataService", metadataService);
         ReflectionTestUtils.setField(service, "dynamicDataMapper", mapper);
         ReflectionTestUtils.setField(service, "virtualFieldEngine", virtualFields);

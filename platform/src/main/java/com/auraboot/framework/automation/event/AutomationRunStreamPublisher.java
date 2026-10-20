@@ -1,6 +1,5 @@
 package com.auraboot.framework.automation.event;
 
-import com.auraboot.framework.agent.dto.LlmChunk;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -101,7 +100,7 @@ public class AutomationRunStreamPublisher {
      * reconnect (and per Q4 they restart from chunk 0 conceptually, even
      * though we never replay buffered chunks).
      */
-    public Subscription subscribe(String runPid, String nodeId, BiConsumer<LlmChunk, Long> consumer) {
+    public Subscription subscribe(String runPid, String nodeId, BiConsumer<AutomationStreamChunk, Long> consumer) {
         String key = key(runPid, nodeId);
         Subscription sub = new Subscription(this, key, consumer);
         subscribers.computeIfAbsent(key, k -> new CopyOnWriteArrayList<>()).add(sub);
@@ -153,9 +152,9 @@ public class AutomationRunStreamPublisher {
     public static final class Subscription {
         private final AutomationRunStreamPublisher owner;
         private final String key;
-        private final BiConsumer<LlmChunk, Long> consumer;
+        private final BiConsumer<AutomationStreamChunk, Long> consumer;
 
-        private Subscription(AutomationRunStreamPublisher owner, String key, BiConsumer<LlmChunk, Long> consumer) {
+        private Subscription(AutomationRunStreamPublisher owner, String key, BiConsumer<AutomationStreamChunk, Long> consumer) {
             this.owner = owner;
             this.key = key;
             this.consumer = consumer;

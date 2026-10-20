@@ -1,7 +1,7 @@
 package com.auraboot.framework.behavior;
 
 import com.auraboot.framework.agent.dto.ResultContract;
-import com.auraboot.framework.behavior.service.AnalyticsResultHistory;
+import com.auraboot.framework.agent.integration.behavior.AnalyticsResultHistory;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;

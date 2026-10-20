@@ -1,4 +1,4 @@
-package com.auraboot.framework.behavior.service;
+package com.auraboot.framework.agent.integration.behavior;
 
 import com.auraboot.framework.agent.dto.ResultContract;
 import com.auraboot.framework.exception.BusinessException;

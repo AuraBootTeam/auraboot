@@ -62,6 +62,7 @@ permissions:
 
 env:
   AURA_GRADLE_REPOSITORY_POLICY: central
+  MAVEN_CENTRAL_FIRST: 'true'
   COMPOSE_PROJECT_NAME: auraboot-auth-${{ github.run_id }}-${{ github.run_attempt }}
   PW_E2E_RUN_ID: ci-auth-${{ github.run_id }}-${{ github.run_attempt }}
   PW_STORAGE_DIR: tests/storage/ci-auth-${{ github.run_id }}-${{ github.run_attempt }}

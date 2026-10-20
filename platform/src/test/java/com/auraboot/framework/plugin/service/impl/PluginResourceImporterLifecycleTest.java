@@ -54,6 +54,13 @@ class PluginResourceImporterLifecycleTest {
     @Spy ObjectMapper objectMapper = new ObjectMapper();
     @InjectMocks PluginResourceImporterImpl importer;
 
+    @org.junit.jupiter.api.BeforeEach
+    void wireAgentResourceProvider() {
+        org.springframework.test.util.ReflectionTestUtils.setField(importer, "agentDefinitionResources",
+                new com.auraboot.framework.agent.integration.plugin.AgentDefinitionResourceAdapter(
+                        agentDefinitionMapper, agentEvalCaseMapper, pluginResourceMapper, jdbcTemplate, objectMapper));
+    }
+
     DashboardDefinitionDTO dashboard() {
         return DashboardDefinitionDTO.builder().code("invoice_board").title("Invoices")
                 .widgets(List.of(Map.of("id", "revenue", "type", "metric")))

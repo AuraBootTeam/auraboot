@@ -14,7 +14,7 @@ import java.util.Map;
 public class ChatRequest {
 
     /** Reference only; execution goals and provenance are always loaded server-side. */
-    private com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Request analyticsExecution;
+    private com.auraboot.framework.agent.integration.behavior.AnalyticsConversationTaskStore.Request analyticsExecution;
 
     /**
      * Session ID for conversation continuity.

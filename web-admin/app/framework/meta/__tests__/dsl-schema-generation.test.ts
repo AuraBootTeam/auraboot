@@ -16,7 +16,7 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('should have 43 definitions including card image viewports', () => {
+  it('includes the card image viewport in the 43-definition contract', () => {
     expect(Object.keys(defs).length).toBe(43);
     expect(defs).toHaveProperty('CardImageViewport');
   });

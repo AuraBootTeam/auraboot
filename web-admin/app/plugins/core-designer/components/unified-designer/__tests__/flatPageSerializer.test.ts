@@ -439,7 +439,7 @@ describe('flatPageSerializer designer-authored trees', () => {
 });
 
 describe('flatPageSerializer fail-fast boundaries', () => {
-  it('rejects composite kinds and preserves supported dashboard documents', () => {
+  it('rejects composite pages and preserves the supported dashboard representation', () => {
     expect(() =>
       serializePageTreeToFlat({
         schemaVersion: 3,
@@ -449,10 +449,7 @@ describe('flatPageSerializer fail-fast boundaries', () => {
       }),
     ).toThrow(FlatSerializationError);
     expect(serializePageTreeToFlat({
-      schemaVersion: 3,
-      kind: 'dashboard',
-      id: 'dash',
-      blocks: [],
+      schemaVersion: 3, kind: 'dashboard', id: 'dash', blocks: [],
     })).toMatchObject({ schemaVersion: 4, kind: 'dashboard', blocks: [] });
   });
 

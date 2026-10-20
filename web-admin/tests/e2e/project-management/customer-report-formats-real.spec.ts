@@ -1,4 +1,4 @@
-import { EXPLICIT_BASE_URL as CONTRACT_EXPLICIT_BASE_URL } from '../../helpers/environments';
+import { requireRuntimeUrl } from '../../helpers/environments';
 /**
  * Hand-authored SC05 template + current tenant data. No LLM invocation or substitute.
  * This proves report persistence and real exports, never AI interpretation/integration.
@@ -29,7 +29,7 @@ test('SC06-FORMATS manual customer template persists and exports real Chinese da
   page,
 }, info) => {
   test.setTimeout(180_000);
-  const origin = new URL(CONTRACT_EXPLICIT_BASE_URL || '');
+  const origin = new URL(requireRuntimeUrl('base'));
   expect(['localhost', '127.0.0.1']).toContain(origin.hostname);
   const evidence = process.env.AURA_EVIDENCE_DIR;
   expect(evidence, 'bind artifacts to the registered runtime evidence run').toBeTruthy();

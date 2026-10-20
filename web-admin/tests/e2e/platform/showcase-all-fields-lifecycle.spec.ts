@@ -184,46 +184,6 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
   let uiCreatedCode: string;
   let defaultTableView: DefaultTableViewState | null = null;
 
-  async function ensureUiCreatedRecord(page: Page): Promise<void> {
-    if (uiCreatedPid) return;
-
-    const existing = await queryFilteredList(page, MODEL_CODE, 'sc_name', RECORD_NAME_UI, {
-      operator: 'EQ',
-      pageSize: 5,
-    });
-    const existingPid = String(existing[0]?.pid ?? existing[0]?.id ?? '');
-    if (existingPid) {
-      uiCreatedPid = existingPid;
-      uiCreatedCode = String(existing[0]?.sc_code ?? '');
-      return;
-    }
-
-    const result = await executeCommandViaApi(
-      page,
-      'sc:create_showcase',
-      {
-        sc_name: RECORD_NAME_UI,
-        sc_description: DESCRIPTION,
-        sc_quantity: 88,
-        sc_price: 199.5,
-        sc_priority: 'medium',
-        sc_category: 'electronics',
-        sc_status: 'draft',
-        sc_is_active: true,
-        sc_start_date: START_DATE,
-        sc_end_date: END_DATE,
-        sc_progress: 75,
-        sc_rating: 4,
-        sc_email: `ui_${UID}@example.com`,
-        sc_phone: '13900001234',
-      },
-      undefined,
-      'create',
-    );
-    uiCreatedPid = result.recordId;
-    expect(uiCreatedPid, 'SC-008 fallback seed must create a record').toBeTruthy();
-  }
-
   // =========================================================================
   // beforeAll: seed 3 draft records via API for list testing
   // =========================================================================
@@ -950,99 +910,66 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
   // =========================================================================
   // D8: Edit + Re-display — modify values, save, reopen, verify
   // =========================================================================
-  test('SC-008 @critical — Edit record → save → values updated on re-open', async ({ page }) => {
+  test('SC-008 @critical — Edit record → save → values updated on re-open', async ({ page }, info) => {
     test.setTimeout(45000);
-    await ensureUiCreatedRecord(page);
-    // Navigate to edit form directly (avoids detail→edit navigation chain issues)
+    expect(uiCreatedPid, 'SC-006 must create this record through the UI').toBeTruthy();
     await page.goto(`/p/showcase_all_fields/${uiCreatedPid}/edit?commandCode=sc%3Aupdate_showcase`, {
       waitUntil: 'domcontentloaded',
     });
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     await waitForFormReady(page, 15_000);
 
-    // [D8] Verify existing values are pre-filled
+    // The generic form shell can precede these required business controls.
     const nameInput = page
       .locator('[data-testid="form-field-sc_name"] input, [data-field="sc_name"] input')
       .first();
-    if (await nameInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await expect
-        .poll(async () => nameInput.inputValue(), { timeout: 15_000, intervals: [250, 500, 1000] })
-        .toContain(RECORD_NAME_UI.slice(0, 15));
-    }
+    await expect(nameInput).toBeVisible();
+    await expect(nameInput).toHaveValue(RECORD_NAME_UI, { timeout: 15_000 });
+    await expect(nameInput).toBeEditable();
+    await nameInput.fill(RECORD_NAME_EDITED);
+    await expect(nameInput).toHaveValue(RECORD_NAME_EDITED);
 
-    // Modify name
-    if (await nameInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await fillControlledInput(nameInput, RECORD_NAME_EDITED);
-    }
-
-    // Modify quantity to 200
     const qtyInput = page
       .locator('[data-testid="form-field-sc_quantity"] input, [data-field="sc_quantity"] input')
       .first();
-    if (await qtyInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await fillControlledInput(qtyInput, '200');
-    }
+    await expect(qtyInput).toBeVisible();
+    await expect(qtyInput).toBeEditable();
+    await qtyInput.fill('200');
+    await qtyInput.press('Tab');
+    await expect(qtyInput).toHaveValue('200');
 
-    // Submit edit
     const submitBtn = page.locator('[data-testid="form-btn-submit"]').first();
     const submitBtnAlt = page.getByRole('button', { name: /提交|保存|Submit|Save/i }).first();
     const btn = (await submitBtn.isVisible({ timeout: 2_000 }).catch(() => false))
       ? submitBtn
       : submitBtnAlt;
-
     const commandResponsePromise = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/meta/commands/execute/') &&
-        r.request().method().toLowerCase() === 'post' &&
-        r.status() === 200,
+      r => decodeURIComponent(new URL(r.url()).pathname) ===
+        '/api/meta/commands/execute/sc:update_showcase' && r.request().method() === 'POST',
       { timeout: 20_000 },
     );
     await btn.click();
     const commandResponse = await commandResponsePromise;
-    const commandBody = await commandResponse.json().catch(() => ({}));
-    expect(String((commandBody as any)?.code ?? '0'), 'Update command should succeed').toBe('0');
+    expect(commandResponse.status()).toBe(200);
+    const submitted = commandResponse.request().postDataJSON();
+    expect(submitted.targetRecordPid).toBe(uiCreatedPid);
+    expect(submitted.payload.sc_name).toBe(RECORD_NAME_EDITED);
+    expect(Number(submitted.payload.sc_quantity)).toBe(200);
+    const commandBody = await commandResponse.json();
+    expect(String(commandBody.code), 'Update command should succeed').toBe('0');
 
-    // [D8] Verify updated values via API (most reliable — avoids form redirect issues)
-    const verifyResp = await page.request.get(
-      `/api/dynamic/showcase_all_fields/${uiCreatedPid}`,
-    );
-    expect(verifyResp.ok(), 'Should fetch updated record').toBeTruthy();
+    const verifyResp = await page.request.get(`/api/dynamic/showcase_all_fields/${uiCreatedPid}`);
+    expect(verifyResp.status()).toBe(200);
     const verifyBody = await verifyResp.json();
-    const updatedRecord = (verifyBody as any)?.data;
+    expect(String(verifyBody.code)).toBe('0');
+    expect(verifyBody.data.sc_name).toBe(RECORD_NAME_EDITED);
+    expect(Number(verifyBody.data.sc_quantity)).toBe(200);
 
-    // Verify name was updated
-    const actualName = String(updatedRecord?.sc_name || '');
-    console.log(`[SC-008] After edit: sc_name="${actualName}", expected to contain "Edited"`);
-    expect(
-      actualName.includes('Edited'),
-      `Name should contain "Edited" after edit. Actual: "${actualName}"`,
-    ).toBeTruthy();
-
-    // Navigate to detail page to verify UI display
     await navigateToShowcaseDetail(page, RECORD_NAME_EDITED, uiCreatedPid);
-
-    // Verify updated name in UI (with generous timeout for page render)
-    const updatedName = await page
-      .getByText(new RegExp(RECORD_NAME_EDITED.slice(0, 15)))
-      .first()
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-    // API already verified data correctness above. UI rendering of detail page
-    // can be slow due to schema resolution. Log but don't fail on UI check.
-    if (!updatedName) {
-      console.log('[SC-008] UI name check: detail page did not render updated name within timeout. API confirmed data is correct.');
-    }
-
-    // Verify updated quantity = 200 (scope to main to avoid sidebar noise)
-    const updatedQty = await page
-      .locator('main, [role="main"]')
-      .first()
-      .getByText(/^200$|^200\.0$/)
-      .first()
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-    if (!updatedQty) {
-      console.log('[SC-008] UI quantity check failed but API confirmed update.');
-    }
+    const main = page.locator('main, [role="main"]').first();
+    await expect(main).toContainText(RECORD_NAME_EDITED, { timeout: 10_000 });
+    await expect(main.getByText(/^200(?:\.0+)?$/).first()).toBeVisible();
+    await page.screenshot({ path: info.outputPath('SC-008-edited-record.png'), fullPage: true });
   });
 
   // =========================================================================

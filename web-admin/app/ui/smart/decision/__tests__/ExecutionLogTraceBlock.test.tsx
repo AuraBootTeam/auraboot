@@ -229,7 +229,9 @@ describe('ExecutionLogTraceBlock', () => {
     expect(row).toHaveTextContent('费用审批期限');
     expect(row).not.toHaveTextContent('new_tenant_decision');
     fireEvent.click(row.querySelector('button')!);
-    expect(await screen.findByTestId('elta-trace-chain')).toHaveTextContent('费用审批期限');
+    await waitFor(() =>
+      expect(screen.getByTestId('elta-trace-chain')).toHaveTextContent('费用审批期限'),
+    );
   });
 
   it('does not substitute a fixture label or raw code for a missing name', async () => {

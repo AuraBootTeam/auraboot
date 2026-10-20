@@ -1,7 +1,5 @@
 package com.auraboot.framework.observability;
 
-import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
-import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
 import com.auraboot.framework.application.security.AdminAuditService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.audit.entity.AdminEventLog;
@@ -30,7 +28,7 @@ public class CorrelationQueryService {
     private static final int ADMIN_ACTION_LIMIT = 50;
 
     private final CommandAuditLogMapper commandAuditLogMapper;
-    private final GenAiUsageMapper genAiUsageMapper;
+    private final LlmUsageQuery llmUsageQuery;
     private final BehaviorEventMapper behaviorEventMapper;
     private final AdminEventLogMapper adminEventLogMapper;
     private final PermissionAuditLogMapper permissionAuditLogMapper;
@@ -43,9 +41,7 @@ public class CorrelationQueryService {
         view.setCommandAudits(commandAuditLogMapper.findByTraceId(tenantId, traceId).stream()
                 .map(CommandAuditLogDTO::from)
                 .toList());
-        view.setLlmUsage(genAiUsageMapper.selectList(new LambdaQueryWrapper<GenAiUsageRecord>()
-                .eq(GenAiUsageRecord::getTenantId, tenantId)
-                .eq(GenAiUsageRecord::getTraceId, traceId)));
+        view.setLlmUsage(llmUsageQuery.findByTrace(tenantId, traceId));
         view.setBehaviorEvents(behaviorEventMapper.selectList(new LambdaQueryWrapper<BehaviorEvent>()
                 .eq(BehaviorEvent::getTenantId, tenantId)
                 .eq(BehaviorEvent::getTraceId, traceId)));

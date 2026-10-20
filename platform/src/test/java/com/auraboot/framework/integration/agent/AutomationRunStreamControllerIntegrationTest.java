@@ -1,7 +1,7 @@
 package com.auraboot.framework.integration.agent;
 
 import com.auraboot.framework.agent.dto.LlmChatResponse;
-import com.auraboot.framework.agent.dto.LlmChunk;
+import com.auraboot.framework.automation.event.AutomationStreamChunk;
 import com.auraboot.framework.automation.event.AutomationLlmChunkEvent;
 import com.auraboot.framework.automation.event.AutomationRunStreamPublisher;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -108,10 +108,10 @@ class AutomationRunStreamControllerIntegrationTest extends BaseIntegrationTest {
 
         // Publish 2 deltas + terminal aggregate.
         streamPublisher.publish(new AutomationLlmChunkEvent(runPid, nodeId,
-                LlmChunk.delta(0L, "AB"), 0L));
+                new AutomationStreamChunk(0L, "AB", null, false), 0L));
         waitForBodyContains(mvcResult, "\"delta\":\"AB\"");
         streamPublisher.publish(new AutomationLlmChunkEvent(runPid, nodeId,
-                LlmChunk.delta(1L, "CD"), 1L));
+                new AutomationStreamChunk(1L, "CD", null, false), 1L));
         waitForBodyContains(mvcResult, "\"delta\":\"CD\"");
         LlmChatResponse aggregate = LlmChatResponse.builder()
                 .stopReason("end_turn")
@@ -120,7 +120,7 @@ class AutomationRunStreamControllerIntegrationTest extends BaseIntegrationTest {
                 .inputTokens(3).outputTokens(2)
                 .build();
         streamPublisher.publish(new AutomationLlmChunkEvent(runPid, nodeId,
-                LlmChunk.done(2L, aggregate), 2L));
+                new AutomationStreamChunk(2L, null, null, true), 2L));
 
         // Allow async fan-out + emitter.complete() to flush.
         long t = System.currentTimeMillis() + 3_000L;
@@ -168,7 +168,7 @@ class AutomationRunStreamControllerIntegrationTest extends BaseIntegrationTest {
                 .content(List.of()).inputTokens(0).outputTokens(0)
                 .build();
         streamPublisher.publish(new AutomationLlmChunkEvent(runPid, nodeId,
-                LlmChunk.done(0L, aggregate), 0L));
+                new AutomationStreamChunk(0L, null, null, true), 0L));
 
         long t = System.currentTimeMillis() + 3_000L;
         while (!mvcResult.getResponse().isCommitted() && System.currentTimeMillis() < t) {

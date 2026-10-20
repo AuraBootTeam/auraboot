@@ -58,7 +58,9 @@ describe('ActionsTab', () => {
       target: { value: 'Approve' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: '关联命令' }));
+    const selector = await screen.findByRole('button', { name: /关联命令/i });
+    await vi.waitFor(() => expect(selector).toBeEnabled());
+    fireEvent.click(selector);
     fireEvent.click(await screen.findByRole('button', { name: /showcase:approve_record/i }));
 
     expect(screen.getByTestId('detail-custom-button-0')).toHaveTextContent('Approve');

@@ -1,6 +1,6 @@
 import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
 import type { FilterConfig } from '~/framework/smart/types/chart';
-import type { ListFilterFieldMetadata } from '../ListPageContent';
+import type { ListFilterFieldMetadata } from './listFieldMetadata';
 
 const NUMERIC_TYPES = new Set([
   'number',
