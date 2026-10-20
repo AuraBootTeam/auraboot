@@ -35,6 +35,8 @@ async function openProject(page: Page) {
   await expect(row).toHaveCount(1);
   await row.getByRole('button', { name: '查看', exact: true }).click();
   await expect(page.getByRole('heading', { name: project.name, exact: true })).toBeVisible();
+  await expect(page.getByText('加载中...', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('加载活动记录...', { exact: true })).toHaveCount(0);
 }
 async function installedPlugin(page: Page) {
   await navigateToMenuByClick(page, ['系统管理', '插件管理']);

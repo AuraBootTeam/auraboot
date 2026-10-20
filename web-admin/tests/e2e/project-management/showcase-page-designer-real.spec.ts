@@ -114,6 +114,8 @@ test('mature project page is refined with real undo redo, save recovery, publish
   await page.getByTestId('outline-item-outcome').click();
   const title = page.getByTestId('inspector-field-title');
   await expect(title).toHaveValue(before);
+  await page.getByTestId('canvas-block-outcome').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('canvas-block-outcome')).toBeInViewport();
   await shot(page, 'PD01-project-form-designer');
   await title.fill(refined);
   await expect(title).toHaveValue(refined);
@@ -122,6 +124,8 @@ test('mature project page is refined with real undo redo, save recovery, publish
   await expect(title).toHaveValue(before);
   await page.getByTestId('designer-redo').click();
   await expect(title).toHaveValue(refined);
+  await page.getByTestId('canvas-block-outcome').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('canvas-block-outcome')).toBeInViewport();
   await shot(page, 'PD02-project-form-refined');
 
   const beforeRejectedSave = await data(await page.request.get(`/api/pages/${pid}`));
