@@ -64,6 +64,7 @@ test('generated dictionary operations preserve the UI journey', async ({ page },
 
   // Force a deterministic second page, then inspect the CSR operation query.
   await page.goto('/meta/dict?size=1');
+  await expect(page.getByTestId('filter-search')).toBeEnabled();
   const pagedResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
     return url.pathname === '/api/meta/dict' && url.searchParams.get('pageNum') === '2';

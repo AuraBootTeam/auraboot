@@ -301,6 +301,13 @@ export default defineConfig({
       '@tiptap/react',
       '@tiptap/starter-kit',
       '@heroicons/react/24/outline',
+      '@heroicons/react/24/solid',
+      // Lazy editor and Markdown routes must retain stable vendor URLs after startup.
+      '@monaco-editor/react',
+      'monaco-editor/esm/vs/editor/editor.api.js',
+      'monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js',
+      'react-markdown',
+      'remark-gfm',
       '@messageformat/core',
       'dayjs/plugin/relativeTime',
       'dayjs/plugin/timezone',
