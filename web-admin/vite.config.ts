@@ -272,6 +272,7 @@ export default defineConfig({
       // why the chat-bi golden could never see its canvas). Pre-bundling removes
       // the mid-session re-optimization entirely.
       'echarts',
+      'echarts-wordcloud',
       'echarts-for-react',
       'zustand',
       'zustand/middleware',

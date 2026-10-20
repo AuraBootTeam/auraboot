@@ -21,6 +21,7 @@
 import { test, expect } from '@playwright/test';
 import { uniqueId } from '../helpers/index';
 import { BASE_URL } from '../../helpers/environments';
+import { HeaderPage } from '../../pages/HeaderPage';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -664,6 +665,7 @@ test.describe('Page Templates', () => {
       ],
     });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await new HeaderPage(page).waitForHeader();
     const nav = page.locator('nav, aside, [role="navigation"]').first();
     await expect(nav).toBeVisible();
     await nav.getByRole('button', { name: /\u5143\u6570\u636e\u7ba1\u7406|Meta/i }).click();
