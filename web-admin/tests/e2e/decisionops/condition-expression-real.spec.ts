@@ -223,9 +223,21 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
       data: { impactAcknowledged: true },
     }),
   );
+  let releaseCatalog!: () => void;
+  const catalogReady = new Promise<void>(resolve => { releaseCatalog = resolve; });
+  await page.route('**/api/decision/facts/catalog', async route => {
+    await catalogReady;
+    await route.continue();
+  });
   await page.reload();
   await page.getByTestId(`cfl-row-${code}`).click();
   await expect(page.getByTestId('cfl-open-edit')).toHaveCount(0);
+  await expect(page.getByTestId('cfl-open-version')).toBeDisabled();
+  await expect(page.getByTestId('cfl-catalog-state')).toContainText('正在加载模型与属性');
+  await shot(page, 'E09-metadata-loading');
+  releaseCatalog();
+  await expect(page.getByTestId('cfl-open-version')).toBeEnabled();
+  await page.unroute('**/api/decision/facts/catalog');
   await page.getByTestId('cfl-open-version').click();
   await page.getByLabel('value-0-0', { exact: true }).fill('120000');
   const nextVersion = page.waitForResponse(

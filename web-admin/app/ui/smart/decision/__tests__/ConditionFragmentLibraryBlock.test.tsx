@@ -210,6 +210,45 @@ describe('ConditionFragmentLibraryBlock', () => {
     });
   });
 
+  it('waits for model metadata before allowing edits to a published version', async () => {
+    const original = get.getMockImplementation()!;
+    let release!: (value: unknown) => void;
+    const delayed = new Promise((resolve) => {
+      release = resolve;
+    });
+    get.mockImplementation((endpoint: string, params: unknown) =>
+      endpoint === '/decision/facts/catalog' ? delayed : original(endpoint, params),
+    );
+    render(<ConditionFragmentLibraryBlock />);
+    await screen.findByTestId('cfl-row-leave_sla_node_match');
+    expect(screen.getByTestId('cfl-open-version')).toBeDisabled();
+    expect(screen.getByTestId('cfl-open-create')).toBeDisabled();
+    expect(screen.getByTestId('cfl-catalog-state')).toHaveTextContent('正在加载模型与属性');
+    release(await original('/decision/facts/catalog', undefined));
+    await waitFor(() => expect(screen.getByTestId('cfl-open-version')).toBeEnabled());
+    fireEvent.click(screen.getByTestId('cfl-open-version'));
+    expect(await screen.findByTestId('cfl-save-fragment')).toBeEnabled();
+  });
+
+  it('fails closed when metadata fails and retries it through the existing refresh action', async () => {
+    const original = get.getMockImplementation()!;
+    let catalogCalls = 0;
+    get.mockImplementation((endpoint: string, params: unknown) =>
+      endpoint === '/decision/facts/catalog' && catalogCalls++ === 0
+        ? Promise.reject(new Error('Metadata unavailable'))
+        : original(endpoint, params),
+    );
+    render(<ConditionFragmentLibraryBlock />);
+    await screen.findByTestId('cfl-row-leave_sla_node_match');
+    await waitFor(() =>
+      expect(screen.getByTestId('cfl-catalog-state')).toHaveTextContent('加载失败'),
+    );
+    expect(screen.getByTestId('cfl-open-version')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('cfl-refresh'));
+    await waitFor(() => expect(screen.getByTestId('cfl-open-version')).toBeEnabled());
+    expect(catalogCalls).toBe(2);
+  });
+
   it('loads real condition fragments and shows versions plus downstream consumers', async () => {
     render(<ConditionFragmentLibraryBlock />);
 

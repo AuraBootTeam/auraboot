@@ -470,5 +470,13 @@
   "actualComparison": {
     "zh-CN": "实际值比较",
     "en": "Actual comparison"
+  },
+  "catalogLoading": {
+    "zh-CN": "正在加载模型与属性，加载完成后可编辑条件。",
+    "en": "Loading models and properties. Editing becomes available when ready."
+  },
+  "catalogUnavailable": {
+    "zh-CN": "模型与属性加载失败，暂不可编辑条件。请点击刷新重试。",
+    "en": "Models and properties could not be loaded. Editing is unavailable; refresh to try again."
   }
 }
