@@ -87,9 +87,9 @@ class ProcurementOrderChangeNativeDbIT {
         supplier=create("pr_supplier_common:sync_directory","pr_supplier_common",Map.of("pr_supplier_code",namespace,
             "pr_supplier_name","Change fixture supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",namespace));
         Object publisher=construct("ProcurementOrderService",new Class<?>[]{DataAccessor.class,Clock.class},db,Clock.systemUTC());
-        assertEquals("published",tx(PROCESS,()->invoke(publisher,"publish",new Class<?>[]{Map.class,List.class},header(),List.of(candidate("140")))));
+        assertEquals("published",tx(PROCESS,()->invoke(publisher,"publish",new Class<?>[]{Map.class,List.class},header(),initialLines())));
         order=rows("pr_purchase_order","qo_pr_order_account_id",namespace).getFirst().get("pid").toString();
-        linePid=rows("pr_purchase_order_line","pr_pol_order_id",order).getFirst().get("pid").toString();
+        linePid=rows("pr_purchase_order_line","pr_pol_order_id",order).stream().filter(row->"800000001".equals(row.get("qo_pr_order_line_erp_entry_id"))).findFirst().orElseThrow().get("pid").toString();
         Class<?> b=type("ProcurementOrderNoticeService$Binding");
         binding=construct("ProcurementOrderNoticeService$Binding",new Class<?>[]{long.class,String.class,String.class,String.class},tenant,"simulation-"+namespace,connection,actor);
         notices=construct("ProcurementOrderNoticeService",new Class<?>[]{DataAccessor.class},db);
@@ -106,6 +106,7 @@ class ProcurementOrderChangeNativeDbIT {
     Object invoke(Object target,String method,Class<?>[] types,Object...args){try{var m=target.getClass().getDeclaredMethod(method,types);m.setAccessible(true);return m.invoke(target,args);}catch(ReflectiveOperationException e){throw unwrap(e);}}
     RuntimeException unwrap(ReflectiveOperationException e){Throwable c=e instanceof InvocationTargetException i?i.getCause():e;return c instanceof RuntimeException r?r:new IllegalStateException(c);}
     @SuppressWarnings("unchecked") Map<String,Object> physical(String entity,Map<String,Object> values){try{return (Map<String,Object>)type("ProcurementData").getMethod("fields",String.class,Map.class).invoke(null,entity,values);}catch(ReflectiveOperationException e){throw unwrap(e);}}
+    List<Map<String,Object>> initialLines(){return List.of(candidate("140"));}
     Map<String,Object> header(){return Map.of("account_id",namespace,"erp_id","700000001","supplier_pid",supplier,"bill_no",namespace,
         "order_date","2026-10-20","business_status","approved","currency","CNY","exchange_rate","1","commercial_snapshot",Map.of("paymentConditionNumber","NET30"));}
     Map<String,Object> candidate(String quantity){var values=new LinkedHashMap<String,Object>();
