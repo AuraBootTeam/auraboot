@@ -295,8 +295,22 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         return resourceLifecycle().deactivateAllPluginMenus(pluginPid, tenantId);
     }
 
+    int reconcileDeclaredRolesStrictly(PluginManifestExtended manifest, Long tenantId) {
+        return accessPolicies().reconcileDeclaredRolesStrictly(manifest, tenantId);
+    }
+
+    void updateRolePermissions(Long roleId, RoleDefinitionDTO dto, Long tenantId, String pluginPid,
+                               boolean strictResolution) {
+        accessPolicies().updateRolePermissions(roleId, dto, tenantId, pluginPid, strictResolution);
+    }
+
+    static String modelCodeOfGeneratedActionPermission(String permCode) {
+        return PluginAccessPolicyImporter.modelCodeOfGeneratedActionPermission(permCode);
+    }
+
     private PluginModelFieldImporter fieldsModelsBindings() {
         return new PluginModelFieldImporter(
+                this,
                 metaModelService,
                 metaFieldService,
                 schemaManagementService,
@@ -312,6 +326,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private PluginCommandRuleImporter commandsBindingRules() {
         return new PluginCommandRuleImporter(
+                this,
                 commandService,
                 commandDefinitionMapper,
                 bindingRuleMapper,
@@ -322,6 +337,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private PluginAccessPolicyImporter accessPolicies() {
         return new PluginAccessPolicyImporter(
+                this,
                 permissionService,
                 dataScopeService,
                 rolePermissionService,
@@ -339,6 +355,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private PluginPageNavigationImporter pageNavigationResources() {
         return new PluginPageNavigationImporter(
+                this,
                 dictService,
                 menuService,
                 pageSchemaService,
@@ -355,6 +372,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private PluginNamedQueryImporter namedQueries() {
         return new PluginNamedQueryImporter(
+                this,
                 namedQueryService,
                 objectMapper,
                 namedQueryMapper,
@@ -364,6 +382,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private PluginResourceLifecycleImporter resourceLifecycle() {
         return new PluginResourceLifecycleImporter(
+                this,
                 metaModelService,
                 metaFieldService,
                 dictService,

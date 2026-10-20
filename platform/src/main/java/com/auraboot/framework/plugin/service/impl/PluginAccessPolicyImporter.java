@@ -48,6 +48,8 @@ import org.slf4j.Logger;
 
 /** Imports roles, permissions, grants and data-scope policies. */
 final class PluginAccessPolicyImporter {
+    // Preserve virtual calls on the original facade receiver.
+    private final PluginResourceImporterImpl facadeReceiver;
     private final PermissionService permissionService;
     private final DataScopeService dataScopeService;
     private final RolePermissionService rolePermissionService;
@@ -63,6 +65,7 @@ final class PluginAccessPolicyImporter {
     private final PluginImportSupport support;
 
     PluginAccessPolicyImporter(
+            PluginResourceImporterImpl facadeReceiver,
             PermissionService permissionService,
             DataScopeService dataScopeService,
             RolePermissionService rolePermissionService,
@@ -76,6 +79,7 @@ final class PluginAccessPolicyImporter {
             PluginRecordMapper pluginRecordMapper,
             Logger log,
             PluginImportSupport support) {
+        this.facadeReceiver = facadeReceiver;
         this.permissionService = permissionService;
         this.dataScopeService = dataScopeService;
         this.rolePermissionService = rolePermissionService;
@@ -108,7 +112,7 @@ final class PluginAccessPolicyImporter {
 
     public PluginResource importPermission(PermissionDefinitionDTO dto, String pluginPid, String importId,
                                             Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        boolean exists = checkPermissionExists(tenantId, dto.getCode());
+        boolean exists = facadeReceiver.checkPermissionExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Permission already exists: " + dto.getCode());
@@ -190,7 +194,7 @@ final class PluginAccessPolicyImporter {
             }
         }
 
-        boolean exists = checkRoleExists(tenantId, dto.getCode());
+        boolean exists = facadeReceiver.checkRoleExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Role already exists: " + dto.getCode());
@@ -308,7 +312,7 @@ final class PluginAccessPolicyImporter {
                 || !Objects.equals(installed.getVersion(), manifest.getVersion())) {
             throw new PluginException("Role reconciliation requires the same installed plugin version");
         }
-        return reconcileDeclaredRolesStrictly(manifest, tenantId);
+        return facadeReceiver.reconcileDeclaredRolesStrictly(manifest, tenantId);
     }
 
     int reconcileDeclaredRolesStrictly(PluginManifestExtended manifest, Long tenantId) {
@@ -330,7 +334,7 @@ final class PluginAccessPolicyImporter {
                 }
                 permissions.add(permission);
             }
-            reconcileRolePermissions(declaration, tenantId);
+            facadeReceiver.reconcileRolePermissions(declaration, tenantId);
             for (PermissionDTO permission : permissions) {
                 if (rolePermissionMapper.countByRoleAndPermission(role.getId(), permission.getId(), tenantId) <= 0) {
                     throw new PluginException("Declared permission remains unbound: "
@@ -354,7 +358,7 @@ final class PluginAccessPolicyImporter {
                     + dto.getCode() + "' does not exist in this tenant");
         }
         int before = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
-        updateRolePermissions(roleId, dto, tenantId, null, true);
+        facadeReceiver.updateRolePermissions(roleId, dto, tenantId, null, true);
         int after = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
         if (after > before) {
             log.info("Role permission reconciliation bound {} additional codes for role {}",
@@ -364,7 +368,7 @@ final class PluginAccessPolicyImporter {
     }
 
     private void updateRolePermissions(Long roleId, RoleDefinitionDTO dto, Long tenantId, String pluginPid) {
-        updateRolePermissions(roleId, dto, tenantId, pluginPid, false);
+        facadeReceiver.updateRolePermissions(roleId, dto, tenantId, pluginPid, false);
     }
 
     /**
@@ -469,7 +473,7 @@ final class PluginAccessPolicyImporter {
         StringBuilder message = new StringBuilder("Role '").append(roleCode)
                 .append("' declares permission '").append(permCode)
                 .append("' which does not resolve to a registered permission in this tenant");
-        String modelCode = modelCodeOfGeneratedActionPermission(permCode);
+        String modelCode = PluginResourceImporterImpl.modelCodeOfGeneratedActionPermission(permCode);
         if (modelCode != null) {
             List<Model> models = metaModelMapper.selectList(new QueryWrapper<Model>()
                     .eq("tenant_id", tenantId)

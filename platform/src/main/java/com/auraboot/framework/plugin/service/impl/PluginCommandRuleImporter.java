@@ -20,6 +20,8 @@ import org.slf4j.Logger;
 
 /** Imports commands and binding rules. */
 final class PluginCommandRuleImporter {
+    // Preserve virtual calls on the original facade receiver.
+    private final PluginResourceImporterImpl facadeReceiver;
     private final CommandService commandService;
     private final CommandDefinitionMapper commandDefinitionMapper;
     private final BindingRuleMapper bindingRuleMapper;
@@ -28,12 +30,14 @@ final class PluginCommandRuleImporter {
     private final PluginImportSupport support;
 
     PluginCommandRuleImporter(
+            PluginResourceImporterImpl facadeReceiver,
             CommandService commandService,
             CommandDefinitionMapper commandDefinitionMapper,
             BindingRuleMapper bindingRuleMapper,
             com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache,
             Logger log,
             PluginImportSupport support) {
+        this.facadeReceiver = facadeReceiver;
         this.commandService = commandService;
         this.commandDefinitionMapper = commandDefinitionMapper;
         this.bindingRuleMapper = bindingRuleMapper;
@@ -62,7 +66,7 @@ final class PluginCommandRuleImporter {
                     support.logSafe(dto.getCode()));
         }
 
-        boolean exists = checkCommandExists(tenantId, dto.getCode());
+        boolean exists = facadeReceiver.checkCommandExists(tenantId, dto.getCode());
         if (!exists) {
             // A previous uninstall leaves the command soft-deleted; the idempotent
             // insert (ON CONFLICT (tenant_id, code, version) DO NOTHING) would then
@@ -74,7 +78,7 @@ final class PluginCommandRuleImporter {
             if (resurrectedPid != null) {
                 log.info("Resurrected soft-deleted command {} as {} for plugin reimport",
                         support.logSafe(dto.getCode()), support.logSafe(resurrectedPid));
-                exists = checkCommandExists(tenantId, dto.getCode());
+                exists = facadeReceiver.checkCommandExists(tenantId, dto.getCode());
             }
         }
 

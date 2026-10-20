@@ -26,6 +26,8 @@ import org.slf4j.Logger;
 
 /** Imports named queries and preserves their status transitions. */
 final class PluginNamedQueryImporter {
+    // Preserve virtual calls on the original facade receiver.
+    private final PluginResourceImporterImpl facadeReceiver;
     private final NamedQueryService namedQueryService;
     private final ObjectMapper objectMapper;
     private final NamedQueryMapper namedQueryMapper;
@@ -33,11 +35,13 @@ final class PluginNamedQueryImporter {
     private final PluginImportSupport support;
 
     PluginNamedQueryImporter(
+            PluginResourceImporterImpl facadeReceiver,
             NamedQueryService namedQueryService,
             ObjectMapper objectMapper,
             NamedQueryMapper namedQueryMapper,
             Logger log,
             PluginImportSupport support) {
+        this.facadeReceiver = facadeReceiver;
         this.namedQueryService = namedQueryService;
         this.objectMapper = objectMapper;
         this.namedQueryMapper = namedQueryMapper;
@@ -58,7 +62,7 @@ final class PluginNamedQueryImporter {
 
     public PluginResource importNamedQuery(NamedQueryDefinitionDTO dto, String pluginPid, String importId,
                                            Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        boolean exists = checkNamedQueryExists(tenantId, dto.getCode());
+        boolean exists = facadeReceiver.checkNamedQueryExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Named query already exists: " + dto.getCode());

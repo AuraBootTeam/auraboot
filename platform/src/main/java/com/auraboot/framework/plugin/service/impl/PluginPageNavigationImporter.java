@@ -39,6 +39,8 @@ import org.slf4j.Logger;
 
 /** Imports pages, navigation, dashboards and dictionaries. */
 final class PluginPageNavigationImporter {
+    // Preserve virtual calls on the original facade receiver.
+    private final PluginResourceImporterImpl facadeReceiver;
     private final DictService dictService;
     private final MenuService menuService;
     private final PageSchemaService pageSchemaService;
@@ -53,6 +55,7 @@ final class PluginPageNavigationImporter {
     private final PluginImportSupport support;
 
     PluginPageNavigationImporter(
+            PluginResourceImporterImpl facadeReceiver,
             DictService dictService,
             MenuService menuService,
             PageSchemaService pageSchemaService,
@@ -65,6 +68,7 @@ final class PluginPageNavigationImporter {
             Map<String, Long> menuCodeToIdMap,
             Logger log,
             PluginImportSupport support) {
+        this.facadeReceiver = facadeReceiver;
         this.dictService = dictService;
         this.menuService = menuService;
         this.pageSchemaService = pageSchemaService;
@@ -136,7 +140,7 @@ final class PluginPageNavigationImporter {
                     + "' but missing pageKey. Add pageKey to menus.json.");
         }
 
-        boolean exists = checkMenuExists(tenantId, dto.getCode());
+        boolean exists = facadeReceiver.checkMenuExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Menu already exists: " + dto.getCode());
@@ -245,7 +249,7 @@ final class PluginPageNavigationImporter {
     public PluginResource importPage(PageSchemaDTO dto, String pluginPid, String importId,
                                       Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                       Boolean autoPublish) {
-        boolean exists = checkPageExists(tenantId, dto.getPageKey());
+        boolean exists = facadeReceiver.checkPageExists(tenantId, dto.getPageKey());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Page already exists: " + dto.getPageKey());
@@ -448,7 +452,7 @@ final class PluginPageNavigationImporter {
 
     public PluginResource importDict(DictDefinitionDTO dto, String pluginPid, String importId,
                                       Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        boolean exists = checkDictExists(tenantId, dto.getCode());
+        boolean exists = facadeReceiver.checkDictExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Dictionary already exists: " + dto.getCode());

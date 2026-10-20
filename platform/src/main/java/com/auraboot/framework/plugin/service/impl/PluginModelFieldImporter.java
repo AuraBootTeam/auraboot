@@ -41,6 +41,8 @@ import java.util.function.Supplier;
 
 /** Imports model, field and binding metadata using the existing service boundaries. */
 final class PluginModelFieldImporter {
+    // Preserve virtual calls on the original facade receiver.
+    private final PluginResourceImporterImpl facadeReceiver;
     private final MetaModelService metaModelService;
     private final MetaFieldService metaFieldService;
     private final SchemaManagementService schemaManagementService;
@@ -54,6 +56,7 @@ final class PluginModelFieldImporter {
     private final PluginImportSupport support;
 
     PluginModelFieldImporter(
+            PluginResourceImporterImpl facadeReceiver,
             MetaModelService metaModelService,
             MetaFieldService metaFieldService,
             SchemaManagementService schemaManagementService,
@@ -65,6 +68,7 @@ final class PluginModelFieldImporter {
             Supplier<CacheManager> cacheManagerProvider,
             Logger log,
             PluginImportSupport support) {
+        this.facadeReceiver = facadeReceiver;
         this.metaModelService = metaModelService;
         this.metaFieldService = metaFieldService;
         this.schemaManagementService = schemaManagementService;
@@ -97,8 +101,8 @@ final class PluginModelFieldImporter {
     public PluginResource importModel(ModelDefinitionDTO dto, String pluginPid, String importId,
                                        Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                        Boolean autoPublish) {
-        registerModelCacheRollbackEviction(dto.getCode());
-        boolean exists = checkModelExists(tenantId, dto.getCode());
+        facadeReceiver.registerModelCacheRollbackEviction(dto.getCode());
+        boolean exists = facadeReceiver.checkModelExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Model already exists: " + dto.getCode());
@@ -228,7 +232,7 @@ final class PluginModelFieldImporter {
     public PluginResource importField(FieldDefinitionDTO dto, String pluginPid, String importId,
                                        Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
                                        Boolean autoPublish) {
-        boolean exists = checkFieldExists(tenantId, dto.getCode());
+        boolean exists = facadeReceiver.checkFieldExists(tenantId, dto.getCode());
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Field already exists: " + dto.getCode());

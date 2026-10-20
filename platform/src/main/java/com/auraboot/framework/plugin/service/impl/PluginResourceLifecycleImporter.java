@@ -27,6 +27,8 @@ import org.slf4j.Logger;
 
 /** Tracks, rolls back and restores imported resources. */
 final class PluginResourceLifecycleImporter {
+    // Preserve virtual calls on the original facade receiver.
+    private final PluginResourceImporterImpl facadeReceiver;
     private final MetaModelService metaModelService;
     private final MetaFieldService metaFieldService;
     private final DictService dictService;
@@ -52,6 +54,7 @@ final class PluginResourceLifecycleImporter {
     private final PluginImportSupport support;
 
     PluginResourceLifecycleImporter(
+            PluginResourceImporterImpl facadeReceiver,
             MetaModelService metaModelService,
             MetaFieldService metaFieldService,
             DictService dictService,
@@ -75,6 +78,7 @@ final class PluginResourceLifecycleImporter {
             PluginPublicPublicationLifecycle publicPublicationLifecycle,
             Logger log,
             PluginImportSupport support) {
+        this.facadeReceiver = facadeReceiver;
         this.metaModelService = metaModelService;
         this.metaFieldService = metaFieldService;
         this.dictService = dictService;
@@ -315,7 +319,7 @@ final class PluginResourceLifecycleImporter {
             record.setResourceId(menuId);
             record.setResourcePid(menuMapper.findPidByCode(tenantId, code));
             try {
-                rollbackResource(record);
+                facadeReceiver.rollbackResource(record);
             } catch (Exception e) {
                 log.warn("Failed to prune stale menu {}: {}", support.logSafe(code),
                         support.logSafe(e.getMessage()));
