@@ -16,7 +16,7 @@ describe('InstalledTab public lifecycle contract', () => {
     render(<InstalledTab />);
     const row = within(await screen.findByRole('row', { name: /Customer delivery/ }));
     expect(screen.getByText('plugin.status.enabled')).toBeInTheDocument();
-    expect(row.queryByRole('button', { name: 'plugin.action.uninstall' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'plugin.action.uninstall' })).not.toBeInTheDocument();
     fireEvent.click(row.getByRole('button', { name: 'plugin.action.disable' }));
     await screen.findByText('plugin.status.disabled');
     expect(row.getByRole('button', { name: 'plugin.action.uninstall' })).toBeInTheDocument();

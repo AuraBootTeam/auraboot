@@ -134,7 +134,13 @@ test('customer integration is inspectable, its external event survives designer 
     finally { await closeSecret(page); }
     await machine(permanent, 401); await machine(replacement, 200); await machine(fixed, 200);
     await active.getByRole('button', { name: '撤销 Token', exact: true }).click(); await shot(page, 'I10-token-revoke-confirmation');
-    await panel.getByRole('button', { name: '确认', exact: true }).click();
+    const [revoked] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname.startsWith(base + '/integration-tokens/') && response.request().method() === 'DELETE'),
+      panel.getByRole('button', { name: '确认', exact: true }).click(),
+    ]);
+    expect(revoked.status()).toBe(200);
+    const revokedPid = new URL(revoked.url()).pathname.split('/').at(-1);
+    expect((await data(await page.request.get(base + '/integration-tokens'))).find((row: any) => row.pid === revokedPid).status).toBe('revoked');
     await machine(replacement, 401); await machine(fixed, 200);
     await shot(page, 'I11-token-revoked-metadata');
     result = { profile: 'customer-integration-ui-v1', runtime: fixture.runtime,

@@ -112,10 +112,10 @@ test('customer plugin contributes a real command dialog and workspace, survives 
   await expect(page.getByRole('main')).toContainText(next);
   await page.getByTestId('workbench-action-cde_open_workspace').click();
   await expect(page).toHaveURL(/\/p\/c\/cde_delivery_workspace$/);
-  const selected = page.getByTestId(`table-select-row-${process.env.DELIVERY_PROJECT_PID}`);
-  await selected.check();
+  const selected = page.getByRole('row').filter({ has: page.getByText('华辰制造 · 供应链协同平台', { exact: true }) });
+  await selected.click();
   await expect(page.getByTestId('workbench-action-cde_open_project')).toBeEnabled();
-  await expect(page.getByRole('row').filter({ has: selected })).toContainText(next);
+  await expect(selected).toContainText(next);
   await shot(page, 'X03-customer-delivery-workspace');
   await page.getByTestId('workbench-action-cde_open_project').click();
   await expect(button).toBeVisible();
