@@ -539,12 +539,6 @@ PYLOG
   bff_port="$(runtime_env "$name" BFF_PORT)"
   pg_db="$(runtime_env "$name" POSTGRES_DB)"
   redis_db="$(runtime_env "$name" REDIS_DATABASE)"
-  if [ -n "$isolated_redis_port" ]; then
-    local redis_reset=0
-    [ "$fresh_db$require_new_db" = "00" ] || redis_reset=1
-    node "$SCRIPT_DIR/lib/golden-private-redis.mjs" start "$name" "$REPO_ROOT" "$DEV" "$redis_port" "$redis_reset" \
-      || die "owned private Redis startup failed"
-  fi
   pg_host="$(runtime_env "$name" POSTGRES_HOST)"; pg_host="${pg_host:-127.0.0.1}"
   pg_port="$(runtime_env "$name" POSTGRES_PORT)"; pg_port="${pg_port:-5432}"
   pg_user="$(runtime_env "$name" POSTGRES_USER)"; pg_user="${pg_user:-auraboot}"
@@ -554,6 +548,12 @@ PYLOG
     [[ "$pg_db" =~ ^[a-z][a-z0-9_]*$ ]] || die "invalid database name"
     golden_create_new_database "$pg_host" "$pg_port" "$pg_user" "$pg_pass" "$pg_db" \
       || die "database freshness could not be established; allocation retained, infra untouched"
+  fi
+  if [ -n "$isolated_redis_port" ]; then
+    local redis_reset=0
+    [ "$fresh_db$require_new_db" = "00" ] || redis_reset=1
+    node "$SCRIPT_DIR/lib/golden-private-redis.mjs" start "$name" "$REPO_ROOT" "$DEV" "$redis_port" "$redis_reset" \
+      || die "owned private Redis startup failed"
   fi
   "$DEV" infra ensure "$name" --yes >/dev/null
   log "    backend=$server_port vite=$vite_port bff=$bff_port db=$pg_db redis-db=$redis_db"
