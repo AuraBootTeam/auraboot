@@ -133,11 +133,11 @@ fi
     if (queries === 2) assert.match(calls, /CREATE DATABASE %I/);
   });
 }
-test('real stack launcher rejects an existing database before infra or schema writes', t => {
+for (const privateRedis of [false, true]) test(`real stack launcher rejects an existing database before infra or schema writes (private Redis: ${privateRedis})`, t => {
   const f = fixture(t);
   fs.copyFileSync(new URL('../oss-golden-stack.sh', import.meta.url), path.join(f.repo, 'scripts/oss-golden-stack.sh'));
   fs.mkdirSync(path.join(f.repo, 'scripts/lib'), { recursive: true });
-  for (const file of ['web-admin-node-modules.sh', 'golden-new-database.sh', 'golden-runtime-identity.sh', 'oss-stack-lifecycle.mjs']) {
+  for (const file of ['web-admin-node-modules.sh', 'golden-new-database.sh', 'golden-runtime-identity.sh', 'oss-stack-lifecycle.mjs', 'golden-private-redis.mjs', 'golden-stack-state.mjs']) {
     fs.copyFileSync(new URL('../lib/' + file, import.meta.url), path.join(f.repo, 'scripts/lib', file));
   }
   const state = f.env.AURA_WORKSPACE_STATE_DIR;
@@ -162,14 +162,22 @@ fi
   fs.copyFileSync(path.join(f.root, 'dev.sh'), path.join(f.root, 'aura'));
   registerFixtureWorkspace(f.root, f.repo);
   fs.writeFileSync(path.join(f.root, 'bin/psql'), '#!/usr/bin/env bash\ncat >> "$CALLS"\necho 1\n', { mode: 0o755 });
-  const result = spawnSync('bash', [path.join(f.repo, 'scripts/oss-golden-stack.sh'), 'up', 'owned-run', '--slot', '900', '--require-new-db'], {
+  fs.writeFileSync(path.join(f.root, 'bin/node'), `#!/usr/bin/env bash
+if [[ "$1" == */golden-private-redis.mjs && "$2" == start ]]; then
+  printf 'private redis startup\\n' >> "$CALLS"
+  exit 0
+fi
+exec ${JSON.stringify(process.execPath)} "$@"
+`, { mode: 0o755 });
+  const result = spawnSync('bash', [path.join(f.repo, 'scripts/oss-golden-stack.sh'), 'up', 'owned-run', '--slot', '900', '--require-new-db',
+    ...(privateRedis ? ['--isolated-redis-port', '16317'] : [])], {
     env: f.env, encoding: 'utf8', timeout: 10000 });
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stderr, /database freshness could not be established/);
   const calls = fs.readFileSync(f.calls, 'utf8');
   assert.match(calls, /runtime ensure/);
   assert.ok(calls.includes(`runtime lifecycle bind owned-run --handler ${f.repo}/scripts/oss-golden-lifecycle.sh --source core=${f.repo}`));
-  assert.doesNotMatch(calls, /infra ensure|CREATE|DROP|schema-current/);
+  assert.doesNotMatch(calls, /infra ensure|CREATE|DROP|schema-current|private redis startup/);
   assert.ok(fs.existsSync(path.join(state, 'env/owned-run.env')), 'failed allocation must remain inspectable');
   assert.equal(fs.existsSync(path.join(state, 'golden/owned-run/pgenv')), false);
 });

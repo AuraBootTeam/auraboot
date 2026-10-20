@@ -337,19 +337,27 @@ test('OSS golden stack applies explicit product migrations only to a fresh datab
     { fresh: '0', absent: '1', products: '1', allowed: true },
     { fresh: '1', absent: '1', products: '1', allowed: false },
     { fresh: '1', absent: '1', products: '0', allowed: false },
+    { fresh: '0', absent: '0', products: '0', port: '16317', allowed: true },
+    { fresh: '1', absent: '0', products: '1', port: '16317', allowed: true },
+    { fresh: '0', absent: '1', products: '1', port: '16317', allowed: true },
+    { fresh: '0', absent: '0', products: '0', port: '6379', allowed: false },
+    { fresh: '1', absent: '0', products: '1', port: '16317', host: '', allowed: false },
   ];
   for (const row of cases) {
     const result = spawnSync('bash', ['-c', `
       set -euo pipefail
       die() { printf '%s\\n' "$*" >&2; exit 1; }
       fresh_db="$1"; require_new_db="$2"
+      isolated_redis_port="$4"; redis_host="$5"; redis_port=6379; SCRIPT_DIR="$PWD/scripts"
       product_migration_roots=()
       [ "$3" = "0" ] || product_migration_roots+=(/fixture/product-migrations)
       ${guard}
-    `, 'freshness-contract', row.fresh, row.absent, row.products], { encoding: 'utf8' });
+      printf '%s\\n' "$redis_port"
+    `, 'freshness-contract', row.fresh, row.absent, row.products, row.port ?? '', row.host ?? '127.0.0.1'], { encoding: 'utf8' });
     assert.equal(result.error, undefined);
     assert.equal(result.status, row.allowed ? 0 : 1, JSON.stringify(row));
-    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires/);
+    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires|conflicts|invalid/);
+    else assert.equal(result.stdout.trim(), row.port || '6379');
   }
 
   assert.match(stack, /--product-migration-root requires a fresh database flag/);

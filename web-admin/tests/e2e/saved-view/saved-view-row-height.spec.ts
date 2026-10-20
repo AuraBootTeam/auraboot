@@ -7,7 +7,9 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from '../helpers';
+import { executeCommandViaApi, uniqueId } from '../helpers';
+import { ModelTestHelper } from '../../helpers/model-test-helper';
+import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { cleanupGeneratedSavedViews } from './helpers';
 
 import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
@@ -23,14 +25,19 @@ async function createViewViaApi(
   modelCode: string,
   name: string,
   rowHeight?: string,
+  recordTitle?: string,
 ): Promise<string> {
   const resp = await page.request.post('/api/views', {
     data: {
       name,
       modelCode,
+      pageKey: `${modelCode}_list`,
       viewType: 'table',
       scope: 'personal',
-      viewConfig: rowHeight ? { rowHeight } : {},
+      viewConfig: {
+        ...(rowHeight ? { rowHeight } : {}),
+        ...(recordTitle ? { filters: [{ fieldCode: 'e2et_order_title', operator: 'eq', value: recordTitle }] } : {}),
+      },
     },
   });
   if (!resp.ok()) {
@@ -82,51 +89,73 @@ test.describe('Row Height Control (GAP-127)', () => {
   });
 
   test('RH-002: switching row height changes table row visual height', async ({ page }) => {
-    const viewPid = await createViewViaApi(page, 'e2et_order', uniqueId('rh_table'), 'medium');
-    await page.goto(viewPid ? `/p/e2et_order?view=${viewPid}` : '/p/e2et_order');
-    const rowHeightBtn = page.getByTestId('row-height-btn');
-    await expect(rowHeightBtn).toBeVisible({ timeout: 30000 });
+    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const title = uniqueId('RH_Row');
+    const recordPid = await order.createViaApi({ e2et_order_title: title });
+    expect(recordPid).toBeTruthy();
+    let viewPid = '';
+    try {
+      const viewName = uniqueId('RH_Table');
+      viewPid = await createViewViaApi(page, 'e2et_order', viewName, 'medium', title);
+      expect(viewPid).toBeTruthy();
+      await page.goto(`/p/e2et_order?view=${viewPid}`);
+      await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute('data-current-view-name', viewName);
+      const rowHeightBtn = page.getByTestId('row-height-btn');
+      await expect(rowHeightBtn).toBeVisible({ timeout: 30000 });
 
-    const firstRow = page.getByTestId('table-row-0');
-    if (!(await firstRow.isVisible({ timeout: 10000 }).catch(() => false))) {
-      test.skip(true, 'No data rows to verify height');
-      return;
-    }
+      const firstRow = page.getByTestId('table-row-0');
+      await expect(firstRow).toBeVisible({ timeout: 10000 });
+      await expect(firstRow).toContainText(title);
 
-    // Capture the initial row height so we can poll for the actual visual
-    // change (the rowHeight change is propagated through SavedView async via
-    // ensureViewAndUpdateConfig, so a fixed waitForTimeout is racy).
-    const initialHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
+      // Capture the initial row height so we can poll for the actual visual
+      // change (the rowHeight change is propagated through SavedView async via
+      // ensureViewAndUpdateConfig, so a fixed waitForTimeout is racy).
+      const initialHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
 
-    // Switch to "short" row height
-    await rowHeightBtn.click();
-    await page.getByTestId('row-height-option-short').click();
-    // Poll until the row visibly shrinks (or timeout)
-    await expect
-      .poll(() => firstRow.evaluate((el) => el.getBoundingClientRect().height), {
-        timeout: 10000,
-        intervals: [200, 300, 500, 1000],
-      })
-      .toBeLessThan(initialHeight);
+      // Switch to "short" row height
+      await rowHeightBtn.click();
+      await page.getByTestId('row-height-option-short').click();
+      // Poll until the row visibly shrinks (or timeout)
+      await expect
+        .poll(() => firstRow.evaluate((el) => el.getBoundingClientRect().height), {
+          timeout: 10000,
+          intervals: [200, 300, 500, 1000],
+        })
+        .toBeLessThan(initialHeight);
 
-    const shortHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
+      const shortHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
 
-    // Switch to "extra-tall"
-    await rowHeightBtn.click();
-    await page.getByTestId('row-height-option-extra-tall').click();
-    // Poll until the row visibly grows past short
-    await expect
-      .poll(() => firstRow.evaluate((el) => el.getBoundingClientRect().height), {
-        timeout: 10000,
-        intervals: [200, 300, 500, 1000],
-      })
-      .toBeGreaterThan(shortHeight + 10);
+      // Switch to "extra-tall"
+      await rowHeightBtn.click();
+      await page.getByTestId('row-height-option-extra-tall').click();
+      // Poll until the row visibly grows past short
+      await expect
+        .poll(() => firstRow.evaluate((el) => el.getBoundingClientRect().height), {
+          timeout: 10000,
+          intervals: [200, 300, 500, 1000],
+        })
+        .toBeGreaterThan(shortHeight + 10);
 
-    const tallHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
-    expect(tallHeight).toBeGreaterThan(shortHeight);
+      const tallHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
+      expect(tallHeight).toBeGreaterThan(shortHeight);
 
-    if (viewPid) {
-      await page.request.delete(`/api/views/${viewPid}`).catch(() => null);
+      await test.info().attach('row-height-measurements', {
+        body: Buffer.from(JSON.stringify({ recordPid, viewPid, title, initialHeight, shortHeight, tallHeight })),
+        contentType: 'application/json',
+      });
+    } finally {
+      try {
+        const record = await order.fetchViaApi(recordPid);
+        const version = Number(record.row_version ?? record.rowVersion);
+        const deleted = await executeCommandViaApi(page, order.commandCode('delete'), {}, recordPid, 'delete',
+          Number.isSafeInteger(version) ? { expectedVersion: version } : undefined);
+        expect(deleted.code).toBe('0');
+      } finally {
+        if (viewPid) {
+          const deleted = await page.request.delete(`/api/views/${viewPid}`);
+          expect(deleted.ok()).toBe(true);
+        }
+      }
     }
   });
 
