@@ -1,8 +1,25 @@
+import type {
+  PresentFields,
+  SavedViewWire,
+  SavedViewCreateWire,
+  SavedViewUpdateWire,
+  SavedViewCopyWire,
+  SavedViewAutoSaveWire,
+  SavedViewCapabilityRequestWire,
+  SavedViewCapabilityWire,
+  SavedViewReasonWire,
+  SavedViewAuditWire,
+  SavedViewShareRequestWire,
+  SavedViewShareWire,
+  SavedViewShareStatusWire,
+  SavedViewQueryWire,
+} from './savedViewWire';
+
 /**
  * SavedView Types
  *
  * Type definitions for SavedView feature.
- * These types align with the backend SavedView API.
+ * HTTP shapes are generated in savedViewWire.ts; this file holds checked display and editor projections.
  */
 
 /**
@@ -27,19 +44,7 @@ export interface SavedViewTeamOption {
 /**
  * Audit trail entry for shared/global SavedView changes.
  */
-export interface SavedViewAuditEvent {
-  id?: string;
-  sequenceNo?: number;
-  eventType?: string;
-  entityType?: string;
-  entityPid?: string;
-  commandCode?: string;
-  operationType?: string;
-  actorName?: string;
-  timestamp?: string;
-  changedFields?: string[];
-  metadata?: Record<string, unknown>;
-}
+export type SavedViewAuditEvent = PresentFields<SavedViewAuditWire>;
 
 /**
  * Tenant-scoped user option used by SavedView collaborator picker.
@@ -54,25 +59,28 @@ export interface SavedViewUserOption {
 
 export type SavedViewCapabilityStatus = 'available' | 'degraded' | 'blocked';
 
-export interface SavedViewCapabilityCheckRequest {
-  modelCode?: string;
-  pageKey?: string;
+export type SavedViewCapabilityCheckRequest = Omit<
+  SavedViewCapabilityRequestWire,
+  'viewType' | 'viewConfig'
+> & {
   viewType: ViewType;
   viewConfig?: Partial<ViewConfig>;
-}
+};
 
-export interface SavedViewCapabilityReason {
-  code: 'MISSING_REQUIRED_FIELD' | 'UNKNOWN_FIELD' | 'INCOMPATIBLE_FIELD_TYPE' | string;
-  field?: string;
+export type SavedViewCapabilityReason = PresentFields<SavedViewReasonWire> & {
+  code: string;
   message: string;
-}
+};
 
-export interface SavedViewCapabilityCheckResponse {
+export type SavedViewCapabilityCheckResponse = Omit<
+  SavedViewCapabilityWire,
+  'viewType' | 'status' | 'reasons' | 'missingFields'
+> & {
   viewType: ViewType;
   status: SavedViewCapabilityStatus;
   missingFields: string[];
   reasons: SavedViewCapabilityReason[];
-}
+};
 
 /**
  * View type determines the rendering mode
@@ -347,8 +355,8 @@ export interface ConditionalFormatRule {
   fieldCode: string;
   /** Comparison operator */
   operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'isNull' | 'isNotNull';
-  /** Comparison value (not needed for isNull/isNotNull) */
-  value?: string;
+  /** Scalar comparison operand; zero, false and null retain their JSON meaning. */
+  value?: string | number | boolean | null;
   /** Style to apply when condition matches */
   style: ConditionalFormatStyle;
 }
@@ -365,7 +373,7 @@ export const CONDITIONAL_FORMAT_PRESETS: Array<{ label: string; bg: string; text
 ];
 
 /**
- * Complete view configuration stored in JSONB
+ * Editable view configuration; savedViewContract.ts checks the generated wire projection
  */
 export interface ViewConfig {
   /** Column configurations */
@@ -597,167 +605,71 @@ export const VIEW_TYPE_FIELD_REQUIREMENTS: Record<string, ViewFieldRequirement[]
 /**
  * SavedView entity representing a user's customized view
  */
-export interface SavedView {
-  /** Primary identifier (UUID) */
+export type SavedView = Partial<
+  PresentFields<Omit<SavedViewWire, 'scope' | 'viewType' | 'viewConfig'>>
+> & {
   pid: string;
-  /** View name displayed to user */
   name: string;
-  /** View description */
-  description?: string;
-  /** Associated model code */
   modelCode: string;
-  /** Associated page key (optional - null means model-level view) */
-  pageKey?: string;
-  /** View scope determining visibility */
   scope: ViewScope;
-  /** View type determining rendering mode */
   viewType?: ViewType;
-  /** Owner user ID (for PERSONAL views) */
-  ownerId?: string;
-  /** Team ID (for TEAM views) */
-  teamId?: string;
-  /** Role PID (for ROLE views) */
-  roleId?: string;
-  /** View configuration */
   viewConfig?: ViewConfig;
-  /** Whether to allow access to full model fields */
-  allowFullModel?: boolean;
-  /** Whether this is the default view */
-  isDefault?: boolean;
-  /** Whether this is an implicit system-created personal view */
-  isImplicit?: boolean;
-  /** Sort order for view list display */
-  sortOrder?: number;
-  /** Effective permission for current user on this view */
-  effectivePermission?: 'view' | 'save' | 'manage' | string;
-  /** Server-authoritative actions available to current user */
-  actions?: Array<'view' | 'copy' | 'save' | 'manage' | 'delete' | 'setDefault' | 'share' | string>;
-  /** Whether persisted local override changes are present */
-  dirty?: boolean;
-  /** Creation timestamp */
-  createdAt?: string;
-  /** Last update timestamp */
-  updatedAt?: string;
-  /** Creator user ID */
-  createdBy?: string;
-  /** Last updater user ID */
-  updatedBy?: string;
-  /** Owner display name (populated by service) */
-  ownerName?: string;
-  /** Team display name (populated by service) */
-  teamName?: string;
-  /** Role display name (populated by service) */
-  roleName?: string;
-}
+};
 
 /**
  * Request payload for creating a SavedView
  */
-export interface SavedViewCreateRequest {
-  /** View name (required, max 100 characters) */
-  name: string;
-  /** View description (max 500 characters) */
-  description?: string;
-  /** Associated model code (required) */
-  modelCode: string;
-  /** Associated page key (optional) */
-  pageKey?: string;
-  /** View scope (defaults to PERSONAL) */
+export type SavedViewCreateRequest = Omit<
+  SavedViewCreateWire,
+  'scope' | 'viewType' | 'viewConfig'
+> & {
   scope?: ViewScope;
-  /** View type (defaults to TABLE) */
   viewType?: ViewType;
-  /** Team ID (required when scope is TEAM) */
-  teamId?: string;
-  /** Role PID (required when scope is ROLE) */
-  roleId?: string;
-  /** View configuration */
   viewConfig?: ViewConfig;
-  /** Whether to allow full model field access */
-  allowFullModel?: boolean;
-  /** Whether this is the default view */
-  isDefault?: boolean;
-  /** Sort order for display */
-  sortOrder?: number;
-}
+};
 
 /**
  * Request payload for updating a SavedView
  * All fields are optional for partial updates
  */
-export interface SavedViewUpdateRequest {
-  /** View name (max 100 characters) */
-  name?: string;
-  /** View description (max 500 characters) */
-  description?: string;
-  /** View scope */
+export type SavedViewUpdateRequest = Omit<
+  SavedViewUpdateWire,
+  'scope' | 'viewType' | 'viewConfig'
+> & {
   scope?: ViewScope;
-  /** Team ID (required when scope is TEAM) */
-  teamId?: string;
-  /** Role PID (required when scope is ROLE) */
-  roleId?: string;
-  /** View configuration */
   viewConfig?: ViewConfig;
-  /** Whether to allow full model field access */
-  allowFullModel?: boolean;
-  /** Whether this is the default view */
-  isDefault?: boolean;
-  /** Sort order for display */
-  sortOrder?: number;
-}
+};
 
 /**
  * Request payload for copying any accessible SavedView into the current user's
  * personal scope. Used when a user customizes a team/global view but should not
  * mutate the shared source view.
  */
-export interface SavedViewCopyToPersonalRequest {
-  /** Optional new personal view name */
-  name?: string;
-  /** Optional config override with the user's local pending changes applied */
+export type SavedViewCopyToPersonalRequest = Omit<SavedViewCopyWire, 'viewConfig'> & {
   viewConfig?: ViewConfig;
-}
+};
 
 /**
  * Query parameters for listing SavedViews
  */
-export interface SavedViewQueryParams {
-  /** Model code to filter by (required) */
-  modelCode: string;
-  /** Page key to filter by (optional) */
-  pageKey?: string;
-}
+export type SavedViewQueryParams = SavedViewQueryWire;
 
 /**
  * Options accepted by POST /api/views/{viewPid}/share (ViewShareController).
  */
-export interface SavedViewShareRequest {
-  /** Optional password gate for the public link */
-  password?: string;
-  /** Optional expiry, in hours from now. Omit for a link that never expires. */
-  expireHours?: number;
-}
+export type SavedViewShareRequest = SavedViewShareRequestWire;
 
 /**
  * Result of POST /api/views/{viewPid}/share (ViewShareService.createShareLink).
  */
-export interface SavedViewShareResult {
-  /** Opaque share token; the public page lives at /share/{token} */
-  token: string;
-  /** API path of the shared-view endpoint, e.g. /api/views/shared/{token} */
-  shareUrl: string;
-  /** ISO timestamp, or null when the link never expires */
-  expiresAt?: string | null;
-  passwordProtected?: boolean;
-}
+export type SavedViewShareResult = SavedViewShareWire;
 
 /**
  * Result of GET /api/views/{viewPid}/share/status (ViewShareService.getShareStatus).
  * `token` / `expiresAt` / `passwordProtected` are only present once a link exists.
  */
-export interface SavedViewShareStatus {
-  /** True only when a share link exists AND is active */
-  shared: boolean;
-  token?: string | null;
-  expiresAt?: string | null;
-  passwordProtected?: boolean;
-}
+export type SavedViewShareStatus = SavedViewShareStatusWire;
+
+export type SavedViewAutoSaveRequest = Omit<SavedViewAutoSaveWire, 'viewConfig'> & {
+  viewConfig?: Partial<ViewConfig>;
+};

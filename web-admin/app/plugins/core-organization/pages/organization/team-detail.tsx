@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import TEAM_TEXT from '~/ui/smart/organization/TeamMembers.i18n.json';
 import {
   fetchTeam,
   fetchTeamMembers,
@@ -10,8 +13,7 @@ import {
   type Team,
   type TeamMember,
 } from '~/shared/services/teamService';
-import { post } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
+import { searchTenantMembers } from '~/shared/services/tenantMemberSearchService';
 
 interface TenantMemberOption {
   memberPid: string;
@@ -21,6 +23,7 @@ interface TenantMemberOption {
 }
 
 export default function TeamDetailPage() {
+  const { locale } = useI18n();
   const { teamPid } = useParams();
   const navigate = useNavigate();
   const { showSuccessToast, showErrorToast } = useToastContext();
@@ -153,7 +156,7 @@ export default function TeamDetailPage() {
               {members.map((member) => (
                 <tr key={member.pid} className="hover:bg-subtle/70">
                   <td className="text-text px-6 py-4 text-sm font-medium">
-                    {member.userName || `User #${member.userId}`}
+                    {member.userName || member.userEmail || getLocalizedText(TEAM_TEXT.member, locale)}
                   </td>
                   <td className="text-text-2 px-6 py-4 text-sm">
                     {member.userEmail || '-'}
@@ -177,7 +180,7 @@ export default function TeamDetailPage() {
                       onClick={() => handleRemoveMember(member)}
                       className="text-text-3 hover:text-status-red rounded p-1.5 transition-colors"
                       title="移除成员"
-                      data-testid={`remove-member-${member.userId}`}
+                      data-testid={`remove-member-${member.pid}`}
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -194,7 +197,7 @@ export default function TeamDetailPage() {
           onClose={() => setShowAddModal(false)}
           onAdd={handleAddMember}
           existingMemberUserIds={members.flatMap((m) =>
-            [m.userId, m.userPid, m.memberPid].filter((value): value is string => Boolean(value)),
+            [m.userPid, m.memberPid].filter((value): value is string => Boolean(value)),
           )}
         />
       )}
@@ -211,6 +214,7 @@ function AddMemberModal({
   onAdd: (memberPid: string, role: string) => void;
   existingMemberUserIds: string[];
 }) {
+  const { locale } = useI18n();
   const [tenantMembers, setTenantMembers] = useState<TenantMemberOption[]>([]);
   const [selectedMemberPid, setSelectedMemberPid] = useState('');
   const [loading, setLoading] = useState(true);
@@ -218,35 +222,23 @@ function AddMemberModal({
   useEffect(() => {
     const loadMembers = async () => {
       try {
-        const result = await post<{ records?: any[]; content?: any[] } | any[]>(
-          '/api/tenant/members/search',
-          {
-            status: 'active',
-            pageNum: 1,
-            pageSize: 100,
-          },
-        );
-        if (ResultHelper.isSuccess(result) && result.data) {
-          const items = Array.isArray(result.data)
-            ? result.data
-            : result.data.records || result.data.content || [];
+        const items = await searchTenantMembers({ status: 'active', pageNum: 1, pageSize: 100 });
+        {
           const existing = new Set(existingMemberUserIds.map(String));
           const options: TenantMemberOption[] = items
-            .filter((m: any) => {
-              const userId = m.userId ?? m.user?.id;
-              const userPid = m.userPid ?? m.user?.pid;
-              return !existing.has(String(userId)) && !existing.has(String(userPid));
+            .filter((m) => {
+              const userPid = m.user?.pid;
+              return !existing.has(String(m.pid)) && !existing.has(String(userPid));
             })
-            .map((m: any) => ({
-              memberPid: String(m.pid || ''),
-              userPid: m.user?.pid || m.userPid,
+            .map((m) => ({
+              memberPid: m.pid!,
+              userPid: m.user?.pid,
               userName:
-                m.displayName ||
                 m.user?.realName ||
                 m.user?.username ||
                 m.user?.email ||
-                String(m.userId || m.user?.pid || ''),
-              userEmail: m.email || m.user?.email || '',
+                '',
+              userEmail: m.user?.email || '',
             }))
             .filter((m) => m.memberPid);
           setTenantMembers(options);
@@ -293,7 +285,7 @@ function AddMemberModal({
                 <option value="">请选择用户</option>
                 {tenantMembers.map((m) => (
                   <option key={m.memberPid} value={m.memberPid}>
-                    {m.userName} ({m.userEmail})
+                    {m.userName || getLocalizedText(TEAM_TEXT.member, locale)} ({m.userEmail})
                   </option>
                 ))}
               </select>

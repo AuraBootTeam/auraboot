@@ -20,6 +20,7 @@
 ARG BUILD_JDK_IMAGE=eclipse-temurin:21-jdk
 ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine
 FROM ${BUILD_JDK_IMAGE} AS builder
+ARG AURA_GRADLE_REPOSITORY_POLICY=project
 
 WORKDIR /app
 
@@ -36,9 +37,12 @@ RUN if [ "$MAVEN_CENTRAL_FIRST" = "true" ]; then \
 COPY platform/gradlew gradlew
 COPY platform/gradle gradle
 COPY platform/build.gradle platform/settings.gradle platform/gradle.properties ./
+# Lombok controls constructor binding and copied injection qualifiers, hence the HTTP contract.
+COPY platform/lombok.config ./
 # platform/build.gradle intentionally reads ../VERSION so the platform and repository release
 # stay on one canonical version. WORKDIR is /app in this stage, therefore that file is /VERSION.
 COPY VERSION /VERSION
+COPY scripts/ci/gradle-repositories.init.gradle /opt/aura-ci/gradle-repositories.init.gradle
 
 # Copy subproject build files for dependency resolution
 COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle
@@ -56,7 +60,8 @@ RUN chmod +x gradlew
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
-    ./gradlew dependencies --no-daemon || true
+    AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
+    ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle dependencies --no-daemon || true
 
 # Copy source code
 COPY platform/src ./src
@@ -77,7 +82,8 @@ COPY platform/vendor* ./vendor/
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
-    ./gradlew :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test
+    AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
+    ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────
 FROM ${RUNTIME_JRE_IMAGE}

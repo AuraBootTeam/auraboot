@@ -1,3 +1,4 @@
+import { searchTenantMembers } from '~/shared/services/tenantMemberSearchService';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
@@ -83,37 +84,20 @@ export default function MemberManager({ projectId }: MemberManagerProps) {
 
   const loadTenantUsers = useCallback(async () => {
     try {
-      const result = await post<{
-        records: Array<{
-          userId: string;
-          displayName?: string;
-          email?: string;
-          user?: {
-            email?: string;
-            realName?: string;
-            username?: string;
-          };
-        }>;
-      }>('/api/tenant/members/search', {
-        pageNum: 1,
-        pageSize: 200,
-        status: 'active',
-      });
-      if (ResultHelper.isSuccess(result) && result.data?.records) {
-        setTenantUsers(
-          result.data.records.map((u) => ({
-            userId: u.userId,
-            displayName:
-              u.displayName ||
-              u.user?.realName ||
-              u.user?.username ||
-              u.user?.email ||
-              u.email ||
-              String(u.userId),
-            email: u.email || u.user?.email || '',
-          })),
-        );
-      }
+      const records = await searchTenantMembers({ pageNum: 1, pageSize: 200, status: 'active' });
+      setTenantUsers(
+        records.flatMap(({ user }): TenantUser[] =>
+          user
+            ? [
+                {
+                  userId: user.pid!,
+                  displayName: user.realName || user.username || user.email || '',
+                  email: user.email || '',
+                },
+              ]
+            : [],
+        ),
+      );
     } catch {
       // silent
     }

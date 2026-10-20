@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * useDictCache — parallel dictionary data loading and caching
  *
@@ -6,14 +8,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchResult } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
 
-interface DictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, any>;
-}
+type DictItem = Pick<import('~/types/dict').DictItemData, 'value' | 'label' | 'extension'>;
 
 interface UseDictCacheOptions {
   /** Dict codes to preload */
@@ -58,14 +54,12 @@ export function useDictCache({ dictCodes, token }: UseDictCacheOptions): UseDict
     const loadAll = async () => {
       const promises = unloadedCodes.map(async (code) => {
         try {
-          const result = await fetchResult(`/api/meta/dict/by-code/${code}/data`, {
-            method: 'get',
-            token,
+          const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+            path: { code },
+            options: { token },
           });
-          if (ResultHelper.isSuccess(result) && result.data) {
-            const data = result.data as { items?: DictItem[] } | DictItem[];
-            const items: DictItem[] = Array.isArray(data) ? data : data.items || [];
-            cacheRef.current.set(code, items);
+          if (result.code === '0' && result.data) {
+            cacheRef.current.set(code, dictionaryData(result.data).items);
           }
         } catch (error) {
           console.error(`[useDictCache] Failed to load dict: ${code}`, error);

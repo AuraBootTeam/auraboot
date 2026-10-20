@@ -86,21 +86,4 @@ export interface PermissionGrantRequest {
 // Role Member DTOs
 // ---------------------------------------------------------------------------
 
-export interface RoleMemberDTO {
-  memberId: number;
-  memberPid: string;
-  userName: string;
-  email: string;
-  departmentName: string;
-  positionName: string;
-  assignedAt: string;
-  effectiveDate?: string;
-  expiryDate?: string;
-}
-
-export interface PaginationResult<T> {
-  records: T[];
-  total: number;
-  pageNum: number;
-  pageSize: number;
-}
+export type { RoleMember as RoleMemberDTO } from '~/shared/services/roleMemberService';

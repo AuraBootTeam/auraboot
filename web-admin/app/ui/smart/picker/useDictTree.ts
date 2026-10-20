@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * useDictTree — Shared hook for loading tree-structured dict data.
  *
@@ -6,7 +8,6 @@
  */
 
 import { useState, useEffect } from 'react';
-import { fetchResult } from '~/shared/services/http-client';
 
 export interface DictTreeNode {
   value: string;
@@ -23,23 +24,16 @@ export interface DictTreeNode {
  * @param skip - Skip fetching (e.g., when external options are provided)
  * @returns Tree-structured options array (empty while loading or when skipped)
  */
-export function useDictTree(
-  dictCode: string | undefined | null,
-  skip = false,
-): DictTreeNode[] {
+export function useDictTree(dictCode: string | undefined | null, skip = false): DictTreeNode[] {
   const [options, setOptions] = useState<DictTreeNode[]>([]);
 
   useEffect(() => {
     if (!dictCode || skip) return;
 
-    fetchResult<any>(`/api/meta/dict/by-code/${dictCode}/data`, { method: 'get' })
+    internalRequest('get', '/api/meta/dict/by-code/{code}/data', { path: { code: dictCode } })
       .then((result) => {
-        if (!result?.data?.items) return;
-        const items = result.data.items as Array<{
-          value: string;
-          label: string;
-          parentValue?: string | null;
-        }>;
+        if (result.code !== '0' || !result.data) return;
+        const items = dictionaryData(result.data).items;
 
         // Build tree from flat items with parentValue
         const nodeMap = new Map<string, DictTreeNode>();

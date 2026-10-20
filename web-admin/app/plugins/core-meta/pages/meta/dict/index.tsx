@@ -4,6 +4,8 @@
  * Displays a paginated list of dictionaries with search and filter capabilities
  */
 
+import { useLocalizedText } from '~/utils/i18n';
+import BATCH_TEXT from './batchFeedback.i18n.json';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
@@ -12,6 +14,8 @@ import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { DictDTO, DictQueryRequest, DictPageResult } from '~/types/dict';
 import { StatusBadge } from '~/ui/common/StatusBadge';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 
 /**
  * Loader function
@@ -50,6 +54,8 @@ export default function DictListPage() {
   const navigate = useNavigate();
   const { result: initialResult, query: initialQuery } = useLoaderData<typeof loader>();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const lt = useLocalizedText();
+  const { timezone, formats } = useTimezone();
 
   const [result, setResult] = useState<DictPageResult<DictDTO>>(initialResult);
   const [loading, setLoading] = useState(false);
@@ -151,9 +157,20 @@ export default function DictListPage() {
 
     setLoading(true);
     try {
-      await dictService.batchDelete(Array.from(selectedDicts));
-      showSuccessToast(`成功删除 ${selectedDicts.size} 个字典`);
-      setSelectedDicts(new Set());
+      const deleted = await dictService.batchDelete(Array.from(selectedDicts));
+      if (!Number.isInteger(deleted) || deleted < 0 || deleted > selectedDicts.size) {
+        throw new Error('Invalid dictionary deletion count');
+      }
+      if (deleted === selectedDicts.size) {
+        showSuccessToast(lt(BATCH_TEXT.complete).replace('{deleted}', String(deleted)));
+      } else if (deleted === 0) {
+        showErrorToast(lt(BATCH_TEXT.none));
+      } else {
+        showErrorToast(lt(BATCH_TEXT.partial)
+          .replace('{deleted}', String(deleted))
+          .replace('{selected}', String(selectedDicts.size)));
+      }
+      if (deleted > 0) setSelectedDicts(new Set());
 
       // Reload current page
       await handlePageChange(result.current);
@@ -163,7 +180,7 @@ export default function DictListPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDicts, result.current, handlePageChange, showSuccessToast, showErrorToast]);
+  }, [selectedDicts, result.current, handlePageChange, showSuccessToast, showErrorToast, lt]);
 
   /**
    * Handle select all
@@ -356,7 +373,7 @@ export default function DictListPage() {
       )}
 
       {/* Dictionary Table */}
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="overflow-x-auto rounded-lg bg-white shadow">
         {loading && (
           <div className="bg-opacity-75 absolute inset-0 z-10 flex items-center justify-center bg-white">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
@@ -366,7 +383,7 @@ export default function DictListPage() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left">
+              <th className="px-4 py-3 text-left">
                 <input
                   type="checkbox"
                   checked={
@@ -376,25 +393,25 @@ export default function DictListPage() {
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 字典编码
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 字典名称
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 类型
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 状态
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 版本
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 更新时间
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                 操作
               </th>
             </tr>
@@ -402,14 +419,14 @@ export default function DictListPage() {
           <tbody className="divide-y divide-gray-200 bg-white">
             {result.records.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                   暂无数据
                 </td>
               </tr>
             ) : (
               result.records.map((dict: DictDTO) => (
                 <tr key={dict.pid} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4">
                     <input
                       type="checkbox"
                       checked={selectedDicts.has(dict.pid)}
@@ -417,17 +434,20 @@ export default function DictListPage() {
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <Link
                       to={`/meta/dict/${dict.pid}`}
                       data-testid={`dict-row-code-${dict.pid}`}
-                      className="font-mono text-sm text-blue-600 hover:text-blue-900"
+                      title={dict.code}
+                      className="block max-w-56 truncate font-mono text-sm text-blue-600 hover:text-blue-900"
                     >
                       {dict.code}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">{dict.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 text-sm text-gray-900">
+                    <span title={dict.name} className="block max-w-56 truncate">{dict.name}</span>
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getTypeBadgeColor(dict.dictType)}`}
                     >
@@ -436,16 +456,18 @@ export default function DictListPage() {
                       {dict.dictType === 'cascade' && '级联'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <StatusBadge status={dict.status} />
                   </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                  <td className="px-4 py-4 text-sm whitespace-nowrap text-gray-500">
                     v{dict.version}
                   </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-                    {new Date(dict.updatedAt).toLocaleString()}
+                  <td className="px-4 py-4 text-sm whitespace-nowrap text-gray-500">
+                    <time dateTime={dict.updatedAt} data-testid={`dict-updated-at-${dict.pid}`}>
+                      {formatInTimezone(dict.updatedAt, formats.datetime, timezone)}
+                    </time>
                   </td>
-                  <td className="px-6 py-4 text-sm whitespace-nowrap">
+                  <td className="px-4 py-4 text-sm whitespace-nowrap">
                     <Link
                       to={`/meta/dict/${dict.pid}`}
                       data-testid={`dict-row-view-${dict.pid}`}

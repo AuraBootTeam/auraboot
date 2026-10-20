@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { put } from '~/shared/services/http-client';
+import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { ResultHelper } from '~/utils/type';
 import { useToast } from '~/contexts/ToastContext';
 import PasswordStrengthIndicator from './PasswordStrengthIndicator';
@@ -34,10 +34,8 @@ export default function PasswordChangeForm({ onSuccess }: PasswordChangeFormProp
 
     setIsSubmitting(true);
     try {
-      const result = await put<{ code: string; message?: string }>('/api/user/password', {
-        currentPassword,
-        newPassword,
-        confirmPassword,
+      const result = await internalRequest('put', '/api/user/password', {
+        body: { currentPassword, newPassword, confirmPassword },
       });
       if (result && ResultHelper.isSuccess(result)) {
         showSuccessToast('Password changed successfully. Please log in again.');

@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, useRef, useId, type FormEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useId,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import {
   addTeamMember,
@@ -6,8 +15,7 @@ import {
   removeTeamMember,
   type TeamMember,
 } from '~/shared/services/teamService';
-import { post } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
+import { searchTenantMembers } from '~/shared/services/tenantMemberSearchService';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useAuth } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -50,6 +58,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { hasPermission } = useAuth();
   const canManage = hasPermission('org.team.manage');
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,15 +97,15 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
 
   useEffect(() => {
     void loadMembers();
-    return () => { requestVersion.current++; };
+    return () => {
+      requestVersion.current++;
+    };
   }, [loadMembers]);
 
   const existingMemberKeys = useMemo(
     () =>
       members.flatMap((member) =>
-        [member.userId, member.userPid, member.memberPid].filter((value): value is string =>
-          Boolean(value),
-        ),
+        [member.userPid, member.memberPid].filter((value): value is string => Boolean(value)),
       ),
     [members],
   );
@@ -115,7 +124,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
 
   const handleRemoveMember = async (member: TeamMember) => {
     if (!teamPid || !canManage) return;
-    const name = member.userName || member.userEmail || text('memberFallback');
+    const name = member.userName || member.userEmail || l('该成员', 'this member');
     if (!window.confirm(text('confirmRemove').replace('{name}', name))) return;
     try {
       await removeTeamMember(teamPid, member.pid);
@@ -145,21 +154,21 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
             </h3>
             <p className="text-text-3 mt-0.5 text-xs">
               {canManage
-                ? text('subtitle')
-                : text('viewSubtitle')}
+                ? l('维护团队成员与团队角色', 'Manage team members and roles')
+                : l('查看团队成员与团队角色', 'View team members and roles')}
             </p>
           </div>
         </div>
         {canManage && (
           <button
             type="button"
-            disabled={loading || loadFailed}
             onClick={() => setShowAddModal(true)}
-            className="disabled:cursor-not-allowed disabled:opacity-50 bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
+            disabled={loading || loadFailed}
+            className="bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
             data-testid="team-members-add"
           >
             <PlusIcon className="h-4 w-4" />
-            {text('addMember')}
+            {l('添加成员', 'Add member')}
           </button>
         )}
       </div>
@@ -171,15 +180,22 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
       ) : loadFailed ? (
         <div role="alert" className="px-6 py-10 text-center" data-testid="team-members-load-error">
           <p className="text-status-red text-sm">{text('loadFailure')}</p>
-          <button type="button" onClick={() => void loadMembers()} className="mt-3 text-sm text-accent" data-testid="team-members-retry">{text('retry')}</button>
+          <button
+            type="button"
+            onClick={() => void loadMembers()}
+            className="text-accent mt-3 text-sm"
+            data-testid="team-members-retry"
+          >
+            {text('retry')}
+          </button>
         </div>
       ) : members.length === 0 ? (
         <div className="px-6 py-10 text-center">
           <p className="text-text-2 text-sm font-medium">{text('empty')}</p>
           <p className="text-text-3 mt-1 text-sm">
             {canManage
-              ? text('emptyHint')
-              : text('viewEmptyHint')}
+              ? l('添加成员后，他们会出现在这里。', 'Added members will appear here.')
+              : l('此团队尚未添加成员。', 'This team has no members yet.')}
           </p>
         </div>
       ) : (
@@ -191,7 +207,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
                 <HeaderCell>{text('email')}</HeaderCell>
                 <HeaderCell>{text('role')}</HeaderCell>
                 <HeaderCell>{text('joined')}</HeaderCell>
-                {canManage && <HeaderCell align="right">{text('actions')}</HeaderCell>}
+                {canManage && <HeaderCell align="right">{l('操作', 'Actions')}</HeaderCell>}
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -204,14 +220,16 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
                   <td className="px-5 py-3">
                     <RoleBadge role={member.role} />
                   </td>
-                  <td className="text-text-2 px-5 py-3 text-sm">{formatDate(member.joinedAt, locale)}</td>
+                  <td className="text-text-2 px-5 py-3 text-sm">
+                    {formatDate(member.joinedAt, locale)}
+                  </td>
                   {canManage && (
                     <td className="px-5 py-3 text-right">
                       <button
                         type="button"
                         onClick={() => void handleRemoveMember(member)}
                         className="text-text-3 hover:text-status-red focus-visible:shadow-focus rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors focus:outline-none"
-                        title={text('removeMember')}
+                        title={l('移除成员', 'Remove member')}
                         data-testid={`team-members-remove-${member.pid}`}
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -259,56 +277,26 @@ function AddMemberModal({
       setLoading(true);
       setLoadFailed(false);
       try {
-        const result = await post<{ records?: any[]; content?: any[] } | any[]>(
-          '/api/tenant/members/search',
-          {
-            status: 'active',
-            pageNum: 1,
-            pageSize: 100,
-          },
-        );
+        const items = await searchTenantMembers({ status: 'active', pageNum: 1, pageSize: 100 });
         if (cancelled) return;
-        if (!ResultHelper.isSuccess(result) || !result.data) {
-          setLoadFailed(true);
-          return;
-        }
-        const items = Array.isArray(result.data)
-          ? result.data
-          : Array.isArray(result.data.records)
-            ? result.data.records
-            : Array.isArray(result.data.content)
-              ? result.data.content
-              : null;
-        if (!items) {
-          setLoadFailed(true);
-          return;
-        }
         const existing = new Set(existingMemberKeys.map(String));
         const options = items
-          .filter((member: any) => {
-            const userId = member.userId ?? member.user?.id;
-            const userPid = member.userPid ?? member.user?.pid;
+          .filter((member) => {
+            const userPid = member.user?.pid;
             const memberPid = member.pid;
-            return (
-              !existing.has(String(userId)) &&
-              !existing.has(String(userPid)) &&
-              !existing.has(String(memberPid))
-            );
+            return !existing.has(String(userPid)) && !existing.has(String(memberPid));
           })
-          .map((member: any) => ({
-            memberPid: String(member.pid || ''),
-            userPid: member.user?.pid || member.userPid,
-            userName:
-              member.displayName ||
-              member.user?.realName ||
-              member.user?.username ||
-              member.user?.email ||
-              String(member.userId || member.user?.pid || ''),
-            userEmail: member.email || member.user?.email || '',
+          .map((member) => ({
+            memberPid: member.pid!,
+            userPid: member.user?.pid,
+            userName: member.user?.realName || member.user?.username || member.user?.email || '',
+            userEmail: member.user?.email || '',
           }))
           .filter((member) => member.memberPid);
         setTenantMembers(options);
-        setSelectedMemberPid(previous => options.some(member => member.memberPid === previous) ? previous : '');
+        setSelectedMemberPid((previous) =>
+          options.some((member) => member.memberPid === previous) ? previous : '',
+        );
       } catch {
         if (!cancelled) setLoadFailed(true);
       } finally {
@@ -323,14 +311,26 @@ function AddMemberModal({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!loading && !loadFailed && tenantMembers.some(member => member.memberPid === selectedMemberPid)) onAdd(selectedMemberPid, 'member');
+    if (
+      !loading &&
+      !loadFailed &&
+      tenantMembers.some((member) => member.memberPid === selectedMemberPid)
+    )
+      onAdd(selectedMemberPid, 'member');
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="bg-panel border-border rounded-card w-full max-w-lg overflow-hidden border shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        className="bg-panel border-border rounded-card w-full max-w-lg overflow-hidden border shadow-xl"
+      >
         <div className="border-border border-b px-6 py-4">
-          <h3 id={dialogTitleId} className="text-text text-base font-semibold">{text('modalTitle')}</h3>
+          <h3 id={dialogTitleId} className="text-text text-base font-semibold">
+            {text('modalTitle')}
+          </h3>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 p-6">
           <label className="block">
@@ -338,9 +338,20 @@ function AddMemberModal({
             {loading ? (
               <span className="text-text-3 text-sm">{text('loading')}</span>
             ) : loadFailed ? (
-              <span role="alert" className="text-status-red text-sm" data-testid="team-members-candidate-error">
+              <span
+                role="alert"
+                className="text-status-red text-sm"
+                data-testid="team-members-candidate-error"
+              >
                 {text('candidateFailure')}
-                <button type="button" onClick={() => setRetryAttempt(n => n + 1)} className="ml-2 text-accent" data-testid="team-members-candidate-retry">{text('retry')}</button>
+                <button
+                  type="button"
+                  onClick={() => setRetryAttempt((n) => n + 1)}
+                  className="text-accent ml-2"
+                  data-testid="team-members-candidate-retry"
+                >
+                  {text('retry')}
+                </button>
               </span>
             ) : tenantMembers.length === 0 ? (
               <span className="text-text-3 text-sm">{text('noCandidates')}</span>
@@ -355,7 +366,7 @@ function AddMemberModal({
                 <option value="">{text('selectPlaceholder')}</option>
                 {tenantMembers.map((member) => (
                   <option key={member.memberPid} value={member.memberPid}>
-                    {member.userName} ({member.userEmail || text('noEmail')})
+                    {member.userName || text('member')} ({member.userEmail || text('noEmail')})
                   </option>
                 ))}
               </select>

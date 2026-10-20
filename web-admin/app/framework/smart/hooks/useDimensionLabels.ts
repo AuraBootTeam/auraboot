@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * useDimensionLabels
  *
@@ -45,16 +47,6 @@ interface FieldMetaRow {
   dictCode?: string | null;
 }
 
-interface DictItemRow {
-  value?: string;
-  label?: string;
-  enabled?: boolean;
-}
-
-interface DictDataResponse {
-  items?: DictItemRow[];
-}
-
 /** Reset the module caches. Test-only — a dict edited in one test must not leak into the next. */
 export function __resetDimensionLabelCaches(): void {
   fieldDictCache.clear();
@@ -72,10 +64,9 @@ async function loadFieldDicts(modelCode: string): Promise<FieldDictMap> {
   if (inFlight) return inFlight;
 
   const promise = (async () => {
-    const result = await fetchResult<FieldMetaRow[]>(
-      `/api/dynamic/${modelCode}/field-meta`,
-      { method: 'get' },
-    );
+    const result = await fetchResult<FieldMetaRow[]>(`/api/dynamic/${modelCode}/field-meta`, {
+      method: 'get',
+    });
     const map: FieldDictMap = {};
     if (ResultHelper.isSuccess(result) && Array.isArray(result.data)) {
       for (const field of result.data) {
@@ -101,14 +92,13 @@ async function loadDictLabels(dictCode: string): Promise<DictLabelMap> {
   const promise = (async () => {
     // `/by-code/{code}` returns the dict with `items: null`; the items live behind
     // `/data`, which is what the form/list renderers already use.
-    const result = await fetchResult<DictDataResponse>(
-      `/api/meta/dict/by-code/${dictCode}/data`,
-      { method: 'get' },
-    );
+    const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+      path: { code: dictCode },
+    });
     const map: DictLabelMap = {};
-    if (ResultHelper.isSuccess(result) && Array.isArray(result.data?.items)) {
-      for (const item of result.data.items) {
-        if (item?.value != null && item.label) map[String(item.value)] = item.label;
+    if (result.code === '0' && result.data) {
+      for (const item of dictionaryData(result.data).items) {
+        if (item.label) map[item.value] = item.label;
       }
     }
     dictLabelCache.set(dictCode, map);
@@ -179,7 +169,6 @@ export function useDimensionLabels(
     let cancelled = false;
 
     (async () => {
-
       // Explicit mapping wins: a namedQuery aliasing a column to a different name
       // than the underlying field must be able to say which dict it means.
       const fromModel = modelCode ? await loadFieldDicts(modelCode) : {};

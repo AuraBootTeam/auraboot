@@ -1,381 +1,265 @@
-/**
- * Unit tests for dictService
- * Validates URL construction, payload forwarding, and response handling.
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getMock, postMock, putMock, delMock } = vi.hoisted(() => ({
-  getMock: vi.fn(),
-  postMock: vi.fn(),
-  putMock: vi.fn(),
-  delMock: vi.fn(),
-}));
-
-vi.mock('../http-client', () => ({
-  get: getMock,
-  post: postMock,
-  put: putMock,
-  del: delMock,
-}));
-
+const { callMock } = vi.hoisted(() => ({ callMock: vi.fn() }));
+vi.mock('../http-client/internal-api', () => ({ internalRequest: callMock }));
 import { dictService } from '../dictService';
+import { dictionaryData, dictionaryPage, dictionaryTree, dictionaryView } from '../dict-adapter';
 
-// dictService.handleResponse checks result.success (bool) and result.message
-const SUCCESS = { success: true };
+const dto = {
+  pid: 'dict-pid',
+  code: 'STATUS',
+  name: 'Status',
+  dictType: 'simple',
+  status: 'published',
+  updatedAt: '2026-10-18T00:00:00',
+};
+const item = {
+  value: 'active',
+  label: 'Active',
+  enabled: true,
+  sortOrder: 2,
+  extension: { color: 'green' },
+};
+const page = { records: [dto], total: 1, size: 20, current: 1, pages: 1 };
+const body = { code: 'STATUS', name: 'Status', dictType: 'simple', sourceType: 'STATIC' };
+const cases = [
+  {
+    name: 'create',
+    invoke: () => dictService.create(body),
+    method: 'post',
+    path: '/api/meta/dict',
+    input: { body, request: undefined },
+    data: dto,
+  },
+  {
+    name: 'update',
+    invoke: () => dictService.update('dict-pid', { name: 'Updated' }),
+    method: 'put',
+    path: '/api/meta/dict/{pid}',
+    input: { path: { pid: 'dict-pid' }, body: { name: 'Updated' }, request: undefined },
+    data: dto,
+  },
+  {
+    name: 'replace items',
+    invoke: () => dictService.replaceItems('dict-pid', []),
+    method: 'put',
+    path: '/api/meta/dict/{pid}/items',
+    input: { path: { pid: 'dict-pid' }, body: [], request: undefined },
+    data: dto,
+  },
+  {
+    name: 'delete',
+    invoke: () => dictService.delete('dict-pid'),
+    method: 'delete',
+    path: '/api/meta/dict/{pid}',
+    input: { path: { pid: 'dict-pid' }, request: undefined },
+    data: null,
+  },
+  {
+    name: 'find by pid',
+    invoke: () => dictService.findByPid('dict-pid'),
+    method: 'get',
+    path: '/api/meta/dict/{pid}',
+    input: { path: { pid: 'dict-pid' }, request: undefined },
+    data: dto,
+  },
+  {
+    name: 'find by code',
+    invoke: () => dictService.findByCode('STATUS'),
+    method: 'get',
+    path: '/api/meta/dict/by-code/{code}',
+    input: { path: { code: 'STATUS' }, request: undefined },
+    data: dto,
+  },
+  {
+    name: 'query',
+    invoke: () => dictService.query({ pageNum: 1, pageSize: 20 }),
+    method: 'get',
+    path: '/api/meta/dict',
+    input: { query: { pageNum: 1, pageSize: 20 }, request: undefined },
+    data: page,
+  },
+  {
+    name: 'load data',
+    invoke: () => dictService.loadData('dict-pid'),
+    method: 'get',
+    path: '/api/meta/dict/{pid}/data',
+    input: {
+      path: { pid: 'dict-pid' },
+      query: { versionStrategy: 'latest', pinnedVersion: undefined },
+      request: undefined,
+    },
+    data: { success: true, items: [item] },
+  },
+  {
+    name: 'publish',
+    invoke: () => dictService.publish('dict-pid', 'Release'),
+    method: 'post',
+    path: '/api/meta/dict/{pid}/publish',
+    input: { path: { pid: 'dict-pid' }, query: { versionNote: 'Release' }, request: undefined },
+    data: dto,
+  },
+  {
+    name: 'unpublish',
+    invoke: () => dictService.unpublish('dict-pid'),
+    method: 'post',
+    path: '/api/meta/dict/{pid}/unpublish',
+    input: { path: { pid: 'dict-pid' }, request: undefined },
+    data: dto,
+  },
+  {
+    name: 'version history',
+    invoke: () => dictService.getVersionHistory('STATUS'),
+    method: 'get',
+    path: '/api/meta/dict/{code}/versions',
+    input: { path: { code: 'STATUS' }, request: undefined },
+    data: [dto],
+  },
+  {
+    name: 'cascade children',
+    invoke: () => dictService.getCascadeChildren('dict-pid', 'parent'),
+    method: 'get',
+    path: '/api/meta/dict/{pid}/cascade/children',
+    input: { path: { pid: 'dict-pid' }, query: { parentValue: 'parent' }, request: undefined },
+    data: [item],
+  },
+  {
+    name: 'cascade tree',
+    invoke: () => dictService.buildCascadeTree('dict-pid'),
+    method: 'get',
+    path: '/api/meta/dict/{pid}/cascade/tree',
+    input: { path: { pid: 'dict-pid' }, request: undefined },
+    data: { value: 'root', label: 'Status', children: [] },
+  },
+  {
+    name: 'statistics',
+    invoke: () => dictService.getStatistics(),
+    method: 'get',
+    path: '/api/meta/dict/statistics',
+    input: { request: undefined },
+    data: { totalCount: 1 },
+  },
+  {
+    name: 'validate config',
+    invoke: () => dictService.validateConfig('dict-pid'),
+    method: 'get',
+    path: '/api/meta/dict/{pid}/validate',
+    input: { path: { pid: 'dict-pid' }, request: undefined },
+    data: { valid: false, errors: ['invalid'], warnings: [] },
+  },
+  {
+    name: 'code uniqueness false',
+    invoke: () => dictService.checkCodeUnique('STATUS', 'dict-pid'),
+    method: 'get',
+    path: '/api/meta/dict/code/{code}/unique',
+    input: { path: { code: 'STATUS' }, query: { excludePid: 'dict-pid' }, request: undefined },
+    data: false,
+  },
+  {
+    name: 'batch delete zero',
+    invoke: () => dictService.batchDelete(['a', 'b']),
+    method: 'delete',
+    path: '/api/meta/dict/batch',
+    input: { query: { pids: ['a', 'b'] }, request: undefined },
+    data: 0,
+  },
+  {
+    name: 'search',
+    invoke: () => dictService.search('Sta'),
+    method: 'get',
+    path: '/api/meta/dict/search',
+    input: { query: { keyword: 'Sta' }, request: undefined },
+    data: [dto],
+  },
+  {
+    name: 'find all',
+    invoke: () => dictService.findAll(),
+    method: 'get',
+    path: '/api/meta/dict',
+    input: { query: { pageNum: 1, pageSize: 1000, status: 'published' }, request: undefined },
+    data: page,
+  },
+];
 
-describe('dictService', () => {
-  beforeEach(() => {
-    getMock.mockReset();
-    postMock.mockReset();
-    putMock.mockReset();
-    delMock.mockReset();
+describe('generated dictionary operations', () => {
+  beforeEach(() => callMock.mockReset());
+  it.each(cases)(
+    '$name uses its declared operation and input slots',
+    async ({ invoke, method, path, input, data }) => {
+      callMock.mockResolvedValue({ code: '0', desc: 'OK', data });
+      const result = await invoke();
+      expect(callMock).toHaveBeenCalledExactlyOnceWith(method, path, input);
+      if (data === false || data === 0) expect(result).toBe(data);
+      if (data === null) expect(result).toBeUndefined();
+      if (data === dto) expect(result).toEqual(dto);
+    },
+  );
+  it('forwards the SSR request identity separately from the operation body', async () => {
+    const request = new Request('http://frontend.invalid/meta/dict');
+    callMock.mockResolvedValue({ code: '0', desc: 'OK', data: dto });
+    await dictService.create(body, request);
+    expect(callMock).toHaveBeenCalledWith('post', '/api/meta/dict', { body, request });
   });
-
-  // ── create ──────────────────────────────────────────────────────────────────
-
-  describe('create', () => {
-    it('posts to /api/meta/dict and returns data on success', async () => {
-      const dto = { pid: 'p1', code: 'STATUS', name: 'Status' };
-      postMock.mockResolvedValue({ ...SUCCESS, data: dto });
-
-      const result = await dictService.create({ code: 'STATUS', name: 'Status', dictType: 'simple', sourceType: 'STATIC' });
-
-      expect(postMock).toHaveBeenCalledWith('/api/meta/dict', { code: 'STATUS', name: 'Status', dictType: 'simple', sourceType: 'STATIC' }, undefined, undefined);
-      expect(result).toEqual(dto);
-    });
-
-    it('throws when success is false', async () => {
-      postMock.mockResolvedValue({ success: false, message: 'Server error', data: null });
-
-      await expect(dictService.create({ code: 'X', name: 'X', dictType: 'simple', sourceType: 'STATIC' })).rejects.toThrow('Server error');
-    });
-
-    it('throws default message when result.message is missing', async () => {
-      postMock.mockResolvedValue({ success: false, message: '', data: null });
-
-      await expect(dictService.create({ code: 'X', name: 'X', dictType: 'simple', sourceType: 'STATIC' })).rejects.toThrow('Failed to create dictionary');
-    });
+  it('uses the authoritative code and refuses missing successful data', async () => {
+    callMock.mockResolvedValue({ code: '403', success: true, message: 'Denied', data: dto });
+    await expect(dictService.create(body)).rejects.toThrow('Denied');
+    callMock.mockResolvedValue({ code: '0', desc: 'OK', data: null });
+    await expect(dictService.findByPid('dict-pid')).rejects.toThrow('Failed to fetch dictionary');
   });
+});
 
-  // ── update ──────────────────────────────────────────────────────────────────
-
-  describe('update', () => {
-    it('puts to /api/meta/dict/:pid and returns data', async () => {
-      const dto = { pid: 'p1', code: 'STATUS', name: 'Updated' };
-      putMock.mockResolvedValue({ ...SUCCESS, data: dto });
-
-      const result = await dictService.update('p1', { name: 'Updated' });
-
-      expect(putMock).toHaveBeenCalledWith('/api/meta/dict/p1', { name: 'Updated' }, undefined, undefined);
-      expect(result).toEqual(dto);
-    });
-
-    it('throws on failure', async () => {
-      putMock.mockResolvedValue({ success: false, message: 'Bad request', data: null });
-
-      await expect(dictService.update('p1', {})).rejects.toThrow('Bad request');
-    });
+describe('dictionary wire to editor projections', () => {
+  it('accepts only the producer empty root while refusing malformed children', () => {
+    expect(dictionaryTree({ value: null, label: null, children: [] })).toBeUndefined();
+    expect(() =>
+      dictionaryTree({
+        value: 'root',
+        label: 'Root',
+        children: [{ value: null, label: null, children: [] }],
+      }),
+    ).toThrow('value');
+    expect(() => dictionaryTree({ children: [] })).toThrow('value');
   });
-
-  // ── replaceItems ─────────────────────────────────────────────────────────────
-
-  describe('replaceItems', () => {
-    it('puts to /api/meta/dict/:pid/items', async () => {
-      const dto = { pid: 'p1', code: 'STATUS', name: 'Status' };
-      putMock.mockResolvedValue({ ...SUCCESS, data: dto });
-
-      const items = [{ value: 'ACTIVE', label: 'Active' }];
-      const result = await dictService.replaceItems('p1', items);
-
-      expect(putMock).toHaveBeenCalledWith('/api/meta/dict/p1/items', items, undefined, undefined);
-      expect(result).toEqual(dto);
-    });
+  it('rejects missing identity/display and pagination fields rather than inventing defaults', () => {
+    expect(() => dictionaryView({ pid: 'dict-pid' })).toThrow('code');
+    expect(() => dictionaryPage({ records: [] })).toThrow('total');
+    expect(() => dictionaryTree({ value: 'root' })).toThrow('label');
+    expect(() => dictionaryView({ ...dto, status: 'unknown' })).toThrow(
+      'Unsupported dictionary display status',
+    );
   });
-
-  // ── delete ───────────────────────────────────────────────────────────────────
-
-  describe('delete', () => {
-    it('calls del on /api/meta/dict/:pid and resolves void', async () => {
-      delMock.mockResolvedValue({ ...SUCCESS, data: null });
-
-      await expect(dictService.delete('p1')).resolves.toBeUndefined();
-      expect(delMock).toHaveBeenCalledWith('/api/meta/dict/p1', undefined, undefined, undefined);
+  it('maps wire ordering/enabled fields to editor state and preserves extension JSON', () => {
+    const result = dictionaryData({
+      success: true,
+      code: 'STATUS',
+      version: '3',
+      loadTimestamp: 123,
+      items: [item],
     });
-
-    it('throws on failure', async () => {
-      delMock.mockResolvedValue({ success: false, message: 'Forbidden', data: null });
-
-      await expect(dictService.delete('p1')).rejects.toThrow('Forbidden');
+    expect(result).toMatchObject({
+      code: 'STATUS',
+      version: '3',
+      loadTimestamp: 123,
+      items: [
+        {
+          value: 'active',
+          label: 'Active',
+          order: 2,
+          disabled: false,
+          extension: { color: 'green' },
+        },
+      ],
     });
-  });
-
-  // ── findByPid ────────────────────────────────────────────────────────────────
-
-  describe('findByPid', () => {
-    it('GETs /api/meta/dict/:pid', async () => {
-      const dto = { pid: 'p1', code: 'STATUS' };
-      getMock.mockResolvedValue({ ...SUCCESS, data: dto });
-
-      const result = await dictService.findByPid('p1');
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/p1', undefined, undefined, undefined);
-      expect(result).toEqual(dto);
-    });
-  });
-
-  // ── findByCode ───────────────────────────────────────────────────────────────
-
-  describe('findByCode', () => {
-    it('GETs /api/meta/dict/by-code/:code', async () => {
-      const dto = { pid: 'p1', code: 'STATUS' };
-      getMock.mockResolvedValue({ ...SUCCESS, data: dto });
-
-      const result = await dictService.findByCode('STATUS');
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/by-code/STATUS', undefined, undefined, undefined);
-      expect(result).toEqual(dto);
-    });
-  });
-
-  // ── query ────────────────────────────────────────────────────────────────────
-
-  describe('query', () => {
-    it('builds URLSearchParams and GETs paginated results', async () => {
-      const pageResult = { records: [], total: 0, current: 1, size: 10, pages: 0 };
-      getMock.mockResolvedValue({ ...SUCCESS, data: pageResult });
-
-      const result = await dictService.query({ pageNum: 1, pageSize: 10, status: 'published' });
-
-      expect(getMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/meta/dict?'),
-        undefined,
-        undefined,
-        undefined,
-      );
-      const calledUrl: string = getMock.mock.calls[0][0];
-      expect(calledUrl).toContain('pageNum=1');
-      expect(calledUrl).toContain('pageSize=10');
-      expect(calledUrl).toContain('status=published');
-      expect(result).toEqual(pageResult);
-    });
-
-    it('throws on failure', async () => {
-      getMock.mockResolvedValue({ success: false, message: 'Internal error', data: null });
-
-      await expect(dictService.query({})).rejects.toThrow('Internal error');
-    });
-  });
-
-  // ── loadData ─────────────────────────────────────────────────────────────────
-
-  describe('loadData', () => {
-    it('GETs with versionStrategy=latest by default', async () => {
-      const data = { items: [] };
-      getMock.mockResolvedValue({ ...SUCCESS, data });
-
-      const result = await dictService.loadData('p1');
-
-      const url: string = getMock.mock.calls[0][0];
-      expect(url).toContain('/api/meta/dict/p1/data?');
-      expect(url).toContain('versionStrategy=latest');
-      expect(result).toEqual(data);
-    });
-
-    it('appends pinnedVersion when provided', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: { items: [] } });
-
-      await dictService.loadData('p1', 'pinned', '42');
-
-      const url: string = getMock.mock.calls[0][0];
-      expect(url).toContain('pinnedVersion=42');
-    });
-  });
-
-  // ── publish / unpublish ───────────────────────────────────────────────────────
-
-  describe('publish', () => {
-    it('posts to publish URL without versionNote', async () => {
-      const dto = { pid: 'p1', code: 'STATUS' };
-      postMock.mockResolvedValue({ ...SUCCESS, data: dto });
-
-      const result = await dictService.publish('p1');
-
-      expect(postMock).toHaveBeenCalledWith('/api/meta/dict/p1/publish', undefined, undefined, undefined);
-      expect(result).toEqual(dto);
-    });
-
-    it('includes versionNote in query string when provided', async () => {
-      postMock.mockResolvedValue({ ...SUCCESS, data: { pid: 'p1' } });
-
-      await dictService.publish('p1', 'v2 release');
-
-      const url: string = postMock.mock.calls[0][0];
-      expect(url).toContain('versionNote=v2+release');
-    });
-  });
-
-  describe('unpublish', () => {
-    it('posts to /api/meta/dict/:pid/unpublish', async () => {
-      const dto = { pid: 'p1', code: 'STATUS' };
-      postMock.mockResolvedValue({ ...SUCCESS, data: dto });
-
-      const result = await dictService.unpublish('p1');
-
-      expect(postMock).toHaveBeenCalledWith('/api/meta/dict/p1/unpublish', undefined, undefined, undefined);
-      expect(result).toEqual(dto);
-    });
-  });
-
-  // ── getVersionHistory ─────────────────────────────────────────────────────────
-
-  describe('getVersionHistory', () => {
-    it('GETs /:code/versions', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: [] });
-
-      await dictService.getVersionHistory('STATUS');
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/STATUS/versions', undefined, undefined, undefined);
-    });
-  });
-
-  // ── getCascadeChildren ────────────────────────────────────────────────────────
-
-  describe('getCascadeChildren', () => {
-    it('GETs /cascade/children without parentValue', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: [] });
-
-      await dictService.getCascadeChildren('p1');
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/p1/cascade/children', undefined, undefined, undefined);
-    });
-
-    it('includes parentValue in URL when provided', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: [] });
-
-      await dictService.getCascadeChildren('p1', 'ROOT');
-
-      const url: string = getMock.mock.calls[0][0];
-      expect(url).toContain('parentValue=ROOT');
-    });
-  });
-
-  // ── buildCascadeTree ──────────────────────────────────────────────────────────
-
-  describe('buildCascadeTree', () => {
-    it('GETs /cascade/tree', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: { value: 'root', children: [] } });
-
-      const result = await dictService.buildCascadeTree('p1');
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/p1/cascade/tree', undefined, undefined, undefined);
-      expect(result).toEqual({ value: 'root', children: [] });
-    });
-  });
-
-  // ── getStatistics ─────────────────────────────────────────────────────────────
-
-  describe('getStatistics', () => {
-    it('GETs /statistics', async () => {
-      const stats = { total: 10, published: 8, draft: 2 };
-      getMock.mockResolvedValue({ ...SUCCESS, data: stats });
-
-      const result = await dictService.getStatistics();
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/statistics', undefined, undefined, undefined);
-      expect(result).toEqual(stats);
-    });
-  });
-
-  // ── validateConfig ────────────────────────────────────────────────────────────
-
-  describe('validateConfig', () => {
-    it('GETs /:code/validate', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: { valid: true, errors: [] } });
-
-      const result = await dictService.validateConfig('STATUS');
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/STATUS/validate', undefined, undefined, undefined);
-      expect(result).toEqual({ valid: true, errors: [] });
-    });
-  });
-
-  // ── checkCodeUnique ───────────────────────────────────────────────────────────
-
-  describe('checkCodeUnique', () => {
-    it('GETs /code/:code/unique without excludePid', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: true });
-
-      const result = await dictService.checkCodeUnique('STATUS');
-
-      expect(getMock).toHaveBeenCalledWith('/api/meta/dict/code/STATUS/unique', undefined, undefined, undefined);
-      expect(result).toBe(true);
-    });
-
-    it('includes excludePid when provided', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: true });
-
-      await dictService.checkCodeUnique('STATUS', 'p-old');
-
-      const url: string = getMock.mock.calls[0][0];
-      expect(url).toContain('excludePid=p-old');
-    });
-  });
-
-  // ── batchDelete ───────────────────────────────────────────────────────────────
-
-  describe('batchDelete', () => {
-    it('DELs with pids as repeated query param', async () => {
-      delMock.mockResolvedValue({ ...SUCCESS, data: 2 });
-
-      const result = await dictService.batchDelete(['p1', 'p2']);
-
-      const url: string = delMock.mock.calls[0][0];
-      expect(url).toContain('/api/meta/dict/batch?');
-      expect(url).toContain('pids=p1');
-      expect(url).toContain('pids=p2');
-      expect(result).toBe(2);
-    });
-  });
-
-  // ── search ────────────────────────────────────────────────────────────────────
-
-  describe('search', () => {
-    it('GETs /search?keyword=<value>', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: [] });
-
-      await dictService.search('status');
-
-      const url: string = getMock.mock.calls[0][0];
-      expect(url).toContain('/api/meta/dict/search?');
-      expect(url).toContain('keyword=status');
-    });
-  });
-
-  // ── findAll ───────────────────────────────────────────────────────────────────
-
-  describe('findAll', () => {
-    it('queries with published status page 1 size 1000 and returns records array', async () => {
-      getMock.mockResolvedValue({
-        ...SUCCESS,
-        data: { records: [{ pid: 'p1', code: 'STATUS' }], total: 1, current: 1, size: 1000, pages: 1 },
-      });
-
-      const result = await dictService.findAll();
-
-      const url: string = getMock.mock.calls[0][0];
-      expect(url).toContain('status=published');
-      expect(url).toContain('pageNum=1');
-      expect(url).toContain('pageSize=1000');
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ pid: 'p1', code: 'STATUS' });
-    });
-
-    it('returns empty array when records is missing', async () => {
-      getMock.mockResolvedValue({ ...SUCCESS, data: { total: 0, current: 1, size: 1000, pages: 0 } });
-
-      const result = await dictService.findAll();
-
-      expect(result).toEqual([]);
-    });
+    expect(result).not.toHaveProperty('dictCode');
+    expect(result).not.toHaveProperty('loadedAt');
+    expect(() =>
+      dictionaryData({ success: false, errorMessage: 'Load failed', items: [] }),
+    ).toThrow('Load failed');
+    expect(() =>
+      dictionaryData({
+        success: true,
+        items: [{ value: 'x', label: 'X', extension: ['invalid'] }],
+      }),
+    ).toThrow('JSON object');
   });
 });

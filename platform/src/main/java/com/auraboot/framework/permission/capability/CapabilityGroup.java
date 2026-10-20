@@ -1,5 +1,7 @@
 package com.auraboot.framework.permission.capability;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,6 +13,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CapabilityGroup {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private String group;
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private List<Capability> capabilities;
 }

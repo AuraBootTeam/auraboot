@@ -1,0 +1,5 @@
+{
+  "complete": { "zh-CN": "成功删除 {deleted} 个字典", "en-US": "Deleted {deleted} dictionaries" },
+  "none": { "zh-CN": "未删除任何字典，请检查字典状态或权限。", "en-US": "No dictionaries were deleted. Check their status or your permissions." },
+  "partial": { "zh-CN": "已删除 {deleted} / {selected} 个字典，请检查剩余字典的状态或权限。", "en-US": "Deleted {deleted} of {selected} dictionaries. Check the remaining dictionaries' status or your permissions." }
+}

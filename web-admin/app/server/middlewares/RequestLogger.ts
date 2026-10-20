@@ -6,6 +6,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { trace } from '@opentelemetry/api';
 import logger from '~/server/utils/logger';
+import { redactSensitiveUrl } from '~/server/utils/sensitive-url';
 
 /**
  * Paths to skip logging (high-frequency endpoints)
@@ -48,7 +49,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   const traceId =
     spanContext && !/^0+$/.test(spanContext.traceId) ? spanContext.traceId : undefined;
   const startTime = Date.now();
-  const path = req.originalUrl || req.url;
+  const path = redactSensitiveUrl(req.originalUrl || req.url);
   const skipLogging = shouldSkipLogging(path);
 
   // Attach request ID to request object for downstream use

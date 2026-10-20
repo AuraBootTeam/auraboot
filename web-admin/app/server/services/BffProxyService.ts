@@ -5,6 +5,7 @@ import * as https from 'https';
 import { config } from '~/server/utils/config';
 import { parseCookieHeader } from '~/server/utils/cookie-security';
 import logger from '~/server/utils/logger';
+import { redactSensitiveUrl } from '~/server/utils/sensitive-url';
 import { sessionStorage } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
@@ -28,8 +29,10 @@ const noProxyHttpsAgent = new https.Agent({ keepAlive: false });
 
 /** Parse only routes owned by the transport proxy; leave Router action streams intact. */
 export function shouldParseProxyBody(pathname: string, contentType: string): boolean {
-  return (pathname === '/api' || pathname.startsWith('/api/') || pathname === '/oauth2/token')
-    && !contentType.includes('multipart/form-data');
+  return (
+    (pathname === '/api' || pathname.startsWith('/api/') || pathname === '/oauth2/token') &&
+    !contentType.includes('multipart/form-data')
+  );
 }
 
 /**
@@ -80,11 +83,18 @@ export function rawRequestBody(req: { rawBody?: Buffer }): Buffer | undefined {
   return Buffer.isBuffer(req.rawBody) && req.rawBody.length > 0 ? req.rawBody : undefined;
 }
 
-export function shouldForwardRequestBody(method: string, body?: unknown, rawBody?: Buffer): boolean {
+export function shouldForwardRequestBody(
+  method: string,
+  body?: unknown,
+  rawBody?: Buffer,
+): boolean {
   const normalized = method.toUpperCase();
   // Captured bytes distinguish explicit JSON {} from an absent body parsed as {}.
-  return normalized !== 'GET' && normalized !== 'HEAD'
-    && ((Buffer.isBuffer(rawBody) && rawBody.length > 0) || hasNonEmptyBody(body));
+  return (
+    normalized !== 'GET' &&
+    normalized !== 'HEAD' &&
+    ((Buffer.isBuffer(rawBody) && rawBody.length > 0) || hasNonEmptyBody(body))
+  );
 }
 
 const BROWSER_ONLY_PROXY_HEADERS = new Set([
@@ -210,15 +220,18 @@ export class BffProxyService {
         const requestStartDetails = {
           requestId,
           method: req.method,
-          url: originalPath,
-          backendUrl,
+          url: redactSensitiveUrl(originalPath),
+          backendUrl: redactSensitiveUrl(backendUrl),
           userAgent: req.headers['user-agent'],
           clientIp: req.ip || req.connection.remoteAddress,
           contentType: req.headers['content-type'],
           contentLength: req.headers['content-length'],
         };
 
-        logger.info(requestStartDetails, `🚀 API Request Started [${requestId}] [${backendUrl}]`);
+        logger.info(
+          requestStartDetails,
+          `🚀 API Request Started [${requestId}] [${redactSensitiveUrl(backendUrl)}]`,
+        );
       }
 
       // Check if this is an SSE request using unified detection
@@ -284,7 +297,7 @@ export class BffProxyService {
       const successDetails = {
         requestId,
         method: req.method,
-        url: req.originalUrl || req.url,
+        url: redactSensitiveUrl(req.originalUrl || req.url),
         status: response.status,
         duration: `${duration}ms`,
         responseSize,
@@ -311,13 +324,15 @@ export class BffProxyService {
       }
     } catch (error) {
       const duration = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.redactSecretsForLogging(
+        error instanceof Error ? error.message : 'Unknown error',
+      );
 
       // 增强错误日志，包含请求详情
       const requestDetails = {
         requestId,
         method: req.method,
-        url: req.originalUrl || req.url,
+        url: redactSensitiveUrl(req.originalUrl || req.url),
         userAgent: req.headers['user-agent'],
         clientIp: req.ip || req.connection.remoteAddress,
         duration: `${duration}ms`,
@@ -370,7 +385,7 @@ export class BffProxyService {
         }
 
         logger.info(
-          `[${requestId}] Forwarding multipart request to ${backendUrl}, method: ${req.method}`,
+          `[${requestId}] Forwarding multipart request to ${redactSensitiveUrl(backendUrl)}, method: ${req.method}`,
         );
 
         const proxyReq = httpModule.request(
@@ -434,7 +449,9 @@ export class BffProxyService {
         // Pipe original request stream to backend
         req.pipe(proxyReq);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = this.redactSecretsForLogging(
+          error instanceof Error ? error.message : 'Unknown error',
+        );
         logger.error(`[${requestId}] Multipart request error: ${errorMessage}`);
         if (!res.headersSent) {
           res.status(500).json({
@@ -472,7 +489,9 @@ export class BffProxyService {
       // Use SSE-specific Accept header
       headers['accept'] = 'text/event-stream';
 
-      logger.info(`[${requestId}] Starting SSE stream (${method}) to ${backendUrl}`);
+      logger.info(
+        `[${requestId}] Starting SSE stream (${method}) to ${redactSensitiveUrl(backendUrl)}`,
+      );
 
       // Prepare fetch options based on HTTP method
       const fetchOptions: RequestInit = {
@@ -565,7 +584,9 @@ export class BffProxyService {
     } catch (error) {
       clearTimeout(timeoutId);
       abortController.abort();
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.redactSecretsForLogging(
+        error instanceof Error ? error.message : 'Unknown error',
+      );
 
       // Don't log error if it was just a client disconnect or abort
       if (!aborted && !abortController.signal.aborted) {
@@ -721,7 +742,7 @@ export class BffProxyService {
   private async extractToken(req: Request): Promise<string | null> {
     try {
       const cookieHeader = req.headers.cookie || '';
-      const requestUrl = req.originalUrl || req.url;
+      const requestUrl = redactSensitiveUrl(req.originalUrl || req.url);
 
       if (!cookieHeader) {
         logger.debug(`🍪 No cookies found in request to ${requestUrl}`);
@@ -884,9 +905,9 @@ export class BffProxyService {
   }
 
   private redactSecretsForLogging(value: string): string {
-    return value
+    return redactSensitiveUrl(value)
       .replace(
-        /(\"(?:jwt|jwtToken|refreshToken|accessToken|access_token|token|authorization)\"\s*:\s*\")[^\"]*(\")/gi,
+        /(\"(?:jwt|jwtToken|refreshToken|accessToken|access_token|token|authorization|password|passwordHash|clientSecret|client_secret|apiKey)\"\s*:\s*\")[^\"]*(\")/gi,
         '$1[REDACTED]$2',
       )
       .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
@@ -935,7 +956,9 @@ export class BffProxyService {
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.redactSecretsForLogging(
+        error instanceof Error ? error.message : 'Unknown error',
+      );
       logger.error(`Failed to process proxy response: ${errorMessage}`);
 
       res.status(500).json({
@@ -976,11 +999,11 @@ export class BffProxyService {
    * 处理代理错误
    */
   private handleProxyError(error: any, res: Response): void {
-    const errorMessage = error.message || 'Unknown error';
+    const errorMessage = this.redactSecretsForLogging(error.message || 'Unknown error');
     const errorCode = String(error.code || 'unknown').toLowerCase();
     const errorStatus = error.response?.status || 'N/A';
     const errorStatusText = error.response?.statusText || 'N/A';
-    const requestUrl = error.config?.url || 'Unknown URL';
+    const requestUrl = redactSensitiveUrl(error.config?.url || 'Unknown URL');
     const requestMethod = error.config?.method?.toUpperCase() || 'Unknown Method';
     const errorContentType = String(error.response?.headers?.['content-type'] ?? '');
     const responsePreview = this.formatResponsePreview(
@@ -1242,7 +1265,9 @@ export class BffProxyService {
       };
     } catch (error) {
       const duration = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.redactSecretsForLogging(
+        error instanceof Error ? error.message : 'Unknown error',
+      );
 
       logger.error(`Health check failed in ${duration}ms - Error: ${errorMessage}`);
 

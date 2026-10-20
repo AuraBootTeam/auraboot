@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * useDictWithExtras — Load dict items with extension fields flattened.
  *
@@ -21,7 +23,6 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 export type DictItemTerminal = 'won' | 'lost';
@@ -35,11 +36,7 @@ export interface DictItemWithExtras {
   terminal?: DictItemTerminal;
 }
 
-interface RawDictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, unknown> | null;
-}
+type RawDictItem = Pick<import('~/types/dict').DictItemData, 'value' | 'label' | 'extension'>;
 
 interface UseDictWithExtrasResult {
   items: DictItemWithExtras[];
@@ -52,14 +49,12 @@ function narrowTerminal(value: unknown): DictItemTerminal | undefined {
 
 function flattenItem(raw: RawDictItem): DictItemWithExtras {
   const ext = raw.extension ?? undefined;
-  const color = typeof ext?.color === 'string' ? (ext.color as string) : undefined;
+  const color = typeof ext?.color === 'string' ? ext.color : undefined;
   const terminal = narrowTerminal(ext?.terminal);
   return { value: raw.value, label: raw.label, color, terminal };
 }
 
-export function useDictWithExtras(
-  dictCode: string | undefined | null,
-): UseDictWithExtrasResult {
+export function useDictWithExtras(dictCode: string | undefined | null): UseDictWithExtrasResult {
   const [items, setItems] = useState<DictItemWithExtras[]>([]);
   const [loading, setLoading] = useState(false);
   // Track latest request to avoid races when dictCode changes mid-flight.
@@ -75,10 +70,7 @@ export function useDictWithExtras(
     const requestId = ++requestIdRef.current;
     setLoading(true);
 
-    fetchResult<{ items?: RawDictItem[] }>(
-      `/api/meta/dict/by-code/${encodeURIComponent(dictCode)}/data`,
-      { method: 'get' },
-    )
+    internalRequest('get', '/api/meta/dict/by-code/{code}/data', { path: { code: dictCode } })
       .then((result) => {
         if (requestId !== requestIdRef.current) return;
         if (!ResultHelper.isSuccess(result) || !result.data) {
@@ -86,10 +78,7 @@ export function useDictWithExtras(
           setLoading(false);
           return;
         }
-        const raws = Array.isArray(result.data)
-          ? (result.data as RawDictItem[])
-          : (result.data.items ?? []);
-        setItems(raws.map(flattenItem));
+        setItems(dictionaryData(result.data).items.map(flattenItem));
         setLoading(false);
       })
       .catch((err) => {

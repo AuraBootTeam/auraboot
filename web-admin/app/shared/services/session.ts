@@ -11,6 +11,7 @@ import {
   REFRESH_TOKEN_KEY,
 } from '~/constants/AuthConstant';
 import { post } from '~/shared/services/http-client';
+import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { ResultHelper } from '~/utils/type';
 
 const processEnv = typeof process !== 'undefined' ? process.env : undefined;
@@ -329,13 +330,13 @@ export async function logout(request: Request) {
       try {
         // Bound the revocation call: a dead/hung backend must not stall the
         // redirect — local session clearing below is what actually logs out.
-        await fetch(`${backendUrl}/api/user/sessions/current`, {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          signal: AbortSignal.timeout(3_000),
+        const revoked = await internalRequest('delete', '/api/user/sessions/current', {
+          request,
+          options: { token, timeout: 3_000, apiConfig: { baseUrl: backendUrl } },
         });
+        if (!ResultHelper.isSuccess(revoked)) {
+          console.warn('Backend logout revocation did not succeed:', revoked.code);
+        }
       } catch (error) {
         console.warn('Failed to revoke backend session during logout', error);
       }

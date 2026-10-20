@@ -23,6 +23,8 @@ on:
       - 'pnpm-lock.yaml'
       - 'docker-compose.yml'
       - 'docker-compose.isolated.yml'
+      - 'platform/Dockerfile'
+      - 'scripts/ci/gradle-repositories.init.gradle'
       - '.github/workflows/auth-regression.yml'
   pull_request:
     branches: [main]
@@ -46,6 +48,8 @@ on:
       - 'pnpm-lock.yaml'
       - 'docker-compose.yml'
       - 'docker-compose.isolated.yml'
+      - 'platform/Dockerfile'
+      - 'scripts/ci/gradle-repositories.init.gradle'
       - '.github/workflows/auth-regression.yml'
   workflow_dispatch:
 
@@ -57,6 +61,7 @@ permissions:
   contents: read
 
 env:
+  AURA_GRADLE_REPOSITORY_POLICY: central
   MAVEN_CENTRAL_FIRST: 'true'
   COMPOSE_PROJECT_NAME: auraboot-auth-${{ github.run_id }}-${{ github.run_attempt }}
   PW_E2E_RUN_ID: ci-auth-${{ github.run_id }}-${{ github.run_attempt }}

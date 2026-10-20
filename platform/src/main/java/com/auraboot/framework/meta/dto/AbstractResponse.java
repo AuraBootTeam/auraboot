@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
@@ -72,11 +73,13 @@ public abstract class AbstractResponse {
     /**
      * 是否成功
      */
+    @Schema(nullable = true)
     private Boolean success;
     
     /**
      * 错误消息
      */
+    @Schema(nullable = true)
     private String message;
     
     /**

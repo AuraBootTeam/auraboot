@@ -1,50 +1,89 @@
 #!/usr/bin/env node
 /**
- * check-dsl-render-types.mjs — a DSL page may only ask for a renderer that exists.
- *
- * Why this gate exists (2026-07-14, conversation → FAQ loop):
- *
- * A confidence column was configured `renderType: "percent"`. There is no `percent` renderer —
- * it was invented. Nothing said so. The page rendered, the import validator returned
- * `success: true`, the static page audit was 0/0, and the browser golden went green, because
- * every assertion asked "is the number on screen" and none asked "what does it look like".
- * The column silently printed a bare `0.95`.
- *
- * That is the shape of the whole class: **config written, nobody reads it, nothing warns.**
- * The same session found `format: "percent"` ignored by one branch of the evidence panel, a
- * `renderType` ignored outright by the table renderer, and a `review-drawer` rendering a panel
- * nobody configured. Prose in AGENTS.md did not stop any of them. A script that fails does.
- *
- * The check is deliberately narrow, so it cannot cry wolf: the set of legal renderers is read
- * from the registry source itself (the single place they are registered), so the gate cannot
- * drift away from the runtime. If a renderer is added, this passes with no edit here.
+ * Validate renderType against actual TSX registrations and table-column branches.
+ * Source is parsed, never executed; capabilities apply only in their renderer context.
+ * Install the pinned parser first: npm ci --prefix scripts/internal-api/toolchain --ignore-scripts.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { run } from 'node:test';
+import { auditTests } from './internal-api/foundation.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const ts = createRequire(new URL('./internal-api/toolchain/package.json', import.meta.url))('typescript');
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const REGISTRY = path.join(
-  REPO_ROOT,
-  'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx',
-);
-const PLUGIN_ROOT = path.join(REPO_ROOT, 'plugins');
 
-/** The legal set, read from the one place renderers actually register themselves. */
-function registeredRenderTypes() {
-  const src = fs.readFileSync(REGISTRY, 'utf8');
-  const found = [...src.matchAll(/cellRendererRegistry\.register\(\s*'([A-Za-z-]+)'/g)].map(
-    (m) => m[1],
-  );
-  if (found.length === 0) {
-    console.error(
-      `FATAL: parsed 0 renderers out of ${path.relative(REPO_ROOT, REGISTRY)}.\n` +
-        'The registration shape changed — fix this gate rather than deleting it, or it will ' +
-        'pass vacuously forever.',
-    );
-    process.exit(2);
+function parse(source, file) {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  if (sf.parseDiagnostics.length) throw new Error(`Cannot parse renderer source: ${file}`);
+  return sf;
+}
+
+/** Read actual registration calls; comments and string lookalikes are not registrations. */
+export function registeredRenderTypes(source) {
+  const sf = parse(source, 'CellRendererRegistry.tsx'), found = new Set();
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.expression.getText(sf) === 'cellRendererRegistry'
+      && node.expression.name.text === 'register' && node.arguments[0]
+      && ts.isStringLiteralLike(node.arguments[0])) found.add(node.arguments[0].text);
+    ts.forEachChild(node, visit);
   }
-  return new Set(found);
+  visit(sf);
+  if (!found.size) throw new Error('Parsed 0 renderer registrations; source shape needs reconciliation');
+  return found;
+}
+
+/** TableBlockRenderer also implements explicit column branches outside the generic registry. */
+export function tableColumnRenderTypes(source) {
+  const sf = parse(source, 'TableBlockRenderer.tsx'), found = new Set();
+  function hasReturn(node) {
+    if (ts.isFunctionLike(node)) return false;
+    if (ts.isReturnStatement(node) && node.expression) return true;
+    return ts.forEachChild(node, child => hasReturn(child) || undefined) === true;
+  }
+  function branch(node) {
+    if (ts.isFunctionLike(node)) return;
+    if (ts.isIfStatement(node) && ts.isBinaryExpression(node.expression)) {
+      const { left, right, operatorToken } = node.expression;
+      if (operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+        && ts.isPropertyAccessExpression(left) && left.expression.getText(sf) === 'column'
+        && left.name.text === 'renderType' && ts.isStringLiteralLike(right)
+        && hasReturn(node.thenStatement)) found.add(right.text);
+    }
+    ts.forEachChild(node, branch);
+  }
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(sf) === 'renderCellContent'
+      && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)))
+      branch(node.initializer.body);
+    ts.forEachChild(node, visit);
+  }
+  visit(sf);
+  return found;
+}
+
+/** Only direct columns of a table block use that block's special renderer branches. */
+export function collectRenderTypes(node, trail = '$', hits = [], context = 'registry') {
+  if (Array.isArray(node)) {
+    node.forEach((child, i) => collectRenderTypes(child, `${trail}[${i}]`, hits,
+      context === 'table-columns' ? 'table-column' : 'registry'));
+    return hits;
+  }
+  if (!node || typeof node !== 'object') return hits;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'renderType' && typeof value === 'string') {
+      hits.push({ value, at: `${trail}.renderType`, context });
+    } else collectRenderTypes(value, `${trail}.${key}`, hits,
+      node.blockType === 'table' && key === 'columns' ? 'table-columns' : 'registry');
+  }
+  return hits;
+}
+
+export function unsupportedRenderTypes(schema, registry, tableColumns) {
+  return collectRenderTypes(schema).filter(hit => !registry.has(hit.value)
+    && !(hit.context === 'table-column' && tableColumns.has(hit.value)));
 }
 
 function walk(dir, out = []) {
@@ -57,66 +96,49 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** Every renderType in the tree, with the path that leads to it, so the error is actionable. */
-function collectRenderTypes(node, trail, hits) {
-  if (Array.isArray(node)) {
-    node.forEach((child, i) => collectRenderTypes(child, `${trail}[${i}]`, hits));
-    return;
+export function main(root = REPO_ROOT) {
+  const registry = registeredRenderTypes(fs.readFileSync(path.join(root,
+    'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx'), 'utf8'));
+  const tableColumns = tableColumnRenderTypes(fs.readFileSync(path.join(root,
+    'web-admin/app/framework/meta/rendering/blocks/TableBlockRenderer.tsx'), 'utf8'));
+  const failures = [];
+  let checked = 0;
+  for (const file of walk(path.join(root, 'plugins'))) {
+    const split = file.includes(`${path.sep}config${path.sep}pages${path.sep}`);
+    const single = file.endsWith(`${path.sep}config${path.sep}pages.json`);
+    if (!split && !single) continue;
+    // A malformed page cannot silently disappear from the gate denominator.
+    const schema = JSON.parse(fs.readFileSync(file, 'utf8'));
+    checked += collectRenderTypes(schema).length;
+    for (const hit of unsupportedRenderTypes(schema, registry, tableColumns))
+      failures.push({ file: path.relative(root, file), ...hit });
   }
-  if (!node || typeof node !== 'object') return;
-  for (const [key, value] of Object.entries(node)) {
-    if (key === 'renderType' && typeof value === 'string') {
-      hits.push({ value, at: `${trail}.renderType` });
-    } else {
-      collectRenderTypes(value, `${trail}.${key}`, hits);
-    }
-  }
+  console.log('=== DSL renderType gate ===');
+  console.log(`registered renderers: ${[...registry].sort().join(', ')}`);
+  console.log(`table-column branches: ${[...tableColumns].sort().join(', ') || '(none)'}`);
+  console.log(`renderType usages checked: ${checked}`);
+  if (!checked) throw new Error('Checked 0 renderer usages; source denominator needs reconciliation');
+  if (failures.length) throw new Error(failures.map(f => `${f.file} ${f.at} = "${f.value}" (${f.context}): no renderer in this context`).join('\n'));
+  console.log('PASSED.');
 }
 
-const legal = registeredRenderTypes();
-const failures = [];
-let checked = 0;
+export async function selfTest() {
+  const profile = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'scripts/internal-api/catalog.json'), 'utf8')).profiles.dslRendererGate;
+  const actual = [];
+  for await (const event of run({ files: [path.join(REPO_ROOT, profile.unitFile)], concurrency: 1 })) {
+    if (!['test:pass', 'test:fail'].includes(event.type) || event.data.details?.type === 'suite') continue;
+    actual.push({ name: event.data.name, status: event.type === 'test:pass' ? 'passed' : 'failed', skip: Boolean(event.data.skip), todo: Boolean(event.data.todo) });
+    if (event.type === 'test:fail') console.error(event.data.details?.error);
+  }
+  const counts = auditTests(profile.unitTests, actual);
+  console.log(`DSL renderer gate: ${counts.passed} registered fixture tests passed without skips`);
+}
 
-for (const file of walk(PLUGIN_ROOT)) {
-  // DR-20260715-C-003: scan BOTH page layouts. The split layout lives under
-  // `config/pages/<file>.json`; the single-file layout is `config/pages.json` (no
-  // trailing separator). The old `includes('/config/pages/')` filter silently skipped
-  // every single-file plugin, leaving its renderTypes ungated.
-  const inSplitPages = file.includes(`${path.sep}config${path.sep}pages${path.sep}`);
-  const isSingleFilePages = file.endsWith(`${path.sep}config${path.sep}pages.json`);
-  if (!inSplitPages && !isSingleFilePages) continue;
-  let schema;
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   try {
-    schema = JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    continue; // not our gate's job; the import validator owns malformed JSON
-  }
-  const hits = [];
-  collectRenderTypes(schema, '$', hits);
-  for (const hit of hits) {
-    checked += 1;
-    if (!legal.has(hit.value)) {
-      failures.push({ file: path.relative(REPO_ROOT, file), ...hit });
-    }
-  }
+    const args = process.argv.slice(2);
+    if (args.length === 1 && args[0] === '--self-test') await selfTest();
+    else if (args.length === 0) main();
+    else throw new Error('Usage: node scripts/check-dsl-render-types.mjs [--self-test]');
+  } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
-
-console.log(`=== DSL renderType gate ===`);
-console.log(`registered renderers: ${[...legal].sort().join(', ')}`);
-console.log(`renderType usages checked: ${checked}`);
-
-if (failures.length > 0) {
-  console.error(`\n${failures.length} page(s) ask for a renderer that does not exist:\n`);
-  for (const f of failures) {
-    console.error(`  ${f.file}`);
-    console.error(`      ${f.at} = "${f.value}"  ← not registered`);
-  }
-  console.error(
-    `\nA renderType the registry does not know is not a styling miss — the value is printed raw ` +
-      `(a 0-1 ratio, an enum code, an ISO timestamp) straight at the user.\n` +
-      `Pick one of: ${[...legal].sort().join(', ')}\n`,
-  );
-  process.exit(1);
-}
-
-console.log('PASSED.');
