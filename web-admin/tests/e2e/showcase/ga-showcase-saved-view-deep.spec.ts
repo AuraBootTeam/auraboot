@@ -47,10 +47,13 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
     })
     .first();
   await parent.waitFor({ state: 'visible', timeout: 10_000 });
-  await parent.click();
+  if (await parent.getAttribute('aria-expanded') !== 'true') {
+    await parent.click();
+  }
+  await expect(parent).toHaveAttribute('aria-expanded', 'true');
 
   const leaf = page.locator('nav').locator(`a[href="${LIST_URL}"], a[href*="${LIST_URL}"]`);
-  await leaf.waitFor({ state: 'attached', timeout: 5_000 });
+  await leaf.waitFor({ state: 'visible', timeout: 5_000 });
   await leaf.click();
 
   await expect(page).toHaveURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 10_000 });

@@ -18,7 +18,6 @@
  *   bg-amber-500 (warning) without a role="alert" attribute.
  *   Selector: '[class*="bg-emerald-500"] p, [class*="bg-red-500"] p' or
  *             '.bg-emerald-500 p.text-white' (wrapping div → p with message text).
- *   Fallback: waitForToast() helper uses '[role="alert"], .ant-message'.
  *
  * "Delete test": if the Toast component rendering were removed from
  * ToastContext.tsx, or if showSuccessToast() were not called after command
@@ -28,11 +27,10 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
+import { navigateToOrderViaSidebar } from '../saved-view/helpers';
 import {
   uniqueId,
   executeCommandViaApi,
-  extractRecordId,
-  waitForToast,
   acceptConfirmDialog,
   dismissConfirmDialog,
   clickRowActionByLocator,
@@ -45,45 +43,11 @@ import {
 const UID = uniqueId('uof'); // uof = ux-operation-feedback
 
 // ---------------------------------------------------------------------------
-// Helper: locate a toast that appeared after an operation
-// Toast.tsx wraps: <div class="... bg-emerald-500 ..."><div><p class="text-white">message</p></div></div>
-// ---------------------------------------------------------------------------
-
-function toastLocator(page: Page) {
-  return page.locator(
-    '[class*="bg-emerald-500"] p.text-white, ' +
-      '[class*="bg-red-500"] p.text-white, ' +
-      '[class*="bg-amber-500"] p.text-white, ' +
-      '[role="alert"], .ant-message-notice-content',
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Helper: navigate to CRM Lead list via sidebar menu
 // ---------------------------------------------------------------------------
 
 async function navigateToCrmLeadList(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.waitForLoadState('domcontentloaded');
-
-  const nav = page.locator('nav');
-  const groupBtn = nav.getByRole('button', { name: /E2E测试|E2E Test/i }).first();
-  if (await groupBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await groupBtn.evaluate((el: HTMLElement) => el.click());
-    await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
-  }
-
-  const leafLink = nav.locator('a[href="/p/e2et_order"]').first();
-  await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
-
-  const listResponsePromise = page
-    .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
-      timeout: 15_000,
-    })
-    .catch(() => null);
-
-  await leafLink.evaluate((el: HTMLElement) => el.click());
-  await listResponsePromise;
+  await navigateToOrderViaSidebar(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +72,7 @@ async function openCreateForm(page: Page): Promise<void> {
 // Helper: fill the minimum CRM Lead fields and submit
 // ---------------------------------------------------------------------------
 
-async function fillAndSubmitCrmLeadForm(page: Page, title: string, customerName: string): Promise<void> {
+async function fillAndSubmitCrmLeadForm(page: Page, title: string, customerName: string, customerPid: string): Promise<void> {
   // Wait for DSL form to fully render
   await page.waitForLoadState('domcontentloaded');
 
@@ -126,17 +90,15 @@ async function fillAndSubmitCrmLeadForm(page: Page, title: string, customerName:
   await titleInput.waitFor({ state: 'visible', timeout: 15_000 });
   await titleInput.fill(title);
 
-  // Customer reference (optional on the form)
-  const customerInput = page
-    .locator(
-      '[data-testid="form-field-e2et_order_customer"] input, ' +
-        'input[name="e2et_order_customer"]',
-    )
-    .first();
-  const hasCustomer = await customerInput.isVisible({ timeout: 3_000 }).catch(() => false);
-  if (hasCustomer) {
-    await customerInput.fill(customerName);
-  }
+  const customerTrigger = page.getByTestId('select-trigger-e2et_order_customer');
+  await expect(customerTrigger).toBeEnabled();
+  await customerTrigger.click();
+  await page.getByTestId('select-search-e2et_order_customer').fill(customerName);
+  const customerOption = page.getByRole('option').filter({ hasText: customerName });
+  await expect(customerOption).toHaveCount(1);
+  await customerOption.click();
+  await expect(customerTrigger).toContainText(customerName);
+  await expect(page.locator('input[type="hidden"][name="e2et_order_customer"]')).toHaveValue(customerPid);
 
   // Submit
   const saveBtn = page
@@ -158,11 +120,10 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
   const companyForCreate = `UOF Create ${UID}`;
   const companyForDelete = `UOF Delete ${UID}`;
-  // The customer reference resolves by e2et_cust_name — seed both customers up
-  // front so the order form's reference validation finds them.
+  // Seed both real references before exercising the order form.
   const customerForCreate = `UOF Customer ${UID}`;
   const customerForDelete = `UOF Delete Cust ${UID}`;
-  let deleteRecordId: string;
+  const customerPids = new Map<string, string>();
 
   // Seed a record that we will delete in UOF-003
   test.beforeAll(async ({ browser }) => {
@@ -170,24 +131,26 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     const page = await ctx.newPage();
     try {
       for (const cust of [customerForCreate, customerForDelete]) {
-        await executeCommandViaApi(page, 'e2et:create_customer', {
-          e2et_cust_code: `E2EC-${cust.slice(0, 24)}`,
+        const customer = await executeCommandViaApi(page, 'e2et:create_customer', {
+          e2et_cust_code: `E2EC-${uniqueId('uof_cust')}`,
           e2et_cust_name: cust,
           e2et_cust_region: 'north',
-        }, undefined, 'create').catch(() => {});
+        }, undefined, 'create');
+        expect(customer.recordId).toMatch(/^[0-9A-Z]{26}$/);
+        customerPids.set(cust, customer.recordId);
       }
       const result = await executeCommandViaApi(
         page,
         'e2et:create_order',
         {
           e2et_order_title: companyForDelete,
-          e2et_order_customer: customerForCreate,
+          e2et_order_customer: customerPids.get(customerForCreate),
           e2et_order_type: 'normal',
         },
         undefined,
         'create',
       );
-      deleteRecordId = result.recordId;
+      expect(result.recordId).toMatch(/^[0-9A-Z]{26}$/);
     } finally {
       await ctx.close();
     }
@@ -207,71 +170,24 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     await openCreateForm(page);
 
     // Fill and submit — intercept the create API response before clicking save
-    const createResponsePromise = page
-      .waitForResponse(
-        (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST',
-        { timeout: 20_000 },
-      )
-      .catch(() => null);
+    const createResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/meta/commands/execute/')
+        && response.request().method() === 'POST',
+      { timeout: 20_000 },
+    );
 
-    await fillAndSubmitCrmLeadForm(page, companyForCreate, customerForCreate);
+    await fillAndSubmitCrmLeadForm(page, companyForCreate, customerForCreate, customerPids.get(customerForCreate)!);
+    const created = await createResponsePromise;
+    expect(created.status()).toBe(200);
+    expect(String((await created.json()).code)).toBe('0');
+    expect(created.request().postDataJSON().payload.e2et_order_customer).toBe(customerPids.get(customerForCreate));
 
-    // Wait for either: create API response OR navigation (whichever comes first)
-    await Promise.race([
-      createResponsePromise,
-      page
-        .waitForURL((url) => url.pathname === '/p/e2et_order', { timeout: 10_000 })
-        .catch(() => null),
-    ]);
+    const successToast = page.locator('[class*="bg-emerald-500"] p.text-white').first();
+    await expect(successToast).toBeVisible();
+    await expect(successToast).toContainText(/\S/);
+    await expect(page).toHaveURL(/\/p\/e2et_order(?:[?#]|$)/);
 
-    // Brief wait for React state update (toast rendering or navigation settle)
-    await page.waitForTimeout(1_000);
-
-    // Layer 1 (Render): toast appears after submit
-    // Toast.tsx has no role="alert" — target by background color class on the wrapper div
-    const toastWrapper = page.locator('[class*="bg-emerald-500"]').first();
-    const toastText = toastLocator(page);
-
-    // Check toast visibility (may already be fading)
-    const toastVisible =
-      (await toastWrapper.isVisible({ timeout: 3_000 }).catch(() => false)) ||
-      (await toastText
-        .first()
-        .isVisible({ timeout: 2_000 })
-        .catch(() => false));
-
-    // Also accept navigation back to list OR to record detail (both signal success)
-    const currentUrl = page.url();
-    const navigatedBack =
-      currentUrl.includes('e2et_order') ||
-      (await page
-        .locator('[data-testid="dynamic-list"]')
-        .isVisible({ timeout: 5_000 })
-        .catch(() => false));
-
-    // Layer 2 (Data): either toast is shown OR we navigated back to list
-    // Both prove the form was submitted successfully
-    expect(
-      toastVisible || navigatedBack,
-      'UOF-001: after form submit, either a success toast must appear or navigation back to list must occur',
-    ).toBe(true);
-
-    // If toast appeared, assert it has meaningful text (not blank)
-    if (toastVisible) {
-      const msgEl = toastText.first();
-      const msgText = await msgEl.textContent().catch(() => '');
-      expect(
-        (msgText || '').trim().length,
-        `UOF-001: toast text must not be blank, got: "${msgText}"`,
-      ).toBeGreaterThan(0);
-    }
-
-    // Layer 3 (Behavior): the newly created record appears in the list
-    // Navigate back if we're still on the form
-    if (!navigatedBack) {
-      await navigateToCrmLeadList(page);
-    }
-
+    // The successful response, selected reference and persisted list row must agree.
     const newRecord = page.locator(`tbody tr:has-text("${companyForCreate}")`);
     await newRecord.waitFor({ state: 'visible', timeout: 15_000 });
     await expect(newRecord).toBeVisible();

@@ -47,6 +47,7 @@ test('SC05-INVALID automation rejects invalid design files without adding or cha
   await page.goto('/');
   await ensureSidebarExpanded(page);
   await navigateToMenuByClick(page, ['系统管理', '自动化']);
+  await expect(page.getByTestId('btn-import-automation')).toBeEnabled();
   await expect(page.getByTestId('input-import-automation')).toBeAttached();
   const initial = await page.request.get('/api/automations?page=1&size=500');
   expect(initial.ok()).toBe(true);

@@ -50,10 +50,8 @@ export function RecursiveBlockRenderer({
   const { locale } = useI18n();
   const evaluatePermission = permissionEvaluator ?? hasPermission;
   const modelFieldList = modelFields ?? EMPTY_MODEL_FIELDS;
-  // WYSIWYG is active only when model metadata is supplied (workbench preview). In that
-  // mode the real platform controls (SmartSelect/pickers) call useFieldDataSource, which
-  // hard-requires a DataSourceManager in context — so we provide a lightweight one.
-  const wysiwygActive = modelFieldList.length > 0;
+  // Explicit component configurations also render platform controls without model
+  // metadata. Every preview therefore needs the same data-source context.
   const dataSourceManager = React.useMemo(
     () => new DataSourceManager(createExpressionContext({ locale })),
     [locale],
@@ -102,11 +100,7 @@ export function RecursiveBlockRenderer({
     </RuntimeLocaleContext.Provider>
   );
 
-  return wysiwygActive ? (
-    <DataSourceProvider manager={dataSourceManager}>{tree}</DataSourceProvider>
-  ) : (
-    tree
-  );
+  return <DataSourceProvider manager={dataSourceManager}>{tree}</DataSourceProvider>;
 }
 
 const RuntimeLocaleContext = React.createContext<string>('zh-CN');

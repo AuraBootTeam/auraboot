@@ -1376,10 +1376,11 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       e2et_cust_active: true,
     }, undefined, 'create');
     expect(seedCustomer.code).toBe('0');
+    expect(seedCustomer.recordId).toMatch(/^[0-9A-Z]{26}$/);
     const seedOrder = await executeCommandViaApi(page, 'e2et:create_order', {
       e2et_order_title: `NBE order ${tag}`,
       e2et_order_type: 'normal',
-      e2et_order_customer: `NBE Customer ${tag}`,
+      e2et_order_customer: seedCustomer.recordId,
       e2et_order_urgent: false,
     }, undefined, 'create');
     expect(seedOrder.code).toBe('0');
