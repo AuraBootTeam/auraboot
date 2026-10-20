@@ -161,7 +161,7 @@ test.describe('Menu System', () => {
     }
 
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('header')).toHaveAttribute('data-hydrated', 'true');
+    await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
 
     // Find a parent menu item (directory type with children)
     let parentMenuName: string | null = null;
