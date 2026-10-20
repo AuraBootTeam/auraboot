@@ -156,6 +156,10 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
   await expect(toolbar(page).getByTestId('bpmn-field-name')).toHaveValue(name);
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await page.getByRole('button', { name: /fit view/i }).click();
+  const commandLabel = page.locator('.react-flow__node[data-id="accepted"]').getByText('回写验收通过', { exact: true });
+  await expect(commandLabel).toBeVisible();
+  const labelMetrics = await commandLabel.evaluate(element => ({height:element.clientHeight,required:element.scrollHeight}));
+  expect(labelMetrics.height, 'Command node titles must not be vertically clipped').toBeGreaterThanOrEqual(labelMetrics.required);
   const managerNode = page.locator('.react-flow__node[data-id="tpm_enhanced_review"]');
   await managerNode.click();
   await expect(page.getByTestId('node-label-input')).toBeVisible();
