@@ -41,6 +41,18 @@ test('customer plugin contributes a real command dialog and workspace, survives 
   page,
 }, info) => {
   await loginDeliveryMember(page);
+  const installed = await installedPlugin(page);
+  const plugins = await data(await page.request.get('/api/plugins'));
+  const extension = plugins.find((row: any) => row.pluginId === 'com.auraboot.customer-delivery-extension');
+  expect(extension).toBeTruthy();
+  if (extension.status !== 'enabled') {
+    expect(['installed', 'disabled']).toContain(extension.status);
+    const enabling = page.waitForResponse(response => /\/api\/plugins\/[^/]+\/enable$/.test(new URL(response.url()).pathname) && response.request().method() === 'POST');
+    await installed.getByRole('button', { name: /启用|Enable/ }).click();
+    await data(await enabling);
+  } else {
+    await expect(installed.getByRole('button', { name: /禁用|停用|Disable/ })).toBeVisible();
+  }
   await openProject(page);
   const button = page.getByTestId('workbench-action-cde_register_follow_up');
   await expect(button).toBeVisible();
@@ -149,7 +161,6 @@ test('customer extension keeps read-only access and rejects conflicting contribu
     'model.tpm_task.read',
     'tpm.milestone.read',
     'model.tpm_milestone.read',
-    'tpm.customer.read',
     'model.tpm_customer.read',
   ];
   await data(

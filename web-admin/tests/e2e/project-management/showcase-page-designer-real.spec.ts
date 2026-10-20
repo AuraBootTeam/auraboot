@@ -21,7 +21,8 @@ async function shot(page: Page, id: string) {
 async function projects(page: Page) {
   await navigateToMenuByClick(page, ['项目交付', '项目']);
   await expect(page).toHaveURL(/\/p\/tpm_project$/);
-  await expect(page.getByRole('main')).not.toContainText(/Page Unavailable|Internal Server Error/);
+  await expect(page.getByRole('button', { name: '新建项目', exact: true })).toBeVisible();
+  await expect(page.locator('main[data-aura-scroll-container="page-content"]')).not.toContainText(/Page Unavailable|Internal Server Error/);
 }
 async function designer(page: Page) {
   await navigateToMenuByClick(page, ['元数据管理', '页面配置']);
@@ -248,6 +249,10 @@ test('mature project creation and editing preserve customer owner dates budget a
   );
   await page.getByTestId('form-btn-submit').click();
   expect((await data(await updating)).phaseReached).toBe('completed');
+  await expect(page).toHaveURL(/\/p\/tpm_project$/);
+  const reopened = page.getByRole('row').filter({ has: page.getByText(name, { exact: true }) });
+  await reopened.getByRole('button', { name: '查看', exact: true }).click();
+  await expect(page.getByTestId('object-summary')).toBeVisible();
   await page.reload();
   const persisted = await data(await page.request.get(`/api/dynamic/tpm_project/${pid}`));
   expect(persisted).toMatchObject({
