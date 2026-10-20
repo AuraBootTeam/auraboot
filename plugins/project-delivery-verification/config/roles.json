@@ -26,7 +26,8 @@
       "tdv.check.manage",
       "meta.command.execute",
       "model.tdv_check.create",
-      "model.tdv_check.update"
+      "model.tdv_check.update",
+      "tdv.delivery.register"
     ]
   }
 ]

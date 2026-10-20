@@ -44,6 +44,13 @@ public record DecisionResult(
         }
     }
 
+    /** Keep internal explain evidence out of the public evaluate response. */
+    public DecisionResult withoutConditionTrace() {
+        return conditionTrace == null ? this : new DecisionResult(traceId, decisionCode,
+                decisionVersion, kind, engineType, resultType, status, matched, outputs,
+                violations, actionPlans, matchedRules, errors, unknownReasons, metrics, null);
+    }
+
     public static Builder builder(String decisionCode) {
         return new Builder(decisionCode);
     }

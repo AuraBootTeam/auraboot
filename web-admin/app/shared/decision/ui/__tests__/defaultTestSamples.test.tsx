@@ -60,6 +60,19 @@ describe('defaultSamplesForPolicy', () => {
     expect(evaluatePreview(miss, sample.context)).toBe('FALSE');
   });
 
+  it('uses a distinct event identity for each execution without mutating preview facts', () => {
+    const [sample] = defaultSamplesForPolicy(policy());
+    const original = structuredClone(sample.context);
+    const first = sample.executionContext!();
+    const second = sample.executionContext!();
+    expect(first.event).toMatchObject({ type: 'FORM_SUBMITTED', eventId: expect.stringMatching(/^TEST-EVENT-/) });
+    expect(second.event).toMatchObject({ type: 'FORM_SUBMITTED', eventId: expect.stringMatching(/^TEST-EVENT-/) });
+    expect(second.event).not.toEqual(first.event);
+    expect(first.record).toEqual(original.record);
+    expect(second.record).toEqual(original.record);
+    expect(sample.context).toEqual(original);
+  });
+
   it('provides the leave request sample with resolved applicant and run context', () => {
     const [sample] = defaultSamplesForPolicy(
       policy({ policyCode: 'leave_request_event_policy', targetKey: 'wd_leave_request' }),

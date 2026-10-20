@@ -11,9 +11,8 @@ interface PreparedModel {
   displayName: string;
   status: 'draft' | 'published';
   fieldPid?: string;
+  fieldCode?: string;
 }
-
-const createdModels: PreparedModel[] = [];
 
 test.describe.configure({ timeout: 45_000 });
 
@@ -92,7 +91,7 @@ async function submitFilters(page: Page) {
       response.status() === 200,
     { timeout: 10_000 },
   );
-  await page.getByTestId('filter-search').click();
+  await page.getByTestId('filter-btn-search').click();
   return responsePromise;
 }
 
@@ -142,6 +141,7 @@ async function prepareModel(
     expect(field.code).toBe('0');
     expect(field.data).not.toBeNull();
     prepared.fieldPid = field.data!.pid;
+    prepared.fieldCode = fieldData.code;
 
     const bind = await api.bindFieldToModel(
       prepared.pid,
@@ -154,29 +154,10 @@ async function prepareModel(
     expect(publish.data?.status).toBe('published');
   }
 
-  createdModels.push(prepared);
   return prepared;
 }
 
 test.describe('Model List Page', () => {
-  test.afterEach(async ({ api }) => {
-    while (createdModels.length > 0) {
-      const model = createdModels.pop()!;
-      const fields = await api.getModelFields(model.pid).catch(() => null);
-      const boundFields = Array.isArray(fields?.data) ? fields.data : [];
-      for (const field of boundFields) {
-        const fieldPid = field?.pid;
-        if (fieldPid) {
-          await api.deleteModelField(model.pid, fieldPid).catch(() => null);
-        }
-      }
-      await api.deleteModel(model.pid).catch(() => null);
-      if (model.fieldPid) {
-        await api.deleteField(model.fieldPid).catch(() => null);
-      }
-    }
-  });
-
   test('ML-01: list renders status and version columns without render errors', async ({
     page,
     api,
@@ -268,21 +249,84 @@ test.describe('Model List Page', () => {
       displayName: `Model Filter Pair ${unique}`,
     });
 
-    const namedQueryResp = await request.get('/api/meta/models', {
-      params: {
-        sourceType: 'namedQuery',
-        size: 20,
-        current: 1,
+    // Own the query-backed prerequisite so this case also runs alone on a fresh stack.
+    const physicalResponse = await request.get(`/api/meta/models/${publishedModel.pid}`);
+    expect(physicalResponse.status()).toBe(200);
+    const physical = await physicalResponse.json();
+    expect(physical.code).toBe('0');
+    expect(physical.data.tableName).toMatch(/^[a-z][a-z0-9_]*$/);
+    const queryCode = `ml_filter_query_${unique}`;
+    const queryResponse = await request.post('/api/meta/named-queries', {
+      data: {
+        code: queryCode,
+        title: `Model Filter Query ${unique}`,
+        resourceCode: publishedModel.code,
+        actionCode: 'read',
+        fromSql: `${physical.data.tableName} a`,
+        fields: [
+          {
+            fieldCode: 'pid',
+            columnExpr: 'a.pid',
+            dataType: 'string',
+            displayName: 'Record ID',
+            sortable: true,
+          },
+          {
+            fieldCode: 'name',
+            columnExpr: `a.${publishedModel.fieldCode}`,
+            dataType: 'string',
+            displayName: 'Name',
+            sortable: true,
+          },
+        ],
       },
     });
-    expect(namedQueryResp.ok()).toBeTruthy();
-    const namedQueryBody = await namedQueryResp.json();
-    const namedQueryRecord = (namedQueryBody.data?.records ?? [])[0];
-    test.skip(!namedQueryRecord, '需要至少一个已存在的 namedQuery 模型来验证来源筛选');
+    expect(queryResponse.status()).toBe(200);
+    const query = await queryResponse.json();
+    expect(query.code).toBe('0');
+    for (const status of ['testing', 'published']) {
+      const response = await request.put(`/api/meta/named-queries/${query.data.pid}/status`, {
+        data: { status },
+      });
+      expect(response.status()).toBe(200);
+      expect((await response.json()).code).toBe('0');
+    }
+    const namedQueryResponse = await request.post('/api/meta/models', {
+      data: {
+        code: `ml_filter_virtual_${unique}`,
+        displayName: `Model Filter Pair ${unique}`,
+        modelType: 'view',
+        sourceType: 'namedQuery',
+        sourceRef: queryCode,
+        primaryKey: 'pid',
+        capabilities: { list: true, detail: true, filter: true, sort: true, paginate: true },
+        fields: [
+          {
+            code: 'name',
+            displayName: 'Name',
+            dataType: 'string',
+            filterable: true,
+            sortable: true,
+          },
+        ],
+      },
+    });
+    expect(namedQueryResponse.status()).toBe(200);
+    const namedQuery = await namedQueryResponse.json();
+    expect(namedQuery.code).toBe('0');
+    const namedQueryRecord = namedQuery.data;
+    const publishedQuery = await request.post(`/api/meta/models/${namedQueryRecord.pid}/publish`, {
+      data: { impactAcknowledged: true },
+    });
+    expect(publishedQuery.status()).toBe(200);
+    expect((await publishedQuery.json()).code).toBe('0');
 
     await navigateToModelListViaMenu(page);
     await searchModel(page, `Model Filter Pair ${unique}`);
 
+    await expect(page.getByTestId('search-area')).toHaveCount(0);
+    await page.getByTestId('filters-toggle').click();
+    await expect(page.getByTestId('search-area')).toBeVisible();
     await chooseFilterOption(page, 1, '已发布');
     const statusResp = await submitFilters(page);
     expect(statusResp.url()).toContain('status=published');
@@ -290,7 +334,6 @@ test.describe('Model List Page', () => {
     await expect(getModelRow(page, publishedModel.code)).toBeVisible({ timeout: 10_000 });
     await expect(getModelRow(page, draftModel.code)).toHaveCount(0);
 
-    await searchModel(page, '');
     await chooseFilterOption(page, 0, 'NamedQuery');
     const sourceResp = await submitFilters(page);
     expect(sourceResp.url()).toContain('sourceType=namedQuery');
@@ -298,6 +341,14 @@ test.describe('Model List Page', () => {
     await expect(getModelRow(page, draftModel.code)).toHaveCount(0);
     await expect(getModelRow(page, publishedModel.code)).toHaveCount(0);
     await expect(getModelRow(page, namedQueryRecord.code)).toBeVisible({ timeout: 10_000 });
+    await page.screenshot({
+      path: test.info().outputPath('ML-03-source-filter.png'),
+      fullPage: true,
+    });
+    await test.info().attach('owned-model-filter-fixture', {
+      body: JSON.stringify({ draftModel, publishedModel, namedQueryRecord, query: query.data }),
+      contentType: 'application/json',
+    });
   });
 
   test('ML-04: displayName sorting updates server query and row order', async ({ page, api }) => {

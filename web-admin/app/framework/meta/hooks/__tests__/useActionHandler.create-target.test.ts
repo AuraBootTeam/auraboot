@@ -8,6 +8,12 @@ describe('command target intent', () => {
       expect(resolveCommandTargetRecordId({ operationType }, { record }, record, { data: record })).toBeUndefined();
     }
   });
+  it('keeps detail toolbar commands scoped to the contextual public record', () => {
+    expect(resolveCommandTargetRecordId({operationType:'delete'}, {}, undefined, {record:{pid:'detail-parent'}})).toBe('detail-parent');
+    expect(resolveCommandTargetRecordId({operationType:'update'}, {}, undefined, {row:{pid:'context-row'}})).toBe('context-row');
+    expect(resolveCommandTargetRecordId({operationType:'delete'}, {}, {pid:'explicit-row'}, {record:{pid:'detail-parent'}})).toBe('explicit-row');
+    expect(resolveCommandTargetRecordId({operationType:'create'}, {}, undefined, {record:{pid:'detail-parent'}})).toBeUndefined();
+  });
   it('preserves explicit CREATE targets so the execution validator can reject them', () => {
     expect(resolveCommandTargetRecordId({ operationType: 'create', targetRecordPid: 'explicit-target' }, {}, record, {})).toBe('explicit-target');
   });

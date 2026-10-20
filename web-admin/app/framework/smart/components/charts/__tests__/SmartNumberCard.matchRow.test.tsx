@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SmartNumberCard } from '../SmartNumberCard';
 
 const mockUseChartData = vi.fn();
+vi.mock('~/utils/i18n', () => ({ useSmartText: () => (value: { en: string }) => value.en }));
 
 vi.mock('~/framework/smart/hooks/useChartData', () => ({
   useChartData: (...args: unknown[]) => mockUseChartData(...args),
@@ -17,6 +18,13 @@ const nqSource = {
 describe('SmartNumberCard matchRow selection', () => {
   beforeEach(() => {
     mockUseChartData.mockReset();
+  });
+
+  it('explains denied data access without exposing the infrastructure error', () => {
+    mockUseChartData.mockReturnValue({ data: null, loading: false, error: new Error('Access forbidden') });
+    render(<SmartNumberCard title="Delivery" dataSource={nqSource} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Ask an administrator to check source data permissions.');
+    expect(screen.queryByText('Access forbidden')).not.toBeInTheDocument();
   });
 
   it('cards sharing one field read different rows via matchRow instead of both reading the first row', () => {

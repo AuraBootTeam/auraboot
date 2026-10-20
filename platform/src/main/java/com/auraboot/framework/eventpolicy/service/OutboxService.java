@@ -12,6 +12,9 @@ public interface OutboxService {
     /** Enqueue an event to be processed after commit. Idempotent on (tenant, eventId). */
     void enqueue(String eventId, String eventType, String targetType, String targetKey, JsonNode context);
 
+    /** Process one exact durable event after commit; a processed event is never replayed. */
+    void processEvent(String eventId);
+
     /** Process up to {@code limit} PENDING events for the current tenant. Returns the count processed. */
     int processPending(int limit);
 }

@@ -238,5 +238,17 @@
       "placeholder:zh-CN": "例如：周三前由周宁确认测试环境和联调时间",
       "placeholder:en": "Describe the delivery risk or the next owned action."
     }
+  },
+  {
+    "code": "tpm_pj_accepted_total",
+    "displayName:zh-CN": "累计验收金额",
+    "displayName:en": "Accepted delivery total",
+    "dataType": "decimal",
+    "defaultValue": 0,
+    "extension": {
+      "readOnly": true,
+      "precision": 18,
+      "scale": 2
+    }
   }
 ]

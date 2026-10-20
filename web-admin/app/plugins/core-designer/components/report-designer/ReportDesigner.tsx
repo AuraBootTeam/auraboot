@@ -548,6 +548,14 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
   const query = supplied ?? internal;
   const { dataSets } = query;
 
+  if (query.failed && !query.hasResult) {
+    return (
+      <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+        <ReportQueryControls report={report} query={query} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
       <ReportQueryControls report={report} query={query} />

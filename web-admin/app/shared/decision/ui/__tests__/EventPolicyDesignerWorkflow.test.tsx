@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventPolicyDesignerWorkflow } from '../EventPolicyDesignerWorkflow';
 import type { DecisionApi, EventPolicySummary } from '../../api/decisionApi';
@@ -205,7 +205,8 @@ describe('EventPolicyDesignerWorkflow', () => {
     expect(screen.getByTestId('epd-workflow')).toBeInTheDocument();
     expect(screen.getByTestId('epd-step-trigger')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('投诉表单提交策略');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('FORM_SUBMITTED');
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('草稿');
     expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('DRAFT');
     expect(screen.getByTestId('epd-step-rules')).toBeInTheDocument();
@@ -417,11 +418,17 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-step-actions'));
     fireEvent.click(screen.getByTestId('epd-add-action'));
     fireEvent.click(screen.getByTestId('epd-step-publish'));
-    fireEvent.click(screen.getByTestId('epd-save-draft'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('epd-save-draft'));
+    });
     await waitFor(() => expect(fakeApi.createPolicyDraftVersion).toHaveBeenCalled());
-    fireEvent.click(screen.getByTestId('epd-validate-version'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('epd-validate-version'));
+    });
     await waitFor(() => expect(fakeApi.validatePolicyVersion).toHaveBeenCalledWith('draft-pid-1'));
-    fireEvent.click(screen.getByTestId('epd-publish-version'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('epd-publish-version'));
+    });
     await waitFor(() => expect(fakeApi.publishPolicyVersion).toHaveBeenCalledWith('draft-pid-1'));
 
     expect(fakeApi.createPolicyDraftVersion).toHaveBeenCalledWith(
@@ -476,6 +483,10 @@ describe('EventPolicyDesignerWorkflow', () => {
     expect(payload).toHaveTextContent('接收用户');
     expect(payload).toHaveTextContent('1001');
     expect(payload).not.toHaveTextContent('targetUserIds');
+    const diagnostics = screen.getByTestId('epd-action-diagnostics-0');
+    expect(diagnostics).not.toHaveAttribute('open');
+    expect(diagnostics).toHaveTextContent('support_manager');
+    expect(diagnostics).not.toHaveTextContent('发送数');
   });
 
   it('shows webhook delivery trace evidence without raw payload field names', async () => {
@@ -1174,4 +1185,42 @@ describe('EventPolicy locale presentation', () => {
       'No live SMS provider is configured in this environment',
     );
   });
+});
+
+
+describe('EventPolicy operation failures and recovery', () => {
+  it.each(['validate', 'publish', 'run'] as const)('shows %s failure without claiming success and recovers through the same operation', async operation => {
+    const service = api();
+    const method = operation === 'validate' ? service.validatePolicyVersion : operation === 'publish' ? service.publishPolicyVersion : service.runAndExecutePolicy;
+    vi.mocked(method).mockRejectedValueOnce(new Error('Owned operation unavailable'));
+    render(<EventPolicyDesignerWorkflow api={service} fields={FIELDS} selectedPolicy={POLICY} />);
+    if (operation !== 'run') {
+      fireEvent.click(screen.getByTestId('epd-step-publish'));
+      fireEvent.click(screen.getByTestId('epd-save-draft'));
+      await waitFor(() => expect(screen.getByTestId('epd-validate-version')).toBeEnabled());
+    } else fireEvent.click(screen.getByTestId('epd-step-test'));
+    const button = screen.getByTestId(operation === 'run' ? 'epd-run-published' : operation === 'validate' ? 'epd-validate-version' : 'epd-publish-version');
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Owned operation unavailable'));
+    expect(screen.queryByTestId('epd-run-result')).not.toBeInTheDocument();
+    if (operation !== 'run') expect(screen.getByTestId('epd-publish-status')).toHaveTextContent('草稿');
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(method).toHaveBeenCalledTimes(2));
+  });
+});
+
+
+it('keeps history on the persisted operation version after publication without requiring a parent reload', async () => {
+  const service = api();
+  render(<EventPolicyDesignerWorkflow api={service} fields={FIELDS} selectedPolicy={POLICY} />);
+  fireEvent.click(screen.getByTestId('epd-step-publish'));
+  fireEvent.click(screen.getByTestId('epd-save-draft'));
+  await waitFor(() => expect(service.createPolicyDraftVersion).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByTestId('epd-validate-version')).toBeEnabled());
+  fireEvent.click(screen.getByTestId('epd-publish-version'));
+  await waitFor(() => expect(screen.getByTestId('epd-publish-status')).toHaveTextContent('已发布'));
+  fireEvent.click(screen.getByTestId('epd-step-history'));
+  expect(screen.getByTestId('epd-history-panel')).toHaveTextContent('已发布');
+  expect(screen.getByTestId('epd-history-panel')).toHaveTextContent('v2');
 });

@@ -1,10 +1,12 @@
 ---
 type: artifact
-status: active
+status: stale
 created: 2026-08-09
 ---
 
 # SINGLE Business Tenant + Party Actor 验收证据（2026-08-09）
+
+> Historical acceptance snapshot, not current-main verification. The original results and deliberate partials below are retained unchanged; current provider/device coverage has not been reverified.
 
 ## Scope / environment
 

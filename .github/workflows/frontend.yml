@@ -14,6 +14,8 @@ on:
       - 'plugins/**/config/dashboards/**'
       - 'plugins/schemas/dashboards.schema.json'
       - 'scripts/validate-plugin-dashboards.mjs'
+      - 'scripts/oss-specialized-profiles.test.mjs'
+      - 'oss-scope.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -31,6 +33,8 @@ on:
       - 'plugins/**/config/dashboards/**'
       - 'plugins/schemas/dashboards.schema.json'
       - 'scripts/validate-plugin-dashboards.mjs'
+      - 'scripts/oss-specialized-profiles.test.mjs'
+      - 'oss-scope.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -80,6 +84,10 @@ jobs:
         working-directory: web-admin
         run: pnpm lint
 
+      - name: Test environment contract
+        working-directory: web-admin
+        run: node --test scripts/test-environments.test.mjs
+
       - name: Env-drift gate (tests/)
         working-directory: web-admin
         run: pnpm test:env-lint
@@ -94,6 +102,9 @@ jobs:
 
       - name: Validate dashboard contracts
         run: node scripts/validate-plugin-dashboards.mjs
+
+      - name: Validate E2E profile collection and prerequisites
+        run: node --test scripts/oss-specialized-profiles.test.mjs
 
       - name: Retain internal API consistency evidence
         if: always()

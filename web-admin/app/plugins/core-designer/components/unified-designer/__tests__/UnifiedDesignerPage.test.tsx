@@ -780,8 +780,10 @@ describe('UnifiedDesignerPage', () => {
         '',
       ),
     );
-    expect(screen.getByTestId('authoring-governance-notice')).toHaveTextContent(
-      'revision r7 已批准',
+    await waitFor(() =>
+      expect(screen.getByTestId('authoring-governance-notice')).toHaveTextContent(
+        'revision r7 已批准',
+      ),
     );
     expect(screen.queryByTestId('authoring-governance-approve')).not.toBeInTheDocument();
     expect(screen.queryByTestId('authoring-governance-publish')).not.toBeInTheDocument();

@@ -160,5 +160,13 @@
     "sequence": 18,
     "visible": true,
     "editable": true
+  },
+  {
+    "modelCode": "tpm_project",
+    "fieldCode": "tpm_pj_accepted_total",
+    "sequence": 40,
+    "required": false,
+    "visible": true,
+    "editable": false
   }
 ]

@@ -74,7 +74,9 @@ const recentLog = {
     },
     factMetadata: {
       'record.data.applicant': {
-        label: '申请人', dataType: 'reference', modelCode: 'wd_leave_request',
+        label: '申请人',
+        dataType: 'reference',
+        modelCode: 'wd_leave_request',
         valueLabels: { 'internal-applicant-pid': 'Aura BPM Admin' },
       },
       review_status: {
@@ -219,12 +221,32 @@ describe('ExecutionLogTraceBlock', () => {
     mockLogApi();
   });
 
+  it('keeps business outcomes primary and technical filters behind diagnostics', async () => {
+    render(
+      <MemoryRouter>
+        <ExecutionLogTraceBlock block={{ props: { businessFirst: true } }} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId('elta-business-results')).toHaveTextContent('处理时限：45');
+    expect(screen.queryByTestId('elta-filters')).not.toBeInTheDocument();
+    expect(screen.getByTestId('elta-row-log-1')).not.toHaveTextContent('trace-1');
+    fireEvent.click(screen.getByTestId('elta-professional-toggle'));
+    expect(screen.getByTestId('elta-filters')).toBeInTheDocument();
+    expect(screen.getByTestId('elta-row-log-1')).toHaveTextContent('trace-1');
+  });
+
   it('uses an arbitrary tenant definition name in the row and trace chain', async () => {
     const log = { ...recentLog, decisionCode: 'new_tenant_decision', decisionName: '费用审批期限' };
-    http.get.mockImplementation((endpoint: string) => Promise.resolve({ data:
-      endpoint === '/decision/logs/recent' ? { records: [log], total: 1 } : [log],
-    }));
-    render(<MemoryRouter><ExecutionLogTraceBlock /></MemoryRouter>);
+    http.get.mockImplementation((endpoint: string) =>
+      Promise.resolve({
+        data: endpoint === '/decision/logs/recent' ? { records: [log], total: 1 } : [log],
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <ExecutionLogTraceBlock />
+      </MemoryRouter>,
+    );
     const row = await screen.findByTestId('elta-row-log-1');
     expect(row).toHaveTextContent('费用审批期限');
     expect(row).not.toHaveTextContent('new_tenant_decision');
@@ -237,17 +259,36 @@ describe('ExecutionLogTraceBlock', () => {
   it('does not substitute a fixture label or raw code for a missing name', async () => {
     const log = { ...recentLog, decisionName: undefined };
     http.get.mockImplementation(() => Promise.resolve({ data: { records: [log], total: 1 } }));
-    render(<MemoryRouter><ExecutionLogTraceBlock /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <ExecutionLogTraceBlock />
+      </MemoryRouter>,
+    );
     const row = await screen.findByTestId('elta-row-log-1');
     expect(row).not.toHaveTextContent('SLA 截止时间');
     expect(row).not.toHaveTextContent('sla_deadline');
   });
 
   it('shows the actual business decision name supplied by tenant metadata', async () => {
-    http.get.mockResolvedValueOnce({ data: { records: [{ ...recentLog,
-      decisionCode: 'owned_sla_deadline', decisionName: '请假审批 SLA 截止时间',
-    }], total: 1, size: 20, current: 1 } });
-    render(<MemoryRouter><ExecutionLogTraceBlock block={{ props: { mode: 'list' } }} /></MemoryRouter>);
+    http.get.mockResolvedValueOnce({
+      data: {
+        records: [
+          {
+            ...recentLog,
+            decisionCode: 'owned_sla_deadline',
+            decisionName: '请假审批 SLA 截止时间',
+          },
+        ],
+        total: 1,
+        size: 20,
+        current: 1,
+      },
+    });
+    render(
+      <MemoryRouter>
+        <ExecutionLogTraceBlock block={{ props: { mode: 'list' } }} />
+      </MemoryRouter>,
+    );
     await expect(screen.findByText('请假审批 SLA 截止时间')).resolves.toBeVisible();
   });
 
@@ -381,9 +422,7 @@ describe('ExecutionLogTraceBlock', () => {
 
     const link = await screen.findByTestId('elta-open-product-trace');
     expect(link).toHaveAttribute('href', '/p/sla_config/view/01SLA_CONFIG');
-    expect(await screen.findByTestId('elta-chain-caller-sla-log-1')).toHaveTextContent(
-      'SLA',
-    );
+    expect(await screen.findByTestId('elta-chain-caller-sla-log-1')).toHaveTextContent('SLA');
     expect(screen.getByTestId('elta-chain-caller-sla-log-1')).not.toHaveTextContent('01SLA_CONFIG');
     expect(screen.getByTestId('elta-chain-technical-sla-log-1')).toHaveTextContent('01SLA_CONFIG');
     expect(screen.queryByTestId('elta-open-permission-audit')).not.toBeInTheDocument();
@@ -601,6 +640,40 @@ describe('ExecutionLogTraceBlock', () => {
     expect(output).not.toHaveTextContent('pending');
   });
 
+  it('distinguishes captured input values, redaction and legacy metadata', async () => {
+    const log = { ...recentLog, traceSnapshot: { ...recentLog.traceSnapshot, conditionSnapshot:[{leftKey:'record.data.review_status',operator:'EQ',expected:'pending',truth:'TRUE'}], inputSnapshot: {
+      'record.data.review_status': {scope:'record',path:'data.review_status',label:'审批状态',state:'VALUE',value:'pending'},
+      'record.data.salary': {scope:'record',path:'data.salary',label:'薪酬',state:'REDACTED'},
+      'record.data.optional': {scope:'record',path:'data.optional',label:'可选信息',state:'MISSING'},
+    } } };
+    http.get.mockImplementation((endpoint:string) => Promise.resolve({data:endpoint==='/decision/logs/recent'?{records:[log],total:1}:[log]}));
+    render(<MemoryRouter><ExecutionLogTraceBlock block={{props:{mode:'list'}}}/></MemoryRouter>);
+    await screen.findByTestId('elta-row-log-1'); fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
+    const inputs = await screen.findByTestId('elta-input-snapshot-log-1');
+    expect(inputs).toHaveTextContent('当次输入'); expect(inputs).toHaveTextContent('待审批');
+    expect(inputs).not.toHaveTextContent('已通过'); expect(inputs).toHaveTextContent('敏感值已隐藏');
+    expect(inputs).toHaveTextContent('未提供');
+    expect(screen.getByTestId('elta-condition-snapshot-log-1')).toHaveTextContent('审批状态');
+    expect(screen.getByTestId('elta-condition-snapshot-log-1')).toHaveTextContent('满足');
+    const definitions = screen.getByTestId('elta-fact-metadata-log-1'); expect(definitions).not.toHaveAttribute('open');
+  });
+
+  it('does not present a failed chain load as complete and recovers in the same drawer', async () => {
+    let broken = true;
+    http.get.mockImplementation((endpoint:string) => {
+      if (endpoint==='/decision/logs/recent') return Promise.resolve({data:{records:[recentLog],total:1}});
+      if (endpoint==='/decision/logs' && broken) return Promise.reject(new Error('trace unavailable'));
+      return Promise.resolve({data:[recentLog]});
+    });
+    render(<MemoryRouter><ExecutionLogTraceBlock block={{props:{mode:'list'}}}/></MemoryRouter>);
+    await screen.findByTestId('elta-row-log-1'); fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
+    await screen.findByTestId('elta-trace-error'); expect(screen.getByTestId('elta-trace-chain').children).toHaveLength(0);
+    broken = false; fireEvent.click(screen.getByRole('button',{name:'重新加载'}));
+    await screen.findByTestId('elta-input-snapshot-log-1');
+    expect(screen.queryByTestId('elta-trace-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('elta-input-snapshot-log-1')).toHaveTextContent('该历史记录未保存当次输入');
+  });
+
   it('shows low-code fact metadata snapshots in the trace drawer', async () => {
     render(
       <MemoryRouter initialEntries={['/p/decisionops_execution_logs?traceId=trace-1']}>
@@ -612,7 +685,7 @@ describe('ExecutionLogTraceBlock', () => {
     fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
 
     const facts = await screen.findByTestId('elta-fact-metadata-log-1');
-    expect(facts).toHaveTextContent('事实快照');
+    expect(facts).toHaveTextContent('字段定义与字典说明');
     expect(facts).toHaveTextContent('审批状态');
     expect(facts).toHaveTextContent('record.data.review_status');
     expect(facts).toHaveTextContent('pending');
@@ -624,9 +697,13 @@ describe('ExecutionLogTraceBlock', () => {
     expect(facts).toHaveTextContent('annual');
     expect(facts).toHaveTextContent('年假');
     expect(facts).not.toHaveTextContent('tenant_id');
-    const applicant = Array.from((facts as HTMLElement).querySelectorAll<HTMLElement>('article')).find(article => article.querySelector('strong')?.textContent === '申请人')!;
+    const applicant = Array.from(
+      (facts as HTMLElement).querySelectorAll<HTMLElement>('article'),
+    ).find((article) => article.querySelector('strong')?.textContent === '申请人')!;
     expect(applicant.querySelector('.elta-fact-values')).toHaveTextContent('Aura BPM Admin');
-    expect(applicant.querySelector('.elta-fact-values')).not.toHaveTextContent('internal-applicant-pid');
+    expect(applicant.querySelector('.elta-fact-values')).not.toHaveTextContent(
+      'internal-applicant-pid',
+    );
     const technical = applicant.querySelector('details')!;
     expect(technical).not.toHaveAttribute('open');
     expect(technical).toHaveTextContent('internal-applicant-pid');
@@ -837,6 +914,12 @@ describe('ExecutionLogTraceBlock', () => {
     expect(drawer).toHaveTextContent('执行链路');
     expect(drawer).not.toHaveTextContent('Trace Chain');
     await waitFor(() => expect(drawer).toHaveTextContent('R-101'));
+    expect(screen.getByTestId('elta-rule-summary-log-1')).toHaveTextContent('命中规则数: 1');
+    expect(screen.getByTestId('elta-rule-summary-log-1')).not.toHaveTextContent('R-101');
+    const identifiers = screen.getByTestId('elta-rule-identifiers-log-1');
+    expect(identifiers.closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(identifiers.closest('details')!.querySelector('summary')!);
+    expect(identifiers.closest('details')).toHaveAttribute('open');
     expect(drawer).toHaveTextContent('命中');
     expect(drawer).toHaveTextContent('未命中');
     expect(drawer).not.toHaveTextContent('MATCHED');

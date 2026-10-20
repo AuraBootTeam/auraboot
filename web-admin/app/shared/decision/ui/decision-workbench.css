@@ -67,3 +67,83 @@
 .decisionops-shell .decision-table--compact .dt-cell-expression>summary{border:0;padding:4px 0 0;font-size:10px;color:var(--color-text-3);}
 .decisionops-shell .strategy-test-trace{font-size:11px;color:var(--color-text-3);overflow-wrap:anywhere;}
 .decisionops-shell .strategy-test-trace summary{cursor:pointer;}
+
+/* Model-aware actions follow the compact rule workspace layout. */
+.rule-action-model { display: grid; gap: 18px; max-width: 760px; }
+.rule-action-assignment { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(130px, 1fr) minmax(160px, 2fr); align-items: center; gap: 16px; border-top: 1px solid var(--border, #e2e8f0); padding-top: 16px; }
+.epd-action-grid { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 800px) { .rule-action-assignment { grid-template-columns: 1fr; } }
+
+.decisionops-professional-entry { margin-left: auto; position: relative; align-self: center; color: var(--muted-foreground, #64748b); font-size: 13px; }
+.decisionops-professional-entry summary { cursor: pointer; padding: 10px; }
+.decisionops-professional-entry > div { position: absolute; right: 0; z-index: 20; width: 210px; padding: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px #0f172a12; }
+.decisionops-professional-entry button { display: block; width: 100%; text-align: left; padding: 9px 12px; border-radius: 6px; }
+.decisionops-professional-entry button:hover { background: #f1f5f9; }
+.decisionops-rule-link { color: var(--primary, #2563eb); text-align: left; font-weight: 600; }
+
+.epd-edit-scope { border: 0; padding: 0; margin: 0; min-width: 0; }
+.epd-edit-scope:disabled { opacity: .8; }
+
+.decisionops-rule-purpose { max-width: 420px; color: #64748b; line-height: 1.6; }
+.decisionops-rule-identifiers { font-size: 12px; color: #64748b; }
+.decisionops-rule-identifiers summary { cursor: pointer; }
+.decisionops-rule-identifiers div { margin-top: 5px; overflow-wrap: anywhere; }
+
+/* Keep editing and trial evaluation separate so the decision table has room. */
+.decisionops-shell .strategy-studio-body { grid-template-columns:minmax(0,1fr); }
+.decisionops-shell .strategy-test-panel { position:static; max-width:100%; }
+.decisionops-shell .strategy-test-panel [data-testid=strategy-test-inputs] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.decisionops-shell .strategy-test-panel select { min-height:38px; padding:7px 10px; border:1px solid var(--color-border); border-radius:6px; background:var(--color-panel); }
+.decisionops-shell .strategy-studio-grid:has(~ .strategy-test-panel[data-active=true]) { display:none; }
+@media(max-width:800px){ .decisionops-shell .strategy-test-panel [data-testid=strategy-test-inputs]{grid-template-columns:1fr;} }
+
+.decisionops-shell [data-testid=decision-definition-list] td:nth-child(2) { white-space:normal;line-height:1.7;max-width:none;overflow:visible;text-overflow:clip; }
+.decisionops-shell .epd-context-meta[open] { display:block; }
+.decisionops-shell .epd-context-meta summary { cursor:pointer;font-size:11px;color:var(--color-text-2); }
+
+.decisionops-shell .epl-table td { white-space:normal;max-width:none;overflow:visible; }
+.decisionops-shell .epl-table .decisionops-switch-button { margin-left:8px; }
+.decisionops-shell .epl-table td:first-child { width:30%; }
+.decisionops-shell .epl-table td:last-child { width:20%; }
+.decisionops-shell .epl-table .decisionops-row-actions { flex-wrap:wrap; }
+
+/* Secondary tools retain page context and avoid stretching sparse drawer rows. */
+.decisionops-shell .elta-drawer-backdrop,
+.decisionops-shell .elta-drawer-backdrop:hover { background:rgb(15 23 42 / .24); border:0; border-radius:0; padding:0; }
+.decisionops-shell .elta-drawer { align-content:start; }
+.decisionops-shell .ddl-impact-drawer,
+.decisionops-shell .dmv-impact-drawer { position:fixed; inset:56px 0 0 auto; z-index:70; width:min(820px,calc(100vw - 32px)); overflow:auto; background:var(--color-panel,#fff); border-left:1px solid var(--color-border,#e2e8f0); padding:24px; box-shadow:-12px 0 32px #0f172a12; font-size:13px; }
+.decisionops-shell .drawer-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.decisionops-shell .drawer-head h4 { font-size:18px; font-weight:600; }
+.decisionops-shell .dmv-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:16px; }
+.decisionops-shell .dmv-table { width:100%; border-collapse:collapse; font-size:12px; }
+.decisionops-shell .dmv-table th { padding:12px; text-align:left; background:var(--color-subtle,#f8fafc); color:var(--color-text-2,#64748b); font-weight:500; }
+.decisionops-shell .dmv-table td { padding:12px; border-bottom:1px solid var(--color-border,#e2e8f0); overflow-wrap:anywhere; }
+
+/* Professional navigation must not clip its own menu or obscure the next page. */
+.decisionops-shell .decisionops-layout .decisionops-nav { overflow:visible; flex-wrap:wrap; }
+.decisionops-shell .pm-grid { width:100%; border-collapse:collapse; font-size:13px; }
+.decisionops-shell .pm-grid th { padding:12px 16px; text-align:center; font-size:12px; font-weight:500; color:var(--color-text-2,#64748b); background:var(--color-subtle,#f8fafc); }
+.decisionops-shell .pm-grid td { padding:10px 16px; text-align:center; border-bottom:1px solid var(--color-border,#e2e8f0); }
+.decisionops-shell .pm-grid th:first-child,.decisionops-shell .pm-grid td:first-child { text-align:left; width:30%; }
+.decisionops-shell .pm-grid button { border:0; min-width:32px; background:transparent; }
+.decisionops-shell .pm-grid button[data-granted=true] { color:#047857; background:#ecfdf5; }
+.decisionops-shell .cl-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:16px; }
+.decisionops-shell [data-testid=cl-empty] { padding:32px; text-align:center; color:var(--color-text-2,#64748b); border:1px dashed var(--color-border,#e2e8f0); border-radius:8px; }
+.decisionops-shell .epd-action-result-payload { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+.decisionops-shell .epd-action-diagnostics { margin-top:14px; border-top:1px solid var(--color-border,#e2e8f0); padding-top:12px; font-size:12px; }
+.decisionops-shell .epd-action-diagnostics summary { cursor:pointer; color:var(--color-text-2,#64748b); }
+
+/* Overview metrics use the same grouped, compact workspace vocabulary. */
+.decisionops-shell [data-testid=decision-dashboard] { display:grid; gap:24px; }
+.decisionops-shell .dd-cards { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); border:1px solid var(--color-border,#e2e8f0); border-radius:8px; overflow:hidden; }
+.decisionops-shell .dd-card { min-width:0; padding:20px 16px; border-right:1px solid var(--color-border,#e2e8f0); }
+.decisionops-shell .dd-card:last-child { border-right:0; }
+.decisionops-shell .dd-card-value { font-size:26px; font-weight:600; line-height:1.3; margin-bottom:8px; }
+.decisionops-shell .dd-card-label { font-size:12px; color:var(--color-text-2,#64748b); }
+.decisionops-shell .dd-exceptions h4 { font-weight:600; margin-bottom:12px; }
+.decisionops-shell [data-testid=dd-exceptions-empty] { padding:32px; text-align:center; color:var(--color-text-2,#64748b); border:1px dashed var(--color-border,#e2e8f0); border-radius:8px; }
+.decisionops-shell .dd-exceptions ul { list-style:none; margin:0; padding:0; }
+.decisionops-shell .dd-exceptions li { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--color-border,#e2e8f0); }
+@media(max-width:1000px) { .decisionops-shell .dd-cards { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:600px) { .decisionops-shell .dd-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
