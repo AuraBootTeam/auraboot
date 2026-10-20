@@ -71,8 +71,8 @@ class PluginResourceImporterFieldReimportTest {
     }
 
     private PluginResource reimport(FieldDefinitionDTO dto) {
-        Map<String, Object> extension = ReflectionTestUtils.invokeMethod(importer, "buildFieldExtension", dto);
-        return ReflectionTestUtils.invokeMethod(importer, "updateFieldForReimport",
+        Map<String, Object> extension = ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "buildFieldExtension", dto);
+        return ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "updateFieldForReimport",
                 dto, "plugin-pid", "import-id", 42L, extension);
     }
 
@@ -112,7 +112,7 @@ class PluginResourceImporterFieldReimportTest {
     void topLevelDslDefaultSurvivesImportWithoutConstraints() {
         var dto = new FieldDefinitionDTO(); dto.setCode("tasset_as_status"); dto.setDataType("enum");
         dto.setDefaultValue("available"); dto.setFeature(Map.of("filterable", true));
-        Map<String, Object> feature = ReflectionTestUtils.invokeMethod(importer, "buildFieldFeature", dto);
+        Map<String, Object> feature = ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "buildFieldFeature", dto);
         assertThat(feature).containsEntry("defaultValue", "available").containsEntry("filterable", true);
         var persisted = json.convertValue(feature, com.auraboot.framework.meta.entity.payload.FieldFeatureBean.class);
         assertThat(persisted.getDefaultValue()).isEqualTo("available");
@@ -122,7 +122,7 @@ class PluginResourceImporterFieldReimportTest {
     void FeatureDefaultRemainsWhenTopLevelDefaultIsAbsent() {
         var dto = new FieldDefinitionDTO(); dto.setCode("tasset_as_status"); dto.setDataType("enum");
         dto.setFeature(Map.of("defaultValue", "available"));
-        Map<String, Object> feature = ReflectionTestUtils.invokeMethod(importer, "buildFieldFeature", dto);
+        Map<String, Object> feature = ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "buildFieldFeature", dto);
         assertThat(feature).containsEntry("defaultValue", "available");
     }
 
