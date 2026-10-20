@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import net from 'node:net';
+import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { privateRedisPort, privateRedisConfig, readPrivateRedisConfig, verifyPrivateRedis, privateRedisRuntimeReport, verifyBackendRedisConnection } from '../lib/golden-private-redis.mjs';
 
@@ -100,4 +101,53 @@ test('matches a live numeric loopback connection independently of hostname resol
   await once(client, 'connect');
   verifyBackendRedisConnection(process.pid, endpoint);
   assert.throws(() => verifyBackendRedisConnection(process.pid, { ...endpoint, host: '127.0.0.2' }));
+});
+
+
+test('reads one no-follow descriptor even when its path is replaced after validation or open', t => {
+  const root = mkdtempSync(join(tmpdir(), 'golden-private-redis-race-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import fs from 'node:fs';
+    import assert from 'node:assert/strict';
+    import { syncBuiltinESMExports } from 'node:module';
+    import { join } from 'node:path';
+    const helper = await import(process.argv[1]), root = process.argv[2];
+    const report = {runtime:'owned',stateDir:root,environment:{REDIS_DATABASE:'3'},ports:{},
+      sources:[{key:'core',status:'ok',expected:{root:'/owned/oss'}}],processes:[]};
+    const config = helper.privateRedisConfig(report,'/owned/oss','16307');
+    const directory=join(root,'runtimes/owned/oss-stack');fs.mkdirSync(directory,{recursive:true});
+    const file=join(directory,'isolated-redis.json'), foreign=join(root,'foreign.json');
+    fs.writeFileSync(file,JSON.stringify(config));fs.writeFileSync(foreign,JSON.stringify(config));
+    const originalStat=fs.lstatSync,originalOpen=fs.openSync,originalRead=fs.readFileSync;
+    let checks=0,swapped=false,foreignReads=0;
+    const swap=()=>{if(!swapped){fs.unlinkSync(file);fs.symlinkSync(foreign,file);swapped=true;}};
+    fs.lstatSync=(path,...args)=>{const value=originalStat(path,...args);if(path===file&&++checks===3)swap();return value;};
+    fs.openSync=(path,...args)=>{const fd=originalOpen(path,...args);if(path===file)swap();return fd;};
+    fs.readFileSync=(path,...args)=>{if(path===file&&originalStat(file).isSymbolicLink())foreignReads++;return originalRead(path,...args);};
+    syncBuiltinESMExports();
+    const actual=helper.readPrivateRedisConfig(report,'/owned/oss');
+    assert(swapped,'race mutation must actually replace the descriptor path');
+    assert.deepEqual(actual.config,config);
+    assert.equal(foreignReads,0,'must not read through a path replaced after its metadata check');
+  `, new URL('../lib/golden-private-redis.mjs', import.meta.url).href, root], {encoding:'utf8'});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+});
+
+
+test('refuses a FIFO descriptor promptly instead of blocking on open', t => {
+  const root=mkdtempSync(join(tmpdir(),'golden-private-redis-fifo-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  const directory=join(root,'runtimes/owned/oss-stack');mkdirSync(directory,{recursive:true});
+  const file=join(directory,'isolated-redis.json');
+  const created=spawnSync('mkfifo',[file],{encoding:'utf8'});
+  assert.equal(created.status,0,created.stderr);
+  const result=spawnSync(process.execPath,['--input-type=module','-e',`
+    import assert from 'node:assert/strict';
+    const helper=await import(process.argv[1]),root=process.argv[2];
+    const report={runtime:'owned',stateDir:root};
+    assert.throws(()=>helper.readPrivateRedisConfig(report,'/owned/oss'),/Invalid private Redis descriptor/);
+  `,new URL('../lib/golden-private-redis.mjs',import.meta.url).href,root],{encoding:'utf8',timeout:2000});
+  assert.equal(result.error,undefined,'non-regular descriptor must not block the identity probe');
+  assert.equal(result.status,0,result.stdout+result.stderr);
 });
