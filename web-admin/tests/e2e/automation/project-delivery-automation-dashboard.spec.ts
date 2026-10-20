@@ -384,7 +384,14 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await page.screenshot({ path: info.outputPath('AD01-field-mapping-reopened.png') });
   await fillNodeConfig(page, guard, {});
   await page.screenshot({ path: info.outputPath('AD01-explicit-archive-scope.png') });
-  await page.getByTestId('flow-close-inspector').click();
+  // A docked wide-screen inspector has no close affordance; only drawers close.
+  if (await page.getByTestId('flow-inspector-shell').getAttribute('data-presentation') === 'overlay') {
+    await page.getByTestId('flow-close-inspector').click();
+    await expect(page.getByTestId('flow-inspector-shell')).toBeHidden();
+  } else {
+    await expect(page.getByTestId('flow-close-inspector')).toHaveCount(0);
+    await expect(page.getByTestId('flow-inspector-shell')).toBeVisible();
+  }
   await expect(page.getByTestId('automation-editor-name-input')).toHaveValue(automationName);
   const savedRule = await (await page.request.get(`/api/automations/${automationPid}`)).json();
   expect(savedRule.data.enabled).toBe(false);
