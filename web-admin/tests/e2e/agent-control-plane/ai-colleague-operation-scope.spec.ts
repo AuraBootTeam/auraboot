@@ -24,7 +24,7 @@ import { test, expect, type Page } from '@playwright/test';
 const UNIQUE = `scope${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Scoped ${UNIQUE}`;
 const CUSTOMER_NAME = `E2E Customer ${UNIQUE}`;
-const SHOTS = 'test-results/digital-employee';
+const SHOTS = process.env.AURA_EVIDENCE_DIR || 'test-results/digital-employee';
 const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 async function createColleague(page: Page) {
@@ -64,7 +64,7 @@ test.describe('Digital employee — allowed operations', () => {
   }) => {
     // --- something for it to try to delete --------------------------------
     const created = await page.request.post('/api/dynamic/e2et_customer/create', {
-      data: { e2et_cust_name: CUSTOMER_NAME, e2et_cust_code: `e2eacc${UNIQUE}` },
+      data: { e2et_cust_name: CUSTOMER_NAME, e2et_cust_code: `e2eacc${UNIQUE}`, e2et_cust_region: 'north', e2et_cust_active: true },
     });
     expect(created.status(), await created.text()).toBe(200);
     const createdBody = await created.json();

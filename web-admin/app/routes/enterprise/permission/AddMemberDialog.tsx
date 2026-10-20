@@ -192,7 +192,8 @@ export default function AddMemberDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         data-testid="add-member-dialog"
-        className="max-w-3xl"
+        className="grid-cols-1 max-w-3xl max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        style={{ maxWidth: 'min(48rem, calc(100vw - 2rem))' }}
       >
         <DialogHeader>
           <DialogTitle>

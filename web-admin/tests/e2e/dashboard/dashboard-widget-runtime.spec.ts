@@ -1463,7 +1463,7 @@ async function readPipelineStageSnapshot(
   context: string,
   response?: APIResponse | PlaywrightResponse,
 ): Promise<PipelineStageSnapshot> {
-  const pipelineResponse = response ?? await page.request.get('/api/workbench/pipeline');
+  const pipelineResponse = response ?? await page.request.get('/api/ext/crm/workbench/pipeline');
   const body = await parseJsonResponse<{ data?: { stages?: PipelineStageRecord[] } }>(
     pipelineResponse,
     context,
@@ -2072,7 +2072,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
 
       const pipelineResponse = page.waitForResponse(
         (response) =>
-          response.url().includes('/api/workbench/pipeline') &&
+          response.url().includes('/api/ext/crm/workbench/pipeline') &&
           response.request().method() === 'GET' &&
           response.status() === 200,
         { timeout: 10_000 },
@@ -2186,7 +2186,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
     }
   });
 
-  test('DWR-011: CRM workbench widgets render empty and unavailable states', async ({ page }) => {
+  test('DWR-011: CRM workbench widgets render empty and unavailable states', { tag: '@crm-contribution' }, async ({ page }) => {
     let dashboard: CreatedDashboard | undefined;
 
     try {
@@ -2195,7 +2195,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         crmWorkbenchWidgets(),
         'Runtime CRM Workbench Empty State Matrix',
       );
-      await page.route('**/api/workbench/pipeline**', async (route) => {
+      await page.route('**/api/ext/crm/workbench/pipeline**', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -2251,7 +2251,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
     }
   });
 
-  test('DWR-012: CRM workbench widgets render stage, lead status, and activity type variants', async ({
+  test('DWR-012: CRM workbench widgets render stage, lead status, and activity type variants', { tag: '@crm-contribution' }, async ({
     page,
   }) => {
     let dashboard: CreatedDashboard | undefined;
@@ -2327,7 +2327,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         crmWorkbenchWidgets(),
         'Runtime CRM Workbench Variant Matrix',
       );
-      await page.route('**/api/workbench/pipeline**', async (route) => {
+      await page.route('**/api/ext/crm/workbench/pipeline**', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -2399,7 +2399,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
     }
   });
 
-  test('DWR-013: CRM workbench widgets distinguish permission denial from empty CRM data', async ({
+  test('DWR-013: CRM workbench widgets distinguish permission denial from empty CRM data', { tag: '@crm-contribution' }, async ({
     page,
   }) => {
     let dashboard: CreatedDashboard | undefined;
@@ -2415,7 +2415,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
         crmWorkbenchWidgets(),
         'Runtime CRM Workbench Permission Matrix',
       );
-      await page.route('**/api/workbench/pipeline**', async (route) => {
+      await page.route('**/api/ext/crm/workbench/pipeline**', async (route) => {
         await route.fulfill({
           status: 403,
           contentType: 'application/json',

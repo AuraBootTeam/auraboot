@@ -25,7 +25,7 @@ const AGENT_CODE = `agent_kb_${UNIQUE.replaceAll('-', '_')}`;
 const AGENT_NAME = `Knowledge Colleague ${UNIQUE}`;
 const KB_NAME = `Binding Manual ${UNIQUE}`;
 const UNIQUE_FACT = `CALIBRATION-${UNIQUE.toUpperCase()}-137-DAYS`;
-const SCREENSHOT_DIR = 'test-results/agent-knowledge-binding';
+const SCREENSHOT_DIR = process.env.AURA_EVIDENCE_DIR || 'test-results/agent-knowledge-binding';
 const RUNTIME_PROVIDER =
   process.env.AURA_LIVE_LLM_PROVIDER?.trim() ||
   (process.env.AGENT_LLM_STUB_MODE === 'true' ? 'stub' : undefined);
@@ -33,7 +33,7 @@ const RUNTIME_MODEL = process.env.AURA_LIVE_LLM_MODEL?.trim() || 'provider-defau
 
 let agentPid = '';
 let knowledgeBasePid = '';
-const EMBEDDING_PROVIDER = `agent_kb_embedding_${UNIQUE.replaceAll('-', '_')}`;
+const EMBEDDING_PROVIDER = `kb_embed_${Date.now().toString(36)}`;
 const EMBEDDING_MODEL = 'owned-unavailable-embedding';
 let embeddingServer: Server | undefined;
 let embeddingConfigPid = '';
@@ -61,6 +61,7 @@ async function configureUnavailableEmbedding(request: APIRequestContext) {
   const address = embeddingServer.address();
   expect(address && typeof address !== 'string').toBeTruthy();
   if (!address || typeof address === 'string') throw new Error('No embedding fixture address');
+  expect(EMBEDDING_PROVIDER.length).toBeLessThanOrEqual(32);
   embeddingConfig = JSON.stringify({
     displayName: `Owned embedding outage ${UNIQUE}`, apiKey: 'owned-fixture-not-a-secret',
     baseUrl: `http://127.0.0.1:${address.port}`, defaultModel: EMBEDDING_MODEL, dimensions: 1536,

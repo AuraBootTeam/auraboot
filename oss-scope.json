@@ -308,5 +308,20 @@
     "tests/e2e/license/**",
     "tests/e2e/entitlement/**",
     "tests/e2e/marketplace/**"
+  ],
+  "application_test_profiles": [
+    {
+      "id": "crm-ui-seams",
+      "config": "web-admin/playwright.crm-ui.config.ts",
+      "tags": [
+        "@crm-contribution"
+      ],
+      "caseIds": [
+        "DWR-011",
+        "DWR-012",
+        "DWR-013"
+      ],
+      "reason": "CRM widget loaders live in the independent aura-crm Web contribution. Run these retained UI seam cases with that real contribution and an owned Core dashboard runtime. Controlled CRM HTTP responses verify widget states; this is not live CRM business-data acceptance."
+    }
   ]
 }
