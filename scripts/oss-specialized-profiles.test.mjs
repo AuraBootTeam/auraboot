@@ -87,7 +87,11 @@ test('workflow profile retains every original automation case and adds an applic
     'tests/e2e/automation/automation-deep.spec.ts',
   ]);
   assert.equal(originals.status, 0, originals.stderr);
-  const actual = caseIdentities(report).filter(row => !row.includes('workflow-application.setup.ts'));
+  const setupFiles = ['workflow-application.setup.ts', 'workflow-fixture.setup.ts'];
+  const actual = caseIdentities(report).filter(row => !setupFiles.some(file => row.includes(file)));
+  for (const file of setupFiles) {
+    assert.equal(caseIdentities(report).filter(row => row.includes(file)).length, 1, `${file} must collect once`);
+  }
   assert.ok(actual.length > 0);
   assert.deepEqual(actual, caseIdentities(JSON.parse(originals.stdout)));
   assert.match(workflow.stdout, /requires the real BPM application/);

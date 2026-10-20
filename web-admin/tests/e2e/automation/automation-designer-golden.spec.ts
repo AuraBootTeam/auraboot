@@ -28,6 +28,7 @@
  * @since Phase 1 (Layer A)
  */
 import http from 'node:http';
+import { provisionRestrictedCommandActor } from './_restricted-command-actor';
 import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { Client } from 'pg';
@@ -55,12 +56,16 @@ const MODEL_CODE = 'e2et_order';
 const MODEL_LABEL = '测试订单'; // e2et_order displayName — model-select options render by label.
 const CREATE_COMMAND = 'e2eto:create_e2et_order';
 
-async function loginAsAdmin(page: Page, baseURL: string): Promise<void> {
+async function loginAsAdmin(
+  page: Page,
+  baseURL: string,
+  account: { email: string; password: string } = DEFAULT_TEST_ACCOUNT,
+): Promise<void> {
   const response = await page.request.post(`${baseURL}/login`, {
     form: {
       channelCode: 'email_password',
-      identifier: DEFAULT_TEST_ACCOUNT.email,
-      password: DEFAULT_TEST_ACCOUNT.password,
+      identifier: account.email,
+      password: account.password,
       remember: 'on',
       redirectTo: '/',
     },
@@ -2400,36 +2405,89 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   });
 
   test('N-EXECUTE-COMMAND-SAD: pick a permission-gated command via the picker; under the restricted automation principal the run FAILS with a clear permission-denied reason and the side effect does not happen (sad) @golden', async ({
-    page,
-  }) => {
-    await openNewDesigner(page);
-    await setAutomationName(page, `N-EXECUTE-COMMAND-SAD ${uniqueId()}`);
-
-    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
-    const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
-    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
-    await connectEdge(page, trigger, action);
-    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
-    // e2et:update_order requires E2ET.order.manage → the automation principal lacks it (FINDING-3).
-    await fillNodeConfig(page, action, {
-      commandCode: 'e2et:update_order',
-      params: '{"e2et_order_title":"EXEC_SHOULD_BE_DENIED"}',
+    page: admin,
+    browser,
+    baseURL,
+  }, testInfo) => {
+    const account = await provisionRestrictedCommandActor(admin);
+    const context = await browser.newContext({
+      baseURL,
+      storageState: { cookies: [], origins: [] },
     });
-    const { pid } = await saveAutomation(page);
-    createdPids.push(pid);
-    await enableViaListToggle(page, pid);
+    const page = await context.newPage();
+    try {
+      await loginAsAdmin(page, baseURL!, account);
+      const me = await page.request.get('/api/auth/me');
+      expect(me.status()).toBe(200);
+      const identity = await me.json();
+      expect(identity.code).toBe('0');
+      const codes: string[] = identity.data.permissions.permissionCodes;
+      expect(codes).toContain('model.e2et_order.create');
+      expect(codes).toContain('automation.update');
+      expect(codes).not.toContain('e2et.order.manage');
+      expect(
+        identity.data.permissions.roles.map((role: { code: string }) => role.code),
+      ).not.toContain('tenant_admin');
+      await testInfo.attach('restricted-command-principal', {
+        body: JSON.stringify({ userPid: identity.data.user.pid, permissionCodes: codes }),
+        contentType: 'application/json',
+      });
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-EXECUTE-COMMAND-SAD ${uniqueId()}`);
 
-    const firedAt = Date.now();
-    const recordId = await fireCreate(page, 100, `EXEC-SAD-order ${uniqueId()}`);
-    const log = await pollLogTerminal(page, pid, firedAt);
-    expect(['failed', 'partial_success'], `N-EXECUTE-COMMAND-SAD must fail (denied): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
-    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
-    const node = statuses.find((s) => s.nodeId === action);
-    expect(node?.status, `execute-command node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
-    expect(node?.errorMessage ?? '', 'denial must name the required permission (clear reason)').toMatch(/permission denied|E2ET\.order\.manage/i);
-    // The denied command did NOT change the record title.
-    const record = await getOrderRecord(page, recordId);
-    expect(record.e2et_order_title, 'denied command must not have run').not.toBe('EXEC_SHOULD_BE_DENIED');
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      // The authenticated author and trigger actor both lack the command permission.
+      await fillNodeConfig(page, action, {
+        commandCode: 'e2et:update_order',
+        params: '{"e2et_order_title":"EXEC_SHOULD_BE_DENIED"}',
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      await enableViaListToggle(page, pid);
+
+      const firedAt = Date.now();
+      const originalTitle = `EXEC-SAD-order ${uniqueId()}`;
+      const created = await page.request.post('/api/dynamic/e2et_order', {
+        data: {
+          e2et_order_title: originalTitle,
+          e2et_order_type: 'normal',
+          e2et_order_status: 'draft',
+        },
+      });
+      expect(created.status()).toBe(200);
+      const createdBody = await created.json();
+      expect(createdBody.code, JSON.stringify(createdBody)).toBe('0');
+      const recordId = createdBody.data.pid;
+      expect(recordId).toEqual(expect.any(String));
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(
+        ['failed', 'partial_success'],
+        `N-EXECUTE-COMMAND-SAD must fail (denied): ${JSON.stringify(log)}`,
+      ).toContain(String(log!.status).toLowerCase());
+      const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+      const node = statuses.find((s) => s.nodeId === action);
+      expect(
+        node?.status,
+        `execute-command node should be failed: ${JSON.stringify(statuses)}`,
+      ).toBe('failed');
+      expect(
+        node?.errorMessage ?? '',
+        'denial must name the required permission (clear reason)',
+      ).toMatch(/permission denied|E2ET\.order\.manage/i);
+      // The denied command did NOT change the record title.
+      const record = await getOrderRecord(page, recordId);
+      expect(record.e2et_order_title, 'denied command must not have changed the owned record').toBe(
+        originalTitle,
+      );
+      expect(record.e2et_order_status).toBe('draft');
+      await page.screenshot({ path: testInfo.outputPath('restricted-command-denial.png') });
+    } finally {
+      await context.close();
+    }
   });
 
   // ── control-loop: real designer, collection-carrying webhook fixture ─────────────
