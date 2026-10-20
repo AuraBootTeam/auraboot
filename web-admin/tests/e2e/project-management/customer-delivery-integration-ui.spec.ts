@@ -88,10 +88,10 @@ test('customer integration is inspectable, its external event survives designer 
     expect(eventTypes.triggerConfig.eventTypes).toEqual([`external.${fixture.sourceCode}.materials.received.v1`]);
     await shot(page, 'I05-external-event-designer');
     await page.getByTestId('automation-editor-name-input').fill(fixture.automationName + ' · 资料联动');
-    await expect(page.getByTestId('designer-save')).toBeEnabled();
+    await expect(page.getByTestId('automation-editor-toolbar-btn-save')).toBeEnabled();
     const [saving] = await Promise.all([
       page.waitForResponse(response => new URL(response.url()).pathname === `/api/automations/${fixture.automationPid}` && response.request().method() === 'PUT', { timeout: 15_000 }),
-      page.getByTestId('designer-save').click(),
+      page.getByTestId('automation-editor-toolbar-btn-save').click(),
     ]).catch(async error => { await shot(page, 'I05-save-diagnostic'); throw error; });
     expect(saving.status()).toBe(200);
     await page.reload();
