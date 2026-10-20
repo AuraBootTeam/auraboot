@@ -1,4 +1,4 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { lstatSync, mkdirSync, openSync, closeSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
@@ -65,6 +65,17 @@ function command(file, args) {
   }
 }
 
+export function privateRedisRuntimeReport(cli, name) {
+  const result = spawnSync(cli, ['runtime', 'explain', name, '--json'], { encoding: 'utf8' });
+  // During startup other product listeners may be absent. Still require actual source
+  // and owned-process probes below; a registration-only `show` cannot establish identity.
+  need(!result.error && [0, 1].includes(result.status), 'Private Redis runtime probe failed');
+  const report = JSON.parse(result.stdout);
+  need(report.runtime === name && Array.isArray(report.sources) && Array.isArray(report.processes),
+    'Private Redis runtime probe owner mismatch');
+  return report;
+}
+
 function listenerPids(port) {
   try {
     return execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'],
@@ -110,7 +121,7 @@ export function verifyBackendRedisConnection(pid, endpoint) {
 }
 
 export async function startPrivateRedis(name, repo, cli, value, reset) {
-  let report = JSON.parse(command(cli, ['runtime', 'show', name, '--json']));
+  let report = privateRedisRuntimeReport(cli, name);
   need(report.runtime === name, 'Private Redis runtime mismatch');
   const config = privateRedisConfig(report, repo, value), file = descriptorPath(report);
   const retained = readPrivateRedisConfig(report, repo);
@@ -145,7 +156,7 @@ export async function startPrivateRedis(name, repo, cli, value, reset) {
       await new Promise(done => setTimeout(done, 100));
     }
     command(cli, ['runtime', 'process', 'register', name, '--key', 'redis-owned', '--pid', String(child.pid), '--token', token]);
-    report = JSON.parse(command(cli, ['runtime', 'show', name, '--json']));
+    report = privateRedisRuntimeReport(cli, name);
     collectPrivateRedis(report, repo);
   }
   if (reset) {

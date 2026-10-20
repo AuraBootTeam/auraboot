@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { privateRedisPort, privateRedisConfig, readPrivateRedisConfig, verifyPrivateRedis } from '../lib/golden-private-redis.mjs';
+import { privateRedisPort, privateRedisConfig, readPrivateRedisConfig, verifyPrivateRedis, privateRedisRuntimeReport } from '../lib/golden-private-redis.mjs';
 
 // Hermetic contract controls; live Redis/process isolation is verified separately.
 function fixture() {
@@ -66,4 +66,19 @@ test('fingerprints retained configuration and refuses path or symlink substituti
   const foreign = join(root, 'foreign'); mkdirSync(foreign);
   symlinkSync(foreign, join(root, 'redis'));
   assert.throws(() => readPrivateRedisConfig(f.report, f.repo));
+});
+
+test('uses live explain probes even while other startup listeners are absent', t => {
+  const root = mkdtempSync(join(tmpdir(), 'golden-private-redis-probe-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cli = join(root, 'cli'), f = fixture();
+  const script = (value, status) => `#!${process.execPath}\n` +
+    `if (JSON.stringify(process.argv.slice(2)) !== '${JSON.stringify(['runtime', 'explain', 'owned', '--json'])}') process.exit(2);\n` +
+    `process.stdout.write(${JSON.stringify(JSON.stringify(value))}); process.exit(${status});\n`;
+  writeFileSync(cli, script(f.report, 1), { mode: 0o700 });
+  assert.deepEqual(privateRedisRuntimeReport(cli, 'owned'), f.report);
+  writeFileSync(cli, script({ ...f.report, runtime: 'foreign' }, 1));
+  assert.throws(() => privateRedisRuntimeReport(cli, 'owned'));
+  writeFileSync(cli, script(f.report, 2));
+  assert.throws(() => privateRedisRuntimeReport(cli, 'owned'));
 });
