@@ -221,7 +221,7 @@ describe('ConditionFragmentLibraryBlock', () => {
     );
     render(<ConditionFragmentLibraryBlock />);
     await screen.findByTestId('cfl-row-leave_sla_node_match');
-    expect(screen.getByTestId('cfl-open-version')).toBeDisabled();
+    expect(await screen.findByTestId('cfl-open-version')).toBeDisabled();
     expect(screen.getByTestId('cfl-open-create')).toBeDisabled();
     expect(screen.getByTestId('cfl-catalog-state')).toHaveTextContent('正在加载模型与属性');
     release(await original('/decision/facts/catalog', undefined));
@@ -243,7 +243,7 @@ describe('ConditionFragmentLibraryBlock', () => {
     await waitFor(() =>
       expect(screen.getByTestId('cfl-catalog-state')).toHaveTextContent('加载失败'),
     );
-    expect(screen.getByTestId('cfl-open-version')).toBeDisabled();
+    expect(await screen.findByTestId('cfl-open-version')).toBeDisabled();
     fireEvent.click(screen.getByTestId('cfl-refresh'));
     await waitFor(() => expect(screen.getByTestId('cfl-open-version')).toBeEnabled());
     expect(catalogCalls).toBe(2);
