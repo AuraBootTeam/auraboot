@@ -142,6 +142,44 @@ describe('useSerializedSearchParamsUpdater', () => {
     expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');
   });
 
+  it('keeps the saved view when an earlier preset navigation commits later', () => {
+    const committed: string[] = [];
+    const routerSetter = vi.fn((next: any) => committed.push(new URLSearchParams(next).toString()));
+    const { result, rerender } = renderHook(
+      ({ search }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: 'pageSize=20' } },
+    );
+    act(() => {
+      result.current(new URLSearchParams('pageSize=20&preset=modified_this_week'), { replace: true });
+      result.current(new URLSearchParams('pageSize=20&view=personal-view'), { replace: true });
+    });
+    // The router acknowledges the earlier preset while the save is still pending.
+    rerender({ search: 'pageSize=20&preset=modified_this_week' });
+    act(() => result.current((prev) => {
+      prev.set('pageNum', '1');
+      return prev;
+    }, { replace: true }));
+    expect(new URLSearchParams(committed.at(-1)).get('view')).toBe('personal-view');
+    expect(new URLSearchParams(committed.at(-1)).has('preset')).toBe(false);
+    expect(new URLSearchParams(committed.at(-1)).get('pageNum')).toBe('1');
+  });
+
+  it('accepts external navigation after the latest write commits', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: 'preset=modified_this_week' } },
+    );
+    act(() => result.current(new URLSearchParams('view=personal-view'), { replace: true }));
+    rerender({ search: 'view=personal-view' });
+    rerender({ search: 'preset=created_today' });
+    act(() => result.current((prev) => {
+      prev.set('pageNum', '2');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('preset=created_today&pageNum=2');
+  });
+
   it('drops queued list URL writes after an outgoing page navigation begins', () => {
     const routerSetter = vi.fn();
     const writesEnabledRef = { current: true };
