@@ -52,6 +52,22 @@ describe('stored passthrough property locations', () => {
     expect(findBlockById(reloaded.blocks, 'helper')?.block.props).toEqual(fixture.props);
   });
 
+  it('keeps helper props separate from same-named common metadata', () => {
+    const original: LegacyDslBlockV2 = {
+      id: 'workflow', blockType: 'workflow-panel', span: 12,
+      description: 'Block metadata', area: 'detail',
+      props: { description: 'Helper description', area: 'panel' },
+    };
+    const first = load(original);
+    expect(first.block).toMatchObject({ description: original.description, area: original.area });
+    expect(first.block.props).toEqual(original.props);
+    const flat = serializePageTreeToFlat(first.tree);
+    expect(flat.blocks).toEqual([original]);
+    const second = load(flat.blocks[0]);
+    expect(second.block.props).toEqual(original.props);
+    expect(serializePageTreeToFlat(second.tree).blocks).toEqual([original]);
+  });
+
   it('keeps existing top-level display keys at the top level', () => {
     const original: LegacyDslBlockV2 = {
       id: 'metric', blockType: 'metric-strip', span: 12,
