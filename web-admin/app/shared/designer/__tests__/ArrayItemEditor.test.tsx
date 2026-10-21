@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { ArrayItemEditor } from '../ArrayItemEditor';
 import type { PropertySchema } from '../types';
 
@@ -52,4 +52,18 @@ describe('ArrayItemEditor', () => {
     fireEvent.change(nameInput, { target: { value: 'bar' } });
     expect(onChange).toHaveBeenCalledWith({ name: 'bar', count: 1 });
   });
+});
+
+it('labels repeated column fields once and edits the intended item without duplicate IDs', () => {
+  const changed = vi.fn();
+  const { container } = render(<>
+    <ArrayItemEditor itemSchema={itemSchema} value={{name:'budget',count:1}} onChange={() => {}} onRemove={() => {}} itemLabel="Budget column" />
+    <ArrayItemEditor itemSchema={itemSchema} value={{name:'amount',count:2}} onChange={changed} onRemove={() => {}} itemLabel="Amount column" />
+  </>);
+  expect(screen.getAllByText('Name')).toHaveLength(2);
+  const inputs = [...container.querySelectorAll('input')];
+  expect(new Set(inputs.map(input => input.id)).size).toBe(inputs.length);
+  const second = within(screen.getByRole('group',{name:'Amount column'})).getByRole('textbox',{name:'Name',exact:true});
+  fireEvent.change(second,{target:{value:'paid_amount'}});
+  expect(changed).toHaveBeenCalledWith({name:'paid_amount',count:2});
 });

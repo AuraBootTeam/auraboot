@@ -1,7 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useId } from 'react';
 import { PropertyFieldRenderer } from './PropertyFieldRenderer';
 import type { PropertySchema } from './types';
-import { useLocalizedText } from '~/utils/i18n';
 
 export interface ArrayItemEditorProps<T extends Record<string, unknown>> {
   itemSchema: PropertySchema<any>[];
@@ -27,7 +26,7 @@ export function ArrayItemEditor<T extends Record<string, unknown>>({
   itemLabel,
   readonly,
 }: ArrayItemEditorProps<T>) {
-  const lt = useLocalizedText();
+  const itemId = useId();
 
   const updateField = useCallback(
     (key: string, next: unknown) => {
@@ -51,7 +50,7 @@ export function ArrayItemEditor<T extends Record<string, unknown>>({
   );
 
   return (
-    <div className="rounded-lg border border-gray-200 p-3">
+    <div role="group" aria-label={itemLabel} className="rounded-lg border border-gray-200 p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">{itemLabel}</span>
         <button
@@ -75,11 +74,9 @@ export function ArrayItemEditor<T extends Record<string, unknown>>({
           };
           return (
             <div key={field.key}>
-              <label className="mb-0.5 block text-xs text-gray-600">
-                {typeof field.label === 'string' ? field.label : lt(field.label as any)}
-              </label>
               <PropertyFieldRenderer
                 schema={field as PropertySchema<string>}
+                fieldId={`${itemId}-${field.key}`}
                 adapter={adapter}
               />
             </div>

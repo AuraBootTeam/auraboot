@@ -71,6 +71,8 @@ export interface PropertyFieldRendererProps {
   schema: PropertySchema<string | LocalizedText>;
   /** FieldAdapter that bridges the designer store with base-field components. */
   adapter: FieldAdapter<unknown>;
+  /** Unique DOM field identity for repeated properties; schema keys retain storage semantics. */
+  fieldId?: string;
 }
 
 /**
@@ -81,7 +83,7 @@ export interface PropertyFieldRendererProps {
  *  - Creating the appropriate FieldAdapter (flow, dashboard, etc.)
  *  - Evaluating `dependsOn` visibility (keep at panel level)
  */
-export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRendererProps) {
+export function PropertyFieldRenderer({ schema, adapter, fieldId }: PropertyFieldRendererProps) {
   const { locale } = useI18n();
   const label = getLocalizedText(schema.label as string | Record<string, string>, locale);
   const placeholder = schema.placeholder
@@ -104,7 +106,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseInput
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={
             placeholder ||
@@ -147,7 +149,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseInput
           adapter={numericAdapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
@@ -160,7 +162,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseTextarea
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
@@ -169,14 +171,14 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       );
 
     case 'json':
-      return <JsonField adapter={adapter} name={schema.key} label={label} helpText={helpText} />;
+      return <JsonField adapter={adapter} name={fieldId ?? schema.key} label={label} helpText={helpText} />;
 
     // ---- Selection fields ----
     case 'select':
       return (
         <BaseSelect
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
@@ -242,7 +244,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
 
     case 'boolean':
       return (
-        <BaseSwitch adapter={adapter as any} name={schema.key} label={label} helpText={helpText} />
+        <BaseSwitch adapter={adapter as any} name={fieldId ?? schema.key} label={label} helpText={helpText} />
       );
 
     // ---- Expression / formula ----
@@ -251,7 +253,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         <ExpressionField
           schema={schema}
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           helpText={helpText}
         />
@@ -261,7 +263,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseFormulaEditor
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder || 'Enter expression...'}
           helpText={helpText}
@@ -450,7 +452,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseInput
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
