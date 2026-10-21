@@ -33,14 +33,28 @@ export function resolveCommandErrorMessage(
     }
   }
   const conflictCode = String(body.context?.errorCode || '').toUpperCase();
-  if (conflictCode === 'CAS_VERSION_CONFLICT') {
-    return 'This record was updated by someone else. Refresh to review the latest data before saving.';
-  }
-  if (conflictCode === 'REQUEST_INTENT_CONFLICT') {
-    return 'This request does not match the original request. Refresh and start the operation again.';
-  }
-  if (conflictCode === 'CAS_VERSION_REQUIRED') {
-    return 'This form is stale and cannot prove the record is unchanged. Refresh and try again.';
+  const conflictMessages: Record<string, { key: string; zh: string; en: string }> = {
+    CAS_VERSION_CONFLICT: {
+      key: 'common.error.recordVersionConflict',
+      zh: '这条记录已被其他操作更新，请刷新查看最新内容后再提交。',
+      en: 'This record was updated by someone else. Refresh to review the latest data before saving.',
+    },
+    REQUEST_INTENT_CONFLICT: {
+      key: 'common.error.requestIntentConflict',
+      zh: '本次请求与原请求内容不一致，请刷新后重新发起操作。',
+      en: 'This request does not match the original request. Refresh and start the operation again.',
+    },
+    CAS_VERSION_REQUIRED: {
+      key: 'common.error.recordVersionRequired',
+      zh: '当前表单缺少记录版本，请刷新后重试。',
+      en: 'This form is stale and cannot prove the record is unchanged. Refresh and try again.',
+    },
+  };
+  const conflict = conflictMessages[conflictCode];
+  if (conflict) {
+    const localized = translate?.(conflict.key);
+    return localized && localized !== conflict.key ? localized
+      : locale?.toLowerCase().startsWith('zh') ? conflict.zh : conflict.en;
   }
   // New rejection contract: `context` carries the bare i18n reason key (for
   // example "annual_balance_not_found") instead of the legacy {messageKey,

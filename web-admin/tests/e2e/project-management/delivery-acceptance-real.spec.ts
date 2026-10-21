@@ -119,7 +119,7 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   expect((Date.parse(sla[0].deadlineTime)-Date.parse(sla[0].startTime))/60000).toBe(minutes);
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
-  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toHaveAttribute('data-state','ready');
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel').filter({has:page.getByTestId('bpm-section-operations')})).toHaveAttribute('data-state','ready');
   await expect(page.getByRole('tab',{name:'验收详情',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
   await expect(page.getByTestId('bpm-history-container')).toHaveCount(0);
@@ -143,7 +143,8 @@ async function decide(page: Page, pid: string, action: 'approve'|'reject', obser
   const expected = action==='approve'?'accepted':'returned';
   await expect.poll(async ()=>(await row(page,pid)).tpm_ac_status).toBe(expected);
   // The detail must update through the contributed block callback, without manual reload.
-  await expect(page.getByTestId('detail-persistent-header')).toHaveCount(0);
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-section-operations')).toHaveCount(0);
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-sla-summary')).toBeVisible();
   await expect(page.getByRole('main')).toContainText(action==='approve'?'审批通过，交付材料已确认。':'审批退回，请补充交付材料后重新提交。');
   const sla = await data(await observer.request.get(`/api/bpm/monitor/instances/${pending.tpm_ac_process}/sla`));
   expect(sla.every((item:any)=>item.status==='completed' && !item.active)).toBe(true);
@@ -597,7 +598,9 @@ test('high-risk rejection can be corrected and resubmitted through a new owned i
 });
 
 test('accelerated SLA uses the real scheduler and stops after approval @critical',async({page})=>{
-  test.setTimeout(180000);const user=await login(page);
+  test.setTimeout(240000);const user=await login(page);
+  const publishedDesign = await publishAcceptanceDesign(page);
+  const publishedAction = await configureAcceptanceModelAction(page, true);
   const configs=await data(await page.request.get('/api/bpm/sla-configs'));
   const config=configs.find((item:any)=>item.targetKey==='tpm_enhanced_review');expect(config).toBeTruthy();
   const change=async(value:any)=>data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:value}));
@@ -614,19 +617,30 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
     expect(action.resultPayload.sentCount).toBeGreaterThan(0);
     await writeFile(join(evidence!,'sla-notification-evidence.json'),JSON.stringify({notifications:actual,action},null,2));
     await menu(page,'流程监控');await page.getByTestId('sla-refresh').click();await expect(page.getByRole('main')).toContainText('SLA');await expect(page.getByTestId('sla-record-row').filter({hasText:name})).toContainText('逾期');await shot(page,'S01');await page.getByTestId('sla-record-row').filter({hasText:name}).getByTestId('sla-record-detail').click();await expect(page.getByTestId('sla-item-detail')).toContainText('已执行成功');await expect(page.getByTestId('sla-item-detail')).not.toContainText(/NaN|undefined/);await expect(page.getByTestId('sla-item-detail')).toContainText('第 1 级');await shot(page,'S02');
-    await openRecord(page,name);await decide(page,pid,'approve');
+    await openRecord(page,name);
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已超时');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已触发 2 次');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('不会自动通过或驳回');
+    await shot(page,'S03-overdue-acceptance');
+    await decide(page,pid,'approve');
+    await page.reload();
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('超时办结');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已停止计时');
+    await shot(page,'S04-completed-acceptance');
     const completed=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));
     const closedAt=Date.parse(completed.completedTime);
     await expect.poll(async()=>{const next=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));expect(next.status).toBe('completed');expect(next.warningHistory).toEqual(completed.warningHistory);return Date.now()-closedAt;},{timeout:25000,intervals:[3000]}).toBeGreaterThan(16000);
     const after=await data(await page.request.get('/api/bpm/notify/received?type=urge'));expect(after.filter((item:any)=>item.taskId===sla.taskId)).toHaveLength(2);
     const actionAfter=await data(await page.request.get(`/api/event-policy/action-logs?correlationId=sla:${sla.pid}`));expect(actionAfter).toHaveLength(1);
-    receipts.push({accelerated:true,sla:expired,completed});await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
+    receipts.push({accelerated:true,sla:expired,completed,publishedAction,publishedDesign});await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   } finally { await change(config); }
 });
 
 
 test('readonly viewers and unassigned reviewers cannot change another acceptance @critical',async({page,browser})=>{
-  const admin=await login(page);const name='华辰制造 · 验收协作权限验证';
+  const admin=await login(page);
+  const issue = new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
+  const name=`华辰制造 · 验收协作权限验证 · ${issue}`;
   const pid=await create(page,admin,name,68000,'普通',true);const sla=await submit(page,pid,480,'tpm_standard_review');
   const tree=await data(await page.request.get('/api/permissions/tree'));const ids=new Map<string,number>();
   const collect=(nodes:any[])=>nodes.forEach(node=>{ids.set(node.code,node.id);collect(node.children||[]);});collect(tree);
@@ -646,6 +660,8 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
       await expect(actor.getByRole('tab',{name:'核验结果',exact:true})).toHaveCount(0);
       if(reviewer) {
         await expect(actor.getByTestId('bpm-operations-approve')).toBeDisabled();
+        await expect(actor.getByTestId('bpm-sla-summary')).toContainText('没有查看处理时限的权限');
+        expect((await actor.request.get(`/api/bpm/monitor/instances/${sla.processInstanceId}/sla`)).status()).toBe(403);
         const refused=await actor.request.post(`/api/bpm/tasks/${sla.taskId}/approve`,{data:{comment:'An unassigned reviewer must be refused',variables:{}}});expect(refused.status()).toBe(403);
       } else {
         await expect(actor.getByTestId('toolbar-btn-edit')).toHaveCount(0);
@@ -667,7 +683,7 @@ test('readonly viewers and unassigned reviewers cannot change another acceptance
       }
       expect((await row(page,pid)).tpm_ac_status).toBe('submitted');await shot(actor,reviewer?'d13':'d13-readonly');
       if(reviewer) {
-        const assignedName='华辰制造 · 指定协作成员审批';
+        const assignedName=`华辰制造 · 指定协作成员审批 · ${issue}`;
         const assignedPid=await create(page,actorUser,assignedName,68000,'普通',true);
         await submit(page,assignedPid,480,'tpm_standard_review');
         await openRecord(actor,assignedName);await expect(actor.getByTestId('bpm-operations-approve')).toBeEnabled();
@@ -862,8 +878,59 @@ test('associated DSL form freezes structure, denies node writes and keeps the bu
   await shot(page,'form-approved-readonly');
 });
 
-test('model actions select real metadata, save typed references and reopen the same policy @critical', async({page})=>{
-  await login(page);await menu(page,'事件策略');
+async function publishAcceptanceDesign(page: Page) {
+  await menu(page,'流程定义');
+  await page.getByTestId('list-search-input').fill('tpm_delivery_acceptance');
+  await page.getByTestId('list-search-input').press('Enter');
+  await page.getByRole('row').filter({hasText:'tpm_delivery_acceptance'}).getByText('tpm_delivery_acceptance',{exact:true}).click();
+  await page.getByTestId('toolbar-btn-open_bpmn_designer').click();
+  await expect(page).toHaveURL(/\/bpm\/designer\?pid=/);
+  let definitionPid = new URL(page.url()).searchParams.get('pid');
+  expect(definitionPid).toBeTruthy();
+  const originalPid = definitionPid;
+  const original = await data(await page.request.get(`/api/bpm/process-definitions/${originalPid}`));
+  expect(original.status).toBe('deployed');
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
+  await page.locator('.react-flow__node[data-id="tpm_enhanced_review"]').click();
+  await page.getByTestId('node-label-input').fill('验收负责人 · 加强审核');
+  if (await page.getByTestId('bpmn-drawer-backdrop').isVisible()) {
+    await page.getByTestId('bpmn-close-inspector').click();
+  }
+  await page.getByTestId('bpmn-toolbar').getByTestId('bpmn-toolbar-btn-save').click();
+  await expect(page.getByTestId('bpmn-save-dialog-panel')).toBeVisible();
+  await expect(page.getByTestId('bpmn-save-version-notice')).toContainText('已有实例保持不变');
+  await shot(page,'BPM00-new-version-confirmation');
+  const saved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/bpm/process-definitions/key/tpm_delivery_acceptance/versions' && r.request().method()==='POST');
+  await page.getByTestId('bpmn-save-dialog-submit').click();
+  const draft = await data(await saved);
+  definitionPid = draft.pid;
+  expect(definitionPid).not.toBe(originalPid);
+  expect(draft.version).toBe(original.version + 1);
+  expect(draft.status).toBe('draft');
+  await expect(page).toHaveURL(new RegExp(`/bpm/designer\\?pid=${definitionPid}$`));
+  const historical = await data(await page.request.get(`/api/bpm/process-definitions/${originalPid}`));
+  expect(historical.designerJson).toBe(original.designerJson);
+  expect(historical.bpmnContent).toBe(original.bpmnContent);
+  expect(historical.status).toBe('deployed');
+  await page.reload();
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
+  await expect(page.locator('.react-flow__node[data-id="tpm_enhanced_review"]')).toContainText('验收负责人 · 加强审核');
+  await page.getByRole('button',{name:/fit view/i}).click();
+  await shot(page,'BPM01-persisted-design');
+  const deployed = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bpm/process-definitions/${definitionPid}/deploy` && r.request().method()==='POST');
+  await page.getByTestId('bpmn-btn-deploy').click();
+  expect((await data(await deployed)).status).toBe('deployed');
+  const xml = await data(await page.request.get(`/api/bpm/process-definitions/${definitionPid}/bpmn`));
+  expect(xml).toContain('commandCode="tpm:accept_acceptance"');
+  expect(xml).toContain('assigneeType="expression"');
+  expect(xml).toContain('assignee="#tpm_ac_reviewer"');
+  expect(xml).toContain('targetRecordPid="${processBusinessKey}"');
+  await shot(page,'BPM02-published-design');
+  return {definitionPid,originalPid,version:draft.version,originalUnchanged:true,node:'tpm_enhanced_review',label:'验收负责人 · 加强审核',compiledCommand:'tpm:accept_acceptance'};
+}
+
+async function configureAcceptanceModelAction(page: Page, publish = false) {
+  await menu(page,'事件策略');
   await page.getByTestId('epl-open-designer-tpm_acceptance_registered').click();
   await expect(page).toHaveURL(/policy=tpm_acceptance_registered/);
   await page.getByTestId('epd-step-actions').click();
@@ -893,6 +960,25 @@ test('model actions select real metadata, save typed references and reopen the s
   await expect(page.getByTestId('epd-action-0').getByRole('textbox',{name:'业务操作',exact:true})).toHaveValue('登记验收通过');
   await expect(page.getByTestId('epd-action-0')).toContainText('所属项目');
   await page.getByTestId('epd-action-0').scrollIntoViewIfNeeded();await shot(page,'R12');
+  if (publish) {
+    await page.getByTestId('epd-step-publish').click();
+    const validated = page.waitForResponse(r => new URL(r.url()).pathname === `/api/event-policy/versions/${version.pid}/validate` && r.request().method() === 'POST');
+    await page.getByTestId('epd-validate-version').click();
+    expect((await data(await validated)).status).toBe('VALIDATED');
+    const published = page.waitForResponse(r => new URL(r.url()).pathname === `/api/event-policy/versions/${version.pid}/publish` && r.request().method() === 'POST');
+    await page.getByTestId('epd-publish-version').click();
+    expect((await data(await published)).status).toBe('PUBLISHED');
+    await page.reload();
+    await page.getByTestId('epd-step-publish').click();
+    await expect(page.getByTestId('epd-publish-status')).toContainText(/已发布|PUBLISHED/);
+    await shot(page,'AC02-published');
+  }
+  return {policyCode:'tpm_acceptance_registered', versionPid:version.pid, payload, published:publish};
+}
+
+test('model actions select real metadata, save typed references and reopen the same policy @critical', async({page})=>{
+  await login(page);
+  await configureAcceptanceModelAction(page);
 });
 
 
@@ -919,4 +1005,37 @@ test('rule center primary and professional views remain reachable through their 
     if(tab==='logs'){await expect(page.getByTestId('elta-business-results')).toBeVisible();await expect(page.getByTestId('elta-filters')).toHaveCount(0);}
     await shot(page,['R01','A03','A04','A05','R06'].includes(image)?`${image}-navigation`:image);
   }
+});
+
+
+test('SLA business summary exposes loading errors and empty reads and recovers explicitly @critical', async ({page}) => {
+  const user=await login(page);
+  const name='交付验收 · 时限读取与恢复验证';
+  const pid=await create(page,user,name,1000,'普通',true);
+  const sla=await submit(page,pid,480,'tpm_standard_review');
+  const endpoint=`**/api/bpm/monitor/instances/${sla.processInstanceId}/sla`;
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route(endpoint,async route=>{
+    await pending;
+    await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'503',message:'Injected monitoring outage'})});
+  });
+  await page.reload();
+  await expect(page.getByTestId('bpm-sla-summary')).toContainText('正在读取处理时限');
+  await shot(page,'S05-loading-injected');
+  release();
+  await expect(page.getByTestId('bpm-sla-summary').getByRole('alert')).toContainText('读取失败');
+  await expect(page.getByTestId('bpm-sla-summary')).not.toContainText('没有 SLA');
+  await shot(page,'S06-error-injected');
+  await page.unroute(endpoint);
+  await page.getByTestId('bpm-sla-summary').getByRole('button',{name:'刷新状态',exact:true}).click();
+  await expect(page.getByTestId('bpm-sla-record')).toContainText('计时中');
+  await shot(page,'S07-recovered-real');
+  await page.route(endpoint,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({code:'0',data:[]})}));
+  await page.getByTestId('bpm-sla-summary').getByRole('button',{name:'刷新状态',exact:true}).click();
+  await expect(page.getByTestId('bpm-sla-summary')).toContainText('此审批没有 SLA 计时记录');
+  await shot(page,'S08-empty-injected');
+  await page.unroute(endpoint);
+  await page.getByTestId('bpm-sla-summary').getByRole('button',{name:'刷新状态',exact:true}).click();
+  await expect(page.getByTestId('bpm-sla-record')).toContainText('计时中');
 });

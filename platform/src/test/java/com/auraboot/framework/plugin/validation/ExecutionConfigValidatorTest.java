@@ -1,11 +1,13 @@
 package com.auraboot.framework.plugin.validation;
 
+import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
+import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import java.util.*;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ExecutionConfigValidatorTest {
@@ -85,6 +87,135 @@ class ExecutionConfigValidatorTest {
         var command = command(null);
         command.setHandler("customHandler");
         assertEquals(List.of(), validate(List.of(command)));
+    }
+
+    @Test
+    void unsupportedVersionIntentRoundTripsOnlyItsExplicitOption() {
+        var cmd = unsupported();
+        assertEquals(List.of(), validate(List.of(cmd)));
+        assertEquals(
+                Map.of("targetVersionPolicy", "unsupported"),
+                cmd.getConsolidatedExecutionConfig().get("options"));
+        cmd.setUnknownField("casRequired", false);
+        assertEquals(List.of(), validate(List.of(cmd)));
+    }
+
+    @Test
+    void targetVersionPolicyRejectsUnknownNullAndNonStringValues() {
+        for (Object value : Arrays.asList("unknown", true, 1, null)) {
+            var cmd = unsupported();
+            var options = new LinkedHashMap<String, Object>();
+            options.put("targetVersionPolicy", value);
+            cmd.getExecutionConfig().setOptions(options);
+            assertPolicyError(cmd);
+        }
+    }
+
+    @Test
+    void unsupportedRejectsDeclaredCasEvenWhenDtoRetainsItOnlyAsAnUnknownField() {
+        for (Object value : Arrays.asList(true, "false", 0, null)) {
+            var cmd = unsupported();
+            cmd.setUnknownField("casRequired", value);
+            assertPolicyError(cmd);
+        }
+    }
+
+    @Test
+    void unsupportedRejectsOtherTypesMissingHandlerAndPreHandlerMutationDeclarations() {
+        var wrong = unsupported();
+        wrong.setType("update");
+        assertPolicyError(wrong);
+        wrong = unsupported();
+        wrong.setHandler(" ");
+        assertPolicyError(wrong);
+        var mutations =
+                List.<java.util.function.Consumer<CommandDefinitionDTO>>of(
+                        c -> c.setAutoSetFields(Map.of()),
+                        c -> c.setInputFields(List.of()),
+                        c -> c.setComputedFields(Map.of()),
+                        c -> c.setPreActions(List.of()),
+                        c -> c.setStateField("state"),
+                        c -> c.setFromStates(List.of("pending")),
+                        c -> c.setToState("sent"),
+                        c -> c.setSideEffects(List.of()),
+                        c -> c.setPostActions(List.of()));
+        for (var mutation : mutations) {
+            var cmd = unsupported();
+            mutation.accept(cmd);
+            assertPolicyError(cmd);
+        }
+    }
+
+    @Test
+    void unsupportedRejectsAsyncAndDslPersistenceButAllowsExplicitSyncFalseFlags() {
+        for (var params :
+                List.<Map<String, Object>>of(
+                        Map.of("async", true),
+                        Map.of("async", "false"),
+                        Map.of("dslPersistence", true))) {
+            var cmd = unsupported();
+            cmd.setHandlerParams(params);
+            assertPolicyError(cmd);
+        }
+        var cmd = unsupported();
+        cmd.setHandlerParams(Map.of("async", false, "dslPersistence", false));
+        cmd.getExecutionConfig().setExecutionMode("SYNC");
+        assertEquals(List.of(), validate(List.of(cmd)));
+        cmd.getExecutionConfig().setExecutionMode("ASYNC");
+        assertPolicyError(cmd);
+    }
+
+    @Test
+    void unsupportedRejectsLocalAndGlobalBindingRules() {
+        var cmd = unsupported();
+        var rule = new BindingRuleDTO();
+        rule.setCommandCode(cmd.getCode());
+        rule.setRuleType("field_map");
+        cmd.setBindingRules(List.of(rule));
+        assertPolicyError(cmd);
+        cmd.setBindingRules(null);
+        var manifest = new PluginManifestExtended();
+        manifest.setCommands(List.of(cmd));
+        manifest.setBindingRules(List.of(rule));
+        assertTrue(
+                validator
+                        .validate(PluginValidationContext.builder().manifest(manifest).build())
+                        .stream()
+                        .anyMatch(
+                                m ->
+                                        m.getCode().equals("S-EXEC-TARGET-VERSION-POLICY")
+                                                && m.isError()));
+    }
+
+    @Test
+    void currentStateImportRetainsItsPreviousStateTransitionWarnings() {
+        var cmd = command("state_transition");
+        var execution = new CommandDefinitionDTO.ExecutionConfig();
+        execution.setOptions(Map.of("targetVersionPolicy", "current_state"));
+        cmd.setExecutionConfig(execution);
+        assertEquals(
+                List.of("S-EXEC-ST-FIELD", "S-EXEC-ST-TO"),
+                validate(List.of(cmd)).stream().map(PluginValidationMessage::getCode).toList());
+    }
+
+    private CommandDefinitionDTO unsupported() {
+        var cmd = command("custom");
+        cmd.setHandler("test:command");
+        var execution = new CommandDefinitionDTO.ExecutionConfig();
+        execution.setOptions(Map.of("targetVersionPolicy", "unsupported"));
+        cmd.setExecutionConfig(execution);
+        return cmd;
+    }
+    private void assertPolicyError(CommandDefinitionDTO cmd) {
+        var errors =
+                validate(List.of(cmd)).stream()
+                        .filter(m -> m.getCode().equals("S-EXEC-TARGET-VERSION-POLICY"))
+                        .toList();
+        assertEquals(1, errors.size());
+        assertTrue(errors.getFirst().isError());
+        assertEquals(
+                "commands[0].executionConfig.options.targetVersionPolicy",
+                errors.getFirst().getPath());
     }
 
     private CommandDefinitionDTO command(String type) {

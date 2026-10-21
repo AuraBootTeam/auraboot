@@ -534,6 +534,9 @@ dependencies {
     testImplementation 'org.apache.avro:avro:1.12.2'
 
     // JUnit 5 Platform
+    // Keep the declared platform aligned with the existing locked JUnit 5.12.2 graph.
+    // Otherwise Gradle rejects testCompileClasspath because the locked BOM is never requested.
+    testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'
     testImplementation 'org.junit.platform:junit-platform-launcher'
@@ -590,6 +593,15 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    def procurementHostJar = providers.environmentVariable('PROCUREMENT_PLUGIN_JAR').orNull
+    if (procurementHostJar) {
+        inputs.file(procurementHostJar).withPropertyName('procurementHostPluginJar')
+                .withPathSensitivity(PathSensitivity.NONE)
+        inputs.property('procurementHostTenant', providers.environmentVariable('TEST_TENANT_ID').getOrElse(''))
+        // Opt-in host probes depend on live PostgreSQL state as well as the external product JAR.
+        outputs.upToDateWhen { false }
+        outputs.doNotCacheIf('Procurement host verification requires actual database execution') { true }
+    }
     def retainedAllure = providers.environmentVariable('AURA_ALLURE_RESULTS').orNull
     if (retainedAllure) {
         systemProperty 'allure.results.directory', retainedAllure

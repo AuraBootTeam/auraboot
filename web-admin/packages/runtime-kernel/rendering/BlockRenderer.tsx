@@ -13,7 +13,7 @@
  * are injected by the host (see ./blockResolver) so the kernel stays admin-free.
  */
 
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, useEffect, useMemo, useReducer } from 'react';
 import { useProfileSafe } from '../profiles/ProfileContext';
 import type { BlockRendererProps } from '../profiles/types';
 import { BlockErrorBoundary } from './BlockErrorBoundary';
@@ -26,6 +26,17 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
   runtime,
   areaId: _areaId,
 }) => {
+  const [, refreshCondition] = useReducer((version: number) => version + 1, 0);
+  const conditional = Boolean(block.visibleWhen);
+  useEffect(() => {
+    if (!conditional) return;
+    const store = runtime.getStateManager?.().getStore?.(runtime.getScopeId?.());
+    if (!store?.subscribe) return;
+    const unsubscribe = store.subscribe(() => refreshCondition());
+    // A sibling may update the form during mount before this subscription starts.
+    refreshCondition();
+    return unsubscribe;
+  }, [runtime, conditional]);
   const context = runtime.getContext();
   const profile = useProfileSafe();
 

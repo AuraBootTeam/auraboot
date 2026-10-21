@@ -11,6 +11,13 @@ export const dataSourceConfigSchema = z
     autoFetch: z.boolean().optional(),
     pagination: z.boolean().optional(),
     adaptor: z.string().optional(),
+    dataPath: z.string().optional(),
+    rowIdentityField: z.string().optional(),
+    rowProjection: z.record(z.string(), z.union([
+      z.string(), z.array(z.string()),
+      z.object({ paths: z.union([z.string(), z.array(z.string())]), optional: z.boolean().optional(),
+        omitWhen: z.array(z.enum(['undefined', 'null', 'empty'])).optional() }).strict(),
+    ])).optional(),
     valueField: z.string().optional(),
     labelField: z.string().optional(),
     data: z.array(z.any()).optional(),

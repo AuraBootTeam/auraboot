@@ -100,7 +100,7 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
   // =========================================================================
   // 1. CascadeSelect multi-level interaction
   // =========================================================================
-  test.fixme('SCI-001 — CascadeSelect: level 1 → level 2 populates → level 3 populates → all have values; clear level 1 resets others', async ({
+  test('SCI-001 — CascadeSelect: level 1 → level 2 populates → level 3 populates → all have values; clear level 1 resets others', async ({
     page,
   }) => {
     test.setTimeout(30000);
@@ -177,17 +177,15 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
       expect(displayText.length, 'Display text should be non-empty').toBeGreaterThan(0);
     }
 
-    // -- Select a different level 1 value to verify levels 2 and 3 reset --
+    // A new parent selection must clear the previous child path.
     await trigger0.click();
-    const serviceOption = page.locator('[data-testid="cascade-option-sc_cascade_category-0-service"]');
-    if (await serviceOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await serviceOption.click();
-      // Level 2 and 3 triggers should have reset (show placeholder)
-      await expect(trigger2).toBeDisabled({ timeout: 3_000 });
-    } else {
-      // Re-select electronics to close dropdown
-      await electronicsOption.click();
-    }
+    const software = page.getByTestId('cascade-option-sc_cascade_category-0-software');
+    await expect(software).toBeVisible();
+    await software.click();
+    await expect(trigger0).toContainText(/Software|软件/);
+    await expect(trigger1).not.toContainText(/Phone|手机/);
+    await expect(trigger2).not.toContainText(/Smartphone|智能手机/);
+    await expect(trigger2).toBeDisabled();
   });
 
   // =========================================================================

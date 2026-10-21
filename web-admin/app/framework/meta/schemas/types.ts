@@ -1,3 +1,5 @@
+import type { CardRowSelection } from '../runtime/expression/row-selection';
+import type { RowProjection } from '../runtime/expression/row-projection';
 /**
  * 统一 DSL Schema 类型定义
  * 基于 final.v1.0 DSL 结构
@@ -46,6 +48,12 @@ export interface BlockConfig {
 
   // 表单相关
   fields?: FieldConfig[];
+  /** Optional card-grid inner field layout; existing cards retain stacked fields. */
+  fieldsLayout?: LayoutConfig;
+  /** Explicit card-row selection; eligibility derives from current exact positive facts. */
+  rowSelection?: CardRowSelection;
+  /** Fit card-grid tracks to the available width, collapsing unused tracks. */
+  autoFitColumns?: boolean;
   buttons?: ButtonConfig[];
 
   // 表格相关
@@ -99,6 +107,15 @@ export interface DataSourceConfig {
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
   adaptor?: string; // Default: 'optionList'
+  /** Explicit path inside completed command data; no fallback. */
+  dataPath?: string;
+  /** Optional safe projection before commandArray rows seed a scoped form. */
+  rowProjection?: RowProjection;
+  rowIdentityField?: string;
+  /** Options require this total to equal the complete array length. */
+  totalPath?: string;
+  /** Optional boolean path; false disables the corresponding option. */
+  selectableField?: string;
   valueField?: string; // Default: 'value'
   labelField?: string; // Default: 'name'
   data?: any[]; // For static type only
@@ -227,6 +244,8 @@ export interface ColumnConfig {
 
   // Format
   format?: string; // 'currency' | 'percent' | 'number'
+  /** Maximum displayed fractional digits for numeric cells; defaults to 2 when omitted. */
+  precision?: number;
   readOnly?: boolean;
 
   /**

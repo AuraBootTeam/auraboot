@@ -33,7 +33,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -41,6 +44,7 @@ import java.util.function.Supplier;
 
 /** Imports model, field and binding metadata using the existing service boundaries. */
 final class PluginModelFieldImporter {
+    private static final ThreadLocal<Set<String>> FIELD_BATCH_MODELS = new ThreadLocal<>();
     // Preserve virtual calls on the original facade receiver.
     private final PluginResourceImporterImpl facadeReceiver;
     private final MetaModelService metaModelService;
@@ -80,6 +84,21 @@ final class PluginModelFieldImporter {
         this.cacheManagerProvider = cacheManagerProvider;
         this.log = log;
         this.support = support;
+    }
+
+    public void beginFieldImportBatch() {
+        if (FIELD_BATCH_MODELS.get() != null) {
+            throw new PluginException("Nested field import schema batch");
+        }
+        FIELD_BATCH_MODELS.set(new LinkedHashSet<>());
+    }
+
+    public void endFieldImportBatch(boolean completed) {
+        Set<String> models = FIELD_BATCH_MODELS.get();
+        FIELD_BATCH_MODELS.remove();
+        if (completed && models != null && !models.isEmpty()) {
+            syncReimportedModels(new ArrayList<>(models), "field batch");
+        }
     }
 
     public boolean checkModelExists(Long tenantId, String code) {
@@ -130,6 +149,7 @@ final class PluginModelFieldImporter {
         extension.put("immutable", Boolean.TRUE.equals(dto.getImmutable()));
         extension.put("commandOnlyCreate", Boolean.TRUE.equals(dto.getCommandOnlyCreate()));
         // Warn on unknown extension keys (informational, does not block)
+        com.auraboot.framework.meta.security.RecordCommandWriterDeclaration.validate(extension.get("recordCommandWriters"));
         ExtensionBean.warnUnknownModelKeys(dto.getCode(), extension.keySet(), log);
         // tableName is a first-class column. Extract from extension as fallback (legacy format).
         String effectiveTableName = dto.getTableName();
@@ -375,6 +395,15 @@ final class PluginModelFieldImporter {
             return;
         }
 
+        Set<String> batch = FIELD_BATCH_MODELS.get();
+        if (batch != null) {
+            batch.addAll(modelCodes);
+            return;
+        }
+        syncReimportedModels(modelCodes, fieldCode);
+    }
+
+    private void syncReimportedModels(List<String> modelCodes, String fieldCode) {
         for (String modelCode : modelCodes) {
             SchemaOperationResult schemaResult = schemaManagementService.updateTableByModel(modelCode);
             if (schemaResult == null || !schemaResult.isSuccess()) {

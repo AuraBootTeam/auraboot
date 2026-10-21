@@ -13,6 +13,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DataAccessorTest {
 
     @Test
+    void queryPage_doesNotSilentlyLoadAllRowsOnAnOlderAccessor() {
+        InMemoryAccessor accessor = new InMemoryAccessor();
+        assertThatThrownBy(() -> accessor.queryPage("m",
+                new DataPageQuery(Map.of(), Map.of(), List.of(), 1, 20)))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(accessor.queries).isEmpty();
+    }
+
+    @Test
     void queryIn_defaultFallbackDelegatesToQueryForDistinctNonNullValues() {
         InMemoryAccessor accessor = new InMemoryAccessor();
 

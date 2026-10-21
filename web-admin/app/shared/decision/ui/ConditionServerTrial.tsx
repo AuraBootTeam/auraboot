@@ -257,23 +257,29 @@ export function ConditionServerTrial({
             const truth = result.conditionTrace!.nodeResults[nodeKey(parts)];
             return (
               <div key={nodeKey(parts)} className="ce-evidence-row">
-                <strong>
-                  {parts.map((part) => part + 1).join('.')} · {field?.label}
-                </strong>
+                <div className="ce-evidence-heading">
+                  <strong>
+                    {parts.map((part) => part + 1).join('.')} · {field?.label}
+                  </strong>
+                  <b className={`ce-${truth?.toLowerCase()}`}>{truthLabel(truth)}</b>
+                </div>
                 <span>
                   {decisionConditionOperatorLabel(node.operator, locale)}{' '}
                   {rightField?.label ??
                     (node.right?.type === 'literal' ? format(node.right.value, field) : '')}
                 </span>
                 {step && (
-                  <span>
-                    {format(step.left, field)} →{' '}
-                    {UNARY_OPERATORS.has(node.operator)
-                      ? ''
-                      : format(step.right, rightField ?? field)}
-                  </span>
+                  <div className="ce-evidence-comparison">
+                    <small>{text('actualComparison')}</small>
+                    <span>
+                      {format(step.left, field)}{' '}
+                      {decisionConditionOperatorLabel(node.operator, locale)}{' '}
+                      {UNARY_OPERATORS.has(node.operator)
+                        ? ''
+                        : format(step.right, rightField ?? field)}
+                    </span>
+                  </div>
                 )}
-                <b className={`ce-${truth?.toLowerCase()}`}>{truthLabel(truth)}</b>
               </div>
             );
           })}

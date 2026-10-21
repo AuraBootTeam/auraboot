@@ -96,6 +96,16 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private CacheManager cacheManager;
 
     @Override
+    public void beginFieldImportBatch() {
+        fieldsModelsBindings().beginFieldImportBatch();
+    }
+
+    @Override
+    public void endFieldImportBatch(boolean completed) {
+        fieldsModelsBindings().endFieldImportBatch(completed);
+    }
+
+    @Override
     public boolean checkModelExists(Long tenantId, String code) {
         return fieldsModelsBindings().checkModelExists(tenantId, code);
     }

@@ -316,14 +316,30 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertMutable(model, "updated");
-        FieldDefinition compareField = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
-        if (compareField.isPrimaryKey() || compareField.isJsonbVirtual() || compareField.isVirtual()) {
-            throw new MetaServiceException(
-                    "compareAndSet requires a writable stored field: " + fieldCode);
-        }
-        if (compareField.isImmutable() || compareField.getImmutableWhen() != null) {
-            throw new MetaServiceException(
-                    "compareAndSet cannot bypass immutable field rules: " + fieldCode);
+        boolean implicitVersion = "row_version".equals(fieldCode)
+                && model.getFields().stream().noneMatch(field -> fieldCode.equals(field.getCode()));
+        String compareColumn;
+        Object compareValue = expectedValue;
+        if (implicitVersion) {
+            if (model.getTableName() == null
+                    || !model.getTableName().startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)
+                    || (model.getSourceType() != null && !"physical".equals(model.getSourceType()))) {
+                throw new MetaServiceException("Implicit row_version comparison requires a physical dynamic model");
+            }
+            compareColumn = "row_version";
+            compareValue = requireExpectedRowVersion(expectedValue);
+        } else {
+            FieldDefinition compareField = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
+            if (compareField.isPrimaryKey() || compareField.isJsonbVirtual() || compareField.isVirtual()) {
+                throw new MetaServiceException(
+                        "compareAndSet requires a writable stored field: " + fieldCode);
+            }
+            if (compareField.isImmutable() || compareField.getImmutableWhen() != null) {
+                throw new MetaServiceException(
+                        "compareAndSet cannot bypass immutable field rules: " + fieldCode);
+            }
+            compareColumn = compareField.getColumnName() != null
+                    ? compareField.getColumnName() : compareField.getCode();
         }
         if (nextValues == null || nextValues.isEmpty()) {
             throw new MetaServiceException("compareAndSet next values cannot be empty");
@@ -334,6 +350,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             throw new MetaServiceException("compareAndSet contains a non-writable field");
         }
         for (String nextFieldCode : data.keySet()) {
+            if ("row_version".equals(nextFieldCode)) {
+                throw new MetaServiceException("compareAndSet cannot write infrastructure row_version");
+            }
             FieldDefinition nextField = DynamicDataValueMapper.findFieldDefinition(model, nextFieldCode);
             if (nextField.isPrimaryKey() || nextField.isJsonbVirtual() || nextField.isVirtual()
                     || nextField.isImmutable() || nextField.getImmutableWhen() != null) {
@@ -351,7 +370,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         data = convertDataTypes(model, data);
 
         Map<String, Object> expectedData = new LinkedHashMap<>();
-        expectedData.put(fieldCode, expectedValue);
+        expectedData.put(fieldCode, compareValue);
         payloadTemporalNormalizer.normalize(expectedData, model);
         expectedData = convertDataTypes(model, expectedData);
 
@@ -365,9 +384,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         String primaryKeyColumn = primaryKey.getColumnName() != null
                 ? primaryKey.getColumnName()
                 : primaryKey.getCode();
-        String compareColumn = compareField.getColumnName() != null
-                ? compareField.getColumnName()
-                : compareField.getCode();
         Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
         int updated = executeScopedUpdate(
                 model,
@@ -387,6 +403,21 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
         }
         return updated == 1;
+    }
+
+    private static long requireExpectedRowVersion(Object value) {
+        if (!(value instanceof Number)) {
+            throw new MetaServiceException("Expected row_version must be a non-negative exact integer");
+        }
+        try {
+            long version = new java.math.BigDecimal(value.toString()).longValueExact();
+            if (version < 0) {
+                throw new MetaServiceException("Expected row_version must be a non-negative exact integer");
+            }
+            return version;
+        } catch (NumberFormatException | ArithmeticException invalid) {
+            throw new MetaServiceException("Expected row_version must be a non-negative exact integer", invalid);
+        }
     }
 
     @Override
@@ -412,6 +443,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (update == null || !ids.add(update.recordId())) {
                 throw new MetaServiceException("CAS batch contains a null or duplicate record");
             }
+            RecordCommandWriterGuard.assertInputAllowed(model, update.nextValues(), "update");
+            RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, code -> metadataService.getModelDefinition(code).orElse(null), update.nextValues());
             Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
             stripNonWritableFields(modelCode, data);
             if (data.size() != update.nextValues().size()) {
@@ -496,6 +529,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         sql.append(")");
         appendAggregateBindingGuard(sql, params, model);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update");
         int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
         if (affected != updates.size()) {
@@ -564,7 +598,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (capCode != null) {
             capCol = resolveNumericColumn(model, capCode);
         }
-        String softDeleteClause = buildSoftDeleteClause(model);
+        StringBuilder guardedClause = new StringBuilder(buildSoftDeleteClause(model));
+        RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
+        String softDeleteClause = guardedClause.toString();
         FieldDefinition pkField = metadataService.getPrimaryKeyField(modelCode);
         String pkColumn = SqlSafetyUtils.requireIdentifier(
                 pkField.getColumnName(), "primary key column");
@@ -850,6 +886,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Same reason as the fields above: a derived row created under a command authorized for one
         // aggregate belongs to that aggregate, not to whichever one the payload names.
         injectAggregateBinding(model, enrichedData);
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, code -> metadataService.getModelDefinition(code).orElse(null), enrichedData);
 
         // 生成主键（如果需要）
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1288,6 +1325,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
+        RecordCommandWriterGuard.assertStoredAllowed(model, existingRecord, "delete");
         Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
 
         // 构建删除条件
@@ -1564,6 +1602,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         validateModelCode(modelCode);
         logOperation("createRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        ModelDefinition sourceModel = getModelDefinition(modelCode);
+        RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, sourceModel,
+                sourceModel.getTableName(), Map.of("id", recordId), "update", null,
+                code -> metadataService.getModelDefinition(code).orElse(null));
         return relationSupport().createRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 
@@ -1574,6 +1616,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         validateModelCode(modelCode);
         logOperation("removeRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        ModelDefinition sourceModel = getModelDefinition(modelCode);
+        RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, sourceModel,
+                sourceModel.getTableName(), Map.of("id", recordId), "update", null,
+                code -> metadataService.getModelDefinition(code).orElse(null));
         return relationSupport().removeRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 
@@ -1729,7 +1775,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicScopedWriteSupport dynamicScopedWriteSupport() {
-        return new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService);
+        return new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService, metadataService);
     }
 
     private DynamicDataTransferSupport dynamicDataTransferSupport() {

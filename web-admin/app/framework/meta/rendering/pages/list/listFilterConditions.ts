@@ -1,5 +1,6 @@
 import type { FieldConfig } from '~/framework/meta/schemas/types';
 import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
+import { normalizeSavedViewFilterRange } from '~/framework/smart/utils/savedViewFilterRange';
 import { resolveFieldMetaDataType } from './listFieldMetadata';
 
 export function viewConfigFiltersToRuntimeFilters(
@@ -37,7 +38,7 @@ export function resolveSavedViewFilterExpressions(
   context: SavedViewFilterExpressionContext,
 ): ViewFilterConfig[] {
   return (filters ?? []).map((filter) => {
-    if (!filter.isExpression) return filter;
+    if (!filter.isExpression) return normalizeSavedViewFilterRange(filter);
 
     const expression = String(filter.expression ?? '').trim();
     const resolvedValue =
@@ -51,7 +52,7 @@ export function resolveSavedViewFilterExpressions(
             ? CURRENT_SHARED_RECORD_PIDS_RESOLVER
             : undefined;
 
-    return { ...filter, value: resolvedValue };
+    return normalizeSavedViewFilterRange({ ...filter, value: resolvedValue });
   });
 }
 
@@ -191,8 +192,19 @@ export function resolveUserFilterCondition(
   filterFieldMap?: Map<string, any>,
 ): ListQueryFilterCondition[] {
   if (value == null || value === '') return [];
+  const fieldConfig = (filterFields || []).find((field) => field.field === key);
+  // ControlledFieldRenderer serializes DateRange objects for the field wire contract.
+  if (typeof value === 'string' && fieldConfig?.component?.toLowerCase() === 'daterange') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        && ('start' in parsed || 'end' in parsed)) value = parsed;
+    } catch {
+      // Keep malformed values intact so query validation can report them.
+    }
+  }
   // Date range objects { start, end }
-  if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+  if (value !== null && typeof value === 'object' && ('start' in value || 'end' in value)) {
     const range = value as { start?: unknown; end?: unknown };
     const conditions: ListQueryFilterCondition[] = [];
     if (range.start)
@@ -200,7 +212,6 @@ export function resolveUserFilterCondition(
     if (range.end) conditions.push({ fieldName: key, operator: 'lte', value: String(range.end) });
     return conditions;
   }
-  const fieldConfig = (filterFields || []).find((field) => field.field === key);
   const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
   const dataType = resolveFieldMetaDataType(key, filterFieldMap);
   const supportsLike =
@@ -225,8 +236,9 @@ export function resolveUserFilterCondition(
 
 /** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
 export function viewFilterToQueryCondition(
-  filter: ViewFilterConfig,
+  input: ViewFilterConfig,
 ): ListQueryFilterCondition | null {
+  const filter = normalizeSavedViewFilterRange(input);
   if (!filter.fieldCode) return null;
   const operator = (filter.operator || 'eq').toUpperCase();
   if (operator === 'ISNULL' || operator === 'ISNOTNULL') {

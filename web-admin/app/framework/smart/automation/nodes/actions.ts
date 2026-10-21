@@ -29,7 +29,7 @@ export const actionNodes: FlowNodeDefinition[] = [
       {
         key: 'fields',
         label: '$i18n:automation.field.updateFields',
-        type: 'json',
+        type: 'model-field-map',
         required: true,
         placeholder: '{ "status": "completed" }',
         description: '$i18n:automation.field.updateFields.desc',
@@ -58,7 +58,7 @@ export const actionNodes: FlowNodeDefinition[] = [
       {
         key: 'fields',
         label: '$i18n:automation.field.createFields',
-        type: 'json',
+        type: 'model-field-map',
         required: true,
         placeholder: '{ "name": "${trigger.name}", "status": "new" }',
         description: '$i18n:automation.field.createFields.desc',
@@ -228,6 +228,13 @@ export const actionNodes: FlowNodeDefinition[] = [
         required: true,
         placeholder: '{ "event": "record_updated", "data": "${trigger.record}" }',
         group: 'fields_mapping',
+      },
+      {
+        key: 'headers',
+        label: '$i18n:automation.field.httpHeaders',
+        type: 'json',
+        placeholder: '{ "X-Project-Pid": "${recordPid}" }',
+        group: 'advanced',
       },
     ],
     defaultConfig: {

@@ -473,7 +473,22 @@ export async function executeSimpleWorkbenchAction(
 
     const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;
     const operationType = args.operationType ? String(args.operationType).toUpperCase() : undefined;
+    const versionInput = args.expectedVersion;
+    const expectedVersion =
+      versionInput === undefined
+        ? undefined
+        : typeof versionInput === 'number' ||
+            (typeof versionInput === 'string' && versionInput.trim() !== '')
+          ? Number(versionInput)
+          : Number.NaN;
+    if (
+      expectedVersion !== undefined &&
+      (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0)
+    ) {
+      throw new Error('[workbench] command.execute expectedVersion must be a non-negative integer');
+    }
     const params: Record<string, any> = {
+      expectedVersion,
       targetRecordPid,
       operationType,
       payload: { ...(args.payload || {}), ...collectedInputs },

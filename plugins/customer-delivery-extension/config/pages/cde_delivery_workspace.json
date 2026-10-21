@@ -1,0 +1,184 @@
+{
+  "pageKey": "cde_delivery_workspace",
+  "name:zh-CN": "客户交付工作台",
+  "name:en": "Customer delivery workspace",
+  "title": {
+    "zh-CN": "客户交付工作台",
+    "en": "Customer delivery workspace"
+  },
+  "modelCode": "tpm_project",
+  "schemaVersion": 4,
+  "kind": "detail",
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "dataSources": {
+    "projects": {
+      "type": "namedQuery",
+      "queryCode": "tpm_delivery_brief",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    }
+  },
+  "blocks": [
+    {
+      "id": "cde_workspace_actions",
+      "blockType": "workbench-action-bar",
+      "title": {
+        "zh-CN": "选择项目，登记并核对下一步行动",
+        "en": "Select a project and record its next action"
+      },
+      "actions": [
+        {
+          "code": "cde_register_follow_up",
+          "label": {
+            "zh-CN": "登记交付跟进",
+            "en": "Record delivery follow-up"
+          },
+          "permissionCode": "tpm.project.manage",
+          "variant": "primary",
+          "disabledWhen": "!state.selectedProject.pid",
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "tpm:update_project",
+              "operationType": "UPDATE",
+              "targetRecordPid": "${state.selectedProject.pid}",
+              "inputFields": [
+                {
+                  "field": "tpm_pj_next_action",
+                  "type": "textarea",
+                  "required": true,
+                  "label": {
+                    "zh-CN": "下一步行动",
+                    "en": "Next action"
+                  },
+                  "placeholder": {
+                    "zh-CN": "写清负责人、完成时间和行动内容",
+                    "en": "Specify owner, due date and action"
+                  }
+                }
+              ],
+              "inputFieldsTitle": {
+                "zh-CN": "登记交付跟进",
+                "en": "Record delivery follow-up"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "保存跟进",
+                "en": "Save follow-up"
+              },
+              "reload": [
+                "projects"
+              ],
+              "feedback": {
+                "successMessage": {
+                  "zh-CN": "交付跟进已保存，可重新打开项目核对。",
+                  "en": "Delivery follow-up saved. Reopen the project to verify."
+                }
+              },
+              "expectedVersion": "${state.selectedProject.project_version}"
+            }
+          }
+        },
+        {
+          "code": "cde_open_project",
+          "label": {
+            "zh-CN": "查看项目详情",
+            "en": "View project"
+          },
+          "permissionCode": "tpm.project.read",
+          "disabledWhen": "!state.selectedProject.pid",
+          "onClick": {
+            "action": "navigate",
+            "args": {
+              "path": "/p/tpm_project/view/${state.selectedProject.pid}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "cde_project_queue",
+      "blockType": "table",
+      "title": {
+        "zh-CN": "客户交付项目",
+        "en": "Customer delivery projects"
+      },
+      "dataSource": "projects",
+      "selection": {
+        "mode": "single",
+        "bind": "selectedProject"
+      },
+      "columns": [
+        {
+          "field": "project_name",
+          "label": {
+            "zh-CN": "客户项目",
+            "en": "Project"
+          },
+          "width": 240
+        },
+        {
+          "field": "customer_name",
+          "label": {
+            "zh-CN": "客户",
+            "en": "Customer"
+          },
+          "width": 110
+        },
+        {
+          "field": "owner_name",
+          "label": {
+            "zh-CN": "负责人",
+            "en": "Owner"
+          },
+          "width": 96
+        },
+        {
+          "field": "delivery_stage",
+          "label": {
+            "zh-CN": "阶段",
+            "en": "Stage"
+          },
+          "width": 110
+        },
+        {
+          "field": "budget",
+          "label": {
+            "zh-CN": "预算（元）",
+            "en": "Budget"
+          },
+          "width": 120,
+          "valueType": "currency",
+          "currencyCode": "CNY",
+          "align": "right"
+        },
+        {
+          "field": "delivery_date",
+          "label": {
+            "zh-CN": "交付日期",
+            "en": "Delivery date"
+          },
+          "width": 150,
+          "valueType": "date",
+          "ellipsis": true
+        },
+        {
+          "field": "next_action",
+          "label": {
+            "zh-CN": "下一步行动",
+            "en": "Next action"
+          },
+          "width": 280
+        }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,208 @@ describe('DataSourceManager', () => {
     mockedFetchResult.mockReset();
   });
 
+  const commandTableManager = () => {
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { billNo: 'REQ-100' },
+        state: { routeContext: { taskPid: 'task-1' } },
+      } as any),
+    );
+    manager.register('candidates', {
+      type: 'api',
+      method: 'post',
+      autoFetch: false,
+      adaptor: 'commandTable',
+      endpoint: '/api/meta/commands/execute/example:read_candidates',
+      params: {
+        targetRecordPid: '${state.routeContext.taskPid}',
+        payload: { billNo: '${form.billNo}', pageSize: 20 },
+      },
+    });
+    return manager;
+  };
+
+  it('adapts completed command pages and preserves evaluated command input', async () => {
+    const records = [{ pid: 'candidate-1', quantity: 30 }];
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { records, total: 1, current: 1, size: 20 },
+      },
+    } as any);
+    const manager = commandTableManager();
+    expect(await manager.fetch('candidates')).toEqual({
+      records,
+      total: 1,
+      current: 1,
+      pageSize: 20,
+    });
+    expect(mockedFetchResult).toHaveBeenCalledExactlyOnceWith(
+      '/api/meta/commands/execute/example:read_candidates',
+      {
+        method: 'post',
+        params: { targetRecordPid: 'task-1', payload: { billNo: 'REQ-100', pageSize: 20 } },
+      },
+    );
+    expect(manager.getState('candidates')?.error).toBeNull();
+  });
+
+  it('accepts an explicitly completed empty command page', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { records: [], total: 0, current: 1, size: 1 },
+      },
+    } as any);
+    expect(await commandTableManager().fetch('candidates')).toEqual({
+      records: [],
+      total: 0,
+      current: 1,
+      pageSize: 1,
+    });
+  });
+
+  it.each([
+    { phaseReached: 'handler', data: { records: [], total: 0, current: 1, size: 1 } },
+    { phaseReached: 'completed', records: [], total: 0, current: 1, size: 1 },
+    { phaseReached: 'completed', data: { list: [], total: 0, current: 1, size: 1 } },
+    ...[
+      { total: '1' },
+      { total: -1 },
+      { total: 0 },
+      { current: 0 },
+      { current: 1.5 },
+      { size: 0 },
+      { size: '20' },
+      { records: [null] },
+      { records: [['nested']] },
+      { records: [{}, {}], size: 1 },
+    ].map((invalid) => ({
+      phaseReached: 'completed',
+      data: {
+        records: [{ pid: 'candidate-1' }],
+        total: 1,
+        current: 1,
+        size: 20,
+        ...invalid,
+      },
+    })),
+  ])('reports invalid command pages instead of presenting an empty table: %j', async (data) => {
+    mockedFetchResult.mockResolvedValueOnce({ code: '0', data } as any);
+    const manager = commandTableManager();
+    expect(await manager.fetch('candidates')).toBeNull();
+    expect(manager.getState('candidates')?.error?.message).toBe(
+      'Invalid completed command table response',
+    );
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves permission errors before command table adaptation', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '403',
+      message: 'Forbidden',
+      data: null,
+    } as any);
+    const manager = commandTableManager();
+    expect(await manager.fetch('candidates')).toBeNull();
+    expect(manager.getState('candidates')?.error).not.toBeNull();
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('extracts exact completed command rows without changing decimal strings', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { lines: [{ pid: 'a', quantity: '100.000000000000001', included: false }] },
+      },
+    } as any);
+    const manager = commandTableManager();
+    manager.register('lines', {
+      type: 'api',
+      method: 'post',
+      endpoint: '/api/meta/commands/execute/example:view',
+      adaptor: 'commandArray',
+      dataPath: 'lines',
+      params: { targetRecordPid: 'a' },
+    } as any);
+    expect(await manager.fetch('lines')).toEqual([
+      { pid: 'a', quantity: '100.000000000000001', included: false },
+    ]);
+    expect(mockedFetchResult.mock.calls[0][1]?.method).toBe('post');
+  });
+
+  it.each(['handler', 'failed'])('refuses incomplete command arrays (%s)', async (phaseReached) => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { phaseReached, data: { lines: [] } },
+    } as any);
+    const manager = commandTableManager();
+    manager.register('lines', {
+      type: 'api',
+      endpoint: '/x',
+      adaptor: 'commandArray',
+      dataPath: 'lines',
+    } as any);
+    expect(await manager.fetch('lines')).toBeNull();
+    expect(manager.getState('lines')?.error).not.toBeNull();
+  });
+
+  it('refuses a truncated command options collection', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { items: [{ pid: 'a', label: 'A', selectable: true }], total: 2 },
+      },
+    } as any);
+    const manager = commandTableManager();
+    manager.register('options', {
+      type: 'api',
+      endpoint: '/x',
+      adaptor: 'commandOptions',
+      dataPath: 'items',
+      valueField: 'pid',
+      labelField: 'label',
+      selectableField: 'selectable',
+    } as any);
+    expect(await manager.fetch('options')).toBeNull();
+  });
+
+  it('retains typed permission denial after real manager option reload', async () => {
+    const manager = commandTableManager();
+    manager.register('options', {
+      type: 'api',
+      method: 'post',
+      endpoint: '/x',
+      autoFetch: false,
+      adaptor: 'commandOptions',
+      dataPath: 'items',
+      valueField: 'pid',
+      labelField: 'label',
+      selectableField: 'selectable',
+    });
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { items: [{ pid: 'p', label: 'P', selectable: false }], total: 1 },
+      },
+    } as any);
+    expect(await manager.fetch('options')).toEqual([{ value: 'p', label: 'P', disabled: true }]);
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '403',
+      data: null,
+      message: 'Forbidden',
+    } as any);
+    await manager.reload('options');
+    expect(manager.getState('options')?.data).toEqual([{value:'p',label:'P',disabled:true}]);
+    expect((manager.getState('options')?.error as any)?.code).toBe('403');
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+  });
+
   it('defers detail child data sources until form.pid is available', async () => {
     mockedFetchResult.mockResolvedValue({
       code: '0',
@@ -500,6 +702,57 @@ describe('DataSourceManager', () => {
       statusCode: 503,
       code: '503',
     });
+  });
+
+  it('retains human error detail and actual HTTP status separately from business code', async () => {
+    for (const httpStatus of [400, 403]) {
+      for (const context of ['分页参数无效', { detail: '分页参数无效', messageKey: 'private-key', cause: 'private-cause' }]) {
+        mockedFetchResult.mockResolvedValueOnce({
+          code: '35000', httpStatus, status: 500, statusCode: 502,
+          desc: 'Bad parameter', message: 'Bad parameter', context, success: false, data: null,
+        } as any);
+        const manager = new DataSourceManager(createExpressionContext({} as any));
+        manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
+          method: 'get', autoFetch: false });
+        await manager.fetch('offers');
+        expect(manager.getState('offers')?.error).toMatchObject({
+          message: httpStatus === 403 ? 'Bad parameter' : '分页参数无效', status: httpStatus, statusCode: httpStatus, code: '35000',
+        });
+        expect(manager.getState('offers')?.data).toBeNull();
+        expect(manager.getState('offers')?.loading).toBe(false);
+      }
+    }
+  });
+
+  it('does not turn diagnostic objects into user-visible data-source text', async () => {
+    for (const context of [{ detail: { private: 'secret' } }, { detail: '  ', messageKey: 'private-key' }]) {
+      mockedFetchResult.mockResolvedValueOnce({ code: '35000', httpStatus: 400,
+        desc: 'Original failure', context, success: false, data: null } as any);
+      const manager = new DataSourceManager(createExpressionContext({} as any));
+      manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
+        method: 'get', autoFetch: false });
+      await manager.fetch('offers');
+      expect(manager.getState('offers')?.error?.message).toBe('Original failure');
+    }
+  });
+
+  it('does not promote generic Core diagnostics but retains actual status and business identity', async () => {
+    for (const result of [
+      { code: '1', httpStatus: 500, desc: 'Internal system error', context: {
+        exception: 'IllegalStateException', detail: 'SELECT secret FROM private_model; PID secret', cause: 'private-cause' } },
+      { code: '403', httpStatus: 403, desc: 'Access forbidden', context: 'private permission' },
+      { code: '35000', httpStatus: 400, desc: 'Bad parameter', context: {
+        exception: 'IllegalStateException', detail: 'private stored snapshot' } },
+    ]) {
+      mockedFetchResult.mockResolvedValueOnce({ ...result, success: false, data: null } as any);
+      const manager = new DataSourceManager(createExpressionContext({} as any));
+      manager.register('read', { type: 'api', endpoint: '/api/meta/command-phases', method: 'get', autoFetch: false });
+      await manager.fetch('read');
+      expect(manager.getState('read')?.error).toMatchObject({
+        message: result.desc, status: result.httpStatus, statusCode: result.httpStatus, code: result.code,
+      });
+      expect(manager.getState('read')?.data).toBeNull();
+    }
   });
 
   it('omits format for namedQuery sources by default (option/dropdown format)', async () => {

@@ -146,6 +146,48 @@ class NotifyActionHandlerTest {
                 .containsEntry("errorMessage", "notification down");
     }
 
+    @Test
+    void executeWithResult_preservesTemplatedRecordSourceForRoleRecipients() {
+        when(notificationService.sendInAppToRecipient("role", "reviewer", "Review", "",
+                "EVENT_POLICY", "wd_leave_request", "REQ-1")).thenReturn(List.of(42L));
+        ResolvedActionPlan plan = new ResolvedActionPlan("R", "NOTIFY", "ROLE:reviewer", 1,
+                Map.of("title", "Review", "sourceType", "${record.entityCode}",
+                        "sourceId", "${record.recordPid}"), "record-key");
+
+        Map<String, Object> result = handler.executeWithResult(plan, decisionContext());
+
+        assertThat(result).containsEntry("sourceType", "wd_leave_request")
+                .containsEntry("sourceId", "REQ-1").containsEntry("sentCount", 1);
+        verify(notificationService).sendInAppToRecipient("role", "reviewer", "Review", "",
+                "EVENT_POLICY", "wd_leave_request", "REQ-1");
+    }
+
+    @Test
+    void executeWithResult_preservesRecordSourceForIndividualRecipients() {
+        ResolvedActionPlan plan = new ResolvedActionPlan("R", "NOTIFY", "USER:42", 1,
+                Map.of("sourceType", "wd_leave_request", "sourceId", "REQ-1"), "record-key");
+        handler.executeWithResult(plan, decisionContext());
+        verify(notificationService).sendInApp(42L, "Policy notification", "",
+                "EVENT_POLICY", "wd_leave_request", "REQ-1");
+    }
+
+    @Test
+    void executeWithResult_rejectsIncompleteUnsafeAndUnresolvedRecordSourcesBeforeSending() {
+        for (Map<String, Object> payload : List.<Map<String, Object>>of(
+                Map.of("sourceType", "wd_leave_request"),
+                Map.of("sourceType", "../admin", "sourceId", "REQ-1"),
+                Map.of("sourceType", "wd_leave_request", "sourceId", "REQ-1?token=bad"),
+                Map.of("sourceType", "wd_leave_request", "sourceId", "${record.missing}"),
+                Map.of("sourceType", 42, "sourceId", "REQ-1"))) {
+            ResolvedActionPlan plan = new ResolvedActionPlan("R", "NOTIFY", "USER:42", 1,
+                    payload, "record-key");
+            ActionExecutionException error = assertThrows(ActionExecutionException.class,
+                    () -> handler.executeWithResult(plan, decisionContext()));
+            assertThat(error.resultPayload()).containsEntry("failureReason", "notification_source_invalid");
+        }
+        org.mockito.Mockito.verifyNoInteractions(notificationService);
+    }
+
     @Test void acceptsPublicUserPidAndRefusesAnUnresolvedOrForeignRecipient() {
         when(identities.findActiveTenantUser(7L,"public-user"))
                 .thenReturn(new IdentityDirectoryAccessor.UserIdentity(42L,"public-user","reviewer","Reviewer"));

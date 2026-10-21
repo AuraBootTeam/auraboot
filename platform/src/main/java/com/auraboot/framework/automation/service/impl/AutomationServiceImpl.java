@@ -382,6 +382,9 @@ public class AutomationServiceImpl implements AutomationService {
         log.info("Manually triggering automation: pid={}, recordPid={}", pid, recordPid);
 
         Automation automation = loadOwnedAutomation(pid);
+        templateBinder.rejectUnresolved(automation.getFlowConfig());
+        // Test the saved definition without enabling its automatic trigger.
+        requireAutomationWorkflowRuntime().deploy(automation);
 
         AutomationLog logEntry = automationTriggerService.executeAutomation(
                 automation,

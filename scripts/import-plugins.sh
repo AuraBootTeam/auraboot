@@ -22,6 +22,8 @@ EXTRA_PLUGIN_ROOTS_RAW="${EXTRA_PLUGIN_ROOTS:-${EXTRA_PLUGINS_DIRS:-}}"
 EXTRA_PLUGIN_ROOTS=()
 PLUGINS=()
 IDENTIFIER_MAPPING_PATH="${IDENTIFIER_MAPPING_PATH:-}"
+PLUGIN_IDENTIFIER_MAPPINGS=()
+MAPPING_TOOL="$SCRIPT_DIR/dev/plugin-identifier-mapping.py"
 
 usage() {
     cat <<USAGE
@@ -43,6 +45,9 @@ Options:
                                    container path in --slug Docker mode.
   --extra-plugin-root=<path>       Additional plugin root. Can be passed multiple times.
                                    Host path in host mode; container path in --slug Docker mode.
+  --plugin-identifier-mapping=<pluginId>=<path>
+                                   Mapping only for one selected manifest pluginId.
+                                   Repeat for distinct plugins; cannot overlap the global flag.
   --identifier-mapping=<path>      Identifier-mapping JSON (plugin rename upgrade).
                                    Passed to every import-directory-sync call as
                                    identifierMappingPath; the backend migrates
@@ -69,6 +74,7 @@ for arg in "$@"; do
         --plugin-root=*) PLUGIN_ROOT="${arg#--plugin-root=}" ;;
         --enterprise-plugin-root=*) ENTERPRISE_PLUGIN_ROOT="${arg#--enterprise-plugin-root=}" ;;
         --extra-plugin-root=*) EXTRA_PLUGIN_ROOTS+=("${arg#--extra-plugin-root=}") ;;
+        --plugin-identifier-mapping=*) PLUGIN_IDENTIFIER_MAPPINGS+=("${arg#--plugin-identifier-mapping=}") ;;
         --identifier-mapping=*) IDENTIFIER_MAPPING_PATH="${arg#--identifier-mapping=}" ;;
         --help|-h) usage; exit 0 ;;
         --*) echo "ERROR: unknown argument: $arg" >&2; usage; exit 2 ;;
@@ -170,70 +176,6 @@ if [ "${#PLUGINS[@]}" -eq 0 ]; then
     exit 2
 fi
 
-echo "Importing plugins into ${PROJECT_NAME:-host backend} ($BACKEND_URL)"
-echo "Profile: $PROFILE; edition: $EDITION"
-echo "Plugin root: $PLUGIN_ROOT"
-if [ -n "$ENTERPRISE_PLUGIN_ROOT" ]; then
-    echo "Enterprise plugin root: $ENTERPRISE_PLUGIN_ROOT"
-fi
-if [ "${#EXTRA_PLUGIN_ROOTS[@]}" -gt 0 ]; then
-    echo "Extra plugin roots: ${EXTRA_PLUGIN_ROOTS[*]}"
-fi
-echo "Plugins (${#PLUGINS[@]}): ${PLUGINS[*]}"
-
-# Transient failures (load, slow disk, network hiccup on remote backends) used to
-# surface as a bare "{}" and a hard exit right after a healthy wait loop. Probe
-# with a timeout and short retries before giving up.
-health='{}'
-for _attempt in 1 2 3 4 5; do
-    health="$(NO_PROXY=localhost curl -s --max-time 5 "$BACKEND_URL/actuator/health" 2>/dev/null || echo '{}')"
-    status="$(printf '%s' "$health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")"
-    [ "$status" = "UP" ] && break
-    sleep 2
-done
-if [ "$status" != "UP" ]; then
-    echo "ERROR: backend is not healthy after 5 attempts: $health" >&2
-    exit 1
-fi
-
-login_resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/auth/login" \
-    -H "Content-Type: application/json" \
-    -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")"
-jwt="$(printf '%s' "$login_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('jwt',''))" 2>/dev/null || echo "")"
-tenant_id="$(printf '%s' "$login_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('tenantId',''))" 2>/dev/null || echo "")"
-
-if [ -z "$jwt" ] || [ "$jwt" = "None" ]; then
-    echo "ERROR: admin login failed: $login_resp" >&2
-    exit 1
-fi
-
-if [ -z "$tenant_id" ] || [ "$tenant_id" = "None" ]; then
-    spaces="$(NO_PROXY=localhost curl -s "$BACKEND_URL/api/tenant-selection/my-spaces" \
-        -H "Authorization: Bearer $jwt")"
-    biz_tenant="$(printf '%s' "$spaces" | python3 -c "
-import sys,json
-for item in json.load(sys.stdin).get('data',[]):
-    if item.get('spaceType') == 'business' and item.get('tenantId'):
-        print(item.get('tenantId'))
-        break
-" 2>/dev/null || echo "")"
-    if [ -z "$biz_tenant" ]; then
-        echo "ERROR: no business tenant found: $spaces" >&2
-        exit 1
-    fi
-    select_resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/tenant-selection/process" \
-        -H "Authorization: Bearer $jwt" \
-        -H "Content-Type: application/json" \
-        -d "{\"action\":\"select\",\"tenantId\":$biz_tenant}")"
-    selected_jwt="$(printf '%s' "$select_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('jwt',''))" 2>/dev/null || echo "")"
-    if [ -n "$selected_jwt" ] && [ "$selected_jwt" != "None" ]; then
-        jwt="$selected_jwt"
-    else
-        echo "ERROR: tenant selection failed: $select_resp" >&2
-        exit 1
-    fi
-fi
-
 path_has_plugin() {
     local path="$1"
     if [ -n "$BACKEND_CONTAINER" ]; then
@@ -306,18 +248,114 @@ container_plugin_path() {
     return 1
 }
 
+# Resolve every mapped plugin before any health/login/import HTTP request.
+selected_mapping_plugins='{}'
+if [ "${#PLUGIN_IDENTIFIER_MAPPINGS[@]}" -gt 0 ]; then
+    for plugin in "${PLUGINS[@]}"; do
+        path="$(container_plugin_path "$plugin")" || { echo "ERROR: selected mapping plugin path not found" >&2; exit 2; }
+        if [ -n "$BACKEND_CONTAINER" ]; then
+            manifest_json="$(docker exec "$BACKEND_CONTAINER" cat "$path/plugin.json")"
+        else
+            manifest_path="$path/plugin.json"
+            if [ ! -f "$manifest_path" ]; then
+                case "$path" in
+                    /app/plugins/*) manifest_path="$PROJECT_ROOT/plugins/${path#/app/plugins/}/plugin.json" ;;
+                    /app/plugins-enterprise/*) manifest_path="${AURA_ENTERPRISE_ROOT:?}/plugins/${path#/app/plugins-enterprise/}/plugin.json" ;;
+                esac
+            fi
+            manifest_json="$(cat "$manifest_path")"
+        fi
+        selected_mapping_plugins="$(python3 - "$selected_mapping_plugins" "$path" "$manifest_json" <<'PYMAP'
+import json,sys
+selected=json.loads(sys.argv[1]); manifest=json.loads(sys.argv[3]); identity=manifest.get('pluginId')
+if not isinstance(identity,str) or not identity or sys.argv[2] in selected:
+    raise ValueError('Invalid or duplicate selected plugin path')
+selected[sys.argv[2]]=identity
+print(json.dumps(selected))
+PYMAP
+)"
+    done
+fi
+if [ "${#PLUGIN_IDENTIFIER_MAPPINGS[@]}" -gt 0 ]; then
+    identifier_mapping_plan="$(python3 "$MAPPING_TOOL" plan "$IDENTIFIER_MAPPING_PATH" "$selected_mapping_plugins" "${PLUGIN_IDENTIFIER_MAPPINGS[@]}")"
+else
+    identifier_mapping_plan="$(python3 "$MAPPING_TOOL" plan "$IDENTIFIER_MAPPING_PATH" "$selected_mapping_plugins")"
+fi
+
+echo "Importing plugins into ${PROJECT_NAME:-host backend} ($BACKEND_URL)"
+echo "Profile: $PROFILE; edition: $EDITION"
+echo "Plugin root: $PLUGIN_ROOT"
+if [ -n "$ENTERPRISE_PLUGIN_ROOT" ]; then
+    echo "Enterprise plugin root: $ENTERPRISE_PLUGIN_ROOT"
+fi
+if [ "${#EXTRA_PLUGIN_ROOTS[@]}" -gt 0 ]; then
+    echo "Extra plugin roots: ${EXTRA_PLUGIN_ROOTS[*]}"
+fi
+echo "Plugins (${#PLUGINS[@]}): ${PLUGINS[*]}"
+
+# Transient failures (load, slow disk, network hiccup on remote backends) used to
+# surface as a bare "{}" and a hard exit right after a healthy wait loop. Probe
+# with a timeout and short retries before giving up.
+health='{}'
+for _attempt in 1 2 3 4 5; do
+    health="$(NO_PROXY=localhost curl -s --max-time 5 "$BACKEND_URL/actuator/health" 2>/dev/null || echo '{}')"
+    status="$(printf '%s' "$health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")"
+    [ "$status" = "UP" ] && break
+    sleep 2
+done
+if [ "$status" != "UP" ]; then
+    echo "ERROR: backend is not healthy after 5 attempts: $health" >&2
+    exit 1
+fi
+
+login_resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/auth/login" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")"
+jwt="$(printf '%s' "$login_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('jwt',''))" 2>/dev/null || echo "")"
+tenant_id="$(printf '%s' "$login_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('tenantId',''))" 2>/dev/null || echo "")"
+
+if [ -z "$jwt" ] || [ "$jwt" = "None" ]; then
+    echo "ERROR: admin login failed: $login_resp" >&2
+    exit 1
+fi
+
+if [ -z "$tenant_id" ] || [ "$tenant_id" = "None" ]; then
+    spaces="$(NO_PROXY=localhost curl -s "$BACKEND_URL/api/tenant-selection/my-spaces" \
+        -H "Authorization: Bearer $jwt")"
+    biz_tenant="$(printf '%s' "$spaces" | python3 -c "
+import sys,json
+for item in json.load(sys.stdin).get('data',[]):
+    if item.get('spaceType') == 'business' and item.get('tenantId'):
+        print(item.get('tenantId'))
+        break
+" 2>/dev/null || echo "")"
+    if [ -z "$biz_tenant" ]; then
+        echo "ERROR: no business tenant found: $spaces" >&2
+        exit 1
+    fi
+    select_resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/tenant-selection/process" \
+        -H "Authorization: Bearer $jwt" \
+        -H "Content-Type: application/json" \
+        -d "{\"action\":\"select\",\"tenantId\":$biz_tenant}")"
+    selected_jwt="$(printf '%s' "$select_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('jwt',''))" 2>/dev/null || echo "")"
+    if [ -n "$selected_jwt" ] && [ "$selected_jwt" != "None" ]; then
+        jwt="$selected_jwt"
+    else
+        echo "ERROR: tenant selection failed: $select_resp" >&2
+        exit 1
+    fi
+fi
+
 import_plugin_once() {
     local path="$1"
     local resp result
-    local mapping_json=""
-    if [ -n "$IDENTIFIER_MAPPING_PATH" ]; then
-        mapping_json=",\"identifierMappingPath\":\"$IDENTIFIER_MAPPING_PATH\""
-    fi
+    local import_body
+    import_body="$(python3 "$MAPPING_TOOL" request "$path" "$identifier_mapping_plan")" || return 2
 
     resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/plugins/import/import-directory-sync" \
         -H "Authorization: Bearer $jwt" \
         -H "Content-Type: application/json" \
-        -d "{\"path\":\"$path\",\"conflictStrategy\":\"OVERWRITE\",\"autoPublishModels\":true,\"autoPublishFields\":true,\"autoPublishCommands\":true,\"autoPublishPages\":true,\"deferReferenceValidation\":true${mapping_json}}")"
+        -d "$import_body")"
     result="$(printf '%s' "$resp" | python3 -c "
 import sys,json
 try:

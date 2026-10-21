@@ -1,0 +1,14 @@
+[
+  {
+    "code": "cde_delivery_workspace",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "客户交付工作台",
+    "name:en": "Customer delivery workspace",
+    "path": "/p/c/cde_delivery_workspace",
+    "icon": "IconBriefcase",
+    "type": 1,
+    "permissionCode": "tpm.project.read",
+    "orderNo": 9,
+    "visible": true
+  }
+]

@@ -18,6 +18,25 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.auraboot.framework.application.web.handler.GlobalExceptionHandler;
+import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
+import com.auraboot.framework.meta.service.IdempotencyService;
+import com.auraboot.framework.meta.service.impl.CommandEffectExecutor;
+import com.auraboot.framework.plugin.extension.PluginCommandRejectionException;
+import com.auraboot.framework.plugin.extension.PluginHttpResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import static org.mockito.Mockito.doAnswer;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
@@ -42,6 +61,97 @@ class PluginRestDispatcherTest {
     private final SystemModeService systemModeService = mock(SystemModeService.class);
     private final PluginRestDispatcher dispatcher =
             new PluginRestDispatcher(registry, perms, ctxFactory, pipeline, rateLimiter, systemModeService);
+
+    private MockMvc governedMvc(RuntimeException failure,PlatformTransactionManager tx) throws Exception {
+        permit();
+        RestEndpointExtension ext=mock(RestEndpointExtension.class);
+        doAnswer(invocation->{
+            PluginHttpResponse partial=invocation.getArgument(1);
+            partial.header("X-Private-Partial","private-identity");
+            partial.out().write("private-partial-body".getBytes(StandardCharsets.UTF_8));
+            throw failure;
+        }).when(ext).handle(any(),any(),any());
+        when(registry.match("probe","GET","/whoami")).thenReturn(Optional.of(whoamiMatch(ext)));
+        when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        var actualPipeline=new RestEndpointPipeline(tx,mock(IdempotencyService.class),
+                new RestSchemaValidator(new ObjectMapper()),mock(CommandEffectExecutor.class));
+        var actualDispatcher=new PluginRestDispatcher(registry,perms,ctxFactory,actualPipeline,rateLimiter,systemModeService);
+        var advice=new GlobalExceptionHandler();
+        var locale=mock(I18nLocaleResolver.class);when(locale.resolveLocale(any())).thenReturn("zh-CN");
+        var catalog=mock(I18nService.class);when(catalog.getValue("zh-CN","plugin.probe.rejected"))
+                .thenReturn("报价快照内容无效，请联系采购负责人核对。");
+        ReflectionTestUtils.setField(advice,"activeProfile","prod");
+        ReflectionTestUtils.setField(advice,"i18nService",catalog);ReflectionTestUtils.setField(advice,"i18nLocaleResolver",locale);
+        return MockMvcBuilders.standaloneSetup(actualDispatcher).setMessageConverters(new MappingJackson2HttpMessageConverter())
+                .setControllerAdvice(advice).build();
+    }
+
+    @Test
+    void sdkBusinessRejectionsUseExistingGlobalLocalizationAndNeverFlushPartialContent() throws Exception {
+        for(var code:PluginCommandRejectionException.Code.values()) {
+            var tx=mock(PlatformTransactionManager.class);
+            var mvc=governedMvc(new PluginCommandRejectionException(code,"plugin.probe.rejected"),tx);
+            var response=mvc.perform(get("/api/ext/probe/whoami").header("Accept-Language","zh-CN"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("35000"))
+                    .andExpect(jsonPath("$.context").value("报价快照内容无效，请联系采购负责人核对。"))
+                    .andReturn().getResponse();
+            assertThat(response.getHeader("X-Private-Partial")).isNull();
+            assertThat(response.getContentAsString()).doesNotContain("plugin.probe.rejected","$i18n:","private-partial-body","private-identity");
+            verify(tx).rollback(any());verify(tx,never()).commit(any());
+        }
+    }
+
+    @Test
+    void securityAndAccessDeniedFailuresStaySafe403AfterBufferedWrites() throws Exception {
+        for(var failure:new RuntimeException[]{new SecurityException("foreign-private-record"),new AccessDeniedException("private-permission-code")}) {
+            var tx=mock(PlatformTransactionManager.class);var mvc=governedMvc(failure,tx);
+            var response=mvc.perform(get("/api/ext/probe/whoami")).andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("403")).andReturn().getResponse();
+            assertThat(response.getHeader("X-Private-Partial")).isNull();
+            assertThat(response.getContentAsString()).doesNotContain("foreign-private-record","private-permission-code","private-partial-body","private-identity");
+            verify(tx).rollback(any());verify(tx,never()).commit(any());
+        }
+    }
+
+    @Test
+    void codedSdkDataDenialUsesSafe403AndRollsBackBufferedResponse() throws Exception {
+        var failure=new com.auraboot.framework.plugin.extension.DataAccessorException(
+                com.auraboot.framework.plugin.extension.DataAccessErrorCode.PERMISSION_DENIED,
+                new AccessDeniedException("private-supplier-record-and-rule"));
+        var tx=mock(PlatformTransactionManager.class);var mvc=governedMvc(failure,tx);
+        var response=mvc.perform(get("/api/ext/probe/whoami")).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("403")).andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.context").value("Access denied")).andReturn().getResponse();
+        assertThat(response.getHeader("X-Private-Partial")).isNull();
+        assertThat(response.getContentAsString()).doesNotContain("private-supplier-record-and-rule","PERMISSION_DENIED",
+                "DataAccessorException","private-partial-body","private-identity");
+        verify(tx).rollback(any());verify(tx,never()).commit(any());
+    }
+
+    @Test
+    void unknownWrapperDoesNotInferAuthorizationFromMessageOrNestedSdkCode() throws Exception {
+        var nested=new com.auraboot.framework.plugin.extension.DataAccessorException(
+                com.auraboot.framework.plugin.extension.DataAccessErrorCode.PERMISSION_DENIED,
+                new AccessDeniedException("private-nested-record"));
+        var tx=mock(PlatformTransactionManager.class);
+        var mvc=governedMvc(new IllegalStateException("PERMISSION_DENIED private-wrapper",nested),tx);
+        var response=mvc.perform(get("/api/ext/probe/whoami")).andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Internal error")).andReturn().getResponse();
+        assertThat(response.getHeader("X-Private-Partial")).isNull();
+        assertThat(response.getContentAsString()).doesNotContain("PERMISSION_DENIED","private-wrapper","private-nested-record",
+                "private-partial-body","private-identity");
+        verify(tx).rollback(any());verify(tx,never()).commit(any());
+    }
+
+    @Test
+    void unknownInfrastructureFailureRemainsGeneric500AndDropsPartialBuffer() throws Exception {
+        var tx=mock(PlatformTransactionManager.class);var mvc=governedMvc(new IllegalStateException("private-db-address"),tx);
+        var response=mvc.perform(get("/api/ext/probe/whoami")).andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Internal error")).andReturn().getResponse();
+        assertThat(response.getHeader("X-Private-Partial")).isNull();
+        assertThat(response.getContentAsString()).doesNotContain("private-db-address","private-partial-body","private-identity");
+        verify(tx).rollback(any());verify(tx,never()).commit(any());
+    }
 
     @AfterEach
     void clear() {

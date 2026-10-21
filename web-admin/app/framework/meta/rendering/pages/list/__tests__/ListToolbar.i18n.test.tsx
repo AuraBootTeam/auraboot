@@ -76,6 +76,15 @@ function renderToolbar(extraProps: Partial<React.ComponentProps<typeof ListToolb
 }
 
 describe('ListToolbar i18n', () => {
+  it('hides unsupported keyword search while keeping the configured filter entry usable', () => {
+    const onFilterFormToggle = vi.fn();
+    renderToolbar({ hideSearch: true, onFilterFormToggle, hideQuickFilters: true,
+      hideSort: true, hideColumnSettings: true, hideRowHeight: true, hideFilterChips: true });
+    expect(screen.queryByTestId('list-search-input')).toBeNull();
+    fireEvent.click(screen.getByTestId('filters-toggle'));
+    expect(onFilterFormToggle).toHaveBeenCalledTimes(1);
+  });
+
   it('renders Sort label from common.sort instead of English literal', () => {
     renderToolbar();
     expect(screen.getByTestId('sort-popover-trigger')).toHaveTextContent('排序');

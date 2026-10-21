@@ -688,3 +688,43 @@ test('marketplace smoke waits for API data and allows cold plugin boot latency',
   assert.match(smoke, /\/api\/marketplace\/plugins/);
   assert.doesNotMatch(smoke, /cards\.first\(\)\)\.toBeVisible\(\{ timeout: 10000 \}\)/);
 });
+
+test('per-plugin mapping is admitted before HTTP and applies only to the exact manifest identity', () => {
+  const script = read('scripts/import-plugins.sh');
+  assert.ok(script.indexOf('identifier_mapping_plan=') < script.indexOf("health='{}'"));
+  assert.match(script, /--plugin-identifier-mapping=\*/);
+  const call = (mode, ...args) => spawnSync('python3', ['scripts/dev/plugin-identifier-mapping.py', mode, ...args], { encoding:'utf8' });
+  const selected = JSON.stringify({'/plugins/contact':'com.example.contact','/plugins/category':'com.example.category'});
+  const planned = call('plan','',selected,'com.example.contact=/mapping/with "quote".json');
+  assert.equal(planned.status,0,planned.stderr);
+  const target=JSON.parse(call('request','/plugins/contact',planned.stdout).stdout);
+  assert.equal(target.identifierMappingPath,'/mapping/with "quote".json');
+  const other=JSON.parse(call('request','/plugins/category',planned.stdout).stdout);
+  assert.equal(Object.hasOwn(other,'identifierMappingPath'),false);
+  assert.equal(target.deferReferenceValidation,true);
+  assert.deepEqual(Object.keys(target).sort(),['autoPublishCommands','autoPublishFields','autoPublishModels','autoPublishPages','conflictStrategy','deferReferenceValidation','identifierMappingPath','path'].sort());
+  for(const specs of [
+    ['','com.example.missing=/mapping.json'],
+    ['','com.example.contact=/one.json','com.example.contact=/two.json'],
+    ['/global.json','com.example.contact=/one.json'],
+    ['','com.example.contact=relative.json'],
+  ]) {
+    assert.equal(call('plan',specs[0],selected,...specs.slice(1)).status,2);
+  }
+  assert.equal(call('request','/plugins/not-selected',planned.stdout).status,2);
+  const legacy=call('plan','/legacy.json','{}');
+  assert.equal(legacy.status,0);
+  assert.equal(JSON.parse(call('request','/plugins/category',legacy.stdout).stdout).identifierMappingPath,'/legacy.json');
+});
+
+
+test('default mapping admission is safe under the supported macOS bash nounset semantics', () => {
+  const script=read('scripts/import-plugins.sh');
+  const start=script.indexOf('if [ "${#PLUGIN_IDENTIFIER_MAPPINGS[@]}" -gt 0 ]; then\n    identifier_mapping_plan=');
+  const end=script.indexOf('\necho "Importing plugins',start);
+  assert.ok(start>0 && end>start);
+  const shell='set -eu; PLUGIN_IDENTIFIER_MAPPINGS=(); IDENTIFIER_MAPPING_PATH=""; selected_mapping_plugins={}; MAPPING_TOOL=scripts/dev/plugin-identifier-mapping.py;\n'+script.slice(start,end)+'\nprintf "%s" "$identifier_mapping_plan"';
+  const result=spawnSync('/bin/bash',['-c',shell],{encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout),{global:'',plugins:{},selected:{}});
+});

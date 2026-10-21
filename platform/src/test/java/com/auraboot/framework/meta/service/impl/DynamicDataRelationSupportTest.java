@@ -102,4 +102,27 @@ class DynamicDataRelationSupportTest {
         assertThatThrownBy(() -> support.removeRelations(relation(false),"o",List.of("i"),42L)).isInstanceOf(MetaServiceException.class);
         verifyNoInteractions(mapper);
     }
+    @org.junit.jupiter.api.AfterEach void clearOwnershipContext() {
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+    }
+    @ParameterizedTest @ValueSource(booleans = {false,true})
+    void directJunctionWritesCannotBypassManagedParentOfUnmarkedTarget(boolean create) {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(1L,7L,null,"system");
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var child=RecordCommandWriterParentTest.childModel("mt_child");
+        var parent=RecordCommandWriterParentTest.parentModel("mt_parent");
+        var guarded=new DynamicDataRelationSupport(mapper,permissions,domains,code -> code.equals("line") ? child : parent);
+        when(mapper.selectRecordWriterTargetsForUpdate(eq("mt_child"),eq("managed_flag"),eq("managed"),anyMap()))
+            .thenReturn(List.of(Map.of("id",7L,"pid","line-a","managed",false)));
+        when(mapper.selectRecordWriterTargetsForUpdate(eq("mt_child"),eq("order_pid"),eq("record_writer_parent_pid"),anyMap()))
+            .thenReturn(List.of(Map.of("record_writer_parent_pid","parent-a")));
+        when(mapper.selectRecordWriterTargetsForUpdate(eq("mt_parent"),eq("managed_flag"),eq("managed"),anyMap()))
+            .thenReturn(List.of(Map.of("managed",true)));
+        var link=relation(true);link.setTargetModel("line");link.setTargetTable("mt_child");
+        assertThatThrownBy(() -> { if (create) guarded.createRelations(link,"owner-a",List.of("line-a"),1L);
+            else guarded.removeRelations(link,"owner-a",List.of("line-a"),1L); }).hasMessageContaining("RECORD_WRITER_DENIED");
+        verify(mapper,never()).insert(anyString(),anyMap());verify(mapper,never()).delete(anyString(),anyMap());
+    }
+
 }

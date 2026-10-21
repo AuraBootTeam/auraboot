@@ -4,6 +4,7 @@
  * Supports chart linkage and drill-down but no editing, dragging, or resizing.
  */
 
+import { widgetContainerStyle } from '../utils/widgetAppearance';
 import React, { useCallback, useRef, useMemo, useState, useEffect } from 'react';
 import GridLayout from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
@@ -213,6 +214,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
                   style={autoHeight ? undefined : { height: authoredHeight }}
                 >
                   <div
+                    style={widgetContainerStyle(widget.config)}
                     className={`${autoHeight ? 'h-auto' : 'h-full'} overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/92 dark:shadow-[0_12px_34px_rgba(0,0,0,0.35)]`}
                   >
                     {renderViewerWidget(widget, autoHeight)}
@@ -238,7 +240,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
         >
           {widgets.map((widget) => (
             <div key={widget.id} data-testid={`dashboard-block-${widget.id}`}>
-              <div className="h-full overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/92 dark:shadow-[0_12px_34px_rgba(0,0,0,0.35)]">
+              <div style={widgetContainerStyle(widget.config)} className="h-full overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/92 dark:shadow-[0_12px_34px_rgba(0,0,0,0.35)]">
                 {renderViewerWidget(widget)}
               </div>
             </div>

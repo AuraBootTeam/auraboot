@@ -161,6 +161,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final SemanticPublishService semanticPublishService;
     private final JdbcTemplate jdbcTemplate;
     private final IdentifierMappingDataMigrator identifierMappingDataMigrator;
+    private final ModelFieldRenameMigrator modelFieldRenameMigrator;
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
@@ -793,15 +794,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
             result.setPluginPid(pluginPid);
 
-            // Import resources in dependency order
-            importResources(context, request, result, pluginPid);
-
-            // Plugin rename upgrade contract: when the request carries an
-            // identifier mapping, migrate legacy-identifier physical-table rows
-            // into the freshly imported identifiers before the import commits.
-            // A migration failure fails the whole import so an upgrade is never
-            // half-applied silently.
-            applyIdentifierDataMigration(request, result, tenantId);
+            // V2 plans own only physical DDL deferral; logical required remains unchanged.
+            try (var migration = modelFieldRenameMigrator.prepare(request.getIdentifierMappingPath(),
+                    identifierMappingRoot(context, request), manifest, tenantId, pluginPid, importId)) {
+                importResources(context, request, result, pluginPid);
+                if (migration.isV2()) result.setFieldMigrations(migration.complete());
+                else applyIdentifierDataMigration(request, result, tenantId);
+            }
 
             // Mark as success
             result.setSuccess(true);
@@ -818,6 +817,9 @@ public class PluginImportServiceImpl implements PluginImportService {
             Map<String, Object> summary = new HashMap<>();
             result.getResourceCounts().forEach((k, v) -> summary.put(k, v));
             history.setResourceSummary(summary);
+            if (result.getFieldMigrations() != null && !result.getFieldMigrations().isEmpty()) {
+                history.setResult(Map.of("modelFieldRenames", result.getFieldMigrations()));
+            }
 
             // Compute plugin quality score
             try {
@@ -866,6 +868,14 @@ public class PluginImportServiceImpl implements PluginImportService {
      * when the request declares one, attaching per-model receipts to the result.
      * Runs inside the import transaction — any failure rolls the whole import back.
      */
+    private java.nio.file.Path identifierMappingRoot(ImportContext context, ImportRequest request) {
+        if (request.getIdentifierMappingPath() == null || request.getIdentifierMappingPath().isBlank()) return null;
+        if (!"directory".equals(context.getHistory().getSourceType())) {
+            throw new IllegalArgumentException("Identifier mapping requires a parsed directory import");
+        }
+        return java.nio.file.Path.of(context.getHistory().getSourceName());
+    }
+
     private void applyIdentifierDataMigration(ImportRequest request, ImportExecuteResult result, Long tenantId) {
         String mappingPath = request.getIdentifierMappingPath();
         if (mappingPath == null || mappingPath.isBlank()) {
@@ -1092,6 +1102,14 @@ public class PluginImportServiceImpl implements PluginImportService {
                 metaModelService.saveDefinition(definition);
             }
         }
+        // Validate the freshly imported database metadata, not an older active release snapshot.
+        Set<String> composedModelCodes = new java.util.LinkedHashSet<>(importedModelCodes);
+        if (manifest.getModelFieldBindings() != null) {
+            for (var binding : manifest.getModelFieldBindings()) {
+                if (binding.isValid()) composedModelCodes.add(binding.getModelCode());
+            }
+        }
+        com.auraboot.framework.plugin.validation.PluginModelOwnershipImportGate.validate(metaModelService, composedModelCodes);
 
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
@@ -1461,6 +1479,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw new PluginException("Can only rollback successful imports");
         }
 
+        modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
         if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
             throw new PluginException("Rollback tenant does not match import owner");
         }
