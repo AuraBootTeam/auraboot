@@ -55,6 +55,10 @@ async function narrow(page: Page, prefix: string, selected: Locator, edit: () =>
     'data-layout',
     'wide',
   );
+  // App navigation animates when returning from a mobile viewport. Capture the settled UI.
+  await expect
+    .poll(async () => (await page.getByTestId('sidebar').boundingBox())!.x)
+    .toBeCloseTo(0, 0);
 }
 
 test('NR Dashboard: balanced DSL → narrow editing → save/publish → real results', async ({
@@ -114,7 +118,11 @@ test('NR Dashboard: balanced DSL → narrow editing → save/publish → real re
   await page.getByTestId('toolbar-btn-presentation').click();
   await expect(page.getByTestId('big-screen-mode')).toBeVisible();
   // ECharts paints its title into Canvas; persisted config above proves the title.
-  await expect(page.getByTestId('big-screen-mode').locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]')).toBeVisible();
+  await expect(
+    page
+      .getByTestId('big-screen-mode')
+      .locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]'),
+  ).toBeVisible();
   await expect(page.getByTestId('big-screen-mode')).toContainText('华辰制造');
   await expect(page.getByTestId('big-screen-mode')).toContainText('当前逾期');
   await shot(page, 'CF-dashboard-runtime');
@@ -185,6 +193,13 @@ test('NR Report: formal DSL → narrow Schema edit → save/reopen → three exp
       format === 'pdf'
         ? execFileSync('pdftotext', ['-layout', path, '-'], { encoding: 'utf8' })
         : await readFile(path, 'utf8');
+    if (format === 'pdf') {
+      const info = execFileSync('pdfinfo', [path], { encoding: 'utf8' });
+      const pages = Number(info.match(/^Pages:\s+(\d+)/m)?.[1]);
+      // This bounded seven-acceptance review should not orphan a compact chart on page four.
+      expect(pages).toBeGreaterThan(0);
+      expect(pages).toBeLessThanOrEqual(3);
+    }
     expect(content).toContain('华辰制造');
     expect(content).toContain('SLA');
     if (format !== 'markdown') {

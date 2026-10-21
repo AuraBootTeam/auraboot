@@ -284,3 +284,26 @@ it('prints business total labels and explicit currency in tables and pivot total
   expect(result.html).not.toContain('>Total<');
   expect(result.html.match(/¥68,000.50/g)?.length).toBeGreaterThanOrEqual(5);
 });
+
+it('honors configured chart dimensions and prints its title once', () => {
+  const result = renderReportToPrintDocument(
+    {
+      body: [
+        {
+          blockType: 'chart',
+          title: '各项目验收金额',
+          chartType: 'horizontal-bar',
+          dataSource: 'delivery',
+          categoryField: 'project',
+          valueField: 'amount',
+          width: 600,
+          height: 180,
+        },
+      ],
+    },
+    { delivery: [{ project: '华辰', amount: 68000 }] },
+  );
+  expect(result.html).toContain('width="600"');
+  expect(result.html).toContain('height="180"');
+  expect(result.html.match(/各项目验收金额/g)).toHaveLength(1);
+});

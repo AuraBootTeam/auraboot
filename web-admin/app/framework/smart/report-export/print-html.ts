@@ -120,7 +120,11 @@ function renderChart(block: ReportPrintBlock, dataSets: PrintDataSets): string {
   // Aggregate by category (matches the backend) before plotting, so an aggregated
   // chart over un-aggregated rows renders correct values, not duplicate bars.
   const rows = aggregateChartRows(block, rowsFor(block, dataSets));
-  const svg = renderReportChartSvg(spec, rows); // trusted, self-generated
+  // The section owns the heading; honor the designer's physical chart dimensions.
+  const svg = renderReportChartSvg({ ...spec, title: undefined }, rows, {
+    width: block.width,
+    height: block.height,
+  }); // trusted, self-generated
   return `<section class="block chart">${renderBlockTitle(block.title)}<div class="chart-canvas">${svg}</div></section>`;
 }
 

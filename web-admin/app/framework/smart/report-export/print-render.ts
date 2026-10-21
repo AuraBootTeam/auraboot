@@ -62,7 +62,8 @@ function valueFieldOf(block: ReportChartBlock): string {
  */
 export function reportChartBlockToChartSpec(block: ReportChartBlock): ChartSpec {
   const rawType = block.chartType ?? block.config?.chartType ?? 'bar';
-  const type: ChartSpecType = isChartSpecType(rawType) ? rawType : 'bar';
+  const type: ChartSpecType =
+    rawType === 'horizontal-bar' ? 'bar' : isChartSpecType(rawType) ? rawType : 'bar';
 
   const categoryField = categoryFieldOf(block);
   const valueField = valueFieldOf(block);
@@ -81,7 +82,10 @@ export function reportChartBlockToChartSpec(block: ReportChartBlock): ChartSpec 
     dataSource: { type: 'static' },
     dimensions,
     measures: [{ field: valueField }],
-    visual: { dataLabels: true },
+    visual: {
+      dataLabels: true,
+      ...(rawType === 'horizontal-bar' ? { orientation: 'horizontal' as const } : {}),
+    },
   };
 }
 

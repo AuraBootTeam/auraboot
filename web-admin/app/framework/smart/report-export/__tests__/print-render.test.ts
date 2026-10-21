@@ -145,3 +145,13 @@ describe('renderBarcodeSvg (real CODE128 barcode, no DOM)', () => {
     expect(ean).toContain('5901234123457');
   });
 });
+
+it('maps the report horizontal-bar alias to the shared horizontal chart contract', () => {
+  expect(
+    reportChartBlockToChartSpec({
+      chartType: 'horizontal-bar',
+      categoryField: 'project',
+      valueField: 'amount',
+    }),
+  ).toMatchObject({ type: 'bar', visual: { orientation: 'horizontal' } });
+});
