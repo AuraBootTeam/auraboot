@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getRuntimeComponentEntry } from '../runtime-component-loaders';
 
 describe('runtime component loaders', () => {
@@ -58,4 +58,19 @@ describe('runtime component loaders', () => {
     expect(getRuntimeComponentEntry('TeamMembersBlock')).toBeDefined();
     expect(getRuntimeComponentEntry('team-members')).toBeDefined();
   });
+});
+
+vi.mock('~/framework/meta/registry/components/ComponentRuntimeManifest', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/framework/meta/registry/components/ComponentRuntimeManifest')>();
+  return { ...actual, COMPONENT_RUNTIME_MANIFEST: { ...actual.COMPONENT_RUNTIME_MANIFEST,
+    'test-only-module': { modulePath: '../../../../ui/smart/organization/__tests__/TeamMembersBlock.i18n.test.tsx',
+      componentName: 'TestOnlyModule', exportName: 'default' },
+  } };
+});
+vi.mock('~/framework/bootstrap', () => ({ getKernel: () => ({
+  contributionRegistry: { getComponentLoader: () => undefined },
+}) }));
+it('does not expose a test module even when a manifest attempts to register it', () => {
+  expect(getRuntimeComponentEntry('TestOnlyModule')).toBeUndefined();
+  expect(getRuntimeComponentEntry('test-only-module')).toBeUndefined();
 });

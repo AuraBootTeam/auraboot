@@ -1,10 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 import { test, expect } from '../../fixtures';
+import { requireRuntimeUrl } from '../../helpers/environments';
 import { uniqueId } from '../helpers';
 import {
   makeQuoteRoleUser,
@@ -25,6 +27,168 @@ import {
 const QUOTE_LIST = '/p/qo_quote_common';
 const uid = uniqueId('w2b').replace(/_/g, '-');
 const users: Record<string, QuoteRoleUser> = {};
+
+test('restored material snapshot exposes matching counts and sync state through read-only APIs', async ({ browser }, testInfo) => {
+  const manifestFile = process.env.BOM_KINGDEE_MATERIAL_SNAPSHOT_MANIFEST;
+  const pluginsRoot = process.env.AURA_PLUGINS_PROJECT_ROOT;
+  const baseURL = testInfo.project.use.baseURL;
+  expect(manifestFile, 'The original release must bind its approved development material snapshot').toBeTruthy();
+  expect(baseURL).toBeTruthy();
+  expect(pluginsRoot).toBeTruthy();
+  expect(requireRuntimeUrl('base')).toBeTruthy();
+  expect(new URL(baseURL!).origin).toBe(new URL(requireRuntimeUrl('base')!).origin);
+  const bytes = fs.readFileSync(manifestFile!);
+  const manifest = JSON.parse(bytes.toString('utf8'));
+  expect(manifest.masterRows).toBeGreaterThan(0);
+  expect(manifest.failedRows).toBe(0);
+  const expectedFinished = manifest.sourceDump.kingdeeSyncState.lastSuccessfulSyncAt;
+  expect(expectedFinished, 'Snapshot provenance must make its timestamp timezone explicit').toMatch(/(?:Z|[+-]\d{2}:\d{2})$/);
+  const { normalizeInstant } = await import(pathToFileURL(path.join(pluginsRoot!,
+    'bom-standardization/scripts/kingdee-material-snapshot.mjs')).href);
+  const toInstant = (value: unknown) => {
+    expect(typeof value).toBe('string');
+    const date = Date.parse(normalizeInstant(String(value), 'sync state timestamp'));
+    expect(Number.isFinite(date)).toBe(true);
+    return date;
+  };
+  const context = await browser.newContext({ baseURL,
+    storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+  const evidence: unknown[] = [];
+  try {
+    const list = async (model: string, pageSize: number, filters: unknown[] = []) => {
+      const url = `/api/dynamic/${model}/list?pageNum=1&pageSize=${pageSize}&filters=${encodeURIComponent(JSON.stringify(filters))}`;
+      const response = await context.request.get(url);
+      const body = await response.json();
+      evidence.push({ method: 'GET', target: response.url(), status: response.status(), body });
+      expect(response.status()).toBe(200);
+      expect(String(body.code)).toBe('0');
+      expect(Array.isArray(body.data.records)).toBe(true);
+      return body.data;
+    };
+    const materials = await list('bom_material_master', 1,
+      [{ fieldName: 'bom_mm_source_type', operator: 'EQ', value: 'KINGDEE' }]);
+    expect(materials.records[0].bom_mm_source_type).toBe('KINGDEE');
+    expect(Number(materials.total)).toBe(manifest.masterRows);
+    const states = await list('bom_material_sync_state', 100);
+    expect(Number(states.total)).toBe(states.records.length);
+    const succeeded = states.records.filter((row: Record<string, unknown>) =>
+      row.bom_mss_source_type === 'KINGDEE' && row.bom_mss_last_status === 'succeeded');
+    expect(succeeded.length).toBeGreaterThan(0);
+    const latest = succeeded.reduce((left: Record<string, unknown>, right: Record<string, unknown>) =>
+      toInstant(left.bom_mss_last_finished_at) >= toInstant(right.bom_mss_last_finished_at) ? left : right);
+    expect(toInstant(latest.bom_mss_last_finished_at)).toBe(toInstant(expectedFinished));
+    expect(Number(latest.bom_mss_last_failed_count)).toBe(0);
+    expect(latest.bom_mss_last_error_message ?? '').toBe('');
+  } finally {
+    await testInfo.attach('restored-material-read-only-api-proof', {
+      body: JSON.stringify({ runtime: process.env.AURA_RUNTIME_NAME, snapshotId: manifest.snapshotId,
+        snapshotSha256: createHash('sha256').update(bytes).digest('hex'), expectedFinished,
+        expectedMasterRows: manifest.masterRows, evidence }, null, 2), contentType: 'application/json',
+    });
+    await context.close();
+  }
+});
+
+test('plugin page import API publishes only explicitly imported source revisions', async ({ browser }, testInfo) => {
+  const quoteRoot = process.env.AURA_QUOTE_ROOT;
+  const pluginsRoot = process.env.AURA_PLUGINS_PROJECT_ROOT;
+  const runtime = process.env.AURA_RUNTIME_NAME;
+  const baseURL = testInfo.project.use.baseURL;
+  for (const value of [quoteRoot, pluginsRoot, runtime, baseURL, requireRuntimeUrl('base')]) {
+    expect(value, 'The original gate must supply its exact source roots, runtime and target').toBeTruthy();
+  }
+  expect(new URL(baseURL!).origin).toBe(new URL(requireRuntimeUrl('base')!).origin);
+  const namespace = `x02${uniqueId('import').replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
+  const pageKey = `${namespace}_runtime_list`;
+  const fixture = path.join(quoteRoot!, '.workspace', 'e2e-fixtures', namespace);
+  fs.mkdirSync(path.join(fixture, 'config'), { recursive: true });
+  const original = JSON.parse(fs.readFileSync(path.join(pluginsRoot!, 'bom-standardization/config/pages.json'), 'utf8'))[0];
+  expect(original.modelCode).toBe('req_requirement_set_pcba_bom');
+  const table = original.blocks.find((block: { blockType: string }) => block.blockType === 'table');
+  expect(table).toBeTruthy();
+  const schema = { ...original, pageKey, 'name:zh-CN': '页面导入验证', 'name:en': 'Page import verification',
+    blocks: [{ ...table, columns: table.columns.filter((column: { isActionColumn?: boolean }) => !column.isActionColumn) }] };
+  const sourceFile = path.join(fixture, 'config', 'pages.json');
+  fs.writeFileSync(path.join(fixture, 'plugin.json'), JSON.stringify({
+    pluginId: `com.auraboot.test.${namespace}`, namespace, version: '1.0.0', dslVersion: 1,
+    pluginType: 'config', displayName: 'Page import API evidence', minPlatformVersion: '1.0.0',
+    dependencies: ['com.auraboot.bom-standardization'], resourceDirs: { pages: 'config/pages.json' },
+  }, null, 2));
+  const writeRevision = async (revision: 'a' | 'b') => {
+    schema.blocks[0].id = `${namespace}_published_${revision}`;
+    const bytes = JSON.stringify([schema], null, 2);
+    fs.writeFileSync(sourceFile, bytes);
+    await testInfo.attach(`page-source-${revision}`, { body: bytes, contentType: 'application/json' });
+  };
+  const context = await browser.newContext({ baseURL,
+    storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+  const evidence: unknown[] = [];
+  try {
+    const importPage = async () => {
+      const payload = { path: fixture, conflictStrategy: 'OVERWRITE', autoPublishModels: true,
+        autoPublishFields: true, autoPublishCommands: true, autoPublishPages: true, deferReferenceValidation: true };
+      const response = await context.request.post('/api/plugins/import/import-directory-sync', { data: payload });
+      const body = await response.json();
+      evidence.push({ operation: 'import', runtime, target: response.url(), payload, status: response.status(), body });
+      expect(response.status()).toBe(200);
+      expect(body.success).toBe(true);
+    };
+    const expectRevision = async (phase: string, revision: 'a' | 'b') => {
+      const response = await context.request.get(`/api/pages/key/${pageKey}`);
+      const body = await response.json();
+      evidence.push({ operation: 'read-runtime-page', phase, runtime, target: response.url(), status: response.status(), body });
+      expect(response.status()).toBe(200);
+      expect(String(body.code)).toBe('0');
+      expect(body.data.pageKey).toBe(pageKey);
+      expect(body.data.blocks[0].id).toBe(`${namespace}_published_${revision}`);
+    };
+    await writeRevision('a');
+    await importPage();
+    await expectRevision('initial-import', 'a');
+    await writeRevision('b');
+    await expectRevision('source-changed-without-import', 'a');
+    await importPage();
+    await expectRevision('explicit-reimport', 'b');
+  } finally {
+    try {
+      const pluginsResponse = await context.request.get('/api/plugins');
+      expect(pluginsResponse.status()).toBe(200);
+      const plugins = await pluginsResponse.json();
+      expect(String(plugins.code)).toBe('0');
+      const owned = plugins.data.filter((plugin: { pluginId: string }) => (
+        plugin.pluginId === `com.auraboot.test.${namespace}`
+      ));
+      expect(owned.length, 'the unique import fixture must never resolve to multiple plugins').toBeLessThanOrEqual(1);
+      if (owned.length === 1) {
+        const pluginPid = owned[0].pid;
+        const uninstall = await context.request.post(`/api/plugins/${pluginPid}/uninstall`, {
+          data: { removeData: false, force: false, decisions: { [pageKey]: 'DELETE' } },
+        });
+        const uninstalled = await uninstall.json();
+        evidence.push({ operation: 'withdraw-owned-fixture', status: uninstall.status(), body: uninstalled });
+        expect(uninstall.status()).toBe(200);
+        expect(uninstalled.success).toBe(true);
+        expect(uninstalled.deletedResources).toEqual([pageKey]);
+        const disable = await context.request.post(`/api/plugins/${pluginPid}/disable`);
+        const disabled = await disable.json();
+        expect(disable.status()).toBe(200);
+        expect(String(disabled.code)).toBe('0');
+        const reread = await context.request.get(`/api/plugins/${pluginPid}`);
+        const persisted = await reread.json();
+        evidence.push({ operation: 'reread-retired-fixture', status: reread.status(), body: persisted });
+        expect(reread.status()).toBe(200);
+        expect(persisted.data.pluginId).toBe(`com.auraboot.test.${namespace}`);
+        expect(persisted.data.status).toBe('stopped');
+      }
+    } finally {
+      await testInfo.attach('page-import-api-boundary', {
+        body: JSON.stringify({ fixture, pageKey, runtime, evidence }, null, 2), contentType: 'application/json',
+      });
+      await context.close();
+      fs.rmSync(fixture, { recursive: true });
+    }
+  }
+});
 
 function findSampleBom(): string | undefined {
   const rel = 'aura-quote/docs/ref/10款GERBER加坐标';

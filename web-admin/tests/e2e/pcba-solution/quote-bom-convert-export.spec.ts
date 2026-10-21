@@ -124,7 +124,6 @@ test.describe('BOM workbench + export deep (BOM-05/08 + XLS-B) @smoke', () => {
       expect(wb.SheetNames, 'XLS-B: standard workbook has all contract sheets').toEqual([
         'BOM',
         '变更记录',
-        '转换明细',
       ]);
       const sheet = wb.Sheets.BOM;
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];

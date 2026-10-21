@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { test, expect } from '../../fixtures';
-import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator, executeCommandViaApi } from '../helpers';
+import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator, executeCommandViaApi, waitForFormReady } from '../helpers';
 import {
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
@@ -1431,6 +1431,8 @@ test('dashboard management capability governs customer 360 editing and revocatio
       await settings.locator('textarea').fill(value);
       await settings.getByRole('button', { name: '保存', exact: true }).click();
       await expect(settings).toHaveCount(0);
+      const historyRefreshing = member.waitForResponse(response => new URL(response.url()).origin === origin
+        && new URL(response.url()).pathname === versionsEndpoint && response.request().method() === 'GET');
       const saving = member.waitForResponse(response => new URL(response.url()).origin === origin
         && new URL(response.url()).pathname === endpoint && response.request().method() === 'PUT');
       await member.getByTestId('designer-toolbar-btn-save').click();
@@ -1438,6 +1440,9 @@ test('dashboard management capability governs customer 360 editing and revocatio
       expect(saved.status()).toBe(200);
       expect(saved.request().postDataJSON().description).toBe(value);
       expect(String((await saved.json()).code)).toBe('0');
+      const refreshed = await historyRefreshing;
+      expect(refreshed.status()).toBe(200);
+      expect(String((await refreshed.json()).code)).toBe('0');
       const readback = await member.request.get(endpoint);
       expect(readback.status()).toBe(200);
       const body = await readback.json();
@@ -1457,7 +1462,7 @@ test('dashboard management capability governs customer 360 editing and revocatio
     const rollbackEndpoint = `${versionsEndpoint}/${firstVersion.pid}/rollback`;
     const historyLoading = member.waitForResponse(response => new URL(response.url()).origin === origin
       && new URL(response.url()).pathname === versionsEndpoint && response.request().method() === 'GET');
-    await member.getByTestId('designer-toolbar').getByRole('button', { name: /^History/ }).click();
+    await member.getByTestId('designer-toolbar').getByRole('button', { name: /^(?:History|版本历史)/ }).click();
     const historyResponse = await historyLoading;
     expect(historyResponse.status()).toBe(200);
     expect(String((await historyResponse.json()).code)).toBe('0');
@@ -1968,6 +1973,7 @@ for (const domain of ['catalog', 'board', 'rfq', 'dfm', 'margin', 'model'] as co
         const reorderHandle = member.getByRole('row').filter({ hasText: bindingFieldCode }).getByTestId('model-field-reorder');
         const initialPosition = await reorderHandle.boundingBox();
         expect(initialPosition).not.toBeNull();
+        await expect(reorderHandle).toHaveAttribute('aria-describedby', /\S+/);
         await reorderHandle.focus();
         await reorderHandle.press('Space');
         await expect(reorderHandle).toHaveAttribute('aria-pressed', 'true');
@@ -1992,6 +1998,7 @@ for (const domain of ['catalog', 'board', 'rfq', 'dfm', 'margin', 'model'] as co
       }
       for (const form of forms) {
         await member.goto(`/p/${form.model}/edit/${form.pid}?commandCode=${encodeURIComponent(form.command)}`);
+        await waitForFormReady(member);
         const input = member.getByTestId(`form-field-${form.field}`).locator('input, textarea');
         await expect(input).toBeVisible();
         if (form.referenceField) {
@@ -2008,6 +2015,7 @@ for (const domain of ['catalog', 'board', 'rfq', 'dfm', 'margin', 'model'] as co
         expect(String((await saved.json()).code)).toBe('0');
         expect(String(saved.request().postDataJSON().payload[form.field])).toBe(form.value);
         await member.goto(`/p/${form.model}/edit/${form.pid}?commandCode=${encodeURIComponent(form.command)}`);
+        await waitForFormReady(member);
         await expect(member.getByTestId(`form-field-${form.field}`).locator('input, textarea')).toHaveValue(form.value);
         if (form.referenceField) {
           await expect(member.getByTestId(`select-trigger-${form.referenceField}`)).toBeVisible();

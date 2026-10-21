@@ -126,15 +126,6 @@ export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
 export const EXPLICIT_BACKEND_URL = process.env.BACKEND_URL;
 export const EXPLICIT_SPRING_BOOT_URL = process.env.SPRING_BOOT_URL;
 
-/** Require an explicitly owned runtime URL for tests that must never use host defaults. */
-export function requireRuntimeUrl(target: 'base' | 'backend'): string {
-  const key = target === 'base' ? 'PLAYWRIGHT_BASE_URL' : 'BACKEND_URL';
-  const value = process.env[key];
-  if (!value?.trim()) {
-    throw new Error(`[E2E env] ${key} must explicitly identify the owned test runtime`);
-  }
-  return value;
-}
 
 export const BOOTSTRAP_COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
 export const SETUP_TENANT_ID = process.env.AURA_ADMIN_TENANT_ID;
@@ -146,6 +137,16 @@ export const BACKEND_URL =
 /** Vite-served base — what `page.goto` and `page.request` use by default. */
 export const BASE_URL =
   EXPLICIT_BASE_URL ?? `http://localhost:${VITE_PORT}`;
+
+/** Require an explicitly owned runtime URL for tests that must never use host defaults. */
+export function requireRuntimeUrl(target: 'base' | 'backend'): string {
+  const key = target === 'base' ? 'PLAYWRIGHT_BASE_URL' : 'BACKEND_URL';
+  const value = process.env[key];
+  if (!value?.trim()) {
+    throw new Error(`[E2E env] ${key} must explicitly identify the owned test runtime`);
+  }
+  return value;
+}
 
 /** Remix BFF base — for specs that need to drive `/login` or BFF-specific endpoints directly. */
 export const BFF_URL =
