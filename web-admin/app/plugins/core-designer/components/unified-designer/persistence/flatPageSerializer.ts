@@ -389,10 +389,14 @@ function applyCommonShape(
   if (typeof layout.rowSpan === 'number') flat.rowSpan = layout.rowSpan;
   if (block.dataSource !== undefined) flat.dataSource = unwrapDataSourceRef(block.dataSource);
   const props = { ...(residualProps ?? {}) };
-  for (const key of ['area', 'description'] as const) {
-    const value = props[key] ?? block.props?.[key];
-    if (value !== undefined) flat[key] = value;
-    delete props[key];
+  // Structural blocks store common metadata at the top level. Passthrough
+  // blocks retain explicit props and same-named top-level keys independently.
+  if (!PASSTHROUGH_BLOCK_TYPES.has(block.blockType)) {
+    for (const key of ['area', 'description'] as const) {
+      const value = props[key] ?? block.props?.[key];
+      if (value !== undefined) flat[key] = value;
+      delete props[key];
+    }
   }
   if (block.extension !== undefined) flat.extension = { ...block.extension };
   const residualLayout = { ...layout };

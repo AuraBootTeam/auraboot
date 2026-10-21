@@ -1730,6 +1730,7 @@ function ListPageContentInner(props: PageContentProps) {
               tabCondition,
               params?.filters,
               params?.chipFilters ?? chipFiltersRef.current,
+              modelFieldMapRef.current,
             );
             if (filtersParam) {
               queryParams.filters = filtersParam;
