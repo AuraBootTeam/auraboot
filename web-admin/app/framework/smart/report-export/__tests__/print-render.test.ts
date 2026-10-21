@@ -155,3 +155,18 @@ it('maps the report horizontal-bar alias to the shared horizontal chart contract
     }),
   ).toMatchObject({ type: 'bar', visual: { orientation: 'horizontal' } });
 });
+
+it('keeps the full horizontal value label inside the printed SVG', () => {
+  const spec = reportChartBlockToChartSpec({
+    chartType: 'horizontal-bar',
+    categoryField: 'project',
+    valueField: 'amount',
+  });
+  const svg = renderReportChartSvg(spec, [{ project: '华辰制造', amount: 196000.01 }], {
+    width: 600,
+    height: 180,
+  });
+  const text = svg.match(/<text[^>]*transform="translate\(([\d.]+)[^>]*>196000\.01<\/text>/);
+  expect(text).not.toBeNull();
+  expect(Number(text![1]) + '196000.01'.length * 7).toBeLessThanOrEqual(600);
+});

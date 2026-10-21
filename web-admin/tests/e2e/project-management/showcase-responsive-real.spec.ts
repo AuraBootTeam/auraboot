@@ -154,6 +154,7 @@ test('NR Report: formal DSL → narrow Schema edit → save/reopen → three exp
   const totalLabel = '验收金额合计（元）';
   await narrow(page, 'report', page.getByTestId('drag-handle-status-amount'), async () => {
     await page.getByTestId('schema-config-field-totalLabel').getByRole('textbox').fill(totalLabel);
+    await page.getByTestId('schema-config-field-totalLabel').getByRole('textbox').press('Tab');
   });
   await expect(page.getByTestId('schema-config-field-totalLabel').getByRole('textbox')).toHaveValue(
     totalLabel,

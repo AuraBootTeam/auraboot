@@ -172,6 +172,20 @@ export function renderReportChartSvg(
   opts: RenderChartSvgOptions = {},
 ): string {
   const option = chartSpecToEChartsOption(spec, rows);
+  // A printed SVG cannot reveal text beyond its viewport on hover. Reserve room
+  // for right-aligned horizontal value labels instead of clipping the final digits.
+  if (
+    spec.visual?.orientation === 'horizontal' &&
+    spec.visual?.dataLabels &&
+    option.grid &&
+    !Array.isArray(option.grid)
+  ) {
+    const characters = Math.max(
+      1,
+      ...rows.map((row) => String(row[spec.measures[0]?.field] ?? '').length),
+    );
+    option.grid = { ...option.grid, right: Math.max(80, characters * 8 + 16) };
+  }
   const chart = echarts.init(null as unknown as HTMLElement, null, {
     renderer: 'svg',
     ssr: true,
