@@ -50,6 +50,9 @@ test('PK complete business entry and secondary professional actions navigate thr
       await expect(page.getByRole('main')).toContainText('客户交付经营复盘');
     await start(page);
   }
+  await page.getByRole('main').getByRole('button', { name: '专业配置与诊断', exact: true }).click();
+  await page.getByRole('main').getByRole('button', { name: '返回开始体验', exact: true }).click();
+  await expect(page.getByRole('main')).toContainText('把一次客户交付完整跑通');
   const professional: [string, string][] = [
     ['数据模型', '/meta/models'],
     ['页面设计', '/p/page_schema'],
