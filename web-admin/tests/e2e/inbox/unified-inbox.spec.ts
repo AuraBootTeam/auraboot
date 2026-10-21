@@ -11,6 +11,8 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { provisionOwnedTenantUser } from '../../helpers/owned-tenant-user';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 test.describe('Unified Inbox', () => {
   let inboxAvailable = true;
@@ -146,30 +148,26 @@ test.describe('Unified Inbox', () => {
     expect(response.status()).toBe(200);
   });
 
-  test('empty state shows when no items', async ({ page }) => {
-    test.fixme(true, 'Inbox filter combination not reliably producing empty state');
-    // Navigate with a filter combination likely to return 0 results
-    // Click alert tab first, then "closed" status
-    const alertResponsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/inbox') &&
-        resp.url().includes('itemType=alert') &&
-        resp.request().method() === 'GET',
-    );
-    await page.getByTestId('inbox-tab-alert').click();
-    await alertResponsePromise;
-
-    const closedResponsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/inbox') && resp.request().method() === 'GET',
-    );
-    await page.getByTestId('inbox-status-closed').click();
-    await closedResponsePromise;
-
-    // Either shows items or empty state
-    const hasItems = await page.getByTestId(/^inbox-item-/).count();
-    if (hasItems === 0) {
-      await expect(page.getByTestId('inbox-empty-state')).toBeVisible();
-      await expect(page.getByText('No items to show')).toBeVisible();
+  test('empty state shows when no items', async ({ page, browser, baseURL }) => {
+    const actor = await provisionOwnedTenantUser(page, 'inbox_empty', ['viewer']);
+    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const ownPage = await context.newPage();
+    try {
+      await loginViaUI(ownPage, actor.email, actor.password);
+      const loaded = ownPage.waitForResponse(response =>
+        new URL(response.url()).pathname === '/api/inbox' && response.request().method() === 'GET');
+      await ownPage.goto('/inbox');
+      const response = await loaded;
+      expect(response.ok()).toBe(true);
+      const body = await response.json();
+      expect(String(body.code)).toBe('0');
+      expect(body.data.records).toEqual([]);
+      expect(body.data.total).toBe(0);
+      await expect(ownPage.getByTestId('inbox-empty-state')).toBeVisible();
+      await expect(ownPage.getByText('No items to show')).toBeVisible();
+      await expect(ownPage.getByTestId(/^inbox-item-/)).toHaveCount(0);
+    } finally {
+      await context.close();
     }
   });
 

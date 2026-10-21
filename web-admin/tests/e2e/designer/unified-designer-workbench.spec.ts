@@ -4722,10 +4722,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): repeater/subform blocks have no flat v4 representation,
-  // so persisting them fails fast by design. These journeys need either a v4
-  // repeater/subform block contract or a designer placement restriction.
-  test.fixme('UDW-038: drags a repeater into a form and submits edited rows from runtime preview', async ({
+  test('UDW-038: drags a repeater into a form and submits edited rows from runtime preview', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -4834,7 +4831,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persistedRepeater = findBlockById(persisted.blocks ?? [], repeaterId);
     expect(persistedRepeater).toMatchObject({
       blockType: 'repeater',
-      title: repeaterTitle,
+      title: expect.objectContaining({ 'zh-CN': repeaterTitle }),
       props: expect.objectContaining({
         rows: [{ [fieldCode]: initialLineValue }],
       }),
@@ -4848,10 +4845,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): repeater/subform blocks have no flat v4 representation,
-  // so persisting them fails fast by design. These journeys need either a v4
-  // repeater/subform block contract or a designer placement restriction.
-  test.fixme('UDW-039: drags a nested subform into a form and submits row editor values', async ({
+  test('UDW-039: drags a nested subform into a form and submits row editor values', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -4963,7 +4957,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persistedSubform = findBlockById(persisted.blocks ?? [], subformId);
     expect(persistedSubform).toMatchObject({
       blockType: 'subform',
-      title: subformTitle,
+      title: expect.objectContaining({ 'zh-CN': subformTitle }),
       props: expect.objectContaining({
         rows: [{ [fieldCode]: initialMemberValue }],
       }),
@@ -5091,11 +5085,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): this journey authors blocks that have no flat v4
-  // representation in their current placement, so persistence now fails fast
-  // by design (see flatPageSerializer.ts). Needs a product decision: extend
-  // the v4 dialect or restrict the designer placement.
-  test.fixme('UDW-042: designs detail complex blocks and verifies saved runtime output', async ({
+  test('UDW-042: designs detail complex blocks and verifies saved runtime output', async ({
     page,
   }) => {
     expect(detailPagePid).toBeTruthy();
@@ -5247,30 +5237,27 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persisted = await readPage(page, detailPagePid);
     expect(findBlockById(persisted.blocks ?? [], subTableId)).toMatchObject({
       blockType: 'sub-table',
-      title: detailSubTableTitle,
+      title: expect.objectContaining({ 'zh-CN': detailSubTableTitle }),
       props: expect.objectContaining({ rows: [{ [fieldCode]: subTablePreviewValue }] }),
     });
     expect(findBlockById(persisted.blocks ?? [], repeaterId)).toMatchObject({
       blockType: 'repeater',
-      title: detailRepeaterTitle,
+      title: expect.objectContaining({ 'zh-CN': detailRepeaterTitle }),
       props: expect.objectContaining({ rows: [{ [fieldCode]: repeaterPreviewValue }] }),
     });
     expect(findBlockById(persisted.blocks ?? [], subformId)).toMatchObject({
       blockType: 'subform',
-      title: detailSubformTitle,
+      title: expect.objectContaining({ 'zh-CN': detailSubformTitle }),
       props: expect.objectContaining({ rows: [{ [fieldCode]: subformPreviewValue }] }),
     });
-    expect(findBlockById(persisted.blocks ?? [], actionId)).toMatchObject({
-      blockType: 'action',
-      actionType: 'command',
-      props: expect.objectContaining({
-        label: detailActionLabel,
-        command: detailCommandCode,
-      }),
+    expect(findBlockById(persisted.blocks ?? [], actionBarId)).toMatchObject({
+      blockType: 'toolbar',
+      buttons: expect.arrayContaining([expect.objectContaining({
+        label: detailActionLabel, command: detailCommandCode,
+      })]),
     });
     expect(findBlockById(persisted.blocks ?? [], widgetId)).toMatchObject({
-      blockType: 'widget',
-      widgetType: 'number-card',
+      blockType: 'stat-card',
       props: expect.objectContaining({
         title: detailWidgetTitle,
         value: detailWidgetValue,
@@ -5321,20 +5308,22 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): this journey authors blocks that have no flat v4
-  // representation in their current placement, so persistence now fails fast
-  // by design (see flatPageSerializer.ts). Needs a product decision: extend
-  // the v4 dialect or restrict the designer placement.
-  test.fixme('UDW-043: drags a new widget onto a dashboard and persists runtime rendering', async ({
+  test('UDW-043: drags a new widget onto a dashboard and persists runtime rendering', async ({
     page,
   }) => {
     expect(dashboardPagePid).toBeTruthy();
 
+    const original = await readPage(page, dashboardPagePid);
+    const positiveDashboardPid = await createPageResource(page, {
+      name: `UDW dashboard positive ${uid}`, pageKey: `udw_dashboard_positive_${uid}`,
+      title: 'Dashboard widget authoring', kind: 'dashboard', modelCode, schemaVersion: 3,
+      blocks: original.blocks,
+    });
     const newWidgetId = 'widget_new_widget';
     const newWidgetTitle = `Palette widget ${uid}`;
     const newWidgetMarkdown = `Dashboard palette widget ${uid}`;
 
-    await page.goto(`/unified-designer?pageId=${dashboardPagePid}`, {
+    await page.goto(`/unified-designer?pageId=${positiveDashboardPid}`, {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
@@ -5359,7 +5348,16 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-layout.h').fill('2');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
-    await expectDashboardSaveRefused(page, dashboardPagePid);
+    await saveDesignerPage(page, positiveDashboardPid);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+    await page.getByTestId(`outline-item-${newWidgetId}`).click();
+    await expect(page.getByTestId('inspector-field-props.markdown')).toHaveValue(newWidgetMarkdown);
+    const persisted = await readPage(page, positiveDashboardPid);
+    expect(findBlockById(persisted.blocks ?? [], newWidgetId)).toMatchObject({
+      blockType: 'widget', widgetType: 'markdown',
+      props: expect.objectContaining({ title: newWidgetTitle, markdown: newWidgetMarkdown }),
+    });
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
@@ -5516,16 +5514,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`runtime-action-overlay-${actionId}`)).toContainText(actionTitle);
   });
 
-  // FIXME(designer-v4): dashboard-kind pages refuse flat-v4 persistence by
-  // design (dashboards live in ab_dashboard), so saved-grid assertions cannot
-  // pass until the dashboard persistence story lands.
-  test.fixme('UDW-044: moves dashboard widgets by browser drag and rejects overlap', async ({ page }) => {
+  test('UDW-044: moves dashboard widgets by browser drag and rejects overlap', async ({ page }) => {
     const movePageKey = `udw_v3_dashboard_move_${uid}`;
     const moveDashboardPid = await createPageResource(page, {
       name: `UDW V3 Dashboard Move ${uid}`,
       pageKey: movePageKey,
       title: `UDW V3 Dashboard Move ${uid}`,
-      kind: 'detail',
+      kind: 'dashboard',
       modelCode,
       schemaVersion: 3,
       blocks: [
@@ -5591,11 +5586,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): the runtime renders datetime-local from the model
-  // field metadata even when the authored component is `date` (stored entry
-  // keeps component=date + dataType=datetime faithfully). Triage whether this
-  // metadata-precedence behaviour predates the v4 persistence change.
-  test.fixme('UDW-045: configures date, number, and switch form controls in browser preview', async ({
+  test('UDW-045: configures date, number, and switch form controls in browser preview', async ({
     page,
   }) => {
     const componentPageKey = `udw_v3_form_components_${uid}`;
@@ -5604,14 +5595,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       pageKey: componentPageKey,
       title: `UDW V3 Form Components ${uid}`,
       kind: 'form',
-      modelCode,
+      modelCode: 'showcase_all_fields',
       schemaVersion: 3,
       blocks: [
         {
           id: 'form_root',
           blockType: 'form',
           title: 'Component Form',
-          dataSource: { model: modelCode },
+          dataSource: { model: 'showcase_all_fields' },
           layout: { span: 12 },
           blocks: [
             {
@@ -5639,7 +5630,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('field-palette-add-field').click();
     const dateFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
-    await page.getByTestId('inspector-field-field').selectOption('created_at');
+    await page.getByTestId('inspector-field-field').selectOption('sc_start_date');
     await page.getByTestId('inspector-field-props.label').fill(dateLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('date');
     await page.getByTestId('inspector-field-props.placeholder').fill('YYYY-MM-DD');
@@ -5650,7 +5641,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('field-palette-add-field').click();
     const numberFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
-    await page.getByTestId('inspector-field-field').selectOption('page_key');
+    await page.getByTestId('inspector-field-field').selectOption('sc_quantity');
     await page.getByTestId('inspector-field-props.label').fill(numberLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('number');
     await page.getByTestId('inspector-field-props.helpText').fill(`Number help ${uid}`);
@@ -5661,7 +5652,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('field-palette-add-field').click();
     const switchFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
-    await page.getByTestId('inspector-field-field').selectOption('name');
+    await page.getByTestId('inspector-field-field').selectOption('sc_is_active');
     await page.getByTestId('inspector-field-props.label').fill(switchLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('switch');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -5679,15 +5670,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const persisted = await readPage(page, componentFormPid);
     expect(findBlockById(persisted.blocks ?? [], dateFieldId)).toMatchObject({
-      field: 'created_at',
+      field: 'sc_start_date',
       props: expect.objectContaining({ label: dateLabel, component: 'date' }),
     });
     expect(findBlockById(persisted.blocks ?? [], numberFieldId)).toMatchObject({
-      field: 'page_key',
+      field: 'sc_quantity',
       props: expect.objectContaining({ label: numberLabel, component: 'number' }),
     });
     expect(findBlockById(persisted.blocks ?? [], switchFieldId)).toMatchObject({
-      field: 'name',
+      field: 'sc_is_active',
       props: expect.objectContaining({ label: switchLabel, component: 'switch' }),
     });
 
@@ -5705,7 +5696,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const dateControl = runtimePreviewControl(page, dateFieldId);
     await expect(dateControl).toBeVisible();
     await expect(dateControl).toHaveAttribute('type', 'date');
-    await expect(dateControl).toHaveAttribute('data-testid', 'date-picker-input-created_at');
+    await expect(dateControl).toHaveAttribute('data-testid', 'date-picker-input-sc_start_date');
     await expect(dateControl).toBeEditable();
     await dateControl.fill('2026-03-18');
     await expect(dateControl).toHaveValue('2026-03-18');
@@ -6090,10 +6081,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   });
 
-  // FIXME(designer-v4): dashboard-kind pages refuse flat-v4 persistence by
-  // design (dashboards live in ab_dashboard), so saved-grid assertions cannot
-  // pass until the dashboard persistence story lands.
-  test.fixme('UDW-048: edits dashboard root grid properties and renders persisted grid styles', async ({
+  test('UDW-048: edits dashboard root grid properties and renders persisted grid styles', async ({
     page,
   }) => {
     const gridPageKey = `udw_v3_dashboard_grid_${uid}`;
@@ -6101,7 +6089,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       name: `UDW V3 Dashboard Grid ${uid}`,
       pageKey: gridPageKey,
       title: `UDW V3 Dashboard Grid ${uid}`,
-      kind: 'detail',
+      kind: 'dashboard',
       modelCode,
       schemaVersion: 3,
       blocks: [
@@ -6145,8 +6133,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-field-layout.gap')).toHaveValue('24');
 
     const persisted = await readPage(page, gridDashboardPid);
-    expect(findBlockById(persisted.blocks ?? [], 'dashboard_root')).toMatchObject({
-      blockType: 'dashboard',
+    expect(persisted).toMatchObject({ schemaVersion: 4, kind: 'dashboard',
       layout: expect.objectContaining({ cols: 6, rowHeight: 96, gap: 24 }),
     });
 
