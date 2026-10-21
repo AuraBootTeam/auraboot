@@ -6,6 +6,9 @@ import { execFileSync } from 'node:child_process';
 import { navigateToMenuByClick } from '../helpers';
 import { loginDeliveryMember } from '../../helpers/delivery-session';
 
+// These journeys explicitly exercise sign-in; do not inherit profile administrator cookies.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const root = process.env.AURA_ENTERPRISE_PROJECT_ROOT;
 const evidence = process.env.AURA_EVIDENCE_DIR;
 if (!root || !evidence || !process.env.AURA_ADMIN_TENANT_ID)
