@@ -1,6 +1,6 @@
 package com.auraboot.framework.im.websocket;
 
-import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
+import com.auraboot.framework.im.event.ImMessageSentEvent;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.im.dto.*;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;

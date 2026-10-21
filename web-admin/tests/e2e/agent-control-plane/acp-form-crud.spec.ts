@@ -1980,6 +1980,7 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await clickCreateButton(page);
     await waitForFormReady(page);
 
+    await expect(page.getByTestId('form-field-title').locator('input[name="title"]')).toBeVisible();
     await fillFormField(page, 'title', artifactTitle);
     await selectFormField(page, 'artifact_type', 'report').catch(() => null);
     await fillFormField(

@@ -328,7 +328,7 @@ public class AnthropicLlmProvider implements LlmProvider {
      *
      * <p>The aggregate {@link LlmChatResponse} is built from accumulated text
      * + thinking blocks + final usage so downstream callers (e.g.
-     * {@link com.auraboot.framework.automation.executor.impl.LlmCallExecutor})
+     * {@link com.auraboot.framework.agent.integration.automation.LlmCallExecutor})
      * can write {@code ${outputVariable}} only after the terminal chunk —
      * matching spec Q7 (no partial value visible mid-stream).
      */

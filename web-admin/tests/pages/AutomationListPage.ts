@@ -93,14 +93,16 @@ export class AutomationListPage extends BasePage {
     // don't have to poll on stale text. Under full-suite load the click → PATCH
     // → refetch chain can exceed 10s; explicitly anchoring on the response
     // avoids 20s flake bounds (see automation-enhanced AUTO-04).
-    const togglePromise = this.page
-      .waitForResponse(
-        (r) => r.url().includes(`/api/automations/${pid}/toggle`) && r.status() < 500,
-        { timeout: 20000 },
-      )
-      .catch(() => null);
+    const togglePromise = this.page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/automations/${pid}/toggle` &&
+        response.request().method() === 'POST',
+      { timeout: 20000 },
+    );
     await this.toggleButton(pid).click();
-    await togglePromise;
+    const response = await togglePromise;
+    expect(response.ok(), `Automation toggle returned HTTP ${response.status()}`).toBe(true);
+    expect((await response.json()).code).toBe('0');
   }
 
   /** Open execution logs dialog for an automation. */

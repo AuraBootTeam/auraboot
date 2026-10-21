@@ -50,10 +50,8 @@ export function RecursiveBlockRenderer({
   const { locale } = useI18n();
   const evaluatePermission = permissionEvaluator ?? hasPermission;
   const modelFieldList = modelFields ?? EMPTY_MODEL_FIELDS;
-  // WYSIWYG is active only when model metadata is supplied (workbench preview). In that
-  // mode the real platform controls (SmartSelect/pickers) call useFieldDataSource, which
-  // hard-requires a DataSourceManager in context — so we provide a lightweight one.
-  const wysiwygActive = modelFieldList.length > 0;
+  // Explicit component configurations also render platform controls without model
+  // metadata. Every preview therefore needs the same data-source context.
   const dataSourceManager = React.useMemo(
     () => new DataSourceManager(createExpressionContext({ locale })),
     [locale],
@@ -102,11 +100,7 @@ export function RecursiveBlockRenderer({
     </RuntimeLocaleContext.Provider>
   );
 
-  return wysiwygActive ? (
-    <DataSourceProvider manager={dataSourceManager}>{tree}</DataSourceProvider>
-  ) : (
-    tree
-  );
+  return <DataSourceProvider manager={dataSourceManager}>{tree}</DataSourceProvider>;
 }
 
 const RuntimeLocaleContext = React.createContext<string>('zh-CN');
@@ -393,6 +387,7 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
 }
 
 function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const locale = React.useContext(RuntimeLocaleContext);
   const t = useRuntimeText();
   const tabs = block.blocks?.filter((child) => child.blockType === 'tab') ?? [];
   const [activeTabId, setActiveTabId] = React.useState(() => tabs[0]?.id ?? null);
@@ -427,7 +422,7 @@ function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: Runtime
                   : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
               }`}
             >
-              {getBlockLabel(tab)}
+              {getBlockLabel(tab, locale)}
             </button>
           );
         })}
@@ -3575,8 +3570,8 @@ function isRuntimeFieldValueEmpty(value: unknown): boolean {
 
 function RuntimeRepeater({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
+  const locale = React.useContext(RuntimeLocaleContext);
   const isVisible = isRuntimeBlockVisible(block, formContext?.values);
-
   const repeaterKey = block.field || block.id;
   const fieldBlocks = getRuntimeRepeaterFieldBlocks(block);
   const [rows, setRows] = React.useState<Array<Record<string, unknown>>>(() =>
@@ -3628,7 +3623,7 @@ function RuntimeRepeater({ block }: RuntimeBlockProps) {
     >
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block)}</div>
+          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block, locale)}</div>
           <div className="text-xs text-slate-500">{rows.length} row(s)</div>
         </div>
         <button
@@ -3813,8 +3808,8 @@ function RuntimeRepeaterField({
 
 function RuntimeSubform({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
+  const locale = React.useContext(RuntimeLocaleContext);
   const isVisible = isRuntimeBlockVisible(block, formContext?.values);
-
   const subformKey = block.field || block.id;
   const [rows, setRows] = React.useState<Array<Record<string, unknown>>>(() =>
     getRuntimeRepeaterRows(block),
@@ -3869,7 +3864,7 @@ function RuntimeSubform({ block }: RuntimeBlockProps) {
     >
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block)}</div>
+          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block, locale)}</div>
           <div className="text-xs text-slate-500">{rows.length} row editor(s)</div>
         </div>
         <button
@@ -4075,7 +4070,7 @@ function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: Runtim
     <div className="rounded-md border border-slate-200" data-testid={`runtime-block-${block.id}`}>
       {block.title ? (
         <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">
-          {getBlockLabel(block)}
+          {getBlockLabel(block, locale)}
         </div>
       ) : null}
       <div className="grid grid-cols-2 border-b border-slate-200 bg-slate-50">
@@ -5111,20 +5106,20 @@ function getCurrentRouteQuery(): Record<string, string | string[]> {
   if (typeof window === 'undefined') return {};
 
   const params = new URLSearchParams(window.location.search);
-  const query: Record<string, string | string[]> = {};
+  const query = new Map<string, string | string[]>();
   params.forEach((value, key) => {
-    const existing = query[key];
+    const existing = query.get(key);
     if (Array.isArray(existing)) {
-      query[key] = [...existing, value];
+      query.set(key, [...existing, value]);
       return;
     }
     if (typeof existing === 'string') {
-      query[key] = [existing, value];
+      query.set(key, [existing, value]);
       return;
     }
-    query[key] = value;
+    query.set(key, value);
   });
-  return query;
+  return Object.fromEntries(query);
 }
 
 function normalizeSpan(block: DslBlockV3): number {
@@ -5228,7 +5223,8 @@ function shouldExecuteLiveAction(block: DslBlockV3): boolean {
 
 function hasExecutableWidgetDataSource(block: DslBlockV3): boolean {
   const dataSource = block.dataSource;
-  if (!dataSource) return false;
+  // An explicit static preview must not execute even a configured named query.
+  if (!dataSource || dataSource.executionMode === 'preview') return false;
   const type = getStringProp(dataSource.type) || getStringProp(dataSource.mode);
   const live = dataSource.executionMode === 'live' || dataSource.executeLive === true;
   const hasQueryBuilderQuery = isRecord(dataSource.query);
@@ -5243,7 +5239,8 @@ function hasExecutableWidgetDataSource(block: DslBlockV3): boolean {
 
 function hasExecutableHelperDataSource(block: DslBlockV3): boolean {
   const dataSource = block.dataSource;
-  if (!dataSource) return false;
+  // An explicit static preview must not execute even a configured named query.
+  if (!dataSource || dataSource.executionMode === 'preview') return false;
   const type = getStringProp(dataSource.type) || getStringProp(dataSource.mode);
   const live = dataSource.executionMode === 'live' || dataSource.executeLive === true;
   const hasQueryBuilderQuery = isRecord(dataSource.query);

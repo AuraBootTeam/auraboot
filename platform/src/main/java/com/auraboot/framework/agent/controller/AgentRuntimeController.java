@@ -2,7 +2,7 @@ package com.auraboot.framework.agent.controller;
 
 import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
-import com.auraboot.framework.agent.dto.CapabilityEvalCase;
+import com.auraboot.framework.plugin.dto.imports.CapabilityEvalCase;
 import com.auraboot.framework.agent.dto.CapabilityView;
 import com.auraboot.framework.agent.eval.AgentOnlineEvalService;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;

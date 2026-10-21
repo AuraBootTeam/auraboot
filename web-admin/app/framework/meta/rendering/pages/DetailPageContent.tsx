@@ -44,6 +44,8 @@ import {
   buildApiEndpoint,
 } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
+import { expressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
+import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { ResultHelper } from '~/utils/type';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -273,7 +275,7 @@ export function resolveDetailRecordEndpoint(
   recordPid: string,
 ): { endpoint: string; method: 'get' | 'post' } {
   const ds = schema?.extension?.dataSource as
-    | { type?: string; endpoint?: string; method?: string }
+    | { type?: string; endpoint?: string; method?: string; adaptor?: string }
     | undefined;
   if (ds && ds.type === 'api' && typeof ds.endpoint === 'string' && ds.endpoint.length > 0) {
     const method = String(ds.method || 'get').toLowerCase() === 'post' ? 'post' : 'get';
@@ -285,7 +287,7 @@ export function resolveDetailRecordEndpoint(
     );
     if (recordPid && publicRecordEndpointPlaceholder.test(endpoint)) {
       endpoint = endpoint.replace(publicRecordEndpointPlaceholder, encodeURIComponent(recordPid));
-    } else if (recordPid) {
+    } else if (recordPid && ds.adaptor !== 'commandRecord') {
       endpoint = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordPid)}`;
     } else {
       endpoint = endpoint.replace(/\/+$/, '');
@@ -294,6 +296,44 @@ export function resolveDetailRecordEndpoint(
   }
   const model = schema?.modelCode || tableName;
   return { endpoint: buildDetailRecordEndpoint(model, recordPid), method: 'get' };
+}
+
+export function isSuccessfulDetailResult(result: any): boolean {
+  return ResultHelper.isSuccess(result) && result?.success !== false &&
+    !(Number(result?.httpStatus) >= 400);
+}
+
+/** Shared transport for the initial detail read and post-command refresh. */
+export async function fetchDetailRecord(
+  schema: any, modelCode: string, recordPid: string, token?: string, search = '',
+): Promise<any> {
+  const { endpoint, method } = resolveDetailRecordEndpoint(schema, modelCode, recordPid);
+  const ds = schema?.extension?.dataSource;
+  const configuredParams = ds?.type === 'api' ? ds.params : undefined;
+  if (configuredParams !== undefined && (
+    !configuredParams || typeof configuredParams !== 'object' || Array.isArray(configuredParams)
+  )) throw new Error('Invalid detail data-source parameters');
+  if (ds?.adaptor === 'commandRecord' && method !== 'post') {
+    throw new Error('Command detail data sources require POST');
+  }
+  const context = createExpressionContext({
+    record: { pid: recordPid }, row: { pid: recordPid }, form: { pid: recordPid },
+    $page: { kind: schema?.kind, modelCode: schema?.modelCode || modelCode,
+      pageKey: schema?.pageKey, recordPid: recordPid || undefined },
+    state: { routeContext: decodeRouteContextFromSearch(search) || {} },
+  } as any);
+  const params = configuredParams === undefined ? undefined
+    : expressionEvaluator.evaluateObject(configuredParams, context);
+  const result = await fetchResult(endpoint, {
+    method, token, ...(params === undefined ? {} : { params }),
+  });
+  if (ds?.adaptor !== 'commandRecord' || !isSuccessfulDetailResult(result)) return result;
+  const completed = result.data as any;
+  if (completed?.phaseReached !== 'completed' || !completed.data ||
+      typeof completed.data !== 'object' || Array.isArray(completed.data)) {
+    throw new Error('Invalid completed command detail response');
+  }
+  return { ...result, data: completed.data };
 }
 
 /**
@@ -375,13 +415,35 @@ export async function loadDetailRecordRefreshSnapshot(
   enrichRecord: typeof enrichDetailRecordDisplayFields = enrichDetailRecordDisplayFields,
 ): Promise<DetailRecordRefreshSnapshot | null> {
   const result = await fetchRecord();
-  if (!ResultHelper.isSuccess(result) || !result.data) return null;
+  if (!isSuccessfulDetailResult(result) || !result.data) return null;
   const rawData = result.data as RecordData;
   const unwrappedRecord = unwrapDetailRecord(rawData, recordPath);
   const recordData = recordPid
     ? await enrichRecord(modelCode, recordPid, unwrappedRecord, token)
     : unwrappedRecord;
   return { rawData, recordData };
+}
+
+/** Validate only explicit parent identity/version facts before strict flow refresh can complete. */
+export function assertStrictDetailRefreshParent(
+  raw: unknown, recordPath: string | undefined, previous: Record<string, any>, expectedPid?: string,
+): void {
+  const parent = getByDataPath(raw, recordPath);
+  if (!parent || typeof parent !== 'object' || Array.isArray(parent)
+    || ![Object.prototype, null].includes(Object.getPrototypeOf(parent)) || Object.keys(parent).length===0)
+    throw new Error('Detail parent record is unavailable');
+  if (expectedPid && (typeof parent.pid !== 'string' || parent.pid !== expectedPid))
+    throw new Error('Detail parent identity does not match');
+  for (const field of ['rowVersion', 'row_version']) {
+    if (!Object.prototype.hasOwnProperty.call(previous, field)) continue;
+    const value = parent[field];
+    // Same number/string -> nonnegative safe-integer contract as registered command actions.
+    // Validation never rewrites the original wire value or invents a version field.
+    const version = typeof value === 'number' || typeof value === 'string'
+      ? (String(value).trim()==='' ? NaN : Number(value)) : NaN;
+    if (!Number.isSafeInteger(version) || version < 0)
+      throw new Error('Detail parent version is unavailable');
+  }
 }
 
 /**
@@ -872,17 +934,11 @@ function DetailPageContentInner(props: PageContentProps) {
 
     async function loadRecord(): Promise<void> {
       try {
-        const { endpoint, method } = resolveDetailRecordEndpoint(
-          schema,
-          currentModelCode,
-          currentRecordPid,
+        const result = await fetchDetailRecord(
+          schema, currentModelCode, currentRecordPid, token || undefined, location.search,
         );
-        const result = await fetchResult<RecordData>(endpoint, {
-          method,
-          token: token || undefined,
-        });
         if (cancelled) return;
-        if (ResultHelper.isSuccess(result) && result.data) {
+        if (isSuccessfulDetailResult(result) && result.data) {
           const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
           const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
           setRawData(result.data);
@@ -944,36 +1000,42 @@ function DetailPageContentInner(props: PageContentProps) {
     schema?.modelCode,
     token,
     hasApiSingletonRecordSource,
+    location.search,
   ]);
 
-  // Stable callback to reload the parent record (used after sub-table command execution)
-  const reloadRecord = useCallback(async (): Promise<void> => {
-    if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode) return;
+  // Flow refresh must reject incomplete reads before exiting edit mode or clearing drafts.
+  const reloadRecordStrict = useCallback(async (): Promise<void> => {
+    if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode)
+      throw new Error('Detail record refresh is unavailable');
     const currentRecordPid = routeRecordPid;
     const currentModelCode = recordModelCode;
-    const { endpoint, method } = resolveDetailRecordEndpoint(
-      schema,
+    const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+    const shouldEnrich = currentRecordPid && !shouldSkipDetailModelFieldMeta(schema);
+    const previousParent = unwrapDetailRecord(rawData, recordPath);
+    const expectedPid = (schema as any)?.extension?.dataSource?.adaptor === 'commandRecord' && currentRecordPid
+      ? currentRecordPid : (typeof previousParent.pid === 'string' ? currentRecordPid || previousParent.pid : undefined);
+    const snapshot = await loadDetailRecordRefreshSnapshot(
+      async () => {
+        const result = await fetchDetailRecord(schema, currentModelCode, currentRecordPid, token || undefined, location.search);
+        if (isSuccessfulDetailResult(result))
+          assertStrictDetailRefreshParent(result.data, recordPath, previousParent, expectedPid);
+        return result;
+      },
+      recordPath,
       currentModelCode,
-      currentRecordPid,
+      shouldEnrich ? currentRecordPid : undefined,
+      token || undefined,
     );
-    try {
-      const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
-      const shouldEnrich = currentRecordPid && !shouldSkipDetailModelFieldMeta(schema);
-      const snapshot = await loadDetailRecordRefreshSnapshot(
-        () => fetchResult<RecordData>(endpoint, { method, token: token || undefined }),
-        recordPath,
-        currentModelCode,
-        shouldEnrich ? currentRecordPid : undefined,
-        token || undefined,
-      );
-      if (!snapshot) return;
-      setRawData(snapshot.rawData);
-      setRecordData(snapshot.recordData);
-    } catch {
-      // Preserve the current detail snapshot when a transient refresh fails.
-      // The action itself has already succeeded; a later refresh can recover.
-    }
-  }, [routeRecordPid, recordModelCode, token, schema, hasApiSingletonRecordSource]);
+    if (!snapshot) throw new Error('Detail record refresh failed');
+    setRawData(snapshot.rawData);
+    setRecordData(snapshot.recordData);
+  }, [routeRecordPid, recordModelCode, token, schema, hasApiSingletonRecordSource, location.search, rawData]);
+
+  // Existing sub-table callbacks retain their best-effort display refresh contract.
+  const reloadRecord = useCallback(async (): Promise<void> => {
+    try { await reloadRecordStrict(); }
+    catch { /* Preserve the current snapshot; a later explicit refresh can recover. */ }
+  }, [reloadRecordStrict]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
@@ -1073,6 +1135,7 @@ function DetailPageContentInner(props: PageContentProps) {
     token: token || undefined,
     showToast,
     additionalContext: runtimeContext,
+    loadData: reloadRecordStrict,
     excludeDataSourceIds: permissionHiddenDataSourceIds,
   });
   useRuntimeStateSubscription(runtime);
@@ -2063,7 +2126,7 @@ function prepareDetailRuntimeBlock(
  * + dictCode) and datetime formatting — mirroring the list table's column conventions — so
  * detail sub-tables never leak raw field codes.
  */
-function DataPathTable({
+export function DataPathTable({
   title,
   columns,
   rows,
@@ -2087,7 +2150,8 @@ function DataPathTable({
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
 }) {
   const renderCell = (col: { field: string; renderType?: string; dictCode?: string }, row: any) => {
-    const raw = row?.[col.field];
+    const raw = row && Object.prototype.hasOwnProperty.call(row, col.field)
+      ? row[col.field] : getByDataPath(row, col.field);
     if (raw == null || raw === '') return <span className="text-text-3">—</span>;
     if (col.renderType === 'tag' && col.dictCode && getDictItems) {
       const items = getDictItems(col.dictCode) || [];

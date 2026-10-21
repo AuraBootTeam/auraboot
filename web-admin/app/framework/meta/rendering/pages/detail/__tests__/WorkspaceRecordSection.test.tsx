@@ -20,6 +20,11 @@ describe('Referenced business facts', () => {
     render(<WorkspaceRecordSection block={{ id: 'facts', title: 'Information' }} fields={[{ field: 'customer', label: 'Contact', dataType: 'reference', refTarget: { targetEntity: 'customers' }, referenceDisplayField: 'customer_contact' }]} record={{ customer: 'customer-2' }} locale="en" t={(key: string) => key} getDictItems={() => []} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the related object');
   });
+  it('presents boolean facts in business language', () => {
+    render(<WorkspaceRecordSection block={{id:'facts',title:'Facts'}} fields={[{field:'complete',label:'Complete',dataType:'boolean'},{field:'registered',label:'Registered',dataType:'boolean'}]} record={{complete:true,registered:false}} locale="zh-CN" t={(key:string)=>key} getDictItems={()=>[]} />);
+    expect(screen.getByText('是')).toBeInTheDocument();expect(screen.getByText('否')).toBeInTheDocument();
+    expect(screen.queryByText('true')).not.toBeInTheDocument();
+  });
   it('formats a timestamp in the declared workspace timezone and preserves currency cents', () => {
     render(<WorkspaceRecordSection block={{ id: 'snapshot', title: 'Snapshot' }} fields={[
       { field: 'checked_at', label: 'Checked at', dataType: 'datetime' },

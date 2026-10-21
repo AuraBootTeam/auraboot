@@ -2435,9 +2435,9 @@
 
 .impact-graph-columns {
   display: grid;
-  align-items: stretch;
+  align-items: start;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.45fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .impact-graph-column,
@@ -2453,9 +2453,17 @@
 }
 
 .impact-graph-center {
-  justify-items: center;
-  text-align: center;
+  order: -1;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
+.impact-graph-center details { margin-left: auto; }
+.rollout-advanced { grid-column: 1 / -1; font-size: 13px; }
+.rollout-advanced summary { cursor: pointer; color: #475569; padding: 8px 0; }
+.rollout-advanced-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; padding: 12px 0; }
+
 
 .impact-graph-column h4,
 .impact-graph-center h4 {

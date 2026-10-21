@@ -287,6 +287,8 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
   assert.match(golden, /platform-plugin-api\/build\/libs\/platform-plugin-api-1\.0\.0\.jar/);
   assert.match(golden, /"-PplatformPluginApiJar=\$platform_plugin_api_jar"/);
+  assert.match(golden, /"-PplatformRuntimeJar=\$REPO_ROOT\/platform\/build\/libs\/AuraBoot-1\.0\.0-boot\.jar"/,
+    'external hybrid plugins require the exact Core runtime artifact as well as the plugin API');
   assert.ok(
     golden.indexOf('platform_plugin_api_jar=') <
       golden.indexOf('"-PplatformPluginApiJar=$platform_plugin_api_jar"'),
@@ -335,19 +337,27 @@ test('OSS golden stack applies explicit product migrations only to a fresh datab
     { fresh: '0', absent: '1', products: '1', allowed: true },
     { fresh: '1', absent: '1', products: '1', allowed: false },
     { fresh: '1', absent: '1', products: '0', allowed: false },
+    { fresh: '0', absent: '0', products: '0', port: '16317', allowed: true },
+    { fresh: '1', absent: '0', products: '1', port: '16317', allowed: true },
+    { fresh: '0', absent: '1', products: '1', port: '16317', allowed: true },
+    { fresh: '0', absent: '0', products: '0', port: '6379', allowed: false },
+    { fresh: '1', absent: '0', products: '1', port: '16317', host: '', allowed: false },
   ];
   for (const row of cases) {
     const result = spawnSync('bash', ['-c', `
       set -euo pipefail
       die() { printf '%s\\n' "$*" >&2; exit 1; }
       fresh_db="$1"; require_new_db="$2"
+      isolated_redis_port="$4"; redis_host="$5"; redis_port=6379; SCRIPT_DIR="$PWD/scripts"
       product_migration_roots=()
       [ "$3" = "0" ] || product_migration_roots+=(/fixture/product-migrations)
       ${guard}
-    `, 'freshness-contract', row.fresh, row.absent, row.products], { encoding: 'utf8' });
+      printf '%s\\n' "$redis_port"
+    `, 'freshness-contract', row.fresh, row.absent, row.products, row.port ?? '', row.host ?? '127.0.0.1'], { encoding: 'utf8' });
     assert.equal(result.error, undefined);
     assert.equal(result.status, row.allowed ? 0 : 1, JSON.stringify(row));
-    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires/);
+    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires|conflicts|invalid/);
+    else assert.equal(result.stdout.trim(), row.port || '6379');
   }
 
   assert.match(stack, /--product-migration-root requires a fresh database flag/);
@@ -677,4 +687,44 @@ test('marketplace smoke waits for API data and allows cold plugin boot latency',
   assert.match(smoke, /waitForMarketplaceListReady/);
   assert.match(smoke, /\/api\/marketplace\/plugins/);
   assert.doesNotMatch(smoke, /cards\.first\(\)\)\.toBeVisible\(\{ timeout: 10000 \}\)/);
+});
+
+test('per-plugin mapping is admitted before HTTP and applies only to the exact manifest identity', () => {
+  const script = read('scripts/import-plugins.sh');
+  assert.ok(script.indexOf('identifier_mapping_plan=') < script.indexOf("health='{}'"));
+  assert.match(script, /--plugin-identifier-mapping=\*/);
+  const call = (mode, ...args) => spawnSync('python3', ['scripts/dev/plugin-identifier-mapping.py', mode, ...args], { encoding:'utf8' });
+  const selected = JSON.stringify({'/plugins/contact':'com.example.contact','/plugins/category':'com.example.category'});
+  const planned = call('plan','',selected,'com.example.contact=/mapping/with "quote".json');
+  assert.equal(planned.status,0,planned.stderr);
+  const target=JSON.parse(call('request','/plugins/contact',planned.stdout).stdout);
+  assert.equal(target.identifierMappingPath,'/mapping/with "quote".json');
+  const other=JSON.parse(call('request','/plugins/category',planned.stdout).stdout);
+  assert.equal(Object.hasOwn(other,'identifierMappingPath'),false);
+  assert.equal(target.deferReferenceValidation,true);
+  assert.deepEqual(Object.keys(target).sort(),['autoPublishCommands','autoPublishFields','autoPublishModels','autoPublishPages','conflictStrategy','deferReferenceValidation','identifierMappingPath','path'].sort());
+  for(const specs of [
+    ['','com.example.missing=/mapping.json'],
+    ['','com.example.contact=/one.json','com.example.contact=/two.json'],
+    ['/global.json','com.example.contact=/one.json'],
+    ['','com.example.contact=relative.json'],
+  ]) {
+    assert.equal(call('plan',specs[0],selected,...specs.slice(1)).status,2);
+  }
+  assert.equal(call('request','/plugins/not-selected',planned.stdout).status,2);
+  const legacy=call('plan','/legacy.json','{}');
+  assert.equal(legacy.status,0);
+  assert.equal(JSON.parse(call('request','/plugins/category',legacy.stdout).stdout).identifierMappingPath,'/legacy.json');
+});
+
+
+test('default mapping admission is safe under the supported macOS bash nounset semantics', () => {
+  const script=read('scripts/import-plugins.sh');
+  const start=script.indexOf('if [ "${#PLUGIN_IDENTIFIER_MAPPINGS[@]}" -gt 0 ]; then\n    identifier_mapping_plan=');
+  const end=script.indexOf('\necho "Importing plugins',start);
+  assert.ok(start>0 && end>start);
+  const shell='set -eu; PLUGIN_IDENTIFIER_MAPPINGS=(); IDENTIFIER_MAPPING_PATH=""; selected_mapping_plugins={}; MAPPING_TOOL=scripts/dev/plugin-identifier-mapping.py;\n'+script.slice(start,end)+'\nprintf "%s" "$identifier_mapping_plan"';
+  const result=spawnSync('/bin/bash',['-c',shell],{encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout),{global:'',plugins:{},selected:{}});
 });

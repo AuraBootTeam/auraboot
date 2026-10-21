@@ -1,13 +1,14 @@
 package com.auraboot.framework.eventpolicy.executor.handler;
 
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
 import com.auraboot.framework.eventpolicy.executor.ActionHandler;
 import com.auraboot.framework.eventpolicy.executor.ActionProviderDependency;
 import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
-import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.CommandService;
+import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,10 +19,10 @@ import java.util.Map;
 
 /**
  * Production {@code UPDATE_RECORD} / {@code PATCH_RECORD} {@link ActionHandler} (docs/2.md §7):
- * updates fields on the event's record via the platform {@link DynamicDataService} when a policy rule
+ * updates fields on the event's record via the authorized model update command when a policy rule
  * matches — the most common policy side effect (e.g. set status=ESCALATED). The record
  * (modelCode/recordPid) is read from the decision context; the fields come from {@code payload.fields}.
- * Additive — no change to the dynamic-data subsystem; {@code update} applies a partial field map
+ * The command pipeline validates permissions and the writable field whitelist; the action applies a partial field map
  * (PATCH semantics), so both action types map to it.
  */
 @Slf4j
@@ -29,7 +30,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UpdateRecordActionHandler implements ActionHandler {
 
-    private final DynamicDataService dynamicDataService;
+    private final CommandService commandService;
+    private final CommandExecutor commandExecutor;
 
     @Override
     public boolean supports(String actionType) {
@@ -59,6 +61,10 @@ public class UpdateRecordActionHandler implements ActionHandler {
                             .build(),
                     null);
         }
+        if (!com.auraboot.framework.application.tenant.MetaContext.exists()
+                || com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId() == null) {
+            throw new IllegalStateException("A named execution actor is required for business writes");
+        }
         Map<String, Object> payload = plan.payload() != null ? plan.payload() : Map.of();
         Object fieldsObj = payload.get("fields");
         if (!(fieldsObj instanceof Map<?, ?> fields) || fields.isEmpty()) {
@@ -72,14 +78,23 @@ public class UpdateRecordActionHandler implements ActionHandler {
         Map<String, Object> fieldMap = new LinkedHashMap<>();
         fields.forEach((key, value) -> fieldMap.put(String.valueOf(key), value));
         try {
-            // System-triggered policy action: the event runtime already selected this record
-            // (recordPid comes from the decision context), and AFTER_COMMIT policies run without
-            // a caller's data-permission projection. Explicit ALL execution authority keeps the
-            // platform's internal pre-update read-back (a visibility gate meant for interactive
-            // callers) from denying a write the policy engine is authorized to make.
-            MetaContext.runWithCommandPermitScope("ALL", () -> {
-                dynamicDataService.update(modelCode, recordPid, fieldMap);
-            });
+            Object selectedModel = payload.get("modelCode");
+            if (selectedModel != null && !modelCode.equals(selectedModel)) {
+                throw new IllegalArgumentException("Updates to a related model require its business command");
+            }
+            String commandCode = commandService.resolveCrudCommands(modelCode).get("update");
+            if (commandCode == null || commandCode.isBlank()) {
+                throw new IllegalArgumentException("Configure a model update operation before using this action");
+            }
+            CommandExecuteRequest request = new CommandExecuteRequest();
+            request.setTargetRecordPid(recordPid);
+            request.setPayload(fieldMap);
+            request.setClientRequestId(plan.idempotencyKey());
+            Object rawDepth = context.resolve(Scope.META, "actionDepth").value();
+            int depth = rawDepth instanceof Number number ? number.intValue() : 0;
+            if (depth >= 16) throw new IllegalStateException("Rule action chain exceeded the execution depth limit");
+            request.setAuditContext(Map.of("source", "EVENT_POLICY", "ruleCode", plan.ruleCode(), "policyActionDepth", depth + 1));
+            commandExecutor.execute(commandCode, request);
         } catch (RuntimeException e) {
             throw new ActionExecutionException(
                     "UPDATE_RECORD failed: " + messageOf(e),

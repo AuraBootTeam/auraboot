@@ -6,6 +6,9 @@ import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
 import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
 import com.auraboot.framework.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -26,11 +29,16 @@ class NotifyActionHandlerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock private IdentityDirectoryAccessor identities;
     private NotifyActionHandler handler;
+    @AfterEach void clearActor() { MetaContext.clear(); }
 
     @BeforeEach
     void setUp() {
-        handler = new NotifyActionHandler(notificationService);
+        MetaContext.setContext(7L, 42L, "u42", "Reviewer");
+        handler = new NotifyActionHandler(notificationService, identities);
+        org.mockito.Mockito.lenient().when(identities.findActiveTenantUser(7L, "42"))
+                .thenReturn(new IdentityDirectoryAccessor.UserIdentity(42L,"u42","reviewer","Reviewer"));
     }
 
     @Test
@@ -136,6 +144,59 @@ class NotifyActionHandlerTest {
                 .containsEntry("recipientType", "USER")
                 .containsEntry("recipientId", "42")
                 .containsEntry("errorMessage", "notification down");
+    }
+
+    @Test
+    void executeWithResult_preservesTemplatedRecordSourceForRoleRecipients() {
+        when(notificationService.sendInAppToRecipient("role", "reviewer", "Review", "",
+                "EVENT_POLICY", "wd_leave_request", "REQ-1")).thenReturn(List.of(42L));
+        ResolvedActionPlan plan = new ResolvedActionPlan("R", "NOTIFY", "ROLE:reviewer", 1,
+                Map.of("title", "Review", "sourceType", "${record.entityCode}",
+                        "sourceId", "${record.recordPid}"), "record-key");
+
+        Map<String, Object> result = handler.executeWithResult(plan, decisionContext());
+
+        assertThat(result).containsEntry("sourceType", "wd_leave_request")
+                .containsEntry("sourceId", "REQ-1").containsEntry("sentCount", 1);
+        verify(notificationService).sendInAppToRecipient("role", "reviewer", "Review", "",
+                "EVENT_POLICY", "wd_leave_request", "REQ-1");
+    }
+
+    @Test
+    void executeWithResult_preservesRecordSourceForIndividualRecipients() {
+        ResolvedActionPlan plan = new ResolvedActionPlan("R", "NOTIFY", "USER:42", 1,
+                Map.of("sourceType", "wd_leave_request", "sourceId", "REQ-1"), "record-key");
+        handler.executeWithResult(plan, decisionContext());
+        verify(notificationService).sendInApp(42L, "Policy notification", "",
+                "EVENT_POLICY", "wd_leave_request", "REQ-1");
+    }
+
+    @Test
+    void executeWithResult_rejectsIncompleteUnsafeAndUnresolvedRecordSourcesBeforeSending() {
+        for (Map<String, Object> payload : List.<Map<String, Object>>of(
+                Map.of("sourceType", "wd_leave_request"),
+                Map.of("sourceType", "../admin", "sourceId", "REQ-1"),
+                Map.of("sourceType", "wd_leave_request", "sourceId", "REQ-1?token=bad"),
+                Map.of("sourceType", "wd_leave_request", "sourceId", "${record.missing}"),
+                Map.of("sourceType", 42, "sourceId", "REQ-1"))) {
+            ResolvedActionPlan plan = new ResolvedActionPlan("R", "NOTIFY", "USER:42", 1,
+                    payload, "record-key");
+            ActionExecutionException error = assertThrows(ActionExecutionException.class,
+                    () -> handler.executeWithResult(plan, decisionContext()));
+            assertThat(error.resultPayload()).containsEntry("failureReason", "notification_source_invalid");
+        }
+        org.mockito.Mockito.verifyNoInteractions(notificationService);
+    }
+
+    @Test void acceptsPublicUserPidAndRefusesAnUnresolvedOrForeignRecipient() {
+        when(identities.findActiveTenantUser(7L,"public-user"))
+                .thenReturn(new IdentityDirectoryAccessor.UserIdentity(42L,"public-user","reviewer","Reviewer"));
+        handler.executeWithResult(new ResolvedActionPlan("R","NOTIFY","USER:public-user",1,Map.of(),"one"),decisionContext());
+        verify(notificationService).sendInApp(42L,"Policy notification","","EVENT_POLICY","EVENT_POLICY","R");
+        var denied=assertThrows(ActionExecutionException.class,()->handler.executeWithResult(
+                new ResolvedActionPlan("R","NOTIFY","USER:foreign-user",1,Map.of(),"two"),decisionContext()));
+        assertThat(denied.resultPayload()).containsEntry("failureReason","recipient_unavailable");
+        org.mockito.Mockito.verifyNoMoreInteractions(notificationService);
     }
 
     private static DecisionContext decisionContext() {

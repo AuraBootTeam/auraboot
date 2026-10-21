@@ -190,6 +190,36 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
     }
 
     @Test
+    @DisplayName("updating an unrelated field preserves existing array JSONB without treating it as an object")
+    void implicitUpdateDoesNotRewriteExistingJsonbArrays() {
+        withScopedUser();
+        when(metaModelService.getModelDefinition("bpm_domain_config")).thenReturn(Optional.of(domainConfigModel()));
+        when(dynamicDataMapper.findJsonbColumns("ab_bpm_domain_config"))
+                .thenReturn(Set.of("process_keys", "sort_fields"));
+        when(dynamicDataMapper.queryList(eq("ab_bpm_domain_config"), org.mockito.ArgumentMatchers.anyList(),
+                anyString(), org.mockito.ArgumentMatchers.isNull(), eq(1), eq(0)))
+                .thenReturn(List.of(Map.of("process_keys", "[\"approval\"]", "sort_fields", "[]")));
+        when(fieldPermissionService.getFieldPermissions(200L, "bpm_domain_config"))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("domain_name")));
+        when(dataPermissionEngine.buildRowFilter(100L, "bpm_domain_config", 20L)).thenReturn("");
+        when(dataDomainService.buildDomainFilter("bpm_domain_config", 20L)).thenReturn("");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId("BPM-DOMAIN-001");
+
+        executor().executeImplicitFieldMapPhase(
+                Map.of("type", "update", "inputFields", List.of("domain_name")),
+                Map.of("domain_name", "Updated domain"), 100L, request, domainCommand());
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> params = mapCaptor();
+        verify(dynamicDataMapper).updateByQuery(sql.capture(), params.capture());
+        assertThat(sql.getValue()).doesNotContain("process_keys =", "sort_fields =");
+        assertThat(params.getValue()).containsValue("Updated domain").doesNotContainValue("[]").doesNotContainValue("[\"approval\"]");
+    }
+
+    @Test
     @DisplayName("explicit delete writes through scoped SQL guards")
     void explicitDeleteUsesScopedSqlGuards() {
         withScopedUser();

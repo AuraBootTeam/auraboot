@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import COPY from './ruleCenterV5.i18n.json';
 import type { DataType } from '../ast/conditionAst';
 import type { DecisionApi, DecisionFieldImpact, DecisionFieldPreflight } from '../api/decisionApi';
 
@@ -29,7 +32,10 @@ export interface DataModelFieldViewerProps {
 }
 
 export function DataModelFieldViewer({ fields, initialEntity = 'ALL', api }: DataModelFieldViewerProps) {
+  const { locale } = useI18n();
+  const [model, setModel] = useState('ALL');
   const [entity, setEntity] = useState(initialEntity);
+  const models = useMemo(() => Array.from(new Map(fields.filter(field => field.modelCode).map(field => [field.modelCode!, field.modelName ?? field.modelCode!]))), [fields]);
   const [query, setQuery] = useState('');
   const [selectedField, setSelectedField] = useState<ModelField | null>(null);
   const [fieldImpact, setFieldImpact] = useState<DecisionFieldImpact | null>(null);
@@ -48,9 +54,10 @@ export function DataModelFieldViewer({ fields, initialEntity = 'ALL', api }: Dat
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return fields
+      .filter((f) => model === 'ALL' || f.modelCode === model)
       .filter((f) => entity === 'ALL' || f.entityCode === entity)
       .filter((f) => !q || f.path.toLowerCase().includes(q) || f.label.toLowerCase().includes(q));
-  }, [fields, entity, query]);
+  }, [fields, model, entity, query]);
 
   const fieldRef = (field: ModelField) => `${field.entityCode}.${field.path}`;
 
@@ -93,6 +100,10 @@ export function DataModelFieldViewer({ fields, initialEntity = 'ALL', api }: Dat
   return (
     <div data-testid="data-model-viewer">
       <div className="dmv-toolbar">
+        <select aria-label="model-filter" value={model} onChange={event => setModel(event.target.value)}>
+          <option value="ALL">{getLocalizedText(COPY.allModels, locale)}</option>
+          {models.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+        </select>
         <select aria-label="entity-filter" value={entity} onChange={(e) => setEntity(e.target.value)}>
           {entities.map((en) => <option key={en} value={en}>{en}</option>)}
         </select>
@@ -106,11 +117,12 @@ export function DataModelFieldViewer({ fields, initialEntity = 'ALL', api }: Dat
       ) : (
         <table className="dmv-table">
           <thead>
-            <tr><th>实体</th><th>字段</th><th>名称</th><th>类型</th><th>引用</th><th>脱敏</th><th>权限</th><th>详情</th></tr>
+            <tr><th>{getLocalizedText(COPY.model, locale)}</th><th>实体</th><th>字段</th><th>名称</th><th>类型</th><th>引用</th><th>脱敏</th><th>权限</th><th>详情</th></tr>
           </thead>
           <tbody>
             {filtered.map((f) => (
-              <tr key={`${f.entityCode}.${f.path}`} data-testid={`dmv-row-${f.entityCode}.${f.path}`}>
+              <tr key={`${f.modelCode ?? ""}:${f.entityCode}.${f.path}`} data-testid={`dmv-row-${f.entityCode}.${f.path}`}>
+                <td>{f.modelName ?? f.modelCode ?? getLocalizedText(COPY.unscopedReference, locale)}</td>
                 <td>{f.entityCode}</td>
                 <td className="mono">{f.path}</td>
                 <td>{f.label}</td>

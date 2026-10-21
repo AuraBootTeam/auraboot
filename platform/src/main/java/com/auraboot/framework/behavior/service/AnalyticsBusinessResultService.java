@@ -22,7 +22,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AnalyticsBusinessResultService {
     private final AnalyticsExecutionSourceService sources;
-    private final JdbcTemplate jdbc;
+    private final AnalyticsExecutionReadModel executionReads;
     private final DynamicDataService data;
     private final UserPermissionService permissions;
     private final MetaModelService models;
@@ -39,15 +39,7 @@ public class AnalyticsBusinessResultService {
         var source = sources.resolveForRead(adoptionPid);
         Long tenant = MetaContext.getCurrentTenantId();
         Long actor = MetaContext.getCurrentUserId();
-        var rows = jdbc.queryForList("""
-                SELECT o.event_id, o.target_type, o.target_key, o.occurred_at, o.payload
-                FROM ab_behavior_outcome_outbox o
-                JOIN ab_agent_run r ON r.tenant_id=o.tenant_id AND r.pid=o.run_id
-                JOIN ab_analytics_task_execution a ON a.tenant_id=r.tenant_id AND a.task_pid=r.task_id
-                WHERE a.tenant_id=? AND a.actor_user_id=? AND a.adoption_pid=?
-                  AND o.user_id=? AND o.event_name='analytics_business_command_committed'
-                ORDER BY o.id ASC LIMIT ? OFFSET ?
-                """, tenant, actor, adoptionPid, actor, pageSize + 1, (page - 1) * pageSize);
+        var rows = executionReads.businessResults(tenant, actor, adoptionPid, pageSize + 1, (page - 1) * pageSize);
         List<Result> records = new ArrayList<>();
         for (var row : rows) {
             String model = Objects.toString(row.get("target_type"), "");

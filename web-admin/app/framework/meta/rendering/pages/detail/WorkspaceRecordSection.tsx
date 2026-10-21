@@ -32,6 +32,7 @@ export function WorkspaceRecordSection({ block, fields, record, token, locale, t
       const item = (getDictItems(field.dictCode) || []).find((item: any) => String(item.value) === String(value));
       return item ? getLocalizedText(item.label, locale, t) : '—';
     }
+    if (typeof value === 'boolean') return getLocalizedText(value ? { 'zh-CN':'是',en:'Yes' } : { 'zh-CN':'否',en:'No' }, locale, t);
     if (field.presentation) return <WorkspaceCell value={value} record={record} column={{ ...field, timezone }} locale={locale} />;
     if (field.dataType === 'datetime' || field.dataType === 'timestamp') return formatInTimezone(value, locale.startsWith('zh') ? 'YYYY年MM月DD日 HH:mm:ss' : 'MMM DD, YYYY HH:mm:ss', timezone);
     if (field.dataType === 'date') return formatInTimezone(value, locale.startsWith('zh') ? 'YYYY年MM月DD日' : 'MMM DD, YYYY', timezone);

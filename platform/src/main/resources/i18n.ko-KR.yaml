@@ -411,3 +411,65 @@ aurabot:
     saving: 저장 중…
     saved_as_dashboard: 대시보드에 저장됨
     save_failed: 대시보드 저장 실패
+
+"permission.capability.ungrouped": "기타 권한"
+
+"permission.module.系统管理": "시스템 관리"
+
+"permission.module.决策与事件策略管理": "의사결정 및 이벤트 정책"
+
+"permission.module.报表定义管理": "보고서 정의"
+
+"permission.module.元数据与页面配置": "메타데이터 및 페이지"
+
+"permission.module.页面配置治理": "페이지 거버넌스"
+
+"permission.module.审计与留痕": "감사 및 이력"
+
+"permission.module.报表与输出": "보고서 및 출력"
+
+"permission.module.文件与附件": "파일 및 첨부"
+
+"permission.module.AI运行与治理": "AI 운영 및 거버넌스"
+
+"permission.module.知识库": "지식 베이스"
+
+"permission.module.自动化规则": "자동화 규칙"
+
+"permission.module.计费信息": "결제 정보"
+
+"permission.module.公告与通知": "공지 및 알림"
+
+"permission.module.数据交换与设备": "데이터 교환 및 장치"
+
+"permission.module.元数据工具": "메타데이터 도구"
+
+"permission.module.客服配置与接待": "고객 지원"
+
+"permission.module.业务裁定": "업무 판정"
+
+"permission.module.制造计划与指标": "제조 계획 및 지표"
+
+"permission.module.二维码管理": "QR 코드"
+
+"permission.module.语义指标": "시맨틱 지표"
+
+"permission.module.业务参与方": "업무 참여자"
+
+"permission.module.列表视图": "목록 뷰"
+
+"permission.module.主数据治理": "마스터 데이터 거버넌스"
+
+"permission.module.组织与权限管理": "조직 및 권한"
+
+"permission.module.组织管理": "조직 관리"
+
+"permission.capability.preset.label": "프리셋"
+
+"permission.capability.preset.viewer": "조회자"
+
+"permission.capability.preset.editor": "편집자"
+
+"permission.capability.preset.admin": "관리자"
+
+"about.menuLabel": "{productName} 정보"

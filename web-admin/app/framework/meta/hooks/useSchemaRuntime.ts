@@ -1,3 +1,4 @@
+import type { RequestKeyIdentity } from '../runtime/actions/request-key/session';
 /**
  * useSchemaRuntime Hook
  *
@@ -34,6 +35,8 @@ import { useToastContext } from '~/contexts/ToastContext';
 type RuntimeToastLevel = 'success' | 'error' | 'info' | 'warning';
 
 export interface UseSchemaRuntimeOptions {
+  loadData?: (params?: any) => Promise<void>;
+  requestKeyIdentity?: RequestKeyIdentity;
   /** Schema 对象 */
   schema: UnifiedSchema | null;
 
@@ -109,6 +112,10 @@ function buildGlobalState(options: UseSchemaRuntimeOptions) {
  * @returns SchemaRuntime 实例或 null
  */
 export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntime | null {
+  const pageLoaderRef = useRef(options.loadData);
+  pageLoaderRef.current = options.loadData;
+  const requestKeyIdentityRef = useRef(options.requestKeyIdentity);
+  requestKeyIdentityRef.current = options.requestKeyIdentity;
   const [runtime, setRuntime] = useState<SchemaRuntime | null>(null);
   const activeRuntimeRef = useRef<SchemaRuntime | null>(null);
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
@@ -156,6 +163,12 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
     // P0-3: 创建 SchemaRuntime 实例 (dataSourceManager 必需)
     const rt = new SchemaRuntime({
       schema,
+      getRequestKeyIdentity: () => requestKeyIdentityRef.current,
+      loadData: typeof options.loadData === 'function' ? async (params) => {
+        const load = pageLoaderRef.current;
+        if (typeof load !== 'function') throw new Error('Page refresh loader is unavailable');
+        await load(params);
+      } : undefined,
       globalState: buildGlobalState(options),
       navigate,
       showToast: toastHandler,

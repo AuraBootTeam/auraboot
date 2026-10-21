@@ -4,25 +4,31 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { TableBlockRenderer } from '../TableBlockRenderer';
-import { fetchResult } from '~/shared/services/http-client';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 
-vi.mock('~/shared/services/http-client', () => ({
+vi.mock('~/shared/services/http-client/HttpClient', () => ({
   fetchResult: vi.fn(async (url: string) => {
     if (url.includes('/bom_match_reason_code/')) {
       return {
         code: '0',
-        data: [
-          {
-            value: 'match_spec_package',
-            label: '规格+封装精确命中',
-            extension: { color: 'green' },
-          },
-          { value: 'match_multi_candidate', label: '多候选待选择', extension: { color: 'yellow' } },
-          { value: 'no_library_match', label: '物料库无匹配', extension: { color: 'red' } },
-        ],
+        data: {
+          items: [
+            {
+              value: 'match_spec_package',
+              label: '规格+封装精确命中',
+              extension: { color: 'green' },
+            },
+            {
+              value: 'match_multi_candidate',
+              label: '多候选待选择',
+              extension: { color: 'yellow' },
+            },
+            { value: 'no_library_match', label: '物料库无匹配', extension: { color: 'red' } },
+          ],
+        },
       };
     }
-    return { code: '0', data: [] };
+    return { code: '0', data: { items: [] } };
   }),
 }));
 
@@ -33,6 +39,10 @@ vi.mock('~/contexts/AuthContext', () => ({
 vi.mock('react-router', () => ({
   useNavigate: () => vi.fn(),
 }));
+
+vi.mock('~/contexts/TimezoneContext', () => ({ useTimezone: () => ({
+  timezone: 'Asia/Shanghai', formats: { date: 'YYYY-MM-DD', datetime: 'YYYY-MM-DD HH:mm:ss', time: 'HH:mm:ss' },
+}) }));
 
 function makeRuntime(rows: Record<string, unknown>[], locale = 'zh-CN'): SchemaRuntime {
   const context: Record<string, unknown> = {
@@ -93,7 +103,7 @@ describe('TableBlockRenderer status-pill renderType', () => {
     await act(async () =>
       resolveDictionary({
         code: '0',
-        data: [{ value: 'match_spec_package', label: '规格+封装精确命中' }],
+        data: { items: [{ value: 'match_spec_package', label: '规格+封装精确命中' }] },
       }),
     );
     expect(await screen.findByText('规格+封装精确命中')).toBeInTheDocument();
@@ -124,7 +134,7 @@ describe('TableBlockRenderer status-pill renderType', () => {
     await act(async () =>
       resolveDictionary({
         code: '0',
-        data: [{ value: 'match_spec_package', label: '新匹配说明' }],
+        data: { items: [{ value: 'match_spec_package', label: '新匹配说明' }] },
       }),
     );
     expect(await screen.findByText('新匹配说明')).toBeInTheDocument();
@@ -157,7 +167,7 @@ describe('TableBlockRenderer status-pill renderType', () => {
   it.each([{ items: [] }, { items: [{ value: 'unmapped_code', label: '' }] }])(
     'shows a missing-label state without exposing the stored value',
     async ({ items }) => {
-      vi.mocked(fetchResult).mockResolvedValueOnce({ code: '0', data: items } as any);
+      vi.mocked(fetchResult).mockResolvedValueOnce({ code: '0', data: { items } } as any);
       render(
         <TableBlockRenderer
           block={tableBlock()}
@@ -208,15 +218,15 @@ describe('TableBlockRenderer status-pill renderType', () => {
     expect(pill).toHaveClass('bg-status-amber-bg');
   });
 
-  it('formats date and datetime cells with the runtime locale', () => {
+  it.each([false, true])('formats temporal cells in the effective timezone (explicit renderer: %s)', (explicitRenderer) => {
     const date = '2026-08-09T10:20:30Z';
     const block = {
       id: 'localized-dates',
       blockType: 'table',
       dataSource: 'rows',
       columns: [
-        { field: 'dueDate', label: '日期', valueType: 'date' },
-        { field: 'updatedAt', label: '时间', valueType: 'datetime' },
+        { field: 'dueDate', label: '日期', valueType: 'date', ...(explicitRenderer ? { renderType: 'date' } : {}) },
+        { field: 'updatedAt', label: '时间', valueType: 'datetime', ...(explicitRenderer ? { renderType: 'datetime' } : {}) },
       ],
     } as unknown as BlockConfig;
     render(
@@ -226,8 +236,8 @@ describe('TableBlockRenderer status-pill renderType', () => {
       />,
     );
 
-    expect(screen.getByText(new Date(date).toLocaleDateString('zh-CN'))).toBeInTheDocument();
-    expect(screen.getByText(new Date(date).toLocaleString('zh-CN'))).toBeInTheDocument();
+    expect(screen.getByText('2026-08-09')).toBeInTheDocument();
+    expect(screen.getByText('2026-08-09 18:20:30')).toBeInTheDocument();
   });
 
   it('prefers a backend-enriched reference display label over the raw pid', () => {

@@ -19,12 +19,13 @@ export class HeaderPage {
 
   /** The top-level <header> element */
   get header(): Locator {
-    return this.page.locator('header');
+    return this.page.locator('header[data-hydrated]');
   }
 
-  /** Wait for the header to be visible (indicates page is rendered) */
+  /** Wait for the application shell to be interactive. */
   async waitForHeader(): Promise<void> {
     await expect(this.header).toBeVisible();
+    await expect(this.header).toHaveAttribute('data-hydrated', 'true');
   }
 
   // --- Theme toggle ---
@@ -36,9 +37,7 @@ export class HeaderPage {
 
   /** The clickable theme button inside the toggle */
   get themeButton(): Locator {
-    return this.page
-      .locator('[data-testid="theme-toggle"] button, [data-testid="theme-toggle"]')
-      .first();
+    return this.themeToggle.locator(':scope > button');
   }
 
   /** The theme dropdown panel */
@@ -53,44 +52,19 @@ export class HeaderPage {
     return this.themeDropdown.locator('button', { hasText: new RegExp(label, 'i') });
   }
 
-  /** Open the theme dropdown if current UI uses dropdown mode. */
-  async openThemeDropdown(): Promise<boolean> {
-    // Wait for button to be visible and stable (don't use networkidle — DSL pages have ongoing API calls)
-    await this.themeButton.waitFor({ state: 'visible', timeout: 10000 });
+  /** Open the current header's theme dropdown after hydration. */
+  async openThemeDropdown(): Promise<void> {
+    await this.waitForHeader();
     await this.themeButton.click();
-    let visible = await this.themeDropdown.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!visible) {
-      // Retry — sometimes first click doesn't register during hydration
-      await this.themeButton.click();
-      visible = await this.themeDropdown.isVisible({ timeout: 3000 }).catch(() => false);
-    }
-    return visible;
+    await expect(this.themeDropdown).toBeVisible();
   }
 
-  /**
-   * Select a theme option by matching text.
-   * @param theme - text to match, e.g. /深色|Dark/ or /浅色|Light/
-   */
+  /** Select an option from the real theme dropdown. */
   async selectTheme(theme: string | RegExp): Promise<void> {
-    const hasDropdown = await this.openThemeDropdown();
-    if (hasDropdown) {
-      const option = this.themeDropdown.locator('button').filter({ hasText: theme });
-      await expect(option).toBeVisible();
-      await option.click();
-      return;
-    }
-
-    // Some UI variants use a direct light/dark toggle without dropdown.
-    const isDarkTarget =
-      typeof theme === 'string' ? /dark|深色/i.test(theme) : theme.test('Dark 深色');
-    const isDarkNow = await this.page
-      .locator('html')
-      .getAttribute('class')
-      .then((v) => /dark/.test(v ?? ''))
-      .catch(() => false);
-    if (isDarkNow !== isDarkTarget) {
-      await this.themeButton.click();
-    }
+    await this.openThemeDropdown();
+    const option = this.themeDropdown.locator('button').filter({ hasText: theme });
+    await expect(option).toBeVisible();
+    await option.click();
   }
 
   /** Select dark theme */

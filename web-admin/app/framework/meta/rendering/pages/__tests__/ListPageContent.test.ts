@@ -1,6 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
+import { useEffect, useLayoutEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  useListKeywordSearch,
+  useListApiReadRetry,
   applyLocalSortUpdate,
   beginLatestListRequest,
   useRestoreSavedViewFromUrl,
@@ -138,6 +141,121 @@ describe('useSerializedSearchParamsUpdater', () => {
     });
 
     expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');
+  });
+
+  it('keeps the saved view when an earlier preset navigation commits later', () => {
+    const committed: string[] = [];
+    const routerSetter = vi.fn((next: any) => committed.push(new URLSearchParams(next).toString()));
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: 'pageSize=20' } },
+    );
+    act(() => {
+      result.current(new URLSearchParams('pageSize=20&preset=modified_this_week'), { replace: true });
+      result.current(new URLSearchParams('pageSize=20&view=personal-view'), { replace: true });
+    });
+    // The router acknowledges the earlier preset while the save is still pending.
+    rerender({ search: 'pageSize=20&preset=modified_this_week' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '1');
+      return prev;
+    }, { replace: true }));
+    expect(new URLSearchParams(committed.at(-1)).get('view')).toBe('personal-view');
+    expect(new URLSearchParams(committed.at(-1)).has('preset')).toBe(false);
+    expect(new URLSearchParams(committed.at(-1)).get('pageNum')).toBe('1');
+  });
+
+  it('accepts external navigation after the latest write commits', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: 'preset=modified_this_week' } },
+    );
+    act(() => result.current(new URLSearchParams('view=personal-view'), { replace: true }));
+    rerender({ search: 'view=personal-view' });
+    rerender({ search: 'preset=created_today' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '2');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('preset=created_today&pageNum=2');
+  });
+
+  it('preserves a save between the DOM commit and passive filter synchronization', () => {
+    const routerSetter = vi.fn();
+    const { rerender } = renderHook(({ search, save }: { search: string; save: boolean }) => {
+      const update = useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any);
+      useLayoutEffect(() => {
+        if (!save) return;
+        update((prev: URLSearchParams) => {
+          prev.delete('preset');
+          prev.set('view', 'personal-view');
+          return prev;
+        });
+      }, [save, update]);
+      useEffect(() => {
+        if (!save) return;
+        update((prev: URLSearchParams) => {
+          prev.set('pageNum', '1');
+          return prev;
+        });
+      }, [save, update]);
+    }, { initialProps: { search: 'preset=modified_this_week', save: false } });
+    rerender({ search: 'preset=modified_this_week&pageSize=20', save: true });
+    const final = routerSetter.mock.calls.at(-1)?.[0] as URLSearchParams;
+    expect(final.get('view')).toBe('personal-view');
+    expect(final.has('preset')).toBe(false);
+    expect(final.get('pageNum')).toBe('1');
+  });
+
+  it('honors Back to an earlier query even when a newer write is pending', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search, key, action }: { search: string; key: string; action: 'POP' | 'REPLACE' }) => useSerializedSearchParamsUpdater(
+        new URLSearchParams(search), routerSetter as any, undefined, { key, action },
+      ),
+      { initialProps: { search: 'pageSize=20', key: 'initial', action: 'POP' as 'POP' | 'REPLACE' } },
+    );
+    act(() => {
+      result.current(new URLSearchParams('preset=modified_this_week'));
+      result.current(new URLSearchParams('view=personal-view'));
+    });
+    rerender({ search: 'preset=modified_this_week', key: 'back', action: 'POP' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '2');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('preset=modified_this_week&pageNum=2');
+  });
+
+  it('accepts an unrelated external navigation while local writes are pending', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: '' } },
+    );
+    act(() => result.current(new URLSearchParams('view=personal-view')));
+    rerender({ search: 'keyword=external' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '2');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('keyword=external&pageNum=2');
+  });
+
+  it('does not treat a new params object with the same query as an acknowledgement', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: '' } },
+    );
+    act(() => result.current(new URLSearchParams('view=personal-view')));
+    rerender({ search: '' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '1');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('view=personal-view&pageNum=1');
   });
 
   it('drops queued list URL writes after an outgoing page navigation begins', () => {
@@ -733,6 +851,16 @@ describe('buildListFilterFieldMetadata', () => {
 });
 
 describe('viewFilterToQueryCondition', () => {
+  it('reads persisted legacy preset ranges as two scalar query values', () => {
+    expect(viewFilterToQueryCondition({
+      fieldCode: 'updated_at', operator: 'between',
+      value: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    })).toEqual({
+      fieldName: 'updated_at', operator: 'BETWEEN',
+      values: ['2026-10-14', '2026-10-21T23:59:59'],
+    });
+  });
+
   it('keeps IN and BETWEEN values as arrays for list and export requests', () => {
     const inCondition = viewFilterToQueryCondition({
       fieldCode: 'forecast_category',
@@ -799,6 +927,17 @@ describe('tabFilterToQueryCondition', () => {
 });
 
 describe('resolveSavedViewFilterExpressions', () => {
+  it('restores a legacy range to chip state without mutating the persisted view', () => {
+    const original = {
+      fieldCode: 'updated_at', operator: 'between' as const,
+      value: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    };
+    expect(resolveSavedViewFilterExpressions([original], {})).toEqual([{
+      ...original, value: ['2026-10-14', '2026-10-21T23:59:59'],
+    }]);
+    expect(original.value).toEqual({ start: '2026-10-14', end: '2026-10-21T23:59:59' });
+  });
+
   it('resolves both supported current-user syntaxes to a public user PID', () => {
     const resolved = resolveSavedViewFilterExpressions(
       [
@@ -1219,5 +1358,153 @@ describe('resolveUserFilterCondition', () => {
     expect(
       resolveUserFilterCondition('fin_cfw_week_start', null, smartInputFields, modelFieldMap),
     ).toEqual([]);
+  });
+});
+
+
+describe('useListKeywordSearch submitted filter contract', () => {
+  it('keeps applied filters through debounce and Enter without applying pending form edits', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const form = { s2p_se_status: 'draft' };
+      const { result, unmount } = renderHook(() =>
+        useListKeywordSearch(load, true, 20, {}),
+      );
+      act(() => result.current.rememberSubmittedFilters(form));
+      form.s2p_se_status = 'bidding'; // Edited form has not been submitted.
+      act(() => result.current.debouncedSearch());
+      act(() => vi.advanceTimersByTime(299));
+      expect(load).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1));
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => result.current.debouncedSearch());
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenCalledTimes(2);
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenCalledTimes(2);
+      // Explicit filter-search commits the edited form.
+      act(() => result.current.rememberSubmittedFilters(form));
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'bidding' } });
+      // Explicit reset uses {}, rather than falling back to the previous query.
+      act(() => result.current.rememberSubmittedFilters({}));
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: {} });
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('Enter retains the submitted query even before a pending debounce fires', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const { result, unmount } = renderHook(() => useListKeywordSearch(load, true, 20, {}));
+      act(() => result.current.rememberSubmittedFilters({ s2p_se_status: 'draft' }));
+      act(() => result.current.debouncedSearch());
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenCalledExactlyOnceWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenCalledTimes(1);
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('preserves initial URL filters, latest page size and enabled state in the real scheduling hook', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const { result, rerender, unmount } = renderHook(
+        ({ enabled, size }: { enabled: boolean; size: number }) => useListKeywordSearch(load, enabled, size, { source: 'selected' }),
+        { initialProps: { enabled: false, size: 20 } },
+      );
+      act(() => result.current.commitSearch());
+      expect(load).not.toHaveBeenCalled();
+      rerender({ enabled: true, size: 50 });
+      act(() => result.current.debouncedSearch());
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 50, filters: { source: 'selected' } });
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+
+describe('useListApiReadRetry transport request identity', () => {
+  const failed = { code: '35000', message: 'Rejected', data: null };
+  const success = { code: '0', data: { records: [], total: 0 } };
+  const request = {
+    endpoint: '/api/ext/qoe/procurement/tasks', method: 'get' as const,
+    queryParams: { page: 2, size: 50, sortField: 'updated_at', sortOrder: 'desc', keyword: 'RFQ-exact', s2p_se_status: 'draft' },
+  };
+
+  it('replays the exact failed query instead of pending form, keyword, sort or page changes', async () => {
+    const { result } = renderHook(() => useListApiReadRetry());
+    const original = structuredClone(request);
+    const fetch = vi.fn().mockResolvedValueOnce(failed).mockResolvedValueOnce(success);
+    await act(async () => { await result.current.read(original, () => true, fetch); });
+    original.queryParams.s2p_se_status = 'bidding';
+    original.queryParams.keyword = 'pending-keyword';
+    original.queryParams.page = 0;
+    original.queryParams.size = 20;
+    original.queryParams.sortOrder = 'asc';
+    const retry = result.current.getFailedRequest();
+    expect(retry).toEqual(request);
+    expect(Object.keys(retry!)).toEqual(['endpoint', 'method', 'queryParams']);
+    await act(async () => { await result.current.read(retry!, () => true, fetch); });
+    expect(fetch).toHaveBeenNthCalledWith(2, request);
+    expect(result.current.getFailedRequest()).toBeNull();
+  });
+
+  it('seals thrown transport failures and cannot let an older failure replace newer success', async () => {
+    const { result } = renderHook(() => useListApiReadRetry());
+    const rejection = new Error('network');
+    const throws = vi.fn().mockRejectedValue(rejection);
+    await act(async () => { await expect(result.current.read(request, () => true, throws)).rejects.toBe(rejection); });
+    expect(result.current.getFailedRequest()).toEqual(request);
+    let rejectOld!: (reason: Error) => void;
+    let latest = 1;
+    const old = result.current.read(request, () => latest === 1, () => new Promise((_, reject) => { rejectOld = reject; }));
+    const observedOld = old.catch((error: unknown) => error);
+    latest = 2;
+    const newer = { ...request, queryParams: { ...request.queryParams, keyword: 'newer' } };
+    await act(async () => { await result.current.read(newer, () => latest === 2, vi.fn().mockResolvedValue(success)); });
+    await act(async () => { rejectOld(rejection); await observedOld; });
+    expect(result.current.getFailedRequest()).toBeNull();
+  });
+
+  it('keeps newer failed identity when older result failure resolves late, and clears for explicit new queries', async () => {
+    const { result } = renderHook(() => useListApiReadRetry());
+    let resolveOld!: (value: typeof failed) => void;
+    let latest = 1;
+    const old = result.current.read(request, () => latest === 1, () => new Promise<typeof failed>(resolve => { resolveOld = resolve; }));
+    latest = 2;
+    const newer = { ...request, queryParams: { ...request.queryParams, s2p_se_status: 'bidding' } };
+    await act(async () => { await result.current.read(newer, () => latest === 2, vi.fn().mockResolvedValue(failed)); });
+    await act(async () => { resolveOld(failed); await old; });
+    expect(result.current.getFailedRequest()).toEqual(newer);
+    act(() => result.current.clearFailure());
+    expect(result.current.getFailedRequest()).toBeNull();
+  });
+});
+
+
+describe('DateRange filter component wire values', () => {
+  const fields = [{ field: 'order_date', component: 'DateRange' }];
+  it('expands the actual serialized DateRange component value into date bounds', () => {
+    expect(resolveUserFilterCondition('order_date', JSON.stringify({ start: '2026-04-01', end: '2026-04-30' }), fields)).toEqual([
+      { fieldName: 'order_date', operator: 'gte', value: '2026-04-01' },
+      { fieldName: 'order_date', operator: 'lte', value: '2026-04-30' },
+    ]);
+  });
+  it('does not submit an empty serialized DateRange as an equality filter', () => {
+    expect(resolveUserFilterCondition('order_date', JSON.stringify({ start: '', end: '' }), fields)).toEqual([]);
+  });
+  it('keeps range-shaped JSON literal in an ordinary text field', () => {
+    const literal = JSON.stringify({ start: 'a', end: 'z' });
+    expect(resolveUserFilterCondition('note', literal, [{ field: 'note', component: 'SmartInput' }])).toEqual([
+      { fieldName: 'note', operator: 'LIKE', value: `%${literal}%` },
+    ]);
   });
 });

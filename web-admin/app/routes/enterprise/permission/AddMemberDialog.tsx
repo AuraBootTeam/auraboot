@@ -63,6 +63,7 @@ export default function AddMemberDialog({
   // List mode
   const [candidates, setCandidates] = useState<RoleMemberDTO[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [candidatesError, setCandidatesError] = useState(false);
   const [listKeyword, setListKeyword] = useState('');
   const [listSelectedPids, setListSelectedPids] = useState<Set<string>>(new Set());
   const [temporary, setTemporary] = useState(false);
@@ -80,6 +81,7 @@ export default function AddMemberDialog({
       setListSelectedPids(new Set());
       setListKeyword('');
       setCandidates([]);
+      setCandidatesError(false);
       setTemporary(false);
       setEffectiveDate(new Date().toISOString().slice(0, 10));
       setExpiryDate('');
@@ -92,14 +94,16 @@ export default function AddMemberDialog({
 
   const loadCandidates = useCallback(async () => {
     setCandidatesLoading(true);
+    setCandidatesError(false);
     try {
       const data = await permissionService.getRoleMemberCandidates(
         rolePid,
         listKeyword || undefined,
       );
-      setCandidates(data || []);
+      setCandidates(data);
     } catch {
       setCandidates([]);
+      setCandidatesError(true);
     } finally {
       setCandidatesLoading(false);
     }
@@ -188,7 +192,8 @@ export default function AddMemberDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         data-testid="add-member-dialog"
-        className="max-w-3xl"
+        className="grid-cols-1 max-w-3xl max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        style={{ maxWidth: 'min(48rem, calc(100vw - 2rem))' }}
       >
         <DialogHeader>
           <DialogTitle>
@@ -300,6 +305,11 @@ export default function AddMemberDialog({
                   >
                     <LoadingSpinner />
                   </div>
+                ) : candidatesError ? (
+                  <div role="alert" data-testid="candidate-load-error" className="p-6 text-sm text-red-700 dark:text-red-300">
+                    {t('admin.permission.members.loadFailed', undefined, 'Members could not be loaded. Please retry.')}
+                    <button className="ml-3 underline" onClick={loadCandidates}>{t('common.retry', undefined, 'Retry')}</button>
+                  </div>
                 ) : candidates.length === 0 ? (
                   <div
                     data-testid="candidate-empty-state"
@@ -308,7 +318,7 @@ export default function AddMemberDialog({
                     {t('admin.permission.members.noCandidates', undefined, 'No available members found')}
                   </div>
                 ) : (
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <table className="min-w-full [overflow-wrap:anywhere] divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-800">
                       <tr>
                         <th className="px-3 py-2 text-left">
@@ -342,8 +352,8 @@ export default function AddMemberDialog({
                         const isSelected = listSelectedPids.has(c.memberPid);
                         return (
                           <tr
-                            key={c.memberId}
-                            data-testid={`candidate-row-${c.memberId}`}
+                            key={c.memberPid}
+                            data-testid={`candidate-row-${c.memberPid}`}
                             className={`${
                               isExisting
                                 ? 'cursor-not-allowed opacity-50'
@@ -364,7 +374,7 @@ export default function AddMemberDialog({
                               />
                             </td>
                             <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
-                              {c.userName}
+                              {c.userName || c.email || t('admin.permission.members.unnamed', undefined, 'Member')}
                             </td>
                             <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                               {c.email || '-'}

@@ -499,7 +499,7 @@
               }
             },
             {
-              "id": "milestones",
+              "id": "milestones_milestones",
               "blockType": "sub-table",
               "title": {
                 "zh-CN": "交付里程碑",
@@ -593,7 +593,7 @@
           "permissionCode": "sys.file.read",
           "blocks": [
             {
-              "id": "files",
+              "id": "files_files",
               "blockType": "detail-section",
               "title": {
                 "zh-CN": "合同与附件",
@@ -648,7 +648,7 @@
               }
             },
             {
-              "id": "activity",
+              "id": "activity_changes",
               "blockType": "activity-timeline",
               "title": {
                 "zh-CN": "交付动态",
@@ -745,6 +745,17 @@
         "presentation": {
           "kind": "progress"
         }
+      },
+      {
+        "field": "tpm_pj_accepted_total",
+        "label": {
+          "zh-CN": "已验收金额",
+          "en": "Accepted delivery value"
+        },
+        "presentation": {
+          "kind": "currency",
+          "currencyCode": "CNY"
+        }
       }
     ],
     "hiddenSystemTabs": [
@@ -758,6 +769,17 @@
         "history",
         "activity"
       ]
+    ],
+    "contributionSlots": [
+      {
+        "id": "delivery-follow-up",
+        "kind": "block",
+        "anchor": {
+          "target": "tab-blocks",
+          "blockId": "detail_tabs",
+          "tabKey": "overview"
+        }
+      }
     ]
   },
   "dataSources": {

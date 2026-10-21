@@ -1,8 +1,9 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../../helpers/environments';
 /** Public conversation APIs enforce ownership even for another tenant administrator. */
 import { test, expect, request as requestFactory, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
+import { PG_CONN } from '../../helpers/environments';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 for (const scope of ['same-tenant', 'cross-tenant']) {
@@ -82,7 +83,7 @@ for (const scope of ['same-tenant', 'cross-tenant']) {
       if (scope === 'cross-tenant') expect(tokenTenant).not.toBe(String(owner.tenant_id));
       else expect(tokenTenant).toBe(String(owner.tenant_id));
       other = await requestFactory.newContext({
-        baseURL: BACKEND_URL,
+        baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       const foreignConversation = await create(other);

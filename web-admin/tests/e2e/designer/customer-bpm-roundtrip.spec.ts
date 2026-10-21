@@ -34,6 +34,11 @@ async function processMenu(page: Page) {
 }
 async function capture(page: Page, info: TestInfo, name: string) {
   await expect(page.locator('main')).not.toContainText(/Page Unavailable|Internal Server Error/);
+  await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, {timeout:15000});
+  if (!(await page.getByTestId('bpmn-save-dialog-panel').isVisible()) &&
+      !(await page.getByTestId('bpmn-drawer-backdrop').isVisible())) {
+    await page.getByRole('button', {name:/fit view/i}).click();
+  }
   await info.attach(name, {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
@@ -120,24 +125,25 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
   expect(
     contribution.routes.find((route: { id: string }) => route.id === 'bpm.designer').path,
   ).toBe('/bpm/designer');
-  const fixturePath = join(bpmRoot!, 'test-fixtures/workflow-demo/config/processes.json');
+  const coreRoot = process.env.AURA_CORE_PROJECT_ROOT;
+  expect(coreRoot, 'Bind the exact Core checkout containing the delivery acceptance package').toBeTruthy();
+  const fixturePath = join(coreRoot!, 'plugins/project-management/examples/acceptance-workflow.bpm-package.json');
   const fixtureText = await readFile(fixturePath, 'utf8');
-  const source = JSON.parse(fixtureText).find(
-    (definition: { key: string }) => definition.key === 'wd_leave_approval',
-  );
-  expect(source?.designerJson?.nodes).toHaveLength(13);
-  expect(source.designerJson.edges).toHaveLength(13);
-  const key = `launch_bpm_${Date.now().toString(36)}`;
-  const name = `项目团队审批模板 ${key}`;
-  // Import the product's real leave-approval graph as a NEW draft definition.
-  // Deployment, rules/SLA execution and workflow-demo business state are out of scope.
-  const imported: Graph = { ...source.designerJson, key, name, category: source.category };
+  const source = JSON.parse(fixtureText);
+  const graph = JSON.parse(source.processDefinition.extension.designerJson) as Graph;
+  expect(graph.nodes).toHaveLength(8);
+  expect(graph.edges).toHaveLength(9);
+  const key = `delivery_bpm_${Date.now().toString(36)}`;
+  const name = '客户项目交付 · 验收审批设计';
+  // Reuse the actual delivery graph, not an unrelated leave-approval fixture.
+  // This copy verifies authoring and round-trip; the canonical definition drives live approval.
+  const imported: Graph = { ...graph, key, name, category: 'project-delivery' };
   await info.attach('SC05-BPM-fixture-origin', {
     body: JSON.stringify({
-      root: bpmRoot,
+      root: coreRoot,
       fixturePath,
       sha256: createHash('sha256').update(fixtureText).digest('hex'),
-      processKey: source.key,
+      processKey: source.processKey,
     }),
     contentType: 'application/json',
   });
@@ -148,16 +154,23 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
   await expect(toolbar(page)).toBeVisible();
   await importFile(page, JSON.stringify(imported), `${key}.json`);
   await expect(toolbar(page).getByTestId('bpmn-field-name')).toHaveValue(name);
-  await expect(page.locator('.react-flow__node')).toHaveCount(13);
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await page.getByRole('button', { name: /fit view/i }).click();
-  const managerNode = page.locator('.react-flow__node[data-id="task_manager_approve"]');
+  const commandLabel = page.locator('.react-flow__node[data-id="accepted"]').getByText('回写验收通过', { exact: true });
+  await expect(commandLabel).toBeVisible();
+  const labelMetrics = await commandLabel.evaluate(element => ({height:element.clientHeight,required:element.scrollHeight}));
+  expect(labelMetrics.height, 'Command node titles must not be vertically clipped').toBeGreaterThanOrEqual(labelMetrics.required);
+  const managerNode = page.locator('.react-flow__node[data-id="tpm_enhanced_review"]');
   await managerNode.click();
   await expect(page.getByTestId('node-label-input')).toBeVisible();
-  const refinedLabel = '主管复核 · 已核对';
+  const refinedLabel = '加强审核 · 材料复核';
   await page.getByTestId('node-label-input').fill(refinedLabel);
-  const refinedName = `项目团队审批 · 已核对 ${key}`;
+  const refinedName = '客户项目交付 · 验收审批与材料复核';
   await toolbar(page).getByTestId('bpmn-field-name').fill(refinedName);
   await capture(page, info, 'SC05-BPM-imported-and-refined');
+  if (await page.getByTestId('bpmn-drawer-backdrop').isVisible()) {
+    await page.getByTestId('bpmn-close-inspector').click();
+  }
   const pid = await saveNewDefinition(page, key, refinedName, info, 'SC05-BPM-original');
   const read = await page.request.get(`/api/bpm/process-definitions/${pid}`);
   expect(read.ok()).toBe(true);
@@ -165,10 +178,10 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
   expect(persisted.processKey).toBe(key);
   expect(persisted.processName).toBe(refinedName);
   const savedGraph = JSON.parse(persisted.designerJson) as Graph;
-  expect(savedGraph.nodes.find((node) => node.id === 'task_manager_approve')?.data.label).toBe(
+  expect(savedGraph.nodes.find((node) => node.id === 'tpm_enhanced_review')?.data.label).toBe(
     refinedLabel,
   );
-  expect(savedGraph.edges).toHaveLength(13);
+  expect(savedGraph.edges).toHaveLength(9);
   await processMenu(page);
   await page.getByTestId('list-search-input').fill(key);
   await page.getByTestId('list-search-input').press('Enter');
@@ -176,11 +189,11 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
   await row.getByText(key, { exact: true }).click();
   await page.getByTestId('toolbar-btn-open_bpmn_designer').click();
   await expect(page).toHaveURL(new RegExp(`/bpm/designer\\?pid=${pid}$`));
-  await expect(page.locator('.react-flow__node')).toHaveCount(13);
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await expect(toolbar(page).getByTestId('bpmn-field-name')).toHaveValue(refinedName);
   const exported = await exportFile(page, key, info, 'SC05-BPM-exported-definition');
   expect(semantics(exported)).toEqual(semantics(savedGraph));
-  expect(exported.nodes.find((node) => node.id === 'task_manager_approve')?.data.label).toBe(
+  expect(exported.nodes.find((node) => node.id === 'tpm_enhanced_review')?.data.label).toBe(
     refinedLabel,
   );
   expect(exported.edges.some((edge) => edge.data?.condition)).toBe(true);
@@ -189,7 +202,7 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
   // The invalid shape is rejected before importFromJSON mutates the graph.
   await importFile(page, JSON.stringify({ malformed: true }), 'invalid-process.json');
   await expect(page.getByText(/Invalid BPMN JSON: missing required fields/)).toBeVisible();
-  await expect(page.locator('.react-flow__node')).toHaveCount(13);
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await expect(toolbar(page).getByTestId('bpmn-field-name')).toHaveValue(refinedName);
   const afterInvalid = await exportFile(page, key, info, 'SC05-BPM-after-invalid-file');
   expect(semantics(afterInvalid)).toEqual(semantics(exported));
@@ -207,14 +220,14 @@ test('SC05-BPM: real process fixture JSON → UI refinement → save/reopen → 
     JSON.stringify({ ...portable, key: copyKey, name: copyName }),
     `${copyKey}.json`,
   );
-  await expect(page.locator('.react-flow__node')).toHaveCount(13);
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
   const copied = await exportFile(page, copyKey, info, 'SC05-BPM-reimported-copy');
   expect(semantics(copied)).toEqual(semantics(exported));
   const copyPid = await saveNewDefinition(page, copyKey, copyName, info, 'SC05-BPM-copy');
   expect(copyPid).not.toBe(pid);
   await page.reload();
   await expect(toolbar(page).getByTestId('bpmn-field-name')).toHaveValue(copyName);
-  await expect(page.locator('.react-flow__node')).toHaveCount(13);
+  await expect(page.locator('.react-flow__node')).toHaveCount(8);
   const originalRead = await page.request.get(`/api/bpm/process-definitions/${pid}`);
   expect((await originalRead.json()).data.processName).toBe(refinedName);
   await capture(page, info, 'SC05-BPM-copy-saved-and-reopened');

@@ -1,9 +1,10 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../helpers/environments';
 /** Real query provenance, published commands, immutable dynamic records and outbox facts. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
-import { BACKEND_URL, PG_CONN } from '../helpers/environments';
+import { PG_CONN } from '../helpers/environments';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
@@ -592,7 +593,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       const jwt = (await login.json()).data.jwt;
       expect(jwt).toBeTruthy();
       const other = await requestFactory.newContext({
-        baseURL: BACKEND_URL,
+        baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       try {

@@ -153,6 +153,23 @@ immutable Maven, npm, migration/config, and OCI registries). A downstream releas
 must never resolve an AuraBoot sibling checkout, Maven Local, `workspace:` link,
 `SNAPSHOT`, `latest`, or branch reference.
 
+### Staging independent Web package updates
+
+For an application consuming a separately pinned backend, stage a clean Web source
+commit as npm artifacts without rebuilding or relabeling the runtime:
+
+```bash
+node scripts/application/stage-core-only-artifacts.mjs \
+  --web-only --output /absolute/new/path/to/auraboot-web-packages
+```
+
+This produces the eight npm tarballs, their SHA-256 artifact catalog and a
+`web-packages-only` receipt. It does not emit a runtime, application lock, built
+application, OCI image or deployment approval. Consumers retain the backend's
+original source identity, explicitly admit the new npm hashes, and build and
+verify their application with those exact packages. A dirty source tree is rejected
+by the same staging boundary as the full artifact set.
+
 ## Publishing an application release for tenant binding
 
 Registration records immutable application release content, but it does not make a

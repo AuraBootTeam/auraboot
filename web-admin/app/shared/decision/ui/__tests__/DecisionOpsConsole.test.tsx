@@ -17,6 +17,8 @@ vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => traceHttp,
 }));
 
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }), usePermissions: () => ({ hasPermission: () => true }) }));
+
 const FIELDS: FieldOption[] = [
   {
     scope: 'record',
@@ -809,7 +811,7 @@ describe('DecisionOpsConsole', () => {
     renderConsole();
     expect(screen.getByRole('link', { name: '进入工作区' })).toHaveAttribute(
       'href',
-      '#strategy-workbench',
+      '?tab=studio',
     );
     expect(screen.getByTestId('strategy-studio')).toHaveAttribute('id', 'strategy-workbench');
   });
@@ -1602,16 +1604,16 @@ describe('DecisionOpsConsole', () => {
 
     fireEvent.click(screen.getByTestId('dt-export-dmn'));
     await waitFor(() => expect(exportTableDmn).toHaveBeenCalledOnce());
-    expect(screen.getByLabelText('dmn-xml')).toHaveValue(
+    await waitFor(() => expect(screen.getByLabelText('dmn-xml')).toHaveValue(
       '<definitions id="strategy"><decisionTable /></definitions>',
-    );
+    ));
 
     fireEvent.click(screen.getByTestId('dt-roundtrip-dmn'));
     await waitFor(() => expect(roundTripTableDmn).toHaveBeenCalledOnce());
     await waitFor(() =>
       expect(screen.getByLabelText('feel-0-sla_deadlineMinutes')).toHaveValue('> 30'),
     );
-    expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过');
+    await waitFor(() => expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过'));
   });
 
   it('does not report Strategy Studio publish success when the runtime rejects the transition', async () => {
@@ -2158,8 +2160,10 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('doc-panel-designer')).toBeInTheDocument();
     expect(screen.getByTestId('epd-workflow')).toBeInTheDocument();
     expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('Policy One');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('p1');
-    expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('p1');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('p1');
+    expect(screen.getByTestId('epd-trigger-context')).not.toHaveTextContent('FORM_SUBMITTED');
+    expect(screen.getByTestId('epd-strategy-summary')).toHaveTextContent('FORM_SUBMITTED');
   });
 
   it('switches to Designer (F3) tab and shows the workflow stepper', () => {
@@ -2546,7 +2550,7 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByLabelText('dmn-xml')).toHaveValue(
       '<definitions id="roundtrip"><decisionTable /></definitions>',
     );
-    expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过');
+    await waitFor(() => expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过'));
   });
 
   it('switches to Logs / Model / Permissions / Connectors tabs', () => {
@@ -2576,6 +2580,8 @@ describe('DecisionOpsConsole', () => {
     expect(logRow).not.toHaveTextContent('MATCHED');
     expect(logRow).toHaveTextContent('18ms');
 
+    expect(screen.queryByTestId('elta-filters')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('elta-professional-toggle'));
     fireEvent.change(screen.getByTestId('log-keyword'), { target: { value: 'trace-live' } });
     fireEvent.click(screen.getByTestId('elta-apply'));
 

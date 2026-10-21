@@ -46,6 +46,29 @@ public interface OutboxEventMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertEnvelope(OutboxEvent event);
 
+    @Insert("INSERT INTO ab_outbox (tenant_id, event_id, event_type, command_code, schema_version, " +
+            "event_source, subject, occurred_at, correlation_id, causation_id, ordering_key, event_sequence, " +
+            "payload, headers, status, retry_count, max_retries, next_retry_at, created_at) " +
+            "VALUES (#{tenantId}, #{eventId}, #{eventType}, #{commandCode}, #{schemaVersion}, " +
+            "#{eventSource}, #{subject}, #{occurredAt}, #{correlationId}, #{causationId}, #{orderingKey}, " +
+            "#{eventSequence}, #{payload, jdbcType=OTHER, " +
+            "typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb, " +
+            "#{headers, jdbcType=OTHER, " +
+            "typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb, " +
+            "#{status}, #{retryCount}, #{maxRetries}, #{nextRetryAt}, #{createdAt}) ON CONFLICT (tenant_id, event_id) WHERE schema_version IS NOT NULL DO NOTHING")
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insertEnvelopeIfAbsent(OutboxEvent event);
+
+    @Select("SELECT COUNT(*) FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
+            "AND event_type = #{eventType} AND command_code IS NOT DISTINCT FROM #{commandCode} " +
+            "AND schema_version = #{schemaVersion} AND event_source = #{eventSource} " +
+            "AND subject = #{subject} AND occurred_at = #{occurredAt} " +
+            "AND correlation_id = #{correlationId} AND causation_id IS NOT DISTINCT FROM #{causationId} " +
+            "AND ordering_key = #{orderingKey} AND event_sequence = #{eventSequence} " +
+            "AND payload = #{payload, jdbcType=OTHER, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb " +
+            "AND headers = #{headers, jdbcType=OTHER, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb")
+    int countMatchingEnvelope(OutboxEvent event);
+
     @Select("SELECT * FROM ab_outbox WHERE status IN ('pending', 'processing') " +
             "AND next_retry_at <= NOW() ORDER BY created_at LIMIT #{limit}")
     List<OutboxEvent> findReadyEvents(@Param("limit") int limit);
@@ -66,6 +89,25 @@ public interface OutboxEventMapper {
                                       @Param("leaseOwner") String leaseOwner,
                                       @Param("leaseToken") String leaseToken,
                                       @Param("leaseUntil") Instant leaseUntil);
+
+    /** Internal exact-event lease claim; never polls or claims another tenant's queue. */
+    @Select("<script>WITH candidate AS (" +
+            "SELECT o.id FROM ab_outbox o WHERE o.tenant_id = #{tenantId} AND o.event_id = #{eventId} " +
+            "AND ((o.status = 'pending' AND o.next_retry_at &lt;= NOW()) " +
+            "OR (o.status = 'processing' AND o.lease_until &lt; NOW())) " +
+            "AND (o.ordering_key IS NULL OR NOT EXISTS (SELECT 1 FROM ab_outbox earlier " +
+            "WHERE earlier.tenant_id = o.tenant_id AND earlier.ordering_key = o.ordering_key " +
+            "AND earlier.event_sequence &lt; o.event_sequence " +
+            "AND earlier.status IN ('pending', 'processing'))) " +
+            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT 1) " +
+            "UPDATE ab_outbox o SET status = 'processing', lease_owner = #{leaseOwner}, " +
+            "lease_token = #{leaseToken}, lease_until = #{leaseUntil}, claimed_at = NOW() " +
+            "FROM candidate c WHERE o.id = c.id AND o.tenant_id = #{tenantId} AND o.event_id = #{eventId} RETURNING o.*</script>")
+    List<OutboxEvent> claimKnownEvent(@Param("tenantId") Long tenantId,
+                                     @Param("eventId") String eventId,
+                                     @Param("leaseOwner") String leaseOwner,
+                                     @Param("leaseToken") String leaseToken,
+                                     @Param("leaseUntil") Instant leaseUntil);
 
     @Update("UPDATE ab_outbox SET status = 'processing' WHERE id = #{id} AND status IN ('pending', 'processing')")
     int claimEvent(@Param("id") Long id);
@@ -92,6 +134,18 @@ public interface OutboxEventMapper {
     int recordFailureFenced(@Param("id") Long id, @Param("leaseToken") String leaseToken,
                             @Param("nextRetryAt") Instant nextRetryAt,
                             @Param("lastError") String lastError);
+
+    /** Wall-clock lease expiry must be rechecked even inside a long-running delivery transaction. */
+    @Select("SELECT COUNT(*) FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
+            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > clock_timestamp()")
+    int countActiveDeliveryLease(@Param("tenantId") Long tenantId, @Param("eventId") String eventId,
+                                 @Param("leaseToken") String leaseToken);
+
+    /** Trusted counter holds this exact lease row until its effect and receipt transaction commits. */
+    @Select("SELECT id FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
+            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > clock_timestamp() FOR UPDATE")
+    Long lockActiveDeliveryLease(@Param("tenantId") Long tenantId, @Param("eventId") String eventId,
+                                  @Param("leaseToken") String leaseToken);
 
     @Insert("INSERT INTO ab_integration_receipt (tenant_id, event_id, consumer_code, status, " +
             "lease_token, received_at) VALUES (#{tenantId}, #{eventId}, #{consumerCode}, " +

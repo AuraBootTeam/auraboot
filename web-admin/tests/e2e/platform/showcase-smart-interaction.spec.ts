@@ -86,6 +86,7 @@ async function openCreateForm(page: Page): Promise<void> {
     .waitForURL(/showcase.all.fields.*form|\/new|\/create/, { timeout: 15_000 })
     .catch(() => null);
   await waitForFormReady(page, 15_000);
+  await expect(page.getByTestId('form-section-related_contact')).toBeAttached();
   await expandFormSections(page);
 }
 
@@ -99,7 +100,7 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
   // =========================================================================
   // 1. CascadeSelect multi-level interaction
   // =========================================================================
-  test.fixme('SCI-001 — CascadeSelect: level 1 → level 2 populates → level 3 populates → all have values; clear level 1 resets others', async ({
+  test('SCI-001 — CascadeSelect: level 1 → level 2 populates → level 3 populates → all have values; clear level 1 resets others', async ({
     page,
   }) => {
     test.setTimeout(30000);
@@ -176,17 +177,15 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
       expect(displayText.length, 'Display text should be non-empty').toBeGreaterThan(0);
     }
 
-    // -- Select a different level 1 value to verify levels 2 and 3 reset --
+    // A new parent selection must clear the previous child path.
     await trigger0.click();
-    const serviceOption = page.locator('[data-testid="cascade-option-sc_cascade_category-0-service"]');
-    if (await serviceOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await serviceOption.click();
-      // Level 2 and 3 triggers should have reset (show placeholder)
-      await expect(trigger2).toBeDisabled({ timeout: 3_000 });
-    } else {
-      // Re-select electronics to close dropdown
-      await electronicsOption.click();
-    }
+    const software = page.getByTestId('cascade-option-sc_cascade_category-0-software');
+    await expect(software).toBeVisible();
+    await software.click();
+    await expect(trigger0).toContainText(/Software|软件/);
+    await expect(trigger1).not.toContainText(/Phone|手机/);
+    await expect(trigger2).not.toContainText(/Smartphone|智能手机/);
+    await expect(trigger2).toBeDisabled();
   });
 
   // =========================================================================
@@ -570,70 +569,65 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
   // 7. OrganizationSelect interaction
   // =========================================================================
   test('SCI-007 — OrganizationSelect: open dropdown → tree hierarchy → expand parent → select child → value displayed; clear resets', async ({
-    page,
-  }) => {
-    await openCreateForm(page);
-
-    // Fill required name
-    const nameInput = field(page, 'sc_name').locator('input').first();
-    await nameInput.fill(`SCI-007 Org ${UID}`);
-
-    // Locate org select field
-    const orgField = field(page, 'sc_department');
-    await orgField.scrollIntoViewIfNeeded();
-    await expect(orgField).toBeVisible({ timeout: 5_000 });
-
-    // The OrganizationSelect renders a clickable div trigger with Building2 icon
-    const trigger = orgField.locator('.cursor-pointer').first();
-    await expect(trigger).toBeVisible({ timeout: 3_000 });
-
-    // Click trigger to open dropdown
-    await trigger.click();
-
-    // Dropdown should appear with tree hierarchy and search input
-    const dropdown = orgField.locator('.max-h-60, .overflow-y-auto').first();
-    await expect(dropdown).toBeVisible({ timeout: 3_000 });
-
-    // Search input should be visible in the dropdown
-    const searchInput = orgField.locator('input[type="text"]').first();
-    await expect(searchInput, 'Search input should appear in org dropdown').toBeVisible({
-      timeout: 3_000,
-    });
-
-    const departmentOption = dropdown.locator('[data-testid^="organization-select-option-"]').first();
-    await expect(departmentOption, 'At least one organization option should be visible').toBeVisible({
-      timeout: 5_000,
-    });
-    const selectedOrgName = (await departmentOption.locator('.font-medium').first().innerText()).trim();
-    const selectedOptionId = (await departmentOption.getAttribute('data-testid'))?.replace(
-      'organization-select-option-',
-      '',
-    );
-
-    // Select the first real department from the current seeded organization tree.
-    await departmentOption.click();
-
-    // Trigger should now display the selected org name
-    const triggerText = await trigger.innerText();
-    expect(
-      triggerText.includes(selectedOrgName),
-      `Trigger should show "${selectedOrgName}", got: "${triggerText}"`,
-    ).toBeTruthy();
-
-    // Hidden input should hold the org ID
-    const hiddenInput = orgField.locator('input[type="hidden"]').first();
-    const hiddenValue = await hiddenInput.inputValue();
-    expect(hiddenValue, 'Hidden input should contain selected org ID').toBe(selectedOptionId);
-
-    // -- Clear the value --
-    // OrganizationSelect has a FieldActionButton with X icon for clearing
-    // Look for the clear button that appears when a value is selected
-    const clearAction = orgField.locator('button').filter({ has: page.locator('svg') }).last();
-    if (await clearAction.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await clearAction.click();
-      // After clearing, hidden input should be empty
-      const clearedValue = await hiddenInput.inputValue();
-      expect(clearedValue, 'Value should be cleared after clicking X').toBe('');
+    page, baseURL,
+  }, info) => {
+    const stamp = uniqueId('SCI007');
+    const owned: string[] = [];
+    if (!baseURL) throw new Error('A managed runtime base URL is required');
+    const origin = new URL(baseURL).origin;
+    async function department(label: string, parentPid: string | null) {
+      const response = await page.request.post('/api/org/departments', {
+        headers: { Origin: origin },
+        data: { org_dept_name: `${stamp} ${label}`, org_dept_code: `${stamp}_${label}`,
+          org_dept_parent_id: parentPid, org_dept_order: owned.length, org_dept_status: 'active' },
+      });
+      const payload = await response.json();
+      const pid = payload.data?.pid;
+      if (typeof pid === 'string') owned.push(pid);
+      expect(response.status()).toBe(200);
+      expect(payload.code).toBe('0');
+      expect(pid).toMatch(/^[0-9A-Z]{26}$/);
+      return pid as string;
+    }
+    try {
+      const parentPid = await department('parent', null);
+      const childPid = await department('child', parentPid);
+      await openCreateForm(page);
+      await field(page, 'sc_name').locator('input').first().fill(`SCI-007 Org ${UID}`);
+      const orgField = field(page, 'sc_department');
+      await orgField.scrollIntoViewIfNeeded();
+      await expect(orgField).toBeVisible();
+      const trigger = orgField.getByTestId('organization-select-trigger-sc_department');
+      await expect(trigger).toBeVisible();
+      await trigger.click();
+      const dropdown = orgField.locator('.max-h-60, .overflow-y-auto').first();
+      await expect(dropdown).toBeVisible();
+      await expect(orgField.locator('input[type="text"]').first()).toBeVisible();
+      const parent = dropdown.getByTestId(`organization-select-option-${parentPid}`);
+      const child = dropdown.getByTestId(`organization-select-option-${childPid}`);
+      await expect(parent).toContainText(`${stamp} parent`);
+      await expect(child).toBeVisible();
+      await parent.getByRole('button').click();
+      await expect(child).toHaveCount(0);
+      await parent.getByRole('button').click();
+      await expect(child).toBeVisible();
+      await page.screenshot({ path: info.outputPath('SCI-007-owned-org-expanded.png'), fullPage: true });
+      await child.click();
+      await expect(trigger).toContainText(`${stamp} child`);
+      const hidden = orgField.locator('input[type="hidden"]').first();
+      await expect(hidden).toHaveValue(childPid);
+      await page.screenshot({ path: info.outputPath('SCI-007-owned-org-selected.png'), fullPage: true });
+      const clear = trigger.getByRole('button');
+      await expect(clear).toBeVisible();
+      await clear.click();
+      await expect(hidden).toHaveValue('');
+      await page.screenshot({ path: info.outputPath('SCI-007-owned-org-cleared.png'), fullPage: true });
+    } finally {
+      for (const pid of owned.reverse()) {
+        const removed = await page.request.delete(`/api/org/departments/${pid}`, { headers: { Origin: origin } });
+        expect(removed.status()).toBe(200);
+        expect((await removed.json()).code).toBe('0');
+      }
     }
   });
 

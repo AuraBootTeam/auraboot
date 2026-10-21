@@ -3,6 +3,7 @@
  * 支持 API、字典、静态数据源，以及依赖追踪和自动刷新
  */
 
+import { completedCommandArray, completedCommandOptions } from './completed-command-array';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { DataSourceConfig } from '~/framework/meta/schemas/types';
@@ -130,12 +131,14 @@ function unwrapApiResult(result: any): any {
     }
   }
 
-  const error = new Error(result?.desc || result?.message || 'API request failed') as Error & {
+  const error = new Error(
+    ResultHelper.getErrorDetail(result || {}) ?? (result?.desc || result?.message || 'API request failed'),
+  ) as Error & {
     status?: number;
     statusCode?: number;
     code?: string | number;
   };
-  const numericStatus = Number(result?.status ?? result?.statusCode ?? result?.code);
+  const numericStatus = Number(result?.httpStatus ?? result?.status ?? result?.statusCode ?? result?.code);
   if (Number.isFinite(numericStatus) && numericStatus >= 100 && numericStatus <= 599) {
     error.status = numericStatus;
     error.statusCode = numericStatus;
@@ -740,6 +743,37 @@ export class DataSourceManager {
     }
 
     switch (config.adaptor) {
+      case 'commandArray':
+        return completedCommandArray(data, config);
+      case 'commandOptions':
+        return completedCommandOptions(data, config);
+      case 'commandTable': {
+        // Command execution has one additional envelope after ResultData.
+        // A failed or incomplete command must never become an empty table.
+        const page = data?.data;
+        if (
+          data?.phaseReached !== 'completed' ||
+          !page ||
+          !Array.isArray(page.records) ||
+          !Number.isSafeInteger(page.total) ||
+          page.total < 0 ||
+          !Number.isSafeInteger(page.current) ||
+          page.current < 1 ||
+          !Number.isSafeInteger(page.size) ||
+          page.size < 1 ||
+          page.records.length > page.size ||
+          page.records.length > page.total ||
+          page.records.some((row: unknown) => !row || typeof row !== 'object' || Array.isArray(row))
+        ) {
+          throw new Error('Invalid completed command table response');
+        }
+        return {
+          records: page.records,
+          total: page.total,
+          current: page.current,
+          pageSize: page.size,
+        };
+      }
       case 'optionList':
         // 转换为 { value, label } 格式
         if (Array.isArray(data)) {

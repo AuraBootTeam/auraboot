@@ -15,7 +15,15 @@ import static org.mockito.Mockito.CALLS_REAL_METHODS;
 class DynamicDataAfterCommitContextTest {
     private final DynamicDataServiceImpl service = mock(DynamicDataServiceImpl.class, CALLS_REAL_METHODS);
 
+    @org.junit.jupiter.api.BeforeEach void bindContexts() {
+        ReflectionTestUtils.setField(service, "threadContexts",
+                new com.auraboot.framework.event.context.ThreadContextScopes(java.util.List.of(
+                        new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor())));
+    }
+
     @AfterEach void cleanup() {
+        com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear();
+        com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear();
         MetaContext.clear();
         if (TransactionSynchronizationManager.isSynchronizationActive()) TransactionSynchronizationManager.clearSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(false);
@@ -65,5 +73,18 @@ class DynamicDataAfterCommitContextTest {
         TransactionSynchronization synchronization = register(calls::incrementAndGet);
         synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
         assertThat(calls.get()).isZero();
+    }
+
+    @Test void committedCallbackCapturesAgentAuthorityAndRestoresPreviousWorker() {
+        var submitted = mock(com.auraboot.framework.agent.identity.ExecutionPrincipal.class);
+        var worker = mock(com.auraboot.framework.agent.identity.ExecutionPrincipal.class);
+        com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(submitted);
+        AtomicReference<com.auraboot.framework.agent.identity.ExecutionPrincipal> observed = new AtomicReference<>();
+        TransactionSynchronization synchronization = register(() -> observed.set(
+                com.auraboot.framework.agent.identity.ExecutionPrincipalContext.requireCurrent()));
+        com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(worker);
+        synchronization.afterCommit();
+        assertThat(observed.get()).isSameAs(submitted);
+        assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.requireCurrent()).isSameAs(worker);
     }
 }

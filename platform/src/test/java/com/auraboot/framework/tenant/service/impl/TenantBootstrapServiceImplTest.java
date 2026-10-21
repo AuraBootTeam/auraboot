@@ -78,7 +78,7 @@ class TenantBootstrapServiceImplTest {
                 i18nResourceService,
                 i18nService,
                 dynamicDataMapper,
-                skillAutoGenerator);
+                java.util.List.of(new com.auraboot.framework.agent.integration.bootstrap.AgentTenantSkillInitializer(skillAutoGenerator, dynamicDataMapper)));
     }
 
     private RoleTemplate roleTpl(String code, String name, int priority) {

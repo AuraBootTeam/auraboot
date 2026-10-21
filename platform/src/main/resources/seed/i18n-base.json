@@ -1,5 +1,12 @@
 [
   {
+    "key": "about.menuLabel",
+    "zh-CN": "关于 {productName}",
+    "en-US": "About {productName}",
+    "ja-JP": "{productName} について",
+    "ko-KR": "{productName} 정보"
+  },
+  {
     "key": "action.approve",
     "zh-CN": "审批",
     "en-US": "Approve",
@@ -6104,5 +6111,250 @@
     "en-US": "No downstream consumers",
     "ja-JP": "下流の参照先はありません",
     "ko-KR": "다운스트림 소비자가 없습니다"
+  },
+  {
+    "key": "admin.permission.tab.audit",
+    "zh-CN": "审计",
+    "en-US": "Audit"
+  },
+  {
+    "key": "admin.permission.members.unnamed",
+    "zh-CN": "成员",
+    "en-US": "Member"
+  },
+  {
+    "key": "admin.permission.members.loadFailed",
+    "zh-CN": "成员加载失败，请重试。",
+    "en-US": "Members could not be loaded. Please retry."
+  },
+  {
+    "key": "admin.permission.members.manageHint",
+    "zh-CN": "管理此角色的成员与授权有效期。",
+    "en-US": "Manage membership and access periods for this role."
+  },
+  {
+    "key": "admin.permission.members.readOnlyHint",
+    "zh-CN": "查看成员与授权有效期；修改成员关系需要相应权限。",
+    "en-US": "View members and access periods. Membership changes require permission."
+  },
+  {
+    "key": "permission.capability.ungrouped",
+    "en-US": "Other capabilities",
+    "zh-CN": "其他能力",
+    "ja-JP": "その他の権限",
+    "ko-KR": "기타 권한"
+  },
+  {
+    "key": "permission.module.系统管理",
+    "zh-CN": "系统管理",
+    "en-US": "System Management",
+    "ja-JP": "システム管理",
+    "ko-KR": "시스템 관리"
+  },
+  {
+    "key": "permission.module.决策与事件策略管理",
+    "zh-CN": "决策与事件策略管理",
+    "en-US": "Decisions & Event Policies",
+    "ja-JP": "意思決定とイベントポリシー",
+    "ko-KR": "의사결정 및 이벤트 정책"
+  },
+  {
+    "key": "permission.module.报表定义管理",
+    "zh-CN": "报表定义管理",
+    "en-US": "Report Definitions",
+    "ja-JP": "レポート定義",
+    "ko-KR": "보고서 정의"
+  },
+  {
+    "key": "permission.module.元数据与页面配置",
+    "zh-CN": "元数据与页面配置",
+    "en-US": "Metadata & Pages",
+    "ja-JP": "メタデータとページ",
+    "ko-KR": "메타데이터 및 페이지"
+  },
+  {
+    "key": "permission.module.页面配置治理",
+    "zh-CN": "页面配置治理",
+    "en-US": "Page Governance",
+    "ja-JP": "ページガバナンス",
+    "ko-KR": "페이지 거버넌스"
+  },
+  {
+    "key": "permission.module.审计与留痕",
+    "zh-CN": "审计与留痕",
+    "en-US": "Audit & History",
+    "ja-JP": "監査と履歴",
+    "ko-KR": "감사 및 이력"
+  },
+  {
+    "key": "permission.module.报表与输出",
+    "zh-CN": "报表与输出",
+    "en-US": "Reports & Output",
+    "ja-JP": "レポートと出力",
+    "ko-KR": "보고서 및 출력"
+  },
+  {
+    "key": "permission.module.文件与附件",
+    "zh-CN": "文件与附件",
+    "en-US": "Files & Attachments",
+    "ja-JP": "ファイルと添付",
+    "ko-KR": "파일 및 첨부"
+  },
+  {
+    "key": "permission.module.AI运行与治理",
+    "zh-CN": "AI运行与治理",
+    "en-US": "AI Operations & Governance",
+    "ja-JP": "AI運用とガバナンス",
+    "ko-KR": "AI 운영 및 거버넌스"
+  },
+  {
+    "key": "permission.module.知识库",
+    "zh-CN": "知识库",
+    "en-US": "Knowledge Bases",
+    "ja-JP": "ナレッジベース",
+    "ko-KR": "지식 베이스"
+  },
+  {
+    "key": "permission.module.自动化规则",
+    "zh-CN": "自动化规则",
+    "en-US": "Automation Rules",
+    "ja-JP": "自動化ルール",
+    "ko-KR": "자동화 규칙"
+  },
+  {
+    "key": "permission.module.计费信息",
+    "zh-CN": "计费信息",
+    "en-US": "Billing",
+    "ja-JP": "請求",
+    "ko-KR": "결제 정보"
+  },
+  {
+    "key": "permission.module.公告与通知",
+    "zh-CN": "公告与通知",
+    "en-US": "Announcements & Notifications",
+    "ja-JP": "お知らせと通知",
+    "ko-KR": "공지 및 알림"
+  },
+  {
+    "key": "permission.module.数据交换与设备",
+    "zh-CN": "数据交换与设备",
+    "en-US": "Data Exchange & Devices",
+    "ja-JP": "データ交換とデバイス",
+    "ko-KR": "데이터 교환 및 장치"
+  },
+  {
+    "key": "permission.module.元数据工具",
+    "zh-CN": "元数据工具",
+    "en-US": "Metadata Tools",
+    "ja-JP": "メタデータツール",
+    "ko-KR": "메타데이터 도구"
+  },
+  {
+    "key": "permission.module.客服配置与接待",
+    "zh-CN": "客服配置与接待",
+    "en-US": "Customer Support",
+    "ja-JP": "カスタマーサポート",
+    "ko-KR": "고객 지원"
+  },
+  {
+    "key": "permission.module.业务裁定",
+    "zh-CN": "业务裁定",
+    "en-US": "Business Adjudication",
+    "ja-JP": "業務裁定",
+    "ko-KR": "업무 판정"
+  },
+  {
+    "key": "permission.module.制造计划与指标",
+    "zh-CN": "制造计划与指标",
+    "en-US": "Manufacturing Plans & Metrics",
+    "ja-JP": "製造計画と指標",
+    "ko-KR": "제조 계획 및 지표"
+  },
+  {
+    "key": "permission.module.二维码管理",
+    "zh-CN": "二维码管理",
+    "en-US": "QR Codes",
+    "ja-JP": "QRコード",
+    "ko-KR": "QR 코드"
+  },
+  {
+    "key": "permission.module.语义指标",
+    "zh-CN": "语义指标",
+    "en-US": "Semantic Metrics",
+    "ja-JP": "セマンティック指標",
+    "ko-KR": "시맨틱 지표"
+  },
+  {
+    "key": "permission.module.业务参与方",
+    "zh-CN": "业务参与方",
+    "en-US": "Business Parties",
+    "ja-JP": "業務関係者",
+    "ko-KR": "업무 참여자"
+  },
+  {
+    "key": "permission.module.列表视图",
+    "zh-CN": "列表视图",
+    "en-US": "List Views",
+    "ja-JP": "リストビュー",
+    "ko-KR": "목록 뷰"
+  },
+  {
+    "key": "permission.module.主数据治理",
+    "zh-CN": "主数据治理",
+    "en-US": "Master Data Governance",
+    "ja-JP": "マスターデータ管理",
+    "ko-KR": "마스터 데이터 거버넌스"
+  },
+  {
+    "key": "permission.module.组织与权限管理",
+    "zh-CN": "组织与权限管理",
+    "en-US": "Organization & Permissions",
+    "ja-JP": "組織と権限",
+    "ko-KR": "조직 및 권한"
+  },
+  {
+    "key": "permission.module.组织管理",
+    "zh-CN": "组织管理",
+    "en-US": "Organization",
+    "ja-JP": "組織管理",
+    "ko-KR": "조직 관리"
+  },
+  {
+    "key": "permission.capability.preset.label",
+    "zh-CN": "预设",
+    "en-US": "Presets",
+    "ja-JP": "プリセット",
+    "ko-KR": "프리셋"
+  },
+  {
+    "key": "permission.capability.preset.viewer",
+    "zh-CN": "查看者",
+    "en-US": "Viewer",
+    "ja-JP": "閲覧者",
+    "ko-KR": "조회자"
+  },
+  {
+    "key": "permission.capability.preset.editor",
+    "zh-CN": "编辑者",
+    "en-US": "Editor",
+    "ja-JP": "編集者",
+    "ko-KR": "편집자"
+  },
+  {
+    "key": "permission.capability.preset.admin",
+    "zh-CN": "管理员",
+    "en-US": "Administrator",
+    "ja-JP": "管理者",
+    "ko-KR": "관리자"
+  },
+  {
+    "key": "command.expected_version.unsupported",
+    "zh-CN": "此命令不接受版本参数，请刷新页面后重新操作。",
+    "en-US": "This command does not accept a version parameter. Refresh the page and try again."
+  },
+  {
+    "key": "command.target_version_policy.invalid",
+    "zh-CN": "命令版本策略配置无效，请联系管理员。",
+    "en-US": "The command version policy is invalid. Contact an administrator."
   }
 ]

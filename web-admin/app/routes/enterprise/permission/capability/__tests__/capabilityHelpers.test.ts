@@ -11,6 +11,16 @@ import {
 
 function cap(code: string, granted: boolean, sensitive = false) {
   return {
+    authorizationState: granted ? ('full' as const) : ('none' as const),
+    description: null,
+    tier: null,
+    displayGroupOrder: 10000,
+    displayOrder: 100,
+    localizedLabels: {},
+    localizedDescriptions: {},
+    missingCodes: [],
+    unlockedMenus: null,
+
     code,
     group: '客户管理',
     label: code,
@@ -30,6 +40,13 @@ const groups: CapabilityGroup[] = [
 ];
 
 describe('capabilityHelpers', () => {
+  it('keeps a declared capability without a group selectable in the primary view', () => {
+    const ungrouped = { ...cap('org.cap.read', false), group: null };
+    const split = splitCapabilityGroupsForPrimaryView([{ group: null, capabilities: [ungrouped] }]);
+    expect(split.primaryGroups).toEqual([{ group: null, capabilities: [ungrouped] }]);
+    expect(split.primaryTotal).toBe(1);
+    expect(split.advancedGroups).toEqual([]);
+  });
   it('grantedCapabilityCodes returns only fully-granted capability codes', () => {
     expect(grantedCapabilityCodes(groups)).toEqual(['crm.cap.account']);
   });
@@ -60,6 +77,15 @@ describe('capabilityHelpers', () => {
         group: 'g',
         capabilities: [
           {
+            authorizationState: 'none' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'a',
             group: 'g',
             label: 'a',
@@ -70,6 +96,15 @@ describe('capabilityHelpers', () => {
             conventionDerived: false,
           },
           {
+            authorizationState: 'none' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'b',
             group: 'g',
             label: 'b',
@@ -80,6 +115,15 @@ describe('capabilityHelpers', () => {
             conventionDerived: false,
           },
           {
+            authorizationState: 'none' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'c',
             group: 'g',
             label: 'c',
@@ -90,6 +134,16 @@ describe('capabilityHelpers', () => {
             conventionDerived: false,
           },
           {
+            authorizationState: 'none' as const,
+            description: null,
+            tier: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'd',
             group: 'g',
             label: 'd',
@@ -113,6 +167,15 @@ describe('capabilityHelpers', () => {
         group: '报价单',
         capabilities: [
           {
+            authorizationState: 'full' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'qo.cap.quote_view',
             group: '报价单',
             label: '查看报价',
@@ -128,6 +191,15 @@ describe('capabilityHelpers', () => {
         group: 'model',
         capabilities: [
           {
+            authorizationState: 'full' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'model.qo_quote_common',
             group: 'model',
             label: 'Qo_quote_common Read',
@@ -138,6 +210,15 @@ describe('capabilityHelpers', () => {
             conventionDerived: true,
           },
           {
+            authorizationState: 'none' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'model.crm_account_common',
             group: 'model',
             label: 'Crm_account_common Read',
@@ -153,6 +234,15 @@ describe('capabilityHelpers', () => {
         group: '客户管理',
         capabilities: [
           {
+            authorizationState: 'full' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'crm.cap.account',
             group: '客户管理',
             label: '维护客户资料',
@@ -168,6 +258,15 @@ describe('capabilityHelpers', () => {
         group: 'meta',
         capabilities: [
           {
+            authorizationState: 'full' as const,
+            description: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'meta.model',
             group: 'meta',
             label: 'Meta model read',
@@ -199,6 +298,14 @@ describe('capabilityHelpers', () => {
         group: '规则配置',
         capabilities: [
           {
+            authorizationState: 'none' as const,
+            description: null,
+            tier: null,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'bom.rule.manage',
             group: '规则配置',
             label: '编辑 BOM 规则',
@@ -215,6 +322,14 @@ describe('capabilityHelpers', () => {
         group: '报价管理',
         capabilities: [
           {
+            authorizationState: 'none' as const,
+            description: null,
+            tier: null,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'qo.cap.quote_edit',
             group: '报价管理',
             label: '编辑报价',
@@ -226,6 +341,14 @@ describe('capabilityHelpers', () => {
             displayOrder: 30,
           },
           {
+            authorizationState: 'full' as const,
+            description: null,
+            tier: null,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'qo.cap.quote_view',
             group: '报价管理',
             label: '查看报价',
@@ -257,6 +380,14 @@ describe('capabilityHelpers', () => {
         group: '组织与权限管理',
         capabilities: [
           {
+            authorizationState: 'none' as const,
+            description: null,
+            tier: null,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'org.cap.role',
             group: '组织与权限管理',
             label: '管理角色与授权',
@@ -283,6 +414,14 @@ describe('capabilityHelpers', () => {
         group: '系统管理',
         capabilities: [
           {
+            authorizationState: 'none' as const,
+            description: null,
+            tier: null,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'sys.cap.model_service',
             group: '系统管理',
             label: '模型服务配置',
@@ -309,6 +448,16 @@ describe('capabilityHelpers', () => {
         group: '线索与商机',
         capabilities: [
           {
+            authorizationState: 'none' as const,
+            description: null,
+            tier: null,
+            displayGroupOrder: 10000,
+            displayOrder: 100,
+            localizedLabels: {},
+            localizedDescriptions: {},
+            missingCodes: [],
+            unlockedMenus: null,
+
             code: 'crm.cap.lead',
             group: '线索与商机',
             label: '维护线索',

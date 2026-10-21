@@ -23,7 +23,7 @@ class AnalyticsCommandOutcomePublisherTest {
     private final BehaviorOutcomePublisher outbox = mock(BehaviorOutcomePublisher.class);
     private final RecordSnapshotReader snapshots = mock(RecordSnapshotReader.class);
     private final AnalyticsCommandOutcomePublisher publisher =
-            new AnalyticsCommandOutcomePublisher(jdbc, new ObjectMapper(), outbox, snapshots);
+            new AnalyticsCommandOutcomePublisher(jdbc, new ObjectMapper(), outbox, snapshots, new com.auraboot.framework.agent.integration.behavior.AgentAnalyticsExecutionContext(), new com.auraboot.framework.agent.integration.behavior.AgentAnalyticsCommandOriginLookup(jdbc));
 
     @AfterEach void clearRun() { StepContext.clearRunPid(); }
 

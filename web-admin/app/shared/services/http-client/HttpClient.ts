@@ -92,23 +92,20 @@ export async function fetchResult<T>(
  * transport-level retries reuse the same body.
  */
 function withCommandClientRequestId(path: string, options: FetchOptions): FetchOptions {
+  const payload = options.body !== undefined ? options.body : options.params;
   if (
     options.method?.toLowerCase() !== 'post' ||
     !path.startsWith('/api/meta/commands/execute/') ||
-    !options.params ||
-    Array.isArray(options.params) ||
-    options.params.clientRequestId != null
+    typeof payload !== 'object' ||
+    payload === null ||
+    Array.isArray(payload) ||
+    ('clientRequestId' in payload && payload.clientRequestId != null)
   ) {
     return options;
   }
 
-  return {
-    ...options,
-    params: {
-      ...options.params,
-      clientRequestId: createCommandClientRequestId(),
-    },
-  };
+  const body = { ...payload, clientRequestId: createCommandClientRequestId() };
+  return options.body !== undefined ? { ...options, body } : { ...options, params: body };
 }
 
 function createCommandClientRequestId(): string {

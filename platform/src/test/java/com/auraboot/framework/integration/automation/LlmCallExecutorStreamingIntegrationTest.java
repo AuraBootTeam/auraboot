@@ -8,7 +8,7 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.event.AutomationLlmChunkEvent;
 import com.auraboot.framework.automation.event.AutomationRunStreamPublisher;
-import com.auraboot.framework.automation.executor.impl.LlmCallExecutor;
+import com.auraboot.framework.agent.integration.automation.LlmCallExecutor;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;

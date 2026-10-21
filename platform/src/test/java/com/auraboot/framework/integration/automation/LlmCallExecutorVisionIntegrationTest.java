@@ -8,7 +8,7 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ModelCapabilityProfile;
 import reactor.core.publisher.Flux;
 import com.auraboot.framework.automation.entity.AutomationAction;
-import com.auraboot.framework.automation.executor.impl.LlmCallExecutor;
+import com.auraboot.framework.agent.integration.automation.LlmCallExecutor;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

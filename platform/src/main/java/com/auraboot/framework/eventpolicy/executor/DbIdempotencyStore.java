@@ -27,6 +27,17 @@ public class DbIdempotencyStore implements IdempotencyStore {
     private final DrtPolicyExecLogMapper mapper;
 
     @Override
+    public void lock(Long tenantId, String idempotencyKey) {
+        if (tenantId == null || idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("Tenant and action identity are required");
+        }
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Action execution must own a database transaction");
+        }
+        mapper.lockAction("policy-action:" + tenantId + ":" + idempotencyKey);
+    }
+
+    @Override
     public boolean alreadySucceeded(Long tenantId, String idempotencyKey) {
         if (idempotencyKey == null) {
             return false;
@@ -63,6 +74,9 @@ public class DbIdempotencyStore implements IdempotencyStore {
         }
         Instant now = Instant.now();
         DrtPolicyExecLogEntity existing = mapper.findByTenantAndKey(tenantId, result.idempotencyKey());
+        if (existing != null && ActionExecutionStatus.SUCCESS.name().equals(existing.getStatus())) {
+            return;
+        }
         int maxAttempts = resolveMaxAttempts(plan, existing);
         int attemptCount = (existing != null ? valueOrZero(existing.getAttemptCount()) : 0)
                 + (countsAsAttempt(result.status()) ? 1 : 0);

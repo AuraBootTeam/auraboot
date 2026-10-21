@@ -1,10 +1,11 @@
+import { EXPLICIT_BACKEND_URL as CONTRACT_EXPLICIT_BACKEND_URL } from '../../helpers/environments';
 /** Real role grants and revocation through the existing AuraBot analysis card. */
 import { test, expect } from '../../fixtures';
 import { request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
-import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
+import { PG_CONN } from '../../helpers/environments';
 import { ensureRoleUser, makeRoleUser, openAsRole, fetchRoleSnapshot } from '../rbac/rbac-helpers';
 
 test.use({
@@ -651,7 +652,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         expect(String(tenant.tenantId)).not.toBe(String(currentUser.tenantId));
         expect(tenant.jwt).toBeTruthy();
         const foreign = await requestFactory.newContext({
-          baseURL: BACKEND_URL,
+          baseURL: CONTRACT_EXPLICIT_BACKEND_URL,
           extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
         });
         try {

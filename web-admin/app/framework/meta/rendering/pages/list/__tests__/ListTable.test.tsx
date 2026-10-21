@@ -40,6 +40,13 @@ function renderListTable(overrides: Partial<ListTableProps> = {}) {
 }
 
 describe('ListTable selection column layout', () => {
+  it('declares column scope on data and action headers for browser table semantics', () => {
+    renderListTable({ columns: [...columns, { field: 'actions', label: 'Actions', isActionColumn: true }] });
+    for (const field of ['name', 'kind', 'actions']) {
+      expect(screen.getByTestId(`table-header-${field}`)).toHaveAttribute('scope', 'col');
+    }
+  });
+
   it('does not render body selection cells when selection is disabled', () => {
     renderListTable();
 
@@ -69,6 +76,16 @@ describe('ListTable selection column layout', () => {
     const truncationWrapper = nameCell.querySelector('div.truncate');
     expect(truncationWrapper).toBeInTheDocument();
     expect(truncationWrapper).toHaveAttribute('title', longName);
+  });
+
+  it('honors explicit non-ellipsis columns without changing the exact displayed value', () => {
+    const quantity = '12345678901234567890.000001';
+    renderListTable({ columns: [{ field: 'quantity', label: 'Quantity', width: 140, ellipsis: false }],
+      data: [{ pid: 'row-1', quantity }] });
+    const cell = screen.getByTestId('table-cell-0-quantity');
+    expect(cell).toHaveTextContent(quantity);
+    expect(cell.querySelector('div.truncate')).toBeNull();
+    expect(cell.querySelector('div.whitespace-normal')).toHaveAttribute('title', quantity);
   });
 
   it('widens the action column for long labels instead of wrapping them', () => {

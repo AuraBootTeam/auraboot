@@ -32,13 +32,32 @@ public interface DynamicDataMapper {
             @Param("tenantId") Long tenantId, @Param("targetRecordPid") String targetRecordPid);
 
 
+    /** Structured ownership lock; the provider always binds an explicit tenant predicate. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectRecordWriterTargetsForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String,Object>> selectRecordWriterTargetsForUpdate(
+            @Param("tableName") String tableName, @Param("markerColumn") String markerColumn,
+            @Param("markerAlias") String markerAlias, @Param("conditions") Map<String,Object> conditions);
+
+    /** Structured junction lock; values remain bound and tenant scope cannot be omitted. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectRelationTargetsForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String,Object>> selectRelationTargetsForUpdate(
+            @Param("tableName") String tableName, @Param("sourceColumn") String sourceColumn,
+            @Param("targetColumn") String targetColumn, @Param("tenantId") Long tenantId,
+            @Param("sourceIdentity") String sourceIdentity);
+
+
     /**
      * 根据SQL查询数据
      * @param sql SQL语句
      * @param params 参数映射
      * @return 查询结果
      */
+    // Mutable business rows must be re-read under the database transaction isolation level.
+    // A command's second read must not reuse a pre-change MyBatis session snapshot.
     @SelectProvider(type = DynamicSqlProvider.class, method = "selectByQuery")
+    @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
     List<Map<String, Object>> selectByQuery(@Param("sql") String sql, @Param("params") Map<String, Object> params);
 
     /**

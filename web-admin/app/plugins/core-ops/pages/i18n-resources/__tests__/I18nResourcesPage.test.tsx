@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import I18nResourcesPage from '../index';
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), confirm: vi.fn() }));
@@ -88,5 +88,60 @@ describe('i18n resources workflow feedback', () => {
     fireEvent.click(await screen.findByLabelText('delete-test.review.key'));
     await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
     expect(mocks.request.mock.calls.some(([, options]) => options.method === 'delete')).toBe(false);
+  });
+
+  function deferredList() {
+    let resolve!: (value: unknown) => void;
+    let reject!: (reason: Error) => void;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  }
+
+  function filteredRequestPair() {
+    const older = deferredList();
+    const newer = deferredList();
+    mocks.request.mockImplementation((_path, options) =>
+      options.params?.keyPrefix === 'new.' ? newer.promise : older.promise,
+    );
+    render(<I18nResourcesPage />);
+    fireEvent.change(screen.getByPlaceholderText('key prefix, e.g. menu.'), {
+      target: { value: 'new.' },
+    });
+    return { older, newer };
+  }
+
+  const filteredPage = () => ({ code: '0', data: {
+    records: [{ ...resource, pid: 'new', i18nKey: 'new.review.key' }], total: 1,
+  } });
+  const unfilteredPage = () => ({ code: '0', data: {
+    records: [{ ...resource, pid: 'old', i18nKey: 'old.review.key' }], total: 41,
+  } });
+
+  it('keeps the latest filtered rows and pagination when an older list resolves last', async () => {
+    const { older, newer } = filteredRequestPair();
+    await act(async () => { newer.resolve(filteredPage()); });
+    expect(screen.getByRole('cell', { name: 'new.review.key' })).toBeInTheDocument();
+    await act(async () => { older.resolve(unfilteredPage()); });
+    expect(screen.getByRole('cell', { name: 'new.review.key' })).toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: 'old.review.key' })).not.toBeInTheDocument();
+    expect(screen.getByText('1 / 1')).toBeInTheDocument();
+  });
+
+  it('ignores an older list failure after the current filtered list succeeds', async () => {
+    const { older, newer } = filteredRequestPair();
+    await act(async () => { newer.resolve(filteredPage()); });
+    await act(async () => { older.reject(new Error('stale transport failure')); });
+    expect(screen.getByRole('cell', { name: 'new.review.key' })).toBeInTheDocument();
+    expect(screen.queryByText('Failed to load resources')).not.toBeInTheDocument();
+  });
+
+  it('keeps loading until the current filtered request completes', async () => {
+    const { older, newer } = filteredRequestPair();
+    await act(async () => { older.resolve(unfilteredPage()); });
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: 'old.review.key' })).not.toBeInTheDocument();
+    await act(async () => { newer.resolve(filteredPage()); });
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'new.review.key' })).toBeInTheDocument();
   });
 });

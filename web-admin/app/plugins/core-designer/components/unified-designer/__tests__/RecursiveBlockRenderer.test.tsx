@@ -1689,6 +1689,51 @@ describe('RecursiveBlockRenderer', () => {
     ).toHaveTextContent('80');
   });
 
+  it('renders authored localized tab labels and switches to the selected tab content', () => {
+    render(<RecursiveBlockRenderer schema={{
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'localized_tabs_form',
+      blocks: [{
+        id: 'localized_tabs', blockType: 'tabs',
+        title: { 'zh-CN': 'Authored tabs', en: 'New tabs' },
+        blocks: [
+          { id: 'localized_tab_first', blockType: 'tab', title: { 'zh-CN': 'First authored tab', en: 'New tab' }, blocks: [] },
+          { id: 'localized_tab_second', blockType: 'tab', title: { 'zh-CN': 'Second authored tab', en: 'New tab' }, blocks: [] },
+        ],
+      }],
+    }} />);
+    const first = screen.getByTestId('runtime-tab-trigger-localized_tab_first');
+    const second = screen.getByTestId('runtime-tab-trigger-localized_tab_second');
+    expect(first).toHaveTextContent('First authored tab');
+    expect(second).toHaveTextContent('Second authored tab');
+    expect(first).not.toHaveTextContent('New tab');
+    expect(first).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(second);
+    expect(second).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('runtime-tab-panel-localized_tab_second')).toBeVisible();
+    expect(screen.queryByTestId('runtime-tab-panel-localized_tab_first')).not.toBeInTheDocument();
+  });
+
+  it.each(['table', 'sub-table'] as const)('renders the edited localized %s title instead of its English default', (blockType) => {
+    render(<RecursiveBlockRenderer schema={{
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'localized_table_form',
+      blocks: [{
+        id: 'localized_line_items',
+        blockType,
+        title: { 'zh-CN': 'Authored line items', 'en-US': 'New sub table' },
+        props: { rows: [{ name: 'Owned preview row' }] },
+        blocks: [{ id: 'localized_name', blockType: 'column', field: 'name', props: { label: 'Name' } }],
+      }],
+    }} />);
+    const table = screen.getByTestId('runtime-block-localized_line_items');
+    expect(table).toHaveTextContent('Authored line items');
+    expect(table).not.toHaveTextContent('New sub table');
+    expect(table).toHaveTextContent('Owned preview row');
+  });
+
   it('renders editable repeater rows and passes row values to form actions', async () => {
     const runtimeServices: RuntimeExecutionServices = {
       executeAction: vi.fn().mockResolvedValue({ status: 'Submitted' }),
@@ -3124,5 +3169,60 @@ describe('RecursiveBlockRenderer', () => {
     expect(screen.getByTestId('runtime-widget-error-hint-widget_permission')).toHaveTextContent(
       'Check the permission required by this block.',
     );
+  });
+});
+
+
+describe('localized repeating block titles', () => {
+  it.each(['repeater', 'subform'])('renders the edited current-language %s title', blockType => {
+    render(<RecursiveBlockRenderer schema={{ schemaVersion: 3, kind: 'form', id: 'localized_rows',
+      blocks: [{ id: 'localized_rows_root', blockType: 'form', blocks: [{
+        id: 'localized_rows_block', blockType, title: { en: 'Original title', 'zh-CN': 'Edited current-language title' },
+        props: { rows: [{}] }, blocks: [],
+      }] }],
+    }} />);
+    expect(screen.getByTestId(`runtime-${blockType}-localized_rows_block`)).toHaveTextContent('Edited current-language title');
+    expect(screen.getByTestId(`runtime-${blockType}-localized_rows_block`)).not.toHaveTextContent('Original title');
+  });
+});
+
+// Exercise the query contract through a real runtime action and execution context.
+describe('runtime action route query', () => {
+  it.each([
+    ['ordinary values', '?filter=ready&count=0&empty=', [['filter', 'ready'], ['count', '0'], ['empty', '']]],
+    ['repeated values', '?tag=a&tag=b&tag=c', [['tag', ['a', 'b', 'c']]]],
+    ['prototype names', '?__proto__=first&__proto__=second&constructor=ctor&toString=label&prototype=proto', [
+      ['__proto__', ['first', 'second']], ['constructor', 'ctor'], ['toString', 'label'], ['prototype', 'proto'],
+    ]],
+  ] as const)('preserves %s in the execution context', async (_label, search, entries) => {
+    const originalUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const executeAction = vi.fn().mockResolvedValue({ status: 'Submitted' });
+    try {
+      window.history.replaceState(null, '', `/runtime-query${search}`);
+      render(
+        <RecursiveBlockRenderer
+          runtimeServices={{ executeAction }}
+          schema={{
+            schemaVersion: 3, kind: 'list', id: 'route_query_page',
+            blocks: [{
+              id: 'query_action', blockType: 'action', actionType: 'command',
+              props: { label: 'Submit', command: 'customer.submit', executionMode: 'live' },
+            }],
+          }}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('runtime-action-query_action'));
+      await waitFor(() => expect(executeAction).toHaveBeenCalledTimes(1));
+      const query = executeAction.mock.calls[0][1].routeQuery;
+      expect(Object.getPrototypeOf(query)).toBe(Object.prototype);
+      expect(Object.keys(query).sort()).toEqual(entries.map(([key]) => key).sort());
+      for (const [key, value] of entries) {
+        expect(Object.hasOwn(query, key)).toBe(true);
+        expect(query[key]).toEqual(value);
+      }
+      expect(JSON.parse(JSON.stringify(query))).toEqual(Object.fromEntries(entries));
+    } finally {
+      window.history.replaceState(null, '', originalUrl);
+    }
   });
 });

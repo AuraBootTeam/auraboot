@@ -70,6 +70,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     private final TableMetadataService tableMetadataService;
     private final MultiTenantIndexManager multiTenantIndexManager;
     private final DataSource dataSource;
+    private final ModelFieldRenameColumnPolicy fieldRenameColumnPolicy;
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -218,6 +219,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
      * 生成建表DDL语句
      */
     private String generateCreateTableDDL(ModelDefinition model) {
+        String tableName = model.getTableName();
         DdlDialect dialect = ddlDialectProvider.getDialect();
         StringBuilder ddl = new StringBuilder();
         ddl.append("CREATE TABLE IF NOT EXISTS ").append(model.getTableName()).append(" (\n");
@@ -250,7 +252,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 existingColumns.add(columnName);
                 continue;
             }
-            String columnDef = generateColumnDefinition(field);
+            String columnDef = generateColumnDefinition(tableName, field);
             columnDefinitions.add("    " + columnDef);
             existingColumns.add(columnName);
         }
@@ -297,7 +299,14 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     /**
      * 生成字段定义
      */
-    private String generateColumnDefinition(FieldDefinition field) {
+    private boolean physicalRequired(String tableName, FieldDefinition field) {
+        if (field.isTransientField()) return false;
+        if (field.isPrimaryKey()) return true;
+        if (!field.isRequired()) return false;
+        return fieldRenameColumnPolicy == null || !fieldRenameColumnPolicy.deferNotNull(tableName, field.getColumnName());
+    }
+
+    private String generateColumnDefinition(String tableName, FieldDefinition field) {
         // Validate column name to prevent DDL injection
         SqlSafetyUtils.validateIdentifier(field.getColumnName(), "column name");
 
@@ -314,7 +323,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         // Transient fields are excluded from INSERT (DynamicDataMapper never writes them), so a
         // NOT NULL column for a transient field can never be satisfied — it must stay nullable
         // even when the binding is required (required is a form-level constraint, not a column one).
-        if ((field.isRequired() || field.isPrimaryKey()) && !field.isTransientField()) {
+        if (physicalRequired(tableName, field)) {
             columnDef.append(" NOT NULL");
         }
 
@@ -548,7 +557,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
             // 5. 生成ADD COLUMN DDL (IF NOT EXISTS prevents race-condition failures when
             //    multiple async plugin import tasks try to add the same column concurrently)
-            String columnDef = generateColumnDefinition(field);
+            String columnDef = generateColumnDefinition(tableName, field);
             String ddl = "ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS " + columnDef;
             
             // 6. 执行DDL
@@ -686,8 +695,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 throw new BusinessException("Column does not exist: " + columnName);
             }
             
-            // 5. 生成 ALTER COLUMN DDL(PostgreSQL 是唯一的平台数据库)
-            String columnDef = generateColumnDefinition(field);
+            // 5. 生成MODIFY COLUMN DDL (根据数据库方言)
+            String columnDef = generateColumnDefinition(tableName, field);
             DdlDialect dialect = ddlDialectProvider.getDialect();
 
             {
@@ -703,7 +712,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 // Transient fields are never INSERTed, so they must stay nullable — this also
                 // heals existing NOT NULL columns left behind when a field became transient
                 // (DROP NOT NULL on the next schema sync).
-                if ((field.isRequired() || field.isPrimaryKey()) && !field.isTransientField()) {
+                if (physicalRequired(tableName, field)) {
                     ddls.add(String.format("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
                             tableName, columnName));
                 } else {
@@ -1204,7 +1213,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 continue;
             }
             if (!tableMetadataService.columnExists(tableName, columnName)) {
-                String columnDef = generateColumnDefinition(field);
+                String columnDef = generateColumnDefinition(tableName, field);
                 ddlStatements.add("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS " + columnDef);
                 newlyAddedColumns.add(columnName);
 
@@ -1226,7 +1235,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                         tableName, columnName, ddlDialectProvider.getDialect().mapDataType(field)));
             }
 
-            boolean expectedNullable = !(field.isRequired() || field.isPrimaryKey());
+            boolean expectedNullable = !physicalRequired(tableName, field);
             boolean actualNullable = tableMetadataService.isColumnNullable(tableName, columnName);
             if (expectedNullable != actualNullable) {
                 if (expectedNullable) {

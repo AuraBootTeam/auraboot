@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { get } from '~/shared/services/http-client';
-import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
+import { DESIGNER_I18N, resolveDesignerText, PropertyFieldRenderer } from '~/shared/designer';
 import { getBlockLabel } from '../utils/blockLabel';
 import { getByPath } from '../utils/dotPath';
 import type { DslBlockV3, ModelFieldDefinition } from '../types';
@@ -266,7 +266,11 @@ export function SchemaInspector({
               </div>
             ) : null}
             {fields.map((field) => (
-              <InspectorField
+              field.editor ? <PropertyFieldRenderer key={field.key} schema={field} adapter={{
+                value: getByPath(block as unknown as Record<string, unknown>, field.key) ?? field.defaultValue,
+                setValue: value => onChange(field.key, value),
+                context: { block, modelFields },
+              }} /> : <InspectorField
                 key={field.key}
                 block={block}
                 path={field.key}
@@ -684,7 +688,9 @@ function InspectorField({
 
   if (type === 'json') {
     return (
-      <div className="rounded-md border border-slate-200 bg-white p-3">
+      <details className="rounded-md border border-slate-200 bg-white p-3" data-testid={`inspector-json-section-${path}`}>
+        <summary className="cursor-pointer text-xs font-semibold text-slate-600">{label}</summary>
+        <div className="mt-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <label
             htmlFor={id}
@@ -711,7 +717,7 @@ function InspectorField({
           }}
           spellCheck={false}
           aria-invalid={Boolean(jsonError)}
-          className="h-24 w-full resize-y rounded-md border border-slate-300 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-50 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="h-24 w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
         {jsonError ? (
           <div
@@ -721,7 +727,8 @@ function InspectorField({
             {jsonError}
           </div>
         ) : null}
-      </div>
+        </div>
+      </details>
     );
   }
 

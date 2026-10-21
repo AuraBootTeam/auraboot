@@ -143,6 +143,8 @@ if (webCompositionKey !== undefined && !/^sha256:[0-9a-f]{64}$/.test(webComposit
 
 export default defineConfig({
   define: {
+    // react-draggable reads this optional Node debug flag during pointer gestures.
+    'process.env.DRAGGABLE_DEBUG': false,
     __AURA_WEB_COMPOSITION_KEY__: JSON.stringify(webCompositionKey ?? null),
   },
   // node_modules is shared across AuraBoot worktrees, so keeping Vite's
@@ -281,6 +283,7 @@ export default defineConfig({
       // why the chat-bi golden could never see its canvas). Pre-bundling removes
       // the mid-session re-optimization entirely.
       'echarts',
+      'echarts-wordcloud',
       'echarts-for-react',
       'zustand',
       'zustand/middleware',
@@ -310,6 +313,13 @@ export default defineConfig({
       '@tiptap/react',
       '@tiptap/starter-kit',
       '@heroicons/react/24/outline',
+      '@heroicons/react/24/solid',
+      // Lazy editor and Markdown routes must retain stable vendor URLs after startup.
+      '@monaco-editor/react',
+      'monaco-editor/esm/vs/editor/editor.api.js',
+      'monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js',
+      'react-markdown',
+      'remark-gfm',
       '@messageformat/core',
       'dayjs/plugin/relativeTime',
       'dayjs/plugin/timezone',

@@ -108,9 +108,11 @@ node scripts/performance/measure-home.mjs
 
 # In web-admin, after evaluating the exact runtime's launcher env:
 PERF_EVIDENCE_DIR="$EVIDENCE_DIR" PW_PROFILE=oss PW_WORKERS=1 \
-  pnpm exec playwright test -c playwright.oss.config.ts \
-  tests/e2e/showcase/oss-performance.spec.ts --project=oss --no-deps --workers=1
+  pnpm exec playwright test -c playwright.performance.config.ts \
+  tests/e2e/showcase/oss-performance.spec.ts --project=performance --no-deps --workers=1
 ```
+
+The performance browser profile is separate from the general OSS full profile because its exact row counts and empty-inbox assumptions require an exclusive fixture. Customer-delivery/BPM browser journeys similarly belong to the registered Enterprise scenario profiles recorded in `oss-scope.json`; moving a spec between profiles does not count as an executed pass.
 
 Use an empty showcase model for seed: the driver refuses to overwrite existing data and creates exactly 1,000 controlled records. Reads require exactly 1,000 total/20 page rows and an SQL-count header. The CRUD driver creates, edits, reads back and deletes its own records, and requires a 404 after deletion. Failures stop the run; no partial file marked `running` is a completed result.
 

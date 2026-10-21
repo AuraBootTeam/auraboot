@@ -135,4 +135,30 @@ class PluginResourceImporterFieldReimportTest {
         assertThatThrownBy(() -> reimport(dto)).isInstanceOf(PluginException.class)
                 .hasMessageContaining("schema unavailable");
     }
+
+    @Test
+    void fieldBatchSynchronizesEachModelOnlyAfterAllDefinitionsAreUpdated() {
+        importer.beginFieldImportBatch();
+        try {
+            var first = definition(); first.getConstraints().setScale(7);
+            reimport(first);
+            verifyNoInteractions(schemas);
+            var second = definition(); second.getConstraints().setScale(8);
+            reimport(second);
+            verifyNoInteractions(schemas);
+        } finally {
+            importer.endFieldImportBatch(true);
+        }
+        verify(schemas, times(1)).updateTableByModel("quote_line");
+    }
+
+    @Test
+    void abortedBatchDoesNotApplyPartialSchemaAndReleasesThreadState() {
+        importer.beginFieldImportBatch();
+        var changed = definition(); changed.getConstraints().setScale(7);
+        try { reimport(changed); } finally { importer.endFieldImportBatch(false); }
+        verifyNoInteractions(schemas);
+        reimport(changed);
+        verify(schemas).updateTableByModel("quote_line");
+    }
 }

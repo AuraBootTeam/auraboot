@@ -40,6 +40,7 @@ export const BLOCK_TYPES = [
   'review-drawer',
   'status-banner',
   'code-snippet',
+  'card-grid',
   'conversation-panel',
   'custom',
 ] as const;
@@ -264,6 +265,7 @@ export const blockSchema: z.ZodType<any> = z
     visibleWhen: z.string().optional(),
     className: z.string().optional(),
     fields: z.array(fieldSchema).optional(),
+    rowSelection: z.object({identityField:z.string().min(1),selectedField:z.string().min(1),positiveField:z.string().min(1),defaultSelected:z.boolean().optional(),label:localizedTextSchema.optional(),emptyText:localizedTextSchema.optional()}).strict().optional(),
     buttons: z.array(buttonSchema).optional(),
     table: tableConfigSchema.optional(),
     columns: z.union([z.number(), z.array(columnSchema)]).optional(),

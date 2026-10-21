@@ -41,6 +41,7 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
   const [members, setMembers] = useState<RoleMemberDTO[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [pageNum, setPageNum] = useState(1);
   const pageSize = 20;
 
@@ -65,13 +66,15 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
   const fetchMembers = useCallback(async () => {
     if (!rolePid) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await permissionService.getRoleMembers(rolePid, { pageNum, pageSize });
-      setMembers(data.records || []);
-      setTotal(data.total || 0);
+      setMembers(data.records);
+      setTotal(data.total);
     } catch {
       setMembers([]);
       setTotal(0);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -99,7 +102,7 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
       showSuccessToast(
         (t('admin.permission.members.removeSuccess', undefined, 'Member removed: {name}')).replace(
           '{name}',
-          confirmRemove.member.userName,
+          confirmRemove.member.userName || confirmRemove.member.email || t('admin.permission.members.unnamed', undefined, 'Member'),
         ),
       );
       setConfirmRemove({ open: false, member: null });
@@ -170,6 +173,11 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
         <div className="flex items-center justify-center py-16">
           <LoadingSpinner />
         </div>
+      ) : loadError ? (
+        <div role="alert" data-testid="role-member-load-error" className="rounded-lg border border-red-200 p-6 text-sm text-red-700 dark:border-red-800 dark:text-red-300">
+          {t('admin.permission.members.loadFailed', undefined, 'Members could not be loaded. Please retry.')}
+          <button className="ml-3 underline" onClick={fetchMembers}>{t('common.retry', undefined, 'Retry')}</button>
+        </div>
       ) : members.length === 0 ? (
         <div
           data-testid="role-member-empty"
@@ -181,6 +189,7 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
           </p>
           <button
             data-testid="role-member-empty-add-btn"
+            disabled={readOnly}
             onClick={() => setShowAddDialog(true)}
             className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
           >
@@ -225,13 +234,13 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
                 {members.map((member) => (
                   <tr
-                    key={member.memberId}
-                    data-testid={`role-member-row-${member.memberId}`}
+                    key={member.memberPid}
+                    data-testid={`role-member-row-${member.memberPid}`}
                     className="hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                       <div>
-                        <div>{member.userName}</div>
+                        <div>{member.userName || member.email || t('admin.permission.members.unnamed', undefined, 'Member')}</div>
                         <div className="text-xs text-gray-400">{member.email}</div>
                       </div>
                     </td>
@@ -253,9 +262,9 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right">
                       <button
-                        data-testid={`role-member-remove-${member.memberId}`}
+                        data-testid={`role-member-remove-${member.memberPid}`}
                         disabled={readOnly}
-                        aria-label={`${t('common.remove', undefined, 'Remove')} ${member.userName}`}
+                        aria-label={`${t('common.remove', undefined, 'Remove')} ${member.userName || member.email || t('admin.permission.members.unnamed', undefined, 'Member')}`}
                         title={t('common.remove', undefined, 'Remove')}
                         onClick={() =>
                           setConfirmRemove({ open: true, member })
@@ -319,7 +328,7 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
         content={
           (
             t('admin.permission.members.removeContent', undefined, 'Are you sure you want to remove "{name}" from this role?')
-          ).replace('{name}', confirmRemove.member?.userName || '')
+          ).replace('{name}', confirmRemove.member?.userName || confirmRemove.member?.email || t('admin.permission.members.unnamed', undefined, 'Member'))
         }
         variant="danger"
         onConfirm={handleRemove}

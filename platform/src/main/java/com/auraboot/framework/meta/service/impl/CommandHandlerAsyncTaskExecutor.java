@@ -1,7 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.plugin.extension.AiProviderAccessorFactory;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.meta.service.AsyncTaskExecutor;
@@ -20,7 +20,6 @@ import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
-import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.TenantProjectionAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -72,9 +71,12 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private final DynamicDataService dynamicDataService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+
+    @Autowired(required = false)
     private BiTemporalService biTemporalService;
     @Autowired(required = false)
-    private LlmProviderFactory llmProviderFactory;
+    private AiProviderAccessorFactory aiProviderAccessorFactory;
     @Autowired(required = false)
     private FileService fileService;
     @Autowired(required = false)
@@ -175,6 +177,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY,
                         commandExpectedVersion);
             }
+            com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
+                    pluginSettings, tenantId, cloudConfigService, objectMapper);
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null) {
                 // Q03-04: async-dispatched handlers must get the same nested
@@ -212,9 +216,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 pluginSettings.put("__biTemporalAccessor",
                         new BiTemporalAccessorImpl(biTemporalService, objectMapper));
             }
-            if (llmProviderFactory != null) {
+            if (aiProviderAccessorFactory != null) {
                 pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
-                        new LlmProviderAccessorImpl(llmProviderFactory, objectMapper, tenantId));
+                        aiProviderAccessorFactory.create(tenantId));
             }
             if (fileService != null && storageProvider != null) {
                 pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,

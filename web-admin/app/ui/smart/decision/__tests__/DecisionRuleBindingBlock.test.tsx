@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DecisionRuleBindingBlock } from '../DecisionRuleBindingBlock';
 
@@ -46,6 +46,15 @@ describe('DecisionRuleBindingBlock', () => {
       'approval_routing',
     );
     expect(screen.getByTestId('decision-binding-preview')).not.toHaveTextContent('data.amount');
+  });
+
+  it('does not silently activate a disabled consumer binding when opening or editing its mapping', async () => {
+    const updateField=vi.fn();
+    render(<DecisionRuleBindingBlock runtime={{getFieldValue:()=>undefined,updateField}} block={{props:{mode:'decision',valueField:'rule_binding',initialDecisionCode:'',initialValue:JSON.stringify({bindingKind:'DECISION_REF',enabled:false,decisionBinding:{decisionCode:'',enabled:false}})}}}/>);
+    await waitFor(()=>expect(updateField).toHaveBeenCalled());
+    expect(updateField.mock.calls.at(-1)?.[1]).toMatchObject({enabled:false,decisionBinding:{decisionCode:'',enabled:false}});
+    fireEvent.change(screen.getByLabelText('version-policy'),{target:{value:'ROLLOUT'}});
+    expect(updateField.mock.calls.at(-1)?.[1]).toMatchObject({enabled:false,decisionBinding:{enabled:false}});
   });
 
   it('loads live decision definitions into the decision picker for DSL-hosted consumers', async () => {
@@ -872,10 +881,12 @@ describe('DecisionRuleBindingBlock', () => {
   });
 
   it('resolves fact catalog model code from the host DSL form runtime', async () => {
+    let releaseCatalog!: () => void;
+    const catalogGate = new Promise<void>(resolve => { releaseCatalog = resolve; });
     const api = {
       getDecisionImpact: vi.fn(),
       evaluate: vi.fn(),
-      getFactCatalog: vi.fn(async () => ({
+      getFactCatalog: vi.fn(async () => { await catalogGate; return ({
         entities: [
           {
             entityCode: 'wd_leave_request',
@@ -898,7 +909,7 @@ describe('DecisionRuleBindingBlock', () => {
             ],
           },
         ],
-      })),
+      }); }),
       getModelFields: vi.fn(),
     };
 
@@ -927,7 +938,12 @@ describe('DecisionRuleBindingBlock', () => {
     expect(api.getModelFields).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('cb-add'));
-    fireEvent.change(await screen.findByLabelText('field-0'), {
+    await act(async () => { releaseCatalog(); });
+    await waitFor(() => expect(screen.getByLabelText('model-0')).toHaveTextContent('请假申请'));
+    fireEvent.change(screen.getByLabelText('model-0'), { target: { value: 'record:wd_leave_request' } });
+    await waitFor(() => expect(screen.getByLabelText('field-0')
+      .querySelector('option[value="record:data.wd_leave_type"]')).toHaveTextContent('请假类型'));
+    fireEvent.change(screen.getByLabelText('field-0'), {
       target: { value: 'record:data.wd_leave_type' },
     });
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');

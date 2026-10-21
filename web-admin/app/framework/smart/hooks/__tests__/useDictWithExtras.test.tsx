@@ -13,11 +13,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 
 // Mock http-client BEFORE importing the hook so the hook picks up the mock
-vi.mock('~/shared/services/http-client', () => ({
+vi.mock('~/shared/services/http-client/HttpClient', () => ({
   fetchResult: vi.fn(),
 }));
 
-import { fetchResult } from '~/shared/services/http-client';
+import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { useDictWithExtras } from '~/framework/smart/hooks/useDictWithExtras';
 
 const mockFetchResult = vi.mocked(fetchResult);

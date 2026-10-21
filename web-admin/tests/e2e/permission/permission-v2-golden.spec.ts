@@ -9,7 +9,7 @@ import { test, expect, type Page } from '@playwright/test';
  * capabilities, and the members surface free of raw i18n keys. Screenshots saved for review.
  */
 
-const SHOTS = 'test-results/rbac-v2-golden';
+const SHOTS = process.env.AURA_EVIDENCE_DIR || 'test-results/rbac-v2-golden';
 
 /** A bare lowercase ascii code segment (e.g. "license", "billing.license") = an untranslated leak. */
 const RAW_CODE = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$/;
@@ -105,6 +105,19 @@ test('v2 permissions: members surface supports add and remove without raw i18n k
   await expect(candidate).toBeVisible();
   const memberId = (await candidate.getAttribute('data-testid'))!.replace('candidate-row-', '');
   await candidate.getByRole('checkbox').check();
+  const viewport = page.viewportSize();
+  const confirmBox = await page.getByTestId('add-member-confirm').boundingBox();
+  expect(viewport).not.toBeNull();
+  expect(confirmBox).not.toBeNull();
+  expect(confirmBox!.x).toBeGreaterThanOrEqual(0);
+  expect(confirmBox!.y).toBeGreaterThanOrEqual(0);
+  expect(confirmBox!.x + confirmBox!.width).toBeLessThanOrEqual(viewport!.width);
+  expect(confirmBox!.y + confirmBox!.height).toBeLessThanOrEqual(viewport!.height);
+  const dialogBox = await dialog.boundingBox();
+  const tableBox = await dialog.getByRole('table').boundingBox();
+  expect(dialogBox).not.toBeNull();
+  expect(tableBox).not.toBeNull();
+  expect(tableBox!.x + tableBox!.width).toBeLessThanOrEqual(dialogBox!.x + dialogBox!.width + 1);
   await page.screenshot({ path: `${SHOTS}/04-members.png`, fullPage: true });
   const added = page.waitForResponse(r => r.url().includes(`/api/roles/${role.pid}/members/assign`) && r.request().method() === 'POST');
   await page.getByTestId('add-member-confirm').click();

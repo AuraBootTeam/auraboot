@@ -73,6 +73,22 @@ for Quality Hold contracts after T04 freezes those event types. Until those PR h
 the Core pilot proves the runtime contract and PostgreSQL lifecycle, not the assembled business
 journey.
 
+## Registered Inventory intake writer authority
+
+The host binds the started PF4J `com.auraboot.inventory` artifact, exact implementation class and registered consumer instance `inventory.public-command-adapter.v1` to the sole purchase event `procurement.purchase-order.receipt-requested.v1` from `procurement`. The body command is a consistency check; it cannot choose a command, plugin, row scope or model authority. Artifact observation retains the existing STARTED/classloader/JAR-drift checks.
+
+For this callback only, the claimed envelope tenant and fixed owner command `inv:receive_source_receipt` authorize create operations on `inv_inbound` and `inv_inbound_line`. Reads are limited to those two models and `inv_warehouse`, `inv_warehouse_location`, `prod_product`, `pe_product`, matching current intake prerequisites. Update, delete, batch claim and cross-owner/foreign-tenant access are rejected. The existing `ALL` row grade is bound to each approved model rather than a null/global target; normal tenant enforcement and exact metadata field-writer guards still run. Other reliable consumers retain their prior behavior and receive no new owner authority.
+
+Model names alone are not authorization. Each scoped access resolves the tenant's current published, non-deleted physical model through `MetaModelMapper`, its effective definition through `MetaModelService`, and its actual plugin owner through `PluginRecordMapper`. Inventory models must belong to `com.auraboot.inventory`; product prerequisite reads retain their actual tenant plugin owner rather than pretending to be Inventory. The effective code/id/version/status/table must agree with the persisted tenant model. The approved intake mappings use the canonical `SystemFieldConstants.generateTableName` (`mt_`) because their manifests do not declare a custom table; nullable persisted table names resolve through that generator. Unknown models, wrong owner/table, virtual sources and foreign/unpublished/non-current definitions fail closed. An immutable per-effect binding captures model id/PID/version/row version/owner/table and is rechecked before and after delegated access, rejecting metadata drift without relaxing the field-writer guard.
+
+Effect and receipt remain in the existing independent transaction. Duplicate receipt claims skip the consumer. The host restores prior identity and command permit state on success/failure; nested unrelated delivery cannot borrow the private owner scope. `InventoryOwnerCommandScopeTest` provides hermetic scope/guard counterexamples, alongside the existing delivery isolation, background accessor, MetaContext and field-writer tests. Assembled PF4J, PostgreSQL delivery and posted receipt lineage require separate native evidence; these tests alone do not prove the Procurement received-quantity consumer or customer ERP contracts.
+
+## Inventory posted-fact enqueue provenance
+
+`inventory.receipt.confirmed.v1` receives host-generated `core.inventory.producer.*` headers and `ab_outbox.command_code=inv:confirm_warehouse_in` only while the host pipeline executes the actual registered Inventory handler instance. The private invocation binds current tenant, permitted `inv_inbound` receipt PID, actual model metadata and started PF4J artifact. Enqueue checks the first observed PF4J caller Class identity, reobserves the artifact and metadata binding, and validates the publisher's deterministic receipt/version UUID and envelope identity. Same-Class unregistered instances, foreign nested callers, missing command scopes and client-supplied reserved headers cannot create this provenance. Other event types receive no new producer authority.
+
+The internal delivery verifier requires the complete persisted envelope, stamp and command to match `ab_outbox`, with the current processing lease still valid. A header alone is not proof; unstamped historical events are not automatically upgraded, and the current JAR cannot attest an older posting artifact. The verifier is prepared for the subsequent fixed Procurement received-quantity consumer; this enqueue slice alone does not implement or validate that consumer. No new business receipt table or public raw-apply endpoint is introduced. Actual PG/PF4J producer invocation, lease/receipt atomicity and physical-table existence remain native admission requirements.
+
 ## Observability and rollback
 
 Micrometer counter `auraboot_integration_events_total{outcome=...}` exposes enqueue, claim, receipt,
@@ -82,3 +98,59 @@ undelivered backlog older than five minutes.
 
 Rollback is additive: stop new v1 producers, drain or replay pending rows, then revert consumers.
 Do not drop the receipt/DLQ data during rollback; it is the audit and idempotency record.
+
+The registered `procurement.confirmed-receipt-counter.v1` delivery has a separate host-private
+`pr:consume_confirmed_inventory_receipt` authority. It requires the persisted Inventory producer
+stamp, the complete matching outbox envelope and the current delivery lease before and after
+access. The authority does not grant general update: it permits only `pr_purchase_order_line`
+CAS on an event-qualified target, comparing its server-read `row_version`, with exactly one
+submitted field, `pr_pol_received_qty`. The framework advances the version itself. The current
+row must belong to this tenant, be collaboration-managed, and retain the actual Procurement
+metadata owner/storage binding. Ordinary update/create/delete, other records, extra patch fields,
+non-version CAS, non-increasing quantity and quantity above ordered are rejected. Existing field
+and managed-record writer checks still execute. The consumer must independently verify the
+original immutable Procurement request and full line lineage before computing the quantity;
+this scope does not replace those business checks. Ordinary non-collaboration PR initialization
+and its received-quantity default remain unchanged.
+
+`OutboxEventMapper.claimKnownEvent` is an internal exact tenant/event lease claim for controlled
+owned-event delivery. It retains the global claim's due-pending/expired-processing conditions,
+tenant-local ordering predecessor check and `FOR UPDATE SKIP LOCKED`, with a fixed one-row cap.
+Both selection and update bind the two identity parameters. It never changes event content,
+producer headers or command authority, and does not replace the global dispatcher. The lease
+claim must commit independently before a consumer's `REQUIRES_NEW` effect transaction starts;
+holding that same outbox row lock in an outer transaction would self-block the inner delivery.
+The annotation/BoundSql contract tests are not PostgreSQL lease or ordering acceptance.
+
+The trusted receipt counter closes the lease-check/receipt-commit race by locking the exact
+`tenant_id/event_id/lease_token` processing outbox row with `lease_until > NOW() FOR UPDATE`
+inside its independent T01 effect transaction. It requires an active Spring transaction,
+checks the complete persisted envelope both before and after acquiring the row lock, and
+holds the lock through effect and receipt commit. Missing or replaced leases reject before
+plugin work. Per-access and post-effect envelope/metadata verification remains in place.
+Ordinary consumers and the global dispatcher do not acquire this new lock. Native two-transaction
+verification must prove that a competing exact claim skips the held row, and that a lease replaced
+before lock acquisition causes rollback with no plugin effect or applied receipt. The separate
+lease-claim transaction must already have committed; an outer held row lock followed by this
+`REQUIRES_NEW` delivery is explicitly forbidden.
+
+The fixed Inventory handler/intake consumer and Procurement receipt counter use a host-discovered
+instance proof. PF4J's current Spring factory creates fresh objects on repeated enumeration;
+re-enumerating and comparing with a registry-cached object is not a registration proof. The
+existing AuraPluginManager discovery methods record only returned applicable extensions in a
+weak **identity** ledger, bound to the actual implementation Class, current STARTED wrapper,
+classloader and observed JAR artifact. Read-only lookup cannot register an object. Arbitrary
+same-Class instances (including objects with permissive equals/hashCode) have no proof. Plugin
+lifecycle changes invalidate prior discovery; unload/reload and changed physical artifacts fail
+closed. Other extension types and the global factory's creation semantics remain unchanged.
+Real PF4J factory tests with synthetic local JARs prove this primitive, not full business PG/Auth
+or Inventory/Procurement artifact admission.
+
+The receipt counter's five PR reads (`pr_purchase_order`, `pr_purchase_order_line`,
+`pr_purchase_receipt`, `pr_purchase_receipt_line`, `pr_inventory_operation_request`) require
+the exact `com.auraboot.procurement` owner declared by the canonical Procurement manifest
+and models. No prefix grants ownership. Ambiguous, deleted, unpublished or mismatched effective
+metadata cannot authorize these reads. Product reads retain their actual legitimate owners;
+this change does not require product models to belong to Procurement. Standalone counterexamples
+cover wrong PR ownership and invalid current definitions; assembled tenant metadata and PG
+permission acceptance still require native verification.

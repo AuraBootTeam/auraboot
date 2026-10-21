@@ -2,6 +2,10 @@ package com.auraboot.framework.plugin.rest;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.ApiRateLimiter;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.plugin.extension.PluginCommandRejectionException;
+import com.auraboot.framework.plugin.extension.DataAccessorException;
+import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.ValidationException;
@@ -134,9 +138,23 @@ public class PluginRestDispatcher {
             writeError(httpRes, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
         } catch (ConflictException e) {
             writeError(httpRes, HttpServletResponse.SC_CONFLICT, e.getMessage());
+        } catch (PluginCommandRejectionException e) {
+            ResponseCode responseCode = switch (e.code()) {
+                case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
+            };
+            // Match the command SPI boundary; GlobalExceptionHandler owns locale resolution.
+            throw new BusinessException(responseCode, "$i18n:" + e.messageKey(), e);
         } catch (BusinessException e) {
-            writeError(httpRes, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            throw e;
+        } catch (SecurityException | AccessDeniedException e) {
+            // Preserve authorization classification without exposing internal record identities.
+            throw new AccessDeniedException("Access denied", e);
         } catch (RuntimeException e) {
+            if (e instanceof DataAccessorException dataAccess
+                    && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
+                // Match the command boundary: preserve only the typed authorization verdict.
+                throw new AccessDeniedException("Access denied", dataAccess);
+            }
             log.error("Plugin REST endpoint {} {} failed", httpReq.getMethod(), httpReq.getRequestURI(), e);
             writeError(httpRes, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal error");
         }

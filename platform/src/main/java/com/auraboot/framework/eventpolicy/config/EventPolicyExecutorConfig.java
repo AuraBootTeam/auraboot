@@ -19,9 +19,12 @@ import java.util.List;
 public class EventPolicyExecutorConfig {
 
     @Bean
-    public PolicyExecutor policyExecutor(ObjectProvider<ActionHandler> handlers, IdempotencyStore idempotencyStore) {
+    public PolicyExecutor policyExecutor(ObjectProvider<ActionHandler> handlers, IdempotencyStore idempotencyStore,
+                                          org.springframework.transaction.PlatformTransactionManager transactionManager) {
         // resolve handlers lazily per execution (a snapshot at bean creation can miss handler beans
         // depending on init order — this bit the test ActionHandler collection)
-        return new PolicyExecutor(() -> handlers.stream().collect(java.util.stream.Collectors.toList()), idempotencyStore);
+        var transactions = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transactions.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return new PolicyExecutor(() -> handlers.stream().collect(java.util.stream.Collectors.toList()), idempotencyStore, transactions);
     }
 }

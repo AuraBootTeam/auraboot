@@ -75,7 +75,7 @@ class PermissionInterceptorTest {
         var rollback = new HandlerMethod(controller, controller.getClass().getMethod("rollback", String.class, String.class));
         var sharing = new com.auraboot.framework.view.controller.ViewShareController(
                 mock(com.auraboot.framework.view.service.ViewShareService.class));
-        var share = new HandlerMethod(sharing, sharing.getClass().getMethod("shareView", String.class, Map.class));
+        var share = new HandlerMethod(sharing, sharing.getClass().getMethod("shareView", String.class, com.auraboot.framework.view.dto.ViewShareRequest.class));
         var revokeShare = new HandlerMethod(sharing, sharing.getClass().getMethod("revokeShare", String.class));
         var shareStatus = new HandlerMethod(sharing, sharing.getClass().getMethod("getShareStatus", String.class));
         var shareHandlers = List.of(share, revokeShare, shareStatus);

@@ -10,4 +10,9 @@ package com.auraboot.framework.plugin.extension.integration;
 public interface ReliableIntegrationAccessor {
 
     void enqueue(IntegrationEventEnvelope envelope);
+
+    /** Insert once, or verify an exact immutable-envelope replay. Returns true only for a new row. */
+    default boolean enqueueIdempotent(IntegrationEventEnvelope envelope) {
+        throw new UnsupportedOperationException("Idempotent reliable enqueue is unavailable");
+    }
 }

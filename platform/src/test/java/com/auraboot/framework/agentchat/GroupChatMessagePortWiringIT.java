@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
 import com.auraboot.framework.agentchat.spi.NoOpGroupChatMessagePort;
 import com.auraboot.framework.application.TestApplication;
-import com.auraboot.framework.im.integration.GroupChatMessageAdapter;
+import com.auraboot.framework.agent.integration.im.GroupChatMessageAdapter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;

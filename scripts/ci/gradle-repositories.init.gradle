@@ -1,0 +1,20 @@
+import org.gradle.api.GradleException
+import org.gradle.api.initialization.resolve.RepositoriesMode
+
+// Image builders select a network policy explicitly; dependency versions and locks stay in the project.
+def policy = System.getenv('AURA_GRADLE_REPOSITORY_POLICY') ?: 'project'
+if (!(policy in ['project', 'central'])) {
+    throw new GradleException('AURA_GRADLE_REPOSITORY_POLICY must be project or central')
+}
+
+if (policy == 'central') {
+    settingsEvaluated { settings ->
+        settings.dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+            repositories {
+                mavenLocal()
+                mavenCentral()
+            }
+        }
+    }
+}

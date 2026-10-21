@@ -371,6 +371,7 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             }
         }
 
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "delete", code -> metadataService.getModelDefinition(code).orElse(null));
         for (String recordId : recordIds) {
             mutationObserver.observe(model, recordId, ModelMutationObserver.Operation.DELETED);
         }

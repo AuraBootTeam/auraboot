@@ -16,6 +16,9 @@ import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
 import com.auraboot.framework.view.service.SavedViewChipPinService;
 import com.auraboot.framework.view.service.SavedViewService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,7 +31,8 @@ import org.springframework.web.bind.annotation.*;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 
 import java.util.List;
-import java.util.Map;
+import com.auraboot.framework.view.dto.DuplicateSavedViewRequest;
+import com.auraboot.framework.view.dto.SavedViewTeamMembershipDTO;
 
 /**
  * SavedView Controller
@@ -43,6 +47,17 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "Saved Views", description = "User-defined view configuration management")
+@ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Authentication required", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permission denied", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Resource not found", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Conflict", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "415", description = "Unsupported request media", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "Invalid business request", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal error", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class)))
+})
 public class SavedViewController {
 
     private final SavedViewService savedViewService;
@@ -285,8 +300,8 @@ public class SavedViewController {
     @RequirePermission(MetaPermission.VIEW_MANAGE)
     public ApiResponse<SavedViewDTO> duplicate(
             @Parameter(description = "Source view PID") @PathVariable @NotBlank String pid,
-            @RequestBody Map<String, String> request) {
-        String newName = request.get("name");
+            @RequestBody DuplicateSavedViewRequest request) {
+        String newName = request.name();
         log.info("Duplicating view: pid={}, newName={}", pid, newName);
 
         if (newName == null || newName.isBlank()) {
@@ -327,9 +342,10 @@ public class SavedViewController {
     @Operation(summary = "Get current user's teams",
             description = "Get teams the current user belongs to, for team view scope selection")
     @RequirePermission(MetaPermission.VIEW_READ)
-    public ApiResponse<List<Map<String, Object>>> getMyTeams() {
+    public ApiResponse<List<SavedViewTeamMembershipDTO>> getMyTeams() {
         log.info("Getting current user's teams for view scope");
-        List<Map<String, Object>> teams = currentUserTeamResolver.resolveCurrentUserTeamMemberships();
+        List<SavedViewTeamMembershipDTO> teams = currentUserTeamResolver.resolveCurrentUserTeamMemberships()
+                .stream().map(SavedViewTeamMembershipDTO::from).toList();
         return ApiResponse.success(teams);
     }
 

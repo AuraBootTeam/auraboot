@@ -187,7 +187,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 }
                 table = targetModel.getTableName();
             }
-            String valueField = target.getValueField() != null && !target.getValueField().isBlank()
+            boolean explicitIdentity = target.getValueField() != null && !target.getValueField().isBlank();
+            String valueField = explicitIdentity
                     ? target.getValueField()
                     : target.getTargetField() != null && !target.getTargetField().isBlank()
                             ? target.getTargetField() : "pid";
@@ -204,7 +205,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 for (int index = 0; index < size; index++) {
                     String key = "ref" + index;
                     String lookup = businessReferenceLookup(valueField, target.getTargetField(),
-                            references.get(offset + index), key, params);
+                            references.get(offset + index), key, params, explicitIdentity);
                     queries.add("(SELECT COUNT(*) FROM " + table + " WHERE " + lookup
                             + " AND tenant_id = #{params.tenantId}) AS cnt" + index);
                 }
@@ -355,7 +356,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
             }
             targetTable = targetModel.getTableName();
         }
-        String valueField = (refTarget.getValueField() != null && !refTarget.getValueField().isBlank())
+        boolean explicitIdentity = refTarget.getValueField() != null && !refTarget.getValueField().isBlank();
+        String valueField = explicitIdentity
                 ? refTarget.getValueField()
                 : (refTarget.getTargetField() != null && !refTarget.getTargetField().isBlank())
                         ? refTarget.getTargetField()
@@ -363,16 +365,16 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         SqlSafetyUtils.validateIdentifier(targetTable, "reference targetTable");
         SqlSafetyUtils.validateIdentifier(valueField, "reference valueField");
         Long tenantId = MetaContext.getCurrentTenantId();
-        // A reference candidate is accepted when it resolves through the declared
-        // valueField, the target's pid column, or the display key — callers
-        // legitimately pass any of the three, and all identify the same row.
+        // A declared valueField is the identity contract; a display column is never
+        // an alternate identity. Preserve pid/key compatibility only for legacy
+        // declarations that have no explicit valueField.
         String displayField = (refTarget.getTargetField() != null && !refTarget.getTargetField().isBlank())
                 ? refTarget.getTargetField()
                 : null;
         for (String candidate : parseReferenceValues(rawValue)) {
             Map<String, Object> params = new HashMap<>();
             params.put("tenantId", tenantId);
-            String lookup = businessReferenceLookup(valueField, displayField, candidate, "refValue", params);
+            String lookup = businessReferenceLookup(valueField, displayField, candidate, "refValue", params, explicitIdentity);
             String sql = "SELECT COUNT(*) as cnt FROM " + targetTable
                     + " WHERE " + lookup + " AND tenant_id = #{params.tenantId}";
             // A failed query aborts the enclosing PostgreSQL transaction. Let the
@@ -386,11 +388,13 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
     }
 
     private String businessReferenceLookup(String valueField, String displayField, String candidate,
-                                           String key, Map<String, Object> params) {
+                                           String key, Map<String, Object> params, boolean explicitIdentity) {
         Set<String> columns = new LinkedHashSet<>();
         columns.add(valueField);
-        columns.add("pid");
-        if (displayField != null && !displayField.isBlank()) columns.add(displayField);
+        if (!explicitIdentity) {
+            columns.add("pid");
+            if (displayField != null && !displayField.isBlank()) columns.add(displayField);
+        }
         params.put(key, candidate);
         List<String> predicates = new ArrayList<>();
         for (String column : columns) {
@@ -408,7 +412,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 predicates.add(column + " = #{params." + key + "}");
             }
         }
-        return "(" + String.join(" OR ", predicates) + ")";
+        return predicates.isEmpty() ? "(1 = 0)" : "(" + String.join(" OR ", predicates) + ")";
     }
 
     /**

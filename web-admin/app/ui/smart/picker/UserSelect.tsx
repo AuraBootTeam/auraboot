@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Search, X, Loader2, UserX } from 'lucide-react';
-import { post } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
+import { searchTenantMembers } from '~/shared/services/tenantMemberSearchService';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
@@ -15,18 +14,6 @@ interface UserOption {
   avatar?: string;
   department?: string;
   role?: string;
-}
-
-interface TenantMemberSearchRecord {
-  displayName?: string;
-  user?: {
-    pid?: string;
-    username?: string | null;
-    email?: string | null;
-    realName?: string | null;
-    avatar?: string | null;
-  };
-  userId?: string | number | null;
 }
 
 interface UserSelectProps {
@@ -99,44 +86,26 @@ export const UserSelect: React.FC<UserSelectProps> = ({
     const loadUsers = async () => {
       setLoading(true);
       try {
-        const result = await post<{
-          records?: TenantMemberSearchRecord[];
-          content?: TenantMemberSearchRecord[];
-        }>('/api/tenant/members/search', {
+        const records = await searchTenantMembers({
           pageNum: 1,
           pageSize: 50,
           status: 'active',
           ...(searchQuery.trim() ? { keyword: searchQuery.trim() } : {}),
         });
-
-        if (!ResultHelper.isSuccess(result)) {
-          throw new Error(result.message || result.desc || 'Failed to load users');
-        }
-
-        const records = Array.isArray(result.data)
-          ? result.data
-          : result.data?.records || result.data?.content || [];
-
         if (cancelled) return;
-
         setUsers(
-          records
-            .map((record) => {
-              const userPid = String(record.user?.pid || '');
-              if (!userPid) return null;
-              return {
-                id: userPid,
-                name:
-                  record.displayName ||
-                  record.user?.realName ||
-                  record.user?.username ||
-                  record.user?.email ||
-                  String(record.userId || userPid),
-                email: record.user?.email || undefined,
-                avatar: record.user?.avatar || undefined,
-              } satisfies UserOption;
-            })
-            .filter((item): item is NonNullable<typeof item> => item !== null) as UserOption[],
+          records.flatMap((record): UserOption[] => {
+            const user = record.user;
+            if (!user) return [];
+            return [
+              {
+                id: user.pid!,
+                name: user.realName || user.username || user.email || '',
+                email: user.email || undefined,
+                avatar: user.avatar || undefined,
+              },
+            ];
+          }),
         );
       } catch {
         if (!cancelled) {
@@ -241,11 +210,11 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                     className="rounded-pill bg-hover text-text hover:bg-hover inline-flex items-center gap-1.5 py-0.5 pr-1.5 pl-0.5 text-sm transition-colors"
                   >
                     <span
-                      className={`rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white ${getAvatarColor(user.name)}`}
+                      className={`rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white ${getAvatarColor(user.name || st('成员'))}`}
                     >
-                      {getInitials(user.name)}
+                      {getInitials(user.name || st('成员'))}
                     </span>
-                    <span className="max-w-[120px] truncate">{user.name}</span>
+                    <span className="max-w-[120px] truncate">{user.name || st('成员')}</span>
                     {!disabledValue && (
                       <button
                         type="button"
@@ -322,13 +291,15 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                     >
                       <div className="flex items-center gap-3">
                         <span
-                          className={`rounded-pill flex h-8 w-8 flex-shrink-0 items-center justify-center text-xs font-semibold text-white ${getAvatarColor(user.name)}`}
+                          className={`rounded-pill flex h-8 w-8 flex-shrink-0 items-center justify-center text-xs font-semibold text-white ${getAvatarColor(user.name || st('成员'))}`}
                         >
-                          {getInitials(user.name)}
+                          {getInitials(user.name || st('成员'))}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium">{user.name}</span>
+                            <span className="truncate text-sm font-medium">
+                              {user.name || st('成员')}
+                            </span>
                             {selected && (
                               <svg
                                 className="text-accent h-4 w-4 flex-shrink-0"

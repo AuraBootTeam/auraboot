@@ -24,6 +24,12 @@ public final class TenantProjectionAccessorImpl implements TenantProjectionAcces
     }
 
     @Override
+    public com.auraboot.framework.plugin.extension.DataPage queryPage(String modelCode,
+            com.auraboot.framework.plugin.extension.DataPageQuery query) {
+        return delegate.queryPage(tenantId, modelCode, query);
+    }
+
+    @Override
     public List<Map<String, Object>> query(String modelCode, Map<String, Object> filters) {
         return delegate.query(tenantId, modelCode, filters);
     }

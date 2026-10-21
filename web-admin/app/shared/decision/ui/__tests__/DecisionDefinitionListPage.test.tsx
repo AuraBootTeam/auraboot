@@ -43,6 +43,16 @@ describe('DecisionDefinitionListPage', () => {
     await waitFor(() => expect(screen.getByTestId('ddl-error')).toBeInTheDocument());
   });
 
+  it('reloads the real query after an explicit recovery action', async () => {
+    const listDefinitions = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue([{decisionCode:'recovered', decisionName:'恢复后的规则'}]);
+    renderWithClient(<DecisionDefinitionListPage api={{ listDefinitions } as unknown as DecisionApi} />);
+    await screen.findByTestId('ddl-error');
+    fireEvent.click(screen.getByRole('button', { name:'重新加载' }));
+    expect(await screen.findByTestId('ddl-row-recovered')).toHaveTextContent('恢复后的规则');
+    expect(screen.queryByTestId('ddl-error')).not.toBeInTheDocument();
+    expect(listDefinitions).toHaveBeenCalledTimes(2);
+  });
+
   it('opens an API-backed impact graph from a decision row', async () => {
     const api = {
       listDefinitions: vi.fn(async () => [
@@ -74,7 +84,7 @@ describe('DecisionDefinitionListPage', () => {
     await waitFor(() => expect(screen.getByTestId('impact-graph-panel')).toBeInTheDocument());
     expect(screen.getByTestId('impact-graph-panel')).toHaveTextContent('High Priority Automation');
     expect(screen.getByTestId('impact-graph-panel')).toHaveTextContent('record.data.priority');
-    expect(screen.getByTestId('impact-blast-radius')).toHaveTextContent('Used by 1 automation + 1 SLA rule');
+    expect(screen.getByTestId('impact-blast-radius')).toHaveTextContent('此规则已被业务流程使用');
   });
 
   it('requires impact acknowledgement before publishing a referenced validated version', async () => {

@@ -1,4 +1,4 @@
-import { BASE_URL } from '../../helpers/environments';
+import { requireRuntimeUrl } from '../../helpers/environments';
 /**
  * Real enterprise report authorization, using the existing project-management data.
  * API calls only provision the report/roles and independently probe authorization.
@@ -29,7 +29,7 @@ async function assertSourceDenied(response: APIResponse, exposePermissionCode = 
 
 test('SC06-PERMISSIONS report artifact grants do not bypass customer source read permission', async ({ page, browser }, info) => {
   test.setTimeout(240_000);
-  const origin = new URL(BASE_URL || '').origin;
+  const origin = new URL(requireRuntimeUrl('base')).origin;
   expect(new URL(origin).hostname).toBe('localhost');
   expect(process.env.PW_ADMIN_STORAGE_STATE, 'reuse the real administrator UI login').toBeTruthy();
   const evidence = process.env.AURA_EVIDENCE_DIR;
@@ -212,6 +212,16 @@ test('SC06-PERMISSIONS report artifact grants do not bypass customer source read
         expect(downloads).toHaveLength(3);
       }
       await actor.screenshot({ path: join(evidence!, `SC06-source-${hasSourceRead ? 'allowed' : 'denied'}.png`), fullPage: true });
+      await actor.goto(`/report-designer/${reportPid}`);
+      await expect(actor.getByTestId('report-reader-toolbar')).toContainText('只读报表');
+      await expect(actor.getByTestId('report-designer-toolbar-btn-save')).toHaveCount(0);
+      await expect(actor.getByTestId('block-palette')).toHaveCount(0);
+      await expect(actor.getByTestId('block-property-panel')).toHaveCount(0);
+      const deniedEdit=await actor.request.put(`/api/report-definitions/${reportPid}`,{data:{title:'Forbidden reader edit'}});
+      expect(deniedEdit.status()).toBe(403);
+      const retained=await page.request.get(`/api/report-definitions/${reportPid}`);
+      expect((await retained.json()).data.title).toBe(title);
+      await actor.screenshot({path:join(evidence!,`DS04-readonly-designer-${hasSourceRead?'source':'artifact'}.png`),fullPage:true});
       receipts.push({ tenantId, roleCode, roles, grantedPermissions: grants, effectiveSourceRead: effective.includes(readPermission), reportPid, deniedExports, artifacts, downloads });
     } finally {
       await context.close();

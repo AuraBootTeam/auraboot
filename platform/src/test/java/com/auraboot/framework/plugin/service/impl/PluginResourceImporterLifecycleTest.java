@@ -54,6 +54,13 @@ class PluginResourceImporterLifecycleTest {
     @Spy ObjectMapper objectMapper = new ObjectMapper();
     @InjectMocks PluginResourceImporterImpl importer;
 
+    @org.junit.jupiter.api.BeforeEach
+    void wireAgentResourceProvider() {
+        org.springframework.test.util.ReflectionTestUtils.setField(importer, "agentDefinitionResources",
+                new com.auraboot.framework.agent.integration.plugin.AgentDefinitionResourceAdapter(
+                        agentDefinitionMapper, agentEvalCaseMapper, pluginResourceMapper, jdbcTemplate, objectMapper));
+    }
+
     DashboardDefinitionDTO dashboard() {
         return DashboardDefinitionDTO.builder().code("invoice_board").title("Invoices")
                 .widgets(List.of(Map.of("id", "revenue", "type", "metric")))
@@ -226,4 +233,14 @@ class PluginResourceImporterLifecycleTest {
         verify(jdbcTemplate).update(contains("UPDATE ab_agent_definition"),eq("agent-42"));
         verify(jdbcTemplate).update(contains("WHERE tenant_id = ? AND agent_code = ?"),eq(42L),eq("invoice_agent"));
     }
+    @Test void malformedRecordWriterDeclarationFailsBeforeModelOrResourcePersistence() {
+        var dto=ModelDefinitionDTO.builder().code("shared_bid").extension(Map.of("recordCommandWriters",true)).build();
+        assertThatThrownBy(()->importer.importModel(dto,"p","i",42L,ImportRequest.ConflictStrategy.OVERWRITE,false))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("recordCommandWriters");
+        verify(metaModelService,never()).create(any());
+        verify(metaModelMapper).findCurrentByCodeForTenant(42L, "shared_bid");
+        verifyNoMoreInteractions(metaModelMapper);
+        verifyNoInteractions(pluginResourceMapper);
+    }
+
 }

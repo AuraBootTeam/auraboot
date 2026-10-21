@@ -121,12 +121,18 @@ function envValue(primary: string, alias: string, fallback: string): string {
   return process.env[primary] ?? process.env[alias] ?? fallback;
 }
 
+/** Explicit targets stay optional so fixture-owning specs can reject missing runtime admission. */
+export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
+export const EXPLICIT_BACKEND_URL = process.env.BACKEND_URL;
+export const EXPLICIT_SPRING_BOOT_URL = process.env.SPRING_BOOT_URL;
+
+
+export const BOOTSTRAP_COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
+export const SETUP_TENANT_ID = process.env.AURA_ADMIN_TENANT_ID;
+
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;
-
-/** Explicit URL for tests that require an owned runtime rather than host defaults. */
-export const EXPLICIT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
 
 /** Vite-served base — what `page.goto` and `page.request` use by default. */
 export const BASE_URL =

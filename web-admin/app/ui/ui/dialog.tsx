@@ -26,26 +26,29 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { closeLabel?: string }
->(({ className, children, closeLabel = 'Close', ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { closeLabel?: string; showCloseButton?: boolean; placement?: 'center' | 'right' }
+>(({ className, children, closeLabel = 'Close', showCloseButton = true, placement = 'center', ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'border-border bg-panel shadow-pop fixed top-[50%] left-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 duration-200',
+        'border-border bg-panel shadow-pop fixed z-50 w-full border duration-200',
+        placement === 'right'
+          ? 'inset-y-0 right-0 flex h-dvh max-h-dvh min-h-0 max-w-2xl flex-col gap-0 overflow-hidden p-0'
+          : 'top-[50%] left-[50%] grid max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 p-6 sm:rounded-card',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-        'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-        'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
-        'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
-        'sm:rounded-card dark:border-gray-700 dark:bg-gray-900',
+        placement === 'center' && 'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        placement === 'center' && 'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
+        placement === 'center' && 'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
+        'dark:border-gray-700 dark:bg-gray-900',
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close
+      {showCloseButton && <DialogPrimitive.Close
         className="rounded-control text-text-3 hover:text-text focus-visible:shadow-focus absolute top-4 right-4 transition-colors focus:outline-none disabled:pointer-events-none"
         data-testid="btn-close-dialog"
       >
@@ -58,7 +61,7 @@ const DialogContent = React.forwardRef<
           />
         </svg>
         <span className="sr-only">{closeLabel}</span>
-      </DialogPrimitive.Close>
+      </DialogPrimitive.Close>}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));

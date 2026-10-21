@@ -1,3 +1,8 @@
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
+import { useI18n } from '~/contexts/I18nContext';
+import { diagnosticText } from './diagnosticsCopy';
+import { DecisionLoadError } from './DecisionLoadError';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePermissions } from '~/contexts/AuthContext';
@@ -150,20 +155,20 @@ function rolloutAudienceSummary(rollout: DecisionRollout): string {
   return parts.join(' · ');
 }
 
-function metricSummary(label: string, arm: DecisionRolloutArmMetrics, testId: string) {
+function metricSummary(label: string, arm: DecisionRolloutArmMetrics, testId: string, locale: string) {
   const distribution = distributionEntries(arm);
 
   return (
     <div className="rollout-metric-card" data-testid={testId}>
       <span>{label}</span>
       <strong>v{arm.version ?? '-'}</strong>
-      <small>Eval {arm.evaluations}</small>
-      <small>Match {formatRate(arm.matchedRate)}</small>
-      <small>Error {formatRate(arm.errorRate)}</small>
+      <small>{diagnosticText('eval', locale)} {arm.evaluations}</small>
+      <small>{diagnosticText('match', locale)} {formatRate(arm.matchedRate)}</small>
+      <small>{diagnosticText('error', locale)} {formatRate(arm.errorRate)}</small>
       {arm.p95LatencyMs != null && <small>P95 {arm.p95LatencyMs}ms</small>}
       {distribution.length > 0 && (
         <div className="rollout-distribution" data-testid={`${testId}-distribution`}>
-          <small className="rollout-distribution-title">Distribution</small>
+          <small className="rollout-distribution-title">{diagnosticText('distribution', locale)}</small>
           <dl>
             {distribution.map(([key, count]) => (
               <div key={key}>
@@ -264,6 +269,9 @@ export function DecisionRolloutMonitor({
   hasPermission,
 }: DecisionRolloutMonitorProps) {
   const { hasPermission: hasContextPermission } = usePermissions();
+  const { locale } = useI18n();
+  const { timezone, formats } = useTimezone();
+  const text = (key: string) => diagnosticText(key, locale);
   const [decisionCode, setDecisionCode] = useState(initialDecisionCode);
   const [baselineVersion, setBaselineVersion] = useState(String(initialBaselineVersion));
   const [candidateVersion, setCandidateVersion] = useState(String(initialCandidateVersion));
@@ -279,6 +287,8 @@ export function DecisionRolloutMonitor({
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [selectedPid, setSelectedPid] = useState<string | null>(null);
   const [busyPid, setBusyPid] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const canManageRollouts =
     hasPermission?.(ROLLOUT_MANAGE_PERMISSION) ?? hasContextPermission(ROLLOUT_MANAGE_PERMISSION);
@@ -294,6 +304,16 @@ export function DecisionRolloutMonitor({
   ].filter(Boolean);
 
   const normalizedCode = decisionCode.trim();
+  const definitionsQuery = useQuery({
+    queryKey: ['decision-rollout-definition-choices'],
+    queryFn: () => api.listDefinitions(),
+    enabled: typeof api.listDefinitions === 'function',
+  });
+  const definitionData = definitionsQuery.data;
+  const definitionRows = Array.isArray(definitionData) ? definitionData : (definitionData as {records?:unknown[]})?.records ?? [];
+  const choices = definitionRows.filter((row): row is {decisionCode:string;decisionName?:string} => Boolean(row && typeof row === 'object' && typeof (row as {decisionCode?:unknown}).decisionCode === 'string'));
+  const ruleName = (code: string) => choices.find(row => row.decisionCode === code)?.decisionName || text('selectedRule');
+
   const rolloutsQuery = useQuery({
     queryKey: ['decision-rollouts', normalizedCode],
     queryFn: () => api.listRollouts(normalizedCode),
@@ -325,7 +345,8 @@ export function DecisionRolloutMonitor({
   };
 
   const createRollout = async () => {
-    setMessage(null);
+    setMessage(null); setOperationError(null);setCreating(true);
+    try {
     const request = {
       baselineVersion: asNumber(baselineVersion),
       candidateVersion: asNumber(candidateVersion),
@@ -343,6 +364,8 @@ export function DecisionRolloutMonitor({
     setSelectedPid(created.pid);
     setMessage('灰度策略已创建');
     await rolloutsQuery.refetch();
+    } catch (error) {setMessage(text('operationFailed'));setOperationError(error instanceof Error ? error.message : String(error));}
+    finally {setCreating(false);}
   };
 
   const runAction = async (
@@ -351,16 +374,16 @@ export function DecisionRolloutMonitor({
     action: (pid: string, req?: DecisionRolloutActionRequest) => Promise<DecisionRollout>,
   ) => {
     setBusyPid(pid);
-    setMessage(null);
+    setMessage(null); setOperationError(null);
     try {
       await action(pid, { note: note.trim() || undefined });
       setSelectedPid(pid);
       setPending(null);
       setNote('');
-      setMessage(`已执行 ${label}`);
+      setMessage(`${text('executed')} ${text(label)}`);
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : `执行 ${label} 失败`);
+      setMessage(text('operationFailed'));setOperationError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusyPid(null);
     }
@@ -377,21 +400,18 @@ export function DecisionRolloutMonitor({
       className="decisionops-list-page rollout-monitor"
       data-testid="decision-rollout-monitor"
     >
+      {definitionsQuery.isError && <DecisionLoadError testId="rollout-definitions-error" error={definitionsQuery.error} onRetry={definitionsQuery.refetch} busy={definitionsQuery.isFetching} />}
+      <p className="text-sm text-muted-foreground mb-3">{text('rolloutHelp')}</p>
       <div className="decisionops-toolbar rollout-toolbar">
         <label>
-          决策编码
-          <input
-            className="decisionops-search-input"
-            aria-label="rollout-decision-code"
-            value={decisionCode}
-            onChange={(event) => {
-              setDecisionCode(event.target.value);
-              setSelectedPid(null);
-            }}
-          />
+          {text('ruleSelector')}
+          <select aria-label="rollout-decision-code" disabled={definitionsQuery.isFetching || definitionsQuery.isError} value={decisionCode} onChange={event => {setDecisionCode(event.target.value);setSelectedPid(null);}}>
+            {!choices.some(row => row.decisionCode === decisionCode) && <option value={decisionCode}>{text('selectedRule')}</option>}
+            {choices.map(row => <option key={row.decisionCode} value={row.decisionCode}>{row.decisionName || text('rule')}</option>)}
+          </select>
         </label>
         <label>
-          Baseline
+          {text('baseline')}
           <input
             aria-label="rollout-baseline-version"
             type="number"
@@ -401,7 +421,7 @@ export function DecisionRolloutMonitor({
           />
         </label>
         <label>
-          Candidate
+          {text('candidate')}
           <input
             aria-label="rollout-candidate-version"
             type="number"
@@ -421,8 +441,11 @@ export function DecisionRolloutMonitor({
             onChange={(event) => setPercentage(event.target.value)}
           />
         </label>
+        <details className="rollout-advanced" data-testid="rollout-advanced">
+          <summary>{text('advanced')}</summary>
+          <div className="rollout-advanced-fields">
         <label>
-          Routing key
+          {text('routing')}
           <input
             aria-label="rollout-routing-key"
             value={routingKeyExpr}
@@ -430,7 +453,7 @@ export function DecisionRolloutMonitor({
           />
         </label>
         <label>
-          Cohort keys
+          {text('cohort')}
           <input
             aria-label="rollout-cohort-routing-keys"
             placeholder="record-1, record-2"
@@ -439,7 +462,7 @@ export function DecisionRolloutMonitor({
           />
         </label>
         <label>
-          Trace prefix
+          {text('prefix')}
           <input
             aria-label="rollout-cohort-trace-prefixes"
             placeholder="vip-, beta-"
@@ -448,7 +471,7 @@ export function DecisionRolloutMonitor({
           />
         </label>
         <label>
-          Tenant segments
+          {text('segments')}
           <input
             aria-label="rollout-tenant-segments"
             placeholder="early, beta"
@@ -457,7 +480,7 @@ export function DecisionRolloutMonitor({
           />
         </label>
         <label>
-          Salt
+          {text('salt')}
           <input
             aria-label="rollout-salt"
             value={salt}
@@ -465,7 +488,7 @@ export function DecisionRolloutMonitor({
           />
         </label>
         <label>
-          Metrics window
+          {text('window')}
           <input
             aria-label="rollout-metrics-window-hours"
             type="number"
@@ -475,7 +498,7 @@ export function DecisionRolloutMonitor({
           />
         </label>
         <label>
-          Bucket minutes
+          {text('bucket')}
           <input
             aria-label="rollout-metrics-bucket-minutes"
             type="number"
@@ -484,12 +507,14 @@ export function DecisionRolloutMonitor({
             onChange={(event) => setMetricsBucketMinutes(event.target.value)}
           />
         </label>
+          </div>
+        </details>
         <button
           className="decisionops-primary-button"
           data-testid="rollout-create"
           type="button"
           title={canManageRollouts ? undefined : '缺少灰度管理权限'}
-          disabled={!normalizedCode || !canManageRollouts}
+          disabled={!normalizedCode || !canManageRollouts || creating || definitionsQuery.isError || (typeof api.listDefinitions === 'function' && !choices.some(row => row.decisionCode === normalizedCode))}
           onClick={createRollout}
         >
           新建灰度
@@ -505,6 +530,7 @@ export function DecisionRolloutMonitor({
       {message && (
         <div className="decisionops-state rollout-message" data-testid="rollout-status-message">
           {message}
+          {operationError && <details className="mt-2 text-xs"><summary>{text('technical')}</summary>{operationError}</details>}
         </div>
       )}
 
@@ -514,9 +540,7 @@ export function DecisionRolloutMonitor({
         </div>
       )}
       {rolloutsQuery.isError && (
-        <div className="decisionops-state is-error" data-testid="rollout-error">
-          灰度策略加载失败
-        </div>
+        <DecisionLoadError testId="rollout-error" error={rolloutsQuery.error} onRetry={rolloutsQuery.refetch} busy={rolloutsQuery.isFetching} />
       )}
       {!rolloutsQuery.isLoading && !rolloutsQuery.isError && rollouts.length === 0 && (
         <div className="decisionops-empty" data-testid="rollout-empty">
@@ -533,8 +557,8 @@ export function DecisionRolloutMonitor({
                   <th>策略</th>
                   <th>版本</th>
                   <th>状态</th>
-                  <th>流量</th>
-                  <th>Routing</th>
+                  <th>{text('configuredShare')}</th>
+                  <th>{text('routing')}</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -547,25 +571,21 @@ export function DecisionRolloutMonitor({
                     onClick={() => setSelectedPid(rollout.pid)}
                   >
                     <td>
-                      <strong>{rollout.decisionCode ?? normalizedCode}</strong>
-                      <code className="decisionops-code">{rollout.pid}</code>
+                      <strong>{ruleName(rollout.decisionCode ?? normalizedCode)}</strong>
+                      <details className="text-xs"><summary>{text('technical')}</summary>{rollout.decisionCode} · {rollout.pid}</details>
                     </td>
                     <td>
                       {`v${rollout.baselineVersion ?? '-'} -> v${rollout.candidateVersion ?? '-'}`}
                     </td>
                     <td>
                       <span className={`decisionops-badge ${statusTone(rollout.status)}`}>
-                        {rollout.status ?? 'UNKNOWN'}
+                        {text(rollout.status ?? 'UNKNOWN')}
                       </span>
                     </td>
                     <td>{rollout.percentage ?? 0}%</td>
                     <td>
-                      <span>{rollout.routingKeyExpr ?? 'traceId'}</span>
-                      {rolloutAudienceSummary(rollout) && (
-                        <small className="rollout-routing-meta">
-                          {rolloutAudienceSummary(rollout)}
-                        </small>
-                      )}
+                      <span>{['ACTIVE','PROMOTED'].includes(rollout.status ?? '') ? `${rollout.percentage ?? 0}% → v${rollout.candidateVersion ?? '-'}` : text('inactiveRouting')}</span>
+                      <details className="text-xs"><summary>{text('technical')}</summary>{rollout.routingKeyExpr ?? 'traceId'} · {rolloutAudienceSummary(rollout)}</details>
                     </td>
                     <td>
                       <div className="decisionops-row-actions">
@@ -629,22 +649,22 @@ export function DecisionRolloutMonitor({
             {metricsQuery.data ? (
               <div className="rollout-metrics" data-testid="rollout-metrics-panel">
                 <h3>版本指标对比</h3>
-                {metricsMeta(metricsQuery.data)}
+                <details className="text-xs"><summary>{text('metricsDetails')}</summary>{metricsMeta(metricsQuery.data)}</details>
                 <div className="rollout-metrics-grid">
                   {metricSummary(
-                    'Baseline',
+                    text('baseline'),
                     metricsQuery.data.baseline,
-                    'rollout-metrics-baseline',
+                    'rollout-metrics-baseline', locale,
                   )}
                   {metricSummary(
-                    'Candidate',
+                    text('candidate'),
                     metricsQuery.data.candidate,
-                    'rollout-metrics-candidate',
+                    'rollout-metrics-candidate', locale,
                   )}
                 </div>
                 {windowTrend(metricsQuery.data.windows)}
               </div>
-            ) : (
+            ) : metricsQuery.isError ? <DecisionLoadError testId="rollout-metrics-error" error={metricsQuery.error} onRetry={metricsQuery.refetch} busy={metricsQuery.isFetching} /> : (
               <div className="decisionops-empty" data-testid="rollout-metrics-empty">
                 选择灰度策略后展示指标
               </div>
@@ -652,7 +672,7 @@ export function DecisionRolloutMonitor({
 
             {pending && (
               <div className="rollout-confirm-panel" data-testid="rollout-confirm-panel">
-                <h3>确认 {pending.action}</h3>
+                <h3>{text(pending.action)}</h3>
                 <p>该动作会改变生产版本流量,需要写入审计说明。</p>
                 <label>
                   审计说明
@@ -685,22 +705,23 @@ export function DecisionRolloutMonitor({
                   {selectedAuditEntries.map((entry, index) => (
                     <li key={`${entry.action ?? 'audit'}-${entry.at ?? index}`}>
                       <div className="rollout-audit-entry">
-                        <strong>{entry.action ?? 'AUDIT'}</strong>
+                        <strong>{text(['activate','pause','promote','rollback'].includes(entry.action?.toLowerCase() ?? '') ? entry.action!.toLowerCase() : 'audit')}</strong>
                         {entry.note && <p>{entry.note}</p>}
-                        <dl>
+                        <details><summary>{text('technical')}</summary><code>{entry.action}</code><dl>
                           {entry.by && (
                             <div>
-                              <dt>By</dt>
+                              <dt>{text('technical')}</dt>
                               <dd>{entry.by}</dd>
                             </div>
                           )}
                           {entry.at && (
                             <div>
-                              <dt>At</dt>
+                              <dt>{text('time')}</dt>
                               <dd>{entry.at}</dd>
                             </div>
                           )}
-                        </dl>
+                        </dl></details>
+                        {entry.at && <time>{formatInTimezone(entry.at, formats.datetime, timezone)}</time>}
                       </div>
                     </li>
                   ))}

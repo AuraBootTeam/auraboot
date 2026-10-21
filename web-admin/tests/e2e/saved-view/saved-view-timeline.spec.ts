@@ -5,7 +5,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from '../helpers';
+import { openViewSelectorDropdown, uniqueId } from '../helpers';
 import { createOrReuseSavedView, navigateToOrderViaSidebar } from './helpers';
 
 import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
@@ -43,6 +43,29 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 async function deleteViewViaApi(page: Page, pid: string): Promise<void> {
   if (!pid) return;
   await page.request.delete(`/api/views/${pid}`).catch(() => {});
+}
+
+async function withOwnedTableContext(page: Page, assertions: () => Promise<void>) {
+  const name = `TL_Context_${uniqueId()}`;
+  const created = await page.request.post('/api/views', {
+    data: { name, modelCode: 'e2et_order', pageKey: 'e2et_order_list',
+      viewType: 'table', scope: 'personal', viewConfig: {} },
+  });
+  expect(created.ok()).toBe(true);
+  const body = await created.json();
+  expect(body.code).toBe('0');
+  const pid = body.data.pid as string;
+  expect(pid).toMatch(/^[0-9A-Z]{26}$/);
+  try {
+    await navigateToOrderViaSidebar(page);
+    const dropdown = await openViewSelectorDropdown(page);
+    await dropdown.getByTestId(`view-option-${pid}`).click();
+    await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute('data-current-view-name', name);
+    await assertions();
+  } finally {
+    const deleted = await page.request.delete(`/api/views/${pid}`);
+    expect(deleted.ok()).toBe(true);
+  }
 }
 
 test.describe('Timeline View (GAP-128)', () => {
@@ -90,23 +113,24 @@ test.describe('Timeline View (GAP-128)', () => {
   });
 
   test('TL-003: timeline view renders without errors', async ({ page }) => {
-    await navigateToOrderViaSidebar(page);
-    const toolbar = page.getByTestId('row-height-btn');
-    await expect(toolbar).toBeVisible({ timeout: 30000 });
+    await withOwnedTableContext(page, async () => {
+      const toolbar = page.getByTestId('row-height-btn');
+      await expect(toolbar).toBeVisible({ timeout: 30000 });
 
-    // Switch to Timeline view type via the view type selector
-    const timelineBtn = page.getByTestId('view-type-timeline');
-    if (await timelineBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await timelineBtn.click();
-      // Should show timeline or "not configured" message
-      const timelineView = page.getByTestId('timeline-view');
-      const notConfigured = page.locator('text=时间线视图未配置');
-      const visible = await Promise.race([
-        timelineView.waitFor({ timeout: 5000 }).then(() => 'timeline'),
-        notConfigured.waitFor({ timeout: 5000 }).then(() => 'not-configured'),
-      ]).catch(() => 'timeout');
-      expect(['timeline', 'not-configured']).toContain(visible);
-    }
+      // Switch to Timeline view type via the view type selector
+      const timelineBtn = page.getByTestId('view-type-timeline');
+      if (await timelineBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await timelineBtn.click();
+        // Should show timeline or "not configured" message
+        const timelineView = page.getByTestId('timeline-view');
+        const notConfigured = page.locator('text=时间线视图未配置');
+        const visible = await Promise.race([
+          timelineView.waitFor({ timeout: 5000 }).then(() => 'timeline'),
+          notConfigured.waitFor({ timeout: 5000 }).then(() => 'not-configured'),
+        ]).catch(() => 'timeout');
+        expect(['timeline', 'not-configured']).toContain(visible);
+      }
+    });
   });
 
   test('TL-004: timeline config persists across reload', async ({ page }) => {
@@ -136,15 +160,16 @@ test.describe('Timeline View (GAP-128)', () => {
 
   test('TL-005: TIMELINE in VIEW_TYPE_CONFIGS', async ({ page }) => {
     // Verify TIMELINE appears in the view type selector
-    await navigateToOrderViaSidebar(page);
-    await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
+    await withOwnedTableContext(page, async () => {
+      await page.getByTestId('row-height-btn').waitFor({ state: 'visible', timeout: 30000 });
 
-    // Look for Timeline in the view type bar
-    const timelineOption = page.locator('text=Timeline');
-    // It should be in the view type switcher
-    if (await timelineOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-      expect(await timelineOption.isVisible()).toBe(true);
-    }
+      // Look for Timeline in the view type bar
+      const timelineOption = page.locator('text=Timeline');
+      // It should be in the view type switcher
+      if (await timelineOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        expect(await timelineOption.isVisible()).toBe(true);
+      }
+    });
   });
 
   test('TL-006: unconfigured timeline is rejected by capability gate', async ({ page }) => {

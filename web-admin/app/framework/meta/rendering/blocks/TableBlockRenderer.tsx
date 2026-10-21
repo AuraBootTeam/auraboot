@@ -1,3 +1,5 @@
+import { internalRequest } from '~/shared/services/http-client/internal-api';
+import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
  * TableBlockRenderer - 表格块渲染器
  * 支持新的列配置特性: valueType, render, ellipsis 等
@@ -14,8 +16,6 @@ import type {
 } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
-import { fetchResult } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
@@ -33,6 +33,7 @@ import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEdit
 import { useMediaQuery } from '~/framework/meta/rendering/components/ResponsiveBlockLayout';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { RowActionButtons } from '~/framework/meta/rendering/pages/list/RowActionButtons';
+import { useTimezone } from '~/contexts/TimezoneContext';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -40,11 +41,7 @@ export interface TableBlockRendererProps {
 }
 
 // 字典数据项类型
-interface DictItem {
-  value: string;
-  label: string;
-  extension?: Record<string, any>;
-}
+type DictItem = Pick<import('~/types/dict').DictItemData, 'value' | 'label' | 'extension'>;
 
 interface GroupedSelectionItem {
   row: any;
@@ -166,6 +163,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
+  const { timezone, formats: dateTimeFormats } = useTimezone();
 
   const evaluator = runtime.getEvaluator();
   const dataSourceManager = runtime.getDataSourceManager();
@@ -234,14 +232,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     const loadDictData = async () => {
       const promises = unloadedCodes.map(async (code) => {
         try {
-          const result = await fetchResult(`/api/meta/dict/by-code/${code}/data`, {
-            method: 'get',
+          const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
+            path: { code },
           });
-          if (ResultHelper.isSuccess(result) && result.data) {
-            // 适配字典数据格式
-            const data = result.data as { items?: DictItem[] } | DictItem[];
-            const items: DictItem[] = Array.isArray(data) ? data : data.items || [];
-            dictDataCache.current.set(code, items);
+          if (result.code === '0' && result.data) {
+            dictDataCache.current.set(code, dictionaryData(result.data).items);
             failedDictRequests.current.delete(code);
           } else {
             failedDictRequests.current.add(code);
@@ -735,7 +730,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
         if (item && typeof item.label === 'string' && item.label.trim()) {
-          const tone = resolveStatusTone(item.extension?.color);
+          const tone = resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined);
           if (column.renderType === 'status-pill') {
             return renderStatusPill(tone, item.label);
           }
@@ -790,17 +785,19 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       return cellRendererRegistry.render(column.renderType, {
         value,
         record: row,
-        column: column as any,
+        column: { ...column, timezone, dateTimeFormats } as any,
+        locale,
+        t,
       } as any);
     }
 
     // valueType 渲染
     switch (column.valueType) {
       case 'date':
-        return new Date(value).toLocaleDateString(locale);
-
       case 'datetime':
-        return new Date(value).toLocaleString(locale);
+        return cellRendererRegistry.render(column.valueType, {
+          value, record: row, column: { ...column, timezone, dateTimeFormats } as any, locale, t,
+        } as any);
 
       case 'currency':
         return new Intl.NumberFormat(locale, {

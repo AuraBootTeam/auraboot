@@ -9,6 +9,7 @@ import type { PageConfig } from '../types';
 interface A4PageProps {
   page: PageConfig;
   children: React.ReactNode;
+  fitWidth?: number;
 }
 
 // A4 dimensions in mm
@@ -21,18 +22,29 @@ const PAGE_SIZES: Record<string, { w: number; h: number }> = {
 
 const SCALE = 3; // 1mm = 3px on screen
 
-export const A4Page: React.FC<A4PageProps> = ({ page, children }) => {
+/** Screen zoom preserves physical paper dimensions and authored DSL values. */
+export function reportPageMetrics(page: PageConfig, fitWidth?: number) {
   const dims = PAGE_SIZES[page.size] || PAGE_SIZES.A4;
   const w = page.orientation === 'landscape' ? dims.h : dims.w;
   const h = page.orientation === 'landscape' ? dims.w : dims.h;
-
   const widthPx = w * SCALE;
-  const minHeightPx = h * SCALE;
+  return {
+    widthPx,
+    minHeightPx: h * SCALE,
+    zoom: fitWidth && fitWidth > 0 ? Math.min(1, fitWidth / widthPx) : 1,
+  };
+}
+
+export const A4Page: React.FC<A4PageProps> = ({ page, children, fitWidth }) => {
+  const { widthPx, minHeightPx, zoom } = reportPageMetrics(page, fitWidth);
 
   return (
     <div
+      data-testid="report-paper"
+      data-scale={zoom}
       className="relative mx-auto bg-white shadow-lg"
       style={{
+        zoom,
         width: `${widthPx}px`,
         minHeight: `${minHeightPx}px`,
         padding: `${page.margin.top * SCALE}px ${page.margin.right * SCALE}px ${page.margin.bottom * SCALE}px ${page.margin.left * SCALE}px`,
