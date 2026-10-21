@@ -14,7 +14,8 @@ import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  createSearchParams,
+  useLocation,
+  useNavigationType,
   useSearchParams,
   type NavigateFunction,
   type NavigateOptions,
@@ -53,6 +54,7 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
 import { ListErrorState } from './list/ListErrorState';
+import { useSerializedSearchParamsUpdater } from './list/useSerializedSearchParamsUpdater';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
@@ -212,6 +214,8 @@ import {
   shouldSkipModelFieldMeta,
   resolveListMiscBlocksPosition,
 } from './list/listSchemaPolicy';
+
+export { useSerializedSearchParamsUpdater } from './list/useSerializedSearchParamsUpdater';
 
 export {
   getListFieldValueWithAlias,
@@ -414,42 +418,6 @@ export function useRestoreSavedViewFromUrl({
   }, [urlViewPid, savedViews, viewsLoading, selectView, setActiveViewType]);
 }
 
-type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
-
-/**
- * Serialize URL search-param writes made during the same React turn.
- *
- * React Router's functional `setSearchParams` form does not queue updates like
- * React state does. List state can change sorts, filters, pagination and the
- * selected SavedView together, so independently queued writers could otherwise
- * restore an older query string and drop a newly selected `view` parameter.
- */
-export function useSerializedSearchParamsUpdater(
-  searchParams: URLSearchParams,
-  setSearchParams: SearchParamsSetter,
-  writesEnabledRef?: { current: boolean },
-): SearchParamsSetter {
-  const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
-
-  useEffect(() => {
-    latestSearchParamsRef.current = new URLSearchParams(searchParams);
-  }, [searchParams]);
-
-  return useCallback<SearchParamsSetter>(
-    (nextInit, options) => {
-      if (writesEnabledRef?.current === false) return;
-      const resolvedInit =
-        typeof nextInit === 'function'
-          ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
-          : nextInit;
-      const next = createSearchParams(resolvedInit);
-      latestSearchParamsRef.current = new URLSearchParams(next);
-      setSearchParams(next, options);
-    },
-    [setSearchParams, writesEnabledRef],
-  );
-}
-
 export function applyLocalSortUpdate(
   previous: SortConfig[],
   update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[]),
@@ -548,11 +516,14 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Parse filter_* params from URL for drill-down navigation
   const [searchParams, routerSetSearchParams] = useSearchParams();
+  const listLocation = useLocation();
+  const listNavigationType = useNavigationType();
   const listUrlWritesEnabledRef = useRef(true);
   const setSearchParams = useSerializedSearchParamsUpdater(
     searchParams,
     routerSetSearchParams,
     listUrlWritesEnabledRef,
+    { key: listLocation.key, action: listNavigationType },
   );
   const listSchemaFieldNames = useMemo(() => collectListSchemaFieldNames(schema), [schema]);
   const listSchemaFieldNameSet = useMemo(

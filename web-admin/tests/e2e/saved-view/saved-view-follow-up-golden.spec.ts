@@ -11,7 +11,6 @@ test.afterAll(() => { releaseSavedViewLock('saved-view-follow-up-golden'); });
 
 const ORDER_MODEL = 'e2et_order';
 const ORDER_PAGE_KEY = 'e2et_order_list';
-const SHOTS = 'test-results/saved-view-follow-up-golden';
 
 async function apiData<T>(
   page: Page,
@@ -76,11 +75,11 @@ async function findPersonalPresetSavedView(page: Page, presetKey: string): Promi
   );
 }
 
-async function ensureModifiedThisWeekPresetCopy(page: Page): Promise<void> {
+async function ensureModifiedThisWeekPresetCopy(page: Page): Promise<{ pid: string; name: string }> {
   const existing = await findPersonalPresetSavedView(page, 'modified_this_week');
-  if (existing?.pid) return;
+  if (existing?.pid) return existing;
 
-  await apiData(page, 'post', '/api/views', {
+  const created = await apiData<{ pid: string; name: string }>(page, 'post', '/api/views', {
     name: `Modified This Week ${uniqueId('preset')}`,
     modelCode: ORDER_MODEL,
     pageKey: ORDER_PAGE_KEY,
@@ -88,13 +87,15 @@ async function ensureModifiedThisWeekPresetCopy(page: Page): Promise<void> {
     viewType: 'table',
     viewConfig: modifiedThisWeekPresetConfig(),
   });
+  expect(created.pid, 'Preset fixture must have a public ID').toBeTruthy();
+  return created;
 }
 
 test.describe('SavedView Personal-only follow-up golden coverage', () => {
   test('SV-FU-003: saved quick preset opens as a personal view without toolbar preset state', async ({
     page,
   }) => {
-    await ensureModifiedThisWeekPresetCopy(page);
+    const savedView = await ensureModifiedThisWeekPresetCopy(page);
     await navigateToOrderViaSidebar(page);
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('preset-view-bar')).toHaveCount(0);
@@ -112,6 +113,7 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
 
     await page.getByTestId('preset-view-save-as-personal').click();
     await expect(page).toHaveURL(/view=[^&]+/, { timeout: 10_000 });
+    await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(savedView.pid);
     await expect
       .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 10_000 })
       .toBeNull();
@@ -120,6 +122,28 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     await expect(presetChip).not.toHaveAttribute('data-preset-edited', 'true');
     await expect(page.getByTestId('preset-view-save-as-personal')).toHaveCount(0);
     await expect(page.getByTestId('preset-view-reset-saved')).toHaveCount(0);
-    await page.screenshot({ path: `${SHOTS}/04-preset-saved-as-personal-clean-state.png`, fullPage: true });
+    await expect(page.getByTestId('view-selector-trigger')).toContainText(savedView.name);
+    await page.screenshot({ path: test.info().outputPath('04-preset-saved-as-personal-clean-state.png'), fullPage: true });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('view-selector-trigger')).toContainText(savedView.name);
+    await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(savedView.pid);
+    await expect.poll(() => new URL(page.url()).searchParams.get('preset')).toBeNull();
+    await expect(page.getByTestId('quick-filter-modified_this_week')).toHaveAttribute('data-preset-active', 'false');
+    await expect(page.getByTestId('preset-view-save-as-personal')).toHaveCount(0);
+    const persisted = await findPersonalPresetSavedView(page, 'modified_this_week');
+    expect(persisted?.pid).toBe(savedView.pid);
+    expect(persisted?.viewConfig?.meta?.originPresetKey).toBe('modified_this_week');
+    expect(persisted?.viewConfig?.filters).toEqual(modifiedThisWeekPresetConfig().filters);
+    await page.screenshot({ path: test.info().outputPath('05-personal-view-after-reload.png'), fullPage: true });
+
+    await page.getByRole('banner').getByRole('link', { name: /AuraBoot/ }).click();
+    await expect(page).toHaveURL(/\/home(?:$|[?#])/);
+    await page.goBack();
+    await expect(page.getByTestId('view-selector-trigger')).toContainText(savedView.name);
+    await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(savedView.pid);
+    await expect.poll(() => new URL(page.url()).searchParams.get('preset')).toBeNull();
+    await expect(page.getByTestId('quick-filter-modified_this_week')).toHaveAttribute('data-preset-active', 'false');
+    await page.screenshot({ path: test.info().outputPath('06-personal-view-after-back.png'), fullPage: true });
   });
 });
