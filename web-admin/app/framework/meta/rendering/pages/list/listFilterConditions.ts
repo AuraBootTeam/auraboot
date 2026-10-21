@@ -204,7 +204,7 @@ export function resolveUserFilterCondition(
     }
   }
   // Date range objects { start, end }
-  if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+  if (value !== null && typeof value === 'object' && ('start' in value || 'end' in value)) {
     const range = value as { start?: unknown; end?: unknown };
     const conditions: ListQueryFilterCondition[] = [];
     if (range.start)
