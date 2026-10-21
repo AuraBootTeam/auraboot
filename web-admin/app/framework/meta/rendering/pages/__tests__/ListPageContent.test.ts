@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { useEffect, useLayoutEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   useListKeywordSearch,
@@ -140,6 +141,121 @@ describe('useSerializedSearchParamsUpdater', () => {
     });
 
     expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');
+  });
+
+  it('keeps the saved view when an earlier preset navigation commits later', () => {
+    const committed: string[] = [];
+    const routerSetter = vi.fn((next: any) => committed.push(new URLSearchParams(next).toString()));
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: 'pageSize=20' } },
+    );
+    act(() => {
+      result.current(new URLSearchParams('pageSize=20&preset=modified_this_week'), { replace: true });
+      result.current(new URLSearchParams('pageSize=20&view=personal-view'), { replace: true });
+    });
+    // The router acknowledges the earlier preset while the save is still pending.
+    rerender({ search: 'pageSize=20&preset=modified_this_week' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '1');
+      return prev;
+    }, { replace: true }));
+    expect(new URLSearchParams(committed.at(-1)).get('view')).toBe('personal-view');
+    expect(new URLSearchParams(committed.at(-1)).has('preset')).toBe(false);
+    expect(new URLSearchParams(committed.at(-1)).get('pageNum')).toBe('1');
+  });
+
+  it('accepts external navigation after the latest write commits', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: 'preset=modified_this_week' } },
+    );
+    act(() => result.current(new URLSearchParams('view=personal-view'), { replace: true }));
+    rerender({ search: 'view=personal-view' });
+    rerender({ search: 'preset=created_today' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '2');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('preset=created_today&pageNum=2');
+  });
+
+  it('preserves a save between the DOM commit and passive filter synchronization', () => {
+    const routerSetter = vi.fn();
+    const { rerender } = renderHook(({ search, save }: { search: string; save: boolean }) => {
+      const update = useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any);
+      useLayoutEffect(() => {
+        if (!save) return;
+        update((prev: URLSearchParams) => {
+          prev.delete('preset');
+          prev.set('view', 'personal-view');
+          return prev;
+        });
+      }, [save, update]);
+      useEffect(() => {
+        if (!save) return;
+        update((prev: URLSearchParams) => {
+          prev.set('pageNum', '1');
+          return prev;
+        });
+      }, [save, update]);
+    }, { initialProps: { search: 'preset=modified_this_week', save: false } });
+    rerender({ search: 'preset=modified_this_week&pageSize=20', save: true });
+    const final = routerSetter.mock.calls.at(-1)?.[0] as URLSearchParams;
+    expect(final.get('view')).toBe('personal-view');
+    expect(final.has('preset')).toBe(false);
+    expect(final.get('pageNum')).toBe('1');
+  });
+
+  it('honors Back to an earlier query even when a newer write is pending', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search, key, action }: { search: string; key: string; action: 'POP' | 'REPLACE' }) => useSerializedSearchParamsUpdater(
+        new URLSearchParams(search), routerSetter as any, undefined, { key, action },
+      ),
+      { initialProps: { search: 'pageSize=20', key: 'initial', action: 'POP' as 'POP' | 'REPLACE' } },
+    );
+    act(() => {
+      result.current(new URLSearchParams('preset=modified_this_week'));
+      result.current(new URLSearchParams('view=personal-view'));
+    });
+    rerender({ search: 'preset=modified_this_week', key: 'back', action: 'POP' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '2');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('preset=modified_this_week&pageNum=2');
+  });
+
+  it('accepts an unrelated external navigation while local writes are pending', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: '' } },
+    );
+    act(() => result.current(new URLSearchParams('view=personal-view')));
+    rerender({ search: 'keyword=external' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '2');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('keyword=external&pageNum=2');
+  });
+
+  it('does not treat a new params object with the same query as an acknowledgement', () => {
+    const routerSetter = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => useSerializedSearchParamsUpdater(new URLSearchParams(search), routerSetter as any),
+      { initialProps: { search: '' } },
+    );
+    act(() => result.current(new URLSearchParams('view=personal-view')));
+    rerender({ search: '' });
+    act(() => result.current((prev: URLSearchParams) => {
+      prev.set('pageNum', '1');
+      return prev;
+    }));
+    expect(routerSetter.mock.calls.at(-1)?.[0].toString()).toBe('view=personal-view&pageNum=1');
   });
 
   it('drops queued list URL writes after an outgoing page navigation begins', () => {
@@ -735,6 +851,16 @@ describe('buildListFilterFieldMetadata', () => {
 });
 
 describe('viewFilterToQueryCondition', () => {
+  it('reads persisted legacy preset ranges as two scalar query values', () => {
+    expect(viewFilterToQueryCondition({
+      fieldCode: 'updated_at', operator: 'between',
+      value: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    })).toEqual({
+      fieldName: 'updated_at', operator: 'BETWEEN',
+      values: ['2026-10-14', '2026-10-21T23:59:59'],
+    });
+  });
+
   it('keeps IN and BETWEEN values as arrays for list and export requests', () => {
     const inCondition = viewFilterToQueryCondition({
       fieldCode: 'forecast_category',
@@ -801,6 +927,17 @@ describe('tabFilterToQueryCondition', () => {
 });
 
 describe('resolveSavedViewFilterExpressions', () => {
+  it('restores a legacy range to chip state without mutating the persisted view', () => {
+    const original = {
+      fieldCode: 'updated_at', operator: 'between' as const,
+      value: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    };
+    expect(resolveSavedViewFilterExpressions([original], {})).toEqual([{
+      ...original, value: ['2026-10-14', '2026-10-21T23:59:59'],
+    }]);
+    expect(original.value).toEqual({ start: '2026-10-14', end: '2026-10-21T23:59:59' });
+  });
+
   it('resolves both supported current-user syntaxes to a public user PID', () => {
     const resolved = resolveSavedViewFilterExpressions(
       [
