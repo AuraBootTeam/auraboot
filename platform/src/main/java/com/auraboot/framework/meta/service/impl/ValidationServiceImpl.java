@@ -187,7 +187,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 }
                 table = targetModel.getTableName();
             }
-            String valueField = target.getValueField() != null && !target.getValueField().isBlank()
+            boolean explicitIdentity = target.getValueField() != null && !target.getValueField().isBlank();
+            String valueField = explicitIdentity
                     ? target.getValueField()
                     : target.getTargetField() != null && !target.getTargetField().isBlank()
                             ? target.getTargetField() : "pid";
@@ -203,9 +204,10 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 params.put("tenantId", MetaContext.getCurrentTenantId());
                 for (int index = 0; index < size; index++) {
                     String key = "ref" + index;
-                    params.put(key, references.get(offset + index));
-                    queries.add("(SELECT COUNT(*) FROM " + table + " WHERE " + valueField
-                            + " = #{params." + key + "} AND tenant_id = #{params.tenantId}) AS cnt" + index);
+                    String lookup = businessReferenceLookup(valueField, target.getTargetField(),
+                            references.get(offset + index), key, params, explicitIdentity);
+                    queries.add("(SELECT COUNT(*) FROM " + table + " WHERE " + lookup
+                            + " AND tenant_id = #{params.tenantId}) AS cnt" + index);
                 }
                 List<Map<String, Object>> matches = dynamicDataMapper.selectByQuery(
                         "SELECT " + String.join(", ", queries), params);
@@ -370,32 +372,47 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 ? refTarget.getTargetField()
                 : null;
         for (String candidate : parseReferenceValues(rawValue)) {
-            String lookup = "(" + valueField + " = #{params.refValue}";
-            if (!explicitIdentity && !valueField.equalsIgnoreCase("pid")) lookup += " OR pid = #{params.refValue}";
-            if (!explicitIdentity && displayField != null && !displayField.equalsIgnoreCase(valueField)) {
-                lookup += " OR " + displayField + " = #{params.refValue}";
-            }
-            lookup += ")";
-            String sql = "SELECT COUNT(*) as cnt FROM " + targetTable
-                    + " WHERE " + lookup
-                    + " AND tenant_id = #{params.tenantId}";
             Map<String, Object> params = new HashMap<>();
-            params.put("refValue", candidate);
             params.put("tenantId", tenantId);
-            try {
-                List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql, params);
-                if (!results.isEmpty()) {
-                    long count = ((Number) results.get(0).get("cnt")).longValue();
-                    if (count == 0) {
-                        errors.add("Referenced record not found for field '" + fieldDefinition.getName()
-                                + "': " + targetTable + "." + valueField + " = " + candidate);
-                    }
-                }
-            } catch (RuntimeException e) {
-                log.warn("Reference existence check failed for {}: {}", fieldDefinition.getCode(), e.getMessage());
-                errors.add("Reference existence could not be verified for field '" + fieldDefinition.getName() + "'");
+            String lookup = businessReferenceLookup(valueField, displayField, candidate, "refValue", params, explicitIdentity);
+            String sql = "SELECT COUNT(*) as cnt FROM " + targetTable
+                    + " WHERE " + lookup + " AND tenant_id = #{params.tenantId}";
+            // A failed query aborts the enclosing PostgreSQL transaction. Let the
+            // failure propagate rather than accepting an unverified reference.
+            List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql, params);
+            if (!results.isEmpty() && ((Number) results.get(0).get("cnt")).longValue() == 0) {
+                errors.add("Referenced record not found for field '" + fieldDefinition.getName()
+                        + "': " + targetTable + "." + valueField + " = " + candidate);
             }
         }
+    }
+
+    private String businessReferenceLookup(String valueField, String displayField, String candidate,
+                                           String key, Map<String, Object> params, boolean explicitIdentity) {
+        Set<String> columns = new LinkedHashSet<>();
+        columns.add(valueField);
+        if (!explicitIdentity) {
+            columns.add("pid");
+            if (displayField != null && !displayField.isBlank()) columns.add(displayField);
+        }
+        params.put(key, candidate);
+        List<String> predicates = new ArrayList<>();
+        for (String column : columns) {
+            SqlSafetyUtils.validateIdentifier(column, "reference lookup column");
+            if ("id".equalsIgnoreCase(column)) {
+                // Internal IDs are BIGINT; a business PID/display key remains text.
+                // Never bind the same varchar parameter to both column types.
+                try {
+                    params.put(key + "Id", Long.valueOf(candidate));
+                    predicates.add(column + " = #{params." + key + "Id}");
+                } catch (NumberFormatException notInternalId) {
+                    // A nonnumeric or out-of-range key can still match pid/display.
+                }
+            } else {
+                predicates.add(column + " = #{params." + key + "}");
+            }
+        }
+        return predicates.isEmpty() ? "(1 = 0)" : "(" + String.join(" OR ", predicates) + ")";
     }
 
     /**

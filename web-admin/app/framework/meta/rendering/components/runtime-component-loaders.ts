@@ -15,8 +15,16 @@ interface RuntimeEntry {
 }
 
 const moduleLoaders: Record<string, () => Promise<Record<string, any>>> = {
-  ...import.meta.glob('../../../../ui/smart/**/*.tsx'),
-  ...import.meta.glob('/app/ui/smart/**/*.tsx'),
+  ...import.meta.glob([
+    '../../../../ui/smart/**/*.tsx',
+    '!../../../../ui/smart/**/__tests__/**',
+    '!../../../../ui/smart/**/*.{test,spec}.tsx',
+  ]),
+  ...import.meta.glob([
+    '/app/ui/smart/**/*.tsx',
+    '!/app/ui/smart/**/__tests__/**',
+    '!/app/ui/smart/**/*.{test,spec}.tsx',
+  ]),
 };
 
 const runtimeEntryMap = new Map<string, RuntimeEntry>();

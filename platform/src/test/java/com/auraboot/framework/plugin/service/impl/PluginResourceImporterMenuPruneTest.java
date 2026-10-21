@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
@@ -17,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 /**
  * menus.json is the plugin's complete menu surface: codes this plugin family imported
@@ -146,18 +149,82 @@ class PluginResourceImporterMenuPruneTest {
     }
 
     @Test
-    @DisplayName("a menu the service refuses (active children) still converges via the direct soft-delete fallback")
-    void serviceRefusalFallsBackToDirectSoftDelete() {
+    @DisplayName("service refusal aborts import without a fallback that hides a rollback-only transaction")
+    void serviceRefusalAbortsWithoutFallback() {
         trackedCodes("broken_menu", "healthy_menu");
-        activeMenu("healthy_menu", 12L, "menu-pid-2");
+        lenient().when(menuMapper.findIdByCode(42L, "healthy_menu")).thenReturn(12L);
+        lenient().when(menuMapper.findPidByCode(42L, "healthy_menu")).thenReturn("menu-pid-2");
         lenient().when(menuMapper.findIdByCode(42L, "broken_menu")).thenReturn(11L);
         lenient().when(menuMapper.findPidByCode(42L, "broken_menu")).thenReturn("menu-pid-1");
         when(menuService.deleteMenu(11L)).thenThrow(new IllegalStateException("child menus exist"));
 
-        int pruned = importer.deactivateAllPluginMenus("plugin-pid", 42L);
+        assertThatThrownBy(() -> importer.deactivateAllPluginMenus("plugin-pid", 42L))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("child menus");
+        verify(menuService, never()).deleteMenu(12L);
+        verify(menuMapper, never()).softDeleteById(any());
+        verify(pluginResourceMapper, never()).insert(any(PluginResource.class));
+    }
 
-        assertThat(pruned).isEqualTo(2);
-        verify(menuService).deleteMenu(12L);
-        verify(menuMapper).softDeleteById(11L);
+    private Menu menu(long id, long parentId, String code) {
+        Menu menu = new Menu();
+        menu.setId(id);
+        menu.setParentId(parentId);
+        menu.setCode(code);
+        return menu;
+    }
+
+    @Test
+    void prunesNestedStaleMenusChildrenFirst() {
+        trackedCodes("root", "branch", "leaf");
+        activeMenu("root", 11L, "root-pid");
+        activeMenu("branch", 12L, "branch-pid");
+        activeMenu("leaf", 13L, "leaf-pid");
+        when(menuMapper.selectList(any())).thenReturn(List.of(
+                menu(11, 0, "root"), menu(12, 11, "branch"), menu(13, 12, "leaf")));
+
+        assertThat(importer.pruneStaleMenus("plugin-pid", "import-1", 42L, List.of())).isEqualTo(3);
+
+        var order = inOrder(menuService);
+        order.verify(menuService).deleteMenu(13L);
+        order.verify(menuService).deleteMenu(12L);
+        order.verify(menuService).deleteMenu(11L);
+    }
+
+    @Test
+    void refusesRetainedChildBeforeAnyDeletion() {
+        trackedCodes("root", "other");
+        activeMenu("root", 11L, "root-pid");
+        activeMenu("other", 12L, "other-pid");
+        when(menuMapper.selectList(any())).thenReturn(List.of(
+                menu(11, 0, "root"), menu(12, 0, "other"), menu(13, 11, "tenant-owned-child")));
+
+        assertThatThrownBy(() -> importer.deactivateAllPluginMenus("plugin-pid", 42L))
+                .hasMessageContaining("retained child");
+        verify(menuService, never()).deleteMenu(any());
+        verify(pluginResourceMapper, never()).insert(any(PluginResource.class));
+    }
+
+    @Test
+    void refusesCycleBeforeAnyDeletion() {
+        trackedCodes("root", "branch");
+        activeMenu("root", 11L, "root-pid");
+        activeMenu("branch", 12L, "branch-pid");
+        when(menuMapper.selectList(any())).thenReturn(List.of(
+                menu(11, 12, "root"), menu(12, 11, "branch")));
+
+        assertThatThrownBy(() -> importer.deactivateAllPluginMenus("plugin-pid", 42L))
+                .hasMessageContaining("cyclic");
+        verify(menuService, never()).deleteMenu(any());
+    }
+
+    @Test
+    void doesNotAuditAnUnsuccessfulDelete() {
+        trackedCodes("root");
+        activeMenu("root", 11L, "root-pid");
+        when(menuService.deleteMenu(11L)).thenReturn(false);
+
+        assertThatThrownBy(() -> importer.pruneStaleMenus("plugin-pid", "import-1", 42L, List.of()))
+                .hasMessageContaining("not deleted");
+        verify(pluginResourceMapper, never()).insert(any(PluginResource.class));
     }
 }

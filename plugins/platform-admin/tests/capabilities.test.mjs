@@ -614,3 +614,15 @@ test('master-data governance has registered upper duties matching the existing c
   assert.ok(!caps.find(item => item.code === 'sys.cap.governance_submit').includes
     .includes('governance.governance.review'));
 });
+
+test('native member command permissions are declared before generated model synchronization', () => {
+  const declared = new Set(JSON.parse(source('../config/permissions.json')).map(item => item.code));
+  const commands = JSON.parse(source('../config/commands.json'))
+    .filter(command => command.modelCode === 'tenant_member');
+  assert.ok(commands.length >= 7);
+  for (const command of commands) {
+    for (const code of command.permissions ?? []) {
+      assert.ok(declared.has(code), `Native member command ${command.code} must declare ${code}`);
+    }
+  }
+});

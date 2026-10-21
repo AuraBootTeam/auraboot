@@ -70,7 +70,7 @@ function validateStandardBomWorkbook(filePath: string, created: BomWorkbenchSeed
     cellText: false,
     sheetStubs: true,
   });
-  expect(workbook.SheetNames).toEqual(['BOM', '变更记录', '转换明细']);
+  expect(workbook.SheetNames).toEqual(['BOM', '变更记录']);
 
   for (const sheetName of workbook.SheetNames) {
     for (const [address, entry] of Object.entries(workbook.Sheets[sheetName])) {
@@ -111,24 +111,7 @@ function validateStandardBomWorkbook(filePath: string, created: BomWorkbenchSeed
   expect(mcuRow, 'standard BOM should include direct-copy MCU row').toBeTruthy();
   expect(cell(mcuRow, 2)).toMatch(/^E2E-U1-/);
 
-  const detailRows = sheetRows(workbook, '转换明细');
-  expect(detailRows[0]).toEqual([
-    '原始行号',
-    '原始描述',
-    '系统分类',
-    '提取属性',
-    '匹配编码',
-    '候选编码',
-    '颜色',
-    '错误原因',
-    '数量语义证据',
-  ]);
-  const resistorDetail = detailRows.find((row) => cell(row, 1) === '10K 1% 0603');
-  expect(resistorDetail, 'detail sheet should include unresolved resistor evidence').toBeTruthy();
-  expect(cell(resistorDetail, 5)).toContain(created.candidateCode);
-  expect(cell(resistorDetail, 6)).toBe('YELLOW');
-
-  const flat = JSON.stringify(bomRows.slice(0, 6)) + JSON.stringify(detailRows.slice(0, 2));
+  const flat = JSON.stringify(workbook.SheetNames.map(name => sheetRows(workbook, name)));
   expect(flat, 'no raw bom_* field codes leak into the workbook').not.toMatch(/bom_(std|task|raw)_[a-z_]+/);
 }
 
@@ -284,7 +267,7 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       step = 'undo decision';
       await page.reload({ waitUntil: 'domcontentloaded' });
       await waitForDynamicPageLoad(page, 20_000);
-      await page.locator('tbody tr').filter({ hasText: '10K resistor canonical' }).first().click();
+      await page.locator('tbody tr').filter({ hasText: 'R1,R2' }).first().click();
       await expect(page.getByTestId('review-drawer')).toBeVisible({ timeout: 20_000 });
       await expect(page.getByTestId('review-drawer-candidate-action-undo_decision')).toBeEnabled({
         timeout: 20_000,
@@ -352,6 +335,18 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       const exportPath = path.join(testInfo.outputDir, `role-eng-standard-bom-${created.taskId}.xlsx`);
       await saveWorkbookDownload(download, exportPath, testInfo, 'bom-engineering');
       validateStandardBomWorkbook(exportPath, created);
+      // Removing the customer detail sheet must not remove internal review evidence.
+      const internalRow = await readDynamicRecord(page, 'bom_standard_line_pcba', created.standardLineId);
+      expect(String(internalRow.bom_std_candidate_codes ?? '')).toContain(created.candidateCode);
+      const matchRows = await queryDynamicRecords(adminPage, 'bom_match_result_pcba', [
+        { fieldName: 'bom_mr_std_item_id', operator: 'EQ', value: created.standardLineId },
+      ]);
+      expect(matchRows).toHaveLength(1);
+      expect(String(matchRows[0].bom_mr_status_color).toUpperCase()).toBe('YELLOW');
+      const retainedDecisions = await queryDynamicRecords(adminPage, 'bom_review_decision', [
+        { fieldName: 'bom_rd_task_id', operator: 'EQ', value: created.taskId },
+      ]);
+      expect(retainedDecisions.map(d => d.bom_rd_decision_type).sort()).toEqual(['manual_confirm', 'undo']);
       const exportFileId = String(regenBody?.data?.data?.exportFileId ?? regenBody?.data?.exportFileId ?? '');
       expect(exportFileId).toBeTruthy();
       const exportedTask = await readDynamicRecord(page, 'bom_conversion_task_pcba', created.taskId);
