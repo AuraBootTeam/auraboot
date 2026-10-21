@@ -119,7 +119,10 @@ test('customer integration is inspectable, its external event survives designer 
     const row = page.getByRole('row').filter({ has: page.getByText(fixture.projectName, { exact: true }) });
     await row.getByRole('button', { name: '查看', exact: true }).click();
     await expect(page.getByRole('heading', { name: fixture.projectName, exact: true })).toBeVisible();
-    await expect(page.getByRole('main')).toContainText(action); await shot(page, 'I07-event-business-result');
+    await expect(page.getByRole('main')).toContainText(action);
+    await expect(page.getByRole('main')).not.toContainText(/加载中/);
+    await expect(page.getByRole('main')).toContainText('暂无待完成里程碑');
+    await shot(page, 'I07-event-business-result');
 
     card = await platform(page, fixture.applicationName);
     await page.getByTestId(`open-platform-operations-${fixture.installationPid}`).click();

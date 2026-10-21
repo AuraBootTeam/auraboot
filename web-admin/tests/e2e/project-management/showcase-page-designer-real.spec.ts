@@ -28,8 +28,13 @@ async function projects(page: Page) {
 }
 async function designer(page: Page) {
   await navigateToMenuByClick(page, ['元数据管理', '页面配置']);
+  const searched = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/dynamic/page_schema/list' && url.searchParams.get('keyword') === 'tpm_project_form';
+  });
   await page.getByTestId('list-search-input').fill('tpm_project_form');
   await page.getByTestId('list-search-input').press('Enter');
+  expect((await data(await searched)).records).toHaveLength(1);
   const row = page.getByRole('row').filter({ hasText: 'tpm_project_form' });
   await expect(row).toHaveCount(1);
   await row.getByText('统一设计器', { exact: true }).click();
