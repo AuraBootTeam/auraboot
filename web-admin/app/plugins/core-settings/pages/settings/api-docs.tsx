@@ -681,6 +681,7 @@ export default function OpenPlatformPage() {
                                 )
                               }
                               className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
+                              data-testid={`open-platform-operations-${installation.pid}`}
                               aria-expanded={operationsInstallation === installation.pid}
                             >
                               <WrenchScrewdriverIcon className="h-3.5 w-3.5" />

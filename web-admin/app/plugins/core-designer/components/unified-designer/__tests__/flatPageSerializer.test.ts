@@ -677,3 +677,14 @@ describe('flatPageSerializer fail-fast boundaries', () => {
     ]);
   });
 });
+
+it('preserves mature form layout, section extension, descriptions and footer placement when refining a title', () => {
+  roundTrip('form', [
+    { id: 'outcome', blockType: 'form-section', title: { 'zh-CN': '客户与交付背景' },
+      description: { 'zh-CN': '核对客户与负责人' },
+      fields: [{ field: 'customer', colSpan: 6, required: true }, { field: 'owner', colSpan: 6 }] },
+    { id: 'supplement', blockType: 'form-section', extension: { collapsible: true, defaultCollapsed: true },
+      fields: [{ field: 'files', colSpan: 12, component: 'fileattachment' }] },
+    { id: 'buttons', blockType: 'form-buttons', area: 'footer', buttons: [{ code: 'submit', action: 'save', commandCode: 'tpm:create_project' }] },
+  ]);
+});

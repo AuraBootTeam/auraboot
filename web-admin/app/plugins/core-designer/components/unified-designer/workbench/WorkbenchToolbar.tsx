@@ -114,7 +114,7 @@ export function WorkbenchToolbar({
   // button is disabled to prevent double submits.
   const publishBusy = publishStatus === 'publishing' || publishStatus === 'unpublishing';
   const isPublished = publishStatus === 'published';
-  const publishDisabled = readOnly || !pageId || isDirty || publishBusy;
+  const publishDisabled = readOnly || !pageId || isDirty || publishBusy || isPublished;
 
   useEffect(() => {
     if (!isDirty) setShowLeaveWarning(false);

@@ -65,6 +65,7 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     document.body.innerHTML = '';
   });
 
@@ -100,6 +101,7 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
 
   it('starts compact viewports with drawers closed so the automation canvas keeps width', () => {
     mockMatchMedia(true);
+    mockResizeObserver(720);
 
     renderWorkspace();
 
@@ -113,6 +115,7 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
 
   it('opens one compact drawer at a time without changing the canvas flex contract', () => {
     mockMatchMedia(true);
+    mockResizeObserver(720);
 
     renderWorkspace();
 
@@ -127,8 +130,24 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
     expect(screen.getByTestId('flow-canvas-shell')).toHaveClass('flex', 'min-w-0', 'flex-1');
   });
 
+  it('docks the inspector beside the canvas when a desktop workspace fits two columns', () => {
+    mockMatchMedia(true);
+    mockResizeObserver(1184);
+    renderWorkspace();
+
+    fireEvent.click(screen.getByTestId('flow-toggle-inspector'));
+    expect(screen.getByTestId('flow-inspector-shell')).toHaveAttribute('data-open', 'true');
+    expect(screen.getByTestId('flow-inspector-shell')).not.toHaveClass('absolute');
+    expect(screen.queryByTestId('flow-drawer-backdrop')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('flow-toggle-palette'));
+    expect(screen.getByTestId('flow-palette-shell')).toHaveClass('absolute');
+    expect(screen.getByTestId('flow-drawer-backdrop')).toBeVisible();
+  });
+
   it('opens the inspector drawer when compact mode receives a new selected node', () => {
     mockMatchMedia(true);
+    mockResizeObserver(720);
 
     const { rerender } = renderWorkspace({ inspectorFocusKey: null });
 
@@ -148,5 +167,36 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
 
     expect(screen.getByTestId('flow-inspector-shell')).toHaveAttribute('data-open', 'true');
     expect(screen.getByTestId('flow-palette-shell')).toHaveAttribute('data-open', 'false');
+  });
+});
+
+
+describe('shared Report/Dashboard workspace contract', () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
+
+  it.each([620, 768])('retains property drafts while drawers close at %ipx', (width) => {
+    mockMatchMedia(false);
+    mockResizeObserver(width);
+    const view = renderWorkspace({ compactWidth: 900, testIdPrefix: 'report', propertyPanel: <input aria-label="Draft title" defaultValue="Original" /> });
+    expect(screen.getByTestId('report-designer-workspace')).toHaveAttribute('data-layout', 'compact');
+    expect(screen.getByTestId('report-palette-shell')).toHaveAttribute('data-open', 'false');
+    fireEvent.click(screen.getByTestId('report-toggle-inspector'));
+    const input = screen.getByRole('textbox', { name: 'Draft title' });
+    fireEvent.change(input, { target: { value: 'Edited, not saved' } });
+    expect(screen.getByTestId('report-inspector-shell')).toHaveAttribute('data-presentation', 'overlay');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByTestId('report-inspector-shell')).toHaveAttribute('data-open', 'false');
+    fireEvent.click(screen.getByTestId('report-toggle-inspector'));
+    expect(screen.getByRole('textbox', { name: 'Draft title' })).toHaveValue('Edited, not saved');
+    view.unmount();
+  });
+
+  it('keeps useful desktop Report/Dashboard panels docked without importing Flow state', () => {
+    mockMatchMedia(true);
+    mockResizeObserver(1184);
+    renderWorkspace({ compactWidth: 900, testIdPrefix: 'dashboard' });
+    expect(screen.getByTestId('dashboard-designer-workspace')).toHaveAttribute('data-layout', 'wide');
+    expect(screen.getByTestId('dashboard-inspector-shell')).toHaveAttribute('data-open', 'true');
+    expect(screen.getByTestId('dashboard-palette-shell')).toHaveAttribute('data-open', 'true');
   });
 });

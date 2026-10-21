@@ -371,6 +371,20 @@ async function fillOneField(
   field: Locator,
   value: string | string[] | boolean,
 ): Promise<void> {
+  const mapping = field.getByTestId('model-field-map');
+  if (await mapping.count()) {
+    if (typeof value !== 'string') throw new Error('Field mapping input must be an object JSON fixture');
+    for (const [index, [key, mappedValue]] of Object.entries(JSON.parse(value)).entries()) {
+      await expect(mapping.getByTestId('model-map-add')).toBeEnabled();
+      await mapping.getByTestId('model-map-add').click();
+      await mapping.getByTestId('model-map-new-field').selectOption(key);
+      const control = mapping.getByTestId(`model-map-value-${index}`);
+      if (typeof mappedValue === 'boolean') await control.setChecked(mappedValue);
+      else await control.fill(String(mappedValue));
+    }
+    return;
+  }
+
   if (typeof value === 'boolean') {
     const cb = field.locator('input[type="checkbox"], [role="switch"]').first();
     if (value) await cb.check();

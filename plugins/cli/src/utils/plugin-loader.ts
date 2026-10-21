@@ -85,7 +85,7 @@ export function loadPlugin(dir: string): PluginFiles {
   }
 
   // Public declarations follow explicit manifest paths rather than conventional config filenames.
-  for (const resourceType of ['publicResources', 'publicQueries']) {
+  for (const resourceType of ['publicResources', 'publicQueries', 'pageContributions']) {
     const declaredPath = manifest.resourceDirs?.[resourceType];
     if (declaredPath === undefined) continue;
     if (typeof declaredPath !== 'string' || !declaredPath) {

@@ -63,6 +63,22 @@
       "visibleWhen": "form.tpm_ac_status === 'submitted'"
     },
     {
+      "id": "acceptance-sla",
+      "blockType": "workflow-panel",
+      "bpmPanel": {
+        "processKey": "tpm_delivery_acceptance",
+        "sections": [
+          "sla"
+        ],
+        "businessView": true,
+        "showTechnicalDetails": false
+      },
+      "area": "main",
+      "permissionCode": "bpm.process.read",
+      "detailPlacement": "header",
+      "visibleWhen": "form.tpm_ac_status !== 'draft'"
+    },
+    {
       "id": "acceptance-tabs",
       "blockType": "tabs",
       "tabs": [

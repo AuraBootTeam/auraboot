@@ -212,6 +212,16 @@ test('SC06-PERMISSIONS report artifact grants do not bypass customer source read
         expect(downloads).toHaveLength(3);
       }
       await actor.screenshot({ path: join(evidence!, `SC06-source-${hasSourceRead ? 'allowed' : 'denied'}.png`), fullPage: true });
+      await actor.goto(`/report-designer/${reportPid}`);
+      await expect(actor.getByTestId('report-reader-toolbar')).toContainText('只读报表');
+      await expect(actor.getByTestId('report-designer-toolbar-btn-save')).toHaveCount(0);
+      await expect(actor.getByTestId('block-palette')).toHaveCount(0);
+      await expect(actor.getByTestId('block-property-panel')).toHaveCount(0);
+      const deniedEdit=await actor.request.put(`/api/report-definitions/${reportPid}`,{data:{title:'Forbidden reader edit'}});
+      expect(deniedEdit.status()).toBe(403);
+      const retained=await page.request.get(`/api/report-definitions/${reportPid}`);
+      expect((await retained.json()).data.title).toBe(title);
+      await actor.screenshot({path:join(evidence!,`DS04-readonly-designer-${hasSourceRead?'source':'artifact'}.png`),fullPage:true});
       receipts.push({ tenantId, roleCode, roles, grantedPermissions: grants, effectiveSourceRead: effective.includes(readPermission), reportPid, deniedExports, artifacts, downloads });
     } finally {
       await context.close();
