@@ -24,7 +24,7 @@ test('PK complete business entry and secondary professional actions navigate thr
   await shot(page, 'PK01');
   const business: [string, string][] = [
     ['查看项目', '/p/tpm_project'],
-    ['登记交付跟进', '/p/c/cde_delivery_workspace'],
+    ['查看交付工作台', '/p/c/cde_delivery_workspace'],
     ['打开交付验收', '/p/tpm_acceptance'],
     ['处理我的审批', '/bpm/task-center'],
     ['交付核验', '/p/tdv_check'],
@@ -100,6 +100,10 @@ test('PK viewer gets readable business entry without installation or professiona
     page.getByRole('main').getByRole('button', { name: '处理我的审批', exact: true }),
   ).toHaveCount(0);
   await shot(page, 'PK05');
+  await page.getByRole('main').getByRole('button',{name:'查看交付工作台',exact:true}).click();
+  await expect(page).toHaveURL(url=>url.pathname==='/p/c/cde_delivery_workspace');
+  await expect(page.getByRole('button',{name:'登记交付跟进',exact:true})).toHaveCount(0);
+  await start(page);
   const denied = await page.request.post('/api/plugins/import/import-directory-sync', {
     data: { path: 'not-authorized', conflictStrategy: 'ERROR' },
   });
