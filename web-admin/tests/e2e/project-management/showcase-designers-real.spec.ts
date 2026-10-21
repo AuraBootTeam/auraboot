@@ -174,7 +174,7 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   const color = panel.getByTestId('schema-config-field-style.backgroundColor');
   await color.getByRole('button').click();
   await color.getByRole('textbox').fill('#eef2ff');
-  await panel.getByRole('heading', { name: '样式', exact: true }).click();
+  await panel.getByRole('heading', { name: '样式配置', exact: true }).click();
   const chartSurface = chart.locator(':scope > div').first();
   await expect(chartSurface).toHaveCSS('border-radius', '16px');
   await expect(chartSurface).toHaveCSS('background-color', 'rgb(238, 242, 255)');
