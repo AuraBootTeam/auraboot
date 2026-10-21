@@ -348,6 +348,13 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       await columns.getByRole('button', { name: '+ 添加', exact: true }).click();
       await columns.getByRole('textbox', { name: '字段名称*', exact: true }).fill('amount');
       await columns.getByRole('textbox', { name: '显示名称', exact: true }).fill('交付金额');
+      const width = columns.getByRole('spinbutton', {name:'列宽',exact:true});
+      await expect(width).toHaveValue('');
+      await width.fill('0');
+      await expect(columns.getByRole('alert')).toBeVisible();
+      await shot(page, 'DS04-numeric-range');
+      await width.fill('120');
+      await expect(columns.getByRole('alert')).toHaveCount(0);
     }
     if (['stat-card', 'cross-tab', 'chart'].includes(type))
       await textField('valueField').fill('amount');
@@ -387,6 +394,7 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       expect(block.dataSource).toBe('delivery');
   }
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').style.fontSize).toBe(18);
+  expect(persisted.dsl.body.find((b:any)=>b.blockType==='grouped-table').columns[0].width).toBe(120);
   const toolbar = page.getByTestId('report-designer-toolbar');
   await toolbar.getByRole('button', { name: '预览', exact: true }).click();
   await expect(page.getByRole('main')).toContainText(note);

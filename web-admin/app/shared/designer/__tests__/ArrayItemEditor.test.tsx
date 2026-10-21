@@ -67,3 +67,17 @@ it('labels repeated column fields once and edits the intended item without dupli
   fireEvent.change(second,{target:{value:'paid_amount'}});
   expect(changed).toHaveBeenCalledWith({name:'paid_amount',count:2});
 });
+
+it('enforces numeric bounds inside repeated properties and recovers after valid input', () => {
+  const changed = vi.fn();
+  render(<ArrayItemEditor itemSchema={[{key:'width',label:'Width',type:'number',min:1,max:100}]} value={{width:20}} onChange={changed} onRemove={()=>{}} itemLabel="Column" />);
+  const input = screen.getByRole('spinbutton',{name:'Width'});
+  fireEvent.change(input,{target:{value:'0'}});
+  expect(changed).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert')).toBeVisible();
+  fireEvent.change(input,{target:{value:'120'}});
+  expect(changed).not.toHaveBeenCalled();
+  fireEvent.change(input,{target:{value:'80'}});
+  expect(changed).toHaveBeenCalledWith({width:80});
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});

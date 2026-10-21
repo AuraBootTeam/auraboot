@@ -393,7 +393,7 @@ export function PropertyFieldRenderer({ schema, adapter, fieldId }: PropertyFiel
         const obj: Record<string, unknown> = {};
         for (const field of schema.itemSchema ?? []) {
           obj[field.key] =
-            field.defaultValue !== undefined ? field.defaultValue : defaultForType(field.type);
+            field.defaultValue !== undefined ? field.defaultValue : field.type === 'number' ? undefined : defaultForType(field.type);
         }
         return obj;
       };

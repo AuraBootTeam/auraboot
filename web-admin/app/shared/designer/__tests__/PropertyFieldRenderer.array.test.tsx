@@ -97,3 +97,11 @@ it('resolves localized array prompts and labels instead of showing English defau
   expect(screen.getByText('暂无列')).toBeVisible();
   expect(screen.getByRole('button',{name:'+ 添加列'})).toBeVisible();
 });
+
+it('leaves optional numeric properties unset instead of inventing an invalid zero', () => {
+  const changed = vi.fn();
+  render(<PropertyFieldRenderer schema={{...arraySchema,itemSchema:[{key:'width',label:'Width',type:'number',min:1}]}} adapter={makeAdapter([],changed)} />);
+  fireEvent.click(screen.getByRole('button',{name:'+ Add'}));
+  expect(changed).toHaveBeenCalledOnce();
+  expect(changed.mock.calls[0][0][0].width).toBeUndefined();
+});
