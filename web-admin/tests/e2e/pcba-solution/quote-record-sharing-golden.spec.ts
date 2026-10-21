@@ -33,10 +33,12 @@ test.beforeAll(async ({}, testInfo) => {
   const log = createWriteStream(logPath);
   try {
     await new Promise<void>((resolve, reject) => {
+      // Force only the seed test to execute. Recompiling every dependency inside
+      // beforeAll consumes its bounded browser budget; Gradle still rebuilds changed inputs.
       const child = spawn(process.execPath, [path.join(workspace, 'aura'), 'gradle', runtime,
-        '--project', project, '--', ':test', '--tests',
+        '--project', project, '--', ':test', '--rerun', '--tests',
         'com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.seed_createsTestTenantAndUser',
-        '--no-daemon', '--rerun-tasks'], {
+        '--no-daemon', '--no-build-cache'], {
         cwd: project,
         env: { ...process.env, AURA_E2E_SEED_IDENTITY_ONLY: 'true',
           TEST_DATABASE_URL: `jdbc:postgresql://${required('POSTGRES_HOST')}:${required('POSTGRES_PORT')}/${database}`,

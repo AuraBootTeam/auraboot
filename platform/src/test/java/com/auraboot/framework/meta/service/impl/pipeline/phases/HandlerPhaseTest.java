@@ -927,4 +927,29 @@ class HandlerPhaseTest {
             return Map.of("scopeObserved", true);
         }
     }
+    @Test
+    void execute_keepsPersistenceFailureOnTheSanitizedPublicBoundary() throws Exception {
+        var failure = new org.springframework.dao.DataAccessResourceFailureException(
+                "SELECT * FROM private_pricing_table; tenant_id=private_tenant");
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) { throw failure; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+        var observed = org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.dao.DataAccessException.class, () -> phase.execute(ctx));
+        assertThat(observed).isSameAs(failure);
+        for (String profile : java.util.List.of("dev", "prod")) {
+            var handler = new com.auraboot.framework.application.web.handler.GlobalExceptionHandler();
+            org.springframework.test.util.ReflectionTestUtils.setField(handler, "activeProfile", profile);
+            var response = handler.handleDataAccessException(observed);
+            assertThat(response.getStatusCode().value()).isEqualTo(500);
+            String body = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().writeValueAsString(response.getBody());
+            assertThat(body).doesNotContain("SELECT", "private_pricing_table", "private_tenant", "DataAccessResourceFailureException");
+        }
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
 }

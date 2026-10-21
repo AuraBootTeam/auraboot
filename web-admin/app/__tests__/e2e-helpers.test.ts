@@ -6,7 +6,7 @@ import type { APIRequestContext } from '@playwright/test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { FixtureCleanupJournal } from '../../tests/e2e/pcba-solution/fixture-cleanup';
+import { FixtureCleanupJournal, immutableQuoteArtifactCleanup } from '../../tests/e2e/pcba-solution/fixture-cleanup';
 
 function mockPage(reload: ReturnType<typeof vi.fn>): Page {
   return {
@@ -161,5 +161,26 @@ describe('fixture cleanup evidence', () => {
       expect(request.delete).toHaveBeenCalledTimes(1);
       expect(JSON.parse(readFileSync(f.file, 'utf8')).snapshotPending).toBe(false);
     } finally { f.dispose(); }
+  });
+});
+
+describe('immutable document fixture purge boundaries', () => {
+  it.each(['auraboot', 'postgres', 'production', 'enterprise_prod', 'enterprise_27;DROP'])('rejects unisolated database %s', database => {
+    expect(() => immutableQuoteArtifactCleanup(database, 'owned-quote', ['owned-artifact'])).toThrow('isolated');
+  });
+  it('rejects missing, duplicate and malformed exact identities', () => {
+    for (const ids of [[], ['one', 'one'], ["one' OR true"]]) {
+      expect(() => immutableQuoteArtifactCleanup('enterprise_27', 'owned-quote', ids)).toThrow('exact unique');
+    }
+    expect(() => immutableQuoteArtifactCleanup('enterprise_27', '', ['one'])).toThrow('exact unique');
+  });
+  it('binds artifact and quote identities and requires the same tenant and source model', () => {
+    const query = immutableQuoteArtifactCleanup('enterprise_27', 'owned-quote', ['owned-artifact']);
+    expect(query.values).toEqual(['owned-quote', ['owned-artifact']]);
+    expect(query.text).toContain('artifact.tenant_id = quote.tenant_id');
+    expect(query.text).toContain('artifact.ab_da_source_record_pid = quote.pid');
+    expect(query.text).toContain("artifact.ab_da_source_model = 'qo_quote_common'");
+    expect(query.text).not.toContain('owned-quote');
+    expect(query.text).not.toContain('owned-artifact');
   });
 });

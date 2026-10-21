@@ -125,6 +125,7 @@ describe('ReviewDrawerBlockRenderer V3 contract', () => {
             context: '${state.selectedBomLine}',
             contextDataSource: 'standardLines',
             contextKeyField: 'pid',
+            summaryBadges: [{ key: 'identified', label: '识别', template: '${canonical.bom_cl_material_name} · ${canonical.bom_cl_attributes_json.capacitance}' }],
             layoutMode: 'compact-review',
             compare: {
               layoutMode: 'stacked',
@@ -280,6 +281,7 @@ describe('ReviewDrawerBlockRenderer V3 contract', () => {
       />,
     );
 
+    expect(screen.getByTestId('review-drawer-badge-identified')).toHaveTextContent('识别 贴片电容 · 1nF');
     expect(screen.getByTestId('review-drawer-content-layout')).toHaveClass(
       'xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,1fr)]',
     );

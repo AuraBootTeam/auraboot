@@ -111,10 +111,6 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await checkbox.check();
   await expect(page.getByTestId('capability-save')).toBeEnabled(); // waits for React to register the selection
 
-  const saveResp = page.waitForResponse(
-    (r) => r.url().includes('/api/permission/capabilities') && r.request().method() === 'PUT',
-    { timeout: 15_000 },
-  );
   const previewResponse = page.waitForResponse(
     (response) =>
       response.url().includes('/api/permission/capabilities/preview') &&
@@ -199,6 +195,10 @@ test('① capability save persists through the browser on a snowflake-id role', 
       fullPage: true,
     });
   }
+  const saveResp = page.waitForResponse(
+    (r) => r.url().includes('/api/permission/capabilities') && r.request().method() === 'PUT',
+    { timeout: 15_000 },
+  );
   await page.getByTestId('confirm-ok').click();
   expect((await saveResp).status()).toBe(200);
 
