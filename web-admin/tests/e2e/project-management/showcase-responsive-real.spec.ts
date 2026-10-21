@@ -113,7 +113,10 @@ test('NR Dashboard: balanced DSL → narrow editing → save/publish → real re
   expect(chartConfig.title['zh-CN'] || chartConfig.title.zh).toBe(title);
   await page.getByTestId('toolbar-btn-presentation').click();
   await expect(page.getByTestId('big-screen-mode')).toBeVisible();
-  await expect(page.getByTestId('big-screen-mode')).toContainText(title);
+  // ECharts paints its title into Canvas; persisted config above proves the title.
+  await expect(page.getByTestId('big-screen-mode').locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]')).toBeVisible();
+  await expect(page.getByTestId('big-screen-mode')).toContainText('华辰制造');
+  await expect(page.getByTestId('big-screen-mode')).toContainText('当前逾期');
   await shot(page, 'CF-dashboard-runtime');
   await page.keyboard.press('Escape');
   await writeFile(
