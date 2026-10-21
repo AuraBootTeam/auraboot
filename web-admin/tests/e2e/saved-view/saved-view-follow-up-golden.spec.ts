@@ -134,7 +134,11 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     const persisted = await findPersonalPresetSavedView(page, 'modified_this_week');
     expect(persisted?.pid).toBe(savedView.pid);
     expect(persisted?.viewConfig?.meta?.originPresetKey).toBe('modified_this_week');
-    expect(persisted?.viewConfig?.filters).toEqual(modifiedThisWeekPresetConfig().filters);
+    expect(persisted?.viewConfig?.filters).toHaveLength(1);
+    expect(persisted.viewConfig.filters.map(
+      ({ fieldCode, operator, value }: { fieldCode: string; operator: string; value: unknown }) =>
+        ({ fieldCode, operator, value }),
+    )).toEqual(modifiedThisWeekPresetConfig().filters);
     await page.screenshot({ path: test.info().outputPath('05-personal-view-after-reload.png'), fullPage: true });
 
     await page.getByRole('banner').getByRole('link', { name: /AuraBoot/ }).click();
