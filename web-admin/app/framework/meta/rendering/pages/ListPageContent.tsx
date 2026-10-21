@@ -1729,6 +1729,7 @@ function ListPageContentInner(props: PageContentProps) {
               tabCondition,
               params?.filters,
               params?.chipFilters ?? chipFiltersRef.current,
+              modelFieldMapRef.current,
             );
             if (filtersParam) {
               queryParams.filters = filtersParam;
@@ -1746,18 +1747,6 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortField = tableBlock.defaultSort.field;
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
-          }
-        } else {
-          // For standard dynamic tables, use JSON filters array
-          const tabCondition = getTabFilter();
-          const filtersParam = buildFiltersParam(
-            tabCondition,
-            params?.filters,
-            params?.chipFilters ?? chipFiltersRef.current,
-            modelFieldMapRef.current,
-          );
-          if (filtersParam) {
-            queryParams.filters = filtersParam;
           }
 
           // Pass keyword search to backend (supported by DynamicController)
