@@ -331,6 +331,7 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   const addedTypes = Object.keys(addedTitles);
   for (const type of addedTypes) {
     await page.getByTestId(`block-palette-item-${type}`).click();
+    await expect(page.getByTestId('report-canvas').locator('[data-testid^="drag-handle-"]').last().locator('..')).toBeInViewport();
     const panel = page.getByTestId('block-property-panel');
     const textField = (key: string) =>
       panel.getByTestId(`schema-config-field-${key}`).getByRole('textbox');

@@ -3,7 +3,7 @@
  * Supports drag-and-drop reordering of body blocks.
  */
 
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useReportDocument } from '../state/ReportDocumentProvider';
 import { A4Page } from './A4Page';
 import { ReportTableBlock } from '../blocks/ReportTableBlock';
@@ -34,6 +34,12 @@ export const ReportCanvas: React.FC = () => {
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Keep the selected component and its property editor visible together.
+  useEffect(() => {
+    if (!selectedBlockId) return;
+    blockRefs.current.get(selectedBlockId)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [selectedBlockId]);
 
   const handleDragStart = useCallback((e: React.DragEvent, blockId: string) => {
     setDraggedBlockId(blockId);
