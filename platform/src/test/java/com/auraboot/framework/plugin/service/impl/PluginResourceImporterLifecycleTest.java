@@ -238,7 +238,8 @@ class PluginResourceImporterLifecycleTest {
         assertThatThrownBy(()->importer.importModel(dto,"p","i",42L,ImportRequest.ConflictStrategy.OVERWRITE,false))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("recordCommandWriters");
         verify(metaModelService,never()).create(any());
-        verifyNoInteractions(metaModelMapper);
+        verify(metaModelMapper).findCurrentByCodeForTenant(42L, "shared_bid");
+        verifyNoMoreInteractions(metaModelMapper);
         verifyNoInteractions(pluginResourceMapper);
     }
 

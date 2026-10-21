@@ -123,20 +123,20 @@ export function getCurrentRouteQuery(): Record<string, string | string[]> {
   if (typeof window === 'undefined') return {};
 
   const params = new URLSearchParams(window.location.search);
-  const query: Record<string, string | string[]> = {};
+  const query = new Map<string, string | string[]>();
   params.forEach((value, key) => {
-    const existing = query[key];
+    const existing = query.get(key);
     if (Array.isArray(existing)) {
-      query[key] = [...existing, value];
+      query.set(key, [...existing, value]);
       return;
     }
     if (typeof existing === 'string') {
-      query[key] = [existing, value];
+      query.set(key, [existing, value]);
       return;
     }
-    query[key] = value;
+    query.set(key, value);
   });
-  return query;
+  return Object.fromEntries(query);
 }
 
 function normalizeSpan(block: DslBlockV3): number {
