@@ -163,4 +163,53 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
     await page.screenshot({ path: test.info().outputPath('06-personal-view-after-back.png'), fullPage: true });
   });
+
+  test('SV-FU-004: a new personal date preset persists scalar bounds and finds the owned row', async ({ page }) => {
+    const existing = await findPersonalPresetSavedView(page, 'created_today');
+    expect(existing, 'This owned fixture needs no pre-existing created_today personal copy').toBeNull();
+    const orderTitle = `New saved preset ${uniqueId('SVFU')}`;
+    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const orderPid = await order.createViaApi({ e2et_order_title: orderTitle });
+    let createdViewPid = '';
+    try {
+      await navigateToOrderViaSidebar(page);
+      await page.getByTestId('quick-filter-created_today').click();
+      const createdResponse = page.waitForResponse(response =>
+        response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/views');
+      await page.getByTestId('preset-view-save-as-personal').click();
+      const response = await createdResponse;
+      expect(response.ok()).toBe(true);
+      const body = await response.json();
+      expect(body.code).toBe('0');
+      createdViewPid = body.data.pid;
+      expect(createdViewPid).toBeTruthy();
+      const today = toLocalDateString(new Date());
+      const expectedBounds = [today, `${today}T23:59:59`];
+      const submitted = response.request().postDataJSON();
+      expect(submitted.viewConfig.filters).toEqual([{
+        fieldCode: 'created_at', operator: 'between', value: expectedBounds,
+      }]);
+      await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(createdViewPid);
+      await expect.poll(() => new URL(page.url()).searchParams.get('preset')).toBeNull();
+      await page.getByTestId('list-search-input').fill(orderTitle);
+      await page.getByTestId('list-search-input').press('Enter');
+      await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(createdViewPid);
+      await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+      const persisted = await apiData<any>(page, 'get', `/api/views/${createdViewPid}`);
+      expect(persisted.viewConfig.filters).toHaveLength(1);
+      expect(persisted.viewConfig.filters[0]).toMatchObject({
+        fieldCode: 'created_at', operator: 'between', value: expectedBounds,
+      });
+      await expect(page.getByTestId('list-toolbar')).not.toContainText('{"start"');
+      await page.screenshot({ path: test.info().outputPath('07-new-personal-range-after-reload.png'), fullPage: true });
+    } finally {
+      if (createdViewPid) {
+        const deleted = await page.request.delete(`/api/views/${createdViewPid}`);
+        expect(deleted.ok(), 'Only this test-created personal copy is cleaned up').toBe(true);
+        expect((await deleted.json()).code).toBe('0');
+      }
+    }
+  });
 });
