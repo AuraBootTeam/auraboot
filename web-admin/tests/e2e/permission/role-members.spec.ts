@@ -36,9 +36,10 @@ async function members(page: Page) {
 
 async function addOwnedMember(page: Page) {
   const add = page.getByTestId('role-member-add-btn');
-  const emptyAdd = page.getByTestId('role-member-empty-add-btn');
-  await expect(add.or(emptyAdd)).toBeVisible();
-  await add.or(emptyAdd).click();
+  await expect(page.getByTestId('role-member-empty')).toBeVisible();
+  await expect(add).toBeVisible();
+  await expect(add).toBeEnabled();
+  await add.click();
   const dialog = page.getByTestId('add-member-dialog');
   await expect(dialog).toBeVisible();
   await page.getByTestId('add-member-tab-list').click();
