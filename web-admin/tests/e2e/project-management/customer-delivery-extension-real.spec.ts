@@ -119,7 +119,7 @@ test('customer plugin contributes a real command dialog and workspace, survives 
   await expect(page.getByTestId('workbench-action-cde_open_project')).toBeEnabled();
   await expect(selected).toContainText(next);
   const deliveryDate = selected.getByRole('cell').nth(5);
-  await expect(deliveryDate).toHaveText('2026/10/28');
+  await expect(deliveryDate).toHaveText('2026-10-28');
   expect(await deliveryDate.evaluate(cell => cell.scrollWidth <= cell.clientWidth)).toBe(true);
   await shot(page, 'X03-customer-delivery-workspace');
   await page.getByTestId('workbench-action-cde_open_project').click();
