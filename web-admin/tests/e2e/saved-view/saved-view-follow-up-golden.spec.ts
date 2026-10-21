@@ -93,6 +93,36 @@ async function ensureModifiedThisWeekPresetCopy(page: Page): Promise<{ pid: stri
   return created;
 }
 
+async function expectOwnedOrderRow(page: Page, title: string): Promise<void> {
+  const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: title, exact: true }) });
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText(title);
+}
+
+async function searchForOwnedOrder(
+  page: Page,
+  pid: string,
+  title: string,
+  range: { fieldName: string; operator: string; values: string[] },
+): Promise<void> {
+  const responsePromise = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/dynamic/e2et_order/list' && url.searchParams.get('keyword') === title;
+  });
+  const search = page.getByTestId('list-search-input');
+  await search.fill(title);
+  await search.press('Enter');
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+  const conditions = JSON.parse(new URL(response.url()).searchParams.get('filters') || '[]');
+  expect(conditions).toEqual([range]);
+  const body = await response.json();
+  expect(body.code).toBe('0');
+  expect(body.data.records).toHaveLength(1);
+  expect(body.data.records[0]).toMatchObject({ pid, e2et_order_title: title });
+  await expectOwnedOrderRow(page, title);
+}
+
 test.describe('SavedView Personal-only follow-up golden coverage', () => {
   test('SV-FU-003: saved quick preset opens as a personal view without toolbar preset state', async ({
     page,
@@ -128,10 +158,12 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     await expect(page.getByTestId('preset-view-save-as-personal')).toHaveCount(0);
     await expect(page.getByTestId('preset-view-reset-saved')).toHaveCount(0);
     await expect(page.getByTestId('view-selector-trigger')).toContainText(savedView.name);
-    const searchInput = page.getByTestId('list-search-input');
-    await searchInput.fill(orderTitle);
-    await searchInput.press('Enter');
-    await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+    const legacyRange = (modifiedThisWeekPresetConfig().filters as Array<{
+      value: { start: string; end: string };
+    }>)[0].value;
+    await searchForOwnedOrder(page, orderPid, orderTitle, {
+      fieldName: 'updated_at', operator: 'BETWEEN', values: [legacyRange.start, legacyRange.end],
+    });
     await expect(page.getByTestId('list-toolbar')).not.toContainText('{"end"');
     await expect(page.getByTestId('list-toolbar')).not.toContainText('{"start"');
     await page.screenshot({ path: test.info().outputPath('04-preset-saved-as-personal-clean-state.png'), fullPage: true });
@@ -150,7 +182,7 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
       ({ fieldCode, operator, value }: { fieldCode: string; operator: string; value: unknown }) =>
         ({ fieldCode, operator, value }),
     )).toEqual(modifiedThisWeekPresetConfig().filters);
-    await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+    await expectOwnedOrderRow(page, orderTitle);
     await page.screenshot({ path: test.info().outputPath('05-personal-view-after-reload.png'), fullPage: true });
 
     await page.getByRole('banner').getByRole('link', { name: /AuraBoot/ }).click();
@@ -160,7 +192,7 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(savedView.pid);
     await expect.poll(() => new URL(page.url()).searchParams.get('preset')).toBeNull();
     await expect(page.getByTestId('quick-filter-modified_this_week')).toHaveAttribute('data-preset-active', 'false');
-    await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+    await expectOwnedOrderRow(page, orderTitle);
     await page.screenshot({ path: test.info().outputPath('06-personal-view-after-back.png'), fullPage: true });
   });
 
@@ -191,12 +223,12 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
       }]);
       await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(createdViewPid);
       await expect.poll(() => new URL(page.url()).searchParams.get('preset')).toBeNull();
-      await page.getByTestId('list-search-input').fill(orderTitle);
-      await page.getByTestId('list-search-input').press('Enter');
-      await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+      await searchForOwnedOrder(page, orderPid, orderTitle, {
+        fieldName: 'created_at', operator: 'BETWEEN', values: expectedBounds,
+      });
       await page.reload({ waitUntil: 'domcontentloaded' });
       await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(createdViewPid);
-      await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+      await expectOwnedOrderRow(page, orderTitle);
       const persisted = await apiData<any>(page, 'get', `/api/views/${createdViewPid}`);
       expect(persisted.viewConfig.filters).toHaveLength(1);
       expect(persisted.viewConfig.filters[0]).toMatchObject({
