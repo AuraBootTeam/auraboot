@@ -192,6 +192,17 @@ export function resolveUserFilterCondition(
   filterFieldMap?: Map<string, any>,
 ): ListQueryFilterCondition[] {
   if (value == null || value === '') return [];
+  const fieldConfig = (filterFields || []).find((field) => field.field === key);
+  // ControlledFieldRenderer serializes DateRange objects for the field wire contract.
+  if (typeof value === 'string' && fieldConfig?.component?.toLowerCase() === 'daterange') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        && ('start' in parsed || 'end' in parsed)) value = parsed;
+    } catch {
+      // Keep malformed values intact so query validation can report them.
+    }
+  }
   // Date range objects { start, end }
   if (typeof value === 'object' && ('start' in value || 'end' in value)) {
     const range = value as { start?: unknown; end?: unknown };
@@ -201,7 +212,6 @@ export function resolveUserFilterCondition(
     if (range.end) conditions.push({ fieldName: key, operator: 'lte', value: String(range.end) });
     return conditions;
   }
-  const fieldConfig = (filterFields || []).find((field) => field.field === key);
   const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
   const dataType = resolveFieldMetaDataType(key, filterFieldMap);
   const supportsLike =
