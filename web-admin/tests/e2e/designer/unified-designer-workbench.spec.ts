@@ -1461,10 +1461,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: { en: 'New section', 'zh-CN': nestedSectionTitle },
       // Section flags persist as flat top-level keys (v4 section convention).
       collapsible: true,
-      props: expect.objectContaining({
-        description: nestedSectionDescription,
-        visibleWhen,
-      }),
+      description: nestedSectionDescription,
+      props: expect.objectContaining({ visibleWhen }),
     });
     expect(persistedField).toMatchObject({
       blockType: 'field',
