@@ -31,6 +31,18 @@ describe('AutomationEditPageImpl legacy flow synthesis', () => {
     expect(flow!.nodes[1].position.x - flow!.nodes[0].position.x).toBeGreaterThanOrEqual(320);
   });
 
+  it('preserves external-event routing and subscription types in the visual editor', () => {
+    const flow = synthesizeFlowData({ pid: 'external-one', name: 'Delivery materials received', enabled: true,
+      triggerType: 'external_event', modelCode: 'delivery-erp',
+      triggerConfig: { eventTypes: ['external.delivery-erp.materials.received.v1'] },
+      actions: [{ type: 'update_record', config: { modelCode: 'tpm_project', recordPid: 'project-one', fields: { tpm_pj_next_action: '${trigger.data.nextAction}' } } }],
+      createdAt: '2026-10-21T00:00:00Z', updatedAt: '2026-10-21T00:00:00Z',
+    } satisfies Automation);
+    expect(flow!.nodes[0].type).toBe('trigger-external-event');
+    expect(flow!.nodes[0].data.config).toMatchObject({ triggerType: 'external_event', modelCode: 'delivery-erp', eventTypes: ['external.delivery-erp.materials.received.v1'] });
+    expect(flow!.nodes[1].type).toBe('action-update-record');
+  });
+
   it('normalizes legacy notification action config for the visual property panel', () => {
     const flow = synthesizeFlowData({
       pid: 'auto-1',

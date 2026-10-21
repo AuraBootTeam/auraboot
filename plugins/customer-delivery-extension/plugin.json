@@ -1,0 +1,30 @@
+{
+  "pluginId": "com.auraboot.customer-delivery-extension",
+  "namespace": "cde",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName:zh-CN": "客户交付扩展",
+  "displayName:en": "Customer delivery extension",
+  "description": "Governed customer delivery actions and workspace contributed without changing the base application.",
+  "author": "AuraBoot Team",
+  "dependencies": [
+    "com.auraboot.template.project-management"
+  ],
+  "requires": [
+    {
+      "type": "model",
+      "code": "tpm_project"
+    }
+  ],
+  "resourceDirs": {
+    "pageContributions": "config/page-contributions.json",
+    "pages": "config/pages",
+    "menus": "config/menus.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishPages": true
+  }
+}

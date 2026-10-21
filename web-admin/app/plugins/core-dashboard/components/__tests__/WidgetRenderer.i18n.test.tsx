@@ -57,24 +57,84 @@ describe('WidgetRenderer i18n config resolution', () => {
   });
 });
 
-
 describe('Persisted pie designer presentation', () => {
-  beforeEach(() => { chartMock.props = []; });
-  it.each([true, false])('applies donut and label switches (%s) instead of silently ignoring them', value => {
-    const widget = { id: 'status', type: 'smart-pie-chart', config: {
-      ring: !value, showLabel: !value,
-      visualization: { donut: value, showLabels: value },
-      dataSource: { type: 'namedQuery', queryCode: 'delivery_status' },
-    } } as unknown as Widget;
-    render(<>{renderWidget({ widget })}</>);
-    expect(chartMock.props[0]?.ring).toBe(value);
-    expect(chartMock.props[0]?.showLabel).toBe(value);
-    expect(chartMock.props[0]?.dataSource).toEqual(widget.config.dataSource);
+  beforeEach(() => {
+    chartMock.props = [];
   });
+  it.each([true, false])(
+    'applies donut and label switches (%s) instead of silently ignoring them',
+    (value) => {
+      const widget = {
+        id: 'status',
+        type: 'smart-pie-chart',
+        config: {
+          ring: !value,
+          showLabel: !value,
+          visualization: { donut: value, showLabels: value },
+          dataSource: { type: 'namedQuery', queryCode: 'delivery_status' },
+        },
+      } as unknown as Widget;
+      render(<>{renderWidget({ widget })}</>);
+      expect(chartMock.props[0]?.ring).toBe(value);
+      expect(chartMock.props[0]?.showLabel).toBe(value);
+      expect(chartMock.props[0]?.dataSource).toEqual(widget.config.dataSource);
+    },
+  );
   it('keeps existing direct chart settings when no designer switch is stored', () => {
-    const widget = { id: 'status', type: 'smart-pie-chart', config: { ring: true, showLabel: false } } as unknown as Widget;
+    const widget = {
+      id: 'status',
+      type: 'smart-pie-chart',
+      config: { ring: true, showLabel: false },
+    } as unknown as Widget;
     render(<>{renderWidget({ widget })}</>);
     expect(chartMock.props[0]?.ring).toBe(true);
     expect(chartMock.props[0]?.showLabel).toBe(false);
   });
+});
+
+it('applies declared chart appearance instead of passing ignored component props', () => {
+  chartMock.props = [];
+  const widget = {
+    id: 'appearance',
+    type: 'smart-pie-chart',
+    config: {
+      title: 'Delivery',
+      style: {
+        showTitle: false,
+        showLegend: false,
+        legendPosition: 'right',
+        borderRadius: 12,
+        backgroundColor: '#f8fafc',
+      },
+      chartOptions: { tooltip: { trigger: 'item' } },
+    },
+  } as unknown as Widget;
+  render(<>{renderWidget({ widget })}</>);
+  expect(chartMock.props[0]?.title).toBeUndefined();
+  expect(chartMock.props[0]?.chartOptions).toMatchObject({
+    legend: { show: false, right: 0, orient: 'vertical' },
+    tooltip: { trigger: 'item' },
+  });
+  expect(chartMock.props[0]?.style).toEqual({ borderRadius: 12, backgroundColor: '#f8fafc' });
+});
+
+it.each([true, false])('consumes bar, line and number-card presentation switches (%s)', (value) => {
+  for (const [type, key, expected] of [
+    ['smart-bar-chart', 'horizontal', { orientation: value ? 'horizontal' : 'vertical' }],
+    ['smart-line-chart', 'showArea', { areaStyle: value }],
+    ['smart-number-card', 'showTrend', { trend: { enabled: value, compareType: 'lastMonth' } }],
+  ] as const) {
+    chartMock.props = [];
+    const widget = {
+      id: type,
+      type,
+      config: {
+        title: 'Delivery',
+        visualization: { [key]: value },
+        trend: { compareType: 'lastMonth' },
+      },
+    } as unknown as Widget;
+    render(<>{renderWidget({ widget })}</>);
+    expect(chartMock.props[0]).toMatchObject(expected);
+  }
 });

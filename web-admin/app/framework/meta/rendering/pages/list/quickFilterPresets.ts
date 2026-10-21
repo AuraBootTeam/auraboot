@@ -13,6 +13,7 @@ import type {
   SavedViewCreateRequest,
   ViewFilterConfig,
 } from '~/framework/smart/types/savedView';
+import { normalizeSavedViewFilterRange } from '~/framework/smart/utils/savedViewFilterRange';
 
 /** Keys of the built-in preset views, in display order. */
 export const BUILT_IN_QUICK_FILTER_PRESET_KEYS = [
@@ -198,7 +199,7 @@ export function buildQuickFilterPresetViewFilters(
   if (!filters) return [];
   return Object.entries(filters)
     .filter(([, value]) => value != null && value !== '')
-    .map(([fieldCode, value]) => {
+    .map<ViewFilterConfig>(([fieldCode, value]) => {
       if (isRangeFilterValue(value)) {
         return {
           fieldCode,
@@ -218,7 +219,9 @@ export function buildQuickFilterPresetViewFilters(
         operator: 'eq',
         value,
       };
-    });
+    })
+    .map(normalizeSavedViewFilterRange)
+    .filter((filter) => filter.value !== undefined);
 }
 
 export function buildQuickFilterPresetViewRequest(

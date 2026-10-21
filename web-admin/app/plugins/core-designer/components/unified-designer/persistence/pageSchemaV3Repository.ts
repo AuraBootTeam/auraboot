@@ -513,6 +513,20 @@ function toApiKind(kind: PageSchemaV3Kind): ApiPageType {
   return kind;
 }
 
+function resolvePageModelCode(document: PageSchemaV3): string | undefined {
+  const root = document.blocks.length === 1 && document.blocks[0].blockType === document.kind
+    ? document.blocks[0] : undefined;
+  const source = root?.dataSource;
+  return source && typeof source === 'object' && typeof source.model === 'string'
+    ? source.model : document.modelCode;
+}
+
+function resolvePageLayout(document: PageSchemaV3): PageSchemaV3['layout'] {
+  const root = document.kind === 'dashboard' && document.blocks.length === 1
+    && document.blocks[0].blockType === 'dashboard' ? document.blocks[0] : undefined;
+  return root?.layout ? { ...document.layout, ...root.layout } : document.layout;
+}
+
 function toUpdateRequest(
   document: PageSchemaV3,
   source: PageSchemaV3Source,
@@ -525,8 +539,9 @@ function toUpdateRequest(
     pageKey: document.pageKey || source.pageKey || document.id,
     title: document.title,
     kind: toApiKind(flatKind),
+    modelCode: resolvePageModelCode(document),
     blocks: flatBlocks,
-    layout: document.layout,
+    layout: resolvePageLayout(document),
     schemaVersion: FLAT_PAGE_SCHEMA_VERSION,
     extension: flatExtension,
   };
@@ -545,6 +560,8 @@ function toCreateRequest(
     pageKey,
     title: resolveTitle(document.title, document.id),
     kind: toApiKind(flatKind),
+    modelCode: resolvePageModelCode(document),
+    layout: resolvePageLayout(document),
     blocks: flatBlocks,
     schemaVersion: FLAT_PAGE_SCHEMA_VERSION,
     extension: flatExtension,

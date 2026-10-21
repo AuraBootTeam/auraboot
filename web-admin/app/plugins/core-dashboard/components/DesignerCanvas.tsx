@@ -19,6 +19,7 @@ import {
   type DrillDownPayload,
 } from '../utils/drillDownNavigation';
 import { createWidgetDraft } from '../utils/createWidgetDraft';
+import { widgetContainerStyle } from '../utils/widgetAppearance';
 
 /**
  * Linkage filters state - grouped by linkage group ID
@@ -200,6 +201,7 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({ className = '' }
           e.stopPropagation();
           selectWidget(widget.id);
         }}
+        style={widgetContainerStyle(widget.config)}
         className={`h-full cursor-pointer overflow-hidden rounded-lg border bg-white shadow-sm transition-all ${
           isSelected
             ? 'border-blue-500 ring-2 ring-blue-500'

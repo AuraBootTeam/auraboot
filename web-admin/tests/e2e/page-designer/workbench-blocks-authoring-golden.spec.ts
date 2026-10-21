@@ -42,6 +42,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -139,7 +140,7 @@ async function saveDesigner(page: Page, pid: string): Promise<void> {
 
 /** Apply a basic-tab JSON inspector field (inspector-json-field-apply-<path>). */
 async function applyJsonField(page: Page, path: string, value: unknown): Promise<void> {
-  const textarea = page.getByTestId(`inspector-field-${path}`);
+  const textarea = await inspectorJsonField(page, path);
   await expect(textarea).toBeVisible({ timeout: 5_000 });
   await textarea.fill(JSON.stringify(value, null, 2));
   await page.evaluate(
@@ -359,7 +360,7 @@ test('A2: status-banner — statusField + toneMap + titleMap persist at the bloc
     const beforeMetrics = findBlockById(before.blocks, METRIC_STRIP)?.metrics;
     expect(Array.isArray(beforeMetrics), 'A1 metrics present before sad path').toBeTruthy();
 
-    const metricsField = page.getByTestId('inspector-field-metrics');
+    const metricsField = await inspectorJsonField(page, 'metrics');
     await expect(metricsField).toBeVisible({ timeout: 5_000 });
     await metricsField.fill('[ { key: open, ');
     await page.evaluate(

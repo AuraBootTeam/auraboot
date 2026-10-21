@@ -7,7 +7,8 @@
  */
 
 import React, { Suspense } from 'react';
-import type { Widget, WidgetType } from '../types';
+import type { Widget } from '../types';
+import { widgetAppearanceProps, widgetPresentationProps } from '../utils/widgetAppearance';
 import type { DrillDownConfig, FilterConfig } from '~/framework/smart/types/chart';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
 import { useI18n } from '~/contexts/I18nContext';
@@ -128,15 +129,12 @@ function RenderedWidget({
   // emit callbacks, h-full className) come last so config can never clobber
   // them.
   // Preserve persisted designer keys while adapting them to chart props.
-  const piePresentation = chartType === 'pie' ? {
-    ring: config.visualization?.donut ?? config.ring,
-    showLabel: config.visualization?.showLabels ?? config.showLabel,
-  } : {};
   const componentProps = {
     ...config,
     ...(config.visualization || {}),
     ...(config.style || {}),
-    ...piePresentation,
+    ...widgetPresentationProps(chartType, config),
+    ...widgetAppearanceProps(chartType, config),
     linkageFilters,
     onLinkageEmit,
     onDrillDown,
@@ -151,7 +149,12 @@ function RenderedWidget({
     >
       <Suspense
         fallback={
-          <div role="status" aria-live="polite" data-testid="dashboard-widget-loading" className="flex h-full items-center justify-center text-sm text-gray-400">
+          <div
+            role="status"
+            aria-live="polite"
+            data-testid="dashboard-widget-loading"
+            className="flex h-full items-center justify-center text-sm text-gray-400"
+          >
             {getLocalizedText({ zh: '加载中…', en: 'Loading…' }, locale, t)}
           </div>
         }

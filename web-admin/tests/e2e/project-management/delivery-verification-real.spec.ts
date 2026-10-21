@@ -92,10 +92,17 @@ async function verify(page:Page,pid:string,expected:'passed'|'blocked') {
 }
 
 test('optional PF4J verifier reads stored evidence and recomputes after actual form correction @critical',async({page})=>{
-  const user=await login(page);const projectPid=await prepareProject(page);await menu(page,'交付核验');
+  const user=await login(page);
+  const beforeProjects=await data(await page.request.get('/api/dynamic/tpm_project/list',{params:{pageSize:500}}));
+  expect(beforeProjects.total).toBe(beforeProjects.records.length);
+  expect(beforeProjects.records.filter((row:any)=>row.tpm_pj_name===projectName)).toHaveLength(0);
+  const projectPid=await prepareProject(page);await menu(page,'交付核验');
   await expect(page).toHaveURL(/\/p\/tdv_check$/);
   await expect(page.getByRole('main')).toContainText('还没有交付核验');
-  expect((await data(await page.request.get('/api/dynamic/tpm_project/list'))).total).toBe(9);
+  const afterProjects=await data(await page.request.get('/api/dynamic/tpm_project/list',{params:{pageSize:500}}));
+  expect(afterProjects.total).toBe(beforeProjects.total+1);
+  expect(afterProjects.records.map((row:any)=>row.pid).sort()).toEqual([...beforeProjects.records.map((row:any)=>row.pid),projectPid].sort());
+  expect(afterProjects.records.find((row:any)=>row.pid===projectPid)).toMatchObject({tpm_pj_name:projectName,tpm_pj_budget:128000});
   expect((await data(await page.request.get('/api/dynamic/tpm_acceptance/list',{params:{pageSize:500}}))).records.filter((row:any)=>row.tpm_ac_project===projectPid)).toHaveLength(0);
   expect((await data(await page.request.get('/api/dynamic/tdv_check/list'))).total).toBe(0);await shot(page,'v01');
   const name=prefix+' · 补齐材料';const acceptance=await createAcceptance(page,user,name,68000,false);

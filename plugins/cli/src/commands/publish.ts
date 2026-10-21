@@ -255,7 +255,7 @@ export function inlineRuleContents(rules: any[], pluginDir: string): any[] {
   });
 }
 
-function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
+export function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
   const rawRules = plugin.resourceFiles.get('rules') || [];
   const rules = inlineRuleContents(rawRules, plugin.dir);
   return {
@@ -265,6 +265,9 @@ function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
     modelFieldBindings: plugin.resourceFiles.get('bindings') || [],
     commands: plugin.resourceFiles.get('commands') || [],
     pages: plugin.resourceFiles.get('pages') || [],
+    pageContributions: plugin.resourceFiles.get('pageContributions') || [],
+    publicResources: plugin.resourceFiles.get('publicResources') || [],
+    publicQueries: plugin.resourceFiles.get('publicQueries') || [],
     permissions: plugin.resourceFiles.get('permissions') || [],
     roles: plugin.resourceFiles.get('roles') || [],
     menus: plugin.resourceFiles.get('menus') || [],

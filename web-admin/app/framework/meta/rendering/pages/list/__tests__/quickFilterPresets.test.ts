@@ -71,6 +71,24 @@ describe('buildQuickFilterPreset', () => {
 });
 
 describe('buildQuickFilterPresetViewFilters', () => {
+  it('stores closed date ranges as two scalar BETWEEN values', () => {
+    expect(buildQuickFilterPresetViewFilters({
+      updated_at: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    })).toEqual([{
+      fieldCode: 'updated_at', operator: 'between',
+      value: ['2026-10-14', '2026-10-21T23:59:59'],
+    }]);
+  });
+
+  it('keeps one-sided range semantics instead of emitting a malformed BETWEEN', () => {
+    expect(buildQuickFilterPresetViewFilters({
+      amount: { start: 0 }, updated_at: { end: '2026-10-21T23:59:59' },
+    })).toEqual([
+      { fieldCode: 'amount', operator: 'gte', value: 0 },
+      { fieldCode: 'updated_at', operator: 'lte', value: '2026-10-21T23:59:59' },
+    ]);
+  });
+
   it('converts scalar, array, and range preset filters to SavedView filters', () => {
     expect(
       buildQuickFilterPresetViewFilters({
@@ -84,7 +102,7 @@ describe('buildQuickFilterPresetViewFilters', () => {
       {
         fieldCode: 'created_at',
         operator: 'between',
-        value: { start: '2026-06-17', end: '2026-06-17T23:59:59' },
+        value: ['2026-06-17', '2026-06-17T23:59:59'],
       },
     ]);
   });
@@ -115,7 +133,7 @@ describe('buildQuickFilterPresetViewRequest', () => {
       {
         fieldCode: 'created_at',
         operator: 'between',
-        value: { start: '2026-06-17', end: '2026-06-17T23:59:59' },
+        value: ['2026-06-17', '2026-06-17T23:59:59'],
       },
     ]);
   });

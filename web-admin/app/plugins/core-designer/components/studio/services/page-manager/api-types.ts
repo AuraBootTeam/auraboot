@@ -84,6 +84,7 @@ export interface PageSchemaCreateRequest {
  * Matches: PageSchemaUpdateRequest.java
  */
 export interface PageSchemaUpdateRequest {
+  modelCode?: string;
   name?: string;
   pageKey?: string;
   title?: string | Record<string, string>;

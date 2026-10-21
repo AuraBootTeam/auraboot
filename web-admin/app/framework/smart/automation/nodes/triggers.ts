@@ -20,6 +20,20 @@ const automationRuleBindingFields: NonNullable<FlowNodeDefinition['configSchema'
 
 export const triggerNodes: FlowNodeDefinition[] = [
   {
+    type: 'trigger-external-event',
+    label: '$i18n:automation.trigger.externalEvent',
+    icon: 'Webhook',
+    category: 'trigger',
+    description: '$i18n:automation.trigger.externalEvent.desc',
+    configSchema: [
+      { key: 'modelCode', label: '$i18n:automation.field.externalSourceCode', type: 'text', required: true,
+        pattern: '^[a-z][a-z0-9-]{2,63}$', description: '$i18n:automation.field.externalSourceCode.desc', group: 'trigger_source' },
+      { key: 'eventTypes', label: '$i18n:automation.field.externalEventTypes', type: 'json', required: true,
+        description: '$i18n:automation.field.externalEventTypes.desc', group: 'filter' },
+    ],
+    defaultConfig: { triggerType: 'external_event', eventTypes: [] },
+  },
+  {
     type: 'trigger-record-create',
     label: '$i18n:automation.trigger.recordCreate',
     icon: 'Plus',

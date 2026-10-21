@@ -487,7 +487,7 @@ export function AutomationEditor({
   /** Page-level save: uses the latest flowData snapshot and keeps the only save
    *  action in the Automation editor shell. */
   const handleToolbarSave = useCallback(async () => {
-    if (!onSave || !flowData) return;
+    if (readOnly || !onSave || !flowData) return;
     const result = validate();
     if (!result.valid) {
       showErrorToast(
@@ -503,7 +503,7 @@ export function AutomationEditor({
     } finally {
       setSaving(false);
     }
-  }, [onSave, name, description, flowData, validate, showErrorToast, st]);
+  }, [readOnly, onSave, name, description, flowData, validate, showErrorToast, st]);
 
   const handleChange = useCallback((data: FlowData) => {
     setFlowData(data);
@@ -532,12 +532,12 @@ export function AutomationEditor({
   const declaredActions = useMemo(() => extractDeclaredActions(flowData), [flowData]);
 
   const handleDebug = useCallback(() => {
-    if (!automationId) return;
+    if (readOnly || !automationId) return;
     startDebug(automationId);
-  }, [automationId, startDebug]);
+  }, [readOnly, automationId, startDebug]);
 
   const handleTestRun = useCallback(async () => {
-    if (!automationId) return;
+    if (readOnly || !automationId) return;
     setTestRunning(true);
     try {
       const response = await fetch(`/api/automations/${automationId}/trigger`, {
@@ -593,7 +593,7 @@ export function AutomationEditor({
     } finally {
       setTestRunning(false);
     }
-  }, [automationId, showSuccessToast, showErrorToast, testRunContext, testRunRecordPid]);
+  }, [readOnly, automationId, showSuccessToast, showErrorToast, testRunContext, testRunRecordPid, st]);
 
   const handleExport = useCallback(() => {
     if (!flowData) return;
@@ -841,7 +841,10 @@ function AutomationTestRunResultPanel({
         </div>
 
         {log.errorMessage && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div
+            className="min-w-0 rounded-md border border-red-200 bg-red-50 p-3 text-sm break-all whitespace-pre-wrap text-red-700"
+            data-testid="automation-run-error"
+          >
             {runFailureText(log.errorMessage, t)}
           </div>
         )}
@@ -965,7 +968,7 @@ function TraceFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-white px-3 py-2">
       <dt className="text-xs font-medium text-blue-600">{label}</dt>
-      <dd className="mt-1 break-words text-sm text-blue-950">{value}</dd>
+      <dd className="mt-1 text-sm break-words text-blue-950">{value}</dd>
     </div>
   );
 }
@@ -1044,7 +1047,7 @@ function RunSummaryItem({ label, children }: { label: string; children: React.Re
   return (
     <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className="mt-1 break-words text-sm font-medium text-gray-900">{children}</div>
+      <div className="mt-1 text-sm font-medium break-words text-gray-900">{children}</div>
     </div>
   );
 }
@@ -1116,7 +1119,10 @@ function ActionResultCard({
         </span>
       </div>
       {action.errorMessage && (
-        <div className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700">
+        <div
+          className="mt-2 min-w-0 rounded bg-red-50 px-2 py-1 text-xs break-all whitespace-pre-wrap text-red-700"
+          data-testid="automation-action-error"
+        >
           {runFailureText(action.errorMessage, t)}
         </div>
       )}
@@ -1145,7 +1151,7 @@ function EvidenceGrid({ entries }: { entries: EvidenceEntry[] }) {
           data-testid={`automation-action-evidence-${entry.key}`}
         >
           <dt className="text-xs font-medium text-gray-500">{entry.label}</dt>
-          <dd className="mt-1 break-words text-sm text-gray-900">{entry.value}</dd>
+          <dd className="mt-1 text-sm break-words text-gray-900">{entry.value}</dd>
         </div>
       ))}
     </dl>
