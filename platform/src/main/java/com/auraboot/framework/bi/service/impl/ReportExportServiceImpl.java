@@ -705,7 +705,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
 
         for (Map.Entry<String, List<Map<String, Object>>> group : groupRows(rows, groupByField).entrySet()) {
-            lines.add(PdfLine.text(groupByField + ": " + group.getKey() + " (" + group.getValue().size() + ")"));
+            lines.add(PdfLine.text(reportGroupLabel(columns, groupByField, group.getKey(), group.getValue().size())));
             for (Map<String, Object> row : group.getValue()) {
                 List<String> values = columns.stream()
                         .map(column -> formatColumnValue(row.get(column.field()), column))
@@ -1342,7 +1342,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             for (Map.Entry<String, List<Map<String, Object>>> group : groupRows(rows, groupByField).entrySet()) {
                 Row groupRow = sheet.createRow(rowIndex++);
                 Cell groupCell = groupRow.createCell(0);
-                groupCell.setCellValue(groupByField + ": " + group.getKey() + " (" + group.getValue().size() + ")");
+                groupCell.setCellValue(reportGroupLabel(columns, groupByField, group.getKey(), group.getValue().size()));
                 groupCell.setCellStyle(headerStyle);
 
                 for (Map<String, Object> rowData : group.getValue()) {
@@ -1607,6 +1607,12 @@ public class ReportExportServiceImpl implements ReportExportService {
             columns.add(new ReportColumn(field, field, ""));
         }
         return columns;
+    }
+
+    private String reportGroupLabel(List<ReportColumn> columns, String field, String key, int count) {
+        String label = columns.stream().filter(column -> column.field().equals(field) && !column.label().equals(field))
+                .map(ReportColumn::label).findFirst().orElse("");
+        return (label.isEmpty() ? "" : label + ": ") + key + " (" + count + ")";
     }
 
     private Map<String, List<Map<String, Object>>> groupRows(List<Map<String, Object>> rows, String groupByField) {

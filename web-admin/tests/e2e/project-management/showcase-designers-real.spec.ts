@@ -454,7 +454,14 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       await textField('columnField').fill('acceptance_label');
       await textField('rowLabel').fill('客户项目');await textField('columnLabel').fill('验收状态');await textField('totalLabel').fill('合计');
     }
-    if (type === 'chart') {await textField('categoryField').fill('project_name');await panel.getByTestId('schema-config-field-width').getByRole('spinbutton').fill('860');await panel.getByTestId('schema-config-field-height').getByRole('spinbutton').fill('280');}
+    if (type === 'chart') {
+      await textField('categoryField').fill('project_name');
+      const chartWidth=panel.getByTestId('schema-config-field-width');await chartWidth.getByRole('spinbutton').fill('860');
+      await expect(chartWidth.getByRole('alert')).toContainText('800');
+      await chartWidth.getByRole('spinbutton').fill('760');await expect(chartWidth.getByRole('alert')).toHaveCount(0);
+      await panel.getByTestId('schema-config-field-height').getByRole('spinbutton').fill('240');
+      await page.getByTestId('report-canvas').locator('[data-testid^="drag-handle-"]').last().locator('..').scrollIntoViewIfNeeded();
+    }
     if (type === 'barcode') await textField('staticValue').fill('ACC20261021');
     await expect(
       page
@@ -496,10 +503,10 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   const storedColumns=persisted.dsl.body.find((block:any)=>block.id==='acceptance').columns;
   expect(storedColumns.map((column:any)=>column.field)).toEqual([originalFields[1],originalFields[0],...originalFields.slice(2)]);
   expect(storedColumns[0].width).toBe(240);
-  expect(persisted.dsl.body.find((block:any)=>block.blockType==='chart')).toMatchObject({width:860,height:280});
+  expect(persisted.dsl.body.find((block:any)=>block.blockType==='chart')).toMatchObject({width:760,height:240});
   const grouped=persisted.dsl.body.find((block:any)=>block.blockType==='grouped-table');
-  expect(grouped.groupSubtotal).toMatchObject({enabled:true,columns:[{field:'amount',aggregation:'sum'}]});
-  expect(grouped.grandTotal).toMatchObject({enabled:true,columns:[{field:'amount',aggregation:'sum'}]});
+  expect(grouped.groupSubtotal).toMatchObject({enabled:true,label:'本组交付金额小计',columns:[{field:'amount',aggregation:'sum',format:'currency'}]});
+  expect(grouped.grandTotal).toMatchObject({enabled:true,label:'全部项目交付金额总计',columns:[{field:'amount',aggregation:'sum',format:'currency'}]});
 
   expect(
     persisted.dsl.body.find((b: any) => b.blockType === 'grouped-table').columns.find((column:any)=>column.field==='amount').width,

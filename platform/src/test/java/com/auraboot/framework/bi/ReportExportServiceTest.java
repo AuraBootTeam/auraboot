@@ -575,9 +575,9 @@ class ReportExportServiceTest {
             assertThat(workbook.getSheetName(0)).isEqualTo("Grouped Cases");
             var groupedSheet = workbook.getSheet("Grouped Cases");
             assertThat(groupedSheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Region");
-            assertThat(groupedSheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("owner: Ops-A (2)");
+            assertThat(groupedSheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("Ops-A (2)");
             assertThat(groupedSheet.getRow(3).getCell(0).getStringCellValue()).isEqualTo("North");
-            assertThat(groupedSheet.getRow(5).getCell(0).getStringCellValue()).isEqualTo("owner: Ops-B (1)");
+            assertThat(groupedSheet.getRow(5).getCell(0).getStringCellValue()).isEqualTo("Ops-B (1)");
 
             var crossTabSheet = workbook.getSheet("Region Status Matrix");
             assertThat(crossTabSheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("region \\ status");
@@ -730,7 +730,7 @@ class ReportExportServiceTest {
             String text = new PDFTextStripper().getText(document);
             assertThat(text).contains("Operations Non Table Export");
             assertThat(text).contains("Operations Header");
-            assertThat(text).contains("owner: Ops-A (2)");
+            assertThat(text).contains("Ops-A (2)");
             assertThat(text).contains("Region Status Matrix");
             assertThat(text).contains("region \\ status | Closed | Open | Total");
             assertThat(text).contains("North | 3 | 12 | 15");

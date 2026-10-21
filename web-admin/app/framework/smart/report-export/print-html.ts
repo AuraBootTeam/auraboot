@@ -211,7 +211,7 @@ function renderGroupedTable(block: ReportPrintBlock, dataSets: PrintDataSets): s
   }
 
   const head = cols.map((c) => `<th>${escapeHtml(c.label ?? c.field)}</th>`).join('');
-  const groupFieldLabel = cols.find((c) => c.field === groupBy && c.label)?.label;
+  const groupFieldLabel = cols.find((c) => c.field === groupBy && c.label && c.label !== c.field)?.label;
   const body = [...groups.entries()]
     .map(([key, grp]) => {
       const groupHeader = `<tr class="group-header"><td colspan="${span}">${escapeHtml(groupFieldLabel ? `${groupFieldLabel}: ` : '')}${escapeHtml(key)} (${grp.length})</td></tr>`;

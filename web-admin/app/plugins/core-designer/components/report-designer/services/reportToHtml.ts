@@ -217,8 +217,9 @@ function renderGroupedTable(block: GroupedTableBlock, data: Record<string, unkno
   }
 
   html += '<tbody>';
+  const groupLabel=block.columns.find(column => column.field === block.groupByField && column.label && column.label !== column.field)?.label;
   for (const [groupKey, rows] of groups.entries()) {
-    html += `<tr><td colspan="${block.columns.length}" style="${cellBorder} padding: 6px 8px; background: #dbeafe; font-weight: bold; color: #1e40af;">${escapeHtml(block.groupByField)}: ${escapeHtml(groupKey)} (${rows.length})</td></tr>`;
+    html += `<tr><td colspan="${block.columns.length}" style="${cellBorder} padding: 6px 8px; background: #dbeafe; font-weight: bold; color: #1e40af;">${groupLabel ? escapeHtml(groupLabel) + ': ' : ''}${escapeHtml(groupKey)} (${rows.length})</td></tr>`;
 
     for (const row of rows) {
       html += '<tr>';
