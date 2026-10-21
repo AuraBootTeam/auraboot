@@ -425,7 +425,10 @@ test('SC10 report template → reviewed text edit → save/reload → three real
         const summary=panel.getByTestId(`schema-config-field-${key}.columns`);
         await summary.getByRole('button',{name:'+ 添加',exact:true}).click();
         await summary.getByRole('textbox',{name:'字段名称*',exact:true}).fill('amount');
-        await summary.getByRole('combobox',{name:'聚合方式',exact:true}).selectOption('sum');
+        const aggregate=summary.getByRole('combobox',{name:'聚合方式',exact:true});
+        await aggregate.click();await page.getByRole('option',{name:'平均值',exact:true}).click();
+        await aggregate.click();await page.getByRole('option',{name:'求和',exact:true}).click();
+        await expect(aggregate).toContainText('求和');
       }
 
     }
