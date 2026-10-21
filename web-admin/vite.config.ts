@@ -33,6 +33,15 @@ const chartRequire = createRequire(path.join(coreWebAdminRoot, 'package.json'));
 const zrenderRoot = fs.realpathSync(path.dirname(chartRequire.resolve('zrender/package.json', {
   paths: [path.dirname(chartRequire.resolve('echarts/package.json'))],
 })));
+// DnD providers and sortable consumers must share one physical module instance.
+// Thin compositions otherwise preserve pnpm symlink paths as separate contexts.
+const dndSingletonAliases = ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'].map((id) => {
+  const manifest = fs.realpathSync(chartRequire.resolve(`${id}/package.json`));
+  const metadata = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+  return { find: new RegExp(`^${id}$`), replacement: normalizePath(
+    fs.realpathSync(path.resolve(path.dirname(manifest), metadata.module)),
+  ) };
+});
 const WEB_CONTRIBUTIONS_MODULE = 'virtual:auraboot-web-contributions';
 const RESOLVED_WEB_CONTRIBUTIONS_MODULE = `\0${WEB_CONTRIBUTIONS_MODULE}`;
 const contributionRoots = (process.env.AURA_WEB_CONTRIBUTION_ROOTS || '')
@@ -149,8 +158,8 @@ export default defineConfig({
     tsconfigPaths(),
   ].filter((plugin): plugin is Plugin => Boolean(plugin)),
   resolve: {
-    dedupe: ['react', 'react-dom'],
-    alias: [{ find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }],
+    dedupe: ['react', 'react-dom', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+    alias: [{ find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }, ...dndSingletonAliases],
   },
   server: {
     host: process.env.VITE_HOST || '0.0.0.0',

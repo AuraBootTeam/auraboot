@@ -4012,11 +4012,11 @@ function ListPageContentInner(props: PageContentProps) {
       if (currentView && !isImplicitSavedView(currentView)) {
         clearSortOverrides();
         clearFilterOverrides();
-        selectDefaultView();
         setPendingViewConfig(null);
         setActiveViewType('table');
         clearKeyword();
       }
+      selectDefaultView();
       const qf = buildQuickFilterPreset(key, { userId: user?.id, now: new Date() }) ?? {};
       activeQuickFilterRef.current = key;
       setActiveQuickFilter(key);

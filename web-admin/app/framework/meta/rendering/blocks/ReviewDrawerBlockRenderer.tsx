@@ -638,6 +638,7 @@ function fillTemplate(
   fieldConfigs: Map<string, any>,
   locale: string,
   t: (key: string) => string,
+  relatedRecords: Record<string, unknown> = {},
 ): string {
   return template.replace(/\$\{([^}]+)\}/g, (_match, expression: string) => {
     const path = String(expression).trim();
@@ -647,7 +648,7 @@ function fillTemplate(
       const config = fieldConfigs.get(fieldPath);
       return config ? formatConfiguredValue(value, config, locale, t) : formatValue(value, '');
     }
-    return formatValue(readPath(runtime.getContext(), path), '');
+    return formatValue(readPath({ ...runtime.getContext(), ...relatedRecords }, path), '');
   });
 }
 
@@ -839,17 +840,23 @@ function scoreToneClass(color: unknown): string {
 function Badge({
   badge,
   record,
+  runtime,
+  relatedRecords,
   locale,
   t,
 }: {
   badge: any;
   record: any;
+  runtime: SchemaRuntime;
+  relatedRecords: Record<string, unknown>;
   locale: string;
   t: (key: string) => string;
 }) {
   const key = String(badge.key || badge.valueField || badge.label);
   const label = getLocalizedText(badge.label || key, locale, t);
-  const value = readFieldValue(record, badge);
+  const value = badge.template
+    ? fillTemplate(String(badge.template), runtime, record, new Map(), locale, t, relatedRecords)
+    : readFieldValue(record, badge);
   const text = `${label} ${formatConfiguredValue(value, badge, locale, t)}${badge.unit ? String(badge.unit) : ''}`;
   const tone = (badge.tone || 'gray') as Tone;
 
@@ -2978,6 +2985,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               key={String(badge.key || badge.valueField || badge.label)}
               badge={badge}
               record={record}
+              runtime={runtime}
+              relatedRecords={{ raw: rawRecord, canonical: canonicalRecord, source: sourceRecord }}
               locale={locale}
               t={t}
             />

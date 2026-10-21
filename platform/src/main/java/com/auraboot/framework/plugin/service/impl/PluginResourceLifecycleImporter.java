@@ -17,10 +17,15 @@ import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.entity.PluginResource;
+import com.auraboot.framework.plugin.exception.PluginException;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -300,14 +305,13 @@ final class PluginResourceLifecycleImporter {
     }
 
     /**
-     * Soft-delete tracked menu rows through {@link #rollbackResource}, appending an audit
-     * row per pruned code. rollbackResource falls back to a direct soft delete when the
-     * menu service refuses a parent with active children, so a stale subtree converges in
-     * one pass. A code whose active menu row is already gone is silently accepted
-     * (idempotent re-run).
+     * Validate the complete deletion boundary, then remove leaves before parents.
+     * Import runs in a transaction: invoking a service that throws and catching it in
+     * rollbackResource would still poison that transaction. Retained children and cycles
+     * must fail before any deletion; they must never become orphaned through a fallback.
      */
     private int deleteTrackedMenus(String pluginPid, String importId, Long tenantId, List<String> codes) {
-        int pruned = 0;
+        Map<Long, PluginResource> pending = new java.util.LinkedHashMap<>();
         for (String code : codes) {
             Long menuId = menuMapper.findIdByCode(tenantId, code);
             if (menuId == null) {
@@ -318,21 +322,49 @@ final class PluginResourceLifecycleImporter {
             record.setResourceCode(code);
             record.setResourceId(menuId);
             record.setResourcePid(menuMapper.findPidByCode(tenantId, code));
-            try {
-                facadeReceiver.rollbackResource(record);
-            } catch (Exception e) {
-                log.warn("Failed to prune stale menu {}: {}", PluginImportSupport.logSafe(code),
-                        PluginImportSupport.logSafe(e.getMessage()));
+            pending.put(menuId, record);
+        }
+        if (pending.isEmpty()) {
+            return 0;
+        }
+        List<Menu> activeMenus = menuMapper.selectList(new QueryWrapper<Menu>()
+                .eq("tenant_id", tenantId).eq("deleted_flag", false));
+        Map<Long, java.util.Set<Long>> children = new HashMap<>();
+        for (Menu menu : activeMenus) {
+            if (!pending.containsKey(menu.getParentId())) {
                 continue;
             }
-            pruned++;
+            if (!pending.containsKey(menu.getId())) {
+                throw new PluginException("Cannot prune menu with retained child: " + menu.getCode());
+            }
+            children.computeIfAbsent(menu.getParentId(), ignored -> new java.util.HashSet<>())
+                    .add(menu.getId());
+        }
+        List<PluginResource> ordered = new ArrayList<>();
+        java.util.Set<Long> remaining = new java.util.LinkedHashSet<>(pending.keySet());
+        while (!remaining.isEmpty()) {
+            List<Long> leaves = remaining.stream().filter(id -> children.getOrDefault(id,
+                    java.util.Set.of()).stream().noneMatch(remaining::contains)).toList();
+            if (leaves.isEmpty()) {
+                throw new PluginException("Cannot prune cyclic menu hierarchy");
+            }
+            for (Long id : leaves) {
+                ordered.add(pending.get(id));
+            }
+            remaining.removeAll(leaves);
+        }
+        for (PluginResource record : ordered) {
+            if (!menuService.deleteMenu(record.getResourceId())) {
+                throw new PluginException("Tracked menu was not deleted: " + record.getResourceCode());
+            }
             if (pluginPid != null) {
                 upsertResourceRecord(createResourceRecord(pluginPid, importId, tenantId,
-                        ResourceType.MENU, record.getResourcePid(), menuId, code, null,
+                        ResourceType.MENU, record.getResourcePid(), record.getResourceId(),
+                        record.getResourceCode(), null,
                         ResourceAction.DELETE, null, null));
             }
         }
-        return pruned;
+        return ordered.size();
     }
 
     /**

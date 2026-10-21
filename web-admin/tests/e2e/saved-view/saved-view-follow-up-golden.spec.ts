@@ -131,20 +131,37 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     const orderPid = await order.createViaApi({ e2et_order_title: orderTitle });
     const savedView = await ensureModifiedThisWeekPresetCopy(page);
-    await navigateToOrderViaSidebar(page);
-    await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('preset-view-bar')).toHaveCount(0);
-
     const presetChip = page.getByTestId('quick-filter-modified_this_week');
-    await expect(presetChip).not.toHaveAttribute('data-preset-saved', 'true');
-    await expect(presetChip).not.toHaveAttribute('data-preset-edited', 'true');
-    await expect(page.getByTestId('preset-view-reset-saved')).toHaveCount(0);
+    let releaseViews!: () => void;
+    let heldViewReads = 0;
+    const viewsReleased = new Promise<void>((resolve) => { releaseViews = resolve; });
+    // Preserve the real response while exercising a user choice made before initial hydration.
+    await page.route(url => url.pathname === '/api/views/accessible'
+      && url.searchParams.get('modelCode') === ORDER_MODEL
+      && url.searchParams.get('pageKey') === ORDER_PAGE_KEY, async route => {
+      const response = await route.fetch();
+      heldViewReads++;
+      await viewsReleased;
+      await route.fulfill({ response });
+    });
+    try {
+      await navigateToOrderViaSidebar(page);
+      await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('preset-view-bar')).toHaveCount(0);
+      await expect(presetChip).not.toHaveAttribute('data-preset-saved', 'true');
+      await expect(presetChip).not.toHaveAttribute('data-preset-edited', 'true');
+      await expect(page.getByTestId('preset-view-reset-saved')).toHaveCount(0);
 
-    await presetChip.click();
-    await expect(presetChip).toHaveAttribute('data-preset-active', 'true', { timeout: 10_000 });
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 10_000 })
-      .toBe('modified_this_week');
+      await presetChip.click();
+      await expect(presetChip).toHaveAttribute('data-preset-active', 'true', { timeout: 10_000 });
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 10_000 })
+        .toBe('modified_this_week');
+      await expect.poll(() => heldViewReads).toBeGreaterThan(0);
+    } finally {
+      releaseViews();
+    }
+    await expect(page.getByTestId('view-selector-trigger')).toBeEnabled();
 
     await page.getByTestId('preset-view-save-as-personal').click();
     await expect(page).toHaveURL(/view=[^&]+/, { timeout: 10_000 });

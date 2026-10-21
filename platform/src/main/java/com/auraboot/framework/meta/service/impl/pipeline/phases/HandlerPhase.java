@@ -758,6 +758,11 @@ public class HandlerPhase implements CommandPhase {
                     && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
                 throw new AccessDeniedException("Plugin source data access denied", dataAccess);
             }
+            // Preserve the typed persistence boundary: the global response handler
+            // sanitizes database diagnostics in every profile, including dev.
+            if (e instanceof org.springframework.dao.DataAccessException persistenceFailure) {
+                throw persistenceFailure;
+            }
             // Plugin handlers use stable, transport-neutral error keys because
             // the plugin API must not depend on host web exceptions. Preserve
             // the optimistic-concurrency semantic at the host boundary so DSL

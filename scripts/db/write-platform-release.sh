@@ -40,7 +40,41 @@ _require_db
 _sha256() { if command -v shasum >/dev/null 2>&1; then shasum -a 256; else sha256sum; fi | cut -d' ' -f1; }
 _psql() { PGPASSWORD="$PG_PASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tA "$@"; }
 _sql_lit() { if [[ -z "$1" ]]; then printf 'NULL'; else printf "'%s'" "${1//\'/\'\'}"; fi; }
-_sha() { git -C "$1" rev-parse --short HEAD 2>/dev/null || echo unknown; }
+
+# A release-contained migrator deliberately has no Git checkout. Its caller must
+# verify the immutable payload and pass its full repository identities explicitly.
+# Never turn an unavailable checkout into successful "unknown" provenance.
+REPOSITORY_SHAS="$(CORE_SOURCE_ROOT="$AURA_CORE_ROOT" ENT_SOURCE_ROOT="$ENTERPRISE_ROOT" \
+  RELEASE_EDITION="$EDITION" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+
+required = {'core'} | ({'enterprise'} if os.environ['RELEASE_EDITION'] == 'enterprise' else set())
+roots = {'core': os.environ['CORE_SOURCE_ROOT'], 'enterprise': os.environ['ENT_SOURCE_ROOT']}
+raw = os.environ.get('AURA_RELEASE_REPOSITORY_SHAS_JSON', '')
+shas = json.loads(raw) if raw else {}
+if not isinstance(shas, dict):
+    raise SystemExit('[release] verified repository identities must be an object')
+for name, root in roots.items():
+    if name not in required:
+        continue
+    if root and (Path(root) / '.git').exists():
+        actual = subprocess.check_output(['git', '-C', root, 'rev-parse', 'HEAD'], text=True).strip()
+        if raw and shas.get(name) != actual:
+            raise SystemExit('[release] verified repository SHA contradicts checkout: ' + name)
+        if not raw:
+            shas[name] = actual
+if not required.issubset(shas):
+    raise SystemExit('[release] explicit verified repository SHAs are required outside a Git checkout')
+for name, value in shas.items():
+    if not re.fullmatch(r'[a-z][a-z0-9_-]*', name) or not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{40}', value):
+        raise SystemExit('[release] repository identities require safe owners and full Git OIDs')
+print(json.dumps(shas, sort_keys=True))
+PY
+)"
 
 DB_MIGRATION_VERSION="$(_psql -c "SELECT version FROM ab_flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1;")"
 if [[ -z "$DB_MIGRATION_VERSION" ]]; then
@@ -54,14 +88,18 @@ DB_SCHEMA_HASH="$(PGPASSWORD="$PG_PASSWORD" pg_dump -h "$PG_HOST" -p "$PG_PORT" 
   | grep -vE '^\\(un)?restrict |^-- Dumped (from database|by pg_dump) version ' | _sha256)"
 
 # Multi-repo provenance.
-CORE_SHA="$(_sha "$AURA_CORE_ROOT")"
+CORE_SHA="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["core"])' "$REPOSITORY_SHAS")"
 ENT_SHA=""
 PRIMARY_ROOT="$AURA_CORE_ROOT"
 if [[ "$EDITION" == "enterprise" && -n "$ENTERPRISE_ROOT" ]]; then
-  ENT_SHA="$(_sha "$ENTERPRISE_ROOT")"
+  ENT_SHA="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["enterprise"])' "$REPOSITORY_SHAS")"
   PRIMARY_ROOT="$ENTERPRISE_ROOT"
 fi
-[[ -n "$GIT_SHA" ]] || GIT_SHA="$(_sha "$PRIMARY_ROOT")"
+PRIMARY_SHA="${ENT_SHA:-$CORE_SHA}"
+[[ -z "$GIT_SHA" || "$GIT_SHA" == "$PRIMARY_SHA" ]] || {
+  echo "[release] primary Git SHA must match the verified primary repository" >&2; exit 2;
+}
+GIT_SHA="$PRIMARY_SHA"
 
 # app_version: --app-version > VERSION file (primary repo) > platform.version > migration version.
 if [[ -z "$APP_VERSION" && -f "$PRIMARY_ROOT/VERSION" ]]; then
@@ -73,16 +111,14 @@ if [[ -z "$APP_VERSION" ]]; then
 fi
 [[ -n "$APP_VERSION" ]] || APP_VERSION="$DB_MIGRATION_VERSION"
 
-META="$(CORE_SHA="$CORE_SHA" ENT_SHA="$ENT_SHA" BUILD="$BUILD_VERSION" python3 -c '
+META="$(REPOSITORY_SHAS="$REPOSITORY_SHAS" BUILD="$BUILD_VERSION" python3 -c '
 import json, os
-shas = {"core": os.environ["CORE_SHA"]}
-if os.environ.get("ENT_SHA"):
-    shas["enterprise"] = os.environ["ENT_SHA"]
+shas = json.loads(os.environ["REPOSITORY_SHAS"])
 meta = {"repo_shas": shas}
 if os.environ.get("BUILD"):
     meta["build"] = os.environ["BUILD"]
 print(json.dumps(meta))
-' 2>/dev/null || echo '{}')"
+')"
 
 PID="rel_$(date -u +%Y%m%d%H%M%S)_$$"
 
