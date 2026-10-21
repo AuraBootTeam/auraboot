@@ -1,5 +1,6 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
+import { createDefaultTableView, restoreDefaultTableView, type DefaultTableViewState } from '../showcase/helpers/default-table-view';
 import { navigateToOrderViaSidebar } from '../saved-view/helpers';
 import { uniqueId } from '../helpers';
 
@@ -76,8 +77,10 @@ test.describe('Permission data scope runtime', () => {
 
     const ownerContext = await newAuthenticatedContext(browser, resolvedBaseURL, owner);
     const ownerPage = await ownerContext.newPage();
+    let defaultTableView: DefaultTableViewState | null = null;
 
     try {
+      defaultTableView = await createDefaultTableView(page.request, MODEL_CODE, 'e2et_order_list', 'Data Scope');
       // The owner may create orders but not customers. Provision both references
       // as admin and persist their public PIDs, rather than customer labels.
       const ownerCustomerPid = await seedCustomer(page, `Customer ${titlePrefix} Owner`);
@@ -124,6 +127,7 @@ test.describe('Permission data scope runtime', () => {
       await searchOrderList(page, adminRecord.title);
       await expect(page.getByText(adminRecord.title).first()).toBeVisible({ timeout: 10_000 });
     } finally {
+      await restoreDefaultTableView(page.request, defaultTableView);
       await ownerContext.close();
     }
   });

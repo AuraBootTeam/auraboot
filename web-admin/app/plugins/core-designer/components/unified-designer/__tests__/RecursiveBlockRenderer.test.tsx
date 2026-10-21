@@ -3185,3 +3185,44 @@ describe('localized repeating block titles', () => {
     expect(screen.getByTestId(`runtime-${blockType}-localized_rows_block`)).not.toHaveTextContent('Original title');
   });
 });
+
+// Exercise the query contract through a real runtime action and execution context.
+describe('runtime action route query', () => {
+  it.each([
+    ['ordinary values', '?filter=ready&count=0&empty=', [['filter', 'ready'], ['count', '0'], ['empty', '']]],
+    ['repeated values', '?tag=a&tag=b&tag=c', [['tag', ['a', 'b', 'c']]]],
+    ['prototype names', '?__proto__=first&__proto__=second&constructor=ctor&toString=label&prototype=proto', [
+      ['__proto__', ['first', 'second']], ['constructor', 'ctor'], ['toString', 'label'], ['prototype', 'proto'],
+    ]],
+  ] as const)('preserves %s in the execution context', async (_label, search, entries) => {
+    const originalUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const executeAction = vi.fn().mockResolvedValue({ status: 'Submitted' });
+    try {
+      window.history.replaceState(null, '', `/runtime-query${search}`);
+      render(
+        <RecursiveBlockRenderer
+          runtimeServices={{ executeAction }}
+          schema={{
+            schemaVersion: 3, kind: 'list', id: 'route_query_page',
+            blocks: [{
+              id: 'query_action', blockType: 'action', actionType: 'command',
+              props: { label: 'Submit', command: 'customer.submit', executionMode: 'live' },
+            }],
+          }}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('runtime-action-query_action'));
+      await waitFor(() => expect(executeAction).toHaveBeenCalledTimes(1));
+      const query = executeAction.mock.calls[0][1].routeQuery;
+      expect(Object.getPrototypeOf(query)).toBe(Object.prototype);
+      expect(Object.keys(query).sort()).toEqual(entries.map(([key]) => key).sort());
+      for (const [key, value] of entries) {
+        expect(Object.hasOwn(query, key)).toBe(true);
+        expect(query[key]).toEqual(value);
+      }
+      expect(JSON.parse(JSON.stringify(query))).toEqual(Object.fromEntries(entries));
+    } finally {
+      window.history.replaceState(null, '', originalUrl);
+    }
+  });
+});

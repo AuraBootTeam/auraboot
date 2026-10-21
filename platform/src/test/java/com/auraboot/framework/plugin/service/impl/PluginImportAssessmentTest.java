@@ -47,6 +47,24 @@ class PluginImportAssessmentTest {
         when(snapshots.findByTenantAndType(42L,"menu")).thenReturn(Arrays.asList(null,new PluginResource(),snapshot("invoice",Map.of("code","invoice","name","old")),snapshot("bad",Map.of("code",List.of("bad"))),snapshot("invoice",Map.of("code","invoice","name","new"))));
         assertThat(assessment.loadImportedResourceSnapshots(42L,ResourceType.MENU,MenuDefinitionDTO.class)).extracting(MenuDefinitionDTO::getName).containsExactly("new");
     }
+    @Test void deletedResourceSnapshotDoesNotRemainAnActiveReference() {
+        var removed=snapshot("removed",Map.of("code","removed","parentCode","removed-parent"));
+        removed.setAction("delete");
+        var active=snapshot("active",Map.of("code","active","parentCode","missing-parent"));
+        when(snapshots.findByTenantAndType(42L,"menu")).thenReturn(List.of(removed,active));
+        assertThat(assessment.loadImportedResourceSnapshots(42L,ResourceType.MENU,MenuDefinitionDTO.class))
+                .extracting(MenuDefinitionDTO::getCode).containsExactly("active");
+    }
+    @Test void newestTombstoneOverridesAnOlderSnapshotAndReimportCanReactivateIt() {
+        var old=snapshot("menu",Map.of("code","menu","parentCode","old-parent"));
+        var tombstone=PluginResource.builder().resourceCode("menu").action("delete").build();
+        when(snapshots.findByTenantAndType(42L,"menu")).thenReturn(List.of(old,tombstone));
+        assertThat(assessment.loadImportedResourceSnapshots(42L,ResourceType.MENU,MenuDefinitionDTO.class)).isEmpty();
+        var restored=snapshot("menu",Map.of("code","menu","parentCode","current-parent"));
+        when(snapshots.findByTenantAndType(42L,"menu")).thenReturn(List.of(old,tombstone,restored));
+        assertThat(assessment.loadImportedResourceSnapshots(42L,ResourceType.MENU,MenuDefinitionDTO.class))
+                .extracting(MenuDefinitionDTO::getParentCode).containsExactly("current-parent");
+    }
     @Test void validationContextContainsExternalCapabilitiesAndExplicitReferencePolicy() throws Exception {
         var m=new ObjectMapper().readValue("""
             {"pluginId":"billing","namespace":"billing","commands":[{"code":"create","modelCode":"external_invoice"}],

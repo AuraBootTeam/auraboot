@@ -7,10 +7,30 @@ test.use({ locale: 'zh-CN' });
 // Dedicated records are created through the public admin API as fixtures. Every
 // lifecycle mutation below is driven by the native detail button, never by API fallback.
 test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist state @critical', async ({
-  page,
+  page, browser,
 }, testInfo) => {
   test.setTimeout(120000);
   const stamp = uniqueId('native-member');
+  // Native member removal is an independent capability, not an implied admin grant.
+  const roleCode = `e2e_lifecycle_${stamp}`;
+  const roleResponse = await page.request.post('/api/roles', { data: {
+    code: roleCode, name: `Lifecycle ${stamp}`, type: 'custom', defaultDataScopeType: 'all',
+  } });
+  expect(roleResponse.status()).toBe(200);
+  const roleBody = await roleResponse.json();
+  expect(String(roleBody.code)).toBe('0');
+  const grants = await page.request.put(`/api/permission/capabilities?rolePid=${roleBody.data.pid}`, {
+    data: ['org.cap.member_remove'],
+  });
+  expect(grants.status()).toBe(200);
+  expect(String((await grants.json()).code)).toBe('0');
+  const operator = makeQuoteRoleUser('lifecycle', stamp, ['tenant_admin', roleCode]);
+  await ensureQuoteRoleUser(page, operator);
+  const opened = await openQuoteRolePage(browser, operator);
+  page = opened.page;
+  const snapshot = await fetchRoleSnapshot(page);
+  expect(snapshot.permissionCodes).toContain('model.tenant_member.delete');
+  try {
   const email = `${stamp}@e2e.local`;
   const created = await page.request.post('/api/admin/users', {
     data: {
@@ -176,6 +196,7 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   await expect(page.getByTestId('invite-section')).toHaveText('邀请成员');
   await expect(page.getByTestId('member-import-entry')).toHaveText('导入成员');
   await capture('native-member-removed-list');
+  } finally { await opened.context.close(); }
 });
 
 

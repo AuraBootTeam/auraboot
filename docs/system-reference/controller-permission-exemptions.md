@@ -226,6 +226,14 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 - `controller/SolutionBrowseController.java`
 - `PluginRestDispatcher.java`
 
+`PluginRestDispatcher.dispatch` explicitly delegates the annotation-level decision through
+`@AuthenticatedAccess` to the registered route policy. This is not a route permission waiver:
+authenticated routes still require caller context and their exact `RestRoute.permissionCode`
+before entering the transaction/audit pipeline. Declared public routes retain the rate limit,
+public tenant context, and cleanup contract. The default-deny policy for other handlers is unchanged.
+The dispatcher tests exercise the real permission interceptor before dispatch, including permitted,
+denied, missing-caller, and public paths.
+
 ## promotion (1)
 
 Rationale: domain-specific scoping enforced at service layer; A4 census classification pending (TBD)
