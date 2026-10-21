@@ -28,9 +28,11 @@ import {
 } from '~/shared/services/resourceSelectService';
 import { ExpressionEditor } from './expression';
 import type { FieldOption as ExpressionFieldOption } from './expression/types';
+import { ModelFieldMapEditor } from './ModelFieldMapEditor';
 import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
+import { ColorPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/ColorPicker';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 import { ArrayItemEditor } from './ArrayItemEditor';
 import { createDecisionApi } from '~/shared/decision/api/decisionApi';
@@ -46,9 +48,19 @@ import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema } from './types';
+import { propertyEditorRegistry } from './PropertyEditorRegistry';
 import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { getLocalizedText, useSmartText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
+
+function ColorPropertyEditor({schema,adapter}: PropertyFieldRendererProps) {
+  const {locale} = useI18n();
+  return <ColorPicker value={typeof adapter.value==='string'?adapter.value:''}
+    label={getLocalizedText(schema.label,locale)} disabled={adapter.disabled || adapter.readOnly}
+    onChange={value=>adapter.setValue(value)} />;
+}
+const disposeColorEditor = propertyEditorRegistry.register('designer.color', ColorPropertyEditor);
+import.meta.hot?.dispose(disposeColorEditor);
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -59,6 +71,8 @@ export interface PropertyFieldRendererProps {
   schema: PropertySchema<string | LocalizedText>;
   /** FieldAdapter that bridges the designer store with base-field components. */
   adapter: FieldAdapter<unknown>;
+  /** Unique DOM field identity for repeated properties; schema keys retain storage semantics. */
+  fieldId?: string;
 }
 
 /**
@@ -69,7 +83,7 @@ export interface PropertyFieldRendererProps {
  *  - Creating the appropriate FieldAdapter (flow, dashboard, etc.)
  *  - Evaluating `dependsOn` visibility (keep at panel level)
  */
-export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRendererProps) {
+export function PropertyFieldRenderer({ schema, adapter, fieldId }: PropertyFieldRendererProps) {
   const { locale } = useI18n();
   const label = getLocalizedText(schema.label as string | Record<string, string>, locale);
   const placeholder = schema.placeholder
@@ -79,6 +93,11 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
     ? getLocalizedText(schema.description as string | Record<string, string>, locale)
     : undefined;
 
+  if (schema.editor) {
+    const Editor = propertyEditorRegistry.resolve(schema.editor);
+    return <Editor schema={schema} adapter={adapter} />;
+  }
+
   switch (schema.type) {
     // ---- Text-like inputs ----
     case 'text':
@@ -87,7 +106,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseInput
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={
             placeholder ||
@@ -130,7 +149,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseInput
           adapter={numericAdapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
@@ -143,7 +162,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseTextarea
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
@@ -152,14 +171,14 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       );
 
     case 'json':
-      return <JsonField adapter={adapter} name={schema.key} label={label} helpText={helpText} />;
+      return <JsonField adapter={adapter} name={fieldId ?? schema.key} label={label} helpText={helpText} />;
 
     // ---- Selection fields ----
     case 'select':
       return (
         <BaseSelect
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
@@ -208,6 +227,11 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
 
+    case 'model-field-map':
+      return (
+        <ModelFieldMapEditor adapter={adapter} label={label} modelKey={schema.dependsOn?.field} />
+      );
+
     case 'field-select':
       return (
         <DependentFieldSelect
@@ -220,7 +244,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
 
     case 'boolean':
       return (
-        <BaseSwitch adapter={adapter as any} name={schema.key} label={label} helpText={helpText} />
+        <BaseSwitch adapter={adapter as any} name={fieldId ?? schema.key} label={label} helpText={helpText} />
       );
 
     // ---- Expression / formula ----
@@ -229,7 +253,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         <ExpressionField
           schema={schema}
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           helpText={helpText}
         />
@@ -239,7 +263,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseFormulaEditor
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder || 'Enter expression...'}
           helpText={helpText}
@@ -298,7 +322,8 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           onChange={(next) => adapter.setValue(next as unknown)}
           label={label}
           placeholder={placeholder}
-          testId={schema.key}
+          testId={schema.testId ?? schema.key}
+          disabled={adapter.disabled}
         />
       );
 
@@ -314,8 +339,14 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       );
 
     case 'command-select':
-      return <CommandResourceField adapter={adapter} label={label}
-        placeholder={placeholder} helpText={helpText} />;
+      return (
+        <CommandResourceField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder}
+          helpText={helpText}
+        />
+      );
 
     case 'rule-binding':
       return (
@@ -352,15 +383,17 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         ? (adapter.value as Record<string, unknown>[])
         : [];
 
-      const addLabel = typeof schema.addButtonLabel === 'string' ? schema.addButtonLabel : '+ Add';
+      const addLabel = schema.addButtonLabel
+        ? getLocalizedText(schema.addButtonLabel, locale)
+        : locale.startsWith('zh') ? '+ 添加' : '+ Add';
       const emptyPlaceholder =
-        typeof schema.placeholder === 'string' ? schema.placeholder : undefined;
+        schema.placeholder ? getLocalizedText(schema.placeholder, locale) : undefined;
 
       const buildDefaultItem = (): Record<string, unknown> => {
         const obj: Record<string, unknown> = {};
         for (const field of schema.itemSchema ?? []) {
           obj[field.key] =
-            field.defaultValue !== undefined ? field.defaultValue : defaultForType(field.type);
+            field.defaultValue !== undefined ? field.defaultValue : field.type === 'number' ? undefined : defaultForType(field.type);
         }
         return obj;
       };
@@ -373,7 +406,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           {items.map((item, idx) => {
             const resolvedLabel = schema.itemLabel
               ? schema.itemLabel(item, idx)
-              : `Item ${idx + 1}`;
+              : locale.startsWith('zh') ? `第 ${idx + 1} 项` : `Item ${idx + 1}`;
             return (
               <ArrayItemEditor
                 key={idx}
@@ -388,11 +421,13 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
                   (adapter as FieldAdapter<unknown>).setValue(updated);
                 }}
                 itemLabel={resolvedLabel}
+                readonly={adapter.disabled || adapter.readOnly}
               />
             );
           })}
           <button
             type="button"
+            disabled={adapter.disabled || adapter.readOnly}
             onClick={() => {
               (adapter as FieldAdapter<unknown>).setValue([...items, buildDefaultItem()]);
             }}
@@ -419,7 +454,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       return (
         <BaseInput
           adapter={adapter as any}
-          name={schema.key}
+          name={fieldId ?? schema.key}
           label={label}
           placeholder={placeholder}
           helpText={helpText}
@@ -1232,11 +1267,28 @@ function DictSelectField({
 export default PropertyFieldRenderer;
 
 /** Model-scoped command discovery shared by schema-driven action editors. */
-function CommandResourceField({ adapter, label, placeholder, helpText }: {
-  adapter: FieldAdapter<unknown>; label: string; placeholder?: string; helpText?: string;
+function CommandResourceField({
+  adapter,
+  label,
+  placeholder,
+  helpText,
+}: {
+  adapter: FieldAdapter<unknown>;
+  label: string;
+  placeholder?: string;
+  helpText?: string;
 }) {
-  const modelCode = typeof adapter.context?.modelCode === 'string' ? adapter.context.modelCode : undefined;
+  const modelCode =
+    typeof adapter.context?.modelCode === 'string' ? adapter.context.modelCode : undefined;
   const fetchOptions = useCallback(() => fetchCommandOptions(modelCode), [modelCode]);
-  return <ResourceSelectField key={modelCode ?? 'all'} adapter={adapter} label={label}
-    placeholder={placeholder ?? ''} helpText={helpText} fetchOptions={fetchOptions} />;
+  return (
+    <ResourceSelectField
+      key={modelCode ?? 'all'}
+      adapter={adapter}
+      label={label}
+      placeholder={placeholder ?? ''}
+      helpText={helpText}
+      fetchOptions={fetchOptions}
+    />
+  );
 }

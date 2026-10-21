@@ -5,6 +5,7 @@
 import React from 'react';
 import { useSmartText } from '~/utils/i18n';
 import type { ReportBand, BandElement } from '../types';
+import { SchemaBlockConfigPanel, type ExtendedPropertySchema } from '~/shared/designer/SchemaBlockConfigPanel';
 
 interface BandEditorProps {
   band: ReportBand;
@@ -13,7 +14,7 @@ interface BandEditorProps {
 
 export const BandEditor: React.FC<BandEditorProps> = ({ band, onChange }) => {
   const text = useSmartText();
-  const heightId = React.useId();
+
   const updateElement = (idx: number, updates: Partial<BandElement>) => {
     const elements = [...band.elements];
     elements[idx] = { ...elements[idx], ...updates };
@@ -41,21 +42,8 @@ export const BandEditor: React.FC<BandEditorProps> = ({ band, onChange }) => {
 
   return (
     <div className="space-y-4">
-      {/* Band height */}
-      <div>
-        <label htmlFor={heightId} className="mb-1 block text-sm font-medium text-gray-700">
-          {text({ zh: '高度（毫米）', en: 'Height (mm)' })}
-        </label>
-        <input
-          id={heightId}
-          type="number"
-          value={band.height}
-          onChange={(e) => onChange({ ...band, height: Number(e.target.value) })}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          min={5}
-          max={100}
-        />
-      </div>
+      <SchemaBlockConfigPanel density="compact" schemas={[{key:'height',label:text({zh:'高度（毫米）',en:'Height (mm)'}),type:'number',min:5,max:100}]}
+        value={band as unknown as Record<string,unknown>} onChange={next=>onChange(next as unknown as ReportBand)} />
 
       {/* Elements */}
       <div>
@@ -97,46 +85,14 @@ export const BandEditor: React.FC<BandEditorProps> = ({ band, onChange }) => {
                 </button>
               </div>
 
-              {(el.type === 'text' || el.type === 'image') && (
-                <input
-                  type="text"
-                  value={el.content || ''}
-                  onChange={(e) => updateElement(idx, { content: e.target.value })}
-                  className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
-                  placeholder={
-                    el.type === 'text'
-                      ? text({ zh: '文本内容', en: 'Text content' })
-                      : text({ zh: '图片地址', en: 'Image URL' })
-                  }
-                />
-              )}
-
-              <div className="flex gap-2">
-                <select
-                  value={el.align || 'left'}
-                  onChange={(e) =>
-                    updateElement(idx, { align: e.target.value as 'left' | 'center' | 'right' })
-                  }
-                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
-                >
-                  <option value="left">{text({ zh: '左对齐', en: 'Left' })}</option>
-                  <option value="center">{text({ zh: '居中', en: 'Center' })}</option>
-                  <option value="right">{text({ zh: '右对齐', en: 'Right' })}</option>
-                </select>
-                <input
-                  type="number"
-                  value={el.style?.fontSize || 10}
-                  onChange={(e) =>
-                    updateElement(idx, {
-                      style: { ...el.style, fontSize: Number(e.target.value) },
-                    })
-                  }
-                  className="w-16 rounded border border-gray-300 px-2 py-1 text-xs"
-                  title={text({ zh: '字号（磅）', en: 'Font size (pt)' })}
-                  min={6}
-                  max={48}
-                />
-              </div>
+              <SchemaBlockConfigPanel density="compact" pathMode="nested"
+                schemas={[
+                  ...(['text','image'].includes(el.type) ? [{key:'content',label:text({zh:el.type==='text'?'文本内容':'图片地址',en:el.type==='text'?'Text content':'Image URL'}),placeholder:text({zh:el.type==='text'?'文本内容':'图片地址',en:el.type==='text'?'Text content':'Image URL'}),type:'text' as const}] : []),
+                  {key:'align',label:text({zh:'对齐方式',en:'Alignment'}),type:'select',defaultValue:'left',options:[{value:'left',label:text({zh:'左对齐',en:'Left'})},{value:'center',label:text({zh:'居中',en:'Center'})},{value:'right',label:text({zh:'右对齐',en:'Right'})}]},
+                  {key:'style.fontSize',label:text({zh:'字号（磅）',en:'Font size (pt)'}),type:'number',min:6,max:48,defaultValue:10},
+                ] satisfies ExtendedPropertySchema<string>[]}
+                value={el as unknown as Record<string,unknown>}
+                onChange={next=>updateElement(idx,next as unknown as BandElement)} />
             </div>
           ))}
         </div>

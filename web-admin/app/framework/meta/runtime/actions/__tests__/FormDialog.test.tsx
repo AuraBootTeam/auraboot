@@ -21,6 +21,15 @@ describe('FormDialog choice fields', () => {
     vi.unstubAllGlobals();
   });
 
+  it('names a required command textarea by its business label and submits its value', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ title: '登记交付跟进', submitLabel: '保存跟进', fields: [{ field: 'tpm_pj_next_action', label: '下一步行动', type: 'textarea', required: true }], defaults: {}, onSubmit });
+    const input = screen.getByRole('textbox', { name: '下一步行动', exact: true });
+    fireEvent.change(input, { target: { value: '林晓于11月8日前完成范围确认。' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存跟进', exact: true }));
+    expect(onSubmit).toHaveBeenCalledWith({ tpm_pj_next_action: '林晓于11月8日前完成范围确认。' });
+  });
+
   it('renders a MemberPicker command input and submits the selected user pid', async () => {
     const onSubmit = vi.fn();
     const member = {

@@ -27,3 +27,6 @@ export { DESIGNER_I18N, resolveDesignerText } from './designerI18n';
 
 export { SchemaBlockConfigPanel } from './SchemaBlockConfigPanel';
 export type { ExtendedPropertySchema, SchemaBlockConfigPanelProps } from './SchemaBlockConfigPanel';
+
+export { PropertyEditorRegistry, propertyEditorRegistry } from './PropertyEditorRegistry';
+export type { RegisteredPropertyEditorProps } from './PropertyEditorRegistry';

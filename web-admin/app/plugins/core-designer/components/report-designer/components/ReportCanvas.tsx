@@ -3,9 +3,10 @@
  * Supports drag-and-drop reordering of body blocks.
  */
 
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useReportDocument } from '../state/ReportDocumentProvider';
-import { A4Page } from './A4Page';
+import { A4Page, reportPageMetrics } from './A4Page';
+import { useSmartText } from '~/utils/i18n';
 import { ReportTableBlock } from '../blocks/ReportTableBlock';
 import { ReportGroupedTableBlock } from '../blocks/ReportGroupedTableBlock';
 import { ReportStatCardBlock } from '../blocks/ReportStatCardBlock';
@@ -34,6 +35,42 @@ export const ReportCanvas: React.FC = () => {
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [fitToWidth, setFitToWidth] = useState(true);
+  const [contentWidth, setContentWidth] = useState<number>();
+  const text = useSmartText();
+  const hasReport = Boolean(report);
+  useEffect(() => {
+    if (!hasReport) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const measure = () => {
+      const css = getComputedStyle(canvas);
+      const width =
+        canvas.clientWidth -
+        parseFloat(css.paddingLeft || '0') -
+        parseFloat(css.paddingRight || '0');
+      if (width > 0) setContentWidth(width);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [hasReport]);
+
+  // Keep the selected component and its property editor visible together.
+  useEffect(() => {
+    if (!selectedBlockId) return;
+    const block = blockRefs.current.get(selectedBlockId);
+    const canvas = canvasRef.current;
+    if (!block || !canvas) return;
+    const bounds = block.getBoundingClientRect();
+    const viewport = canvas.getBoundingClientRect();
+    if (bounds.top < viewport.top + 40 || bounds.bottom > viewport.bottom) {
+      block.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+    }
+  }, [selectedBlockId]);
 
   const handleDragStart = useCallback((e: React.DragEvent, blockId: string) => {
     setDraggedBlockId(blockId);
@@ -93,13 +130,44 @@ export const ReportCanvas: React.FC = () => {
 
   return (
     <div
+      ref={canvasRef}
       data-testid="report-canvas"
-      className="flex-1 overflow-auto bg-gray-100 p-8 [background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1px)] [background-size:18px_18px]"
+      className="relative min-h-0 min-w-0 flex-1 [scrollbar-gutter:stable] overflow-auto bg-gray-100 [background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1px)] [background-size:18px_18px] p-8"
       onClick={(e) => {
         if (e.target === e.currentTarget) selectBlock(null);
       }}
     >
-      <A4Page page={report.page}>
+      <div
+        role="toolbar"
+        aria-label={text({ zh: '画布缩放', en: 'Canvas zoom' })}
+        className="sticky top-0 z-20 mb-4 flex items-center justify-end gap-2 rounded-md border border-gray-200 bg-white/95 p-1.5 text-xs shadow-sm"
+      >
+        <span className="mr-1 text-gray-500">
+          {Math.round(
+            reportPageMetrics(report.page, fitToWidth ? contentWidth : undefined).zoom * 100,
+          )}
+          %
+        </span>
+        <button
+          type="button"
+          data-testid="report-canvas-fit"
+          aria-pressed={fitToWidth}
+          onClick={() => setFitToWidth(true)}
+          className={`rounded px-2 py-1 ${fitToWidth ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          {text({ zh: '适应画布', en: 'Fit canvas' })}
+        </button>
+        <button
+          type="button"
+          data-testid="report-canvas-actual"
+          aria-pressed={!fitToWidth}
+          onClick={() => setFitToWidth(false)}
+          className={`rounded px-2 py-1 ${!fitToWidth ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          100%
+        </button>
+      </div>
+      <A4Page page={report.page} fitWidth={fitToWidth ? contentWidth : undefined}>
         {/* Header */}
         {report.header && (
           <div
@@ -166,9 +234,7 @@ export const ReportCanvas: React.FC = () => {
                   <GripVertical className="h-4 w-4" />
                 </div>
 
-                {block.blockType === 'table' && (
-                  <ReportTableBlock block={block} mode="design" />
-                )}
+                {block.blockType === 'table' && <ReportTableBlock block={block} mode="design" />}
                 {block.blockType === 'grouped-table' && (
                   <ReportGroupedTableBlock block={block} mode="design" />
                 )}
