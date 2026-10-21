@@ -108,7 +108,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
             value={row.key}
             onChange={(e) => update(index, { key: e.target.value })}
             placeholder={keyPlaceholder}
-            className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
           <input
             type="text"
@@ -116,13 +116,13 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
             value={row.value}
             onChange={(e) => update(index, { value: e.target.value })}
             placeholder={valuePlaceholder}
-            className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
           <button
             type="button"
             data-testid={`${testIdPrefix}-remove`}
             onClick={() => remove(index)}
-            className="px-2 py-1 text-sm text-gray-400 hover:text-red-500"
+            className="shrink-0 px-2 py-1 text-sm text-gray-400 hover:text-red-500"
             aria-label="移除参数"
           >
             ✕

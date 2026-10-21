@@ -34,7 +34,7 @@ function computeValue(data: Record<string, unknown>[], field: string, agg: strin
 function formatValue(value: number, format?: string): string {
   if (!format) return value.toLocaleString();
   if (format === 'currency')
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (format === 'percent') return `${(value * 100).toFixed(1)}%`;
   if (format === 'number') return value.toLocaleString();
   return String(value);
@@ -59,6 +59,8 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
   const value = mode === 'design' ? 12345 : computeValue(data, block.valueField, block.aggregation);
 
   return (
+    <>
+    {block.title && block.label && block.title !== block.label && <div className="mb-2 text-sm font-semibold text-gray-700">{block.title}</div>}
     <div
       className={`inline-block min-w-[140px] rounded-lg border p-4 ${colors.bg} ${colors.border}`}
     >
@@ -77,5 +79,6 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
         </div>
       )}
     </div>
+    </>
   );
 };

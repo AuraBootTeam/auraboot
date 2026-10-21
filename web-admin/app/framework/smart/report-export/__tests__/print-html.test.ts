@@ -307,3 +307,32 @@ it('honors configured chart dimensions and prints its title once', () => {
   expect(result.html).toContain('height="180"');
   expect(result.html.match(/各项目验收金额/g)).toHaveLength(1);
 });
+
+describe('configured report summary rows',()=>{
+ const columns=[{field:'name',label:'Item'},{field:'amount',label:'Amount',format:'currency'}];
+ const rows=[{name:'Alpha',team:'A',amount:10},{name:'Beta',team:'A',amount:2.5},{name:'Gamma',team:'B',amount:5}];
+ it.each(['sum','avg','count','min','max'])('renders table %s using the same summary contract as the designer',aggregation=>{
+  const {html}=doc({body:[{blockType:'table',dataSource:'main',columns,summary:{enabled:true,label:'Review total',columns:[{field:'amount',aggregation,format:'currency'}]}}]},{main:rows});
+  const expected={sum:'17.50',avg:'5.83',count:'3.00',min:'2.50',max:'10.00'}[aggregation];
+  expect(html).toContain('class="summary-row table-summary"');expect(html).toContain('Review total');expect(html).toContain('¥'+expected);
+ });
+ it('renders independent group subtotals and the grand total with escaped labels',()=>{
+  const {html}=doc({body:[{blockType:'grouped-table',dataSource:'main',groupByField:'team',columns,groupSubtotal:{enabled:true,label:'<Group>',columns:[{field:'amount',aggregation:'sum',format:'currency'}]},grandTotal:{enabled:true,label:'Grand total',columns:[{field:'amount',aggregation:'sum',format:'currency'}]}}]},{main:rows});
+  expect(html.match(/class="summary-row group-subtotal"/g)).toHaveLength(2);expect(html).toContain('&lt;Group&gt;');expect(html).toContain('¥12.50');expect(html).toContain('¥5.00');expect(html).toContain('¥17.50');expect(html).toContain('Grand total');
+ });
+ it('omits disabled summaries and tolerates the initial empty summary configuration',()=>{
+  const {html}=doc({body:[{blockType:'table',dataSource:'main',columns,summary:{enabled:false}},{blockType:'grouped-table',dataSource:'main',columns,groupByField:'team',groupSubtotal:{enabled:true},grandTotal:{enabled:false}}]},{main:rows});
+  expect(html).not.toContain('class="summary-row table-summary"');expect(html).not.toContain('class="summary-row grand-total"');expect(html.match(/class="summary-row group-subtotal"/g)).toHaveLength(2);
+ });
+});
+
+it('rounds currency summaries to two decimals and keeps null or text numeric input consistent with the designer',()=>{
+ const {html}=doc({body:[{blockType:'table',dataSource:'main',columns:[{field:'name'},{field:'amount',format:'currency'}],summary:{enabled:true,label:'Average',columns:[{field:'amount',aggregation:'avg',format:''}]}}]},{main:[{name:'Null',amount:null},{name:'Text',amount:'2.50'},{name:'Invalid',amount:'not-number'}]});
+ expect(html).toContain('Average');expect(html).toContain('¥0.83');expect(html).not.toContain('¥0.833');
+});
+
+it('renders an explicit metric section title separately and escapes it without duplicating fallback labels',()=>{
+ const block={blockType:'stat-card',dataSource:'main',valueField:'amount',aggregation:'sum',title:'<Executive>',label:'Accepted amount'};
+ const {html}=doc({body:[block]},{main:[{amount:10}]});expect(html).toContain('<h2>&lt;Executive&gt;</h2>');expect(html).toContain('Accepted amount');expect(html).not.toContain('<Executive>');
+ const fallback=doc({body:[{...block,label:undefined}]},{main:[]}).html;expect(fallback.match(/&lt;Executive&gt;/g)).toHaveLength(1);
+});

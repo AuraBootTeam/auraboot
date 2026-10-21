@@ -33,7 +33,16 @@ export interface ReportColumnDef {
   align?: string;
 }
 
+export interface ReportPrintSummary {
+  enabled?: boolean;
+  label?: string;
+  columns?: Array<{field: string; aggregation?: string; format?: string}>;
+}
+
 export interface ReportPrintBlock extends ReportChartBlock {
+  summary?: ReportPrintSummary;
+  groupSubtotal?: ReportPrintSummary;
+  grandTotal?: ReportPrintSummary;
   blockType: string;
   title?: string;
   dataSource?: string;
@@ -133,10 +142,22 @@ function formattedValue(value: unknown, format?: string): string {
   if (value === null || value === undefined) return '';
   if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
   if (format === 'currency')
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (format === 'percent') return `${(value * 100).toFixed(1)}%`;
   if (format === 'number') return value.toLocaleString('zh-CN');
   return String(value);
+}
+
+function renderSummary(summary: ReportPrintSummary | undefined, cols: ReportColumnDef[], rows: PrintRow[], css: string): string {
+  if (!summary?.enabled || !cols.length) return '';
+  const cells=cols.map((column,index)=>{
+    const selected=summary.columns?.find(item=>item.field===column.field);
+    const value=selected
+      ? formattedValue(aggregateNumbers(rows.map(row=>Number(row[column.field]) || 0),selected.aggregation || 'sum'),selected.format || column.format)
+      : index===0 ? summary.label || 'Total' : '';
+    return `<td>${escapeHtml(value)}</td>`;
+  }).join('');
+  return `<tr class="summary-row ${css}">${cells}</tr>`;
 }
 
 function renderTable(block: ReportPrintBlock, dataSets: PrintDataSets): string {
@@ -150,7 +171,7 @@ function renderTable(block: ReportPrintBlock, dataSets: PrintDataSets): string {
     )
     .join('');
   const empty = `<tr><td colspan="${Math.max(cols.length, 1)}">无数据</td></tr>`;
-  return `<section class="block table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body || empty}</tbody></table></section>`;
+  return `<section class="block table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body || empty}${renderSummary(block.summary,cols,rows,'table-summary')}</tbody></table></section>`;
 }
 
 function formatNumber(n: number): string {
@@ -169,7 +190,7 @@ function renderStatCard(block: ReportPrintBlock, dataSets: PrintDataSets): strin
     aggregation,
   );
   const label = block.label ?? block.title ?? '';
-  return `<section class="block stat-card"><div class="stat-value">${escapeHtml(block.format ? formattedValue(value, block.format) : formatNumber(value))}</div><div class="stat-label">${escapeHtml(label)}</div></section>`;
+  return `<section class="block stat-card">${block.title && block.label && block.title !== block.label ? renderBlockTitle(block.title) : ''}<div class="stat-value">${escapeHtml(block.format ? formattedValue(value, block.format) : formatNumber(value))}</div><div class="stat-label">${escapeHtml(label)}</div></section>`;
 }
 
 function renderGroupedTable(block: ReportPrintBlock, dataSets: PrintDataSets): string {
@@ -190,7 +211,7 @@ function renderGroupedTable(block: ReportPrintBlock, dataSets: PrintDataSets): s
   }
 
   const head = cols.map((c) => `<th>${escapeHtml(c.label ?? c.field)}</th>`).join('');
-  const groupFieldLabel = cols.find((c) => c.field === groupBy && c.label)?.label;
+  const groupFieldLabel = cols.find((c) => c.field === groupBy && c.label && c.label !== c.field)?.label;
   const body = [...groups.entries()]
     .map(([key, grp]) => {
       const groupHeader = `<tr class="group-header"><td colspan="${span}">${escapeHtml(groupFieldLabel ? `${groupFieldLabel}: ` : '')}${escapeHtml(key)} (${grp.length})</td></tr>`;
@@ -200,10 +221,10 @@ function renderGroupedTable(block: ReportPrintBlock, dataSets: PrintDataSets): s
             `<tr>${cols.map((c) => `<td>${escapeHtml(formattedValue(r[c.field], c.format))}</td>`).join('')}</tr>`,
         )
         .join('');
-      return groupHeader + groupRows;
+      return groupHeader + groupRows + renderSummary(block.groupSubtotal,cols,grp,'group-subtotal');
     })
     .join('');
-  return `<section class="block grouped-table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></section>`;
+  return `<section class="block grouped-table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body}${renderSummary(block.grandTotal,cols,rows,'grand-total')}</tbody></table></section>`;
 }
 
 function renderCrossTab(block: ReportPrintBlock, dataSets: PrintDataSets): string {
@@ -353,6 +374,7 @@ function shell(model: ReportPrintModel, body: string, watermark: string): string
   .stat-value { font-size: 24px; font-weight: 600; }
   .stat-label { font-size: 12px; color: #6b7280; }
   .chart-canvas svg { max-width: 100%; height: auto; }
+.summary-row td { font-weight: 600; background: #f3f4f6; }
 </style></head><body>
   ${watermark}
   ${model.title ? `<h1>${escapeHtml(model.title)}</h1>` : ''}

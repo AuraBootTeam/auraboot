@@ -194,8 +194,9 @@ describe('reportToHtml — grouped table block', () => {
   it('groups rows by the key field, labels each group with its size, and adds subtotals', () => {
     const html = reportToHtml(baseReport({ body: [block] }), { sales: salesRows })
 
-    expect(html).toContain('region: EMEA (2)');
-    expect(html).toContain('region: APAC (1)');
+    expect(html).toContain('EMEA (2)');
+    expect(html).toContain('APAC (1)');
+    expect(html).not.toContain('region:');
     expect(html).toContain('小计');
     expect(html).toContain('总计');
     expect(html).toContain('>350<'); // grand total amount
@@ -208,7 +209,7 @@ describe('reportToHtml — grouped table block', () => {
       sales: [{ product: 'Thing', amount: 5 }],
     })
 
-    expect(html).toContain('region: Other (1)');
+    expect(html).toContain('Other (1)');
     expect(html).not.toContain('border: 1px solid #ddd;');
   });
 });
