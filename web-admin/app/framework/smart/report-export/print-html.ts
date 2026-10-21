@@ -190,7 +190,7 @@ function renderStatCard(block: ReportPrintBlock, dataSets: PrintDataSets): strin
     aggregation,
   );
   const label = block.label ?? block.title ?? '';
-  return `<section class="block stat-card"><div class="stat-value">${escapeHtml(block.format ? formattedValue(value, block.format) : formatNumber(value))}</div><div class="stat-label">${escapeHtml(label)}</div></section>`;
+  return `<section class="block stat-card">${block.title && block.label && block.title !== block.label ? renderBlockTitle(block.title) : ''}<div class="stat-value">${escapeHtml(block.format ? formattedValue(value, block.format) : formatNumber(value))}</div><div class="stat-label">${escapeHtml(label)}</div></section>`;
 }
 
 function renderGroupedTable(block: ReportPrintBlock, dataSets: PrintDataSets): string {

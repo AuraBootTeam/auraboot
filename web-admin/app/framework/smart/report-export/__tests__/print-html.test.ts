@@ -330,3 +330,9 @@ it('rounds currency summaries to two decimals and keeps null or text numeric inp
  const {html}=doc({body:[{blockType:'table',dataSource:'main',columns:[{field:'name'},{field:'amount',format:'currency'}],summary:{enabled:true,label:'Average',columns:[{field:'amount',aggregation:'avg',format:''}]}}]},{main:[{name:'Null',amount:null},{name:'Text',amount:'2.50'},{name:'Invalid',amount:'not-number'}]});
  expect(html).toContain('Average');expect(html).toContain('¥0.83');expect(html).not.toContain('¥0.833');
 });
+
+it('renders an explicit metric section title separately and escapes it without duplicating fallback labels',()=>{
+ const block={blockType:'stat-card',dataSource:'main',valueField:'amount',aggregation:'sum',title:'<Executive>',label:'Accepted amount'};
+ const {html}=doc({body:[block]},{main:[{amount:10}]});expect(html).toContain('<h2>&lt;Executive&gt;</h2>');expect(html).toContain('Accepted amount');expect(html).not.toContain('<Executive>');
+ const fallback=doc({body:[{...block,label:undefined}]},{main:[]}).html;expect(fallback.match(/&lt;Executive&gt;/g)).toHaveLength(1);
+});

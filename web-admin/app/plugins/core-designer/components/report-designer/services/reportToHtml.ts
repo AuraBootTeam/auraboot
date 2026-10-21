@@ -273,8 +273,9 @@ function renderStatCard(block: StatCardBlock, data: Record<string, unknown>[]): 
   const formatted = formatCellValue(value, block.format);
 
   return `
+    ${block.title && block.label && block.title !== block.label ? `<h3>${escapeHtml(block.title)}</h3>` : ''}
     <div style="display: inline-block; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 20px; margin: 4px 8px 4px 0; min-width: 120px; background: #f9fafb;">
-      <div style="font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${escapeHtml(block.label || 'Metric')}</div>
+      <div style="font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${escapeHtml(block.label || block.title || 'Metric')}</div>
       <div style="font-size: 18pt; font-weight: bold; color: ${block.color || '#1d4ed8'};">${formatted}</div>
     </div>
   `;
