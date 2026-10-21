@@ -315,16 +315,9 @@ test.describe.serial('Unified Designer display-blocks authoring golden', () => {
     expect(block).toMatchObject({ blockType: 'record-comments', title });
   });
 
-  // Product gap (same signature as B2, isolation-verified 2026-10-03): the
-  // embedded-list legacy inspector fields (modelCode/parentField/columns)
-  // accept edits and register dirty, but the values do not survive
-  // save+reload once the page is widget-normalized — modelCode reads back as
-  // empty string. Backlog: bind embedded-list legacy paths in the
-  // widget-normalized payload builder.
   test('B4: embedded-list — modelCode + parentField + columns JSON persist at the block top level and preview shows the binding', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: embedded-list legacy field bindings dropped after widget normalize — same signature as B2');
     const modelCode = 'ab_announcement';
     const parentField = 'parent_id';
     const columns = [
@@ -361,7 +354,6 @@ test.describe.serial('Unified Designer display-blocks authoring golden', () => {
   test('B5 (sad path): invalid columns JSON on embedded-list shows a per-field error and is NOT written back', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'depends on B4 seeding columns — blocked by the B4 embedded-list binding gap (product)');
     await openDesigner(page, pid);
     await selectBlock(page, EMBEDDED_LIST);
 
@@ -490,19 +482,10 @@ test.describe.serial('Unified Designer display-blocks authoring golden', () => {
 
     await testInfo.attach('l1-live-render', { body: await page.screenshot(), contentType: 'image/png' });
   });
-  // Product gap (probe-verified 2026-10-03): on a designer page whose schema
-  // has been through the widget-family normalize cycle, the description
-  // inspector renders the legacy content field and the edit registers dirty +
-  // PUT 200, but the persisted description block never receives content — no
-  // inspector path (content/props.content/props.text/props.markdown) binds to
-  // the payload. Description content is currently uneditable via the designer
-  // UI. Backlog: bind the description widget-model content path (or restore
-  // the legacy content binding) in SchemaInspector/FormBlockRenderer payload
-  // builder. Runtime skip (not a static fixme) so the serial group still runs.
+
   test('B2: description — content persists at the bare block.content path and preview shows the text', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: description content uneditable after widget normalize — see probe evidence 2026-10-03');
     const content = 'Read before submitting';
 
     await openDesigner(page, pid);

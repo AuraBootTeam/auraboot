@@ -204,7 +204,6 @@ test.describe('Inbox Header Widget', () => {
   });
 
   test('clicking badge opens dropdown', async ({ page }) => {
-    test.fixme(true, 'Inbox header widget testids changed — inbox-badge not found');
     await page.goto('/');
     await expect(page.getByTestId('inbox-badge')).toBeVisible({ timeout: 15_000 });
 
@@ -223,7 +222,6 @@ test.describe('Inbox Header Widget', () => {
   });
 
   test('view all link navigates to inbox page', async ({ page }) => {
-    test.fixme(true, 'Inbox header widget testids changed — inbox-badge not found');
     await page.goto('/');
     await expect(page.getByTestId('inbox-badge')).toBeVisible({ timeout: 15_000 });
 
@@ -240,7 +238,6 @@ test.describe('Inbox Header Widget', () => {
   });
 
   test('dropdown closes on escape', async ({ page }) => {
-    test.fixme(true, 'Inbox header widget testids changed — inbox-badge not found');
     await page.goto('/');
     await expect(page.getByTestId('inbox-badge')).toBeVisible({ timeout: 15_000 });
 
