@@ -4118,7 +4118,10 @@ function ListPageContentInner(props: PageContentProps) {
     if (existingPresetView) {
       selectView(existingPresetView.pid);
       setActiveViewType((existingPresetView.viewType as ViewType) || 'table');
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -4150,7 +4153,10 @@ function ListPageContentInner(props: PageContentProps) {
 
     try {
       const view = await createView(request);
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -4180,10 +4186,12 @@ function ListPageContentInner(props: PageContentProps) {
     clearFilterOverrides,
     createView,
     modelCode,
+    rememberSubmittedFilters,
     pageKey,
     savedViews,
     selectView,
     setSearchParams,
+    setFilters,
     showErrorToast,
     showSuccessToast,
     syncPresetToUrl,
