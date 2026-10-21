@@ -46,6 +46,7 @@ test('named owner and assigned reviewer return correct reverify and approve one 
   const reviewerContext=await browser.newContext({baseURL,storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
   try {
     const owner=await ownerContext.newPage(),reviewer=await reviewerContext.newPage();
+    owner.setDefaultTimeout(20000);reviewer.setDefaultTimeout(20000);
     const ownerIdentity=await loginDeliveryMember(owner,lin.login,process.env.AURA_ADMIN_TENANT_ID,process.env.ADMIN_PASSWORD,lin.userPid);
     const reviewerIdentity=await loginDeliveryMember(reviewer,zhou.login,process.env.AURA_ADMIN_TENANT_ID,process.env.ADMIN_PASSWORD,zhou.userPid);
     for(const identity of [ownerIdentity,reviewerIdentity]) {
@@ -93,12 +94,18 @@ test('named owner and assigned reviewer return correct reverify and approve one 
     const forged=await owner.request.post(`/api/bpm/tasks/${task.instanceId}/approve`,{data:{comment:'Owner is not the assigned reviewer',variables:{}}});expect(forged.status()).toBe(403);
     expect((await record(owner,'tpm_acceptance',pid)).tpm_ac_status).toBe('submitted');
     await data(await completeDeliveryApproval(reviewer,'reject','培训签到与培训交付范围不一致，请林晓补齐后重新提交。'));
-    await expect.poll(async()=>(await record(owner,'tpm_acceptance',pid)).tpm_ac_status).toBe('returned');await reviewer.reload();await shot(reviewer,'MR03-reviewer-returned');
+    await expect.poll(async()=>(await record(owner,'tpm_acceptance',pid)).tpm_ac_status).toBe('returned');await reviewer.reload();
+    await expect(reviewer.getByRole('main')).toContainText(name);
+    await expect(reviewer.getByTestId('bpm-sla-summary')).toContainText('计时已结束');
+    await reviewer.getByRole('tab',{name:'审批记录',exact:true}).click();
+    await expect(reviewer.getByTestId('bpm-history-container')).toContainText('培训签到与培训交付范围不一致');await shot(reviewer,'MR03-reviewer-returned');
     await open(owner,'交付验收',name);await owner.getByTestId('toolbar-btn-edit').click();await owner.locator('#tpm_ac_scope').fill('客户门户、权限配置已验收；补齐培训签到及培训范围说明，由周宁再次核对。');
     const correctedFile=await upload(owner,'培训签到与交付说明.txt','培训签到：客户项目组已确认。范围：门户操作、权限管理和供应链交接。');
     await command(owner,'tpm:update_acceptance',()=>owner.getByRole('button',{name:'保存验收草稿',exact:true}).click());
     const stale=await fact(owner,pid);expect(stale.verification_result).toBe('资料已更新 · 需复核');
-    await menu(owner,'交付经营看板');await expect(owner.getByTestId('dashboard-block-delivery-actions')).toContainText(name);await shot(owner,'MR04-stale-materials');
+    await menu(owner,'交付经营看板');
+    const staleRow=owner.getByTestId('dashboard-block-verification-results').getByRole('row').filter({hasText:name});
+    await expect(staleRow).toContainText('资料已更新 · 需复核');await staleRow.scrollIntoViewIfNeeded();await shot(owner,'MR04-stale-materials');
     const secondCheck=await verify();expect(Date.parse(secondCheck.tdv_ck_checked_at)).toBeGreaterThan(Date.parse(firstCheck.tdv_ck_checked_at));
     expect((await fact(owner,pid)).verification_result).toBe('核验通过');await shot(owner,'MR05-reverified');
     const secondProcess=await submit();expect(secondProcess).not.toBe(firstProcess);
@@ -112,7 +119,9 @@ test('named owner and assigned reviewer return correct reverify and approve one 
     await menu(owner,'交付经营看板');await expect(owner.getByTestId('dashboard-block-delivery-actions')).toContainText(name);await expect(owner.getByTestId('dashboard-block-delivery-actions')).toContainText('周宁');await shot(owner,'MR07-business-result');
     await menu(reviewer,'开始体验');await reviewer.getByRole('main').getByRole('button',{name:'打开复盘报告',exact:true}).click();
     await reviewer.getByRole('row').filter({hasText:'客户交付经营复盘'}).getByRole('button',{name:/打开|Open/}).click();
-    const toolbar=reviewer.getByTestId('report-designer-toolbar');await toolbar.getByRole('button',{name:'预览',exact:true}).click();
+    const toolbar=reviewer.getByTestId('report-reader-toolbar');await expect(toolbar).toBeVisible();
+    await expect(toolbar.getByRole('button',{name:'预览',exact:true})).toHaveCount(0);
+    await expect(reviewer.getByTestId('report-designer-toolbar-btn-save')).toHaveCount(0);
     await expect(reviewer.getByRole('main')).toContainText(name);await expect(reviewer.getByRole('main')).toContainText('周宁');await shot(reviewer,'MR09-report-result');
     const artifacts=[];
     for(const [format,label,ext] of [['markdown','Markdown','md'],['html','HTML','html'],['pdf','PDF','pdf']]) {
