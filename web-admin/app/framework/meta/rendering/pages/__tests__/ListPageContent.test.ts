@@ -1488,3 +1488,23 @@ describe('useListApiReadRetry transport request identity', () => {
     expect(result.current.getFailedRequest()).toBeNull();
   });
 });
+
+
+describe('DateRange filter component wire values', () => {
+  const fields = [{ field: 'order_date', component: 'DateRange' }];
+  it('expands the actual serialized DateRange component value into date bounds', () => {
+    expect(resolveUserFilterCondition('order_date', JSON.stringify({ start: '2026-04-01', end: '2026-04-30' }), fields)).toEqual([
+      { fieldName: 'order_date', operator: 'gte', value: '2026-04-01' },
+      { fieldName: 'order_date', operator: 'lte', value: '2026-04-30' },
+    ]);
+  });
+  it('does not submit an empty serialized DateRange as an equality filter', () => {
+    expect(resolveUserFilterCondition('order_date', JSON.stringify({ start: '', end: '' }), fields)).toEqual([]);
+  });
+  it('keeps range-shaped JSON literal in an ordinary text field', () => {
+    const literal = JSON.stringify({ start: 'a', end: 'z' });
+    expect(resolveUserFilterCondition('note', literal, [{ field: 'note', component: 'SmartInput' }])).toEqual([
+      { fieldName: 'note', operator: 'LIKE', value: `%${literal}%` },
+    ]);
+  });
+});
