@@ -82,7 +82,7 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
       data-testid={`flow-node-${id}`}
       data-runtime-status={runtimeStatus || undefined}
       className={cn(
-        'relative min-w-[150px] rounded-lg border-2 px-4 py-3 shadow-sm',
+        'relative w-[216px] rounded-lg border-2 px-4 py-3 shadow-sm',
         categoryColor,
         // Selection ring takes priority visually (offset adds spacing); when not
         // selected, the runtime overlay ring renders directly on the node.
@@ -130,12 +130,12 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/70 text-gray-700 shadow-sm">
           {renderNodeIcon(definition?.icon, label)}
         </span>
-        <div>
-          <div className="text-sm font-medium text-gray-900">
+        <div className="min-w-0 flex-1">
+          <div title={label} className="break-words text-sm leading-5 font-medium text-gray-900">
             {label}
           </div>
           {definition?.description && (
-            <div className="text-xs text-gray-500">{st(definition.description)}</div>
+            <div className="mt-1 line-clamp-2 break-words text-xs leading-4 text-gray-500" title={st(definition.description)}>{st(definition.description)}</div>
           )}
         </div>
       </div>

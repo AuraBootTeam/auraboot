@@ -109,6 +109,7 @@ export default function UnifiedDesignerPage() {
   const canReadDesigner = usePermission('meta.designer.read');
   const canAdministerDesigner = usePermission('meta.designer.admin');
   const canManageDesigner = usePermission('meta.designer.update');
+  const canManagePages = usePermission('page.page.manage');
   const canReviewAuthoring = usePermission('meta.publish.update');
   const canReadAuthoringReleases = usePermission('meta.publish.read');
   const canPublishAuthoring = usePermission('meta.publish.admin');
@@ -1411,12 +1412,13 @@ export default function UnifiedDesignerPage() {
       studioPageKindSwitchEnabled(authoringCapabilities),
   );
   const contextualReadOnly = Boolean(
-    handoff &&
+    (!handoff && !canManagePages) ||
+    (handoff &&
       (reviewWorkspaceMode ||
         !canWriteContextualStudio ||
         authoringSession?.state !== 'ACTIVE' ||
         !hasOwnedWriterLease(authoringSession) ||
-        Boolean(studioConflict)),
+        Boolean(studioConflict))),
   );
   const newResource = isNewAuthoringResource(authoringSession);
 

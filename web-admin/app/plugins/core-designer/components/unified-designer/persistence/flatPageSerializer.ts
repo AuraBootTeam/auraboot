@@ -389,6 +389,12 @@ function applyCommonShape(
   if (typeof layout.rowSpan === 'number') flat.rowSpan = layout.rowSpan;
   if (block.dataSource !== undefined) flat.dataSource = unwrapDataSourceRef(block.dataSource);
   const props = { ...(residualProps ?? {}) };
+  for (const key of ['area', 'description'] as const) {
+    const value = props[key] ?? block.props?.[key];
+    if (value !== undefined) flat[key] = value;
+    delete props[key];
+  }
+  if (block.extension !== undefined) flat.extension = { ...block.extension };
   const residualLayout = { ...layout };
   delete residualLayout.span;
   delete residualLayout.rowSpan;
@@ -439,7 +445,10 @@ function serializeFieldLikeEntry(block: DslBlockV3, parentId: string): string | 
   const entry: Record<string, unknown> = { ...props };
   entry.field = field;
   if (!idIsCanonical) entry.id = block.id;
-  if (typeof layout.span === 'number') entry.span = layout.span;
+  if (typeof layout.span === 'number') {
+    if (typeof props.colSpan === 'number') entry.colSpan = layout.span;
+    else entry.span = layout.span;
+  }
   if (typeof layout.width === 'number') entry.width = layout.width;
   return entry;
 }

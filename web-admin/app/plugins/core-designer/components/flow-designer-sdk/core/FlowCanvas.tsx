@@ -168,6 +168,7 @@ export function FlowCanvas({
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      if (readOnly) return;
       changes.forEach((change) => {
         if (change.type === 'position' && change.position && change.id) {
           updateNode(change.id, { position: change.position });
@@ -177,23 +178,24 @@ export function FlowCanvas({
         }
       });
     },
-    [updateNode, deleteNode],
+    [updateNode, deleteNode, readOnly],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      if (readOnly) return;
       changes.forEach((change) => {
         if (change.type === 'remove' && change.id) {
           deleteEdge(change.id);
         }
       });
     },
-    [deleteEdge],
+    [deleteEdge, readOnly],
   );
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      if (connection.source && connection.target) {
+      if (!readOnly && connection.source && connection.target) {
         storeAddEdge({
           source: connection.source,
           target: connection.target,
@@ -202,7 +204,7 @@ export function FlowCanvas({
         });
       }
     },
-    [storeAddEdge],
+    [storeAddEdge, readOnly],
   );
 
   const onNodeClick = useCallback(
@@ -226,6 +228,7 @@ export function FlowCanvas({
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      if (readOnly) return;
 
       const type = event.dataTransfer.getData('application/flow-node');
       if (!type) return;
@@ -282,7 +285,7 @@ export function FlowCanvas({
         },
       });
     },
-    [addNode],
+    [readOnly, addNode],
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -305,6 +308,7 @@ export function FlowCanvas({
         onPaneClick={onPaneClick}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        deleteKeyCode={readOnly ? null : undefined}
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
         elementsSelectable={!readOnly}
@@ -321,7 +325,7 @@ export function FlowCanvas({
         <ScreenToFlowPositionCapture onCapture={handleCapture} />
         <ExistingGraphViewport enabled={fitViewActive} />
         <Background />
-        {showControls && <Controls />}
+        {showControls && <Controls showInteractive={!readOnly} />}
         {showMinimap && <MiniMap />}
       </ReactFlow>
     </div>
