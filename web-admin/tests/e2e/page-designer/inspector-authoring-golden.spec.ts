@@ -3,7 +3,7 @@
  *
  * Closes the gaps recorded in
  * docs/backlog/2026-06-17-page-designer-coverage-ux-gap.md §2.A:
- *   A2  helper-block inspectors (bpm-panel / activity-timeline / field-history)
+ *   A2  helper-block inspectors (workflow-panel / activity-timeline / field-history)
  *   A4  form-section inspector (collapsible / visibleWhen JSON / columns)
  *   A5  AI lock toggle → canvas badge → persisted props.aiLocked
  *   A6  Advanced JSON tab (happy apply + invalid-JSON error state)
@@ -36,7 +36,7 @@ import { loginViaUI, ensureBusinessSpace } from '../../helpers/auth-fixtures';
 import { uniqueId } from '../helpers';
 
 // ab_announcement is a published platform meta-model present in every OSS stack.
-// The helper blocks under test (bpm-panel / activity-timeline / field-history /
+// The helper blocks under test (workflow-panel / activity-timeline / field-history /
 // detail-section) do not bind model fields, so the model only has to satisfy the
 // detail-page contract (a real, published modelCode for the root detail block).
 const MODEL_CODE = 'ab_announcement';
@@ -177,7 +177,7 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
             title: 'Inspector authoring root',
             dataSource: { model: MODEL_CODE },
             layout: { span: 12 },
-            // detail-section is allowed directly under detail; the bpm-panel /
+            // detail-section is allowed directly under detail; the workflow-panel /
             // activity-timeline / field-history helper blocks are NOT allowed
             // directly under detail (BlockRegistry.allowedChildren), so they are
             // nested in a `columns` container which does allow them. Matches the
@@ -196,6 +196,12 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
                 title: 'Helper blocks',
                 layout: { columns: 1, span: 12 },
                 blocks: [
+                  {
+                    id: BPM_BLOCK,
+                    blockType: 'workflow-panel',
+                    title: 'Approval panel',
+                    props: { status: 'draft' },
+                  },
                   {
                     id: TIMELINE_BLOCK,
                     blockType: 'activity-timeline',
@@ -232,10 +238,9 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     await ensureBusinessSpace(page);
   });
 
-test('A2: bpm-panel inspector — status/assignee/dueAt + actions JSON persist and reload', async ({
+test('A2: workflow-panel inspector — status/assignee/dueAt + actions JSON persist and reload', async ({
     page,
   }) => {
-    test.skip(true, 'legacy bpm-panel has no current block registry entry; workflow-panel is covered separately');
     const assignee = `Approver ${uid}`;
     const dueAt = '2026-07-15';
     const actions = [
@@ -267,7 +272,7 @@ test('A2: bpm-panel inspector — status/assignee/dueAt + actions JSON persist a
     const persisted = await readPage(page, pid);
     const block = findBlockById(persisted.blocks, BPM_BLOCK);
     expect(block).toMatchObject({
-      blockType: 'bpm-panel',
+      blockType: 'workflow-panel',
       props: expect.objectContaining({ status: 'pending', assignee, dueAt, actions }),
     });
   });
