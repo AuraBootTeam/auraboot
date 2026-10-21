@@ -50,9 +50,12 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     const administrator=await adminContext.newPage();await loginDeliveryMember(administrator);
     const plan=JSON.parse(await readFile(join(process.env.AURA_ENTERPRISE_PROJECT_ROOT!,'plugins/customer-delivery-showcase/examples/delivery-participants.json'),'utf8'));
     // Explicit administrator fixture setup for existing installations; ordinary --update never grants roles.
+    const roles=await data(await administrator.request.get('/api/roles/all'));
     for(const assignment of plan) {
       const actor=fixture.participants.find((row:any)=>row.login===assignment.login);expect(actor).toBeTruthy();
-      expect(await data(await administrator.request.post('/api/user-roles/assign-by-code',{data:{memberPid:actor.memberPid,roleCodes:assignment.roleCodes}}))).toBe(true);
+      const rolePids=assignment.roleCodes.map((code:string)=>{const found=roles.filter((role:any)=>role.code===code);expect(found).toHaveLength(1);return found[0].pid;});
+      expect(await data(await administrator.request.put('/api/user-roles/sync-by-pid',{data:{memberPid:actor.memberPid,rolePids}}))).toBe(true);
+      expect((await data(await administrator.request.get('/api/user-roles/member/'+actor.memberPid))).sort()).toEqual([...rolePids].sort());
     }
     const owner=await ownerContext.newPage(),reviewer=await reviewerContext.newPage(),verifier=await verifierContext.newPage();
     owner.setDefaultTimeout(20000);reviewer.setDefaultTimeout(20000);verifier.setDefaultTimeout(20000);
