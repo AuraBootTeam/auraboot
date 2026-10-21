@@ -44,7 +44,7 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
      * {@code import_snapshot} JSONB column's custom TypeHandler never runs and every row reads
      * back with {@code importSnapshot=null} — no exception, no log, just a silently empty value.
      */
-    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} ORDER BY sequence")
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} ORDER BY updated_at ASC NULLS FIRST, id ASC")
     @ResultMap("mybatis-plus_PluginResource")
     List<PluginResource> findByTenantAndType(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType);
 

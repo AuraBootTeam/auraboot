@@ -134,10 +134,10 @@ export function useListQuickFilters({
         loadData({ page: 0, size: pagination.pageSize, filters: {} });
         return;
       }
+      selectDefaultView();
       if (currentView && !isImplicitSavedView(currentView)) {
         clearSortOverrides();
         clearFilterOverrides();
-        selectDefaultView();
         setPendingViewConfig(null);
         setActiveViewType('table');
         clearKeyword();

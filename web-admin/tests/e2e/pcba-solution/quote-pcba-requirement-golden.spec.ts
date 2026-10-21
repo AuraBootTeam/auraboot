@@ -23,9 +23,12 @@ test.describe('PCBA requirement set golden', () => {
         bom_project_remark: 'Q21-01 golden',
       }, created.rows);
 
-      // 行:合法取值持久化(扩展字段生效)
+      const taskPid = await dynamicCreate(page, 'bom_conversion_task_pcba', {
+        bom_task_no: `${marker}-TASK`, bom_task_project_id: setPid, bom_task_status: 'draft',
+      }, created.rows);
+      // Canonical lines reference a conversion task owned by the BOM project.
       const linePid = await dynamicCreate(page, 'req_requirement_line_pcba_bom', {
-        bom_cl_task_id: setPid,
+        bom_cl_task_id: taskPid,
         bom_cl_line_no: 1,
         bom_cl_mpn: `E2E-REQ-${marker}`,
         bom_cl_qty: 5,
@@ -43,7 +46,7 @@ test.describe('PCBA requirement set golden', () => {
       // 非法取值拒绝腿:数量最小值和 MPN 必填均由模型 binding 在服务端强制。
       const negativeQty = await page.request.post('/api/dynamic/req_requirement_line_pcba_bom', {
         data: {
-          bom_cl_task_id: setPid, bom_cl_line_no: 2, bom_cl_mpn: `E2E-NEG-${marker}`,
+          bom_cl_task_id: taskPid, bom_cl_line_no: 2, bom_cl_mpn: `E2E-NEG-${marker}`,
           bom_cl_qty: -5, bom_cl_level: '1', bom_cl_review_status: 'pending',
         },
         timeout: 20_000,
@@ -61,7 +64,7 @@ test.describe('PCBA requirement set golden', () => {
 
       const missingMpn = await page.request.post('/api/dynamic/req_requirement_line_pcba_bom', {
         data: {
-          bom_cl_task_id: setPid, bom_cl_line_no: 3, bom_cl_qty: 1,
+          bom_cl_task_id: taskPid, bom_cl_line_no: 3, bom_cl_qty: 1,
           bom_cl_level: '1', bom_cl_review_status: 'pending',
         },
         timeout: 20_000,
@@ -76,7 +79,7 @@ test.describe('PCBA requirement set golden', () => {
       expect(JSON.stringify(missingMpnBody), 'the rejection names the required rule').toContain('required');
 
       const invalidRows = await queryDynamicRecords(page, 'req_requirement_line_pcba_bom', [
-        { fieldName: 'bom_cl_task_id', operator: 'EQ', value: setPid },
+        { fieldName: 'bom_cl_task_id', operator: 'EQ', value: taskPid },
         { fieldName: 'bom_cl_line_no', operator: 'EQ', value: 3 },
       ]);
       expect(invalidRows, 'the rejected missing-MPN row is not persisted').toHaveLength(0);
