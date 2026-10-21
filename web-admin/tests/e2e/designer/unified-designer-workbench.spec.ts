@@ -2599,7 +2599,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(componentRichTextLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('rich-text');
-    await expect(page.getByTestId('inspector-field-props.richTextToolbar')).toBeVisible();
+    await expect(await inspectorJsonField(page, 'props.richTextToolbar')).toBeVisible();
     await expect(page.getByTestId('inspector-field-props.pickerSource')).toHaveCount(0);
     await page.getByTestId('inspector-field-props.placeholder').fill(componentRichTextPlaceholder);
     await (await inspectorJsonField(page, 'props.richTextToolbar'))
@@ -2950,10 +2950,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_row_open').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
-    await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
+    await expect(await inspectorJsonField(page, 'props.visibleWhen')).toBeVisible();
     await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
+    await expect(await inspectorJsonField(page, 'props.disabledWhen')).toBeVisible();
     await (await inspectorJsonField(page, 'props.disabledWhen')).fill(JSON.stringify(disabledWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -3010,10 +3010,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
-    await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
+    await expect(await inspectorJsonField(page, 'props.visibleWhen')).toBeVisible();
     await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
+    await expect(await inspectorJsonField(page, 'props.disabledWhen')).toBeVisible();
     await (await inspectorJsonField(page, 'props.disabledWhen')).fill(JSON.stringify(disabledWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
