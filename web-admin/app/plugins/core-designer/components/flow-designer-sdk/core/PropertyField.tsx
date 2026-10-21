@@ -7,22 +7,24 @@
 import React, { useMemo } from 'react';
 import { useSmartText } from '~/utils/i18n';
 import { useFlowFieldAdapter } from '../adapters/FlowFieldAdapter';
-import { PropertyFieldRenderer } from '~/shared/designer';
-import type { PropertySchema as SharedPropertySchema } from '~/shared/designer';
+import { PropertyFieldRenderer, type PropertySchema as SharedPropertySchema } from '~/shared/designer';
 import type { PropertySchema } from '../nodes/types';
 
 export interface PropertyFieldProps {
   schema: PropertySchema;
   nodeId: string;
+  readOnly?: boolean;
 }
 
-export function PropertyField({ schema, nodeId }: PropertyFieldProps) {
+export function PropertyField({ schema, nodeId, readOnly }: PropertyFieldProps) {
   const st = useSmartText();
 
   const adapter = useFlowFieldAdapter({
     fieldKey: schema.key,
     nodeId,
     required: schema.required,
+    disabled: readOnly,
+    readOnly,
   });
 
   // Resolve I18nText labels to plain strings for the shared renderer.

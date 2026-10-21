@@ -179,11 +179,11 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
           <CustomEditor
             nodeId={selectedNode.id}
             config={selectedNode.data.config || {}}
-            onChange={(patch) => updateNodeConfig(selectedNode.id, patch)}
+            onChange={(patch) => { if (!readOnly) updateNodeConfig(selectedNode.id, patch); }}
             readOnly={readOnly}
           />
         ) : visibleSchema.length > 0 ? (
-          <GroupedFields schema={visibleSchema} nodeId={selectedNode.id} />
+          <GroupedFields schema={visibleSchema} nodeId={selectedNode.id} readOnly={readOnly} />
         ) : (
           <div className="py-4 text-center text-gray-500">
             {st('$i18n:flow.panel.noConfig') || 'No configuration options'}
@@ -208,7 +208,7 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
 }
 
 /** Render fields grouped by their `group` property */
-function GroupedFields({ schema, nodeId }: { schema: PropertySchema[]; nodeId: string }) {
+function GroupedFields({ schema, nodeId, readOnly }: { schema: PropertySchema[]; nodeId: string; readOnly?: boolean }) {
   const st = useSmartText();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(['advanced']),
@@ -230,7 +230,7 @@ function GroupedFields({ schema, nodeId }: { schema: PropertySchema[]; nodeId: s
     return (
       <div className="space-y-4">
         {schema.map((field) => (
-          <PropertyField key={field.key} schema={field} nodeId={nodeId} />
+          <PropertyField key={field.key} schema={field} nodeId={nodeId} readOnly={readOnly} />
         ))}
       </div>
     );
@@ -284,7 +284,7 @@ function GroupedFields({ schema, nodeId }: { schema: PropertySchema[]; nodeId: s
             {!isCollapsed && (
               <div className="space-y-4">
                 {fields.map((field) => (
-                  <PropertyField key={field.key} schema={field} nodeId={nodeId} />
+                  <PropertyField key={field.key} schema={field} nodeId={nodeId} readOnly={readOnly} />
                 ))}
               </div>
             )}

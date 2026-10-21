@@ -3171,3 +3171,17 @@ describe('RecursiveBlockRenderer', () => {
     );
   });
 });
+
+
+describe('localized repeating block titles', () => {
+  it.each(['repeater', 'subform'])('renders the edited current-language %s title', blockType => {
+    render(<RecursiveBlockRenderer schema={{ schemaVersion: 3, kind: 'form', id: 'localized_rows',
+      blocks: [{ id: 'localized_rows_root', blockType: 'form', blocks: [{
+        id: 'localized_rows_block', blockType, title: { en: 'Original title', 'zh-CN': 'Edited current-language title' },
+        props: { rows: [{}] }, blocks: [],
+      }] }],
+    }} />);
+    expect(screen.getByTestId(`runtime-${blockType}-localized_rows_block`)).toHaveTextContent('Edited current-language title');
+    expect(screen.getByTestId(`runtime-${blockType}-localized_rows_block`)).not.toHaveTextContent('Original title');
+  });
+});

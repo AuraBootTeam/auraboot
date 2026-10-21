@@ -88,6 +88,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Self-contained capability-eval runner for the digital-employee agent line. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
 | `provider-neutral-architecture-gate.sh` | 0 | 2026-07-31 | Fail closed when agent/runtime fixtures or goldens hard-code a model provider. |
+| `permission-sql-registrations.mjs` | 0 | 2026-10-20 | Resolve permission registrations from migration SQL for permission validation. |
 | `validate-permission-codes.mjs` | 2 | 2026-05-08 | Cross-source permission-code validator. |
 | `permission-sql-registrations.mjs` | 1 | 2026-10-21 | Extract permission codes from SQL registrations for contract validation. |
 | `validate-plugin-dashboards.mjs` | 1 | 2026-05-11 | Validates every plugins/<plugin>/config/dashboards/*.json against the Plan #8 |

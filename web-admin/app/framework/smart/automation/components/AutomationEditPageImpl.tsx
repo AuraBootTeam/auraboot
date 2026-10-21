@@ -6,6 +6,7 @@
 // Enterprise builds may overlay this file to provide advanced behaviors.
 
 import { useEffect, useState } from 'react';
+import { usePermissions } from '~/contexts/AuthContext';
 import { useParams, useNavigate, useSearchParams, useLoaderData } from 'react-router';
 import { AutomationEditor } from './AutomationEditor';
 import { useAutomationNodeStatuses } from './useAutomationNodeStatuses';
@@ -25,6 +26,7 @@ const TRIGGER_NODE_TYPE_BY_TRIGGER: Record<string, string> = {
   on_state_change: 'trigger-state-change',
   scheduled: 'trigger-scheduled',
   webhook: 'trigger-webhook',
+  external_event: 'trigger-external-event',
   on_workflow_event: 'trigger-workflow-event',
   on_inactivity: 'trigger-inactivity',
 };
@@ -203,6 +205,8 @@ export interface AutomationEditPageImplProps {
 }
 
 export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('automation.update');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -253,6 +257,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
     description?: string;
     flowData: FlowData;
   }) => {
+    if (!canManage) throw new Error('Automation is read only');
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
@@ -306,6 +311,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
 
   return (
     <AutomationEditor
+      readOnly={!canManage}
       automationId={isNew ? undefined : id}
       initialData={
         automation
@@ -317,7 +323,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
           : undefined
       }
       onSave={handleSave}
-      initialDebugMode={debugMode && !isNew}
+      initialDebugMode={debugMode && !isNew && canManage}
       nodeStatuses={nodeStatuses}
       testRunContext={testRunContext}
       testRunRecordPid={testRunRecordPid}

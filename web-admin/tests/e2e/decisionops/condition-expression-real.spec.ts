@@ -112,6 +112,12 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
   await page.locator('.ce-enum-values summary').click();
   await page.getByLabel('group-not-2', { exact: true }).check();
   await expect(page.getByTestId('cb-not-2')).toBeVisible();
+  await expect(page.locator('.ce-close-paren:visible')).toHaveCount(0);
+  await page.setViewportSize({width:1280,height:1000});
+  await expect(page.getByLabel('group-op-1', {exact:true})).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await shot(page, 'E04N-1280');
+  await page.setViewportSize({width:1440,height:1000});
   await shot(page, 'E03');
   const save = page.waitForResponse(
     (response) =>
@@ -217,9 +223,21 @@ test('E01–E11 metadata → nested DSL → persisted draft → authoritative ex
       data: { impactAcknowledged: true },
     }),
   );
+  let releaseCatalog!: () => void;
+  const catalogReady = new Promise<void>(resolve => { releaseCatalog = resolve; });
+  await page.route('**/api/decision/facts/catalog', async route => {
+    await catalogReady;
+    await route.continue();
+  });
   await page.reload();
   await page.getByTestId(`cfl-row-${code}`).click();
   await expect(page.getByTestId('cfl-open-edit')).toHaveCount(0);
+  await expect(page.getByTestId('cfl-open-version')).toBeDisabled();
+  await expect(page.getByTestId('cfl-catalog-state')).toContainText('正在加载模型与属性');
+  await shot(page, 'E09-metadata-loading');
+  releaseCatalog();
+  await expect(page.getByTestId('cfl-open-version')).toBeEnabled();
+  await page.unroute('**/api/decision/facts/catalog');
   await page.getByTestId('cfl-open-version').click();
   await page.getByLabel('value-0-0', { exact: true }).fill('120000');
   const nextVersion = page.waitForResponse(

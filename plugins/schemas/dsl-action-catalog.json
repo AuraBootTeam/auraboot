@@ -38,6 +38,7 @@
         "dataSourceId",
         "dataSourceIds",
         "download",
+        "expectedVersion",
         "feedback",
         "href",
         "id",

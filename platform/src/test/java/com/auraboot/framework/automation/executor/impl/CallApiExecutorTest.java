@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
@@ -37,6 +38,29 @@ class CallApiExecutorTest {
     void supports_other_returnsFalse() {
         assertThat(executor.supports("create_record")).isFalse();
         assertThat(executor.supports("send_notification")).isFalse();
+    }
+
+    @Test
+    void bodyTemplates_resolveNestedValuesBeforeJsonEncodingAndPreserveTypes() throws Exception {
+        Map<String, Object> context = Map.of("recordPid", "project-1", "trigger",
+                Map.of("amount", 128000, "confirmed", true, "note", "客户\"材料\n已核验"));
+        String json = executor.buildBodyJson(Map.of("projectPid", "${recordPid}",
+                "details", List.of(Map.of("amount", "${trigger.amount}", "confirmed", "${trigger.confirmed}",
+                        "note", "${trigger.note}"))), context);
+        var root = new ObjectMapper().readTree(json);
+        assertThat(root.path("projectPid").asText()).isEqualTo("project-1");
+        assertThat(root.path("details").get(0).path("amount").isNumber()).isTrue();
+        assertThat(root.path("details").get(0).path("amount").intValue()).isEqualTo(128000);
+        assertThat(root.path("details").get(0).path("confirmed").isBoolean()).isTrue();
+        assertThat(root.path("details").get(0).path("confirmed").booleanValue()).isTrue();
+        assertThat(root.path("details").get(0).path("note").asText()).isEqualTo("客户\"材料\n已核验");
+    }
+
+    @Test
+    void bodyTemplates_keepRawStringContractAndHandleNoBody() throws Exception {
+        assertThat(executor.buildBodyJson(null, Map.of())).isNull();
+        assertThat(executor.buildBodyJson("{\"amount\":${trigger.amount}}", Map.of("trigger", Map.of("amount", 128000))))
+                .isEqualTo("{\"amount\":128000}");
     }
 
     // =========================================================

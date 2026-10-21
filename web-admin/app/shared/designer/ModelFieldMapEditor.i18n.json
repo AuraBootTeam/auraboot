@@ -1,0 +1,40 @@
+{
+  "zh-CN": {
+    "selectModel": "请先选择目标模型",
+    "loading": "正在读取模型属性…",
+    "failed": "模型属性读取失败，请刷新后继续。",
+    "refresh": "刷新属性",
+    "empty": "当前模型没有可用属性",
+    "add": "添加字段",
+    "field": "目标属性",
+    "value": "写入值",
+    "choose": "请选择属性",
+    "remove": "移除字段",
+    "fixed": "固定值",
+    "expression": "表达式",
+    "complex": "结构化值",
+    "invalid": "现有字段映射不是有效对象，请先通过高级配置修正。",
+    "unknown": "原属性不在当前模型中",
+    "none": "选择要写入的业务属性，再填写固定值或引用表达式。",
+    "preview": "查看结构化值（只读）"
+  },
+  "en": {
+    "selectModel": "Select the target model first",
+    "loading": "Loading model fields…",
+    "failed": "Could not load model fields. Refresh to continue.",
+    "refresh": "Refresh fields",
+    "empty": "No fields are available for this model",
+    "add": "Add field",
+    "field": "Target field",
+    "value": "Value",
+    "choose": "Select a field",
+    "remove": "Remove field",
+    "fixed": "Fixed value",
+    "expression": "Expression",
+    "complex": "Structured value",
+    "invalid": "The existing field mapping is not a valid object. Correct it in advanced configuration.",
+    "unknown": "Original field is absent from this model",
+    "none": "Choose a business field, then enter a fixed value or an expression.",
+    "preview": "Inspect structured value (read only)"
+  }
+}

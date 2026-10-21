@@ -1,3 +1,4 @@
+import { completeListReadRequest } from './list/listReadRequest';
 import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { dictionaryData } from '~/shared/services/dict-adapter';
@@ -14,7 +15,8 @@ import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  createSearchParams,
+  useLocation,
+  useNavigationType,
   useSearchParams,
   type NavigateFunction,
   type NavigateOptions,
@@ -53,6 +55,7 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
 import { ListErrorState } from './list/ListErrorState';
+import { useSerializedSearchParamsUpdater } from './list/useSerializedSearchParamsUpdater';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
@@ -212,6 +215,8 @@ import {
   shouldSkipModelFieldMeta,
   resolveListMiscBlocksPosition,
 } from './list/listSchemaPolicy';
+
+export { useSerializedSearchParamsUpdater } from './list/useSerializedSearchParamsUpdater';
 
 export {
   getListFieldValueWithAlias,
@@ -414,42 +419,6 @@ export function useRestoreSavedViewFromUrl({
   }, [urlViewPid, savedViews, viewsLoading, selectView, setActiveViewType]);
 }
 
-type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
-
-/**
- * Serialize URL search-param writes made during the same React turn.
- *
- * React Router's functional `setSearchParams` form does not queue updates like
- * React state does. List state can change sorts, filters, pagination and the
- * selected SavedView together, so independently queued writers could otherwise
- * restore an older query string and drop a newly selected `view` parameter.
- */
-export function useSerializedSearchParamsUpdater(
-  searchParams: URLSearchParams,
-  setSearchParams: SearchParamsSetter,
-  writesEnabledRef?: { current: boolean },
-): SearchParamsSetter {
-  const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
-
-  useEffect(() => {
-    latestSearchParamsRef.current = new URLSearchParams(searchParams);
-  }, [searchParams]);
-
-  return useCallback<SearchParamsSetter>(
-    (nextInit, options) => {
-      if (writesEnabledRef?.current === false) return;
-      const resolvedInit =
-        typeof nextInit === 'function'
-          ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
-          : nextInit;
-      const next = createSearchParams(resolvedInit);
-      latestSearchParamsRef.current = new URLSearchParams(next);
-      setSearchParams(next, options);
-    },
-    [setSearchParams, writesEnabledRef],
-  );
-}
-
 export function applyLocalSortUpdate(
   previous: SortConfig[],
   update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[]),
@@ -548,11 +517,14 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Parse filter_* params from URL for drill-down navigation
   const [searchParams, routerSetSearchParams] = useSearchParams();
+  const listLocation = useLocation();
+  const listNavigationType = useNavigationType();
   const listUrlWritesEnabledRef = useRef(true);
   const setSearchParams = useSerializedSearchParamsUpdater(
     searchParams,
     routerSetSearchParams,
     listUrlWritesEnabledRef,
+    { key: listLocation.key, action: listNavigationType },
   );
   const listSchemaFieldNames = useMemo(() => collectListSchemaFieldNames(schema), [schema]);
   const listSchemaFieldNameSet = useMemo(
@@ -1748,20 +1720,6 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
           }
-
-          // Pass keyword search to backend (supported by DynamicController)
-          // Use ref to get latest value — avoids stale closure when Enter triggers
-          // in the same React cycle as the keyword state update
-          const currentKeyword = keywordRef.current;
-          if (currentKeyword.trim()) {
-            queryParams.keyword = currentKeyword.trim();
-          }
-
-          // When page uses namedQuery data source, pass queryCode to backend
-          if (namedQueryCode) {
-            queryParams.queryCode = namedQueryCode;
-          }
-
         }
 
         const fetchCurrentActorRequest = (request: ListApiReadRequest) => (
@@ -1771,7 +1729,12 @@ function ListPageContentInner(props: PageContentProps) {
             token: token || undefined,
           })
         );
-        const request = { endpoint, method, queryParams };
+        const request = completeListReadRequest({ endpoint, method, queryParams }, {
+          keyword: keywordRef.current,
+          queryCode: namedQueryCode,
+          apiDatasource: Boolean(isApiDatasource),
+          retry: Boolean(retryRequest),
+        });
         const result = isApiDatasource
           ? await readApiRequest(request, isLatestRequest, fetchCurrentActorRequest)
           : await fetchCurrentActorRequest(request);
@@ -4147,7 +4110,10 @@ function ListPageContentInner(props: PageContentProps) {
     if (existingPresetView) {
       selectView(existingPresetView.pid);
       setActiveViewType((existingPresetView.viewType as ViewType) || 'table');
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -4179,7 +4145,10 @@ function ListPageContentInner(props: PageContentProps) {
 
     try {
       const view = await createView(request);
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -4209,10 +4178,12 @@ function ListPageContentInner(props: PageContentProps) {
     clearFilterOverrides,
     createView,
     modelCode,
+    rememberSubmittedFilters,
     pageKey,
     savedViews,
     selectView,
     setSearchParams,
+    setFilters,
     showErrorToast,
     showSuccessToast,
     syncPresetToUrl,

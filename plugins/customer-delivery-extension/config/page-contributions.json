@@ -1,0 +1,82 @@
+[
+  {
+    "id": "customer-delivery-follow-up",
+    "targetPageKey": "tpm_project_detail",
+    "slotId": "delivery-follow-up",
+    "kind": "block",
+    "priority": 10,
+    "payload": {
+      "id": "cde_delivery_actions",
+      "blockType": "workbench-action-bar",
+      "title": {
+        "zh-CN": "客户交付协作",
+        "en": "Customer delivery collaboration"
+      },
+      "align": "start",
+      "actions": [
+        {
+          "code": "cde_register_follow_up",
+          "label": {
+            "zh-CN": "登记交付跟进",
+            "en": "Record delivery follow-up"
+          },
+          "permissionCode": "tpm.project.manage",
+          "variant": "primary",
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "tpm:update_project",
+              "operationType": "UPDATE",
+              "targetRecordPid": "${form.pid}",
+              "inputFields": [
+                {
+                  "field": "tpm_pj_next_action",
+                  "type": "textarea",
+                  "required": true,
+                  "label": {
+                    "zh-CN": "下一步行动",
+                    "en": "Next action"
+                  },
+                  "placeholder": {
+                    "zh-CN": "写清负责人、完成时间和行动内容",
+                    "en": "Specify owner, due date and action"
+                  }
+                }
+              ],
+              "inputFieldsTitle": {
+                "zh-CN": "登记交付跟进",
+                "en": "Record delivery follow-up"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "保存跟进",
+                "en": "Save follow-up"
+              },
+              "reload": [],
+              "feedback": {
+                "successMessage": {
+                  "zh-CN": "交付跟进已保存，可重新打开项目核对。",
+                  "en": "Delivery follow-up saved. Reopen the project to verify."
+                }
+              },
+              "expectedVersion": "${form.row_version}"
+            }
+          }
+        },
+        {
+          "code": "cde_open_workspace",
+          "label": {
+            "zh-CN": "打开客户交付工作台",
+            "en": "Open delivery workspace"
+          },
+          "permissionCode": "tpm.project.read",
+          "onClick": {
+            "action": "navigate",
+            "args": {
+              "path": "/p/c/cde_delivery_workspace"
+            }
+          }
+        }
+      ]
+    }
+  }
+]
