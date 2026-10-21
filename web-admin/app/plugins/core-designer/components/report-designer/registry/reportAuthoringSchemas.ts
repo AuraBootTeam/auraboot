@@ -140,7 +140,9 @@ export function reportAuthoringSchemas(
     'cross-tab': [
       title,
       source,
+      field('rowLabel', '行标题', 'Row label', 'text'),
       field('rowField', '行维度', 'Row field', 'text', { required: true }),
+      field('columnLabel', '列标题', 'Column label', 'text'),
       field('columnField', '列维度', 'Column field', 'text', { required: true }),
       field('valueField', '数值字段', 'Value field', 'text', { required: true }),
       agg,

@@ -48,7 +48,9 @@ export interface ReportPrintBlock extends ReportChartBlock {
   groupByField?: string;
   /** cross-tab pivot axes */
   rowField?: string;
+  rowLabel?: string;
   columnField?: string;
+  columnLabel?: string;
   totalLabel?: string;
   showRowTotal?: boolean;
   showColumnTotal?: boolean;
@@ -232,8 +234,8 @@ function renderCrossTab(block: ReportPrintBlock, dataSets: PrintDataSets): strin
     aggregateNumbers(cells.get(`${rk} ${ck}`) ?? [], aggregation);
 
   const axisLabel = (field: string) => cols.find((c) => c.field === field)?.label;
-  const rowAxisLabel = axisLabel(rowField);
-  const columnAxisLabel = axisLabel(columnField);
+  const rowAxisLabel = block.rowLabel || axisLabel(rowField);
+  const columnAxisLabel = block.columnLabel || axisLabel(columnField);
   const cornerLabel =
     rowAxisLabel && columnAxisLabel
       ? `${rowAxisLabel} \\ ${columnAxisLabel}`

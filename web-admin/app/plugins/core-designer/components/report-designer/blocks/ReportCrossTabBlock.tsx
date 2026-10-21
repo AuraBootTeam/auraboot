@@ -93,7 +93,7 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
           <thead>
             <tr>
               <th className="border border-gray-300 bg-gray-200 px-2 py-1 text-left">
-                {block.rowField} \ {block.columnField}
+                {block.rowLabel || block.rowField} \ {block.columnLabel || block.columnField}
               </th>
               <th className="border border-gray-300 bg-blue-50 px-2 py-1">
                 {text({ zh: '列 A', en: 'Col A' })}
@@ -198,7 +198,7 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
         <thead>
           <tr>
             <th className="border border-gray-300 bg-gray-200 px-3 py-2 text-left">
-              {block.rowField} \ {block.columnField}
+              {block.rowLabel || block.rowField} \ {block.columnLabel || block.columnField}
             </th>
             {colKeys.map((ck) => (
               <th key={ck} className="border border-gray-300 bg-blue-50 px-3 py-2 text-right">

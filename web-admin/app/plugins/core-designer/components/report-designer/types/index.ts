@@ -168,7 +168,9 @@ export interface CrossTabBlock {
   title?: string;
   dataSource: string;
   rowField: string;
+  rowLabel?: string;
   columnField: string;
+  columnLabel?: string;
   valueField: string;
   aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
   format?: string;

@@ -199,7 +199,7 @@ export function DesignerWorkspace({
         <div
           className={cn(
             isCompact
-              ? 'absolute inset-y-0 left-0 z-40 w-64 max-w-full shadow-2xl'
+              ? 'absolute inset-y-0 left-0 z-40 flex w-64 max-w-full bg-white pt-12 shadow-2xl'
               : 'relative z-20 flex shrink-0',
             !paletteVisible && 'hidden',
           )}
@@ -231,7 +231,7 @@ export function DesignerWorkspace({
       <div
         className={cn(
           inspectorOverlay
-            ? 'absolute inset-y-0 right-0 z-40 max-w-full shadow-2xl'
+            ? 'absolute inset-y-0 right-0 z-40 flex max-w-full bg-white pt-12 shadow-2xl'
             : 'relative z-20 flex shrink-0',
           !inspectorVisible && 'hidden',
         )}
