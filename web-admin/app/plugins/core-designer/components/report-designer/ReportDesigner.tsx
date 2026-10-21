@@ -437,7 +437,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     const historical = versioning.viewingSnapshot?.dsl as ReportDsl | undefined;
     const normalizedHistorical = historical ? ensurePageConfig(historical) : undefined;
     return (
-      <div className="flex h-screen flex-col bg-gray-50" data-testid="report-version-preview">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50" data-testid="report-version-preview">
         <div className="border-b border-amber-200 bg-amber-50 p-4 pr-80">
           <h2 className="font-semibold">{historical?.title}</h2>
           <p className="mt-1 text-sm">
@@ -477,7 +477,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   // Preview mode: render as runtime
   if (viewing && report) {
     return (
-      <div className="flex h-screen flex-col bg-gray-50">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
         <ReportToolbar
           readOnly={!canManage}
           exportAllowed={canExport}
@@ -501,7 +501,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
       <ReportToolbar
         readOnly={!canManage}
         exportAllowed={canExport}
@@ -516,7 +516,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         versionCount={versioning.versions.length}
       />
       <ReportTemplateActions disabled={!canManage || isSaving || isLoading} />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <BlockPalette />
         <ReportCanvas />
         <BlockPropertyPanel />

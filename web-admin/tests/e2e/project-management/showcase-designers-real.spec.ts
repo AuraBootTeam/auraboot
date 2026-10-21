@@ -285,6 +285,17 @@ test('SC10 report template → reviewed text edit → save/reload → three real
     ),
   );
   await expect(page.getByTestId('report-template-imported')).toBeVisible();
+  const paper = page.getByTestId('report-paper');
+  await expect.poll(async () => Number(await paper.getAttribute('data-scale'))).toBeLessThan(1);
+  const fitBox = await paper.boundingBox();
+  expect(fitBox).toBeTruthy();
+  await shot(page, 'DS04-paper-fit');
+  await page.getByTestId('report-canvas-actual').click();
+  await expect(paper).toHaveAttribute('data-scale','1');
+  await expect.poll(async () => (await paper.boundingBox())!.width).toBeCloseTo(891,0);
+  await shot(page, 'DS04-paper-actual');
+  await page.getByTestId('report-canvas-fit').click();
+  await expect.poll(async () => (await paper.boundingBox())!.width).toBeCloseTo(fitBox!.width,0);
   const blocks = page.getByTestId('report-canvas').locator('[data-testid^="drag-handle-"]');
   const originalOrder = await blocks.evaluateAll((elements) =>
     elements.map((el) => el.getAttribute('data-testid')),
@@ -384,6 +395,7 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   const persisted = await data(await page.request.get(`/api/report-definitions/${saved.pid}`));
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').content).toBe(note);
   expect(persisted.dsl.dataSources).toEqual(template.dsl.dataSources);
+  expect(persisted.dsl.page).toEqual(template.dsl.page);
   expect(persisted.dsl.body.find((b: any) => b.id === 'summary').title).toBe('当前交付经营摘要');
   expect(
     persisted.dsl.body.slice(0, movedOrder.length).map((b: any) => `drag-handle-${b.id}`),

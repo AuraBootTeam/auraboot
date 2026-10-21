@@ -349,7 +349,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
       {/* Toolbar */}
       <DesignerToolbar
         onSave={handleSave}
@@ -363,7 +363,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
       />
 
       {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {/* Widget palette */}
         <WidgetPalette onWidgetClick={handleWidgetClick} />
 
