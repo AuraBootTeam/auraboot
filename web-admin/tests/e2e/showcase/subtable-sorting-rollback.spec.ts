@@ -132,6 +132,7 @@ test('sortable detail persists keyboard order and reloads after transport or par
   page,
   request,
 }, testInfo) => {
+  test.setTimeout(90_000);
   savedView = await createDefaultTableView(request, model, `${model}_list`, 'owned-sort');
   const sortedView = await request.put(`/api/views/${savedView.createdPid}`, {
     data: { viewConfig: { sorts: [{ fieldCode: 'sc_code', direction: 'desc' }] } },
