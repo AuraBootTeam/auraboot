@@ -296,3 +296,32 @@ describe('PageSchema V3 repository', () => {
     );
   });
 });
+
+
+describe('page model binding persistence', () => {
+  it.each(['list', 'form', 'detail'] as const)('saves the edited %s root model as page metadata before reload', async kind => {
+    const document: PageSchemaV3 = {
+      schemaVersion: 3, kind, id: 'binding_page', pageKey: 'binding_page',
+      modelCode: 'previous_model', blocks: [{
+        id: 'binding_root', blockType: kind, dataSource: { model: 'selected_model' },
+        blocks: [{ id: 'separator', blockType: 'divider' }],
+      }],
+    };
+    let stored: any = { pid: 'binding_pid', name: 'binding_page', modelCode: 'previous_model' };
+    const api = {
+      getPageByPid: vi.fn(async () => ({ code: '0', data: stored })),
+      getPageByPageKey: vi.fn(), createPage: vi.fn(),
+      updatePage: vi.fn(async (_pid, request) => {
+        stored = { ...stored, ...request };
+        return { code: '0', data: stored };
+      }),
+    };
+    const result = await savePageSchemaV3({ document, source: { type: 'page', pid: 'binding_pid' }, api });
+    expect(result.ok).toBe(true);
+    expect(stored.modelCode).toBe('selected_model');
+    const loaded = await loadPageSchemaV3({ pageId: 'binding_pid', api });
+    expect(loaded.document.modelCode).toBe('selected_model');
+    expect(loaded.document.blocks[0].dataSource).toMatchObject({ model: 'selected_model' });
+    expect(document.modelCode).toBe('previous_model');
+  });
+});
