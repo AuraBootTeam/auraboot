@@ -1,4 +1,5 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('~/shared/services/savedViewService', () => ({
@@ -212,6 +213,76 @@ describe('useSavedViews', () => {
 
     expect(result.current.currentView?.pid).toBe('tree1');
     expect(result.current.currentView?.viewType).toBe('tree');
+  });
+
+  it('does not reselect a personal view when an in-flight reload finishes after selecting the default', async () => {
+    const personal = makeView({
+      pid: 'saved-week',
+      viewConfig: {
+        filters: [{ fieldCode: 'updated_at', operator: 'between', value: ['2026-10-15', '2026-10-22'] }],
+      },
+    });
+    let resolveReload!: (views: SavedView[]) => void;
+    const pendingViews = new Promise<SavedView[]>((resolve) => { resolveReload = resolve; });
+    mockService.getAccessibleViews
+      .mockResolvedValue([personal])
+      .mockResolvedValueOnce([personal])
+      .mockReturnValueOnce(pendingViews);
+    mockService.getDefaultView.mockResolvedValue(null);
+
+    const { result } = renderHook(() => useSavedViews({ modelCode: 'order', pageKey: 'orders' }));
+    await waitFor(() => expect(result.current.currentView?.pid).toBe(personal.pid));
+
+    let reload!: Promise<void>;
+    act(() => { reload = result.current.reload(); });
+    act(() => result.current.selectDefaultView());
+    expect(result.current.currentView).toBeNull();
+
+    await act(async () => {
+      resolveReload([personal]);
+      await reload;
+    });
+
+    expect(result.current.accessibleViews).toEqual([personal]);
+    expect(result.current.currentView).toBeNull();
+  });
+
+  it('does not auto-select a personal view when the first load finishes after an explicit default selection', async () => {
+    const personal = makeView({ pid: 'saved-week' });
+    let resolveViews!: (views: SavedView[]) => void;
+    mockService.getAccessibleViews.mockReturnValue(new Promise<SavedView[]>((resolve) => {
+      resolveViews = resolve;
+    }));
+    mockService.getDefaultView.mockResolvedValue(null);
+    const { result } = renderHook(() => useSavedViews({ modelCode: 'order', pageKey: 'orders' }));
+
+    act(() => result.current.selectDefaultView());
+    await act(async () => { resolveViews([personal]); });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.accessibleViews).toEqual([personal]);
+    expect(result.current.currentView).toBeNull();
+  });
+
+  it('keeps the default selection when the second StrictMode initial load completes late', async () => {
+    const personal = makeView({ pid: 'saved-week' });
+    let resolveSecondLoad!: (views: SavedView[]) => void;
+    mockService.getAccessibleViews
+      .mockResolvedValueOnce([personal])
+      .mockReturnValueOnce(new Promise<SavedView[]>((resolve) => { resolveSecondLoad = resolve; }));
+    mockService.getDefaultView.mockResolvedValue(null);
+    const { result } = renderHook(() => useSavedViews({ modelCode: 'order', pageKey: 'orders' }), {
+      wrapper: StrictMode,
+    });
+    await waitFor(() => expect(result.current.currentView?.pid).toBe(personal.pid));
+    expect(mockService.getAccessibleViews).toHaveBeenCalledTimes(2);
+
+    act(() => result.current.selectDefaultView());
+    expect(result.current.currentView).toBeNull();
+    await act(async () => { resolveSecondLoad([personal]); });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.currentView).toBeNull();
   });
 
   it('selectView does nothing for unknown pid', async () => {
