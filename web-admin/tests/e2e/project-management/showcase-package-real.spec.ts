@@ -64,7 +64,9 @@ async function restoredBusiness(page: Page, readonly: boolean) {
     await navigateToMenuByClick(page,['项目交付','交付验收']);
     await page.getByRole('row').filter({hasText:expected.sla.acceptanceName}).getByRole('button',{name:/查看|详情/}).click();
     await expect(page).toHaveURL(url=>url.pathname==='/p/tpm_acceptance/view/'+expected.sla.acceptancePid);
-    await expect(page.getByTestId('bpm-sla-summary')).toContainText('超时后完成');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('超时办结');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已停止计时');
+    await expect(page.getByTestId('bpm-sla-summary')).toContainText('已触发 2 次');
     const sla=await get('/api/bpm/monitor/sla-records/'+expected.sla.pid);
     for(const [key,value] of Object.entries(expected.sla.fields))expect(sla[key],key).toEqual(value);
   }
