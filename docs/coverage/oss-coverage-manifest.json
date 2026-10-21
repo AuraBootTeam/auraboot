@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "14e3856b8",
+    "commit": "efbc86f9d",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -5259,6 +5259,7 @@
           "evidence": [
             "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
             "web-admin/tests/e2e/automation/automation-golden.spec.ts",
+            "web-admin/tests/e2e/block-renderer/block-types.spec.ts",
             "web-admin/tests/e2e/cross-field-validation.spec.ts",
             "web-admin/tests/e2e/realtime-data-push.spec.ts"
           ],
@@ -5422,6 +5423,7 @@
             "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
             "web-admin/tests/e2e/mobile-seed/cross-platform-seed.spec.ts",
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/platform/list-query-config.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/saved-view/quick-filter-team-pin-golden.spec.ts",
             "web-admin/tests/e2e/saved-view/quick-filter-user-pin-golden.spec.ts",

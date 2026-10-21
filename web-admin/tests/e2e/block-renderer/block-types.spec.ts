@@ -23,7 +23,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, ensureFilterFormOpen, waitForFormReady } from '../helpers';
+import { uniqueId, ensureFilterFormOpen, waitForFormReady, executeCommandViaApi } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { DynamicListPage, DynamicFormPage } from '../../pages';
@@ -61,6 +61,11 @@ async function navigateToNewOrderForm(page: import('@playwright/test').Page) {
 
 test.describe('Block Renderer — Block Type Tests', () => {
   let orderPid: string;
+  const filterUid = uniqueId('bk_range');
+  const filterPageKey = `bk_filters_${filterUid}`;
+  const rangeTitle = `Owned range ${filterUid}`;
+  let rangeOrderPid = '';
+  let filterViewPid = '';
   const itemName = `Block Test Widget ${uniqueId()}`;
 
   test.beforeAll(async ({ browser }) => {
@@ -68,6 +73,49 @@ test.describe('Block Renderer — Block Type Tests', () => {
     const page = await context.newPage();
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     orderPid = await order.createViaApi({ e2et_order_title: `BlockTest ${uniqueId()}` });
+    const datedOrder = async (title: string, date: string) => {
+      const result = await executeCommandViaApi(page, 'e2eto:create_e2et_order', {
+        e2et_order_title: title, e2et_order_type: 'normal', e2et_order_date: date,
+        e2et_delivery_date: new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10),
+      });
+      expect(result.code).toBe('0');
+      expect(result.recordId).toBeTruthy();
+      return result.recordId;
+    };
+    rangeOrderPid = await datedOrder(`${rangeTitle} included`, '2026-04-15');
+    await datedOrder(`${rangeTitle} excluded`, '2025-04-15');
+    expect((await order.fetchViaApi(rangeOrderPid)).e2et_order_date).toContain('2026-04-15');
+    const filterPage = await page.request.post('/api/pages', { data: {
+      name: filterPageKey, pageKey: filterPageKey, title: 'Owned order filters', kind: 'list',
+      modelCode: 'e2et_order', schemaVersion: 4,
+      blocks: [
+        { id: 'owned_filters', blockType: 'filters', fields: [
+          { field: 'e2et_order_title', label: 'Title', component: 'SmartInput', layout: { colSpan: 4 } },
+          { field: 'e2et_order_no', label: 'Number', component: 'SmartInput', layout: { colSpan: 4 } },
+          { field: 'e2et_order_amount', label: 'Amount', component: 'SmartInput', layout: { colSpan: 4 } },
+          { field: 'e2et_order_type', label: 'Type', component: 'SmartInput', layout: { colSpan: 4 } },
+          { field: 'e2et_order_date', label: 'Order date range', component: 'DateRange', layout: { colSpan: 4 } },
+        ] },
+        { id: 'owned_table', blockType: 'table', columns: [
+          { field: 'e2et_order_title', label: 'Title' }, { field: 'e2et_order_date', label: 'Date' },
+        ], dataSource: 'tableData' },
+      ],
+    } });
+    expect(filterPage.ok()).toBe(true);
+    const filterPageBody = await filterPage.json();
+    expect(String(filterPageBody.code)).toBe('0');
+    const published = await page.request.post(`/api/pages/${filterPageBody.data.pid}/publish`);
+    expect(published.ok()).toBe(true);
+    expect((await published.json()).data.status).toBe('published');
+    const view = await page.request.post('/api/views', { data: {
+      name: `Owned filters ${filterUid}`, modelCode: 'e2et_order', pageKey: filterPageKey,
+      viewType: 'table', scope: 'personal', isDefault: false, config: {},
+    } });
+    expect(view.ok()).toBe(true);
+    const viewBody = await view.json();
+    expect(String(viewBody.code)).toBe('0');
+    expect(viewBody.data.pid).toBeTruthy();
+    filterViewPid = viewBody.data.pid;
     // Create an item for sub-table tests
     await order.child('item').createForParent(orderPid, {
       e2et_item_name: itemName,
@@ -500,91 +548,57 @@ test.describe('Block Renderer — Block Type Tests', () => {
   // BK-013: filters search expand/collapse
   // -------------------------------------------------------------------------
 
-  test('BK-013: filters block should support search expand and collapse @smoke', async ({
-    page,
-  }) => {
-    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
-
-    // Open the filter form (hidden by default after list refactor)
+  test('BK-013: filters block should support search expand and collapse @smoke', async ({ page }, testInfo) => {
+    await page.goto(`/p/c/${filterPageKey}?view=${encodeURIComponent(filterViewPid)}`);
+    await expect(page.getByRole('table')).toBeVisible();
     await ensureFilterFormOpen(page);
-    const filterForm = page.locator('[data-testid="filters"], form').first();
-    const hasFilterForm = await filterForm.isVisible({ timeout: 8000 }).catch(() => false);
-
-    if (!hasFilterForm) {
-      test.skip(true, 'Filter form not rendered — model has no searchFields configured');
-      return;
-    }
-
-    // Verify search and reset buttons exist
-    await expect(listPage.searchButton).toBeVisible({ timeout: 5000 });
-    await expect(listPage.resetButton).toBeVisible({ timeout: 5000 });
-
-    // Look for expand/collapse toggle for advanced filters
-    const expandToggle = page
-      .locator(
-        '[data-testid="filter-expand"], [data-testid="filter-toggle"], button:has-text("展开"), button:has-text("收起"), button:has-text("Expand"), button:has-text("Collapse")',
-      )
-      .first();
-
-    const hasExpand = await expandToggle.isVisible({ timeout: 3000 }).catch(() => false);
-    if (hasExpand) {
-      // Click to toggle expand/collapse
-      await expandToggle.click();
-      // Verify state changed (more/fewer filter fields visible)
-      const filterInputs = filterForm.locator('input, select');
-      const inputCount = await filterInputs.count();
-      expect(inputCount).toBeGreaterThan(0);
-    }
+    const filters = page.getByTestId('search-area');
+    await expect(filters).toBeVisible();
+    await expect(page.getByTestId('filter-search')).toBeVisible();
+    await expect(page.getByTestId('filter-reset')).toBeVisible();
+    const grid = filters.locator(':scope > div').first();
+    const toggle = page.getByTestId('filter-toggle');
+    await expect(toggle).toBeVisible();
+    const collapsed = (await grid.boundingBox())!.height;
+    expect(collapsed).toBeLessThanOrEqual(72);
+    await toggle.click();
+    await expect.poll(async () => (await grid.boundingBox())!.height).toBeGreaterThan(collapsed);
+    await expect(filters.getByTestId('daterange-e2et_order_date-start')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('BK-013-expanded.png') });
+    await toggle.click();
+    await expect.poll(async () => (await grid.boundingBox())!.height).toBeLessThanOrEqual(72);
+    await page.screenshot({ path: testInfo.outputPath('BK-013-collapsed.png') });
   });
 
   // -------------------------------------------------------------------------
   // BK-014: filters date range component
   // -------------------------------------------------------------------------
 
-  test('BK-014: filters should support date range selection', async ({ page }) => {
-    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
-    await order.gotoList();
-
+  test('BK-014: filters should support date range selection', async ({ page }, testInfo) => {
+    await page.goto(`/p/c/${filterPageKey}?view=${encodeURIComponent(filterViewPid)}`);
+    await expect(page.getByRole('table')).toBeVisible();
     await ensureFilterFormOpen(page);
-    const filterForm2 = page.locator('[data-testid="filters"], form').first();
-    const hasFilterForm2 = await filterForm2.isVisible({ timeout: 8000 }).catch(() => false);
-
-    if (!hasFilterForm2) {
-      test.skip(true, 'Filter form not rendered — model has no searchFields configured');
-      return;
-    }
-
-    // Look for date input fields in filter area
-    const dateInputs = filterForm2.locator(
-      'input[type="date"], input[placeholder*="date" i], input[placeholder*="日期"]',
-    );
-    const dateCount = await dateInputs.count();
-
-    if (dateCount === 0) {
-      test.info().annotations.push({
-        type: 'note',
-        description:
-          'No date range filter found in search area — date field may not be in searchFields',
-      });
-      return;
-    }
-
-    // Fill the first date input with today's date
-    const todayStr = new Date().toISOString().slice(0, 10);
-    await dateInputs.first().fill(todayStr);
-
-    // Click search to apply filter
-    await listPage.searchButton.click();
-
-    // Wait for filtered results
-    await page
-      .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 10000 })
-      .catch(() => null);
-
-    // Table should still be visible after date filter
-    await expect(page.locator('table').first()).toBeVisible({ timeout: 5000 });
+    await page.getByTestId('filter-toggle').click();
+    const filters = page.getByTestId('search-area');
+    await filters.locator('input[name="e2et_order_title"]').fill(rangeTitle);
+    await filters.getByTestId('daterange-e2et_order_date-start').fill('2026-04-01');
+    await filters.getByTestId('daterange-e2et_order_date-end').fill('2026-04-30');
+    const loaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/dynamic/e2et_order/list'
+      && response.request().method() === 'GET' && new URL(response.url()).searchParams.get('filters')?.includes('2026-04-30') === true);
+    await page.getByTestId('filter-search').click();
+    const response = await loaded;
+    expect(response.ok()).toBe(true);
+    const conditions = JSON.parse(new URL(response.url()).searchParams.get('filters')!);
+    expect(conditions).toEqual(expect.arrayContaining([
+      { fieldName: 'e2et_order_date', operator: 'gte', value: '2026-04-01' },
+      { fieldName: 'e2et_order_date', operator: 'lte', value: '2026-04-30' },
+    ]));
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    expect(body.data.records.map((record: { pid: string }) => record.pid)).toEqual([rangeOrderPid]);
+    await expect(page.getByRole('cell', { name: `${rangeTitle} included`, exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: `${rangeTitle} excluded`, exact: true })).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('BK-014-owned-range-result.png') });
   });
 
   // -------------------------------------------------------------------------

@@ -17,6 +17,8 @@
 
 import { test, expect, type Page } from '../../fixtures/index';
 import { uniqueId, navigateToDynamicPage, waitForDynamicPageLoad } from '../helpers/index';
+import { ModelTestHelper } from '../../helpers/model-test-helper';
+import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 
 // Each test gets a fresh page — no serial dependency
 
@@ -149,35 +151,45 @@ test.describe('List Query Dynamic Configuration', () => {
   // =========================================================================
   // B1.3 — Dict Color Tags
   // =========================================================================
-  test('dict fields render colored tags (not all blue)', async ({ page }) => {
-    await navigateToDynamicPage(page, testPageKey);
+  test('dict fields render colored tags (not all blue)', async ({ page }, testInfo) => {
+    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const prefix = uniqueId('dict_tones');
+    const draft = await order.createViaApi({ e2et_order_title: `${prefix} draft` });
+    const approved = await order.createViaApi({ e2et_order_title: `${prefix} approved` });
+    await order.child('item').createForParent(approved, { e2et_item_name: `${prefix} item`, e2et_item_qty: 1, e2et_item_price: 10 });
+    await order.transitionViaApi(approved, ['submit', 'approve']);
+    expect((await order.fetchViaApi(draft)).e2et_order_status).toBe('draft');
+    expect((await order.fetchViaApi(approved)).e2et_order_status).toBe('approved');
+    const viewResponse = await page.request.post('/api/views', { data: {
+      name: `Owned dict tones ${prefix}`, modelCode: 'e2et_order', pageKey: 'e2et_order_list',
+      viewType: 'table', scope: 'personal', isDefault: false, config: {},
+    } });
+    expect(viewResponse.ok()).toBe(true);
+    const viewBody = await viewResponse.json();
+    expect(String(viewBody.code)).toBe('0');
+    expect(viewBody.data.pid).toBeTruthy();
+    await navigateToDynamicPage(page, testPageKey, { viewPid: viewBody.data.pid });
     await waitForDynamicPageLoad(page);
-
-    // Find all tag-style spans in the table
-    const tags = page.locator('tbody span[class*="rounded-full"][class*="bg-"]');
-    const tagCount = await tags.count();
-
-    if (tagCount === 0) {
-      // No dict tags on this page — skip but don't fail
-      test.skip(tagCount === 0, 'No dict tag fields on this list page');
-      return;
-    }
-
-    // Collect all unique background color classes
-    const colorClasses = new Set<string>();
-    for (let i = 0; i < Math.min(tagCount, 20); i++) {
-      const cls = (await tags.nth(i).getAttribute('class')) || '';
-      const bgMatch = cls.match(/bg-(\w+)-100/);
-      if (bgMatch) colorClasses.add(bgMatch[1]);
-    }
-
-    // With extension.color configured, we should see multiple colors (not all blue)
-    // e2et_order has: draft=gray, confirmed=green, shipped=green
-    expect(tagCount).toBeGreaterThan(0);
-    expect(colorClasses.size).toBeGreaterThanOrEqual(1);
-    // At least one non-blue color should be present (gray or green from seeded data)
-    const hasNonBlue = [...colorClasses].some((c) => c !== 'blue');
-    expect(hasNonBlue).toBe(true);
+    const loaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/dynamic/e2et_order/list'
+      && new URL(response.url()).searchParams.get('keyword') === prefix);
+    await page.getByTestId('list-search-input').fill(prefix);
+    await page.getByTestId('list-search-input').press('Enter');
+    const response = await loaded;
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    expect(body.data.records.map((record: { pid: string }) => record.pid).sort()).toEqual([draft, approved].sort());
+    const draftRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: `${prefix} draft`, exact: true }) });
+    const approvedRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: `${prefix} approved`, exact: true }) });
+    const draftDot = draftRow.locator('span.bg-status-gray[aria-hidden="true"]');
+    const approvedDot = approvedRow.locator('span.bg-status-green[aria-hidden="true"]');
+    await expect(draftDot).toHaveCount(1);
+    await expect(approvedDot).toHaveCount(1);
+    await expect(draftDot).toBeVisible();
+    await expect(approvedDot).toBeVisible();
+    expect(await draftDot.evaluate(element => getComputedStyle(element).backgroundColor))
+      .not.toBe(await approvedDot.evaluate(element => getComputedStyle(element).backgroundColor));
+    await page.screenshot({ path: testInfo.outputPath('dict-owned-distinct-status-tones.png') });
   });
 
   // =========================================================================

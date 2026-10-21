@@ -102,3 +102,37 @@ describe('stored passthrough property locations', () => {
     expect(serializePageTreeToFlat(loaded.tree).blocks).toEqual([original]);
   });
 });
+
+
+describe('stored passthrough structural configuration', () => {
+  it.each([
+    { blockType: 'embedded-list', columns: [{ field: 'status', label: 'Status' }] },
+    { blockType: 'workbench-action-bar', actions: [{ code: 'approve', label: 'Approve' }] },
+    { blockType: 'candidate-list', selection: { mode: 'single', valueField: 'pid' } },
+  ])('retains $blockType configuration through two loads and saves', fixture => {
+    const original = { id: 'configured', span: 12, ...fixture } as LegacyDslBlockV2;
+    const first = load(original);
+    expect(first.block).toMatchObject(fixture);
+    const flat = serializePageTreeToFlat(first.tree);
+    expect(flat.blocks).toEqual([original]);
+    const second = load(flat.blocks[0]);
+    expect(second.block).toMatchObject(fixture);
+    expect(serializePageTreeToFlat(second.tree).blocks).toEqual([original]);
+  });
+});
+
+
+describe('stored repeating field identity', () => {
+  it.each(['repeater', 'subform'])('keeps the nested %s field key across stored-page reloads', blockType => {
+    const original: LegacyDslBlockV2 = {
+      id: 'owned_rows', blockType, props: { rows: [{ sku: 'Initial SKU' }] },
+      blocks: [{ id: 'field_sku', blockType: 'field', field: 'sku', props: { label: 'SKU', component: 'input' } }],
+    };
+    const first = load(original);
+    expect(first.block.blocks?.[0].field).toBe('sku');
+    expect(first.block.blocks?.[0].props).toEqual({ label: 'SKU', component: 'input' });
+    expect(serializePageTreeToFlat(first.tree).blocks).toEqual([original]);
+    const second = load(serializePageTreeToFlat(first.tree).blocks[0]);
+    expect(second.block.blocks?.[0].field).toBe('sku');
+  });
+});
