@@ -114,6 +114,10 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
   const [error, setError] = useState<Error | null>(null);
   const mountedRef = useRef(true);
   const selectedViewPidRef = useRef<string | null>(null);
+  // A null PID can be an explicit choice, rather than an initial load awaiting selection.
+  const defaultSelectionRef = useRef<
+    Pick<UseSavedViewsOptions, 'modelCode' | 'pageKey' | 'scopeFilter'> | null
+  >(null);
 
   /**
    * Load all accessible views and default view
@@ -158,9 +162,18 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       // of silently falling back to the implicit table view.
       const selectedDefaultStillApplies =
         scopedDefaultView != null && selectedViewPidRef.current === scopedDefaultView.pid;
-      const nextView = selectedDefaultStillApplies
+      let nextView: SavedView | null = selectedDefaultStillApplies
         ? scopedDefaultView
         : (preservedView ?? scopedDefaultView ?? scopedViews[0] ?? defaultView ?? null);
+      const defaultSelection = defaultSelectionRef.current;
+      if (
+        defaultSelection &&
+        defaultSelection.modelCode === modelCode &&
+        defaultSelection.pageKey === pageKey &&
+        defaultSelection.scopeFilter === scopeFilter
+      ) {
+        nextView = scopedViews.find((view) => view.isImplicit === true) ?? null;
+      }
       selectedViewPidRef.current = nextView?.pid ?? null;
       setCurrentView(nextView);
     } catch (err) {
@@ -181,6 +194,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     (pid: string) => {
       const view = accessibleViews.find((v) => v.pid === pid);
       if (view) {
+        defaultSelectionRef.current = null;
         selectedViewPidRef.current = view.pid;
         setCurrentView(view);
       }
@@ -190,9 +204,10 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
   const selectDefaultView = useCallback(() => {
     const implicitDefaultView = views.find((view) => view.isImplicit === true) ?? null;
+    defaultSelectionRef.current = { modelCode, pageKey, scopeFilter };
     selectedViewPidRef.current = implicitDefaultView?.pid ?? null;
     setCurrentView(implicitDefaultView);
-  }, [views]);
+  }, [modelCode, pageKey, scopeFilter, views]);
 
   const upsertView = useCallback(
     (view: SavedView) => {
@@ -221,6 +236,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
         next[existingIndex] = view;
         return next;
       });
+      defaultSelectionRef.current = null;
       selectedViewPidRef.current = view.pid;
       setCurrentView(view);
     },
@@ -236,6 +252,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     if (mountedRef.current) {
       setAccessibleViews((prev) => [...prev, newView]);
       setViews((prev) => [...prev, newView]);
+      defaultSelectionRef.current = null;
       selectedViewPidRef.current = newView.pid;
       setCurrentView(newView);
     }
@@ -303,6 +320,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
           // If deleted view was current, select first remaining view
           if (currentView?.pid === pid) {
             const nextView = remaining.length > 0 ? remaining[0] : null;
+            defaultSelectionRef.current = null;
             selectedViewPidRef.current = nextView?.pid ?? null;
             setCurrentView(nextView);
           }
@@ -375,6 +393,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
           const withoutExisting = prev.filter((view) => view.pid !== copiedView.pid);
           return [...withoutExisting, copiedView];
         });
+        defaultSelectionRef.current = null;
         selectedViewPidRef.current = copiedView.pid;
         setCurrentView(copiedView);
       }

@@ -15,7 +15,7 @@ vi.mock('~/shared/services/savedViewService', () => ({
   },
 }));
 
-import { useSavedViews } from '../useSavedViews';
+import { useSavedViews, type UseSavedViewsOptions } from '../useSavedViews';
 import { savedViewService } from '~/shared/services/savedViewService';
 import type { SavedView } from '~/framework/smart/types/savedView';
 
@@ -283,6 +283,74 @@ describe('useSavedViews', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.currentView).toBeNull();
+  });
+
+  it.each(['select', 'create', 'upsert', 'copy'] as const)(
+    'can %s a concrete view after choosing the default and preserve that choice on reload',
+    async (action) => {
+      const first = makeView({ pid: 'first' });
+      const selected = makeView({ pid: 'selected' });
+      mockService.getAccessibleViews
+        .mockResolvedValue([first, selected])
+        .mockResolvedValueOnce(action === 'select' ? [first, selected] : [first]);
+      mockService.getDefaultView.mockResolvedValue(null);
+      mockService.createView.mockResolvedValue(selected);
+      mockService.copyToPersonal.mockResolvedValue(selected);
+      const { result } = renderHook(() => useSavedViews({ modelCode: 'order', pageKey: 'orders' }));
+      await waitFor(() => expect(result.current.currentView?.pid).toBe('first'));
+
+      act(() => result.current.selectDefaultView());
+      expect(result.current.currentView).toBeNull();
+      await act(async () => {
+        if (action === 'select') result.current.selectView('selected');
+        else if (action === 'upsert') result.current.upsertView(selected);
+        else if (action === 'create') await result.current.createView({
+          modelCode: 'order', pageKey: 'orders', name: 'Selected', scope: 'personal', viewType: 'table', viewConfig: {},
+        });
+        else await result.current.copyToPersonal('source-view');
+      });
+      await act(async () => { await result.current.reload(); });
+
+      expect(result.current.currentView?.pid).toBe('selected');
+    },
+  );
+
+  it('reloads the chosen implicit default without switching to another personal default', async () => {
+    const personal = makeView({ pid: 'personal', isDefault: true });
+    const implicit = makeView({ pid: 'implicit', isImplicit: true });
+    const refreshedImplicit = makeView({ ...implicit, viewConfig: { density: 'compact' } });
+    mockService.getAccessibleViews.mockResolvedValueOnce([personal, implicit])
+      .mockResolvedValue([personal, refreshedImplicit]);
+    mockService.getDefaultView.mockResolvedValue(personal);
+    const { result } = renderHook(() => useSavedViews({ modelCode: 'order', pageKey: 'orders' }));
+    await waitFor(() => expect(result.current.currentView?.pid).toBe(personal.pid));
+
+    act(() => result.current.selectDefaultView());
+    expect(result.current.currentView?.pid).toBe(implicit.pid);
+    await act(async () => { await result.current.reload(); });
+
+    expect(result.current.currentView?.pid).toBe(implicit.pid);
+    expect(result.current.currentView?.viewConfig.density).toBe('compact');
+  });
+
+  it.each([
+    { label: 'model', next: { modelCode: 'customer', pageKey: 'orders', scopeFilter: 'personal' } },
+    { label: 'page', next: { modelCode: 'order', pageKey: 'other-orders', scopeFilter: 'personal' } },
+    { label: 'scope', next: { modelCode: 'order', pageKey: 'orders', scopeFilter: 'team' } },
+  ] as const)('does not carry an explicit default choice into another $label', async ({ next }) => {
+    const first = makeView({ pid: 'first' });
+    const nextView = makeView({ pid: 'next', modelCode: next.modelCode, scope: next.scopeFilter });
+    mockService.getAccessibleViews.mockResolvedValue([nextView]).mockResolvedValueOnce([first]);
+    mockService.getDefaultView.mockResolvedValue(null);
+    const { result, rerender } = renderHook((options: UseSavedViewsOptions) => useSavedViews(options), {
+      initialProps: { modelCode: 'order', pageKey: 'orders', scopeFilter: 'personal' },
+    });
+    await waitFor(() => expect(result.current.currentView?.pid).toBe('first'));
+    act(() => result.current.selectDefaultView());
+    expect(result.current.currentView).toBeNull();
+
+    rerender(next);
+    await waitFor(() => expect(result.current.currentView?.pid).toBe('next'));
   });
 
   it('selectView does nothing for unknown pid', async () => {
