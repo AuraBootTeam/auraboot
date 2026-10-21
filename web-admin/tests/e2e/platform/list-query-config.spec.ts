@@ -156,6 +156,7 @@ test.describe('List Query Dynamic Configuration', () => {
     const prefix = uniqueId('dict_tones');
     const draft = await order.createViaApi({ e2et_order_title: `${prefix} draft` });
     const approved = await order.createViaApi({ e2et_order_title: `${prefix} approved` });
+    await order.child('item').createForParent(approved, { e2et_item_name: `${prefix} item`, e2et_item_qty: 1, e2et_item_price: 10 });
     await order.transitionViaApi(approved, ['submit', 'approve']);
     expect((await order.fetchViaApi(draft)).e2et_order_status).toBe('draft');
     expect((await order.fetchViaApi(approved)).e2et_order_status).toBe('approved');

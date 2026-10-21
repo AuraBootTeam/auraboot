@@ -5251,7 +5251,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       props: expect.objectContaining({ rows: [{ [fieldCode]: subformPreviewValue }] }),
     });
     expect(findBlockById(persisted.blocks ?? [], actionBarId)).toMatchObject({
-      blockType: 'toolbar',
+      blockType: 'form-buttons',
       buttons: expect.arrayContaining([expect.objectContaining({
         label: detailActionLabel, command: detailCommandCode,
       })]),

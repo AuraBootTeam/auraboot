@@ -23,7 +23,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, ensureFilterFormOpen, waitForFormReady } from '../helpers';
+import { uniqueId, ensureFilterFormOpen, waitForFormReady, executeCommandViaApi } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { DynamicListPage, DynamicFormPage } from '../../pages';
@@ -72,8 +72,16 @@ test.describe('Block Renderer — Block Type Tests', () => {
     const page = await context.newPage();
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     orderPid = await order.createViaApi({ e2et_order_title: `BlockTest ${uniqueId()}` });
-    rangeOrderPid = await order.createViaApi({ e2et_order_title: `${rangeTitle} included`, e2et_order_date: '2026-04-15' });
-    await order.createViaApi({ e2et_order_title: `${rangeTitle} excluded`, e2et_order_date: '2025-04-15' });
+    const datedOrder = async (title: string, date: string) => {
+      const result = await executeCommandViaApi(page, 'e2eto:create_e2et_order', {
+        e2et_order_title: title, e2et_order_type: 'normal', e2et_order_date: date, e2et_delivery_date: date,
+      });
+      expect(result.code).toBe('0');
+      expect(result.recordId).toBeTruthy();
+      return result.recordId;
+    };
+    rangeOrderPid = await datedOrder(`${rangeTitle} included`, '2026-04-15');
+    await datedOrder(`${rangeTitle} excluded`, '2025-04-15');
     expect((await order.fetchViaApi(rangeOrderPid)).e2et_order_date).toContain('2026-04-15');
     const filterPage = await page.request.post('/api/pages', { data: {
       name: filterPageKey, pageKey: filterPageKey, title: 'Owned order filters', kind: 'list',
