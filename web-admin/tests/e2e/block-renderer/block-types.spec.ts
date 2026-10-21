@@ -65,6 +65,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
   const filterPageKey = `bk_filters_${filterUid}`;
   const rangeTitle = `Owned range ${filterUid}`;
   let rangeOrderPid = '';
+  let filterViewPid = '';
   const itemName = `Block Test Widget ${uniqueId()}`;
 
   test.beforeAll(async ({ browser }) => {
@@ -101,7 +102,20 @@ test.describe('Block Renderer — Block Type Tests', () => {
       ],
     } });
     expect(filterPage.ok()).toBe(true);
-    expect(String((await filterPage.json()).code)).toBe('0');
+    const filterPageBody = await filterPage.json();
+    expect(String(filterPageBody.code)).toBe('0');
+    const published = await page.request.post(`/api/pages/${filterPageBody.data.pid}/publish`);
+    expect(published.ok()).toBe(true);
+    expect((await published.json()).data.status).toBe('published');
+    const view = await page.request.post('/api/views', { data: {
+      name: `Owned filters ${filterUid}`, modelCode: 'e2et_order', pageKey: filterPageKey,
+      viewType: 'table', scope: 'personal', isDefault: false, config: {},
+    } });
+    expect(view.ok()).toBe(true);
+    const viewBody = await view.json();
+    expect(String(viewBody.code)).toBe('0');
+    expect(viewBody.data.pid).toBeTruthy();
+    filterViewPid = viewBody.data.pid;
     // Create an item for sub-table tests
     await order.child('item').createForParent(orderPid, {
       e2et_item_name: itemName,
@@ -535,7 +549,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
   // -------------------------------------------------------------------------
 
   test('BK-013: filters block should support search expand and collapse @smoke', async ({ page }, testInfo) => {
-    await page.goto(`/p/${filterPageKey}`);
+    await page.goto(`/p/c/${filterPageKey}?view=${encodeURIComponent(filterViewPid)}`);
     await expect(page.getByRole('table')).toBeVisible();
     await ensureFilterFormOpen(page);
     const filters = page.getByTestId('search-area');
@@ -561,7 +575,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
   // -------------------------------------------------------------------------
 
   test('BK-014: filters should support date range selection', async ({ page }, testInfo) => {
-    await page.goto(`/p/${filterPageKey}`);
+    await page.goto(`/p/c/${filterPageKey}?view=${encodeURIComponent(filterViewPid)}`);
     await expect(page.getByRole('table')).toBeVisible();
     await ensureFilterFormOpen(page);
     await page.getByTestId('filter-toggle').click();
