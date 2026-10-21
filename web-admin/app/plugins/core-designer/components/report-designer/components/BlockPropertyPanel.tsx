@@ -152,7 +152,7 @@ export const BlockPropertyPanel: React.FC = () => {
     );
 
     return <PanelShell title={text({ zh: '组件属性', en: 'Component properties' })} actions={actionBar}>
-      <SchemaBlockConfigPanel key={block.id} density="compact" pathMode="nested"
+      <SchemaBlockConfigPanel key={block.id} density="compact" pathMode="nested" persistDefaults
         schemas={reportAuthoringSchemas(block.blockType, text)}
         value={block as unknown as Record<string, unknown>}
         onChange={(next) => updateBlock(block.id, next)} />

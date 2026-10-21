@@ -113,7 +113,17 @@ describe('native report schema properties', () => {
       { target: { value: '24' } },
     );
     const report = JSON.parse(screen.getByTestId('document').textContent!);
-    expect(report.body[0].style).toEqual({ fontSize: 24, color: '#123456' });
+    expect(report.body[0].style).toEqual({ fontSize: 24, color: '#123456', fontWeight: 'normal' });
     expect(report.body[0].content).toBe('Initial');
   });
+});
+
+it.each([['summary',0],['groupSubtotal',1],['grandTotal',1]] as const)('initializes schema-declared %s columns before rendering an enabled summary',(key,index)=>{
+ mount(fixtures[index]);const current=()=>JSON.parse(screen.getByTestId('document').textContent!).body[0];
+ expect(current()[key]).toBeUndefined();
+ fireEvent.click(within(screen.getByTestId(`schema-config-field-${key}.enabled`)).getByRole('switch'));
+ expect(current()[key]).toMatchObject({enabled:true,columns:[]});
+ expect(within(screen.getByTestId(`schema-config-field-${key}.enabled`)).getByRole('switch')).toHaveAttribute('aria-checked','true');
+ fireEvent.click(screen.getByRole('button',{name:'Undo'}));expect(current()[key]).toBeUndefined();
+ fireEvent.click(screen.getByRole('button',{name:'Redo'}));expect(current()[key].columns).toEqual([]);
 });

@@ -37,6 +37,8 @@ export interface SchemaBlockConfigPanelProps<T extends Record<string, unknown>> 
   onChange: (next: T, changedKey?: string) => void;
   readonly?: boolean;
   pathMode?: 'flat' | 'nested';
+  /** Serialize declared defaults on edit when consumers require complete configuration objects. */
+  persistDefaults?: boolean;
   density?: 'comfortable' | 'compact';
   context?: Record<string, unknown>;
   className?: string;
@@ -48,6 +50,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
   onChange,
   readonly,
   pathMode = 'flat',
+  persistDefaults = false,
   density = 'comfortable',
   context,
   className,
@@ -127,10 +130,19 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
                       return;
                     }
                     setErrors((previous) => ({ ...previous, [schema.key]: '' }));
-                    const next =
+                    let next =
                       pathMode === 'nested'
                         ? setByPath(latestValueRef.current, schema.key, v)
                         : { ...latestValueRef.current, [schema.key]: v };
+                    if (persistDefaults) {
+                      for (const declared of schemas) {
+                        if (read(next, declared.key) !== undefined || declared.defaultValue === undefined) continue;
+                        const fallback = structuredClone(declared.defaultValue);
+                        next = pathMode === 'nested'
+                          ? setByPath(next, declared.key, fallback)
+                          : { ...next, [declared.key]: fallback };
+                      }
+                    }
                     latestValueRef.current = next;
                     onChange(next, schema.key);
                   },

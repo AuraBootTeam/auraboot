@@ -196,6 +196,9 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   await drill.getByTestId('dashboard-drilldown-mapping-add').click();
   await drill.getByTestId('dashboard-drilldown-mapping-key').fill('acceptance_pid');
   await drill.getByTestId('dashboard-drilldown-mapping-value').fill('pid');
+  const mappingRow=drill.getByTestId('dashboard-drilldown-mapping-row');
+  const mappingBox=await mappingRow.boundingBox(),removeBox=await drill.getByTestId('dashboard-drilldown-mapping-remove').boundingBox();
+  expect(mappingBox).toBeTruthy();expect(removeBox).toBeTruthy();expect(removeBox!.x+removeBox!.width).toBeLessThanOrEqual(mappingBox!.x+mappingBox!.width+1);
   await shot(page,'DS03-structured-drilldown');
   const saved = page.waitForResponse(
     (r) => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST',
