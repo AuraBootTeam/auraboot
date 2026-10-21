@@ -45,6 +45,12 @@ async function restoredBusiness(page: Page, readonly: boolean) {
     expect(file.url).toMatch(/^\/api\/file\/download\/[0-9A-Z]{26}$/);
     const downloaded=await page.request.get(file.url);expect(downloaded.status()).toBe(200);
     expect(createHash('sha256').update(await downloaded.body()).digest('hex')).toBe(file.sha256);
+    const link=page.getByTestId('attachment-download-'+expected.files.indexOf(file));
+    await expect(link).toHaveAttribute('href',file.url);
+    const event=page.waitForEvent('download');await link.click();const download=await event;
+    expect(await download.failure()).toBeNull();expect(download.suggestedFilename()).toBe(file.name);
+    const local=await download.path();expect(local).toBeTruthy();
+    expect(createHash('sha256').update(await readFile(local!)).digest('hex')).toBe(file.sha256);
   }
   if(readonly) {
     await expect(page.getByTestId('toolbar-btn-edit')).toHaveCount(0);

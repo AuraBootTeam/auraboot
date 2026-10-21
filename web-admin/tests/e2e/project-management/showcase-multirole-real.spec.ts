@@ -174,7 +174,16 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     expect((await page.request.post('/api/meta/commands/execute/tpm:update_acceptance',{data:{operationType:'update',targetRecordPid:pid,payload:{tpm_ac_amount:1}}})).status()).toBe(403);
     expect(Number((await record(owner,'tpm_acceptance',pid)).tpm_ac_amount)).toBe(68000);
     await expect(page.getByTestId('dsl-form-readonly')).toBeVisible();await expect(page.getByRole('main')).not.toContainText('正在加载表单');
-    await expect(page.getByTestId('dsl-form-readonly')).toContainText('补齐培训签到');await shot(page,'MR08-readonly');
+    await expect(page.getByTestId('dsl-form-readonly')).toContainText('补齐培训签到');
+    for(const reader of [reviewer,page]) {
+      const attachments=JSON.parse(acceptance.tpm_ac_files);expect(attachments).toHaveLength(2);
+      for(const attachment of attachments) {
+        const response=await reader.request.get(attachment.url);expect(response.status()).toBe(200);
+        const bytes=await response.body();expect(bytes.length).toBe(attachment.size);
+        expect(bytes.toString('utf8')).toContain(attachment.name==='交接清单.txt'?'客户门户、权限配置已交付':'培训签到：客户项目组已确认');
+      }
+    }
+    await shot(page,'MR08-readonly');
     await writeFile(join(evidence,'multirole-receipt.json'),JSON.stringify({projectPid,acceptancePid:pid,checkPid,owner:lin,reviewer:zhou,verifier:chen,roleProvisioning:'explicit-admin-fixture-setup',firstProcess,secondProcess,originalFile,correctedFile,firstCheck,secondCheck,stale,finalFact,acceptedTotal:68000,artifacts},null,2));
   } finally {await ownerContext.close();await reviewerContext.close();await verifierContext.close();await adminContext.close();}
 });
