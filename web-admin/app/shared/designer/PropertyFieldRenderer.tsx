@@ -383,9 +383,11 @@ export function PropertyFieldRenderer({ schema, adapter, fieldId }: PropertyFiel
         ? (adapter.value as Record<string, unknown>[])
         : [];
 
-      const addLabel = typeof schema.addButtonLabel === 'string' ? schema.addButtonLabel : '+ Add';
+      const addLabel = schema.addButtonLabel
+        ? getLocalizedText(schema.addButtonLabel, locale)
+        : locale.startsWith('zh') ? '+ 添加' : '+ Add';
       const emptyPlaceholder =
-        typeof schema.placeholder === 'string' ? schema.placeholder : undefined;
+        schema.placeholder ? getLocalizedText(schema.placeholder, locale) : undefined;
 
       const buildDefaultItem = (): Record<string, unknown> => {
         const obj: Record<string, unknown> = {};
@@ -404,7 +406,7 @@ export function PropertyFieldRenderer({ schema, adapter, fieldId }: PropertyFiel
           {items.map((item, idx) => {
             const resolvedLabel = schema.itemLabel
               ? schema.itemLabel(item, idx)
-              : `Item ${idx + 1}`;
+              : locale.startsWith('zh') ? `第 ${idx + 1} 项` : `Item ${idx + 1}`;
             return (
               <ArrayItemEditor
                 key={idx}

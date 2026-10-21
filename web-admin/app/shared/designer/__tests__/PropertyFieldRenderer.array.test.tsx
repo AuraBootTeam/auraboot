@@ -91,3 +91,9 @@ it('keeps nested array controls read only, including adding and removing items',
   fireEvent.click(add); fireEvent.click(remove);
   expect(setValue).not.toHaveBeenCalled();
 });
+
+it('resolves localized array prompts and labels instead of showing English defaults', () => {
+  render(<PropertyFieldRenderer schema={{...arraySchema, addButtonLabel:{'zh-CN':'+ 添加列',en:'+ Add column'}, placeholder:{'zh-CN':'暂无列',en:'No columns'},itemLabel:undefined}} adapter={makeAdapter([],()=>{})} />);
+  expect(screen.getByText('暂无列')).toBeVisible();
+  expect(screen.getByRole('button',{name:'+ 添加列'})).toBeVisible();
+});

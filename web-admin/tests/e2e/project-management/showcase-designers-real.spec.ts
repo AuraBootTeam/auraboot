@@ -345,8 +345,8 @@ test('SC10 report template → reviewed text edit → save/reload → three real
     if (type === 'grouped-table') {
       await textField('groupByField').fill('project_name');
       const columns = panel.getByTestId('schema-config-field-columns');
-      await columns.getByRole('button', { name: '+ Add', exact: true }).click();
-      await columns.getByRole('textbox', { name: '字段名称', exact: true }).fill('amount');
+      await columns.getByRole('button', { name: '+ 添加', exact: true }).click();
+      await columns.getByRole('textbox', { name: '字段名称*', exact: true }).fill('amount');
       await columns.getByRole('textbox', { name: '显示名称', exact: true }).fill('交付金额');
     }
     if (['stat-card', 'cross-tab', 'chart'].includes(type))
