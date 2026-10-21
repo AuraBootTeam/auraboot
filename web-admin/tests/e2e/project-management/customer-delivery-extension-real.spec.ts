@@ -119,7 +119,7 @@ test('customer plugin contributes a real command dialog and workspace, survives 
   await expect(page.getByTestId('workbench-action-cde_open_project')).toBeEnabled();
   await expect(selected).toContainText(next);
   const deliveryDate = selected.getByRole('cell').nth(5);
-  await expect(deliveryDate).toHaveText('2026/10/28');
+  await expect(deliveryDate).toHaveText('2026-10-28');
   expect(await deliveryDate.evaluate(cell => cell.scrollWidth <= cell.clientWidth)).toBe(true);
   await shot(page, 'X03-customer-delivery-workspace');
   await page.getByTestId('workbench-action-cde_open_project').click();
@@ -251,8 +251,13 @@ test('customer extension keeps read-only access and rejects conflicting contribu
       ).tpm_pj_next_action,
     ).toBe(before.tpm_pj_next_action);
     await navigateToMenuByClick(page, ['元数据管理', '页面配置']);
+    const searched = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/dynamic/page_schema/list' && url.searchParams.get('keyword') === 'tpm_project_form';
+    });
     await page.getByTestId('list-search-input').fill('tpm_project_form');
     await page.getByTestId('list-search-input').press('Enter');
+    expect((await data(await searched)).records).toHaveLength(1);
     await page.getByRole('row').filter({ hasText: 'tpm_project_form' }).getByText('统一设计器', { exact: true }).click();
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
     const designerUrl = page.url();

@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "3c906f3b2",
+    "commit": "efbc86f9d",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"

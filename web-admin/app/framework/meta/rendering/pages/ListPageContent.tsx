@@ -1,3 +1,4 @@
+import { completeListReadRequest } from './list/listReadRequest';
 import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { dictionaryData } from '~/shared/services/dict-adapter';
@@ -1719,20 +1720,6 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
           }
-
-          // Pass keyword search to backend (supported by DynamicController)
-          // Use ref to get latest value — avoids stale closure when Enter triggers
-          // in the same React cycle as the keyword state update
-          const currentKeyword = keywordRef.current;
-          if (currentKeyword.trim()) {
-            queryParams.keyword = currentKeyword.trim();
-          }
-
-          // When page uses namedQuery data source, pass queryCode to backend
-          if (namedQueryCode) {
-            queryParams.queryCode = namedQueryCode;
-          }
-
         }
 
         const fetchCurrentActorRequest = (request: ListApiReadRequest) => (
@@ -1742,7 +1729,12 @@ function ListPageContentInner(props: PageContentProps) {
             token: token || undefined,
           })
         );
-        const request = { endpoint, method, queryParams };
+        const request = completeListReadRequest({ endpoint, method, queryParams }, {
+          keyword: keywordRef.current,
+          queryCode: namedQueryCode,
+          apiDatasource: Boolean(isApiDatasource),
+          retry: Boolean(retryRequest),
+        });
         const result = isApiDatasource
           ? await readApiRequest(request, isLatestRequest, fetchCurrentActorRequest)
           : await fetchCurrentActorRequest(request);
