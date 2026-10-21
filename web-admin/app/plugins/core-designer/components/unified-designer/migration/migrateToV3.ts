@@ -450,7 +450,7 @@ function parseFieldLikeRef(ref: LegacyFieldRefV2 | LegacyColumnRefV2): Normalize
     return {
       id: typeof id === 'string' && id ? id : undefined,
       field,
-      props: rest,
+      props: { ...rest, ...(typeof colSpan === 'number' ? { colSpan } : {}) },
       layout,
     };
   }

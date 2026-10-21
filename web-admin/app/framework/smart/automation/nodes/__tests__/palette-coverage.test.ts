@@ -15,6 +15,7 @@ const EXPECTED_TYPES = [
   'trigger-state-change',
   'trigger-scheduled',
   'trigger-webhook',
+  'trigger-external-event',
   'trigger-workflow-event',
   'trigger-inactivity',
   'action-update-record',

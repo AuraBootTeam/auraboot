@@ -148,7 +148,7 @@ export interface StyleSettings {
   showLegend?: boolean;
   legendPosition?: 'top' | 'bottom' | 'left' | 'right';
   showLabel?: boolean;
-  labelPosition?: 'inside' | 'outside' | 'top';
+  labelPosition?: 'inside' | 'outside' | 'top' | 'left' | 'right';
   borderRadius?: number;
   backgroundColor?: string;
 }
@@ -160,6 +160,8 @@ export interface WidgetConfig {
   title: DashboardText;
   dataSource?: DataSourceConfig;
   visualization?: Record<string, unknown>;
+  /** Native chart option overrides, merged with authored appearance. */
+  chartOptions?: Record<string, unknown>;
   /** Legacy chart presentation flags, overridden by visualization when supplied. */
   ring?: boolean;
   showLabel?: boolean;

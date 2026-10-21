@@ -537,3 +537,89 @@
   background: var(--primary, #2563eb);
   color: var(--primary-foreground, #fff);
 }
+
+/* The group boundary spans its contents instead of consuming a closing row. */
+.condition-expression .ce-group {
+  position: relative;
+  margin: 4px 0 8px 6px;
+  padding: 0 0 0 14px;
+  border-left: 0;
+}
+.condition-expression .ce-group::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 8px;
+  width: 6px;
+  border: 1px solid var(--ce-border);
+  border-right: 0;
+  border-radius: 7px 0 0 7px;
+  pointer-events: none;
+}
+.condition-expression .ce-root {
+  margin: 0;
+  padding: 8px 12px;
+}
+.condition-expression .ce-root::before {
+  display: none;
+}
+.condition-expression .ce-paren {
+  display: none;
+}
+.condition-expression .ce-group-head {
+  min-height: 36px;
+  gap: 8px;
+}
+.condition-expression .ce-group-body {
+  padding: 4px 0 0;
+}
+.condition-expression .ce-add-actions {
+  margin: 6px 0 0 20px;
+}
+.condition-expression .ce-connector {
+  padding: 4px 0 4px 28px;
+}
+.condition-expression .ce-group > small {
+  display: block;
+  margin: 4px 0 0 20px;
+}
+.ce-evidence-row {
+  gap: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid var(--ce-border);
+  border-radius: 7px;
+  background: var(--card, #fff);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ce-evidence-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ce-evidence-heading strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.ce-evidence-heading b {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.ce-evidence-comparison {
+  border-top: 1px solid var(--ce-border);
+  padding-top: 8px;
+  color: var(--foreground, #334155);
+}
+.ce-evidence-comparison small {
+  display: block;
+  color: var(--muted-foreground, #64748b);
+  font-size: 11px;
+}
+.ce-evidence-comparison span {
+  display: block;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
