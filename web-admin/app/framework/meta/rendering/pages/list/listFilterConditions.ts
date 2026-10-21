@@ -1,5 +1,6 @@
 import type { FieldConfig } from '~/framework/meta/schemas/types';
 import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
+import { normalizeSavedViewFilterRange } from '~/framework/smart/utils/savedViewFilterRange';
 import { resolveFieldMetaDataType } from './listFieldMetadata';
 
 export function viewConfigFiltersToRuntimeFilters(
@@ -37,7 +38,7 @@ export function resolveSavedViewFilterExpressions(
   context: SavedViewFilterExpressionContext,
 ): ViewFilterConfig[] {
   return (filters ?? []).map((filter) => {
-    if (!filter.isExpression) return filter;
+    if (!filter.isExpression) return normalizeSavedViewFilterRange(filter);
 
     const expression = String(filter.expression ?? '').trim();
     const resolvedValue =
@@ -51,7 +52,7 @@ export function resolveSavedViewFilterExpressions(
             ? CURRENT_SHARED_RECORD_PIDS_RESOLVER
             : undefined;
 
-    return { ...filter, value: resolvedValue };
+    return normalizeSavedViewFilterRange({ ...filter, value: resolvedValue });
   });
 }
 
@@ -225,8 +226,9 @@ export function resolveUserFilterCondition(
 
 /** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
 export function viewFilterToQueryCondition(
-  filter: ViewFilterConfig,
+  input: ViewFilterConfig,
 ): ListQueryFilterCondition | null {
+  const filter = normalizeSavedViewFilterRange(input);
   if (!filter.fieldCode) return null;
   const operator = (filter.operator || 'eq').toUpperCase();
   if (operator === 'ISNULL' || operator === 'ISNOTNULL') {

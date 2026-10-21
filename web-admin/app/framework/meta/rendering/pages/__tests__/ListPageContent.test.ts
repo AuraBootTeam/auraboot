@@ -851,6 +851,16 @@ describe('buildListFilterFieldMetadata', () => {
 });
 
 describe('viewFilterToQueryCondition', () => {
+  it('reads persisted legacy preset ranges as two scalar query values', () => {
+    expect(viewFilterToQueryCondition({
+      fieldCode: 'updated_at', operator: 'between',
+      value: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    })).toEqual({
+      fieldName: 'updated_at', operator: 'BETWEEN',
+      values: ['2026-10-14', '2026-10-21T23:59:59'],
+    });
+  });
+
   it('keeps IN and BETWEEN values as arrays for list and export requests', () => {
     const inCondition = viewFilterToQueryCondition({
       fieldCode: 'forecast_category',
@@ -917,6 +927,17 @@ describe('tabFilterToQueryCondition', () => {
 });
 
 describe('resolveSavedViewFilterExpressions', () => {
+  it('restores a legacy range to chip state without mutating the persisted view', () => {
+    const original = {
+      fieldCode: 'updated_at', operator: 'between' as const,
+      value: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    };
+    expect(resolveSavedViewFilterExpressions([original], {})).toEqual([{
+      ...original, value: ['2026-10-14', '2026-10-21T23:59:59'],
+    }]);
+    expect(original.value).toEqual({ start: '2026-10-14', end: '2026-10-21T23:59:59' });
+  });
+
   it('resolves both supported current-user syntaxes to a public user PID', () => {
     const resolved = resolveSavedViewFilterExpressions(
       [

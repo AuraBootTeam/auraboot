@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 import { navigateToOrderViaSidebar } from './helpers';
+import { ModelTestHelper } from '../../helpers/model-test-helper';
+import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 
 import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
 
@@ -95,6 +97,9 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
   test('SV-FU-003: saved quick preset opens as a personal view without toolbar preset state', async ({
     page,
   }) => {
+    const orderTitle = `Saved preset range ${uniqueId('SVFU')}`;
+    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const orderPid = await order.createViaApi({ e2et_order_title: orderTitle });
     const savedView = await ensureModifiedThisWeekPresetCopy(page);
     await navigateToOrderViaSidebar(page);
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30_000 });
@@ -123,6 +128,12 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     await expect(page.getByTestId('preset-view-save-as-personal')).toHaveCount(0);
     await expect(page.getByTestId('preset-view-reset-saved')).toHaveCount(0);
     await expect(page.getByTestId('view-selector-trigger')).toContainText(savedView.name);
+    const searchInput = page.getByTestId('list-search-input');
+    await searchInput.fill(orderTitle);
+    await searchInput.press('Enter');
+    await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
+    await expect(page.getByTestId('list-toolbar')).not.toContainText('{"end"');
+    await expect(page.getByTestId('list-toolbar')).not.toContainText('{"start"');
     await page.screenshot({ path: test.info().outputPath('04-preset-saved-as-personal-clean-state.png'), fullPage: true });
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -139,6 +150,7 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
       ({ fieldCode, operator, value }: { fieldCode: string; operator: string; value: unknown }) =>
         ({ fieldCode, operator, value }),
     )).toEqual(modifiedThisWeekPresetConfig().filters);
+    await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
     await page.screenshot({ path: test.info().outputPath('05-personal-view-after-reload.png'), fullPage: true });
 
     await page.getByRole('banner').getByRole('link', { name: /AuraBoot/ }).click();
@@ -148,6 +160,7 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     await expect.poll(() => new URL(page.url()).searchParams.get('view')).toBe(savedView.pid);
     await expect.poll(() => new URL(page.url()).searchParams.get('preset')).toBeNull();
     await expect(page.getByTestId('quick-filter-modified_this_week')).toHaveAttribute('data-preset-active', 'false');
+    await expect(page.getByTestId(`table-row-${orderPid}`)).toContainText(orderTitle);
     await page.screenshot({ path: test.info().outputPath('06-personal-view-after-back.png'), fullPage: true });
   });
 });
