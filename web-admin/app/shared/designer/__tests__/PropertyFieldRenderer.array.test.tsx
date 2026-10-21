@@ -80,3 +80,28 @@ describe('PropertyFieldRenderer / array', () => {
     expect(setValue.mock.calls[0][0]).toEqual([{ name: 'gamma', count: 1 }]);
   });
 });
+
+it('keeps nested array controls read only, including adding and removing items', () => {
+  const setValue=vi.fn();
+  render(<PropertyFieldRenderer schema={arraySchema} adapter={{...makeAdapter([{name:'locked',count:0}],setValue),disabled:true}} />);
+  expect(screen.getByDisplayValue('locked')).toBeDisabled();
+  const add=screen.getByRole('button',{name:'+ Add'});
+  const remove=screen.getByRole('button',{name:'remove'});
+  expect(add).toBeDisabled(); expect(remove).toBeDisabled();
+  fireEvent.click(add); fireEvent.click(remove);
+  expect(setValue).not.toHaveBeenCalled();
+});
+
+it('resolves localized array prompts and labels instead of showing English defaults', () => {
+  render(<PropertyFieldRenderer schema={{...arraySchema, addButtonLabel:{'zh-CN':'+ 添加列',en:'+ Add column'}, placeholder:{'zh-CN':'暂无列',en:'No columns'},itemLabel:undefined}} adapter={makeAdapter([],()=>{})} />);
+  expect(screen.getByText('暂无列')).toBeVisible();
+  expect(screen.getByRole('button',{name:'+ 添加列'})).toBeVisible();
+});
+
+it('leaves optional numeric properties unset instead of inventing an invalid zero', () => {
+  const changed = vi.fn();
+  render(<PropertyFieldRenderer schema={{...arraySchema,itemSchema:[{key:'width',label:'Width',type:'number',min:1}]}} adapter={makeAdapter([],changed)} />);
+  fireEvent.click(screen.getByRole('button',{name:'+ Add'}));
+  expect(changed).toHaveBeenCalledOnce();
+  expect(changed.mock.calls[0][0][0].width).toBeUndefined();
+});

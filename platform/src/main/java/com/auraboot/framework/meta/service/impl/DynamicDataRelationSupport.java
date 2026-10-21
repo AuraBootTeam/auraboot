@@ -187,6 +187,10 @@ final class DynamicDataRelationSupport {
             throw new MetaServiceException("createRelations only supports MANY_TO_MANY relations. Use update for other types.");
         }
 
+        ModelDefinition target = modelResolver.apply(relation.getTargetModel());
+        RecordCommandWriterGuard.guardRelationTargets(dynamicDataMapper, target,
+                relation.getTargetTable(), targetRecordIds, "update", modelResolver);
+
         List<String> successIds = new ArrayList<>();
         List<String> failedIds = new ArrayList<>();
 
@@ -226,6 +230,10 @@ final class DynamicDataRelationSupport {
         if (relation.getRelationType() != RelationDefinition.RelationType.MANY_TO_MANY) {
             throw new MetaServiceException("removeRelations only supports MANY_TO_MANY relations.");
         }
+
+        ModelDefinition target = modelResolver.apply(relation.getTargetModel());
+        RecordCommandWriterGuard.guardRelationTargets(dynamicDataMapper, target,
+                relation.getTargetTable(), targetRecordIds, "update", modelResolver);
 
         List<String> successIds = new ArrayList<>();
         List<String> failedIds = new ArrayList<>();

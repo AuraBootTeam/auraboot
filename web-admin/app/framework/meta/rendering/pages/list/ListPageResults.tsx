@@ -30,7 +30,7 @@ export function renderListPageResults(
     | 'syncKeywordToUrl'
     | 'setSearchParams'
     | 'keywordRef'
-    | 'debouncedSearch'
+    | 'commitSearch'
     | 'loadData'
     | 'pagination'
     | 'filterFormVisible'
@@ -141,7 +141,7 @@ export function renderListPageResults(
     syncKeywordToUrl,
     setSearchParams,
     keywordRef,
-    debouncedSearch,
+    commitSearch,
     loadData,
     pagination,
     filterFormVisible,
@@ -295,8 +295,7 @@ export function renderListPageResults(
                   },
                   { replace: true },
                 );
-                debouncedSearch.cancel();
-                loadData({ page: 0, size: pagination.pageSize });
+                commitSearch();
               }}
               filterFormVisible={filterFormVisible}
               onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
@@ -408,6 +407,7 @@ export function renderListPageResults(
                   chipFilters: [],
                 });
               }}
+              hideSearch={Boolean(schemaExtension.hideSearch)}
               hideQuickFilters={hideQuickFilters}
               hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
               hideColumnSettings={
@@ -511,6 +511,7 @@ export function renderListPageResults(
           )}
 
           {/* Pagination + Bulk Action Toolbar */}
+          {!loading && (
           <ListPagination
             workspace={workspace}
             current={pagination.current}
@@ -539,6 +540,7 @@ export function renderListPageResults(
             resolveBulkActionLabel={resolveButtonLabel}
             onClearSelection={clearAllSelection}
           />
+          )}
         </div>
       ) : (
         <div data-aura-block-id={tableBlock?.id} data-aura-element-id={tableBlock?.id}>

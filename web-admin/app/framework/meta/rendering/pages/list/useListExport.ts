@@ -1,3 +1,4 @@
+import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import React, { useCallback, useMemo } from 'react';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
@@ -23,6 +24,7 @@ import type { DynamicEntity } from './listPageTypes';
 import { buildToolbarConditionContext } from './listSchemaPolicy';
 
 interface ListExportInput {
+  runtime: SchemaRuntime | null;
   canUseButton: (button: ButtonConfig) => boolean;
   pagination: { current: number; pageSize: number; total: number };
   data: DynamicEntity[];
@@ -51,6 +53,7 @@ interface ListExportInput {
 
 /** Resolve action capabilities and export the current query or selection. */
 export function useListExport({
+  runtime,
   canUseButton,
   pagination,
   data,
@@ -76,6 +79,7 @@ export function useListExport({
   // Evaluate toolbar button visibility (visibleWhen expression).
   // Exposes the loaded list's recordCount/total so conditions like
   // `recordCount == 0` (singleton "新建" button) work.
+  const toolbarRuntimeContext = runtime?.getContext() ?? {};
   const evaluateButtonVisible = useCallback(
     (button: ButtonConfig): boolean => {
       if (!canUseButton(button)) return false;
@@ -84,10 +88,11 @@ export function useListExport({
       const conditionContext = buildToolbarConditionContext(
         { total: pagination.total, records: data },
         createExpressionContext({ state: { filters } }),
+        toolbarRuntimeContext,
       );
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     },
-    [canUseButton, pagination.total, data, filters],
+    [canUseButton, pagination.total, data, filters, toolbarRuntimeContext],
   );
 
   const visibleBulkActions = useMemo(() => {

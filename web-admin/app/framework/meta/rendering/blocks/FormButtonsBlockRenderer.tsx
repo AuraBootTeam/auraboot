@@ -3,7 +3,7 @@
  * 用于渲染表单底部的操作按钮组
  */
 
-import React from 'react';
+import React, { useEffect, useReducer } from 'react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -12,6 +12,8 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
+import { ExpressionParser } from '~/framework/meta/runtime/expression/parser';
+import { useRuntimeStateSubscription } from './workbenchBlockUtils';
 
 export interface FormButtonsBlockRendererProps {
   block: BlockConfig;
@@ -25,10 +27,59 @@ const renderIcon = (icon?: ButtonConfig['icon']) => {
   return <Icon className="mr-2 h-4 w-4" aria-hidden="true" />;
 };
 
+/** Only static named source references in declared gate expressions are subscribed. */
+export function formButtonSourceDependencies(buttons: ButtonConfig[]): string[] {
+  const names = new Set<string>();
+  const parser = new ExpressionParser({} as any);
+  const visit = (node: any): void => {
+    if (!node || typeof node !== 'object') return;
+    if (
+      node.type === 'MemberExpression' &&
+      node.object?.type === 'Identifier' &&
+      node.object.name === 'dataSources'
+    ) {
+      const name = node.computed ? node.property?.value : node.property?.name;
+      if (
+        (!node.computed || node.property?.type === 'Literal') &&
+        typeof name === 'string' &&
+        /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
+        !['__proto__', 'constructor', 'prototype'].includes(name)
+      )
+        names.add(name);
+    }
+    for (const child of Object.values(node)) {
+      if (Array.isArray(child)) child.forEach(visit);
+      else if (child && typeof child === 'object') visit(child);
+    }
+  };
+  for (const button of buttons) {
+    for (const expression of [button.visibleWhen, button.enableWhen, button.disableWhen]) {
+      if (typeof expression !== 'string') continue;
+      try {
+        visit(parser.parse(expression).ast);
+      } catch {
+        throw new Error('Invalid form button condition');
+      }
+    }
+  }
+  return [...names].sort();
+}
+
 export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> = ({
   block,
   runtime,
 }) => {
+  useRuntimeStateSubscription(runtime);
+  const [, refresh] = useReducer((value: number) => value + 1, 0);
+  const sourceKey = JSON.stringify(formButtonSourceDependencies(block.buttons || []));
+  useEffect(() => {
+    const manager = runtime.getDataSourceManager?.();
+    if (!manager?.subscribe) return;
+    const unsubscribe = (JSON.parse(sourceKey) as string[]).map((name) =>
+      manager.subscribe(name, refresh),
+    );
+    return () => unsubscribe.forEach((stop) => stop());
+  }, [runtime, sourceKey]);
   const context = runtime.getContext();
   const evaluator = runtime.getEvaluator();
   const buttons = block.buttons || [];
@@ -60,6 +111,18 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
 
   // 处理按钮点击事件 - 委托给 useActionHandler
   const handleButtonClick = (button: ButtonConfig) => {
+    // Mutable configuration must pass the same syntax boundary at dispatch time.
+    formButtonSourceDependencies([button]);
+    const freshContext = runtime.getContext();
+    if (button.permissionCode && !hasPermission(button.permissionCode)) return;
+    if (button.visibleWhen && !evaluator.evaluateCondition(button.visibleWhen, freshContext))
+      return;
+    if (
+      button.enableWhen
+        ? !evaluator.evaluateCondition(button.enableWhen, freshContext)
+        : button.disableWhen && evaluator.evaluateCondition(button.disableWhen, freshContext)
+    )
+      return;
     // Only dispatch buttons that have at least one recognizable action source
     // (preserves original behavior: buttons without events.onClick were no-ops)
     const isBuiltinRefresh = String(button.code || '').toLowerCase() === 'refresh';
@@ -76,7 +139,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
     }
     handleAction(
       button,
-      (context.form as Record<string, any>) || (context.data as Record<string, any>),
+      (freshContext.form as Record<string, any>) || (freshContext.data as Record<string, any>),
     );
   };
 

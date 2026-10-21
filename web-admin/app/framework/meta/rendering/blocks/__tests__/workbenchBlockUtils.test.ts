@@ -62,11 +62,13 @@ describe('workbenchBlockUtils action runner', () => {
   it('evaluates numeric pagination actions and notifies dependent data sources', async () => {
     const runtime = makeRuntime({ getEvaluator: () => new ExpressionEvaluator() }) as any;
     await executeSimpleWorkbenchAction(runtime, {
-      action: 'state.set', args: { bomPage: '${(state.bomPage || 1) + 1}' },
+      action: 'state.set',
+      args: { bomPage: '${(state.bomPage || 1) + 1}' },
     });
     expect(runtime.getContext().state.bomPage).toBe(2);
     await executeSimpleWorkbenchAction(runtime, {
-      action: 'state.set', args: { bomPage: '${state.bomPage - 1}' },
+      action: 'state.set',
+      args: { bomPage: '${state.bomPage - 1}' },
     });
     expect(runtime.getContext().state.bomPage).toBe(1);
     expect(runtime.__notifyStateChanged).toHaveBeenCalledWith('bomPage');
@@ -147,6 +149,49 @@ describe('workbenchBlockUtils action runner', () => {
     });
     expect(runtime.__notifyStateChanged).toHaveBeenCalledWith('selectedLine');
   });
+
+  it('passes the version observed by the DSL action without replacing it with a fresh read', async () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().state.selectedLine.version = 7;
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'tpm:update_project',
+        targetRecordPid: '${state.selectedLine.pid}',
+        expectedVersion: '${state.selectedLine.version}',
+        payload: { tpm_pj_next_action: 'Confirm delivery scope' },
+      },
+    });
+    expect(fetchResultMock).toHaveBeenCalledExactlyOnceWith(
+      '/api/meta/commands/execute/tpm:update_project',
+      {
+        method: 'post',
+        params: {
+          targetRecordPid: 'LINE-1',
+          expectedVersion: 7,
+          payload: { tpm_pj_next_action: 'Confirm delivery scope' },
+        },
+      },
+    );
+  });
+
+  it.each(['invalid', '', null, true, -1, 1.5])(
+    'rejects an invalid explicit version %s before sending a mutation',
+    async (version) => {
+      await expect(
+        executeSimpleWorkbenchAction(makeRuntime(), {
+          action: 'command.execute',
+          args: {
+            command: 'tpm:update_project',
+            targetRecordPid: 'LINE-1',
+            expectedVersion: version,
+            payload: {},
+          },
+        }),
+      ).rejects.toThrow(/expectedVersion/);
+      expect(fetchResultMock).not.toHaveBeenCalled();
+    },
+  );
 
   it('executes a command with resolved state references and reloads dependencies', async () => {
     const runtime = makeRuntime() as any;

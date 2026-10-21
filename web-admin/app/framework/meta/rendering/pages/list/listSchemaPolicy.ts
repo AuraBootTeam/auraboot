@@ -39,8 +39,10 @@ export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
 export function buildToolbarConditionContext(
   list: { total: number; records: unknown[] },
   base: Record<string, any>,
+  runtimeContext: Record<string, any> = {},
 ): Record<string, any> {
-  return { ...base, recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
+  return { ...base, ...runtimeContext, state: { ...runtimeContext.state, ...base.state },
+    recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
 }
 
 export function shouldSkipListData(
@@ -76,4 +78,17 @@ export function resolveListMiscBlocksPosition(
   schema: { extension?: Record<string, any> } | null | undefined,
 ): ListMiscBlocksPosition {
   return schema?.extension?.miscBlocksPosition === 'beforeTable' ? 'beforeTable' : 'afterTable';
+}
+
+/** Custom-only lists still render declared external tables, without enabling native model reads. */
+export function collectListMiscBlocks(schema: any, skipListData = shouldSkipListData(schema)): any[] {
+  if (!Array.isArray(schema?.blocks)) return [];
+  const specialized = new Set(['table', 'filters', 'toolbar', 'tabs', 'form-buttons', 'form-section']);
+  return schema.blocks.filter((block: any) => {
+    if (skipListData && block.blockType === 'table' && typeof block.dataSource === 'string') {
+      const source = schema.dataSources?.[block.dataSource];
+      return source?.type === 'api' && typeof source.endpoint === 'string' && source.endpoint.trim() !== '';
+    }
+    return !specialized.has(block.blockType);
+  });
 }

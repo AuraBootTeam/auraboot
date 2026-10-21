@@ -1,3 +1,4 @@
+import { useRuntimeStateSubscription } from '../../blocks/workbenchBlockUtils';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type SetURLSearchParams,
@@ -65,13 +66,13 @@ export function useListPageRuntime({
   listExtensions,
   skipListData,
 }: ListPageRuntimeInput) {
+  const listRuntimeContext = useMemo(() => ({ filters }), [filters]);
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
-    additionalContext: {
-      filters,
-    },
+    additionalContext: listRuntimeContext,
   });
+  useRuntimeStateSubscription(runtime);
   const tableEmptyState = useMemo(() => {
     const configured = (tableBlock as any)?.empty ?? (tableBlock as any)?.table?.empty;
     if (!configured || typeof configured !== 'object') return {};

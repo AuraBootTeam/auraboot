@@ -1391,7 +1391,14 @@
             },
             "options": {
               "type": "object",
-              "description": "Additional execution options"
+              "description": "Additional execution options",
+              "properties": {
+                "targetVersionPolicy": {
+                  "type": "string",
+                  "enum": ["current_state", "unsupported"],
+                  "description": "Trusted target-version policy; omission retains ordinary CAS behavior"
+                }
+              }
             }
           },
           "additionalProperties": false
@@ -2337,6 +2344,7 @@
                   "record-comments",
                   "field-history",
                   "bpm-panel",
+                  "workflow-panel",
                   "metric-strip",
                   "stage-rail",
                   "record-inspector",

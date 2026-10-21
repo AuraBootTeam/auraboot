@@ -87,10 +87,13 @@ const block = z.discriminatedUnion('blockType', [
       blockType: z.literal('cross-tab'),
       dataSource: nonempty,
       rowField: nonempty,
+      rowLabel: z.string().max(120).optional(),
       columnField: nonempty,
+      columnLabel: z.string().max(120).optional(),
       valueField: nonempty,
       aggregation,
       format: z.string().optional(),
+      totalLabel: z.string().max(120).optional(),
       showRowTotal: z.boolean().optional(),
       showColumnTotal: z.boolean().optional(),
     })

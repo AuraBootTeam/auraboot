@@ -6,6 +6,7 @@ import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -77,14 +78,7 @@ public class CallApiExecutor implements ActionExecutor {
             requestBuilder.header("Content-Type", "application/json");
 
             // Set body
-            String bodyJson = null;
-            if (body != null) {
-                if (body instanceof String strBody) {
-                    bodyJson = processTemplate(strBody, context);
-                } else {
-                    bodyJson = objectMapper.writeValueAsString(body);
-                }
-            }
+            String bodyJson = buildBodyJson(body, context);
 
             // Normalize to lower case to match the case labels below. (Previously
             // toUpperCase() was switched against lowercase labels, so EVERY method
@@ -114,6 +108,7 @@ public class CallApiExecutor implements ActionExecutor {
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
+            result.put("deliveryMode", "direct_http");
             result.put("statusCode", statusCode);
             try {
                 result.put("response", objectMapper.readValue(response.body(), Map.class));
@@ -132,16 +127,13 @@ public class CallApiExecutor implements ActionExecutor {
         return "call_api".equals(actionType);
     }
 
+    String buildBodyJson(Object body, Map<String, Object> context) throws JsonProcessingException {
+        if (body == null) return null;
+        if (body instanceof String text) return processTemplate(text, context);
+        return objectMapper.writeValueAsString(AutomationActionValueResolver.resolveValue(body, context));
+    }
+
     private String processTemplate(String template, Map<String, Object> context) {
-        if (template == null) return null;
-        String result = template;
-        for (Map.Entry<String, Object> entry : context.entrySet()) {
-            String placeholder = "${" + entry.getKey() + "}";
-            if (result.contains(placeholder)) {
-                result = result.replace(placeholder,
-                        entry.getValue() != null ? entry.getValue().toString() : "");
-            }
-        }
-        return result;
+        return AutomationActionValueResolver.resolveString(template, context);
     }
 }

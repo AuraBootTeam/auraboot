@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import { fileURLToPath } from 'node:url';
 
 // Mirror of vite.config.ts's `virtual:auraboot-web-contributions` resolution for the
 // unit-test pipeline. Without it, any module importing the virtual id (e.g.
@@ -39,6 +40,11 @@ export default defineConfig({
   // the coverage provider falls back to parsing raw TS with a JS parser, and the file
   // is silently dropped from the coverage denominator.
   resolve: {
+    // Shared dependency caches can link this package to another checkout.
+    // Unit tests must execute the kernel from this exact source tree.
+    alias: {
+      '@auraboot/runtime-kernel': fileURLToPath(new URL('./packages/runtime-kernel/index.ts', import.meta.url)),
+    },
     conditions: ['node'],
   },
   test: {

@@ -1,6 +1,6 @@
 import { type PageContentProps } from '@auraboot/runtime-kernel';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { ButtonConfig, TableConfig } from '~/framework/meta/schemas/types';
@@ -16,10 +16,13 @@ import {
   type QuickFilterKey,
   applyLocalSortUpdate,
   useSerializedSearchParamsUpdater,
+  useListApiReadRetry,
+  useListKeywordSearch,
 } from './listPageStateUtils';
 
 import type { DynamicEntity } from './listPageTypes';
 import {
+  collectListMiscBlocks,
   resolveListMiscBlocksPosition,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
@@ -76,11 +79,14 @@ export function useListPageState(
 
   // Parse filter_* params from URL for drill-down navigation
   const [searchParams, routerSetSearchParams] = useSearchParams();
+  const listLocation = useLocation();
+  const listNavigationType = useNavigationType();
   const listUrlWritesEnabledRef = useRef(true);
   const setSearchParams = useSerializedSearchParamsUpdater(
     searchParams,
     routerSetSearchParams,
     listUrlWritesEnabledRef,
+    { key: listLocation.key, action: listNavigationType },
   );
   const listSchemaFieldNames = useMemo(() => collectListSchemaFieldNames(schema), [schema]);
   const listSchemaFieldNameSet = useMemo(
@@ -187,10 +193,17 @@ export function useListPageState(
   // Debounced auto-search: triggers loadData 300ms after the user stops typing,
   // so results update without requiring Enter. Reduces API calls by ~60-80%
   // compared to firing on every keystroke.
-  const debouncedSearch = useDebouncedCallback(() => {
-    if (!schema) return;
-    late.loadData({ page: 0, size: pagination.pageSize });
-  }, 300);
+  const { debouncedSearch, commitSearch, rememberSubmittedFilters } = useListKeywordSearch(
+    (params) => { void late.loadData(params); },
+    Boolean(schema),
+    pagination.pageSize,
+    urlFilters,
+  );
+  const {
+    read: readApiRequest,
+    getFailedRequest: getFailedApiRequest,
+    clearFailure: clearApiReadFailure,
+  } = useListApiReadRetry();
 
   // Synchronous ref update ensures loadData always reads the latest keyword
   // even when called in the same event cycle as a state update (e.g., Playwright fill + Enter)
@@ -392,18 +405,10 @@ export function useListPageState(
   // (chart / description / rich-text / divider / stat-card / etc.) were
   // previously dropped silently. Collect them here and render via BlockRenderer
   // at the end of the list page so they appear in the UI.
-  const LIST_SPECIALIZED_BLOCK_TYPES = new Set<string>([
-    'table',
-    'filters',
-    'toolbar',
-    'tabs',
-    'form-buttons',
-    'form-section',
-  ]);
-  const miscListBlocks = useMemo(() => {
-    if (!schema?.blocks) return [];
-    return schema.blocks.filter((b: any) => !LIST_SPECIALIZED_BLOCK_TYPES.has(b.blockType));
-  }, [schema]);
+  const miscListBlocks = useMemo(
+    () => collectListMiscBlocks(schema, skipListData),
+    [schema, skipListData],
+  );
 
   // Sync URL pagination params -> local state (supports refresh and browser back/forward).
   useEffect(() => {
@@ -515,6 +520,11 @@ export function useListPageState(
     listRequestSeqRef,
     syncKeywordToUrl,
     debouncedSearch,
+    commitSearch,
+    rememberSubmittedFilters,
+    readApiRequest,
+    getFailedApiRequest,
+    clearApiReadFailure,
     setKeyword,
     activeSorts,
     setActiveSorts,

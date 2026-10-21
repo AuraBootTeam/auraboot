@@ -233,6 +233,9 @@ public class CommandStateCheckExecutor {
                     .flatMap(model -> findFieldDefinition(model, stateField))
                     .orElse(null);
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
+            RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                    modelOpt.orElse(null), tableName, Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()),
+                    "update", Map.of(stateField, newState), code -> metaModelService.getModelDefinition(code).orElse(null));
             var model = modelOpt.orElseThrow(() -> new BusinessException(ResponseCode.BadParam, "State transition model is unavailable"));
             Long expectedVersion = com.auraboot.framework.application.tenant.MetaContext.getCommandExpectedVersion(modelCode, recordId);
             Map<String, Object> stateData;
@@ -258,7 +261,7 @@ public class CommandStateCheckExecutor {
                 stateData = new LinkedHashMap<>(Map.of(stateField, newState, "updated_at", Instant.now()));
                 jsonbColumns = Set.of();
             }
-            int updated = new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService)
+            int updated = new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService, metaModelService)
                     .executeScopedUpdate(model, modelCode, idEntry.getKey(), idEntry.getValue(), stateData,
                             jsonbColumns, expectedVersion);
             if (updated == 0 && expectedVersion != null) {

@@ -392,3 +392,12 @@ describe('reportToHtml — watermark block', () => {
     expect(html).toContain('color: #ff0000');
   });
 });
+
+
+it('keeps configured cross-tab total labels and money identical in exported HTML', () => {
+  const report = baseReport({ body: [{ id: 'pivot', blockType: 'cross-tab', dataSource: 'sales', rowField: 'region', columnField: 'product', valueField: 'amount', aggregation: 'sum', format: 'currency', showRowTotal: true, showColumnTotal: true, totalLabel: '验收合计 <含税>' }] });
+  const html = reportToHtml(report, { sales: salesRows });
+  expect(html).toContain('验收合计 &lt;含税&gt;');
+  expect(html).not.toContain('>Total<');
+  expect(html).toContain('350.00');
+});

@@ -1,3 +1,5 @@
+import { completeListReadRequest } from './listReadRequest';
+import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import React, { useCallback, useEffect } from 'react';
 import type { SetURLSearchParams } from 'react-router';
 import {
@@ -13,6 +15,8 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { type ListQueryFilterCondition } from './listFilterConditions';
 import {
+  type ListApiReadRequest,
+  type useListApiReadRetry,
   type ListLoadDataParams,
   type PaginationResult,
   clearTransientViewSearchParams,
@@ -22,6 +26,10 @@ import type { DynamicEntity } from './listPageTypes';
 import { type ListSortFilterQuery } from './listViewConfig';
 
 interface ListDataLoaderInput {
+  locale: string;
+  rememberSubmittedFilters: (filters: Record<string, any>) => void;
+  readApiRequest: ReturnType<typeof useListApiReadRetry>['read'];
+  clearApiReadFailure: ReturnType<typeof useListApiReadRetry>['clearFailure'];
   loadDataSeqRef: React.RefObject<number>;
   schema: any;
   skipListData: boolean;
@@ -71,6 +79,10 @@ interface ListDataLoaderInput {
 
 /** Load list records and coordinate the latest query and default-view restoration. */
 export function useListDataLoader({
+  locale,
+  rememberSubmittedFilters,
+  readApiRequest,
+  clearApiReadFailure,
   loadDataSeqRef,
   schema,
   skipListData,
@@ -130,6 +142,7 @@ export function useListDataLoader({
         return;
       }
 
+      clearApiReadFailure();
       try {
         setLoading(true);
         setError(null);
@@ -138,9 +151,10 @@ export function useListDataLoader({
         let endpoint: string;
         let method: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options' = 'get';
         const isApiDatasource = schema.dataSource?.type === 'api' && schema.dataSource.endpoint;
+        const retryRequest = isApiDatasource ? params?.retryRequest : undefined;
         if (isApiDatasource) {
-          endpoint = schema.dataSource!.endpoint!;
-          method = (schema.dataSource!.method as typeof method) || 'get';
+          endpoint = retryRequest?.endpoint ?? schema.dataSource!.endpoint!;
+          method = retryRequest?.method ?? ((schema.dataSource!.method as typeof method) || 'get');
         } else {
           // Use schema.modelCode for API endpoint when available (supports NQ-backed pages
           // where URL tableName differs from actual model, e.g., /p/crm-my-tasks → crm_activity_common)
@@ -148,93 +162,104 @@ export function useListDataLoader({
           endpoint = `${buildApiEndpoint(apiTableName)}/list`;
         }
 
-        const requestedPageNum = (params?.page ?? pagination.current - 1) + 1;
-        const requestedPageSize = params?.size ?? pagination.pageSize;
+        // Capture only explicitly submitted filters before issuing the request.
+        // Pending filter-form edits do not participate in keyword-only searches.
+        if (params?.filters !== undefined) rememberSubmittedFilters(params.filters);
+
+        const requestedPageNum = retryRequest
+          ? Number(retryRequest.queryParams.page) + 1
+          : (params?.page ?? pagination.current - 1) + 1;
+        const requestedPageSize = retryRequest
+          ? Number(retryRequest.queryParams.size)
+          : params?.size ?? pagination.pageSize;
         const requestedPageZeroBased = Math.max(requestedPageNum - 1, 0);
         const requestedSorts = params?.sorts ?? activeSorts;
-        lastScheduledSortFilterValuesRef.current = {
-          activeSorts: requestedSorts,
-          chipFilters: params?.chipFilters ?? chipFiltersRef.current,
-        };
-        const queryParams: Record<string, any> = {};
-
-        if (isApiDatasource) {
-          queryParams.page = requestedPageZeroBased;
-          queryParams.size = requestedPageSize;
-        } else {
-          queryParams.pageNum = requestedPageNum;
-          queryParams.pageSize = requestedPageSize;
-          if (auditUserDisplayFields) {
-            queryParams.auditUserDisplayFields = auditUserDisplayFields;
-          }
+        if (!retryRequest) {
+          lastScheduledSortFilterValuesRef.current = {
+            activeSorts: requestedSorts,
+            chipFilters: params?.chipFilters ?? chipFiltersRef.current,
+          };
         }
+        const queryParams: Record<string, any> = retryRequest
+          ? structuredClone(retryRequest.queryParams) : {};
 
-        if (isApiDatasource) {
-          // For API datasources, pass filter values as individual query params
-          if (params?.filters) {
-            for (const [key, value] of Object.entries(params.filters)) {
-              if (value == null || value === '') continue;
-              // Handle date range objects { start, end }
-              if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-                if (value.start) queryParams[`${key}_start`] = String(value.start);
-                if (value.end) queryParams[`${key}_end`] = String(value.end);
-              } else {
-                queryParams[key] = String(value);
-              }
+        if (!retryRequest) {
+          if (isApiDatasource) {
+            queryParams.page = requestedPageZeroBased;
+            queryParams.size = requestedPageSize;
+          } else {
+            queryParams.pageNum = requestedPageNum;
+            queryParams.pageSize = requestedPageSize;
+            if (auditUserDisplayFields) {
+              queryParams.auditUserDisplayFields = auditUserDisplayFields;
             }
           }
-          if (requestedSorts.length === 1) {
-            queryParams.sortField = requestedSorts[0].fieldCode;
-            queryParams.sortOrder = requestedSorts[0].direction;
-          } else if (tableBlock?.defaultSort?.field) {
-            queryParams.sortField = tableBlock.defaultSort.field;
-            queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
-          }
-        } else {
-          // For standard dynamic tables, use JSON filters array
-          const tabCondition = getTabFilter();
-          const filtersParam = buildFiltersParam(
-            tabCondition,
-            params?.filters,
-            params?.chipFilters ?? chipFiltersRef.current,
-            modelFieldMapRef.current,
-          );
-          if (filtersParam) {
-            queryParams.filters = filtersParam;
-          }
-          // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
-          // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
-          if (requestedSorts.length > 1) {
-            queryParams.sortFields = requestedSorts
-              .map((s) => `${s.fieldCode}:${s.direction}`)
-              .join(',');
-          } else if (requestedSorts.length === 1) {
-            queryParams.sortField = requestedSorts[0].fieldCode;
-            queryParams.sortOrder = requestedSorts[0].direction;
-          } else if (tableBlock?.defaultSort?.field) {
-            queryParams.sortField = tableBlock.defaultSort.field;
-            queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+
+          if (isApiDatasource) {
+            // For API datasources, pass filter values as individual query params
+            if (params?.filters) {
+              for (const [key, value] of Object.entries(params.filters)) {
+                if (value == null || value === '') continue;
+                // Handle date range objects { start, end }
+                if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+                  if (value.start) queryParams[`${key}_start`] = String(value.start);
+                  if (value.end) queryParams[`${key}_end`] = String(value.end);
+                } else {
+                  queryParams[key] = String(value);
+                }
+              }
+            }
+            if (requestedSorts.length === 1) {
+              queryParams.sortField = requestedSorts[0].fieldCode;
+              queryParams.sortOrder = requestedSorts[0].direction;
+            } else if (tableBlock?.defaultSort?.field) {
+              queryParams.sortField = tableBlock.defaultSort.field;
+              queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+            }
+          } else {
+            // For standard dynamic tables, use JSON filters array
+            const tabCondition = getTabFilter();
+            const filtersParam = buildFiltersParam(
+              tabCondition,
+              params?.filters,
+              params?.chipFilters ?? chipFiltersRef.current,
+              modelFieldMapRef.current,
+            );
+            if (filtersParam) {
+              queryParams.filters = filtersParam;
+            }
+            // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
+            // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
+            if (requestedSorts.length > 1) {
+              queryParams.sortFields = requestedSorts
+                .map((s) => `${s.fieldCode}:${s.direction}`)
+                .join(',');
+            } else if (requestedSorts.length === 1) {
+              queryParams.sortField = requestedSorts[0].fieldCode;
+              queryParams.sortOrder = requestedSorts[0].direction;
+            } else if (tableBlock?.defaultSort?.field) {
+              queryParams.sortField = tableBlock.defaultSort.field;
+              queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+            }
           }
         }
 
-        // Pass keyword search to backend (supported by DynamicController)
-        // Use ref to get latest value — avoids stale closure when Enter triggers
-        // in the same React cycle as the keyword state update
-        const currentKeyword = keywordRef.current;
-        if (currentKeyword.trim()) {
-          queryParams.keyword = currentKeyword.trim();
-        }
-
-        // When page uses namedQuery data source, pass queryCode to backend
-        if (namedQueryCode) {
-          queryParams.queryCode = namedQueryCode;
-        }
-
-        const result = await fetchResult<PaginationResult<DynamicEntity>>(endpoint, {
-          method,
-          params: queryParams,
-          token: token || undefined,
+        const fetchCurrentActorRequest = (request: ListApiReadRequest) => (
+          fetchResult<PaginationResult<DynamicEntity>>(request.endpoint, {
+            method: request.method,
+            params: request.queryParams,
+            token: token || undefined,
+          })
+        );
+        const request = completeListReadRequest({ endpoint, method, queryParams }, {
+          keyword: keywordRef.current,
+          queryCode: namedQueryCode,
+          apiDatasource: Boolean(isApiDatasource),
+          retry: Boolean(retryRequest),
         });
+        const result = isApiDatasource
+          ? await readApiRequest(request, isLatestRequest, fetchCurrentActorRequest)
+          : await fetchCurrentActorRequest(request);
 
         // A newer loadData was issued while this request was in flight — this
         // response (and its pagination) is stale; drop it instead of letting
@@ -276,16 +301,14 @@ export function useListDataLoader({
             }));
           }
         } else {
-          setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+          setError(resolveListReadErrorMessage(result, locale, t));
         }
       } catch (err) {
         // A stale request's error must not clobber the newer request's state.
         if (requestId !== loadDataSeqRef.current) {
           return;
         }
-        setError(
-          err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-        );
+        setError(resolveListReadErrorMessage(err, locale, t));
       } finally {
         // Only the newest invocation owns the loading flag; an older one that
         // resolves late must not clear the newer request's spinner.
@@ -298,6 +321,9 @@ export function useListDataLoader({
       schema,
       tableName,
       token,
+      rememberSubmittedFilters,
+      readApiRequest,
+      clearApiReadFailure,
       pagination.current,
       pagination.pageSize,
       getTabFilter,

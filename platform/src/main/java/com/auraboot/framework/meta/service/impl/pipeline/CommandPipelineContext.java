@@ -139,6 +139,19 @@ public class CommandPipelineContext {
         return shortCircuitResult != null;
     }
 
+    /** Build the same outcome for durable idempotency and the fresh public response. */
+    public Map<String, Object> resultData() {
+        Map<String, Object> result = new HashMap<>(fieldMapResults);
+        result.putAll(handlerResults);
+        if (!result.containsKey("recordPid") && request != null) {
+            String recordPid = request.getTargetRecordId();
+            if (recordPid != null && !recordPid.isBlank()) {
+                result.put("recordPid", recordPid);
+            }
+        }
+        return result;
+    }
+
     // ==================== Phase timing ====================
 
     @Builder.Default

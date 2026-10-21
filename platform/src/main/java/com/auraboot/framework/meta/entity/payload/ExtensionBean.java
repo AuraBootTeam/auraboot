@@ -81,7 +81,7 @@ public class ExtensionBean {
             "uiSchema", "querySchema", "tags", "metadata",
             "enableNba", "skipTableCreation", "dataScope",
             "titleField", "subtitleField",
-            "endpointAdapter", "softDelete", "immutable", "commandOnlyCreate", "commandOnlyDelete");
+            "endpointAdapter", "softDelete", "immutable", "commandOnlyCreate", "commandOnlyDelete", "recordCommandWriters");
 
     /**
      * Validate extension content: key count limit and value size limit.
@@ -93,6 +93,8 @@ public class ExtensionBean {
             totalKeys += extension.size();
         }
         totalKeys += dynamicProperties.size();
+
+        com.auraboot.framework.meta.security.RecordCommandWriterDeclaration.validate(get("recordCommandWriters"));
 
         if (totalKeys > MAX_KEYS) {
             throw new IllegalArgumentException(

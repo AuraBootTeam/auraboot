@@ -25,8 +25,9 @@ export const ReportWatermarkBlock: React.FC<ReportWatermarkBlockProps> = ({ bloc
     // Single centered watermark
     return (
       <div
+        data-testid="report-watermark-overlay"
         style={{
-          position: mode === 'design' ? 'relative' : 'fixed',
+          position: mode === 'design' ? 'relative' : 'absolute',
           top: 0,
           left: 0,
           width: '100%',
@@ -62,8 +63,9 @@ export const ReportWatermarkBlock: React.FC<ReportWatermarkBlockProps> = ({ bloc
 
   return (
     <div
+      data-testid="report-watermark-overlay"
       style={{
-        position: mode === 'design' ? 'relative' : 'fixed',
+        position: mode === 'design' ? 'relative' : 'absolute',
         top: 0,
         left: 0,
         width: '100%',
@@ -109,7 +111,7 @@ export const ReportWatermarkBlock: React.FC<ReportWatermarkBlockProps> = ({ bloc
       </div>
       {mode === 'design' && (
         <div className="absolute right-0 bottom-1 left-0 text-center text-xs text-gray-400">
-          Watermark overlay preview
+          {localize({ zh: '水印预览', en: 'Watermark overlay preview' })}
         </div>
       )}
     </div>

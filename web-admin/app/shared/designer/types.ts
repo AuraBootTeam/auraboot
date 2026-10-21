@@ -25,6 +25,7 @@ export type PropertyType =
   | 'model'
   | 'model-select'
   | 'field-select'
+  | 'model-field-map'
   | 'namedQuery'
   | 'formula'
   | 'page-select'
@@ -48,6 +49,9 @@ export interface PropertySchema<TLabel = string | I18nText> {
   key: string;
   label: TLabel;
   type: PropertyType;
+  /** Registered complex control; the schema remains the property declaration. */
+  editor?: string;
+  testId?: string;
   required?: boolean;
   /** D4 — inline field validation (number bounds + text/regex format). */
   min?: number;

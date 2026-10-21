@@ -75,6 +75,11 @@ public interface BackgroundDataAccessor {
      */
     List<Map<String, Object>> query(long tenantId, String modelCode, Map<String, Object> filters);
 
+    /** Database-backed offset paging with exact filters, candidate filters and stable ordering. */
+    default DataPage queryPage(long tenantId, String modelCode, DataPageQuery query) {
+        throw new UnsupportedOperationException("Background projection paging is unavailable");
+    }
+
     /**
      * Query one keyset page ordered by the model's stable public {@code pid}.
      *

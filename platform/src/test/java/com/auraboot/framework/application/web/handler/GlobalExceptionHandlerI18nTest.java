@@ -1,37 +1,36 @@
 package com.auraboot.framework.application.web.handler;
 
-import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ValidationException;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.dao.DataAccessResourceFailureException;
+import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.meta.controller.CommandPipelineController;
-import com.auraboot.framework.meta.service.impl.CommandPhaseRegistry;
 import com.auraboot.framework.meta.exception.MetaApiExceptionHandler;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import com.auraboot.framework.meta.service.impl.CommandPhaseRegistry;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.multipart.MultipartException;
-import com.auraboot.framework.i18n.service.I18nService;
-import com.auraboot.framework.i18n.util.I18nLocaleResolver;
-import jakarta.servlet.http.HttpServletRequest;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * GlobalExceptionHandler localizes {@code $i18n:<key>} BusinessException messages to the request
@@ -286,5 +285,39 @@ class GlobalExceptionHandlerI18nTest {
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getMessage()).isEqualTo("参数错误");
+    }
+    @Test
+    @SuppressWarnings("unchecked")
+    void unsupportedExpectedVersionUsesCanonicalBadParamAndFixedLocalizedContext() {
+        String key = "command.expected_version.unsupported";
+        var messages =
+                Map.of(
+                        "zh-CN",
+                        "此命令不接受版本参数，请刷新页面后重新操作。",
+                        "en-US",
+                        "This command does not accept a version parameter. Refresh the page and try"
+                            + " again.");
+        for (var entry : messages.entrySet()) {
+            ReflectionTestUtils.setField(handler, "activeProfile", "dev");
+            when(localeResolver.resolveLocale(request)).thenReturn(entry.getKey());
+            when(i18nService.getValue(entry.getKey(), key)).thenReturn(entry.getValue());
+            var response =
+                    handler.handleBusinessException(
+                            new BusinessException(ResponseCode.BadParam, "$i18n:" + key), request);
+            assertThat(response.getStatusCode().value()).isEqualTo(400);
+            assertThat(response.getBody().getCode()).isEqualTo("35000");
+            assertThat(response.getBody().getData()).isNull();
+            var context = (Map<String, String>) response.getBody().getContext();
+            assertThat(context)
+                    .containsEntry("messageKey", "$i18n:" + key)
+                    .containsEntry("detail", entry.getValue());
+            ReflectionTestUtils.setField(handler, "activeProfile", "prod");
+            response =
+                    handler.handleBusinessException(
+                            new BusinessException(ResponseCode.BadParam, "$i18n:" + key), request);
+            assertThat(response.getStatusCode().value()).isEqualTo(400);
+            assertThat(response.getBody().getCode()).isEqualTo("35000");
+            assertThat(response.getBody().getContext()).isEqualTo(entry.getValue());
+        }
     }
 }

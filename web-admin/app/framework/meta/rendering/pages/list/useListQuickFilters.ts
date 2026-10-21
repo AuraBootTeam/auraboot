@@ -26,6 +26,7 @@ import {
 } from './quickFilterPresets';
 
 interface ListQuickFiltersInput {
+  rememberSubmittedFilters: (filters: Record<string, any>) => void;
   setSearchParams: SetURLSearchParams;
   listSchemaFieldNameSet: Set<string>;
   activeQuickFilterRef: React.RefObject<string | null>;
@@ -65,6 +66,7 @@ interface ListQuickFiltersInput {
 
 /** Apply preset chips and select or create saved views. */
 export function useListQuickFilters({
+  rememberSubmittedFilters,
   setSearchParams,
   listSchemaFieldNameSet,
   activeQuickFilterRef,
@@ -233,7 +235,10 @@ export function useListQuickFilters({
     if (existingPresetView) {
       selectView(existingPresetView.pid);
       setActiveViewType((existingPresetView.viewType as ViewType) || 'table');
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -265,7 +270,10 @@ export function useListQuickFilters({
 
     try {
       const view = await createView(request);
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -295,10 +303,12 @@ export function useListQuickFilters({
     clearFilterOverrides,
     createView,
     modelCode,
+    rememberSubmittedFilters,
     pageKey,
     savedViews,
     selectView,
     setSearchParams,
+    setFilters,
     showErrorToast,
     showSuccessToast,
     syncPresetToUrl,

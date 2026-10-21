@@ -212,9 +212,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     public Optional<ModelDefinition> getModelDefinitionFromDb(String modelCode) {
         validateModelCode(modelCode);
 
-        // 清除缓存后重新获取
+        // Authoring/import validation requires the database version even with runtime-primary reads.
         evictModelCache(modelCode);
-        return getModelDefinition(modelCode);
+        return loadModelDefinition(modelCode);
     }
 
     @Override
@@ -458,6 +458,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             }
 
             ModelDefinition model = modelOpt.get();
+            RecordCommandWriterGuard.validatePolicy(model);
             List<String> errors = new ArrayList<>();
             List<String> warnings = new ArrayList<>();
 

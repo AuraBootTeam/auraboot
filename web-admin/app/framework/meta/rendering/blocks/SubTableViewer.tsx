@@ -1276,11 +1276,22 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
       // Persist via batch API
       try {
-        await fetchResult(`/api/dynamic/${config.childModel}/batch`, {
-          method: 'put',
-          token,
-          params: updates,
-        });
+        const result = await fetchResult<{ failed?: number; errors?: string[] }>(
+          `/api/dynamic/${config.childModel}/batch`,
+          {
+            method: 'put',
+            token,
+            params: updates,
+          },
+        );
+        if (!ResultHelper.isSuccess(result) || (result.data?.failed ?? 0) > 0) {
+          throw new Error(
+            result.data?.errors?.join('; ') ||
+              result.message ||
+              result.desc ||
+              'Failed to update sort order',
+          );
+        }
       } catch (err) {
         console.error('[SubTableViewer] Batch sort update failed:', err);
         reloadRows(); // Rollback by reloading
@@ -1834,7 +1845,7 @@ export function formatCellValue(
   }
 
   if (col.format === 'currency' || col.valueType === 'currency') {
-    return formatNumber(Number(value));
+    return formatNumber(Number(value), col.precision);
   }
 
   if (col.format === 'percent') {
@@ -1846,7 +1857,7 @@ export function formatCellValue(
   }
 
   if (typeof value === 'number') {
-    return formatNumber(value);
+    return formatNumber(value, col.precision);
   }
 
   return String(value);
@@ -1955,10 +1966,14 @@ function isReferenceColumn(col: EnrichedColumnConfig): boolean {
   );
 }
 
-function formatNumber(num: number): string {
+function formatNumber(num: number, precision = 2): string {
+  const digits = precision ?? 2;
+  if (!Number.isInteger(digits) || digits < 0 || digits > 20) {
+    throw new Error('Sub-table numeric precision must be an integer from 0 to 20');
+  }
   return num.toLocaleString('zh-CN', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: digits,
   });
 }
 

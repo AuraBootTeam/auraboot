@@ -1,3 +1,4 @@
+import type { RequestKeySession } from '../actions/request-key/session';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import type { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
@@ -9,6 +10,8 @@ interface ActionRegistryLike {
 }
 
 interface FlowRunnerDeps {
+  loadData?: (params?: any) => Promise<void>;
+  requestKeySession?: RequestKeySession;
   evaluator: {
     evaluateCondition: (code: string, context: ExpressionContext) => boolean;
   };
@@ -113,7 +116,9 @@ export class FlowRunner {
 
     const actionContext = {
       args: mergedArgs,
+      requestKeySession: this.deps.requestKeySession,
       navigate: this.deps.navigate,
+      loadData: this.deps.loadData || (typeof (context as any).loadData === 'function' ? (context as any).loadData : undefined),
       showToast: this.deps.showToast,
       stateManager: this.deps.stateManager,
       scopeId: this.deps.scopeId,

@@ -1,32 +1,39 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
-import com.auraboot.framework.exception.ConflictException;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.CasVersionConflictException;
 import com.auraboot.framework.exception.CasVersionRequiredException;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,12 +41,15 @@ class CommandTargetVersionLockPhaseTest {
 
     @Mock private MetaModelService metaModelService;
     @Mock private DynamicDataMapper dynamicDataMapper;
+    @Mock private ExtensionRegistry extensionRegistry;
+    @Mock private ObjectProvider<ExtensionRegistry> extensionRegistryProvider;
+    @Mock private CommandHandlerExtension pluginHandler;
 
     private CommandTargetVersionLockPhase phase;
 
     @BeforeEach
     void setUp() {
-        phase = new CommandTargetVersionLockPhase(metaModelService, dynamicDataMapper);
+        phase = new CommandTargetVersionLockPhase(metaModelService, dynamicDataMapper, extensionRegistryProvider);
         TransactionSynchronizationManager.setActualTransactionActive(true);
     }
 
@@ -202,6 +212,141 @@ class CommandTargetVersionLockPhaseTest {
                 .hasMessageContaining("fromStates");
         verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
                 anyString(), anyString(), anyLong(), anyString());
+    }
+
+    @Test
+    void unsupportedSuppliedVersionRejectsInShouldSkipAndDirectExecuteBeforeAnyDependency() {
+        var ctx = unsupportedContext(7);
+        ctx.getRequest().setOperationType("UPDATE");
+        assertThatThrownBy(() -> phase.shouldSkip(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("$i18n:command.expected_version.unsupported")
+                .satisfies(
+                        error ->
+                                assertThat(((BusinessException) error).getResponseCode())
+                                        .isEqualTo(ResponseCode.BadParam));
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("$i18n:command.expected_version.unsupported");
+        ctx.getRequest().setOperationType("QUERY");
+        assertThatThrownBy(() -> phase.shouldSkip(ctx)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(
+                metaModelService,
+                dynamicDataMapper,
+                extensionRegistry,
+                extensionRegistryProvider,
+                pluginHandler);
+    }
+
+    @Test
+    void unsupportedWithoutVersionPreservesUpdateHintAndSkipsOnlyTheOuterTargetLock()
+            throws Exception {
+        var ctx = unsupportedContext(null);
+        ctx.getRequest().setOperationType("UPDATE");
+        when(extensionRegistryProvider.getIfAvailable()).thenReturn(extensionRegistry);
+        when(extensionRegistry.getCommandHandler("dq:release"))
+                .thenReturn(java.util.Optional.of(pluginHandler));
+        assertThat(phase.shouldSkip(ctx)).isTrue();
+        phase.execute(ctx);
+        assertThat(ctx.getRequest().getOperationType()).isEqualTo("UPDATE");
+        assertThat(ctx.getTargetRecordVersion()).isNull();
+        verifyNoInteractions(metaModelService, dynamicDataMapper);
+        verify(pluginHandler, never()).execute(any());
+    }
+
+    @Test
+    void unsupportedCannotUseMissingChainedOrDslPersistingHandlers() throws Exception {
+        var ctx = unsupportedContext(null);
+        when(extensionRegistryProvider.getIfAvailable()).thenReturn(extensionRegistry);
+        assertThatThrownBy(() -> phase.shouldSkip(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("$i18n:command.target_version_policy.invalid");
+        when(extensionRegistry.getSecondaryCommandHandlers("dq:release"))
+                .thenReturn(List.of(pluginHandler));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+        when(extensionRegistry.getSecondaryCommandHandlers("dq:release")).thenReturn(List.of());
+        when(extensionRegistry.getCommandHandler("dq:release"))
+                .thenReturn(java.util.Optional.of(pluginHandler));
+        when(pluginHandler.requiresDslPersistence(eq("dq:release"), any(), eq(ctx.getRequest())))
+                .thenReturn(true);
+        assertThatThrownBy(() -> phase.shouldSkip(ctx)).isInstanceOf(BusinessException.class);
+        verify(pluginHandler, never()).execute(any());
+        verifyNoInteractions(metaModelService, dynamicDataMapper);
+    }
+
+    @Test
+    void unsupportedRejectsRuntimeBindingRulesAndAllNoncanonicalPolicyTypes() {
+        var ctx = unsupportedContext(null);
+        ctx.setRulesByType(
+                Map.of("field_map", List.of(new com.auraboot.framework.meta.entity.BindingRule())));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+        for (String value : List.of("true", "1", "null", "\"unknown\"")) {
+            var invalid = unsupportedContext(null);
+            invalid.getCommand()
+                    .setExecutionConfig(
+                            "{\"type\":\"custom\",\"handler\":\"dq:release\",\"options\":{\"targetVersionPolicy\":"
+                                    + value
+                                    + "}}");
+            assertThatThrownBy(() -> phase.shouldSkip(invalid))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("$i18n:command.target_version_policy.invalid");
+        }
+        verifyNoInteractions(
+                metaModelService,
+                dynamicDataMapper,
+                extensionRegistry,
+                extensionRegistryProvider,
+                pluginHandler);
+    }
+
+    @Test
+    void unsupportedRejectsRuntimeCasMutationAsyncAndMalformedOptionsBeforeLocking() {
+        for (String tail :
+                List.of(
+                        ",\"casRequired\":true",
+                        ",\"casRequired\":\"false\"",
+                        ",\"autoSetFields\":{}",
+                        ",\"inputFields\":[]",
+                        ",\"fieldMapping\":{}",
+                        ",\"preActions\":[]",
+                        ",\"stateField\":\"state\"",
+                        ",\"handlerParams\":{\"async\":true}")) {
+            var ctx = context(null);
+            ctx.getCommand()
+                    .setExecutionConfig(
+                            "{\"type\":\"custom\",\"handler\":\"dq:release\",\"options\":{\"targetVersionPolicy\":\"unsupported\"}"
+                                    + tail
+                                    + "}");
+            assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+        }
+        var ctx = context(null);
+        ctx.getCommand().setExecutionConfig("{\"options\":false}");
+        assertThatThrownBy(() -> phase.shouldSkip(ctx)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(
+                metaModelService,
+                dynamicDataMapper,
+                extensionRegistry,
+                extensionRegistryProvider,
+                pluginHandler);
+    }
+
+    @Test
+    void unsupportedWithoutPluginRegistryFailsClosedWhileOrdinaryCasDoesNotNeedTheRegistry() {
+        assertThat(phase.shouldSkip(context(null))).isTrue();
+        verifyNoInteractions(extensionRegistryProvider);
+        var ctx = unsupportedContext(null);
+        assertThatThrownBy(() -> phase.shouldSkip(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("$i18n:command.target_version_policy.invalid");
+        verifyNoInteractions(metaModelService, dynamicDataMapper, extensionRegistry, pluginHandler);
+    }
+
+    private CommandPipelineContext unsupportedContext(Integer version) {
+        var ctx = context(version);
+        ctx.getCommand()
+                .setExecutionConfig(
+                        "{\"type\":\"custom\",\"handler\":\"dq:release\",\"options\":{\"targetVersionPolicy\":\"unsupported\"}}");
+        return ctx;
     }
 
     private CommandPipelineContext currentStateContext(Integer expectedVersion) {

@@ -2,7 +2,7 @@ import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext'
 import { AsyncTaskModalHost } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
-import { ErrorAlert } from '~/ui/ErrorAlert';
+import { ListErrorState } from './ListErrorState';
 import { BulkActionResultDialog } from './BulkActionResultDialog';
 import { renderListPageFeedback } from './ListPageFeedback';
 import { renderListPageFilters } from './ListPageFilters';
@@ -52,6 +52,12 @@ export function renderListPage(model: ListPageModel) {
     canImport,
     error,
     setError,
+    listPageTitle,
+    navigateAwayFromList,
+    getFailedApiRequest,
+    loadData,
+    pagination,
+    filters,
     dataSourceManager,
     dataReady,
     loading,
@@ -146,11 +152,21 @@ export function renderListPage(model: ListPageModel) {
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
   if (error) {
     return (
-      <ErrorAlert
+      <ListErrorState
+        title={listPageTitle}
+        buttons={actionBlock?.buttons || []}
+        evaluateVisible={evaluateButtonVisible}
+        resolveLabel={resolveButtonLabel}
+        onNavigate={to => navigateAwayFromList(to)}
         error={error}
+        errorTitle={getLocalizedText({ 'zh-CN': '加载失败', en: 'Unable to load' }, locale, t)}
+        retryLabel={getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale, t)}
         onRetry={() => {
           setError(null);
-          window.location.reload();
+          const retryRequest = getFailedApiRequest();
+          void loadData(retryRequest
+            ? { retryRequest }
+            : { page: pagination.current - 1, size: pagination.pageSize, filters });
         }}
       />
     );

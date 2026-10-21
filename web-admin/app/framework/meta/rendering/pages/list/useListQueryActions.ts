@@ -1,3 +1,4 @@
+import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { type SetURLSearchParams, type NavigateFunction } from 'react-router';
 
@@ -416,13 +417,11 @@ export function useListQueryActions(
               }));
             }
           } else {
-            setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+            setError(resolveListReadErrorMessage(result, locale, t));
           }
         } catch (err) {
           if (!isLatestRequest()) return;
-          setError(
-            err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-          );
+          setError(resolveListReadErrorMessage(err, locale, t));
         } finally {
           if (isLatestRequest()) {
             setLoading(false);

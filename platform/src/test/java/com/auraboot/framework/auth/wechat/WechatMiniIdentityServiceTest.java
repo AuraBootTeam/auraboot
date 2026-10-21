@@ -8,6 +8,8 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import com.auraboot.framework.application.tenant.MetaContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -170,4 +172,67 @@ class WechatMiniIdentityServiceTest {
         assertThat(captor.getValue().getOpenid()).isEqualTo("OPEN-C");
         assertThat(java.util.Optional.ofNullable(captor.getValue().getUnionid())).contains("UNION-2");
     }
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
+    }
+
+    @Test
+    void phoneGrantUsesFreshLoginIdentityBoundToCurrentAccountWithoutWrites() {
+        MetaContext.setContext(1L, USER_A, "actor-a", "Actor A");
+        stubSession("OPEN-A", null);
+        AuthIdentity bound = identity(USER_A, "OPEN-A", null);
+        bound.setAppId("wx-test-appid");
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of(bound));
+        var verified = new WechatMiniClient.VerifiedPhone("wx-test-appid", "OPEN-A", "86", "13800138000", 1791730000);
+        when(wechatMiniClient.verifyPhoneGrant("phone-grant", "OPEN-A")).thenReturn(verified);
+        assertThat(service.verifyCurrentUserPhoneGrant("login-code", "phone-grant")).isSameAs(verified);
+        verify(wechatMiniClient).code2Session("login-code");
+        verify(wechatMiniClient).verifyPhoneGrant("phone-grant", "OPEN-A");
+        verify(authIdentityMapper, never()).insert(any(AuthIdentity.class));
+        verify(authIdentityMapper, never()).updateById(any(AuthIdentity.class));
+        verifyNoInteractions(userService, userMapper);
+    }
+
+    @Test
+    void phoneGrantRejectsAnotherAccountBeforeConsumingPhoneCode() {
+        MetaContext.setContext(1L, USER_B, "actor-b", "Actor B");
+        stubSession("OPEN-A", null);
+        AuthIdentity bound = identity(USER_A, "OPEN-A", null);
+        bound.setAppId("wx-test-appid");
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of(bound));
+        assertThatThrownBy(() -> service.verifyCurrentUserPhoneGrant("login-code", "phone-grant"))
+                .isInstanceOf(RootUnCheckedException.class);
+        verify(wechatMiniClient, never()).verifyPhoneGrant(anyString(), anyString());
+        verifyNoInteractions(userService, userMapper);
+    }
+
+    @Test
+    void phoneGrantRejectsUnboundIdentityWithoutUnionidAttachment() {
+        MetaContext.setContext(1L, USER_A, "actor-a", "Actor A");
+        stubSession("UNBOUND", "UNION-A");
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of());
+        assertThatThrownBy(() -> service.verifyCurrentUserPhoneGrant("login-code", "phone-grant"))
+                .isInstanceOf(RootUnCheckedException.class);
+        verify(wechatMiniClient, never()).verifyPhoneGrant(anyString(), anyString());
+        verify(authIdentityMapper, never()).insert(any(AuthIdentity.class));
+    }
+
+    @Test
+    void phoneGrantRejectsAbsentActorBeforeExternalExchange() {
+        MetaContext.clear();
+        assertThatThrownBy(() -> service.verifyCurrentUserPhoneGrant("login-code", "phone-grant"))
+                .isInstanceOf(RootUnCheckedException.class);
+        verifyNoInteractions(wechatMiniClient, authIdentityMapper, userService, userMapper);
+    }
+    @Test
+    void phoneGrantRejectsImpersonationBeforeExternalExchange() {
+        MetaContext.setContext(1L, USER_A, "actor-a", "Actor A");
+        MetaContext.setSessionContext(1L, 1L, "tenant", null, null, "active", 1, true, USER_B, "web");
+        assertThatThrownBy(() -> service.verifyCurrentUserPhoneGrant("login-code", "phone-grant"))
+                .isInstanceOf(RootUnCheckedException.class);
+        verifyNoInteractions(wechatMiniClient, authIdentityMapper, userService, userMapper);
+    }
+
 }

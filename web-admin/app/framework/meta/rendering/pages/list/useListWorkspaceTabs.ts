@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { type ViewFilterConfig } from '~/framework/smart/types/savedView';
-import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
+import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { type User, ResultHelper } from '~/utils/type';
 
@@ -9,6 +9,9 @@ import type { PaginationResult } from './listPageStateUtils';
 import type { DynamicEntity } from './listPageTypes';
 
 interface ListWorkspaceTabsInput {
+  t: (key: string) => string;
+  locale: string;
+  tableName: string;
   allBlocks: any;
   schema: any;
   dataReady: boolean;
@@ -30,6 +33,9 @@ interface ListWorkspaceTabsInput {
 
 /** Load workspace tab counts from the active list query. */
 export function useListWorkspaceTabs({
+  t,
+  locale,
+  tableName,
   allBlocks,
   schema,
   dataReady,
@@ -48,6 +54,22 @@ export function useListWorkspaceTabs({
     return found;
   }, [allBlocks]);
 
+  const listPageTitle = (() => {
+    // Import writes page titles into the tenant i18n bundle as
+    // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
+    // follows the UI locale; schema.title/schema.name are stored as
+    // plain zh strings and would otherwise pin the title to zh.
+    const listPageKey = schema.pageKey || tableName;
+    const keyedTitle = t(`page.${listPageKey}.title`);
+    if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
+      return keyedTitle;
+    }
+    if (schema.title) return getLocalizedText(schema.title, locale, t);
+    if (schema.name && schema.name.trim()) {
+      return getLocalizedText(schema.name, locale, t);
+    }
+    return tableName;
+  })();
   const [workspaceTabCounts, setWorkspaceTabCounts] = useState<Record<string, number>>({});
   const [workspaceTabCountError, setWorkspaceTabCountError] = useState(false);
   useEffect(() => {
@@ -96,5 +118,5 @@ export function useListWorkspaceTabs({
   }, [listTabsBlock, schema?.modelCode, data, dataReady, filters, chipFilters, token, user?.pid]);
   const workspace = schemaExtension.presentation === 'workspace';
 
-  return { listTabsBlock, workspaceTabCounts, workspaceTabCountError, workspace };
+  return { listPageTitle, listTabsBlock, workspaceTabCounts, workspaceTabCountError, workspace };
 }

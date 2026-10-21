@@ -1,5 +1,7 @@
+import { ResultHelper } from '~/utils/type';
+import { useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { useCallback, useEffect, useRef } from 'react';
-import { createSearchParams, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import type { ButtonConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import {
   type SortConfig,
@@ -15,6 +17,62 @@ export interface ListLoadDataParams {
   filters?: Record<string, any>;
   sorts?: SortConfig[];
   chipFilters?: ViewFilterConfig[];
+  retryRequest?: ListApiReadRequest;
+}
+
+export interface ListApiReadRequest {
+  endpoint: string;
+  method: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options';
+  queryParams: Record<string, any>;
+}
+
+export function useListApiReadRetry() {
+  const failedRequestRef = useRef<ListApiReadRequest | null>(null);
+  const clearFailure = useCallback(() => { failedRequestRef.current = null; }, []);
+  const getFailedRequest = useCallback(() => (
+    failedRequestRef.current ? structuredClone(failedRequestRef.current) : null
+  ), []);
+  const read = useCallback(async <T extends { code: string | number; data?: unknown },>(
+    request: ListApiReadRequest,
+    isLatest: () => boolean,
+    fetch: (request: ListApiReadRequest) => Promise<T>,
+  ): Promise<T> => {
+    const sealedRequest = structuredClone(request);
+    try {
+      const result = await fetch(structuredClone(sealedRequest));
+      if (isLatest()) {
+        failedRequestRef.current = ResultHelper.isSuccess(result) && result.data
+          ? null : sealedRequest;
+      }
+      return result;
+    } catch (error) {
+      if (isLatest()) failedRequestRef.current = sealedRequest;
+      throw error;
+    }
+  }, []);
+  return { read, getFailedRequest, clearFailure };
+}
+
+export function useListKeywordSearch(
+  load: (params: ListLoadDataParams) => void,
+  enabled: boolean,
+  pageSize: number,
+  initialFilters: Record<string, any>,
+) {
+  const appliedFiltersRef = useRef(structuredClone(initialFilters));
+  const rememberSubmittedFilters = useCallback((filters: Record<string, any>) => {
+    appliedFiltersRef.current = structuredClone(filters);
+  }, []);
+  const search = () => {
+    if (!enabled) return;
+    load({ page: 0, size: pageSize, filters: structuredClone(appliedFiltersRef.current) });
+  };
+  const debouncedSearch = useDebouncedCallback(search, 300);
+  const commitSearch = () => {
+    debouncedSearch.cancel();
+    search();
+  };
+  return { debouncedSearch, commitSearch, rememberSubmittedFilters };
 }
 
 export interface BulkFieldCommandState {
@@ -90,39 +148,7 @@ export function useRestoreSavedViewFromUrl({
 
 export type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
 
-/**
- * Serialize URL search-param writes made during the same React turn.
- *
- * React Router's functional `setSearchParams` form does not queue updates like
- * React state does. List state can change sorts, filters, pagination and the
- * selected SavedView together, so independently queued writers could otherwise
- * restore an older query string and drop a newly selected `view` parameter.
- */
-export function useSerializedSearchParamsUpdater(
-  searchParams: URLSearchParams,
-  setSearchParams: SearchParamsSetter,
-  writesEnabledRef?: { current: boolean },
-): SearchParamsSetter {
-  const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
-
-  useEffect(() => {
-    latestSearchParamsRef.current = new URLSearchParams(searchParams);
-  }, [searchParams]);
-
-  return useCallback<SearchParamsSetter>(
-    (nextInit, options) => {
-      if (writesEnabledRef?.current === false) return;
-      const resolvedInit =
-        typeof nextInit === 'function'
-          ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
-          : nextInit;
-      const next = createSearchParams(resolvedInit);
-      latestSearchParamsRef.current = new URLSearchParams(next);
-      setSearchParams(next, options);
-    },
-    [setSearchParams, writesEnabledRef],
-  );
-}
+export { useSerializedSearchParamsUpdater } from './useSerializedSearchParamsUpdater';
 
 export function applyLocalSortUpdate(
   previous: SortConfig[],

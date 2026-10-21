@@ -54,6 +54,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -163,7 +164,7 @@ async function fillTextField(page: Page, path: string, value: string): Promise<v
 
 /** Apply a basic-tab JSON inspector field (inspector-json-field-apply-<path>). */
 async function applyJsonField(page: Page, path: string, value: unknown): Promise<void> {
-  const textarea = page.getByTestId(`inspector-field-${path}`);
+  const textarea = await inspectorJsonField(page, path);
   await expect(textarea).toBeVisible({ timeout: 5_000 });
   await textarea.fill(JSON.stringify(value, null, 2));
   await page.evaluate(
@@ -232,15 +233,9 @@ test.describe.serial('Unified Designer workbench-family batch-2 authoring golden
     await ctx.close();
   });
 
-    // Product gap (binding-loss family, readback-verified 2026-10-03): after the
-  // widget-family normalize cycle the workbench-action-bar legacy selects and
-  // actions JSON register dirty but none of surface/align/actions reach the
-  // persisted block (readback: keys absent). Backlog: bind workbench-action-bar
-  // legacy paths in the payload builder.
 test('B1: workbench-action-bar — actions JSON + surface + align persist at the block top level and preview shows action labels', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: workbench-action-bar surface/align/actions unbound after widget normalize');
     const actions = [
       { code: 'confirm', label: { 'en-US': 'Confirm', 'zh-CN': '确认' }, variant: 'primary' },
       { code: 'reject', label: { 'en-US': 'Reject', 'zh-CN': '驳回' }, variant: 'danger' },
@@ -271,13 +266,9 @@ test('B1: workbench-action-bar — actions JSON + surface + align persist at the
     expect(block).toMatchObject({ blockType: 'workbench-action-bar', surface: 'card', align: 'end', actions });
   });
 
-    // Product gap (binding-loss family, 2026-10-03): evidence-panel sections JSON
-  // does not survive save+reload on a widget-normalized page (sections reads
-  // back empty). Backlog: bind evidence-panel legacy paths.
 test('B2: evidence-panel — dataSource + sections JSON persist at the block top level and preview shows section labels', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: evidence-panel sections unbound after widget normalize');
     const dataSource = `ds_evidence_${uid}`;
     const sections = [
       { key: 'raw', field: 'raw_payload', label: { 'en-US': 'Raw', 'zh-CN': '原始报文' }, format: 'json' },
@@ -309,7 +300,6 @@ test('B2: evidence-panel — dataSource + sections JSON persist at the block top
   test('B3: record-inspector — context + fields JSON persist at the block top level and preview shows field labels', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (legacy fields unbound after widget normalize) — same as B1/B2 evidence');
     const context = '${state.selectedRow}';
     const fields = [
       { field: 'material_name', label: { 'en-US': 'Name', 'zh-CN': '物料名称' }, span: 2 },
@@ -341,7 +331,6 @@ test('B2: evidence-panel — dataSource + sections JSON persist at the block top
   test('B4: candidate-list — dataSource + item + selection persist at the block top level and preview shows item config', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (legacy fields unbound after widget normalize) — same as B1/B2 evidence');
     const dataSource = `ds_candidates_${uid}`;
     const item = {
       titleField: 'material_code',
@@ -378,7 +367,6 @@ test('B2: evidence-panel — dataSource + sections JSON persist at the block top
   test('B5: artifact-timeline — dataSource + item field bindings persist at the block top level and preview shows the bound fields', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (legacy fields unbound after widget normalize) — same as B1/B2 evidence');
     const dataSource = `ds_artifacts_${uid}`;
     const item = {
       keyField: 'pid',
@@ -417,7 +405,6 @@ test('B2: evidence-panel — dataSource + sections JSON persist at the block top
   test('B6: review-drawer — context + summaryBadges + compare + candidates persist at the block top level and preview shows a representative drawer', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (legacy fields unbound after widget normalize) — same as B1/B2 evidence');
     const context = '${state.selectedRow}';
     const contextDataSource = `ds_rows_${uid}`;
     const summaryBadges = [
@@ -469,14 +456,13 @@ test('B2: evidence-panel — dataSource + sections JSON persist at the block top
   test('B7 (sad path): invalid actions JSON on workbench-action-bar shows a per-field error and is NOT written back', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (legacy fields unbound after widget normalize) — same as B1/B2 evidence');
     await openDesigner(page, pid);
     await selectBlock(page, ACTION_BAR);
 
     const before = findBlockById((await readPage(page, pid)).blocks, ACTION_BAR)?.actions;
     expect(Array.isArray(before), 'B1 actions present before sad path').toBeTruthy();
 
-    const actionsField = page.getByTestId('inspector-field-actions');
+    const actionsField = await inspectorJsonField(page, 'actions');
     await expect(actionsField).toBeVisible({ timeout: 5_000 });
     await actionsField.fill('[ { code: confirm, ');
     await page.evaluate(

@@ -100,6 +100,7 @@ export function ResourcePanel({
             </div>
             <OutlineList
               blocks={document.blocks}
+              modelFields={modelFields}
               selectedBlockId={selectedBlockId}
               onSelect={onSelect}
               locale={locale}
@@ -466,6 +467,7 @@ function FieldPalette({
 
 function OutlineList({
   blocks,
+  modelFields,
   selectedBlockId,
   onSelect,
   locale,
@@ -474,6 +476,7 @@ function OutlineList({
   depth = 0,
 }: {
   blocks: DslBlockV3[];
+  modelFields: ModelFieldDefinition[];
   selectedBlockId: string | null;
   onSelect: (blockId: string) => void;
   locale: string;
@@ -487,6 +490,7 @@ function OutlineList({
         <li key={block.id}>
           <OutlineItem
             block={block}
+            modelFields={modelFields}
             selectedBlockId={selectedBlockId}
             onSelect={onSelect}
             locale={locale}
@@ -497,6 +501,7 @@ function OutlineList({
           {block.blocks?.length ? (
             <OutlineList
               blocks={block.blocks}
+              modelFields={modelFields}
               selectedBlockId={selectedBlockId}
               onSelect={onSelect}
               locale={locale}
@@ -520,6 +525,7 @@ function OutlineList({
  */
 function OutlineItem({
   block,
+  modelFields,
   selectedBlockId,
   onSelect,
   locale,
@@ -528,6 +534,7 @@ function OutlineItem({
   depth = 0,
 }: {
   block: DslBlockV3;
+  modelFields: ModelFieldDefinition[];
   selectedBlockId: string | null;
   onSelect: (blockId: string) => void;
   locale: string;
@@ -567,6 +574,11 @@ function OutlineItem({
       data-testid={`outline-item-${block.id}`}
       data-drop-intent={dropIntent ?? 'none'}
       onClick={() => onSelect(block.id)}
+      onPointerDownCapture={(event) => {
+        // A completed pointer drag briefly suppresses document click events.
+        // Select on the next primary press; keep click for keyboard activation.
+        if (event.button === 0) onSelect(block.id);
+      }}
       {...dragAttributes}
       {...listeners}
       className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${
@@ -588,7 +600,7 @@ function OutlineItem({
           aria-hidden="true"
         />
       ) : null}
-      <span className="min-w-0 flex-1 truncate">{getBlockLabel(block, locale, t)}</span>
+      <span className="min-w-0 flex-1 truncate">{getBlockLabel(block, locale, t, modelFields)}</span>
       <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
         {getBlockTypeLabel(block.blockType, locale, t)}
       </span>

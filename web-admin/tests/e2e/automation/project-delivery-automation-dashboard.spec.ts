@@ -1,17 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { BASE_URL } from '../../helpers/environments';
+import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { test, expect, type Page } from '@playwright/test';
-import {
-  ensureSidebarExpanded,
-  navigateToMenuByClick,
-  executeCommandViaApi,
-} from '../helpers';
+import { ensureSidebarExpanded, navigateToMenuByClick, executeCommandViaApi } from '../helpers';
 import {
   fillNodeConfig,
   saveAutomation,
-  dragNodeToCanvas,
+  openFlowDesignerPanel,
   connectEdge,
   setEdgeCondition,
 } from '../_helpers/flow-designer-harness';
@@ -19,9 +17,9 @@ import {
 // Enterprise composition must install the real Aura BPM workflow capability.
 // Setup creates only task fixtures; authoring, enabling, firing and JSON transfer are UI-driven.
 test.use({
-  storageState:
-    process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+  storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
   locale: 'zh-CN',
+  viewport: { width: 1920, height: 1080 },
 });
 test.setTimeout(270000);
 const marker = '[AuraBoot demo] Archived after delivery confirmation';
@@ -29,7 +27,141 @@ const original = '[AuraBoot demo] Waiting for archival';
 const run = randomUUID().slice(0, 8);
 const automationName = `客户交付自动归档-${run}`;
 const dashboardTitle = `客户交付看板-${run}`;
-const fixtureRoot = fileURLToPath(new URL('../../../../plugins/project-management/examples', import.meta.url));
+const fixtureRoot = fileURLToPath(
+  new URL('../../../../plugins/project-management/examples', import.meta.url),
+);
+
+/** Native mouse drag: no dispatched events or designer-store injection. */
+async function dragNodeToCanvas(page: Page, type: string, offset: { x: number; y: number }) {
+  await openFlowDesignerPanel(page, 'palette');
+  const palette = page.getByTestId(`palette-node-${type}`);
+  await palette.scrollIntoViewIfNeeded();
+  const ids = await page
+    .locator('.react-flow__node')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-id')));
+  const source = await palette.boundingBox();
+  const pane = await page.locator('.react-flow__pane').boundingBox();
+  expect(source).toBeTruthy();
+  expect(pane).toBeTruthy();
+  await page.mouse.move(source!.x + source!.width / 2, source!.y + source!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(source!.x + source!.width / 2 + 12, source!.y + source!.height / 2, {
+    steps: 4,
+  });
+  await page.mouse.move(pane!.x + offset.x, pane!.y + offset.y, { steps: 20 });
+  await page.mouse.move(pane!.x + offset.x + 1, pane!.y + offset.y + 1, { steps: 2 });
+  await page.mouse.up();
+  await expect(page.locator('.react-flow__node')).toHaveCount(ids.length + 1);
+  const now = await page
+    .locator('.react-flow__node')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-id')));
+  const id = now.find((id) => !ids.includes(id));
+  expect(id).toBeTruthy();
+  return id!;
+}
+
+async function verifyAutomationReadOnly(
+  page: Page,
+  browser: import('@playwright/test').Browser,
+  pid: string,
+  nodeId: string,
+) {
+  const read = async (response: import('@playwright/test').APIResponse) => {
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    return body.data;
+  };
+  const before = await read(await page.request.get(`/api/automations/${pid}`));
+  const code = `designer_reader_${randomUUID().slice(0, 8)}`;
+  const role = await read(
+    await page.request.post('/api/roles', {
+      data: {
+        code,
+        name: code,
+        type: 'custom',
+        status: 'active',
+        scopeType: 'tenant',
+        defaultDataScopeType: 'all',
+      },
+    }),
+  );
+  const tree = await read(await page.request.get('/api/permissions/tree'));
+  const ids = new Map<string, number>();
+  const visit = (nodes: any[]) =>
+    nodes.forEach((node) => {
+      ids.set(node.code, node.id);
+      visit(node.children || []);
+    });
+  visit(tree);
+  expect(ids.has('automation.read')).toBe(true);
+  await read(
+    await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {
+      data: [{ permissionId: ids.get('automation.read'), granted: true }],
+    }),
+  );
+  const email = `${code}@e2e.local`;
+  await read(
+    await page.request.post('/api/admin/users', {
+      data: {
+        email,
+        displayName: '自动化只读验收',
+        initialPassword: process.env.ADMIN_PASSWORD,
+        roleCodes: [code],
+        sendInviteEmail: false,
+      },
+    }),
+  );
+  const context = await browser.newContext({
+    baseURL: BASE_URL,
+    storageState: { cookies: [], origins: [] },
+    locale: 'zh-CN',
+    viewport: { width: 1920, height: 1080 },
+  });
+  try {
+    const actor = await context.newPage();
+    const identity = await loginDeliveryMember(actor, email);
+    expect(identity.permissions.permissionCodes).not.toContain('automation.update');
+    await actor.goto(`/automation/${pid}`);
+    await expect(actor.locator('.react-flow__node')).toHaveCount(4);
+    await expect(actor.getByTestId('automation-editor-toolbar-btn-save')).toHaveCount(0);
+    await expect(actor.getByTestId('flow-palette')).toHaveCount(0);
+    await expect(
+      actor.getByRole('button', { name: 'Toggle Interactivity', exact: true }),
+    ).toHaveCount(0);
+    const node = actor.locator(`.react-flow__node[data-id="${nodeId}"]`);
+    await node.click();
+    await openFlowDesignerPanel(actor, 'inspector');
+    await actor.getByTestId('prop-group-toggle-advanced').click();
+    await expect(actor.getByTestId('prop-field-message').getByRole('textbox')).toBeDisabled();
+    const box = await node.boundingBox();
+    expect(box).toBeTruthy();
+    const transform = await node.getAttribute('style');
+    await actor.mouse.move(box!.x + 70, box!.y + 20);
+    await actor.mouse.down();
+    await actor.mouse.move(box!.x + 130, box!.y + 70, { steps: 12 });
+    await actor.mouse.up();
+    expect(await node.getAttribute('style')).toBe(transform);
+    await actor.locator('body').press('Backspace');
+    await expect(actor.locator('.react-flow__node')).toHaveCount(4);
+    expect(
+      (
+        await actor.request.put(`/api/automations/${pid}`, {
+          data: { name: 'Forbidden reader edit' },
+        })
+      ).status(),
+    ).toBe(403);
+    const after = await read(await page.request.get(`/api/automations/${pid}`));
+    expect(after.name).toBe(before.name);
+    expect(after.flowConfig).toEqual(before.flowConfig);
+    await actor.screenshot({
+      path: path.join(process.env.AURA_EVIDENCE_DIR!, 'DS05-readonly-schema-controls.png'),
+      fullPage: false,
+    });
+  } finally {
+    await context.close();
+  }
+}
 
 async function record(page: Page, pid: string) {
   const response = await page.request.get(`/api/dynamic/tpm_task/${pid}`);
@@ -60,48 +192,72 @@ async function setupTask(page: Page, title: string, projectPid: string) {
     );
     expect(result.code).toBe('0');
   }
-  expect((await record(page, created.recordId)).tpm_ts_status).toBe(
-    'in_review',
-  );
+  expect((await record(page, created.recordId)).tpm_ts_status).toBe('in_review');
   return created.recordId;
 }
 async function createReviewTaskThroughUi(page: Page, title: string, projectPid: string) {
   const fixture = JSON.parse(fs.readFileSync(process.env.DELIVERY_FIXTURE_PATH!, 'utf8'));
-  const project = fixture.projects.find((row: {pid: string}) => row.pid === projectPid);
+  const project = fixture.projects.find((row: { pid: string }) => row.pid === projectPid);
   expect(project).toBeDefined();
   await menu(page, ['项目交付', '任务']);
-  await page.getByRole('button', {name: '新建', exact: true}).click();
+  await page.getByRole('button', { name: '新建', exact: true }).click();
   await page.locator('#tpm_ts_title').fill(title);
   await page.getByTestId('select-trigger-tpm_ts_project_id').click();
-  await expect(page.getByRole('option', {name: project.name, exact: true})).toBeVisible();
-  await page.screenshot({path: path.join(process.env.AURA_EVIDENCE_DIR!, 'TASK01-project-name-picker.png'), fullPage: true});
-  await page.getByRole('option', {name: project.name, exact: true}).click();
+  await expect(page.getByRole('option', { name: project.name, exact: true })).toBeVisible();
+  await page.screenshot({
+    path: path.join(process.env.AURA_EVIDENCE_DIR!, 'TASK01-project-name-picker.png'),
+    fullPage: true,
+  });
+  await page.getByRole('option', { name: project.name, exact: true }).click();
   await expect(page.getByTestId('select-trigger-tpm_ts_project_id')).toHaveText(project.name);
   await page.locator('#tpm_ts_description').fill(original);
-  const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/meta/commands/execute/tpm:create_task' && response.request().method() === 'POST');
-  await page.getByRole('button', {name: '保存任务', exact: true}).click();
+  const creating = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/meta/commands/execute/tpm:create_task' &&
+      response.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: '保存任务', exact: true }).click();
   const response = await creating;
   expect(response.status()).toBe(200);
-  expect(response.request().postDataJSON().payload).toMatchObject({tpm_ts_title: title, tpm_ts_project_id: projectPid});
+  expect(response.request().postDataJSON().payload).toMatchObject({
+    tpm_ts_title: title,
+    tpm_ts_project_id: projectPid,
+  });
   expect((await response.json()).data.phaseReached).toBe('completed');
-  const row = page.getByRole('row').filter({has: page.getByText(title, {exact: true})});
+  const row = page.getByRole('row').filter({ has: page.getByText(title, { exact: true }) });
   await expect(row).toBeVisible();
-  await row.getByRole('button', {name: '查看', exact: true}).click();
+  await row.getByRole('button', { name: '查看', exact: true }).click();
   await expect(page).toHaveURL(/\/p\/tpm_task\/view\/[0-9A-Z]{26}$/);
   const pid = new URL(page.url()).pathname.split('/').at(-1)!;
-  for (const [command, label, status] of [['tpm:start_task','开始任务','in_progress'],['tpm:review_task','提交审核','in_review']]) {
-    const transition = page.waitForResponse(result => new URL(result.url()).pathname === `/api/meta/commands/execute/${command}` && result.request().method() === 'POST');
-    await page.getByRole('button', {name: label, exact: true}).click();
-    const result = await transition; expect(result.status()).toBe(200);
+  for (const [command, label, status] of [
+    ['tpm:start_task', '开始任务', 'in_progress'],
+    ['tpm:review_task', '提交审核', 'in_review'],
+  ]) {
+    const transition = page.waitForResponse(
+      (result) =>
+        new URL(result.url()).pathname === `/api/meta/commands/execute/${command}` &&
+        result.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: label, exact: true }).click();
+    const result = await transition;
+    expect(result.status()).toBe(200);
     expect(result.request().postDataJSON().targetRecordPid).toBe(pid);
     expect((await result.json()).data.phaseReached).toBe('completed');
     expect((await record(page, pid)).tpm_ts_status).toBe(status);
   }
   await page.reload();
-  await expect(page.getByText(title, {exact: true})).toBeVisible();
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
   const persisted = await record(page, pid);
-  expect(persisted).toMatchObject({tpm_ts_title: title, tpm_ts_project_id: projectPid, tpm_ts_status: 'in_review', tpm_ts_description: original});
-  await page.screenshot({path: path.join(process.env.AURA_EVIDENCE_DIR!, 'TASK02-created-review-task.png'), fullPage: true});
+  expect(persisted).toMatchObject({
+    tpm_ts_title: title,
+    tpm_ts_project_id: projectPid,
+    tpm_ts_status: 'in_review',
+    tpm_ts_description: original,
+  });
+  await page.screenshot({
+    path: path.join(process.env.AURA_EVIDENCE_DIR!, 'TASK02-created-review-task.png'),
+    fullPage: true,
+  });
   return pid;
 }
 async function menu(page: Page, labels: string[]) {
@@ -110,9 +266,7 @@ async function menu(page: Page, labels: string[]) {
 }
 async function completeTaskViaUi(page: Page, title: string, pid: string) {
   await menu(page, ['项目交付', '任务']);
-  const row = page
-    .getByRole('row')
-    .filter({ has: page.getByText(title, { exact: true }) });
+  const row = page.getByRole('row').filter({ has: page.getByText(title, { exact: true }) });
   await expect(row).toHaveCount(1);
   await row.getByRole('button', { name: '查看', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/p/tpm_task/view/${pid}$`));
@@ -138,6 +292,7 @@ async function savedDashboard(page: Page, pid: string) {
 
 test('delivery automation and dashboard form a real, bounded customer-project loop', async ({
   page,
+  browser,
 }, info) => {
   const projectPid = process.env.DELIVERY_PROJECT_PID;
   expect(
@@ -157,9 +312,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await expect(page.getByTestId('automation-editor-name-input')).toBeVisible();
   await page.getByTestId('automation-editor-name-input').fill(automationName);
   const description = `仅修改本次专属演示任务「${activeTitle}」「${disabledTitle}」的描述；完成后覆盖为演示归档说明。其他任务保持不变。默认停用，确认此范围后再启用。`;
-  await page
-    .getByTestId('automation-editor-description-input')
-    .fill(description);
+  await page.getByTestId('automation-editor-description-input').fill(description);
   const trigger = await dragNodeToCanvas(page, 'trigger-state-change', {
     x: 60,
     y: 100,
@@ -175,6 +328,20 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   const ignore = await dragNodeToCanvas(page, 'action-write-audit', {
     x: 570,
     y: 280,
+  });
+  const movable = page.locator(`.react-flow__node[data-id="${ignore}"]`);
+  const beforeMove = await movable.boundingBox();
+  expect(beforeMove).toBeTruthy();
+  await page.mouse.move(beforeMove!.x + 80, beforeMove!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(beforeMove!.x + 120, beforeMove!.y + 60, { steps: 12 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await movable.boundingBox())!.x)
+    .toBeGreaterThan(beforeMove!.x + 20);
+  await page.screenshot({
+    path: path.join(process.env.AURA_EVIDENCE_DIR!, 'DS05-native-node-drag.png'),
+    fullPage: false,
   });
   const condition = `recordId == '${active}' || recordId == '${disabled}'`;
   await fillNodeConfig(page, trigger, {
@@ -197,25 +364,40 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   const no = await connectEdge(page, guard, ignore, 'false');
   await setEdgeCondition(page, yes, condition);
   await setEdgeCondition(page, no, `!(${condition})`);
-  await expect(
-    page.getByTestId('automation-editor-description-input'),
-  ).toHaveValue(description);
+  await expect(page.getByTestId('automation-editor-description-input')).toHaveValue(description);
   await page.screenshot({
-    path: info.outputPath('AD01-explicit-archive-scope.png'),
+    path: info.outputPath('AD00-edge-expression-diagnostics.png'),
   });
   const { pid: automationPid } = await saveAutomation(page);
   await expect(page).toHaveURL(new RegExp(`/automation/${automationPid}$`));
+  await verifyAutomationReadOnly(page, browser, automationPid, ignore);
   await page.reload();
-  await expect(page.getByTestId('automation-editor-name-input')).toHaveValue(
-    automationName,
-  );
-  const savedRule = await (
-    await page.request.get(`/api/automations/${automationPid}`)
-  ).json();
+  await fillNodeConfig(page, archive, {});
+  await expect(page.getByTestId('model-map-field-0')).toHaveValue('tpm_ts_description');
+  await expect(page.getByTestId('model-map-value-0')).toHaveValue(marker);
+  const flowInspector = await page.getByTestId('flow-inspector-shell').boundingBox();
+  const canvas = await page.getByTestId('flow-canvas-shell').boundingBox();
+  expect(flowInspector).not.toBeNull();
+  expect(canvas).not.toBeNull();
+  expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(flowInspector!.x + 1);
+  await expect(page.getByTestId('flow-drawer-backdrop')).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('AD01-field-mapping-reopened.png') });
+  await fillNodeConfig(page, guard, {});
+  await page.screenshot({ path: info.outputPath('AD01-explicit-archive-scope.png') });
+  // A docked wide-screen inspector has no close affordance; only drawers close.
+  if (await page.getByTestId('flow-inspector-shell').getAttribute('data-presentation') === 'overlay') {
+    await page.getByTestId('flow-close-inspector').click();
+    await expect(page.getByTestId('flow-inspector-shell')).toBeHidden();
+  } else {
+    await expect(page.getByTestId('flow-close-inspector')).toHaveCount(0);
+    await expect(page.getByTestId('flow-inspector-shell')).toBeVisible();
+  }
+  await expect(page.getByTestId('automation-editor-name-input')).toHaveValue(automationName);
+  const savedRule = await (await page.request.get(`/api/automations/${automationPid}`)).json();
   expect(savedRule.data.enabled).toBe(false);
   expect(
-    savedRule.data.flowConfig.nodes.find((n: any) => n.id === archive).data
-      .config.fields.tpm_ts_description,
+    savedRule.data.flowConfig.nodes.find((n: any) => n.id === archive).data.config.fields
+      .tpm_ts_description,
   ).toBe(marker);
   const [automationDownload] = await Promise.all([
     page.waitForEvent('download'),
@@ -228,9 +410,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   expect(automationExport.flowConfig.nodes).toHaveLength(4);
   await menu(page, ['系统管理', '自动化']);
   const importing = page.waitForResponse(
-    (r) =>
-      new URL(r.url()).pathname === '/api/automations' &&
-      r.request().method() === 'POST',
+    (r) => new URL(r.url()).pathname === '/api/automations' && r.request().method() === 'POST',
   );
   await page.getByTestId('input-import-automation').setInputFiles({
     name: 'automation-copy.json',
@@ -263,14 +443,32 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   expect(copy.enabled).toBe(false);
   expect(copy.flowConfig).toEqual(automationExport.flowConfig);
   await copyLink.click();
-  await page
-    .getByTestId('automation-editor-name-input')
-    .fill(`${automationName}-副本微调`);
+  await page.getByTestId('automation-editor-name-input').fill(`${automationName}-副本微调`);
   await saveAutomation(page);
   await page.reload();
   await expect(page.getByTestId('automation-editor-name-input')).toHaveValue(
     `${automationName}-副本微调`,
   );
+  await expect(page.locator('.react-flow__node')).toHaveCount(4);
+  await expect(
+    page.locator('.react-flow__node').getByText('写入审计', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('加载设计器...', { exact: true })).toHaveCount(0);
+  const boxes = await page.locator('.react-flow__node').evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    }),
+  );
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i],
+        b = boxes[j];
+      expect(
+        a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top,
+        'Canvas nodes must not overlap',
+      ).toBe(true);
+    }
   await page.screenshot({
     path: info.outputPath('AD01b-automation-round-trip.png'),
   });
@@ -279,10 +477,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await page.getByTestId('toolbar-btn-create').click();
   const design = JSON.parse(
     fs
-      .readFileSync(
-        path.join(fixtureRoot, 'dashboard-task-archive.json'),
-        'utf8',
-      )
+      .readFileSync(path.join(fixtureRoot, 'dashboard-task-archive.json'), 'utf8')
       .replaceAll('REPLACE_WITH_OWN_DEMO_TASK_PID', active),
   );
   design.dashboard.title = dashboardTitle;
@@ -296,23 +491,19 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     path: info.outputPath('AD02-import-design-confirmation.png'),
   });
   await page.getByRole('button', { name: '导入为新草稿', exact: true }).click();
-  await expect(page.getByTestId('designer-toolbar')).toContainText(
-    dashboardTitle,
-  );
-  const archivedWidget = page.getByTestId('designer-canvas').locator('[data-widget-id="archived-tasks"]');
+  await expect(page.getByTestId('designer-toolbar')).toContainText(dashboardTitle);
+  const archivedWidget = page
+    .getByTestId('designer-canvas')
+    .locator('[data-widget-id="archived-tasks"]');
   await expect(archivedWidget).toHaveCount(1);
   await archivedWidget.click();
   const inspector = page.getByTestId('widget-property-panel');
   await expect(inspector).toHaveAttribute('data-widget-id', 'archived-tasks');
   await expect(inspector.getByTestId('widget-prop-title-zh')).toHaveValue('自动归档');
   await inspector.getByTestId('widget-prop-title-zh').fill('自动归档任务');
-  await expect(page.getByTestId('designer-canvas')).toContainText(
-    '自动归档任务',
-  );
+  await expect(page.getByTestId('designer-canvas')).toContainText('自动归档任务');
   const saving = page.waitForResponse(
-    (r) =>
-      new URL(r.url()).pathname === '/api/dashboards' &&
-      r.request().method() === 'POST',
+    (r) => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST',
   );
   await page.getByTestId('designer-toolbar-btn-save').click();
   const saveResponse = await saving;
@@ -324,12 +515,9 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   expect(baseline.scope).toBe('personal');
   expect(baseline.status).toBe('draft');
   expect(
-    baseline.widgets.find((widget: any) => widget.id === 'archived-tasks')
-      .config.title['zh-CN'],
+    baseline.widgets.find((widget: any) => widget.id === 'archived-tasks').config.title['zh-CN'],
   ).toBe('自动归档任务');
-  await expect(
-    page.getByTestId('designer-canvas').getByText('1', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByTestId('designer-canvas').getByText('1', { exact: true })).toBeVisible();
   await page.screenshot({
     path: info.outputPath('AD03-baseline-dashboard.png'),
   });
@@ -343,17 +531,11 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await page.getByTestId(`btn-toggle-${automationPid}`).click();
   expect((await enabling).ok()).toBe(true);
   await completeTaskViaUi(page, activeTitle, active);
-  await expect
-    .poll(async () => (await record(page, active)).tpm_ts_description)
-    .toBe(marker);
+  await expect.poll(async () => (await record(page, active)).tpm_ts_description).toBe(marker);
   expect((await record(page, active)).tpm_ts_status).toBe('done');
-  const logResponse = await page.request.get(
-    `/api/automations/${automationPid}/logs`,
-  );
+  const logResponse = await page.request.get(`/api/automations/${automationPid}/logs`);
   const logs = (await logResponse.json()).data;
-  const activeLogs = logs.filter(
-    (entry: any) => entry.triggerRecordPid === active,
-  );
+  const activeLogs = logs.filter((entry: any) => entry.triggerRecordPid === active);
   expect(activeLogs, 'One command event must produce one target execution').toHaveLength(1);
   const activeLog = activeLogs[0];
   expect(activeLog.status).toBe('success');
@@ -361,9 +543,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     `/api/automation/executions/by-log/${activeLog.id}/node-statuses`,
   );
   const nodes = (await nodeResponse.json()).data;
-  expect(nodes.find((entry: any) => entry.nodeId === archive).status).toBe(
-    'completed',
-  );
+  expect(nodes.find((entry: any) => entry.nodeId === archive).status).toBe('completed');
   await page.reload();
   await expect(page.getByText(marker, { exact: true })).toBeVisible();
   await page.screenshot({
@@ -373,13 +553,9 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await completeTaskViaUi(page, otherTitle, other);
   await expect
     .poll(async () => {
-      const rows = (
-        await (
-          await page.request.get(`/api/automations/${automationPid}/logs`)
-        ).json()
-      ).data;
-      return rows.find((entry: any) => entry.triggerRecordPid === other)
-        ?.status;
+      const rows = (await (await page.request.get(`/api/automations/${automationPid}/logs`)).json())
+        .data;
+      return rows.find((entry: any) => entry.triggerRecordPid === other)?.status;
     })
     .toBe('success');
   expect((await record(page, other)).tpm_ts_description).toBe(original);
@@ -397,17 +573,11 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await expect
     .poll(
       async () => {
-        expect((await record(page, disabled)).tpm_ts_description).toBe(
-          original,
-        );
+        expect((await record(page, disabled)).tpm_ts_description).toBe(original);
         const rows = (
-          await (
-            await page.request.get(`/api/automations/${automationPid}/logs`)
-          ).json()
+          await (await page.request.get(`/api/automations/${automationPid}/logs`)).json()
         ).data;
-        expect(
-          rows.some((entry: any) => entry.triggerRecordPid === disabled),
-        ).toBe(false);
+        expect(rows.some((entry: any) => entry.triggerRecordPid === disabled)).toBe(false);
         return ++observations;
       },
       { intervals: [250], timeout: 5000 },
@@ -430,9 +600,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   await expect(page).toHaveURL(new RegExp(`/dashboard-designer/${dashboardPid}$`));
   await expect(page.getByTestId('designer-canvas')).toBeVisible();
   await page.reload();
-  await expect(
-    page.getByTestId('designer-canvas').getByText('1', { exact: true }),
-  ).toHaveCount(3);
+  await expect(page.getByTestId('designer-canvas').getByText('1', { exact: true })).toHaveCount(3);
   const dataResponses: any[] = [];
   page.on('response', async (response) => {
     if (
@@ -448,9 +616,7 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
     }
   });
   await page.reload();
-  await expect(
-    page.getByTestId('designer-canvas').getByText('1', { exact: true }),
-  ).toHaveCount(3);
+  await expect(page.getByTestId('designer-canvas').getByText('1', { exact: true })).toHaveCount(3);
   await expect.poll(() => dataResponses.length).toBeGreaterThanOrEqual(3);
   for (const evidence of dataResponses) {
     expect(evidence.request.modelCode).toBe('tpm_task');
@@ -507,68 +673,148 @@ test('delivery automation and dashboard form a real, bounded customer-project lo
   });
 });
 
-
-test('portable archive template selects a task once and binds every reference before a disabled import', async ({page}, info) => {
+test('portable archive template selects a task once and binds every reference before a disabled import', async ({
+  page,
+}, info) => {
   const workspace = process.env.AURA_WORKSPACE_PROJECT_ROOT;
-  expect(workspace, 'Bind the owned workspace source containing the portable template').toBeTruthy();
-  const template = JSON.parse(fs.readFileSync(path.join(workspace!, 'docs/product-docs/strategy/enterprise-seven-scenario-assets/task-archive.automation.json'), 'utf8'));
-  const issue = new Intl.DateTimeFormat('zh-CN', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
-  const name = `交付材料完成后归档 · ${issue}`; const title = `交付材料检查 · ${issue}`;
+  expect(
+    workspace,
+    'Bind the owned workspace source containing the portable template',
+  ).toBeTruthy();
+  const template = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        workspace!,
+        'docs/product-docs/strategy/enterprise-seven-scenario-assets/task-archive.automation.json',
+      ),
+      'utf8',
+    ),
+  );
+  const issue = new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date());
+  const name = `交付材料完成后归档 · ${issue}`;
+  const title = `交付材料检查 · ${issue}`;
   expect(process.env.DELIVERY_PROJECT_PID).toMatch(/^[0-9A-Z]{26}$/);
   await page.goto('/');
   const taskPid = await createReviewTaskThroughUi(page, title, process.env.DELIVERY_PROJECT_PID!);
   await menu(page, ['系统管理', '自动化']);
-  const beforeRows = (await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()).data;
-  const upload = async () => page.getByTestId('input-import-automation').setInputFiles({name: '任务归档.automation.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(template))});
+  const beforeRows = (
+    await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()
+  ).data;
+  const upload = async () =>
+    page.getByTestId('input-import-automation').setInputFiles({
+      name: '任务归档.automation.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(template)),
+    });
   await upload();
-  const dialog = page.getByRole('dialog', {name: '配置导入参数'});
-  await expect(dialog).toBeVisible(); await expect(dialog.getByRole('button', {name: '导入停用副本'})).toBeDisabled();
-  await page.screenshot({path: info.outputPath('IMPORT01-任务参数必填.png')});
-  await dialog.getByRole('button', {name: '取消', exact: true}).click(); await expect(dialog).not.toBeVisible();
-  expect((await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()).data).toEqual(beforeRows);
-  await upload(); await dialog.getByLabel('副本名称').fill(name);
+  const dialog = page.getByRole('dialog', { name: '配置导入参数' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '导入停用副本' })).toBeDisabled();
+  await page.screenshot({ path: info.outputPath('IMPORT01-任务参数必填.png') });
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(
+    (await (await page.request.get('/api/automations?pageNum=1&pageSize=500')).json()).data,
+  ).toEqual(beforeRows);
+  await upload();
+  await dialog.getByLabel('副本名称').fill(name);
   await dialog.locator('button#targetTask').click();
   await dialog.getByPlaceholder('搜索记录名称').fill(`__no_task_${run}__`);
-  await expect(dialog.getByText('暂无可选记录', {exact: true})).toBeVisible();
-  await expect(dialog.getByRole('button', {name: '导入停用副本'})).toBeDisabled();
-  await page.screenshot({path: info.outputPath('IMPORT01b-搜索无结果与恢复.png')});
+  await expect(dialog.getByText('暂无可选记录', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '导入停用副本' })).toBeDisabled();
+  await page.screenshot({ path: info.outputPath('IMPORT01b-搜索无结果与恢复.png') });
   await dialog.getByPlaceholder('搜索记录名称').fill(title);
-  await expect(dialog.getByRole('button', {name: title, exact: true})).toBeVisible();
-  await page.screenshot({path: info.outputPath('IMPORT01c-具名任务选择器.png')});
-  await dialog.getByRole('button', {name: title, exact: true}).click();
+  await expect(dialog.getByRole('button', { name: title, exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath('IMPORT01c-具名任务选择器.png') });
+  await dialog.getByRole('button', { name: title, exact: true }).click();
   await expect(dialog.locator('button#targetTask')).toHaveText(title);
   await expect(dialog).not.toContainText(taskPid);
-  await page.screenshot({path: info.outputPath('IMPORT02-选择具名演示任务.png')});
-  const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/automations' && response.request().method() === 'POST');
-  await dialog.getByRole('button', {name: '导入停用副本'}).click();
-  const response = await creating; expect(response.ok()).toBe(true);
-  expect(response.request().postDataJSON()).toMatchObject({enabled: false, templateValues: {targetTask: taskPid}});
-  const created = (await response.json()).data; expect(created.enabled).toBe(false);
-  await expect(dialog).not.toBeVisible(); await page.reload();
+  await page.screenshot({ path: info.outputPath('IMPORT02-选择具名演示任务.png') });
+  const creating = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/automations' &&
+      response.request().method() === 'POST',
+  );
+  await dialog.getByRole('button', { name: '导入停用副本' }).click();
+  const response = await creating;
+  expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON()).toMatchObject({
+    enabled: false,
+    templateValues: { targetTask: taskPid },
+  });
+  const created = (await response.json()).data;
+  expect(created.enabled).toBe(false);
+  await expect(dialog).not.toBeVisible();
+  await page.reload();
   const imported = (await (await page.request.get(`/api/automations/${created.pid}`)).json()).data;
-  const bound = JSON.stringify(imported.flowConfig); expect(bound).not.toContain('{{template.'); expect(bound.split(taskPid)).toHaveLength(4);
+  const bound = JSON.stringify(imported.flowConfig);
+  expect(bound).not.toContain('{{template.');
+  expect(bound.split(taskPid)).toHaveLength(4);
   expect((await record(page, taskPid)).tpm_ts_description).toBe(original);
-  await page.getByRole('link', {name, exact: true}).click();
-  const exported = page.waitForEvent('download'); await page.getByTestId('btn-export-automation').click();
-  const download = await exported; const file = info.outputPath('绑定后的任务归档.automation.json'); await download.saveAs(file);
+  await page.getByRole('link', { name, exact: true }).click();
+  const exported = page.waitForEvent('download');
+  await page.getByTestId('btn-export-automation').click();
+  const download = await exported;
+  const file = info.outputPath('绑定后的任务归档.automation.json');
+  await download.saveAs(file);
   expect(JSON.parse(fs.readFileSync(file, 'utf8')).flowConfig).toEqual(imported.flowConfig);
   await menu(page, ['系统管理', '自动化']);
-  const toggled = page.waitForResponse(r => r.url().includes(`/api/automations/${created.pid}/toggle`) && r.request().method() === 'POST');
-  await page.getByTestId(`btn-toggle-${created.pid}`).click(); expect((await toggled).ok()).toBe(true);
+  const toggled = page.waitForResponse(
+    (r) =>
+      r.url().includes(`/api/automations/${created.pid}/toggle`) && r.request().method() === 'POST',
+  );
+  await page.getByTestId(`btn-toggle-${created.pid}`).click();
+  expect((await toggled).ok()).toBe(true);
   await completeTaskViaUi(page, title, taskPid);
   await expect.poll(async () => (await record(page, taskPid)).tpm_ts_description).toBe(marker);
-  await page.reload(); await expect(page.getByText(marker, {exact: true})).toBeVisible();
-  await page.screenshot({path: info.outputPath('IMPORT03-真实任务完成自动归档.png')});
-  const logs = (await (await page.request.get(`/api/automations/${created.pid}/logs`)).json()).data.filter((entry: any) => entry.triggerRecordPid === taskPid);
-  expect(logs).toHaveLength(1); expect(logs[0].status).toBe('success');
+  await page.reload();
+  await expect(page.getByText(marker, { exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath('IMPORT03-真实任务完成自动归档.png') });
+  const logs = (
+    await (await page.request.get(`/api/automations/${created.pid}/logs`)).json()
+  ).data.filter((entry: any) => entry.triggerRecordPid === taskPid);
+  expect(logs).toHaveLength(1);
+  expect(logs[0].status).toBe('success');
   await menu(page, ['系统管理', '自动化']);
-  const stopped = page.waitForResponse(r => r.url().includes(`/api/automations/${created.pid}/toggle`) && r.request().method() === 'POST');
-  await page.getByTestId(`btn-toggle-${created.pid}`).click(); expect((await stopped).ok()).toBe(true);
-  expect((await (await page.request.get(`/api/automations/${created.pid}`)).json()).data.enabled).toBe(false);
+  const stopped = page.waitForResponse(
+    (r) =>
+      r.url().includes(`/api/automations/${created.pid}/toggle`) && r.request().method() === 'POST',
+  );
+  await page.getByTestId(`btn-toggle-${created.pid}`).click();
+  expect((await stopped).ok()).toBe(true);
+  expect(
+    (await (await page.request.get(`/api/automations/${created.pid}`)).json()).data.enabled,
+  ).toBe(false);
   // Direct submissions cannot use missing, unresolvable or expression-injecting references.
-  for (const templateValues of [{}, {targetTask: '01AAAAAAAAAAAAAAAAAAAAAAAA'}, {targetTask: "' OR true"}]) {
-    const denied = await page.request.post('/api/automations', {data: {...template, templateValues, enabled: true}});
-    const payload = await denied.json(); expect(String(payload.code)).not.toBe('0'); expect(denied.status()).toBe(422);
+  for (const templateValues of [
+    {},
+    { targetTask: '01AAAAAAAAAAAAAAAAAAAAAAAA' },
+    { targetTask: "' OR true" },
+  ]) {
+    const denied = await page.request.post('/api/automations', {
+      data: { ...template, templateValues, enabled: true },
+    });
+    const payload = await denied.json();
+    expect(String(payload.code)).not.toBe('0');
+    expect(denied.status()).toBe(422);
   }
-  await info.attach('Template-binding-receipt', {body: JSON.stringify({automationPid: created.pid, taskPid, boundReferenceCount: 3, defaultDisabled: true, finalDisabled: true, executionCount: logs.length, executionStatus: logs[0].status}), contentType: 'application/json'});
+  await info.attach('Template-binding-receipt', {
+    body: JSON.stringify({
+      automationPid: created.pid,
+      taskPid,
+      boundReferenceCount: 3,
+      defaultDisabled: true,
+      finalDisabled: true,
+      executionCount: logs.length,
+      executionStatus: logs[0].status,
+    }),
+    contentType: 'application/json',
+  });
 });

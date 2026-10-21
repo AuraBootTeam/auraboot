@@ -140,7 +140,7 @@ test.describe('Showcase Smart Components', () => {
   // =========================================================================
   // D5: Verify Smart Component field types render correctly
   // =========================================================================
-  test.fixme('SMC-001 — Smart Component fields render as proper components, not plain text inputs', async ({
+  test('SMC-001 — Smart Component fields render as proper components, not plain text inputs', async ({
     page,
   }) => {
     test.setTimeout(30000);
@@ -152,11 +152,8 @@ test.describe('Showcase Smart Components', () => {
     await expect(cascade).toBeVisible({ timeout: 5_000 });
     // Wait for cascade triggers to render (they load options from API)
     const cascadeTriggers = cascade.locator('[data-testid^="cascade-trigger-"]');
-    await cascadeTriggers.first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
-    const triggerCount = await cascadeTriggers.count();
-    // CascadeSelect should have 3 dropdown triggers (one per level)
-    // If options haven't loaded, there may be fewer
-    expect(triggerCount, 'CascadeSelect should have at least 1 dropdown trigger').toBeGreaterThanOrEqual(1);
+    await expect(cascadeTriggers).toHaveCount(3);
+    for (const trigger of await cascadeTriggers.all()) await expect(trigger).toBeVisible();
 
     // 2. TreeSelect — should have a picker trigger with "请选择" text
     const tree = field(page, 'sc_tree_node');

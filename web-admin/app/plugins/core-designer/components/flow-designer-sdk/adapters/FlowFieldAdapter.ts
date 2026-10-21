@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import { useFlowStore } from '../store/useFlowStore';
 
-export interface FlowFieldAdapterProps<T = unknown> {
+export interface FlowFieldAdapterProps<_T = unknown> {
   /** Field key (in node.data.config) */
   fieldKey: string;
   /** Node ID (defaults to selected node) */
@@ -46,10 +46,10 @@ export function useFlowFieldAdapter<T>(props: FlowFieldAdapterProps<T>): FieldAd
 
   const setValue = useCallback(
     (newValue: T) => {
-      if (!targetNodeId) return;
+      if (!targetNodeId || disabled || readOnly) return;
       updateNodeConfig(targetNodeId, { [fieldKey]: newValue });
     },
-    [targetNodeId, fieldKey, updateNodeConfig],
+    [targetNodeId, fieldKey, updateNodeConfig, disabled, readOnly],
   );
 
   // Find field validation error

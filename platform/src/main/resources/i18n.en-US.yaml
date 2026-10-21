@@ -1348,6 +1348,11 @@ bpmn:
     instance_id_placeholder: Enter process instance ID
   save:
     title: Save process definition
+    newVersionTitle: Save as a new draft version
+    newVersionNotice: The published version and its existing instances stay unchanged. Save creates a new draft; publish it separately to use it for new instances.
+    newVersionConfirm: Create draft version
+    versionAssigned: Assigned on save
+    versionNew: New draft version
     closeAria: Close dialog
     cancel: Cancel
     confirm: Save

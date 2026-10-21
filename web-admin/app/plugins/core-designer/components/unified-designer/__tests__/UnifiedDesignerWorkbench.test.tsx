@@ -470,6 +470,23 @@ describe('UnifiedDesignerWorkbench', () => {
     );
   });
 
+  it('selects the next outline row while a completed drag still suppresses click events', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+    fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
+    // dnd-kit's pointer sensor retains this capture listener for 50ms after drop.
+    const suppressClick = (event: Event) => event.stopPropagation();
+    document.addEventListener('click', suppressClick, true);
+    try {
+      const section = screen.getByTestId('outline-item-section_basic');
+      fireEvent(section, new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      fireEvent.click(section);
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('section_basic');
+      expect(screen.getByTestId('inspector-field-title')).toHaveValue('基本信息');
+    } finally {
+      document.removeEventListener('click', suppressClick, true);
+    }
+  });
+
   it('switches edit and layout modes without losing the selected object', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
@@ -605,6 +622,16 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('canvas-block-action_import')).toHaveTextContent('Bulk import');
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+  });
+
+  it('keeps professional JSON controls collapsed until explicitly opened', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
+    const section = screen.getByTestId('inspector-json-section-props.visibleWhen');
+    expect(section).not.toHaveAttribute('open');
+    expect(screen.getByTestId('inspector-field-props.visibleWhen')).not.toBeVisible();
+    fireEvent.click(section.querySelector('summary')!);
+    expect(screen.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
   });
 
   it('renders action-type specific inspector fields for button configuration', () => {

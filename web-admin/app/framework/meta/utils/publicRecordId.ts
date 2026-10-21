@@ -28,13 +28,18 @@ export function buildCommandTargetParams(target: unknown): Record<string, string
   return pid ? { targetRecordPid: pid } : {};
 }
 
-/** Read a public PID from synchronous or nested command results. */
+/** Resolve a saved record from a command result envelope. */
 export function getCommandResultRecordPid(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as Record<string, unknown>;
-  for (const key of ['recordPid', 'pid']) {
-    const pid = record[key];
-    if (typeof pid === 'string' && pid.trim()) return pid;
+  let current = value;
+  const seen = new Set<object>();
+  while (current && typeof current === 'object' && !Array.isArray(current)) {
+    if (seen.has(current)) return undefined;
+    seen.add(current);
+    const record = current as Record<string, unknown>;
+    for (const candidate of [record.recordPid, record.pid]) {
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    }
+    current = record.data;
   }
-  return getCommandResultRecordPid(record.data);
+  return undefined;
 }

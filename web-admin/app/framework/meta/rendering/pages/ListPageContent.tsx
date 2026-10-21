@@ -44,6 +44,8 @@ export {
 export {
   applyLocalSortUpdate,
   beginLatestListRequest,
+  useListApiReadRetry,
+  useListKeywordSearch,
   useRestoreSavedViewFromUrl,
   useSerializedSearchParamsUpdater,
 } from './list/listPageStateUtils';
@@ -59,6 +61,7 @@ export {
 export {
   buildBulkFieldCommandPayload,
   buildToolbarConditionContext,
+  collectListMiscBlocks,
   resolveInitialListTabKey,
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
@@ -138,7 +141,7 @@ function ListPageContentInner(props: PageContentProps) {
     ...viewPersistence,
   });
   const memberInvite = useListMemberInvite({ ...pageRuntime, ...state });
-  const workspaceTabs = useListWorkspaceTabs({ ...columns, ...state, ...metadata });
+  const workspaceTabs = useListWorkspaceTabs({ ...columns, ...state, ...metadata, t: pageRuntime.t, locale: pageRuntime.locale });
   return renderListPage({
     ...state,
     ...pageRuntime,

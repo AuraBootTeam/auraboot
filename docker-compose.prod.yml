@@ -4,11 +4,12 @@
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Required env vars (set in .env or export; the two secrets fail fast if unset):
+# Required env vars (set in .env or export):
 #   REGISTRY          — e.g. ghcr.io/aurabootteam
 #   TAG               — e.g. latest, v1.0.0, main, or a commit sha
 #   POSTGRES_PASSWORD — PostgreSQL password (no default in prod)
 #   JWT_SECRET        — JWT signing secret, min 32 chars (openssl rand -hex 32)
+#   OPEN_PLATFORM_PROTOCOL_SIGNING_KEY — stable protocol key (openssl rand -hex 48)
 #
 # Resource limits below are conservative defaults for a small single host
 # (backend heap is capped at -Xmx1024m); tune per deployment.

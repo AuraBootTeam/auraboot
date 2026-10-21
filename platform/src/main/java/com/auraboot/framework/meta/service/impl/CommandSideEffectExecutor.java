@@ -366,6 +366,10 @@ public class CommandSideEffectExecutor {
             Set<String> jsonbColumns,
             Map<String, Object> legacyConditions) {
         if (data == null || data.isEmpty()) return 0;
+        ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordCommandWriterGuard.assertInputAllowed(writerModel, data, "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, writerModel, code -> metaModelService.getModelDefinition(code).orElse(null), data);
+
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
             // Reuse the complete machine boundary, including field grants and prospective row policy.
             dynamicDataService.update(modelCode, String.valueOf(idEntry.getValue()), new LinkedHashMap<>(data));
@@ -379,7 +383,7 @@ public class CommandSideEffectExecutor {
             Map<String, Object> updateData = new LinkedHashMap<>(data);
             updateData.remove("row_version");
             updateData.put("updated_at", java.time.Instant.now());
-            int affected = new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService)
+            int affected = new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService, metaModelService)
                     .executeScopedUpdate(model, modelCode, idEntry.getKey(), idEntry.getValue(), updateData, jsonbColumns, expectedVersion);
             if (affected == 0 && expectedVersion != null) {
                 throw new com.auraboot.framework.exception.ConflictException("Side effect target changed after authorization");
@@ -435,9 +439,15 @@ public class CommandSideEffectExecutor {
                 .append(idEntry.getKey())
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update", code -> metaModelService.getModelDefinition(code).orElse(null));
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
-        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+        int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
+        if (updated == 0 && RecordCommandWriterGuard.hasPolicy(writerModel))
+            throw new com.auraboot.framework.exception.ConflictException("SIDE_EFFECT update refused: ownership or target scope changed");
+        return updated;
     }
 
     private boolean shouldUseScopedWrite() {
