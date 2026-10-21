@@ -299,6 +299,12 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       'utf8',
     ),
   );
+  const facts=await data(await page.request.post('/api/meta/named-queries/tdo_delivery_facts/execute',{data:{parameters:{},size:500}}));
+  expect(facts.records.length).toBeGreaterThan(0);
+  const groupAmounts=new Map<string,number>();
+  for(const row of facts.records){expect(Number.isFinite(Number(row.amount))).toBe(true);groupAmounts.set(row.project_name,(groupAmounts.get(row.project_name)||0)+Number(row.amount));}
+  const totalAmount=[...groupAmounts.values()].reduce((sum,value)=>sum+value,0);
+  const money=(value:number)=>'¥'+value.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
   const original = template.dsl.body.find((b: any) => b.id === 'scope').content;
   const note =
     '本周复盘说明：先催办当前逾期审批，再补正退回材料；资料更新后须重新核验。以下表格按当前账号权限实时查询，验收金额不等于收入。';
@@ -411,9 +417,14 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       await textField('groupByField').fill('project_name');
       const columns = panel.getByTestId('schema-config-field-columns');
       await columns.getByRole('button', { name: '+ 添加', exact: true }).click();
-      await columns.getByRole('textbox', { name: '字段名称*', exact: true }).fill('amount');
-      await columns.getByRole('textbox', { name: '显示名称', exact: true }).fill('交付金额');
-      const width = columns.getByRole('spinbutton', { name: '列宽', exact: true });
+      await columns.getByRole('group').last().getByRole('textbox',{name:'字段名称*',exact:true}).fill('acceptance_name');
+      await columns.getByRole('group').last().getByRole('textbox',{name:'显示名称',exact:true}).fill('验收事项');
+      await columns.getByRole('button', { name: '+ 添加', exact: true }).click();
+      const amountColumn=columns.getByRole('group').last();
+      await amountColumn.getByRole('textbox', { name: '字段名称*', exact: true }).fill('amount');
+      await amountColumn.getByRole('textbox', { name: '显示名称', exact: true }).fill('交付金额');
+      await amountColumn.getByRole('combobox',{name:'格式',exact:true}).click();await page.getByRole('option',{name:'金额',exact:true}).click();
+      const width = amountColumn.getByRole('spinbutton', { name: '列宽', exact: true });
       await expect(width).toHaveValue('');
       await width.fill('0');
       await expect(columns.getByRole('alert')).toBeVisible();
@@ -422,6 +433,7 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       await expect(columns.getByRole('alert')).toHaveCount(0);
       for(const key of ['groupSubtotal','grandTotal']) {
         await panel.getByTestId(`schema-config-field-${key}.enabled`).getByRole('switch').check();
+        await panel.getByTestId(`schema-config-field-${key}.label`).getByRole('textbox').fill(key==='groupSubtotal'?'本组交付金额小计':'全部项目交付金额总计');
         const summary=panel.getByTestId(`schema-config-field-${key}.columns`);
         await summary.getByRole('button',{name:'+ 添加',exact:true}).click();
         await summary.getByRole('textbox',{name:'字段名称*',exact:true}).fill('amount');
@@ -429,17 +441,20 @@ test('SC10 report template → reviewed text edit → save/reload → three real
         await aggregate.click();await page.getByRole('option',{name:'平均值',exact:true}).click();
         await aggregate.click();await page.getByRole('option',{name:'求和',exact:true}).click();
         await expect(aggregate).toContainText('求和');
+        await summary.getByRole('combobox',{name:'格式',exact:true}).click();await page.getByRole('option',{name:'金额',exact:true}).click();
       }
 
     }
     if (['stat-card', 'cross-tab', 'chart'].includes(type))
       await textField('valueField').fill('amount');
     if (type === 'stat-card') await textField('label').fill('交付总金额');
+    if(['stat-card','cross-tab'].includes(type)){await panel.getByTestId('schema-config-field-format').getByRole('combobox').click();await page.getByRole('option',{name:'金额',exact:true}).click();}
     if (type === 'cross-tab') {
       await textField('rowField').fill('project_name');
       await textField('columnField').fill('acceptance_label');
+      await textField('rowLabel').fill('客户项目');await textField('columnLabel').fill('验收状态');await textField('totalLabel').fill('合计');
     }
-    if (type === 'chart') await textField('categoryField').fill('project_name');
+    if (type === 'chart') {await textField('categoryField').fill('project_name');await panel.getByTestId('schema-config-field-width').getByRole('spinbutton').fill('860');await panel.getByTestId('schema-config-field-height').getByRole('spinbutton').fill('280');}
     if (type === 'barcode') await textField('staticValue').fill('ACC20261021');
     await expect(
       page
@@ -481,12 +496,13 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   const storedColumns=persisted.dsl.body.find((block:any)=>block.id==='acceptance').columns;
   expect(storedColumns.map((column:any)=>column.field)).toEqual([originalFields[1],originalFields[0],...originalFields.slice(2)]);
   expect(storedColumns[0].width).toBe(240);
+  expect(persisted.dsl.body.find((block:any)=>block.blockType==='chart')).toMatchObject({width:860,height:280});
   const grouped=persisted.dsl.body.find((block:any)=>block.blockType==='grouped-table');
   expect(grouped.groupSubtotal).toMatchObject({enabled:true,columns:[{field:'amount',aggregation:'sum'}]});
   expect(grouped.grandTotal).toMatchObject({enabled:true,columns:[{field:'amount',aggregation:'sum'}]});
 
   expect(
-    persisted.dsl.body.find((b: any) => b.blockType === 'grouped-table').columns[0].width,
+    persisted.dsl.body.find((b: any) => b.blockType === 'grouped-table').columns.find((column:any)=>column.field==='amount').width,
   ).toBe(120);
   const toolbar = page.getByTestId('report-designer-toolbar');
   await toolbar.getByRole('button', { name: '预览', exact: true }).click();
@@ -514,6 +530,7 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   expect(watermarkBox!.y + watermarkBox!.height).toBeLessThanOrEqual(
     paperBox!.y + paperBox!.height + 1,
   );
+  await expect(page.getByRole('main')).toContainText('本组交付金额小计');await expect(page.getByRole('main')).toContainText('全部项目交付金额总计');
   await shot(page, 'SC10-report-persisted-preview');
   const files = [];
   for (const [format, label, ext] of [
@@ -551,6 +568,15 @@ test('SC10 report template → reviewed text edit → save/reload → three real
     ])
       expect(compact(text)).toContain(compact(heading));
     expect(text).toContain('华辰制造');
+    const groupSection=compact(text).split(compact(addedTitles['grouped-table']))[1]?.split(compact(addedTitles['stat-card']))[0];
+    expect(groupSection,format+' grouped summary section').toBeTruthy();
+    expect(groupSection).toContain('本组交付金额小计');expect(groupSection).toContain('全部项目交付金额总计');
+    for(const [project,total] of groupAmounts){expect(groupSection).toContain(compact(project));expect(groupSection).toContain(money(total));}
+    expect(groupSection).toContain(money(totalAmount));
+    const statSection=compact(text).split(compact(addedTitles['stat-card']))[1]?.split(compact(addedTitles['cross-tab']))[0];
+    expect(statSection,format+' statistic currency').toContain(money(totalAmount));
+    const crossSection=compact(text).split(compact(addedTitles['cross-tab']))[1]?.split(compact(addedTitles.chart))[0];
+    expect(crossSection,format+' crosstab labels and money').toContain('客户项目');expect(crossSection).toContain('验收状态');expect(crossSection).toContain('合计');expect(crossSection).toContain(money(totalAmount));
     files.push(path);
   }
   await writeFile(

@@ -186,6 +186,46 @@ class ReportExportServiceTest {
                 .doesNotContain("## grouped-table", "## cross-tab", "## chart");
     }
 
+    @Test
+    void markdownRetainsEveryConfiguredSummaryAggregationAndColumnMoneyFormat() {
+        for (var expected : Map.of("sum", "5.50", "avg", "2.75", "count", "2.00", "min", "2.00", "max", "3.50").entrySet()) {
+            String markdown = exportMarkdownFixture(Map.of("title", "Summary", "dataSources", Map.of("main",
+                    Map.of("type", "static", "data", List.of(Map.of("name", "Alpha", "amount", 2), Map.of("name", "Beta", "amount", 3.5)))),
+                    "body", List.of(Map.of("blockType", "table", "dataSource", "main",
+                            "columns", List.of(Map.of("field", "name", "label", "Item"), Map.of("field", "amount", "label", "Amount", "format", "currency")),
+                            "summary", Map.of("enabled", true, "label", "<Review>", "columns", List.of(Map.of("field", "amount", "aggregation", expected.getKey(), "format", "currency")))))));
+            assertThat(markdown).contains("| Alpha | ¥2.00 |", "| &lt;Review&gt; | ¥" + expected.getValue() + " |").doesNotContain("<Review>");
+        }
+    }
+
+    @Test
+    void groupedSummariesSurviveMarkdownAndPdfFallbackWithExplicitLabels() throws Exception {
+        String markdown = exportMarkdownFixture(Map.of("title", "Grouped summary", "dataSources", Map.of("main",
+                Map.of("type", "static", "data", List.of(Map.of("name", "Alpha", "team", "A", "amount", 10), Map.of("name", "Beta", "team", "A", "amount", 2.5), Map.of("name", "Gamma", "team", "B", "amount", 5)))),
+                "body", List.of(Map.of("blockType", "grouped-table", "dataSource", "main", "groupByField", "team",
+                        "columns", List.of(Map.of("field", "name", "label", "Item"), Map.of("field", "amount", "label", "Amount", "format", "currency")),
+                        "groupSubtotal", Map.of("enabled", true, "label", "Group subtotal", "columns", List.of(Map.of("field", "amount", "aggregation", "sum", "format", "currency"))),
+                        "grandTotal", Map.of("enabled", true, "label", "Grand total", "columns", List.of(Map.of("field", "amount", "aggregation", "sum", "format", "currency")))),
+                        Map.of("blockType", "stat-card", "dataSource", "main", "valueField", "amount", "aggregation", "sum", "format", "currency", "label", "Overall amount"),
+                        Map.of("blockType", "cross-tab", "dataSource", "main", "rowField", "team", "columnField", "name", "valueField", "amount", "aggregation", "sum", "format", "currency", "rowLabel", "Team", "columnLabel", "Item", "totalLabel", "Total Amount"))));
+        assertThat(markdown).contains("| Group subtotal | ¥12.50 |", "| Group subtotal | ¥5.00 |", "| Grand total | ¥17.50 |", "Overall amount: ¥17.50", "Team / Item", "Total Amount");
+        ReportExportRequest request = new ReportExportRequest(); request.setReportPid("md-fixture");
+        ReportExportFile pdf = reportExportService.exportPdf(request);
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdf.getBytes()))) {
+            assertThat(new PDFTextStripper().getText(document)).contains("Group subtotal | ¥12.50", "Grand total | ¥17.50", "Overall amount: ¥17.50", "Team / Item", "Total Amount");
+        }
+    }
+
+    @Test
+    void summaryNumbersCoerceNullAndTextLikeTheDesignerAndRoundCurrencyToTwoDecimals() {
+        Map<String, Object> nullRow = new java.util.HashMap<>(); nullRow.put("name", "Null"); nullRow.put("amount", null);
+        String markdown = exportMarkdownFixture(Map.of("title", "Average", "dataSources", Map.of("main", Map.of("type", "static", "data",
+                List.of(nullRow, Map.of("name", "Text", "amount", "2.50"), Map.of("name", "Invalid", "amount", "not-number")))),
+                "body", List.of(Map.of("blockType", "table", "dataSource", "main", "columns", List.of(Map.of("field", "name"), Map.of("field", "amount", "format", "currency")),
+                        "summary", Map.of("enabled", true, "label", "Average", "columns", List.of(Map.of("field", "amount", "aggregation", "avg", "format", "")))))));
+        assertThat(markdown).contains("| Average | ¥0.83 |").doesNotContain("¥0.833");
+    }
+
     private String exportMarkdownFixture(Map<String, Object> dsl) {
         ReportEntity report = new ReportEntity();
         report.setTenantId(MetaContext.getCurrentTenantId());

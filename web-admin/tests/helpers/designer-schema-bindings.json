@@ -1,7 +1,7 @@
 [
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Dashboard",
@@ -19,7 +19,7 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Dashboard",
@@ -32,7 +32,7 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",
@@ -46,7 +46,7 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",
@@ -62,7 +62,7 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",
@@ -77,13 +77,17 @@
       "groupSubtotal.enabled",
       "groupSubtotal.columns[].aggregation",
       "grandTotal.enabled",
-      "grandTotal.columns[].field"
+      "grandTotal.columns[].field",
+      "groupSubtotal.label",
+      "groupSubtotal.columns[].format",
+      "grandTotal.label",
+      "grandTotal.columns[].format"
     ],
     "testTitle": "SC10 report template → reviewed text edit → save/reload → three real exports retain live facts"
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",
@@ -94,13 +98,17 @@
       "dataSource",
       "rowField",
       "columnField",
-      "valueField"
+      "valueField",
+      "rowLabel",
+      "columnLabel",
+      "totalLabel",
+      "format"
     ],
     "testTitle": "SC10 report template → reviewed text edit → save/reload → three real exports retain live facts"
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",
@@ -110,13 +118,14 @@
       "title",
       "label",
       "dataSource",
-      "valueField"
+      "valueField",
+      "format"
     ],
     "testTitle": "SC10 report template → reviewed text edit → save/reload → three real exports retain live facts"
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",
@@ -126,13 +135,15 @@
       "title",
       "dataSource",
       "categoryField",
-      "valueField"
+      "valueField",
+      "width",
+      "height"
     ],
     "testTitle": "SC10 report template → reviewed text edit → save/reload → three real exports retain live facts"
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",
@@ -146,7 +157,7 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "342719df4c5d6e8b5b608cd1032ec765e3f4c3dd52e692dc99a7437f59ab5cb5",
+    "driverSha256": "cdf115c1439011f556d9b50cad349619d1bbe3372e8be7a25b2a4d53999ca8bc",
     "layer": "browser",
     "profile": "showcase-designers",
     "surface": "Report",

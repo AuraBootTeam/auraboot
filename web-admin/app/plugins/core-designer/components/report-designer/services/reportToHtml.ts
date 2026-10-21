@@ -69,7 +69,7 @@ function formatCellValue(value: unknown, format?: string): string {
     return value.toLocaleString();
   }
   if (format === 'currency' && typeof value === 'number') {
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (format === 'percent' && typeof value === 'number') {
     return `${(value * 100).toFixed(1)}%`;
