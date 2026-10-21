@@ -104,3 +104,19 @@ describe('stored passthrough structural configuration', () => {
     expect(serializePageTreeToFlat(second.tree).blocks).toEqual([original]);
   });
 });
+
+
+describe('stored repeating field identity', () => {
+  it.each(['repeater', 'subform'])('keeps the nested %s field key across stored-page reloads', blockType => {
+    const original: LegacyDslBlockV2 = {
+      id: 'owned_rows', blockType, props: { rows: [{ sku: 'Initial SKU' }] },
+      blocks: [{ id: 'field_sku', blockType: 'field', field: 'sku', props: { label: 'SKU', component: 'input' } }],
+    };
+    const first = load(original);
+    expect(first.block.blocks?.[0].field).toBe('sku');
+    expect(first.block.blocks?.[0].props).toEqual({ label: 'SKU', component: 'input' });
+    expect(serializePageTreeToFlat(first.tree).blocks).toEqual([original]);
+    const second = load(serializePageTreeToFlat(first.tree).blocks[0]);
+    expect(second.block.blocks?.[0].field).toBe('sku');
+  });
+});
