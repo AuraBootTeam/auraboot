@@ -513,6 +513,14 @@ function toApiKind(kind: PageSchemaV3Kind): ApiPageType {
   return kind;
 }
 
+function resolvePageModelCode(document: PageSchemaV3): string | undefined {
+  const root = document.blocks.length === 1 && document.blocks[0].blockType === document.kind
+    ? document.blocks[0] : undefined;
+  const source = root?.dataSource;
+  return source && typeof source === 'object' && typeof source.model === 'string'
+    ? source.model : document.modelCode;
+}
+
 function toUpdateRequest(
   document: PageSchemaV3,
   source: PageSchemaV3Source,
@@ -525,6 +533,7 @@ function toUpdateRequest(
     pageKey: document.pageKey || source.pageKey || document.id,
     title: document.title,
     kind: toApiKind(flatKind),
+    modelCode: resolvePageModelCode(document),
     blocks: flatBlocks,
     layout: document.layout,
     schemaVersion: FLAT_PAGE_SCHEMA_VERSION,
@@ -545,6 +554,7 @@ function toCreateRequest(
     pageKey,
     title: resolveTitle(document.title, document.id),
     kind: toApiKind(flatKind),
+    modelCode: resolvePageModelCode(document),
     blocks: flatBlocks,
     schemaVersion: FLAT_PAGE_SCHEMA_VERSION,
     extension: flatExtension,
