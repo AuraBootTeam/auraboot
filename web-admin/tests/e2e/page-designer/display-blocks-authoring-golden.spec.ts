@@ -62,6 +62,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -161,7 +162,7 @@ async function fillTextField(page: Page, path: string, value: string): Promise<v
 }
 
 async function applyJsonField(page: Page, path: string, value: unknown): Promise<void> {
-  const textarea = page.getByTestId(`inspector-field-${path}`);
+  const textarea = await inspectorJsonField(page, path);
   await expect(textarea).toBeVisible({ timeout: 5_000 });
   await textarea.fill(JSON.stringify(value, null, 2));
   await page.evaluate(
@@ -360,7 +361,7 @@ test.describe.serial('Unified Designer display-blocks authoring golden', () => {
     const before = findBlockById((await readPage(page, pid)).blocks, EMBEDDED_LIST)?.columns;
     expect(Array.isArray(before), 'B4 columns present before sad path').toBeTruthy();
 
-    const columnsField = page.getByTestId('inspector-field-columns');
+    const columnsField = await inspectorJsonField(page, 'columns');
     await expect(columnsField).toBeVisible({ timeout: 5_000 });
     await columnsField.fill('[ { field: title, ');
     await page.evaluate(

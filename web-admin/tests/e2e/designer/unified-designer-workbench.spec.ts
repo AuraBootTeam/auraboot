@@ -5,6 +5,7 @@
  * load V3 page -> add model field -> edit inspector -> save -> reopen.
  */
 
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { expect, test } from '../../fixtures';
 import type { Locator, Page, Request, TestInfo } from '@playwright/test';
 import { grantRolePermissionByCode, createAuthenticatedRoleContext, collectPermissionCodes } from '../../helpers/designer-role-fixtures';
@@ -169,9 +170,9 @@ async function assertStaticWidgetPreview(
   await page.getByTestId('designer-mode-edit').click();
   await page.getByTestId('outline-item-widget_pipeline').click();
   const authoredValue = `${scenario} authored preview`;
-  await page.getByTestId('inspector-field-props.columns').fill(JSON.stringify(['Preview value']));
+  await (await inspectorJsonField(page, 'props.columns')).fill(JSON.stringify(['Preview value']));
   await applyJsonField(page, 'inspector-json-field-apply-props.columns');
-  await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify([[authoredValue]]));
+  await (await inspectorJsonField(page, 'props.rows')).fill(JSON.stringify([[authoredValue]]));
   await applyJsonField(page, 'inspector-json-field-apply-props.rows');
   await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('preview');
   const queryRequests: string[] = [];
@@ -1416,7 +1417,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-title').fill(nestedSectionTitle);
     await page.getByTestId('inspector-field-props.description').fill(nestedSectionDescription);
     await setCheckbox(page, 'inspector-field-props.collapsible', true);
-    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     await switchResourceTab(page, 'outline');
@@ -1424,12 +1425,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.placeholder').fill(complexPlaceholder);
     await page.getByTestId('inspector-field-props.helpText').fill(complexHelpText);
     await setCheckbox(page, 'inspector-field-props.readOnly', true);
-    await page
-      .getByTestId('inspector-field-props.visibleWhen')
+    await (await inspectorJsonField(page, 'props.visibleWhen'))
       .fill(JSON.stringify(fieldVisibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await page
-      .getByTestId('inspector-field-props.validationRules')
+    await (await inspectorJsonField(page, 'props.validationRules'))
       .fill(JSON.stringify(validationRules));
     await applyJsonField(page, 'inspector-json-field-apply-props.validationRules');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -1507,13 +1506,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     // also avoids racing the async model-options load.
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.metric').fill(advancedWidgetMetric);
-    await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
+    await (await inspectorJsonField(page, 'dataSource.query')).fill(JSON.stringify(query));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
     await page.getByTestId('inspector-field-props.value').fill(advancedWidgetValue);
     await page.getByTestId('inspector-field-props.format').selectOption('number');
     await page.getByTestId('inspector-field-props.emptyText').fill(advancedWidgetEmptyText);
     await page.getByTestId('inspector-field-props.drillDownTo').fill(advancedWidgetDrilldown);
-    await page.getByTestId('inspector-field-props.thresholds').fill(JSON.stringify(thresholds));
+    await (await inspectorJsonField(page, 'props.thresholds')).fill(JSON.stringify(thresholds));
     await applyJsonField(page, 'inspector-json-field-apply-props.thresholds');
     await page.getByTestId('inspector-field-props.refreshInterval').fill('60');
 
@@ -1570,7 +1569,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-widgetType').selectOption('bar-chart');
     await page.getByTestId('inspector-field-props.title').fill(chartWidgetTitle);
     await page.getByTestId('inspector-field-props.emptyText').fill('');
-    await page.getByTestId('inspector-field-props.series').fill(JSON.stringify(chartSeries));
+    await (await inspectorJsonField(page, 'props.series')).fill(JSON.stringify(chartSeries));
     await applyJsonField(page, 'inspector-json-field-apply-props.series');
 
     await page.getByTestId('outline-item-widget_pipeline').click();
@@ -1713,7 +1712,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.title').fill(liveWidgetTitle);
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
+    await (await inspectorJsonField(page, 'dataSource.query')).fill(JSON.stringify(query));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
     await page.getByTestId('inspector-field-props.value').fill('');
     await page.getByTestId('inspector-field-props.emptyText').fill('');
@@ -1760,7 +1759,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(
+    await (await inspectorJsonField(page, 'props.payload')).fill(
       JSON.stringify({
         source: 'unified-designer-workbench',
         uid,
@@ -1903,7 +1902,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveWorkflowLabel);
     await page.getByTestId('inspector-field-props.workflowKey').fill(liveWorkflowKey);
     await page.getByTestId('inspector-field-props.businessKey').fill(workflowBusinessKeyTemplate);
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.feedback').fill('');
@@ -2018,7 +2017,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.type').selectOption('namedQuery');
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-dataSource.queryCode-manual').fill(liveNamedQueryCode);
-    await page.getByTestId('inspector-field-dataSource.parameters').fill(JSON.stringify({}));
+    await (await inspectorJsonField(page, 'dataSource.parameters')).fill(JSON.stringify({}));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.parameters');
     await page.getByTestId('inspector-field-dataSource.page').fill('1');
     await page.getByTestId('inspector-field-dataSource.size').fill('20');
@@ -2081,7 +2080,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     if (await readOnlyInput.isChecked()) {
       await readOnlyInput.uncheck();
     }
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     const addedFieldOutlineItem = page.getByTestId(`outline-item-${fieldBlockId}`);
@@ -2098,7 +2097,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveFormCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveFormCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -2215,7 +2214,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveBulkCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveBulkCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -2317,7 +2316,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveRowCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -2433,7 +2432,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(paletteRowActionLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(paletteRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
@@ -2596,7 +2595,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.pickerSource').fill('user');
     await page.getByTestId('inspector-field-props.valueField').fill('id');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(pickerOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(pickerOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
@@ -2605,8 +2604,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-field-props.richTextToolbar')).toBeVisible();
     await expect(page.getByTestId('inspector-field-props.pickerSource')).toHaveCount(0);
     await page.getByTestId('inspector-field-props.placeholder').fill(componentRichTextPlaceholder);
-    await page
-      .getByTestId('inspector-field-props.richTextToolbar')
+    await (await inspectorJsonField(page, 'props.richTextToolbar'))
       .fill(JSON.stringify(['bold', 'italic', 'link']));
     await applyJsonField(page, 'inspector-json-field-apply-props.richTextToolbar');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -2754,8 +2752,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-field-props.displayField')).toHaveValue('displayName');
 
     await page.getByTestId('inspector-field-props.pickerDataSource').selectOption('static');
-    await page
-      .getByTestId('inspector-field-props.options')
+    await (await inspectorJsonField(page, 'props.options'))
       .fill(JSON.stringify([{ label: formTitle, value: formPageKey }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
@@ -2848,8 +2845,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
 
     await page.getByTestId('outline-item-table_customers').click();
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ title: visibleTitle, status: secretStatus }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -2957,10 +2953,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
     await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
+    await (await inspectorJsonField(page, 'props.disabledWhen')).fill(JSON.stringify(disabledWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -3017,10 +3013,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
     await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
+    await (await inspectorJsonField(page, 'props.disabledWhen')).fill(JSON.stringify(disabledWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -3089,8 +3085,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     if (!(await requiredInput.isChecked())) {
       await requiredInput.check();
     }
-    await page
-      .getByTestId('inspector-field-props.validationRules')
+    await (await inspectorJsonField(page, 'props.validationRules'))
       .fill(JSON.stringify(validationRules));
     await applyJsonField(page, 'inspector-json-field-apply-props.validationRules');
 
@@ -3099,11 +3094,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(validationCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(validationCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await page.getByTestId('inspector-field-props.disabledWhen').fill('');
+    await (await inspectorJsonField(page, 'props.disabledWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -3343,7 +3338,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.parentField').fill(subTableParentField);
     await page.getByTestId('inspector-field-dataSource.childField').fill(subTableChildField);
-    await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify(subTableRows));
+    await (await inspectorJsonField(page, 'props.rows')).fill(JSON.stringify(subTableRows));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
     await switchResourceTab(page, 'fields');
@@ -3396,7 +3391,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.component').selectOption('select');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(selectOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(selectOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     const requiredInput = page.getByTestId('inspector-field-props.required');
     if (await requiredInput.isChecked()) {
@@ -3469,7 +3464,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3881,14 +3876,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(controllerLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('select');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(controllerOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(controllerOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(dependentLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('input');
-    await page
-      .getByTestId('inspector-field-props.visibleWhen')
+    await (await inspectorJsonField(page, 'props.visibleWhen'))
       .fill(JSON.stringify(dependentVisibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -3963,7 +3957,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.valueField').fill('page_key');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4059,11 +4053,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.valueField').fill('page_key');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.pickerParameters').fill(JSON.stringify({}));
+    await (await inspectorJsonField(page, 'props.pickerParameters')).fill(JSON.stringify({}));
     await applyJsonField(page, 'inspector-json-field-apply-props.pickerParameters');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4178,7 +4172,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.searchField').fill('page_key');
     await page.getByTestId('inspector-field-props.searchParameter').fill('keyword');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4309,9 +4303,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.searchField').fill('page_key');
     await page.getByTestId('inspector-field-props.searchParameter').fill('keyword');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.pickerParameters').fill(JSON.stringify({}));
+    await (await inspectorJsonField(page, 'props.pickerParameters')).fill(JSON.stringify({}));
     await applyJsonField(page, 'inspector-json-field-apply-props.pickerParameters');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4681,7 +4675,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(radioLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('radio');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(radioOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(radioOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     const requiredInput = page.getByTestId('inspector-field-props.required');
     if (await requiredInput.isChecked()) {
@@ -4757,8 +4751,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(repeaterId);
     await page.getByTestId('inspector-field-title').fill(repeaterTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: initialLineValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -4776,7 +4769,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command-manual').fill(repeaterCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await setCheckbox(page, 'inspector-field-props.validateForm', false);
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(repeaterPayload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(repeaterPayload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
@@ -4880,8 +4873,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(subformId);
     await page.getByTestId('inspector-field-title').fill(subformTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: initialMemberValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -4902,7 +4894,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     if (await validateFormInput.isChecked()) {
       await validateFormInput.uncheck();
     }
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(subformPayload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(subformPayload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
@@ -5159,8 +5151,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`canvas-block-${subTableId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailSubTableTitle);
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: subTablePreviewValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5182,8 +5173,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
     await expect(page.getByTestId(`canvas-block-${repeaterId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailRepeaterTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: repeaterPreviewValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5204,8 +5194,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await dndDragTo(page, subformPaletteItem, page.getByTestId('canvas-block-detail_section_summary'));
     await expect(page.getByTestId(`canvas-block-${subformId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailSubformTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: subformPreviewValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5440,8 +5429,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const tableId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(tableId).toMatch(/^table_new_table(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(tableTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: matchingValue }, { [fieldCode]: hiddenValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5757,11 +5745,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-widgetType').selectOption('table');
     await page.getByTestId('inspector-field-props.title').fill(listWidgetTitle);
     await page.getByTestId('inspector-field-props.subtitle').fill(listWidgetSubtitle);
-    await page
-      .getByTestId('inspector-field-props.columns')
+    await (await inspectorJsonField(page, 'props.columns'))
       .fill(JSON.stringify(['Status', 'Count']));
     await applyJsonField(page, 'inspector-json-field-apply-props.columns');
-    await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify(listWidgetRows));
+    await (await inspectorJsonField(page, 'props.rows')).fill(JSON.stringify(listWidgetRows));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -5919,15 +5906,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await page
         .getByTestId('inspector-field-dataSource.queryCode-manual')
         .fill(`udw_${helper.blockType.replaceAll('-', '_')}_${uid}`);
-      await page
-        .getByTestId('inspector-field-dataSource.parameters')
+      await (await inspectorJsonField(page, 'dataSource.parameters'))
         .fill(JSON.stringify({ ...helperDataSourceParams, helper: helper.blockType }));
       await applyJsonField(page, 'inspector-json-field-apply-dataSource.parameters');
       if (helper.blockType === 'ai-fill-banner') {
         await page.getByTestId('inspector-field-props.description').fill(aiDescription);
         await page.getByTestId('inspector-field-props.feedback').fill(aiFeedback);
-        await page
-          .getByTestId('inspector-field-props.suggestedFields')
+        await (await inspectorJsonField(page, 'props.suggestedFields'))
           .fill(JSON.stringify(aiSuggestedFields));
         await applyJsonField(page, 'inspector-json-field-apply-props.suggestedFields');
       }
@@ -5936,16 +5921,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         await page.getByTestId('inspector-field-props.status').selectOption('pending');
         await page.getByTestId('inspector-field-props.assignee').fill(bpmAssignee);
         await page.getByTestId('inspector-field-props.dueAt').fill(bpmDueAt);
-        await page.getByTestId('inspector-field-props.actions').fill(JSON.stringify(bpmActions));
+        await (await inspectorJsonField(page, 'props.actions')).fill(JSON.stringify(bpmActions));
         await applyJsonField(page, 'inspector-json-field-apply-props.actions');
       }
       if (helper.blockType === 'activity-timeline') {
-        await page.getByTestId('inspector-field-props.items').fill(JSON.stringify(timelineItems));
+        await (await inspectorJsonField(page, 'props.items')).fill(JSON.stringify(timelineItems));
         await applyJsonField(page, 'inspector-json-field-apply-props.items');
       }
       if (helper.blockType === 'field-history') {
-        await page
-          .getByTestId('inspector-field-props.entries')
+        await (await inspectorJsonField(page, 'props.entries'))
           .fill(JSON.stringify(historyEntries));
         await applyJsonField(page, 'inspector-json-field-apply-props.entries');
       }

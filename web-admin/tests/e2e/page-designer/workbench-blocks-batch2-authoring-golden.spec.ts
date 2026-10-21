@@ -54,6 +54,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -163,7 +164,7 @@ async function fillTextField(page: Page, path: string, value: string): Promise<v
 
 /** Apply a basic-tab JSON inspector field (inspector-json-field-apply-<path>). */
 async function applyJsonField(page: Page, path: string, value: unknown): Promise<void> {
-  const textarea = page.getByTestId(`inspector-field-${path}`);
+  const textarea = await inspectorJsonField(page, path);
   await expect(textarea).toBeVisible({ timeout: 5_000 });
   await textarea.fill(JSON.stringify(value, null, 2));
   await page.evaluate(
@@ -461,7 +462,7 @@ test('B2: evidence-panel — dataSource + sections JSON persist at the block top
     const before = findBlockById((await readPage(page, pid)).blocks, ACTION_BAR)?.actions;
     expect(Array.isArray(before), 'B1 actions present before sad path').toBeTruthy();
 
-    const actionsField = page.getByTestId('inspector-field-actions');
+    const actionsField = await inspectorJsonField(page, 'actions');
     await expect(actionsField).toBeVisible({ timeout: 5_000 });
     await actionsField.fill('[ { code: confirm, ');
     await page.evaluate(

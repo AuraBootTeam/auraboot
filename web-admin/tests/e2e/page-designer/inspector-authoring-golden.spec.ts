@@ -30,6 +30,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI, ensureBusinessSpace } from '../../helpers/auth-fixtures';
@@ -118,7 +119,7 @@ async function saveDesigner(page: Page, pid: string): Promise<void> {
 
 /** Apply a basic-tab JSON inspector field (inspector-json-field-apply-<path>). */
 async function applyJsonField(page: Page, path: string, value: unknown): Promise<void> {
-  const textarea = page.getByTestId(`inspector-field-${path}`);
+  const textarea = await inspectorJsonField(page, path);
   await expect(textarea).toBeVisible({ timeout: 5_000 });
   await textarea.fill(JSON.stringify(value, null, 2));
   // Let the draft state commit before the apply handler reads it (UDW pattern).
