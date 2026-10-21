@@ -74,7 +74,8 @@ test.describe('Block Renderer — Block Type Tests', () => {
     orderPid = await order.createViaApi({ e2et_order_title: `BlockTest ${uniqueId()}` });
     const datedOrder = async (title: string, date: string) => {
       const result = await executeCommandViaApi(page, 'e2eto:create_e2et_order', {
-        e2et_order_title: title, e2et_order_type: 'normal', e2et_order_date: date, e2et_delivery_date: date,
+        e2et_order_title: title, e2et_order_type: 'normal', e2et_order_date: date,
+        e2et_delivery_date: new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10),
       });
       expect(result.code).toBe('0');
       expect(result.recordId).toBeTruthy();

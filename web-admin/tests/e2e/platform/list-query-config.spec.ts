@@ -160,7 +160,15 @@ test.describe('List Query Dynamic Configuration', () => {
     await order.transitionViaApi(approved, ['submit', 'approve']);
     expect((await order.fetchViaApi(draft)).e2et_order_status).toBe('draft');
     expect((await order.fetchViaApi(approved)).e2et_order_status).toBe('approved');
-    await navigateToDynamicPage(page, testPageKey);
+    const viewResponse = await page.request.post('/api/views', { data: {
+      name: `Owned dict tones ${prefix}`, modelCode: 'e2et_order', pageKey: 'e2et_order_list',
+      viewType: 'table', scope: 'personal', isDefault: false, config: {},
+    } });
+    expect(viewResponse.ok()).toBe(true);
+    const viewBody = await viewResponse.json();
+    expect(String(viewBody.code)).toBe('0');
+    expect(viewBody.data.pid).toBeTruthy();
+    await navigateToDynamicPage(page, testPageKey, { viewPid: viewBody.data.pid });
     await waitForDynamicPageLoad(page);
     const loaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/dynamic/e2et_order/list'
       && new URL(response.url()).searchParams.get('keyword') === prefix);
