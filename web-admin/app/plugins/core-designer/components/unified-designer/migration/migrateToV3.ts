@@ -236,12 +236,21 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
     blockType: block.blockType,
     region: block.region,
     title: block.title,
+    field: typeof block.field === 'string' ? block.field : undefined,
     dataSource: normalizeDataSource(block.dataSource),
     layout: normalizeLayout(block),
     props: normalizeProps(block),
     blocks: block.blocks?.map((child) => migrateGenericBlock(child, kind)),
     extension: normalizeExtension(block),
   };
+  // Passthrough blocks own structural configuration that normalizeProps reserves
+  // for specialized containers. Keep those keys at their original locations
+  // so a stored-page reload does not discard the inspector binding.
+  if (PASSTHROUGH_BLOCK_TYPES.has(block.blockType)) {
+    for (const key of ['fields', 'columns', 'buttons', 'actions', 'selection'] as const) {
+      if (block[key] !== undefined) (migrated as Record<string, unknown>)[key] = block[key];
+    }
+  }
   // Passthrough display blocks (metric-strip, status-banner, description, …)
   // are rendered from the BLOCK TOP LEVEL by the platform renderers and bound
   // there by the inspector — keep their legacy keys at the top level instead
@@ -444,7 +453,7 @@ function parseFieldLikeRef(ref: LegacyFieldRefV2 | LegacyColumnRefV2): Normalize
     return {
       id: typeof id === 'string' && id ? id : undefined,
       field,
-      props: rest,
+      props: { ...rest, ...(typeof colSpan === 'number' ? { colSpan } : {}) },
       layout,
     };
   }
@@ -504,6 +513,7 @@ function normalizeProps(block: LegacyDslBlockV2): Record<string, unknown> | unde
     blockType: _blockType,
     region: _region,
     title: _title,
+    field: _field,
     fields: _fields,
     columns: _columns,
     buttons: _buttons,

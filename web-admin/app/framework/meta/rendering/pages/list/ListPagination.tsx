@@ -54,7 +54,7 @@ export function ListPagination({
   return (
     <>
       {/* Pagination (hidden in print) */}
-      <div className="print-hide" data-print="hide">
+      <div className="print-hide" data-print="hide" data-testid="list-pagination">
         <Pagination
           alwaysVisible={workspace}
           compact={workspace}

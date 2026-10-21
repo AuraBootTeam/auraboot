@@ -33,7 +33,7 @@ export interface PluginRecord {
   displayName: string;
   description?: string;
   author?: string;
-  status: 'installed' | 'enabled' | 'disabled' | 'failed';
+  status: 'installed' | 'active' | 'stopped' | 'error';
   installedAt: string;
   updatedAt: string;
   minPlatformVersion?: string;
@@ -221,9 +221,9 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
       { bg: string; text: string; icon: typeof CheckCircleIcon; labelKey: string }
     > = {
       installed: { bg: 'bg-blue-100', text: 'text-blue-800', icon: CheckCircleIcon, labelKey: 'plugin.status.installed' },
-      enabled: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircleIcon, labelKey: 'plugin.status.enabled' },
-      disabled: { bg: 'bg-gray-100', text: 'text-gray-800', icon: StopIcon, labelKey: 'plugin.status.disabled' },
-      failed: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircleIcon, labelKey: 'plugin.status.failed' },
+      active: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircleIcon, labelKey: 'plugin.status.enabled' },
+      stopped: { bg: 'bg-gray-100', text: 'text-gray-800', icon: StopIcon, labelKey: 'plugin.status.disabled' },
+      error: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircleIcon, labelKey: 'plugin.status.failed' },
     };
     const c = config[status] || config.installed;
     const Icon = c.icon;
@@ -326,7 +326,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                         >
                           <EyeIcon className="h-5 w-5" />
                         </button>
-                        {plugin.status === 'disabled' || plugin.status === 'installed' ? (
+                        {plugin.status === 'stopped' || plugin.status === 'installed' ? (
                           <button
                             onClick={() => startPlugin(plugin.pid)}
                             className="p-1 text-green-400 hover:text-green-600"
@@ -334,7 +334,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                           >
                             <PlayIcon className="h-5 w-5" />
                           </button>
-                        ) : plugin.status === 'enabled' ? (
+                        ) : plugin.status === 'active' ? (
                           <button
                             onClick={() => stopPlugin(plugin.pid)}
                             className="p-1 text-yellow-400 hover:text-yellow-600"
@@ -343,7 +343,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                             <StopIcon className="h-5 w-5" />
                           </button>
                         ) : null}
-                        {plugin.status !== 'enabled' && (
+                        {plugin.status !== 'active' && (
                           <button
                             onClick={() => uninstallPlugin(plugin.pid)}
                             className="p-1 text-red-400 hover:text-red-600"

@@ -24,6 +24,14 @@ import java.util.Map;
 public class ExternalEventIngressController {
     private final ExternalEventIngressService ingressService;
 
+    private final com.auraboot.framework.openplatform.service.InstalledIntegrationService installedIntegrations;
+
+    @org.springframework.web.bind.annotation.GetMapping("/{sourceCode}/events/{externalEventId}")
+    public Map<String,Object> result(@AuthenticationPrincipal MachinePrincipal principal,
+            @PathVariable String sourceCode, @PathVariable String externalEventId) {
+        return installedIntegrations.result(principal,sourceCode,externalEventId);
+    }
+
     @PostMapping("/{sourceCode}/events")
     public ResponseEntity<ExternalEventIngressService.IngressResult> accept(
             @AuthenticationPrincipal MachinePrincipal principal,
@@ -32,6 +40,11 @@ public class ExternalEventIngressController {
             @RequestBody String rawBody) {
         return ResponseEntity.accepted().body(
                 ingressService.accept(principal, sourceCode, idempotencyKey, rawBody));
+    }
+
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<Map<String,Object>> bindingDenied() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("code","installation_binding_denied"));
     }
 
     @ExceptionHandler(ExternalEventIngressService.InvalidExternalEventException.class)

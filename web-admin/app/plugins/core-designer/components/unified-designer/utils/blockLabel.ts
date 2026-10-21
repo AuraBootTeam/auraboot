@@ -1,6 +1,6 @@
 import { getLocalizedText, type TranslateFunction, type LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
-import type { DslBlockV3 } from '../types';
+import type { DslBlockV3, ModelFieldDefinition } from '../types';
 
 export function asBlockText(value: unknown): string | LocalizedText | undefined {
   if (typeof value === 'string') return value;
@@ -17,10 +17,12 @@ export function getBlockTypeLabel(blockType: string, locale = 'en-US', t?: Trans
   return definition?.label ? getLocalizedText(definition.label, locale, t) : blockType;
 }
 
-export function getBlockLabel(block: DslBlockV3, locale = 'en-US', t?: TranslateFunction): string {
+export function getBlockLabel(block: DslBlockV3, locale = 'en-US', t?: TranslateFunction, modelFields: ModelFieldDefinition[] = []): string {
   const title = block.title ?? block.props?.label ?? block.props?.title;
   const text = asBlockText(title);
   if (text) return getLocalizedText(text, locale, t);
+  const fieldLabel = block.field ? asBlockText(modelFields.find(field => field.code === block.field)?.label) : undefined;
+  if (fieldLabel) return getLocalizedText(fieldLabel, locale, t);
   return block.field || block.widgetType || block.actionType
     || getBlockTypeLabel(block.blockType, locale, t);
 }

@@ -388,6 +388,121 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     @Test
+    void compareAndSet_implicitVersionUsesOneScopedWriteWithoutVersionMetadata() {
+        wireModel(versionCasModel("mt_phase_one_model", "physical"));
+        lenient().when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID))
+                .thenReturn("AND created_by = 20");
+        lenient().when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
+        lenient().when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+
+        assertThat(service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
+                Map.of("quantity", new java.math.BigDecimal("25.000001")))).isTrue();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String,Object>> params = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(), params.capture());
+        assertThat(sql.getValue()).contains("row_version = row_version + 1", "tenant_id = #{params.tenantId}",
+                "row_version IS NOT DISTINCT FROM #{params.compareValue}", "created_by = 20", "domain_id = 7")
+                .containsPattern("quantity = #\\{params\\.set\\d+}");
+        assertThat(sql.getValue().split("row_version = row_version \\+ 1", -1)).hasSize(2);
+        assertThat(params.getValue()).containsEntry("compareValue", 7L).containsEntry("tenantId", TENANT_ID)
+                .containsEntry("recordId", RECORD_ID).containsValue(new java.math.BigDecimal("25.000001"));
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void compareAndSet_implicitVersionStaleComparisonReturnsFalseWithoutRetry() {
+        wireModel(versionCasModel("mt_phase_one_model", "physical"));
+        assertThat(service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L, Map.of("quantity", 25)))
+                .isFalse();
+        verify(dynamicDataMapper).updateByQuery(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void compareAndSet_implicitVersionRetainsCommandExpectedVersionFence() {
+        wireModel(versionCasModel("mt_phase_one_model", "physical"));
+        lenient().when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+        MetaContext.runWithCommandPermitPlan("ALL", 7L, MODEL_CODE, RECORD_ID, () -> {
+            assertThat(service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L, Map.of("quantity", 25)))
+                    .isTrue();
+            assertThat(MetaContext.getCommandExpectedVersion(MODEL_CODE, RECORD_ID)).isEqualTo(8L);
+            return null;
+        });
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String,Object>> params = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(), params.capture());
+        assertThat(sql.getValue()).contains("AND row_version = #{params.expectedVersion}",
+                "row_version IS NOT DISTINCT FROM #{params.compareValue}");
+        assertThat(params.getValue()).containsEntry("expectedVersion", 7L).containsEntry("compareValue", 7L);
+    }
+
+    @Test
+    void compareAndSet_implicitVersionRejectsInvalidExpectedTypesAndBoundsBeforeSql() {
+        wireModel(versionCasModel("mt_phase_one_model", "physical"));
+        for (Object invalid : java.util.Arrays.asList(null, -1L, new java.math.BigDecimal("7.5"),
+                new java.math.BigInteger("9223372036854775808"), "7", true, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", invalid,
+                    Map.of("quantity", 25))).isInstanceOf(MetaServiceException.class).hasMessageContaining("version");
+        }
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void compareAndSet_implicitVersionRejectsNonDynamicPhysicalAndVirtualModels() {
+        wireModel(versionCasModel("ab_external_model", "physical"));
+        assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
+                Map.of("quantity", 25))).isInstanceOf(MetaServiceException.class);
+        wireModel(versionCasModel("mt_phase_one_model", "namedQuery"));
+        assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
+                Map.of("quantity", 25))).isInstanceOf(MetaServiceException.class).hasMessageContaining("read-only");
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void compareAndSet_implicitVersionRejectsExplicitVersionEvenWhenDeclared() {
+        ModelDefinition model = versionCasModel("mt_phase_one_model", "physical");
+        model.setFields(List.of(primaryKey(), quantityField(), FieldDefinition.builder()
+                .code("row_version").columnName("row_version").dataType("long").build()));
+        wireModel(model);
+        assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
+                Map.of("quantity", 25, "row_version", 8L))).isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("row_version");
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void compareAndSet_implicitVersionCannotBypassNextFieldMetadataOrWriter() {
+        ModelDefinition model = versionCasModel("mt_phase_one_model", "physical");
+        wireModel(model);
+        assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
+                Map.of("unknown", 25))).isInstanceOf(MetaServiceException.class);
+        model.getFields().get(1).setAllowedWriterCommands(List.of("sample:receive"));
+        assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
+                Map.of("quantity", 25))).isInstanceOf(MetaServiceException.class).hasMessageContaining("FIELD_WRITER_DENIED");
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void compareAndSet_implicitVersionCannotBypassFieldWritePermission() {
+        wireModel(versionCasModel("mt_phase_one_model", "physical"));
+        lenient().when(dataPermissionEngine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn(java.util.Set.of("quantity"));
+        assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
+                Map.of("quantity", 25))).isInstanceOf(MetaServiceException.class).hasMessageContaining("non-writable");
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    private ModelDefinition versionCasModel(String tableName, String sourceType) {
+        return ModelDefinition.builder().code(MODEL_CODE).tableName(tableName).sourceType(sourceType)
+                .fields(List.of(primaryKey(), quantityField())).build();
+    }
+
+    private FieldDefinition quantityField() {
+        return FieldDefinition.builder().code("quantity").columnName("quantity").dataType("decimal").build();
+    }
+
+    @Test
     void compareAndSetBatch_keepsEveryRowGuardAndUsesOneWrite() {
         ModelDefinition model = batchCasModel();
         wireModel(model);

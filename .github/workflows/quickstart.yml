@@ -62,13 +62,15 @@ jobs:
         if: steps.changes.outputs.run == 'true'
         uses: docker/setup-buildx-action@v4
 
-      - name: Configure ephemeral protocol signing key
+      - name: Prepare private protocol signing key
         if: steps.changes.outputs.run == 'true'
         run: |
-          set -euo pipefail
-          protocol_key="$(openssl rand -hex 32)"
-          echo "::add-mask::$protocol_key"
-          printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$protocol_key" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import os
+          import secrets
+          with os.fdopen(os.open('.env', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as output:
+              output.write('OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=' + secrets.token_hex(48) + '\n')
+          PY
 
       - name: Build & start full stack
         if: steps.changes.outputs.run == 'true'

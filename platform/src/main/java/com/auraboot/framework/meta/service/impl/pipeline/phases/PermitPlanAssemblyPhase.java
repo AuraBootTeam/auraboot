@@ -128,6 +128,11 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * authority.</p>
      */
     private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        // A trusted handler checked this exact target at the boundary. Keep that decision
+        // resource-scoped even when the actor's generic row policy would resolve to ALL.
+        if (hasAuthorizedHandlerTarget(ctx)) {
+            return ScopeGrade.TARGET;
+        }
         String externalPermission = MetaContext.getExternalCommandPermission();
         if (externalPermission != null && ctx.getAuthorizationVerdict() != null
                 && ctx.getAuthorizationVerdict().isAuthorized()
@@ -157,6 +162,20 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
                     ctx.getCommandCode(), modelCode, e);
             return null;
         }
+    }
+
+    private boolean hasAuthorizedHandlerTarget(CommandPipelineContext ctx) {
+        if (ctx == null || ctx.getCommand() == null || ctx.getRequest() == null
+                || !StringUtils.hasText(ctx.getCommand().getModelCode())
+                || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+                || !Boolean.TRUE.equals(ctx.getTargetRecordReadable())
+                || ctx.getAuthorizationVerdict() == null
+                || !ctx.getAuthorizationVerdict().isAuthorized()) return false;
+        Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
+        if (!(params instanceof java.util.Map<?, ?> values)
+                || !"handler".equals(values.get("targetRecordAuthorization"))) return false;
+        Object action = values.get("targetRecordAction");
+        return "update".equals(action) || "delete".equals(action);
     }
 
     /**

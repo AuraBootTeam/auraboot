@@ -71,7 +71,27 @@ public class OpenApiCapabilityRegistry {
         assertUnique(published);
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private InstalledIntegrationRegistry installedIntegrations;
+
+    private List<Capability> installedCapabilities() {
+        if (installedIntegrations == null) return List.of();
+        List<Capability> result = new ArrayList<>();
+        for (var registration : installedIntegrations.registrations()) {
+            String path = "/api/open/v1/event-sources/"+registration.sourceCode()+"/events";
+            result.add(new Capability(registration.capability()+".accept",HttpMethod.POST,path,
+                    registration.requiredScope(),"installation-bound",1));
+            result.add(new Capability(registration.capability()+".result",HttpMethod.GET,path+"/{externalEventId}",
+                    registration.requiredScope(),"installation-bound",1));
+        }
+        return result;
+    }
+
     public Optional<Capability> resolve(String method, String path) {
+        // Exact registered sources take precedence over the legacy generic automation route.
+        Optional<Capability> installed = installedCapabilities().stream()
+                .filter(item -> item.method().matches(method) && pathMatcher.match(item.pathPattern(),path)).findFirst();
+        if (installed.isPresent()) return installed;
         return capabilities.stream()
                 .filter(capability -> capability.method().matches(method)
                         && pathMatcher.match(capability.pathPattern(), path))
@@ -79,10 +99,13 @@ public class OpenApiCapabilityRegistry {
     }
 
     public List<Capability> list() {
-        if (dynamicPublications == null || !com.auraboot.framework.application.tenant.MetaContext.exists()) return capabilities;
+        List<Capability> fixed = new ArrayList<>(capabilities);
+        fixed.addAll(installedCapabilities());
+        assertUnique(fixed);
+        if (dynamicPublications == null || !com.auraboot.framework.application.tenant.MetaContext.exists()) return List.copyOf(fixed);
         Long tenantId = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
-        if (dynamicPublications == null || tenantId == null) return capabilities;
-        List<Capability> published = new ArrayList<>(capabilities);
+        if (tenantId == null) return List.copyOf(fixed);
+        List<Capability> published = new ArrayList<>(fixed);
         dynamicPublications.publishedContracts(tenantId).forEach(contract -> published.addAll(resourceCapabilities(contract)));
         if (dynamicQueries != null) dynamicQueries.published(tenantId).forEach(contract -> published.add(queryCapability(contract)));
         if (dynamicActions != null) dynamicActions.published(tenantId).forEach(contract -> published.add(actionCapability(contract)));

@@ -8,6 +8,8 @@
 ## Quick Start
 
 ```bash
+# Copy .env.example to .env and set OPEN_PLATFORM_PROTOCOL_SIGNING_KEY using
+# `openssl rand -hex 48`. Keep this private value stable across restarts.
 # Start the full platform (first run builds images, ~5-10 min)
 docker compose --profile full up --build
 
@@ -49,12 +51,17 @@ Copy `.env.example` to `.env` to customize:
 
 ```bash
 cp .env.example .env
+chmod 600 .env
 # Edit .env with your settings
 ```
 
 Key settings:
 - `AURABOOT_PORT` — Change the exposed port (default: 3000)
 - `JWT_SECRET` — **Must change** for production
+- `OPEN_PLATFORM_PROTOCOL_SIGNING_KEY` — **Required** for the community backend;
+  generate once with `openssl rand -hex 48`, retain in a private `.env`, and reuse
+  for all instances. Missing keys fail startup. Rotation invalidates existing
+  protocol cursors and ETags.
 - `ANTHROPIC_API_KEY` — Enable AI features
 
 ## Monitoring (Prometheus + Grafana)

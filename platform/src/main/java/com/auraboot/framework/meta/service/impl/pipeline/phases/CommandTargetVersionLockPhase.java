@@ -1,22 +1,30 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
-import com.auraboot.framework.exception.ConflictException;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.CasVersionConflictException;
 import com.auraboot.framework.exception.CasVersionRequiredException;
+import com.auraboot.framework.exception.ConflictException;
+import com.auraboot.framework.meta.constant.CommandTargetVersionPolicy;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * Re-checks and transaction-holds the version of the client-named command target.
@@ -32,8 +40,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CommandTargetVersionLockPhase implements CommandPhase {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final MetaModelService metaModelService;
     private final DynamicDataMapper dynamicDataMapper;
+    private final ObjectProvider<ExtensionRegistry> extensionRegistryProvider;
 
     @Override
     public String name() {
@@ -42,6 +53,7 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
 
     @Override
     public boolean shouldSkip(CommandPipelineContext ctx) {
+        if(usesUnsupportedVersion(ctx))return true;
         if (ctx.getRequest() == null
                 || ctx.getCommand() == null
                 || !StringUtils.hasText(ctx.getCommand().getModelCode())
@@ -62,6 +74,7 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        if(usesUnsupportedVersion(ctx))return;
         boolean currentStateLock = usesCurrentStateLock(ctx);
         if (!currentStateLock && ctx.getRequest().getExpectedVersion() == null) {
             if (isStrictLegacyMutation(ctx.getRequest(), ctx.getCommand())) {
@@ -111,6 +124,51 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
                     ));
         }
         ctx.setTargetRecordVersion(authoritative);
+    }
+
+    private boolean usesUnsupportedVersion(CommandPipelineContext ctx) {
+        if (ctx.getCommand() == null || ctx.getRequest() == null) return false;
+        String raw = ctx.getCommand().getExecutionConfig();
+        if (!StringUtils.hasText(raw)) return false;
+
+        JsonNode root;
+        try {
+            root = OBJECT_MAPPER.readTree(raw);
+        } catch (JsonProcessingException malformed) {
+            return false; // Retain the legacy malformed-config behavior when no policy can be read.
+        }
+        CommandTargetVersionPolicy policy;
+        try {
+            policy = CommandTargetVersionPolicy.parse(root);
+        } catch (IllegalArgumentException invalid) {
+            throw invalidTargetVersionPolicy();
+        }
+        if (policy != CommandTargetVersionPolicy.UNSUPPORTED) return false;
+        if (ctx.getRequest().getExpectedVersion() != null)
+            throw new BusinessException(
+                    ResponseCode.BadParam, "$i18n:command.expected_version.unsupported");
+        if (ctx.getRulesByType() != null
+                && ctx.getRulesByType().values().stream()
+                        .anyMatch(rows -> rows != null && !rows.isEmpty()))
+            throw invalidTargetVersionPolicy();
+        String handlerCode = root.path("handler").textValue().trim();
+        var extensionRegistry = extensionRegistryProvider.getIfAvailable();
+        if (extensionRegistry == null
+                || !extensionRegistry.getSecondaryCommandHandlers(handlerCode).isEmpty())
+            throw invalidTargetVersionPolicy();
+        var handler =
+                extensionRegistry
+                        .getCommandHandler(handlerCode)
+                        .orElseThrow(CommandTargetVersionLockPhase::invalidTargetVersionPolicy);
+        Map<String, Object> config = OBJECT_MAPPER.convertValue(root, new TypeReference<>() {});
+        if (handler.requiresDslPersistence(handlerCode, config, ctx.getRequest()))
+            throw invalidTargetVersionPolicy();
+        return true;
+    }
+
+    private static BusinessException invalidTargetVersionPolicy() {
+        return new BusinessException(
+                ResponseCode.BadParam, "$i18n:command.target_version_policy.invalid");
     }
 
     /**

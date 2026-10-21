@@ -25,6 +25,10 @@ public class ImportExecuteResult {
      */
     private String importId;
 
+    /** Same-model field migration receipts, separate from legacy model-to-model copies. */
+    @Builder.Default
+    private List<ModelFieldRenameReceipt> fieldMigrations = new ArrayList<>();
+
     /**
      * Plugin PID after successful import.
      */

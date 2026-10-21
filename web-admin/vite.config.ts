@@ -134,6 +134,8 @@ if (webCompositionKey !== undefined && !/^sha256:[0-9a-f]{64}$/.test(webComposit
 
 export default defineConfig({
   define: {
+    // react-draggable reads this optional Node debug flag during pointer gestures.
+    'process.env.DRAGGABLE_DEBUG': false,
     __AURA_WEB_COMPOSITION_KEY__: JSON.stringify(webCompositionKey ?? null),
   },
   // node_modules is shared across AuraBoot worktrees, so keeping Vite's

@@ -54,6 +54,18 @@ function roundTrip(kind: string, blocks: LegacyDslBlockV2[], modelCode?: string)
 }
 
 describe('flatPageSerializer round-trip (generator-shaped v4 pages)', () => {
+  it('preserves card-grid source grouping, draft array binding and ordered read-only/editable fields', () => {
+    roundTrip('form', [{
+      id: 'offers', blockType: 'card-grid', dataSource: 'offers', field: 'choices', titleField: 'supplierName',
+      groupByField: 'sourcePid', groupTitleField: 'sourceLabel',
+      fields: [
+        { field: 'availableQty', component: 'SmartInput', label: 'Available capacity', readOnly: true },
+        { field: 'proposedQty', component: 'SmartInput', label: 'Proposed quantity' },
+        { field: 'score', component: 'SmartInput', label: 'Score', readOnly: true },
+      ],
+    } as any]);
+  });
+
   it('carries the editor root block id through the flat document for identity stability', () => {
     const tree = migratePageSchemaV2ToV3({
       schemaVersion: 4,
@@ -664,4 +676,15 @@ describe('flatPageSerializer fail-fast boundaries', () => {
       { id: 'chart_sales', blockType: 'chart', props: { title: 'Sales' } },
     ]);
   });
+});
+
+it('preserves mature form layout, section extension, descriptions and footer placement when refining a title', () => {
+  roundTrip('form', [
+    { id: 'outcome', blockType: 'form-section', title: { 'zh-CN': '客户与交付背景' },
+      description: { 'zh-CN': '核对客户与负责人' },
+      fields: [{ field: 'customer', colSpan: 6, required: true }, { field: 'owner', colSpan: 6 }] },
+    { id: 'supplement', blockType: 'form-section', extension: { collapsible: true, defaultCollapsed: true },
+      fields: [{ field: 'files', colSpan: 12, component: 'fileattachment' }] },
+    { id: 'buttons', blockType: 'form-buttons', area: 'footer', buttons: [{ code: 'submit', action: 'save', commandCode: 'tpm:create_project' }] },
+  ]);
 });

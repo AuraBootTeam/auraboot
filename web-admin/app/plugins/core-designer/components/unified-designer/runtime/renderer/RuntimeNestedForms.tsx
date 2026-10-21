@@ -2,7 +2,7 @@ import type { DslBlockV3 } from '../../types';
 import { DESIGNER_I18N } from '~/shared/designer';
 import React from 'react';
 import { RuntimeTitle } from './RuntimePrimitives';
-import { RuntimeFormValueContext, useRuntimeText, type RuntimeBlockProps } from './runtimeContexts';
+import { RuntimeFormValueContext, RuntimeLocaleContext, useRuntimeText, type RuntimeBlockProps } from './runtimeContexts';
 import { getRuntimeSelectOptions, normalizeRuntimeFieldComponent } from './runtimeFieldMetadata';
 import {
   getRuntimeNestedFieldErrorKey,
@@ -19,6 +19,7 @@ import { getBlockLabel, getSpanGridStyle } from './runtimePresentation';
 
 export function RuntimeRepeater({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
+  const locale = React.useContext(RuntimeLocaleContext);
   const isVisible = isRuntimeBlockVisible(block, formContext?.values);
 
   const repeaterKey = block.field || block.id;
@@ -72,7 +73,7 @@ export function RuntimeRepeater({ block }: RuntimeBlockProps) {
     >
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block)}</div>
+          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block, locale)}</div>
           <div className="text-xs text-slate-500">{rows.length} row(s)</div>
         </div>
         <button
@@ -257,6 +258,7 @@ function RuntimeRepeaterField({
 
 export function RuntimeSubform({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
+  const locale = React.useContext(RuntimeLocaleContext);
   const isVisible = isRuntimeBlockVisible(block, formContext?.values);
 
   const subformKey = block.field || block.id;
@@ -313,7 +315,7 @@ export function RuntimeSubform({ block }: RuntimeBlockProps) {
     >
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block)}</div>
+          <div className="text-sm font-semibold text-slate-900">{getBlockLabel(block, locale)}</div>
           <div className="text-xs text-slate-500">{rows.length} row editor(s)</div>
         </div>
         <button

@@ -3,7 +3,7 @@
  *
  * Closes the gaps recorded in
  * docs/backlog/2026-06-17-page-designer-coverage-ux-gap.md §2.A:
- *   A2  helper-block inspectors (bpm-panel / activity-timeline / field-history)
+ *   A2  helper-block inspectors (workflow-panel / activity-timeline / field-history)
  *   A4  form-section inspector (collapsible / visibleWhen JSON / columns)
  *   A5  AI lock toggle → canvas badge → persisted props.aiLocked
  *   A6  Advanced JSON tab (happy apply + invalid-JSON error state)
@@ -30,13 +30,14 @@
  */
 
 import type { Page } from '@playwright/test';
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI, ensureBusinessSpace } from '../../helpers/auth-fixtures';
 import { uniqueId } from '../helpers';
 
 // ab_announcement is a published platform meta-model present in every OSS stack.
-// The helper blocks under test (bpm-panel / activity-timeline / field-history /
+// The helper blocks under test (workflow-panel / activity-timeline / field-history /
 // detail-section) do not bind model fields, so the model only has to satisfy the
 // detail-page contract (a real, published modelCode for the root detail block).
 const MODEL_CODE = 'ab_announcement';
@@ -118,7 +119,7 @@ async function saveDesigner(page: Page, pid: string): Promise<void> {
 
 /** Apply a basic-tab JSON inspector field (inspector-json-field-apply-<path>). */
 async function applyJsonField(page: Page, path: string, value: unknown): Promise<void> {
-  const textarea = page.getByTestId(`inspector-field-${path}`);
+  const textarea = await inspectorJsonField(page, path);
   await expect(textarea).toBeVisible({ timeout: 5_000 });
   await textarea.fill(JSON.stringify(value, null, 2));
   // Let the draft state commit before the apply handler reads it (UDW pattern).
@@ -177,7 +178,7 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
             title: 'Inspector authoring root',
             dataSource: { model: MODEL_CODE },
             layout: { span: 12 },
-            // detail-section is allowed directly under detail; the bpm-panel /
+            // detail-section is allowed directly under detail; the workflow-panel /
             // activity-timeline / field-history helper blocks are NOT allowed
             // directly under detail (BlockRegistry.allowedChildren), so they are
             // nested in a `columns` container which does allow them. Matches the
@@ -198,7 +199,7 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
                 blocks: [
                   {
                     id: BPM_BLOCK,
-                    blockType: 'bpm-panel',
+                    blockType: 'workflow-panel',
                     title: 'Approval panel',
                     props: { status: 'draft' },
                   },
@@ -238,13 +239,9 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     await ensureBusinessSpace(page);
   });
 
-    // Product gap (binding-loss family, 2026-10-03): the bpm-panel status select
-  // never presents selectable options after the widget-family normalize cycle
-  // (selectOption times out) — the legacy status binding is unbound.
-test('A2: bpm-panel inspector — status/assignee/dueAt + actions JSON persist and reload', async ({
+test('A2: workflow-panel inspector — status/assignee/dueAt + actions JSON persist and reload', async ({
     page,
   }) => {
-    test.skip(true, 'product gap: bpm-panel status select unbound after widget normalize');
     const assignee = `Approver ${uid}`;
     const dueAt = '2026-07-15';
     const actions = [
@@ -276,17 +273,14 @@ test('A2: bpm-panel inspector — status/assignee/dueAt + actions JSON persist a
     const persisted = await readPage(page, pid);
     const block = findBlockById(persisted.blocks, BPM_BLOCK);
     expect(block).toMatchObject({
-      blockType: 'bpm-panel',
+      blockType: 'workflow-panel',
       props: expect.objectContaining({ status: 'pending', assignee, dueAt, actions }),
     });
   });
 
-    // Product gap (binding-loss family, 2026-10-03): items/entries JSON edits
-  // register dirty but the save PUT never fires.
 test('A2: activity-timeline + field-history inspectors — items/entries JSON persist', async ({
     page,
   }) => {
-    test.skip(true, 'product gap: activity-timeline/field-history JSON edits never reach the save PUT');
     const items = [
      { actor: `User ${uid}`, action: 'submitted', time: '2026-07-01 09:00' },
       { actor: `User ${uid}`, action: 'approved', time: '2026-07-02 14:30' },
@@ -328,12 +322,9 @@ test('A2: activity-timeline + field-history inspectors — items/entries JSON pe
     });
   });
 
-    // Product gap (binding-loss family, 2026-10-03): form-section collapsible/
-  // visibleWhen/columns edits never reach the save PUT.
 test('A4: form-section inspector — collapsible / visibleWhen JSON / columns persist and reload', async ({
     page,
   }) => {
-    test.skip(true, 'product gap: form-section JSON edits never reach the save PUT');
     const visibleWhen = { field: 'status', op: 'eq', value: 'pending' };
 
     await openDesigner(page, pid);
@@ -364,22 +355,20 @@ test('A4: form-section inspector — collapsible / visibleWhen JSON / columns pe
     const block = findBlockById(persisted.blocks, SECTION_BLOCK);
     expect(block).toMatchObject({
       blockType: 'detail-section',
-      props: expect.objectContaining({ collapsible: true, visibleWhen }),
+      collapsible: true,
+      props: expect.objectContaining({ visibleWhen }),
       layout: expect.objectContaining({ columns: 6 }),
     });
   });
 
-    // Product gap (binding-loss family, 2026-10-03): aiLocked toggle edit never
-  // reaches the save PUT.
 test('A5: AI lock toggle → canvas badge appears → persisted props.aiLocked=true', async ({
     page,
   }) => {
-    test.skip(true, 'product gap: aiLocked toggle edit never reaches the save PUT');
     await openDesigner(page, pid);
-    await selectBlock(page, BPM_BLOCK);
+    await selectBlock(page, TIMELINE_BLOCK);
 
     // No badge before locking.
-    await expect(page.getByTestId(`ai-lock-badge-${BPM_BLOCK}`)).toHaveCount(0);
+    await expect(page.getByTestId(`ai-lock-badge-${TIMELINE_BLOCK}`)).toHaveCount(0);
 
     // props.aiLocked is appended to every block's inspector by getFieldsForBlock.
     const aiLock = page.getByTestId('inspector-field-props.aiLocked');
@@ -388,7 +377,7 @@ test('A5: AI lock toggle → canvas badge appears → persisted props.aiLocked=t
     await expect(aiLock).toBeChecked();
 
     // The canvas immediately reflects the lock with a visible badge.
-    await expect(page.getByTestId(`ai-lock-badge-${BPM_BLOCK}`)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId(`ai-lock-badge-${TIMELINE_BLOCK}`)).toBeVisible({ timeout: 5_000 });
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesigner(page, pid);
@@ -396,20 +385,18 @@ test('A5: AI lock toggle → canvas badge appears → persisted props.aiLocked=t
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15_000 });
     // Badge re-renders from the persisted schema on reload.
-    await expect(page.getByTestId(`ai-lock-badge-${BPM_BLOCK}`)).toBeVisible({ timeout: 10_000 });
-    await selectBlock(page, BPM_BLOCK);
+    await expect(page.getByTestId(`ai-lock-badge-${TIMELINE_BLOCK}`)).toBeVisible({ timeout: 10_000 });
+    await selectBlock(page, TIMELINE_BLOCK);
     await expect(page.getByTestId('inspector-field-props.aiLocked')).toBeChecked();
 
     const persisted = await readPage(page, pid);
-    const block = findBlockById(persisted.blocks, BPM_BLOCK);
+    const block = findBlockById(persisted.blocks, TIMELINE_BLOCK);
     expect(block?.props).toMatchObject({ aiLocked: true });
   });
 
-    // Product gap (binding-loss family, 2026-10-03): edits never reach the save PUT.
 test('A6: Advanced JSON tab — valid apply persists; invalid JSON shows error and does not write', async ({
     page,
   }) => {
-    test.skip(true, 'product gap: edits never reach the save PUT (binding-loss family)');
     const validProps = { badgeText: `Live ${uid}`, tone: 'info' };
 
     await openDesigner(page, pid);

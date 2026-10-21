@@ -45,6 +45,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -133,7 +134,7 @@ async function selectField(page: Page, path: string, value: string): Promise<voi
   await field.selectOption(value);
 }
 async function applyJsonField(page: Page, path: string, value: unknown): Promise<void> {
-  const textarea = page.getByTestId(`inspector-field-${path}`);
+  const textarea = await inspectorJsonField(page, path);
   await expect(textarea).toBeVisible({ timeout: 5_000 });
   await textarea.fill(JSON.stringify(value, null, 2));
   await page.evaluate(
@@ -145,14 +146,8 @@ async function applyJsonField(page: Page, path: string, value: unknown): Promise
   );
 }
 
-// ── Detail page (cockpit / display / graph blocks + toolbar + divider) ────────
-// Product gap (binding-loss family, deterministic on the campaign stack):
-// every non-family legacy authoring path in this file registers dirty but
-// never persists after the widget-family normalize cycle (save PUT either
-// never fires or drops the fields). File-level skip until the payload-builder
-// backlog item lands.
-test.skip(true, 'product gap: non-family legacy authoring unbound after widget normalize (file-wide)');
-
+// Supported display blocks use an independent fixture so unsupported legacy
+// toolbar authoring does not block unrelated persisted edits.
 const CHART = 'pd_nf_chart';
 const RICH_TEXT = 'pd_nf_rich_text';
 const DIVIDER = 'pd_nf_divider';
@@ -211,7 +206,6 @@ test.describe.serial('Unified Designer non-family-blocks authoring golden', () =
       { id: CHART, blockType: 'chart', title: 'Revenue', layout: { span: 12 } },
       { id: RICH_TEXT, blockType: 'rich-text', title: 'Notes', layout: { span: 12 } },
       { id: DIVIDER, blockType: 'divider', title: 'Section', layout: { span: 12 } },
-      { id: TOOLBAR, blockType: 'toolbar', title: 'Actions', layout: { span: 12 } },
       { id: TRACE_GRAPH, blockType: 'trace-graph', title: 'Lineage', layout: { span: 12 } },
       { id: SELECTION_INFO, blockType: 'selection-info', title: 'Selection', layout: { span: 12 } },
       { id: GERBER_VIEWER, blockType: 'gerber-viewer', title: 'Board', layout: { span: 12 } },
@@ -227,14 +221,10 @@ test.describe.serial('Unified Designer non-family-blocks authoring golden', () =
     await ctx.close();
   });
 
-    // Product gap (binding-loss family, deterministic 2/2 on the campaign stack):
-  // chart legacy edits register dirty but the save PUT never fires (save click
-  // no-ops) — chartType/dataSource/chartConfig never persist. Backlog: bind
-  // chart legacy paths in the widget-normalized payload/save chain.
 test('A1: chart — chartType select + dataSource + chartConfig JSON persist and preview shows the type', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: chart legacy edits never trigger the save PUT after widget normalize');
+    test.skip(true, 'legacy chart controls are replaced by widget controls on reload; needs current widget authoring assertions');
     const dataSource = `ds_rev_${uid}`;
     const chartConfig = { xField: 'month', yField: 'amount' };
     await openDesigner(page, detailPid);
@@ -267,7 +257,6 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   test('A2: rich-text — content persists at the bare block.content path and preview shows the text', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (save PUT never fires / fields unbound after widget normalize) — see A1 evidence');
     const content = '<p>Read before submitting</p>';
     await openDesigner(page, detailPid);
     await selectBlock(page, RICH_TEXT);
@@ -316,7 +305,7 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   test('A4: toolbar — buttons JSON persists at the block top level and preview shows the buttons', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (save PUT never fires / fields unbound after widget normalize) — see A1 evidence');
+    test.skip(true, 'legacy toolbar tree blocks have no flat serializer mapping; needs action-bar authoring migration');
     const buttons = [
       { code: 'export', label: 'Export', variant: 'primary' },
       { code: 'archive', label: 'Archive' },
@@ -344,6 +333,7 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   });
 
   test('A5: trace-graph — dataSource + mode persist and preview shows the binding', async ({ page }, testInfo) => {
+    test.skip(true, 'fixture debt: needs a real graph data source and assertions for the current trace renderer');
     const dataSource = 'pe_consumption_trace_by_lot';
     await openDesigner(page, detailPid);
     await selectBlock(page, TRACE_GRAPH);
@@ -399,7 +389,7 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   test('A7: gerber-viewer — dataSource + line field persist and preview shows the board binding', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (save PUT never fires / fields unbound after widget normalize) — see A1 evidence');
+    test.skip(true, 'fixture debt: needs an owned board file and assertions for the current Gerber renderer');
     const dataSource = 'ds_pcb_inspection';
     const lineInspectionField = 'line_result';
     await openDesigner(page, detailPid);
@@ -426,6 +416,7 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   });
 
   test('F1: form-buttons — buttons JSON persists and preview shows the buttons', async ({ page }, testInfo) => {
+    test.skip(true, 'legacy form-buttons tree blocks have no flat serializer mapping; needs action-bar authoring migration');
     const buttons = [
       { code: 'submit', content: 'Submit', primary: true },
       { code: 'cancel', content: 'Cancel' },
@@ -453,6 +444,7 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   });
 
   test('F2: form-wizard — steps JSON persists and preview shows the step rail', async ({ page }, testInfo) => {
+    test.skip(true, 'form-wizard has no flat serializer mapping; the shared form also contains unsupported form-buttons');
     const steps = [
       { key: 'base', label: 'Basics', blocks: [] },
       { key: 'review', label: 'Review', blocks: [] },
@@ -480,6 +472,7 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   });
 
   test('L1: filters — fields JSON persists and preview shows the filter-field chips', async ({ page }, testInfo) => {
+    test.skip(true, 'legacy filters tree blocks require current filter-bar authoring migration before persistence');
     const fields = [
       { field: 'status', label: 'Status' },
       { field: 'owner', label: 'Owner' },
@@ -509,7 +502,7 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   test('SAD: invalid buttons JSON on toolbar shows a per-field error and is NOT written back', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (save PUT never fires / fields unbound after widget normalize) — see A1 evidence');
+    test.skip(true, 'depends on unsupported legacy toolbar authoring; current JSON error states are covered by display/workbench tests');
     await openDesigner(page, detailPid);
     await selectBlock(page, TOOLBAR);
     const before = findBlockById((await readPage(page, detailPid)).blocks, TOOLBAR)?.buttons;
@@ -532,7 +525,6 @@ test('A1: chart — chartType select + dataSource + chartConfig JSON persist and
   test('LIVE: published custom page renders the REAL platform chart / rich-text / divider', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: binding-loss family (save PUT never fires / fields unbound after widget normalize) — see A1 evidence');
     const id = uniqueId('pdnf_live');
     const pageKey = id.replace(/-/g, '_');
     const blocks = [

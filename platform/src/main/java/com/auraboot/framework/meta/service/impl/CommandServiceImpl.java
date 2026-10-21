@@ -92,8 +92,12 @@ public class CommandServiceImpl implements CommandService {
             entity.setPluginPid(request.getPluginPid());
         }
 
-        commandDefinitionMapper.insertIdempotent(entity);
-        if (commandDefinitionMapper.adoptRetired(entity) > 0) {
+        int inserted = commandDefinitionMapper.insertIdempotent(entity);
+        int adoptedCount = commandDefinitionMapper.adoptRetired(entity);
+        if (inserted != 1 && adoptedCount == 0) {
+            throw new BusinessException(ResponseCode.BadParam, "Command code was concurrently created: " + request.getCode());
+        }
+        if (adoptedCount > 0) {
             // insertIdempotent conflicted on (tenant, code, version) with a row a
             // previous uninstall left soft-deleted and did not insert; adoptRetired
             // flipped that row back to live with this request's content. Rebind the

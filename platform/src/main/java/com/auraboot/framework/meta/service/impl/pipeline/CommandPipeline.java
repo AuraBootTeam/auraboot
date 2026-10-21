@@ -114,9 +114,7 @@ public class CommandPipeline {
 
     private CommandExecuteResult buildFinalResult(CommandPipelineContext ctx) {
         ctx.transitionTo("completed");
-        var resultData = new java.util.HashMap<>(ctx.getFieldMapResults());
-        resultData.putAll(ctx.getHandlerResults());
-        mergeEffectiveRecordId(resultData, ctx.getRequest());
+        var resultData = ctx.resultData();
 
         return CommandExecuteResult.builder()
                 .commandCode(ctx.getCommandCode())
@@ -136,14 +134,4 @@ public class CommandPipeline {
         phase.execute(ctx);
     }
 
-    private void mergeEffectiveRecordId(java.util.Map<String, Object> resultData,
-                                         com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
-        if (resultData == null || resultData.containsKey("recordPid") || request == null) {
-            return;
-        }
-        String recordPid = request.getTargetRecordId();
-        if (recordPid != null && !recordPid.isBlank()) {
-            resultData.put("recordPid", recordPid);
-        }
-    }
 }

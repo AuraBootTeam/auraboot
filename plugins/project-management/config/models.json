@@ -16,6 +16,18 @@
       "titleField": "tpm_pj_name",
       "subtitleField": "tpm_pj_code",
       "activityTimelineEnabled": true
+    },
+    "capabilities": {
+      "list": true,
+      "detail": true,
+      "create": false,
+      "update": false,
+      "delete": false,
+      "bulkDelete": false,
+      "export": true,
+      "sort": false,
+      "filter": false,
+      "paginate": true
     }
   },
   {

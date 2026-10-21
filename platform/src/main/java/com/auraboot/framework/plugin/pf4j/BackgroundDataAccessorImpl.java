@@ -1,6 +1,8 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.integration.InventoryOwnerCommandScope;
+import com.auraboot.framework.integration.ProcurementReceiptCommandScope;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
@@ -39,6 +41,7 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
     private final BackgroundDataBatchService batchService;
     private final String transactionResourceId;
     private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate idempotentCreateTemplate;
 
     /** Lightweight constructor retained for hermetic callers that only use the legacy methods. */
     public BackgroundDataAccessorImpl(DynamicDataService dynamicDataService) {
@@ -62,18 +65,29 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                 ? null : TransactionResourceIdentityRegistry.identityOf(dataSource);
         this.transactionTemplate = transactionManager == null
                 ? null : new TransactionTemplate(transactionManager);
+        this.idempotentCreateTemplate = transactionManager == null
+                ? null : new TransactionTemplate(transactionManager);
+        if (this.idempotentCreateTemplate != null) {
+            this.idempotentCreateTemplate.setPropagationBehavior(
+                    org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        }
     }
 
     @Override
     public Map<String, Object> create(long tenantId, String modelCode, Map<String, Object> data) {
-        return withTenant(tenantId, () -> dynamicDataService.create(modelCode, data));
+        return withTenant(tenantId, modelCode, "create", () -> dynamicDataService.create(modelCode, data));
     }
 
     @Override
     public Optional<Map<String, Object>> tryCreate(long tenantId, String modelCode, Map<String, Object> data) {
-        return withTenant(tenantId, () -> {
+        return withTenant(tenantId, modelCode, "create", () -> {
             try {
-                return Optional.of(dynamicDataService.create(modelCode, data));
+                // A duplicate must roll back its savepoint, not poison the enclosing outbox batch.
+                Map<String, Object> created = idempotentCreateTemplate == null
+                        ? dynamicDataService.create(modelCode, data == null ? null : new java.util.LinkedHashMap<>(data))
+                        : idempotentCreateTemplate.execute(status -> dynamicDataService.create(modelCode,
+                                data == null ? null : new java.util.LinkedHashMap<>(data)));
+                return Optional.of(java.util.Objects.requireNonNull(created, "Idempotent create returned no record"));
             } catch (RuntimeException error) {
                 if (!IdempotentCreateSupport.isUniqueViolation(error)) throw error;
                 log.debug("tryCreate hit unique violation (idempotent skip): tenant={} model={} cause={}",
@@ -85,12 +99,18 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
 
     @Override
     public Map<String, Object> getById(long tenantId, String modelCode, String recordId) {
-        return withTenant(tenantId, () -> dynamicDataService.getById(modelCode, recordId));
+        return withTenant(tenantId, modelCode, "read", () -> dynamicDataService.getById(modelCode, recordId));
+    }
+
+    @Override
+    public com.auraboot.framework.plugin.extension.DataPage queryPage(long tenantId, String modelCode,
+            com.auraboot.framework.plugin.extension.DataPageQuery query) {
+        return withTenant(tenantId, modelCode, "read", () -> new DynamicDataAccessorImpl(dynamicDataService).queryPage(modelCode, query));
     }
 
     @Override
     public List<Map<String, Object>> query(long tenantId, String modelCode, Map<String, Object> filters) {
-        return withTenant(tenantId, () -> {
+        return withTenant(tenantId, modelCode, "read", () -> {
             List<QueryCondition> conditions = new ArrayList<>();
             if (filters != null) {
                 for (Map.Entry<String, Object> entry : filters.entrySet()) {
@@ -118,14 +138,14 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                                  String afterRecordPid,
                                  int limit) {
         BackgroundDataBatchService service = requireBatchService("bounded-page");
-        return withTenant(tenantId, () -> service.queryPage(
+        return withTenant(tenantId, modelCode, "read", () -> service.queryPage(
                 modelCode, exactFilters, afterRecordPid, limit));
     }
 
     @Override
     public List<Map<String, Object>> claimBatch(long tenantId, BatchClaimRequest request) {
         BackgroundDataBatchService service = requireBatchService("atomic-claim");
-        return withTenant(tenantId, () -> service.claimBatch(tenantId, request));
+        return withTenant(tenantId, null, "claim", () -> service.claimBatch(tenantId, request));
     }
 
     @Override
@@ -156,7 +176,7 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
         LinkedHashSet<Object> distinct = new LinkedHashSet<>();
         if (values != null) values.stream().filter(java.util.Objects::nonNull).forEach(distinct::add);
         if (distinct.isEmpty()) return List.of();
-        return withTenant(tenantId, () -> {
+        return withTenant(tenantId, modelCode, "read", () -> {
             DynamicQueryRequest request = DynamicQueryRequest.builder()
                     .pageNum(1)
                     .pageSize(10000)
@@ -173,7 +193,7 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
 
     @Override
     public Map<String, Object> update(long tenantId, String modelCode, String recordId, Map<String, Object> data) {
-        return withTenant(tenantId, () -> dynamicDataService.update(modelCode, recordId, data));
+        return withTenant(tenantId, modelCode, "update", () -> dynamicDataService.update(modelCode, recordId, data));
     }
 
     @Override
@@ -183,7 +203,10 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                                  String fieldCode,
                                  Object expectedValue,
                                  Object nextValue) {
-        return withTenant(tenantId, () -> dynamicDataService.compareAndSet(
+        if (ProcurementReceiptCommandScope.active())
+            return ProcurementReceiptCommandScope.compareAndSet(tenantId, modelCode, recordId, fieldCode, expectedValue,
+                    java.util.Collections.singletonMap(fieldCode, nextValue), dynamicDataService);
+        return withTenant(tenantId, modelCode, "update", () -> dynamicDataService.compareAndSet(
                 modelCode, recordId, fieldCode, expectedValue, nextValue));
     }
 
@@ -194,13 +217,15 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                                  String fieldCode,
                                  Object expectedValue,
                                  Map<String, Object> nextValues) {
-        return withTenant(tenantId, () -> dynamicDataService.compareAndSet(
+        if (ProcurementReceiptCommandScope.active())
+            return ProcurementReceiptCommandScope.compareAndSet(tenantId, modelCode, recordId, fieldCode, expectedValue, nextValues, dynamicDataService);
+        return withTenant(tenantId, modelCode, "update", () -> dynamicDataService.compareAndSet(
                 modelCode, recordId, fieldCode, expectedValue, nextValues));
     }
 
     @Override
     public void delete(long tenantId, String modelCode, String recordId) {
-        withTenant(tenantId, () -> {
+        withTenant(tenantId, modelCode, "delete", () -> {
             dynamicDataService.delete(modelCode, recordId);
             return null;
         });
@@ -209,7 +234,7 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
     @Override
     public Optional<Long> incrementWithinCap(long tenantId, String modelCode, String recordId,
                                               String counterCode, long delta, String capCode) {
-        return withTenant(tenantId, () -> dynamicDataService.incrementWithinCap(modelCode, recordId, counterCode, delta, capCode));
+        return withTenant(tenantId, modelCode, "update", () -> dynamicDataService.incrementWithinCap(modelCode, recordId, counterCode, delta, capCode));
     }
 
     /** Synthetic user id for background-context writes. ab_data_change_log
@@ -222,7 +247,12 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
      * even if the supplier throws.
      */
 
-    private <T> T withTenant(long tenantId, Supplier<T> work) {
+    private <T> T withTenant(long tenantId, String modelCode, String operation, Supplier<T> work) {
+        if (ProcurementReceiptCommandScope.active())
+            return ProcurementReceiptCommandScope.access(tenantId, modelCode, operation, work);
+        if (InventoryOwnerCommandScope.active()) {
+            return InventoryOwnerCommandScope.access(tenantId, modelCode, operation, work);
+        }
         boolean hadPriorContext = MetaContext.exists();
         Long priorTenant = hadPriorContext ? MetaContext.getCurrentTenantId() : null;
         Long priorUser = hadPriorContext ? MetaContext.getCurrentUserId() : null;

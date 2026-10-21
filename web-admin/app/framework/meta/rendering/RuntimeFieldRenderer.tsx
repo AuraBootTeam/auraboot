@@ -26,6 +26,9 @@ import { hasMissingFieldDependency } from '~/framework/meta/rendering/fieldDepen
 export interface RuntimeFieldRendererProps {
   field: FieldConfig;
   runtime: SchemaRuntime;
+  /** A containing array form owns the value when onChange is supplied. */
+  value?: unknown;
+  onChange?: (value: unknown) => void;
 }
 
 function resolveCreateInitialValues(
@@ -88,7 +91,7 @@ function shouldInferJsonEditor(component?: string): boolean {
  * - 自动处理表单验证和错误收集
  * - 支持复杂的 ActionFlow 流程
  */
-export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ field, runtime }) => {
+export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ field, runtime, value: controlledValue, onChange }) => {
   // 从 runtime 获取 context
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
@@ -108,11 +111,13 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   }, [fieldMeta?.hidden, field.visibleWhen, context]);
 
   // 从 SchemaRuntime 获取字段值
-  const value = stateManager.getFieldValue(scopeId, field.field);
+  const value = onChange ? controlledValue : stateManager.getFieldValue(scopeId, field.field);
 
   // 字段更新函数 — also triggers linkage
   const handleChange = (newValue: any) => {
     stateManager.updateField(scopeId, field.field, newValue);
+    // Commit the containing form array before linkage reads the form payload.
+    onChange?.(newValue);
     // `bindState` mirrors the field value to a page state key that data sources
     // read (e.g. a filter field feeding `${state.statusFilter}`). updateField
     // only writes form scope, so without this the search/filter inputs never

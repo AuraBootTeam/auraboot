@@ -1,3 +1,5 @@
+import { completeListReadRequest } from './list/listReadRequest';
+import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { dictionaryData } from '~/shared/services/dict-adapter';
 import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
@@ -13,13 +15,15 @@ import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  createSearchParams,
+  useLocation,
+  useNavigationType,
   useSearchParams,
   type NavigateFunction,
   type NavigateOptions,
   type To,
 } from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
+import { useRuntimeStateSubscription } from '../blocks/workbenchBlockUtils';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
@@ -50,7 +54,8 @@ import {
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
-import { ErrorAlert } from '~/ui/ErrorAlert';
+import { ListErrorState } from './list/ListErrorState';
+import { useSerializedSearchParamsUpdater } from './list/useSerializedSearchParamsUpdater';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
@@ -204,11 +209,14 @@ import {
   buildBulkFieldCommandPayload,
   resolveInitialListTabKey,
   resolveTableBlockRowActions,
+  collectListMiscBlocks,
   buildToolbarConditionContext,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
   resolveListMiscBlocksPosition,
 } from './list/listSchemaPolicy';
+
+export { useSerializedSearchParamsUpdater } from './list/useSerializedSearchParamsUpdater';
 
 export {
   getListFieldValueWithAlias,
@@ -257,6 +265,7 @@ export {
   buildBulkFieldCommandPayload,
   resolveInitialListTabKey,
   resolveTableBlockRowActions,
+  collectListMiscBlocks,
   buildToolbarConditionContext,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
@@ -279,6 +288,64 @@ interface ListLoadDataParams {
   filters?: Record<string, any>;
   sorts?: SortConfig[];
   chipFilters?: ViewFilterConfig[];
+  retryRequest?: ListApiReadRequest;
+}
+
+interface ListApiReadRequest {
+  endpoint: string;
+  method: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options';
+  queryParams: Record<string, any>;
+}
+
+/** Keep only the newest API read failure; authentication stays with the caller. */
+export function useListApiReadRetry() {
+  const failedRequestRef = useRef<ListApiReadRequest | null>(null);
+  const clearFailure = useCallback(() => { failedRequestRef.current = null; }, []);
+  const getFailedRequest = useCallback(() => (
+    failedRequestRef.current ? structuredClone(failedRequestRef.current) : null
+  ), []);
+  const read = useCallback(async <T extends { code: string | number; data?: unknown },>(
+    request: ListApiReadRequest,
+    isLatest: () => boolean,
+    fetch: (request: ListApiReadRequest) => Promise<T>,
+  ): Promise<T> => {
+    const sealedRequest = structuredClone(request);
+    try {
+      const result = await fetch(structuredClone(sealedRequest));
+      if (isLatest()) {
+        failedRequestRef.current = ResultHelper.isSuccess(result) && result.data
+          ? null : sealedRequest;
+      }
+      return result;
+    } catch (error) {
+      if (isLatest()) failedRequestRef.current = sealedRequest;
+      throw error;
+    }
+  }, []);
+  return { read, getFailedRequest, clearFailure };
+}
+
+/** Keyword searches reuse submitted filters, never pending filter-form edits. */
+export function useListKeywordSearch(
+  load: (params: ListLoadDataParams) => void,
+  enabled: boolean,
+  pageSize: number,
+  initialFilters: Record<string, any>,
+) {
+  const appliedFiltersRef = useRef(structuredClone(initialFilters));
+  const rememberSubmittedFilters = useCallback((filters: Record<string, any>) => {
+    appliedFiltersRef.current = structuredClone(filters);
+  }, []);
+  const search = () => {
+    if (!enabled) return;
+    load({ page: 0, size: pageSize, filters: structuredClone(appliedFiltersRef.current) });
+  };
+  const debouncedSearch = useDebouncedCallback(search, 300);
+  const commitSearch = () => {
+    debouncedSearch.cancel();
+    search();
+  };
+  return { debouncedSearch, commitSearch, rememberSubmittedFilters };
 }
 
 interface BulkFieldCommandState {
@@ -350,42 +417,6 @@ export function useRestoreSavedViewFromUrl({
       setActiveViewType(match.viewType as ViewType);
     }
   }, [urlViewPid, savedViews, viewsLoading, selectView, setActiveViewType]);
-}
-
-type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
-
-/**
- * Serialize URL search-param writes made during the same React turn.
- *
- * React Router's functional `setSearchParams` form does not queue updates like
- * React state does. List state can change sorts, filters, pagination and the
- * selected SavedView together, so independently queued writers could otherwise
- * restore an older query string and drop a newly selected `view` parameter.
- */
-export function useSerializedSearchParamsUpdater(
-  searchParams: URLSearchParams,
-  setSearchParams: SearchParamsSetter,
-  writesEnabledRef?: { current: boolean },
-): SearchParamsSetter {
-  const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
-
-  useEffect(() => {
-    latestSearchParamsRef.current = new URLSearchParams(searchParams);
-  }, [searchParams]);
-
-  return useCallback<SearchParamsSetter>(
-    (nextInit, options) => {
-      if (writesEnabledRef?.current === false) return;
-      const resolvedInit =
-        typeof nextInit === 'function'
-          ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
-          : nextInit;
-      const next = createSearchParams(resolvedInit);
-      latestSearchParamsRef.current = new URLSearchParams(next);
-      setSearchParams(next, options);
-    },
-    [setSearchParams, writesEnabledRef],
-  );
 }
 
 export function applyLocalSortUpdate(
@@ -486,11 +517,14 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Parse filter_* params from URL for drill-down navigation
   const [searchParams, routerSetSearchParams] = useSearchParams();
+  const listLocation = useLocation();
+  const listNavigationType = useNavigationType();
   const listUrlWritesEnabledRef = useRef(true);
   const setSearchParams = useSerializedSearchParamsUpdater(
     searchParams,
     routerSetSearchParams,
     listUrlWritesEnabledRef,
+    { key: listLocation.key, action: listNavigationType },
   );
   const listSchemaFieldNames = useMemo(() => collectListSchemaFieldNames(schema), [schema]);
   const listSchemaFieldNameSet = useMemo(
@@ -597,10 +631,18 @@ function ListPageContentInner(props: PageContentProps) {
   // Debounced auto-search: triggers loadData 300ms after the user stops typing,
   // so results update without requiring Enter. Reduces API calls by ~60-80%
   // compared to firing on every keystroke.
-  const debouncedSearch = useDebouncedCallback(() => {
-    if (!schema) return;
-    loadData({ page: 0, size: pagination.pageSize });
-  }, 300);
+  const { debouncedSearch, commitSearch, rememberSubmittedFilters } = useListKeywordSearch(
+    (params) => { void loadData(params); },
+    Boolean(schema),
+    pagination.pageSize,
+    urlFilters,
+  );
+
+  const {
+    read: readApiRequest,
+    getFailedRequest: getFailedApiRequest,
+    clearFailure: clearApiReadFailure,
+  } = useListApiReadRetry();
 
   // Synchronous ref update ensures loadData always reads the latest keyword
   // even when called in the same event cycle as a state update (e.g., Playwright fill + Enter)
@@ -802,18 +844,10 @@ function ListPageContentInner(props: PageContentProps) {
   // (chart / description / rich-text / divider / stat-card / etc.) were
   // previously dropped silently. Collect them here and render via BlockRenderer
   // at the end of the list page so they appear in the UI.
-  const LIST_SPECIALIZED_BLOCK_TYPES = new Set<string>([
-    'table',
-    'filters',
-    'toolbar',
-    'tabs',
-    'form-buttons',
-    'form-section',
-  ]);
-  const miscListBlocks = useMemo(() => {
-    if (!schema?.blocks) return [];
-    return schema.blocks.filter((b: any) => !LIST_SPECIALIZED_BLOCK_TYPES.has(b.blockType));
-  }, [schema]);
+  const miscListBlocks = useMemo(
+    () => collectListMiscBlocks(schema, skipListData),
+    [schema, skipListData],
+  );
 
   // Sync URL pagination params -> local state (supports refresh and browser back/forward).
   useEffect(() => {
@@ -879,13 +913,14 @@ function ListPageContentInner(props: PageContentProps) {
     }, { replace: true });
   }, [pagination.current, pagination.pageSize, searchParams, setSearchParams]);
 
+  // Keep page-owned context stable while runtime draft subscriptions rerender.
+  const listRuntimeContext = useMemo(() => ({ filters }), [filters]);
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
-    additionalContext: {
-      filters,
-    },
+    additionalContext: listRuntimeContext,
   });
+  useRuntimeStateSubscription(runtime);
   const tableEmptyState = useMemo(() => {
     const configured = (tableBlock as any)?.empty ?? (tableBlock as any)?.table?.empty;
     if (!configured || typeof configured !== 'object') return {};
@@ -1585,6 +1620,7 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
 
+      clearApiReadFailure();
       try {
         setLoading(true);
         setError(null);
@@ -1593,9 +1629,10 @@ function ListPageContentInner(props: PageContentProps) {
         let endpoint: string;
         let method: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options' = 'get';
         const isApiDatasource = schema.dataSource?.type === 'api' && schema.dataSource.endpoint;
+        const retryRequest = isApiDatasource ? params?.retryRequest : undefined;
         if (isApiDatasource) {
-          endpoint = schema.dataSource!.endpoint!;
-          method = (schema.dataSource!.method as typeof method) || 'get';
+          endpoint = retryRequest?.endpoint ?? schema.dataSource!.endpoint!;
+          method = retryRequest?.method ?? ((schema.dataSource!.method as typeof method) || 'get');
         } else {
           // Use schema.modelCode for API endpoint when available (supports NQ-backed pages
           // where URL tableName differs from actual model, e.g., /p/crm-my-tasks → crm_activity_common)
@@ -1603,93 +1640,104 @@ function ListPageContentInner(props: PageContentProps) {
           endpoint = `${buildApiEndpoint(apiTableName)}/list`;
         }
 
-        const requestedPageNum = (params?.page ?? pagination.current - 1) + 1;
-        const requestedPageSize = params?.size ?? pagination.pageSize;
+        // Capture only explicitly submitted filters before issuing the request.
+        // Pending filter-form edits do not participate in keyword-only searches.
+        if (params?.filters !== undefined) rememberSubmittedFilters(params.filters);
+
+        const requestedPageNum = retryRequest
+          ? Number(retryRequest.queryParams.page) + 1
+          : (params?.page ?? pagination.current - 1) + 1;
+        const requestedPageSize = retryRequest
+          ? Number(retryRequest.queryParams.size)
+          : params?.size ?? pagination.pageSize;
         const requestedPageZeroBased = Math.max(requestedPageNum - 1, 0);
         const requestedSorts = params?.sorts ?? activeSorts;
-        lastScheduledSortFilterValuesRef.current = {
-          activeSorts: requestedSorts,
-          chipFilters: params?.chipFilters ?? chipFiltersRef.current,
-        };
-        const queryParams: Record<string, any> = {};
-
-        if (isApiDatasource) {
-          queryParams.page = requestedPageZeroBased;
-          queryParams.size = requestedPageSize;
-        } else {
-          queryParams.pageNum = requestedPageNum;
-          queryParams.pageSize = requestedPageSize;
-          if (auditUserDisplayFields) {
-            queryParams.auditUserDisplayFields = auditUserDisplayFields;
-          }
+        if (!retryRequest) {
+          lastScheduledSortFilterValuesRef.current = {
+            activeSorts: requestedSorts,
+            chipFilters: params?.chipFilters ?? chipFiltersRef.current,
+          };
         }
+        const queryParams: Record<string, any> = retryRequest
+          ? structuredClone(retryRequest.queryParams) : {};
 
-        if (isApiDatasource) {
-          // For API datasources, pass filter values as individual query params
-          if (params?.filters) {
-            for (const [key, value] of Object.entries(params.filters)) {
-              if (value == null || value === '') continue;
-              // Handle date range objects { start, end }
-              if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-                if (value.start) queryParams[`${key}_start`] = String(value.start);
-                if (value.end) queryParams[`${key}_end`] = String(value.end);
-              } else {
-                queryParams[key] = String(value);
-              }
+        if (!retryRequest) {
+          if (isApiDatasource) {
+            queryParams.page = requestedPageZeroBased;
+            queryParams.size = requestedPageSize;
+          } else {
+            queryParams.pageNum = requestedPageNum;
+            queryParams.pageSize = requestedPageSize;
+            if (auditUserDisplayFields) {
+              queryParams.auditUserDisplayFields = auditUserDisplayFields;
             }
           }
-          if (requestedSorts.length === 1) {
-            queryParams.sortField = requestedSorts[0].fieldCode;
-            queryParams.sortOrder = requestedSorts[0].direction;
-          } else if (tableBlock?.defaultSort?.field) {
-            queryParams.sortField = tableBlock.defaultSort.field;
-            queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
-          }
-        } else {
-          // For standard dynamic tables, use JSON filters array
-          const tabCondition = getTabFilter();
-          const filtersParam = buildFiltersParam(
-            tabCondition,
-            params?.filters,
-            params?.chipFilters ?? chipFiltersRef.current,
-            modelFieldMapRef.current,
-          );
-          if (filtersParam) {
-            queryParams.filters = filtersParam;
-          }
-          // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
-          // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
-          if (requestedSorts.length > 1) {
-            queryParams.sortFields = requestedSorts
-              .map((s) => `${s.fieldCode}:${s.direction}`)
-              .join(',');
-          } else if (requestedSorts.length === 1) {
-            queryParams.sortField = requestedSorts[0].fieldCode;
-            queryParams.sortOrder = requestedSorts[0].direction;
-          } else if (tableBlock?.defaultSort?.field) {
-            queryParams.sortField = tableBlock.defaultSort.field;
-            queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+
+          if (isApiDatasource) {
+            // For API datasources, pass filter values as individual query params
+            if (params?.filters) {
+              for (const [key, value] of Object.entries(params.filters)) {
+                if (value == null || value === '') continue;
+                // Handle date range objects { start, end }
+                if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+                  if (value.start) queryParams[`${key}_start`] = String(value.start);
+                  if (value.end) queryParams[`${key}_end`] = String(value.end);
+                } else {
+                  queryParams[key] = String(value);
+                }
+              }
+            }
+            if (requestedSorts.length === 1) {
+              queryParams.sortField = requestedSorts[0].fieldCode;
+              queryParams.sortOrder = requestedSorts[0].direction;
+            } else if (tableBlock?.defaultSort?.field) {
+              queryParams.sortField = tableBlock.defaultSort.field;
+              queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+            }
+          } else {
+            // For standard dynamic tables, use JSON filters array
+            const tabCondition = getTabFilter();
+            const filtersParam = buildFiltersParam(
+              tabCondition,
+              params?.filters,
+              params?.chipFilters ?? chipFiltersRef.current,
+              modelFieldMapRef.current,
+            );
+            if (filtersParam) {
+              queryParams.filters = filtersParam;
+            }
+            // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
+            // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
+            if (requestedSorts.length > 1) {
+              queryParams.sortFields = requestedSorts
+                .map((s) => `${s.fieldCode}:${s.direction}`)
+                .join(',');
+            } else if (requestedSorts.length === 1) {
+              queryParams.sortField = requestedSorts[0].fieldCode;
+              queryParams.sortOrder = requestedSorts[0].direction;
+            } else if (tableBlock?.defaultSort?.field) {
+              queryParams.sortField = tableBlock.defaultSort.field;
+              queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+            }
           }
         }
 
-        // Pass keyword search to backend (supported by DynamicController)
-        // Use ref to get latest value — avoids stale closure when Enter triggers
-        // in the same React cycle as the keyword state update
-        const currentKeyword = keywordRef.current;
-        if (currentKeyword.trim()) {
-          queryParams.keyword = currentKeyword.trim();
-        }
-
-        // When page uses namedQuery data source, pass queryCode to backend
-        if (namedQueryCode) {
-          queryParams.queryCode = namedQueryCode;
-        }
-
-        const result = await fetchResult<PaginationResult<DynamicEntity>>(endpoint, {
-          method,
-          params: queryParams,
-          token: token || undefined,
+        const fetchCurrentActorRequest = (request: ListApiReadRequest) => (
+          fetchResult<PaginationResult<DynamicEntity>>(request.endpoint, {
+            method: request.method,
+            params: request.queryParams,
+            token: token || undefined,
+          })
+        );
+        const request = completeListReadRequest({ endpoint, method, queryParams }, {
+          keyword: keywordRef.current,
+          queryCode: namedQueryCode,
+          apiDatasource: Boolean(isApiDatasource),
+          retry: Boolean(retryRequest),
         });
+        const result = isApiDatasource
+          ? await readApiRequest(request, isLatestRequest, fetchCurrentActorRequest)
+          : await fetchCurrentActorRequest(request);
 
         // A newer loadData was issued while this request was in flight — this
         // response (and its pagination) is stale; drop it instead of letting
@@ -1731,16 +1779,14 @@ function ListPageContentInner(props: PageContentProps) {
             }));
           }
         } else {
-          setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+          setError(resolveListReadErrorMessage(result, locale, t));
         }
       } catch (err) {
         // A stale request's error must not clobber the newer request's state.
         if (requestId !== loadDataSeqRef.current) {
           return;
         }
-        setError(
-          err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-        );
+        setError(resolveListReadErrorMessage(err, locale, t));
       } finally {
         // Only the newest invocation owns the loading flag; an older one that
         // resolves late must not clear the newer request's spinner.
@@ -1753,6 +1799,9 @@ function ListPageContentInner(props: PageContentProps) {
       schema,
       tableName,
       token,
+      rememberSubmittedFilters,
+      readApiRequest,
+      clearApiReadFailure,
       pagination.current,
       pagination.pageSize,
       getTabFilter,
@@ -2043,13 +2092,11 @@ function ListPageContentInner(props: PageContentProps) {
               }));
             }
           } else {
-            setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+            setError(resolveListReadErrorMessage(result, locale, t));
           }
         } catch (err) {
           if (!isLatestRequest()) return;
-          setError(
-            err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-          );
+          setError(resolveListReadErrorMessage(err, locale, t));
         } finally {
           if (isLatestRequest()) {
             setLoading(false);
@@ -3743,6 +3790,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Evaluate toolbar button visibility (visibleWhen expression).
   // Exposes the loaded list's recordCount/total so conditions like
   // `recordCount == 0` (singleton "新建" button) work.
+  const toolbarRuntimeContext = runtime?.getContext() ?? {};
   const evaluateButtonVisible = useCallback(
     (button: ButtonConfig): boolean => {
       if (!canUseButton(button)) return false;
@@ -3751,10 +3799,11 @@ function ListPageContentInner(props: PageContentProps) {
       const conditionContext = buildToolbarConditionContext(
         { total: pagination.total, records: data },
         createExpressionContext({ state: { filters } }),
+        toolbarRuntimeContext,
       );
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     },
-    [canUseButton, pagination.total, data, filters],
+    [canUseButton, pagination.total, data, filters, toolbarRuntimeContext],
   );
 
   const visibleBulkActions = useMemo(() => {
@@ -4061,7 +4110,10 @@ function ListPageContentInner(props: PageContentProps) {
     if (existingPresetView) {
       selectView(existingPresetView.pid);
       setActiveViewType((existingPresetView.viewType as ViewType) || 'table');
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -4093,7 +4145,10 @@ function ListPageContentInner(props: PageContentProps) {
 
     try {
       const view = await createView(request);
+      activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
+      setFilters({});
+      rememberSubmittedFilters({});
       syncPresetToUrl(null);
       setSearchParams(
         (prev) => {
@@ -4123,10 +4178,12 @@ function ListPageContentInner(props: PageContentProps) {
     clearFilterOverrides,
     createView,
     modelCode,
+    rememberSubmittedFilters,
     pageKey,
     savedViews,
     selectView,
     setSearchParams,
+    setFilters,
     showErrorToast,
     showSuccessToast,
     syncPresetToUrl,
@@ -4278,6 +4335,22 @@ function ListPageContentInner(props: PageContentProps) {
     return found;
   }, [allBlocks]);
 
+  const listPageTitle = (() => {
+    // Import writes page titles into the tenant i18n bundle as
+    // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
+    // follows the UI locale; schema.title/schema.name are stored as
+    // plain zh strings and would otherwise pin the title to zh.
+    const listPageKey = schema.pageKey || tableName;
+    const keyedTitle = t(`page.${listPageKey}.title`);
+    if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
+      return keyedTitle;
+    }
+    if (schema.title) return getLocalizedText(schema.title, locale, t);
+    if (schema.name && schema.name.trim()) {
+      return getLocalizedText(schema.name, locale, t);
+    }
+    return tableName;
+  })();
   const [workspaceTabCounts, setWorkspaceTabCounts] = useState<Record<string, number>>({});
   const [workspaceTabCountError, setWorkspaceTabCountError] = useState(false);
   useEffect(() => {
@@ -4393,11 +4466,21 @@ function ListPageContentInner(props: PageContentProps) {
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
   if (error) {
     return (
-      <ErrorAlert
+      <ListErrorState
+        title={listPageTitle}
+        buttons={actionBlock?.buttons || []}
+        evaluateVisible={evaluateButtonVisible}
+        resolveLabel={resolveButtonLabel}
+        onNavigate={to => navigateAwayFromList(to)}
         error={error}
+        errorTitle={getLocalizedText({ 'zh-CN': '加载失败', en: 'Unable to load' }, locale, t)}
+        retryLabel={getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale, t)}
         onRetry={() => {
           setError(null);
-          window.location.reload();
+          const retryRequest = getFailedApiRequest();
+          void loadData(retryRequest
+            ? { retryRequest }
+            : { page: pagination.current - 1, size: pagination.pageSize, filters });
         }}
       />
     );
@@ -4912,8 +4995,7 @@ function ListPageContentInner(props: PageContentProps) {
                       },
                       { replace: true },
                     );
-                    debouncedSearch.cancel();
-                    loadData({ page: 0, size: pagination.pageSize });
+                    commitSearch();
                   }}
                   filterFormVisible={filterFormVisible}
                   onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
@@ -5025,6 +5107,7 @@ function ListPageContentInner(props: PageContentProps) {
                       chipFilters: [],
                     });
                   }}
+                  hideSearch={Boolean(schemaExtension.hideSearch)}
                   hideQuickFilters={hideQuickFilters}
                   hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
                   hideColumnSettings={
@@ -5129,6 +5212,7 @@ function ListPageContentInner(props: PageContentProps) {
               )}
 
               {/* Pagination + Bulk Action Toolbar */}
+              {!loading && (
               <ListPagination
                 workspace={workspace}
                 current={pagination.current}
@@ -5159,6 +5243,7 @@ function ListPageContentInner(props: PageContentProps) {
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
               />
+              )}
             </div>
           ) : (
             <div data-aura-block-id={tableBlock?.id} data-aura-element-id={tableBlock?.id}>

@@ -296,3 +296,57 @@ describe('PageSchema V3 repository', () => {
     );
   });
 });
+
+
+describe('page model binding persistence', () => {
+  it.each(['list', 'form', 'detail'] as const)('saves the edited %s root model as page metadata before reload', async kind => {
+    const document: PageSchemaV3 = {
+      schemaVersion: 3, kind, id: 'binding_page', pageKey: 'binding_page',
+      modelCode: 'previous_model', blocks: [{
+        id: 'binding_root', blockType: kind, dataSource: { model: 'selected_model' },
+        blocks: [{ id: 'separator', blockType: 'divider' }],
+      }],
+    };
+    let stored: any = { pid: 'binding_pid', name: 'binding_page', modelCode: 'previous_model' };
+    const api = {
+      getPageByPid: vi.fn(async () => ({ code: '0', data: stored })),
+      getPageByPageKey: vi.fn(), createPage: vi.fn(),
+      updatePage: vi.fn(async (_pid, request) => {
+        stored = { ...stored, ...request };
+        return { code: '0', data: stored };
+      }),
+    };
+    const result = await savePageSchemaV3({ document, source: { type: 'page', pid: 'binding_pid' }, api });
+    expect(result.ok).toBe(true);
+    expect(stored.modelCode).toBe('selected_model');
+    const loaded = await loadPageSchemaV3({ pageId: 'binding_pid', api });
+    expect(loaded.document.modelCode).toBe('selected_model');
+    expect(loaded.document.blocks[0].dataSource).toMatchObject({ model: 'selected_model' });
+    expect(document.modelCode).toBe('previous_model');
+  });
+});
+
+
+describe('dashboard root layout persistence', () => {
+  it('mirrors edited root grid layout into page metadata and restores it on reload', async () => {
+    const document: PageSchemaV3 = {
+      schemaVersion: 3, kind: 'dashboard', id: 'grid_page', pageKey: 'grid_page',
+      layout: { type: 'dashboard-grid', gap: 16, columns: 12 },
+      blocks: [{ id: 'grid_root', blockType: 'dashboard',
+        layout: { type: 'dashboard-grid', cols: 6, rowHeight: 96, gap: 24 },
+        blocks: [{ id: 'grid_widget', blockType: 'widget', widgetType: 'number-card', props: { value: '7' } }],
+      }],
+    };
+    let stored: any = { pid: 'grid_pid', name: 'grid_page' };
+    const api = {
+      getPageByPid: vi.fn(async () => ({ code: '0', data: stored })),
+      getPageByPageKey: vi.fn(), createPage: vi.fn(),
+      updatePage: vi.fn(async (_pid, request) => { stored = { ...stored, ...request }; return { code: '0', data: stored }; }),
+    };
+    expect((await savePageSchemaV3({ document, source: { type: 'page', pid: 'grid_pid' }, api })).ok).toBe(true);
+    expect(stored.layout).toMatchObject({ cols: 6, rowHeight: 96, gap: 24 });
+    const reloaded = await loadPageSchemaV3({ pageId: 'grid_pid', api });
+    expect(reloaded.document.blocks[0].layout).toMatchObject({ cols: 6, rowHeight: 96, gap: 24 });
+    expect(document.layout?.gap).toBe(16);
+  });
+});

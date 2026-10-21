@@ -36,6 +36,8 @@ test('portable delivery report reads governed sources and contains no embedded r
  assert.equal(query.resourceCode,'tpm_project');assert.equal(query.actionCode,'read');
  assert.ok(query.parameter_schema.required.includes('tenantId'));
  assert.match(query.fromSql,/m\.tenant_id = p\.tenant_id/);
+ assert.match(query.fromSql,/CASE WHEN m\.pid IS NOT NULL/);
+ assert.doesNotMatch(query.fromSql,/CASE WHEN m\.id IS NOT NULL/);
  assert.match(query.fromSql,/p\.tenant_id = #\{params\.tenantId\}/);
  assert.equal(report.dsl.body.filter(block=>block.blockType==='table').length,3);
  for(const source of Object.values(report.dsl.dataSources))assert.equal(source.data,undefined);

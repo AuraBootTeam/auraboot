@@ -16,6 +16,7 @@ async function menu(page: Page, label: string) {
   );
 }
 async function screenshot(page: Page, info: TestInfo, name: string) {
+  await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, { timeout: 15000 });
   await info.attach(name, {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
@@ -42,6 +43,8 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('model-type-physical').click();
   await page.getByTestId('model-code-input').fill(code);
   await page.getByTestId('model-display-name-input').fill('交付客户跟进');
+  await expect(page.getByTestId('model-create-submit')).toBeEnabled();
+  await screenshot(page, info, 'SC02-model-create-filled');
   const create = page.waitForResponse(
     (r) => r.url().endsWith('/api/meta/models') && r.request().method() === 'POST',
   );
@@ -68,6 +71,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
       .fill(suffix === 'customer_name' ? '客户名称' : '商机金额');
     await dialog.getByPlaceholder('例如: user_name, email, age').fill(`${code}_${suffix}`);
     await dialog.locator('select').first().selectOption(type);
+    if (suffix === 'customer_name') await screenshot(page, info, 'SC02-field-create-filled');
     const bind = page.waitForResponse(
       (r) =>
         r.url().endsWith(`/api/meta/models/${pid}/fields/bind`) && r.request().method() === 'POST',
@@ -106,6 +110,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(metadata.data.filter((field: { code: string }) => !field.code.startsWith(`${code}_`))
     .map((field: { code: string }) => field.code).sort()).toEqual(['created_at', 'updated_at']);
   expect(JSON.stringify(metadata.data)).toContain(`${code}_opportunity_amount`);
+  await screenshot(page, info, 'SC02-model-fields-ready');
   await page.getByTestId('model-more-actions').click();
   await page.getByTestId('model-publish-action').click();
   await expect(page.getByTestId('model-publish-dialog')).toBeVisible();

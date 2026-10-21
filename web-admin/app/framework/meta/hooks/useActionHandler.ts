@@ -1,4 +1,5 @@
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
+import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
 /**
  * useActionHandler - 统一的 Action 处理 Hook (重构版本)
  *
@@ -704,6 +705,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       try {
         setLoading(true);
         setError(null);
+        if (normalizedButton.confirmVariant !== undefined
+          && normalizedButton.confirmVariant !== 'default' && normalizedButton.confirmVariant !== 'danger') {
+          throw new Error(t('message.operation.failed', undefined,
+            locale.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed'));
+        }
 
         switch (actionDef.type) {
           case 'command': {
@@ -835,9 +841,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   fetchResult,
                   inputFieldsSubmitLabel,
                   actionRuntimeContext,
+                  { t, locale },
                 );
-              } catch {
-                return;
+              } catch (error) {
+                if (error instanceof ActionCancelledError) return;
+                throw error;
               }
               payload = {
                 ...payload,
@@ -1068,9 +1076,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     ...(runtime?.getContext?.() ?? {}),
                     record: record || context.data,
                   },
+                  { t, locale },
                 );
-              } catch {
-                return;
+              } catch (error) {
+                if (error instanceof ActionCancelledError) return;
+                throw error;
               }
             }
             await executeCommand(actionDef.command, targetRecordPid, payload, 'update');
@@ -1210,7 +1220,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   (freshContext as any).fetchResult = fr;
                   const contextWithRecord = { ...freshContext, record, row: record };
                   await flowRunner.run(actionDef.steps, contextWithRecord as any);
-                  if (context.loadData) await context.loadData();
+                  if (context.loadData) await context.loadData({ filters: context.filters });
                   return;
                 }
               }
@@ -1237,12 +1247,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   });
                 }
               }
-              if (context.loadData) await context.loadData();
+              if (context.loadData) await context.loadData({ filters: context.filters });
             }
             return;
           }
         }
       } catch (err) {
+        if (err instanceof ActionCancelledError) return;
         const errorMessage = resolveCommandErrorMessage(
           { context: { detail: err instanceof Error ? err.message : 'Action execution failed' } },
           button.code, t, locale,

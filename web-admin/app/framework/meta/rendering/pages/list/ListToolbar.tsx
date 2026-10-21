@@ -70,6 +70,7 @@ export interface ListToolbarProps {
   hasFilterBlock?: boolean;
   /** Resolve a filter's value to a localized label (e.g. dict code → label). */
   resolveChipValueLabel?: (filter: ViewFilterConfig) => string | undefined;
+  hideSearch?: boolean;
   hideQuickFilters?: boolean;
   hideSort?: boolean;
   hideColumnSettings?: boolean;
@@ -105,6 +106,7 @@ export function ListToolbar({
   onFilterFormToggle,
   hasFilterBlock,
   resolveChipValueLabel,
+  hideSearch,
   hideQuickFilters,
   hideSort,
   hideColumnSettings,
@@ -141,7 +143,7 @@ export function ListToolbar({
         data-testid="list-toolbar"
       >
         {/* Search input */}
-        <div className="relative min-w-0 flex-1 basis-full sm:flex-none sm:basis-auto" style={workspace ? { marginInlineEnd: 'auto' } : undefined}>
+        {!hideSearch && <div className="relative min-w-0 flex-1 basis-full sm:flex-none sm:basis-auto" style={workspace ? { marginInlineEnd: 'auto' } : undefined}>
           <input
             type="text"
             value={keyword}
@@ -164,10 +166,10 @@ export function ListToolbar({
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-        </div>
+        </div>}
 
         {/* Separator */}
-        {showInlineControls && !workspace && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}
+        {!hideSearch && showInlineControls && !workspace && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}
 
         {/* Sort popover trigger */}
         {!hideSort && (

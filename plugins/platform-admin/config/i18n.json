@@ -6061,11 +6061,53 @@
     "source": "import",
     "refType": "ui"
   },
-{
-  "key": "page.open_platform_actions.title",
-  "zh-CN": "公共业务接口",
-  "en-US": "Public Business APIs",
-  "source": "import",
-  "refType": "ui"
-}
+  {
+    "key": "page.open_platform_actions.title",
+    "zh-CN": "公共业务接口",
+    "en-US": "Public Business APIs",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.trigger.externalEvent",
+    "zh-CN": "外部系统事件",
+    "en-US": "External system event",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.trigger.externalEvent.desc",
+    "zh-CN": "经安装 Token 授权并持久接收的外部事件",
+    "en-US": "External events authorized by an installation token and durably accepted",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.field.externalSourceCode",
+    "zh-CN": "事件来源标识",
+    "en-US": "Event source code",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.field.externalSourceCode.desc",
+    "zh-CN": "与外部事件接口 sourceCode 一致。此标识用于路由；调用仍需安装 Token 和发送外部事件权限。",
+    "en-US": "Matches the external event endpoint sourceCode. This is routing, not authority; callers still need an installation token and the external-event scope.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.field.externalEventTypes",
+    "zh-CN": "订阅事件类型",
+    "en-US": "Subscribed event types",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.field.externalEventTypes.desc",
+    "zh-CN": "完整类型列表，例如 [\"external.erp.materials.received.v1\"]。与发送端的来源、事件和版本一致。",
+    "en-US": "Full event types, e.g. [\"external.erp.materials.received.v1\"]. Match the sender source, event and version.",
+    "source": "import",
+    "refType": "ui"
+  }
 ]
