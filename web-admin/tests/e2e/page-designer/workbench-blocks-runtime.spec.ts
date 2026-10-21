@@ -396,6 +396,44 @@ test.describe('Page Designer workbench block runtime', () => {
     await expect(drawer).toHaveAttribute('style', originalLayout!);
     await capture('rd-restored');
 
+    const beforeDrag = await drawer.boundingBox();
+    expect(beforeDrag).not.toBeNull();
+    const heading = await drawer
+      .getByRole('heading', { name: 'Review C-100 · Pending review' })
+      .boundingBox();
+    expect(heading).not.toBeNull();
+    const dragX = heading!.x + heading!.width / 2;
+    const dragY = heading!.y + heading!.height / 2;
+    await page.mouse.move(dragX, dragY);
+    await page.mouse.down();
+    await page.mouse.move(dragX + 40, dragY + 30, { steps: 5 });
+    await page.mouse.up();
+    await expect(drawer).toHaveCSS('left', `${beforeDrag!.x + 40}px`);
+    await expect(drawer).toHaveCSS('top', `${beforeDrag!.y + 30}px`);
+    await capture('rd-dragged');
+
+    const beforeResize = await drawer.boundingBox();
+    expect(beforeResize).not.toBeNull();
+    const resize = await drawer
+      .getByRole('button', { name: /Resize review drawer|调整复核浮层大小/ })
+      .boundingBox();
+    expect(resize).not.toBeNull();
+    const resizeX = resize!.x + resize!.width / 2;
+    const resizeY = resize!.y + resize!.height / 2;
+    await page.mouse.move(resizeX, resizeY);
+    await page.mouse.down();
+    await page.mouse.move(resizeX + 60, resizeY + 40, { steps: 5 });
+    await page.mouse.up();
+    await expect(drawer).toHaveCSS('width', `${beforeResize!.width + 60}px`);
+    await expect(drawer).toHaveCSS('height', `${beforeResize!.height + 40}px`);
+    await capture('rd-resized');
+    const storedLayout = await drawer.getAttribute('style');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('review-drawer-empty')).toContainText('Select a row');
+    await page.getByTestId('candidate-list-item-C-100').click();
+    await expect(drawer).toHaveAttribute('style', storedLayout!);
+    await capture('rd-persisted');
+
     const renderedTypes = await page.getByTestId('list-misc-blocks').evaluate((root) =>
       Array.from(root.querySelectorAll('[class*="block-"]'))
         .map((node) =>
