@@ -550,14 +550,14 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
 
   if (query.failed && !query.hasResult) {
     return (
-      <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+      <div data-testid="report-runtime-paper" className="relative isolate mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
         <ReportQueryControls report={report} query={query} />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+    <div data-testid="report-runtime-paper" className="relative isolate mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
       <ReportQueryControls report={report} query={query} />
       {Object.values(report.dataSources).some((source) => source.type === 'aggregate') && (
         <p className="mb-4 text-sm text-gray-500" data-testid="report-aggregate-limit-hint">

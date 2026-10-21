@@ -28,7 +28,11 @@ async function login(page: Page) {
   await mkdir(evidence!, { recursive: true });
 }
 async function shot(page: Page, name: string) {
-  const toolbar = page.getByTestId(name.startsWith('DS04') || name.startsWith('SC10-report') ? 'report-designer-toolbar' : 'designer-toolbar');
+  const toolbar = page.getByTestId(
+    name.startsWith('DS04') || name.startsWith('SC10-report')
+      ? 'report-designer-toolbar'
+      : 'designer-toolbar',
+  );
   if (await toolbar.isVisible()) await toolbar.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(evidence!, `${name}.png`), fullPage: false });
 }
@@ -291,11 +295,11 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   expect(fitBox).toBeTruthy();
   await shot(page, 'DS04-paper-fit');
   await page.getByTestId('report-canvas-actual').click();
-  await expect(paper).toHaveAttribute('data-scale','1');
-  await expect.poll(async () => (await paper.boundingBox())!.width).toBeCloseTo(891,0);
+  await expect(paper).toHaveAttribute('data-scale', '1');
+  await expect.poll(async () => (await paper.boundingBox())!.width).toBeCloseTo(891, 0);
   await shot(page, 'DS04-paper-actual');
   await page.getByTestId('report-canvas-fit').click();
-  await expect.poll(async () => (await paper.boundingBox())!.width).toBeCloseTo(fitBox!.width,0);
+  await expect.poll(async () => (await paper.boundingBox())!.width).toBeCloseTo(fitBox!.width, 0);
   const blocks = page.getByTestId('report-canvas').locator('[data-testid^="drag-handle-"]');
   const originalOrder = await blocks.evaluateAll((elements) =>
     elements.map((el) => el.getAttribute('data-testid')),
@@ -344,7 +348,13 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   const addedTypes = Object.keys(addedTitles);
   for (const type of addedTypes) {
     await page.getByTestId(`block-palette-item-${type}`).click();
-    await expect(page.getByTestId('report-canvas').locator('[data-testid^="drag-handle-"]').last().locator('..')).toBeInViewport({ ratio: 0.9 });
+    await expect(
+      page
+        .getByTestId('report-canvas')
+        .locator('[data-testid^="drag-handle-"]')
+        .last()
+        .locator('..'),
+    ).toBeInViewport({ ratio: 0.9 });
     const panel = page.getByTestId('block-property-panel');
     const textField = (key: string) =>
       panel.getByTestId(`schema-config-field-${key}`).getByRole('textbox');
@@ -362,7 +372,7 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       await columns.getByRole('button', { name: '+ 添加', exact: true }).click();
       await columns.getByRole('textbox', { name: '字段名称*', exact: true }).fill('amount');
       await columns.getByRole('textbox', { name: '显示名称', exact: true }).fill('交付金额');
-      const width = columns.getByRole('spinbutton', {name:'列宽',exact:true});
+      const width = columns.getByRole('spinbutton', { name: '列宽', exact: true });
       await expect(width).toHaveValue('');
       await width.fill('0');
       await expect(columns.getByRole('alert')).toBeVisible();
@@ -379,7 +389,13 @@ test('SC10 report template → reviewed text edit → save/reload → three real
     }
     if (type === 'chart') await textField('categoryField').fill('project_name');
     if (type === 'barcode') await textField('staticValue').fill('ACC20261021');
-    await expect(page.getByTestId('report-canvas').locator('[data-testid^="drag-handle-"]').last().locator('..')).toBeInViewport({ ratio: 0.9 });
+    await expect(
+      page
+        .getByTestId('report-canvas')
+        .locator('[data-testid^="drag-handle-"]')
+        .last()
+        .locator('..'),
+    ).toBeInViewport({ ratio: 0.9 });
     await shot(page, `DS04-${type}-schema-properties`);
   }
   const title = '客户项目交付复盘 · 每周行动';
@@ -410,11 +426,35 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       expect(block.dataSource).toBe('delivery');
   }
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').style.fontSize).toBe(18);
-  expect(persisted.dsl.body.find((b:any)=>b.blockType==='grouped-table').columns[0].width).toBe(120);
+  expect(
+    persisted.dsl.body.find((b: any) => b.blockType === 'grouped-table').columns[0].width,
+  ).toBe(120);
   const toolbar = page.getByTestId('report-designer-toolbar');
   await toolbar.getByRole('button', { name: '预览', exact: true }).click();
   await expect(page.getByRole('main')).toContainText(note);
   await expect(page.getByRole('main')).toContainText('四、核验快照与跟进行动');
+  const runtimePaper = page.getByTestId('report-runtime-paper');
+  const watermark = page.getByTestId('report-watermark-overlay');
+  await expect(watermark).toHaveCSS('position', 'absolute');
+  await expect(runtimePaper).toHaveCSS('isolation', 'isolate');
+  expect(
+    await watermark.evaluate(
+      (element) =>
+        element instanceof HTMLElement && element.offsetParent === document.querySelector('[data-testid="report-runtime-paper"]'),
+    ),
+  ).toBe(true);
+  const paperBox = await runtimePaper.boundingBox();
+  const watermarkBox = await watermark.boundingBox();
+  expect(paperBox).not.toBeNull();
+  expect(watermarkBox).not.toBeNull();
+  expect(watermarkBox!.x).toBeGreaterThanOrEqual(paperBox!.x);
+  expect(watermarkBox!.y).toBeGreaterThanOrEqual(paperBox!.y);
+  expect(watermarkBox!.x + watermarkBox!.width).toBeLessThanOrEqual(
+    paperBox!.x + paperBox!.width + 1,
+  );
+  expect(watermarkBox!.y + watermarkBox!.height).toBeLessThanOrEqual(
+    paperBox!.y + paperBox!.height + 1,
+  );
   await shot(page, 'SC10-report-persisted-preview');
   const files = [];
   for (const [format, label, ext] of [
