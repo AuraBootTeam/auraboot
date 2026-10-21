@@ -12,7 +12,7 @@
  *
  * Roles (platform-baseline, operator/viewer retired in OSS #1167):
  *   - tenant_admin  — the bootstrap admin; wildcard; must resolve every matrix code and see admin-tier menus.
- *   - tenant_member — a role-LESS baseline member; resolves only the L1 read codes, sees NO admin-tier
+ *   - tenant_member — a role-LESS baseline member; resolves only the L1 read codes, sees NO admin-tier actionable
  *                     menu, and is still admitted into the app (renders, not bounced to /login).
  */
 import { test, expect } from '@playwright/test';
@@ -30,7 +30,7 @@ const baseline = loadPlatformBaseline();
 const MEMBER_ALLOW = baseline.tenant_member.allow;
 const MEMBER_DENY = baseline.tenant_member.deny;
 
-// Menu codes that are admin-tier: a baseline member must never see these in its resolved menu.
+// Admin actions are forbidden. A directory may remain solely to contain authorized children.
 const ADMIN_TIER_MENU_CODES = [
   'org_management',
   'system_management',
@@ -108,15 +108,31 @@ test.describe('RBAC platform-baseline per-role golden (Slice 4)', () => {
         expect(snap.permissionCodes, `member must NOT resolve deny '${code}'`).not.toContain(code);
       }
 
-      // Menu derivation: member's menu is a strict subset of admin's, with NO admin-tier node.
+      // MenuService retains directory ancestors of authorized leaves, without granting sibling actions.
       expect(snap.menuCodes.length, 'member menu must be smaller than admin menu').toBeLessThan(
         adminSnap.menuCodes.length,
       );
       for (const code of snap.menuCodes) {
         expect(adminSnap.menuCodes, `member menu '${code}' must exist within admin's menu`).toContain(code);
       }
+      expect(snap.permissionCodes).not.toContain('*');
+      for (const item of snap.menus) {
+        if (item.type === 0) {
+          expect(snap.menus.some(child => child.parentCode === item.code),
+            `directory ${item.code} must contain a visible child`).toBe(true);
+        } else {
+          expect(ADMIN_TIER_MENU_CODES, `member must not see admin action ${item.code}`)
+            .not.toContain(item.code);
+          if (item.permissionCode) {
+            expect(snap.permissionCodes, `action ${item.code} needs its actual grant`)
+              .toContain(item.permissionCode);
+          }
+        }
+      }
       for (const adminTier of ADMIN_TIER_MENU_CODES) {
-        expect(snap.menuCodes, `member must NOT see admin-tier menu '${adminTier}'`).not.toContain(adminTier);
+        for (const item of snap.menus.filter(menu => menu.code === adminTier)) {
+          expect(item.type, `retained admin-tier ${adminTier} must be a directory`).toBe(0);
+        }
       }
 
       // Real browser (L1 incident guard): the baseline member is ADMITTED to the app — logged in,

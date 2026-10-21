@@ -192,7 +192,8 @@ export default function AddMemberDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         data-testid="add-member-dialog"
-        className="max-w-3xl"
+        className="grid-cols-1 max-w-3xl max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        style={{ maxWidth: 'min(48rem, calc(100vw - 2rem))' }}
       >
         <DialogHeader>
           <DialogTitle>
@@ -317,7 +318,7 @@ export default function AddMemberDialog({
                     {t('admin.permission.members.noCandidates', undefined, 'No available members found')}
                   </div>
                 ) : (
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <table className="min-w-full [overflow-wrap:anywhere] divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-800">
                       <tr>
                         <th className="px-3 py-2 text-left">

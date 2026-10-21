@@ -1,5 +1,12 @@
 [
   {
+    "key": "about.menuLabel",
+    "zh-CN": "关于 {productName}",
+    "en-US": "About {productName}",
+    "ja-JP": "{productName} について",
+    "ko-KR": "{productName} 정보"
+  },
+  {
     "key": "action.approve",
     "zh-CN": "审批",
     "en-US": "Approve",

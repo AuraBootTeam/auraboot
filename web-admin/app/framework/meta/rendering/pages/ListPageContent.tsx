@@ -934,10 +934,12 @@ function ListPageContentInner(props: PageContentProps) {
     const needsUpdate =
       currentUrlPageNum !== pagination.current || currentUrlPageSize !== pagination.pageSize;
     if (!needsUpdate) return;
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('pageNum', String(pagination.current));
-    nextParams.set('pageSize', String(pagination.pageSize));
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams((previous) => {
+      const nextParams = new URLSearchParams(previous);
+      nextParams.set('pageNum', String(pagination.current));
+      nextParams.set('pageSize', String(pagination.pageSize));
+      return nextParams;
+    }, { replace: true });
   }, [pagination.current, pagination.pageSize, searchParams, setSearchParams]);
 
   // Keep page-owned context stable while runtime draft subscriptions rerender.
@@ -1888,14 +1890,15 @@ function ListPageContentInner(props: PageContentProps) {
     const restoredFilters = pendingSavedViewFiltersRef.current;
     if (!restoredFilters) return;
     pendingSavedViewFiltersRef.current = null;
-    // The latest loadData closure already reads the effective active sorts. Do
-    // not bypass a URL override with the selected SavedView's baseline sorts.
+    // Hydration can finish after the user changes pages. Reload the current
+    // page with the restored filters rather than superseding that newer request
+    // with page one. The latest loadData closure retains effective URL sorts.
     loadDataRef.current?.({
-      page: 0,
+      page: pagination.current - 1,
       size: pagination.pageSize,
       filters: restoredFilters,
     });
-  }, [loadData, pagination.pageSize]);
+  }, [loadData, pagination.current, pagination.pageSize]);
 
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction

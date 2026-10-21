@@ -90,6 +90,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `provider-neutral-architecture-gate.sh` | 0 | 2026-07-31 | Fail closed when agent/runtime fixtures or goldens hard-code a model provider. |
 | `permission-sql-registrations.mjs` | 0 | 2026-10-20 | Resolve permission registrations from migration SQL for permission validation. |
 | `validate-permission-codes.mjs` | 2 | 2026-05-08 | Cross-source permission-code validator. |
+| `permission-sql-registrations.mjs` | 1 | 2026-10-21 | Extract permission codes from SQL registrations for contract validation. |
 | `validate-plugin-dashboards.mjs` | 1 | 2026-05-11 | Validates every plugins/<plugin>/config/dashboards/*.json against the Plan #8 |
 | `validate-plugin-i18n.mjs` | 1 | 2026-04-14 | Validates every plugins/<plugin>/config/i18n.json against the plugin i18n contract. |
 | `validate-public-record-id-contracts.mjs` | 2 | 2026-06-24 | Public dynamic-record id contract inventory and regression gate. |
@@ -97,6 +98,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `gates/fixtures/workspace-control.mjs` | 0 | 2026-10-05 | Hermetic workspace-control fixture for gate tests. |
 | `lib/golden-new-database.sh` | 0 | 2026-10-05 | Create an absent owned golden database without replacement. |
 | `lib/golden-process-stop.mjs` | 0 | 2026-10-05 | Stop only identity-attested owned golden processes. |
+| `lib/golden-private-redis.mjs` | 1 | 2026-10-21 | Start and attest an owned private Redis endpoint and persistent storage. |
 | `lib/golden-frontend-supervisor.mjs` | 1 | 2026-10-18 | Keep a stable owned frontend parent across automatic listener restarts. |
 | `lib/golden-frontend-registration.mjs` | 1 | 2026-10-18 | Register each authenticated Web/BFF generation before its entrypoint can listen. |
 | `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |

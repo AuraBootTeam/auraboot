@@ -255,10 +255,18 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
   // next inspector bind).
   if (PASSTHROUGH_BLOCK_TYPES.has(migrated.blockType) && migrated.props) {
     const { ...hoisted } = migrated.props as Record<string, unknown>;
+    const explicitProps = block.props ?? {};
     for (const [key, value] of Object.entries(hoisted)) {
-      if (migrated[key as keyof typeof migrated] === undefined) {
+      // Only keys authored at the flat block's top level belong there. Moving
+      // explicit props empties helper previews after the stored page reloads.
+      if (Object.prototype.hasOwnProperty.call(block, key)
+        && migrated[key as keyof typeof migrated] === undefined) {
         (migrated as Record<string, unknown>)[key] = value;
-        delete (migrated.props as Record<string, unknown>)[key];
+        if (Object.prototype.hasOwnProperty.call(explicitProps, key)) {
+          (migrated.props as Record<string, unknown>)[key] = explicitProps[key];
+        } else {
+          delete (migrated.props as Record<string, unknown>)[key];
+        }
       }
     }
     if (Object.keys(migrated.props as Record<string, unknown>).length === 0) {

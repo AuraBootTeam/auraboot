@@ -5,6 +5,7 @@ import { existsSync, readFileSync, realpathSync, readdirSync, statSync, mkdirSyn
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
+import { readPrivateRedisConfig, privateRedisPort } from './golden-private-redis.mjs';
 
 const TELEMETRY_KEYS = ['SESSION_SECRET_FILE', 'AURA_WEB_MODE', 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED',
   'MANAGEMENT_TRACING_SAMPLING_PROBABILITY', 'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG',
@@ -35,7 +36,7 @@ export function fingerprintDirectory(root) {
   return { root: realpathSync(root), hash: digest.digest('hex') };
 }
 
-export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins, logging = null, frontendBuild = null, sessionSecretFile = null }) {
+export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins, logging = null, frontendBuild = null, sessionSecretFile = null, isolatedRedis = null }) {
   need(report.verdict === 'ok', 'Workspace identity verification failed');
   need(plan.schemaVersion === 1 && plan.runtime === report.runtime && plan.repo === repo,
     'Resume plan owner mismatch');
@@ -71,11 +72,32 @@ export function verifyResumeState({ report, repo, plan, planHash, manifest, depe
       plan.sessionSecretFile.hash === sessionSecretFile.hash, 'Retained production session configuration changed');
   }
   need(typeof (plan.redisHost ?? '127.0.0.1') === 'string' && !/[\r\n]/.test(plan.redisHost || ''), 'Invalid Redis host');
+  const redisPort = plan.redisPort ?? '6379';
+  need(typeof redisPort === 'string' && /^\d+$/.test(redisPort) && Number(redisPort) > 0 &&
+    Number(redisPort) <= 65535, 'Invalid retained Redis port');
+  if (plan.redisPort !== undefined) {
+    need(manifest.redisEndpoint && String(manifest.redisEndpoint.port) === redisPort &&
+      manifest.redisEndpoint.host === plan.redisHost && manifest.redisEndpoint.database === plan.redisDatabase,
+      'Retained Redis endpoint changed');
+  }
+  if (plan.isolatedRedis || isolatedRedis || manifest.redisEndpoint?.isolated) {
+    need(plan.isolatedRedis && isolatedRedis && manifest.redisEndpoint?.isolated &&
+      plan.isolatedRedis.path === isolatedRedis.path && plan.isolatedRedis.hash === isolatedRedis.hash,
+      'Retained private Redis configuration changed');
+    need(isolatedRedis.config.port === privateRedisPort(redisPort) &&
+      isolatedRedis.config.database === plan.redisDatabase && isolatedRedis.config.host === plan.redisHost &&
+      isolatedRedis.config.host === '127.0.0.1' && isolatedRedis.config.runtime === report.runtime &&
+      isolatedRedis.config.repo === repo && typeof isolatedRedis.config.dataDirectory === 'string' &&
+      isolatedRedis.config.dataDirectory === plan.isolatedRedis.config.dataDirectory,
+      'Retained private Redis owner changed');
+  }
   for (const [key, value] of Object.entries(plan.telemetryEnvironment || {})) {
     need(TELEMETRY_KEYS.includes(key) && typeof value === 'string' && !/[\r\n]/.test(value), 'Invalid telemetry environment');
   }
   return { backend: plan.backend.path, llmStubMode: plan.llmStubMode,
-    redisHost: plan.redisHost ?? '127.0.0.1', telemetryEnvironment: plan.telemetryEnvironment || {},
+    redisHost: plan.redisHost ?? '127.0.0.1', redisPort,
+    ...(plan.isolatedRedis ? { isolatedRedisPort: redisPort } : {}),
+    telemetryEnvironment: plan.telemetryEnvironment || {},
     ...(plan.logging ? { loggingConfig: plan.logging.path } : {}) };
 }
 
@@ -108,10 +130,13 @@ export function recordResumeState(name, repo, cli) {
     ports: Object.fromEntries(Object.entries(report.ports).map(([key, item]) => [key, item.port])),
     database: manifest.database, redisDatabase: manifest.redisDatabase,
     redisHost: backendEnv.SPRING_DATA_REDIS_HOST ?? '',
+    redisPort: backendEnv.SPRING_DATA_REDIS_PORT,
     telemetryEnvironment: Object.fromEntries(TELEMETRY_KEYS.filter(key => liveEnv[key] !== undefined).map(key => [key, liveEnv[key]])),
     logging: loggingInput(report, name),
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
     plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')) };
+  const isolatedRedis = readPrivateRedisConfig(report, repo);
+  if (isolatedRedis) plan.isolatedRedis = isolatedRedis;
   if (liveEnv.AURA_WEB_MODE === 'production') {
     plan.frontendBuild = fingerprintDirectory(join(repo, 'web-admin/build'));
     need(Boolean(liveEnv.SESSION_SECRET_FILE), 'Production session input missing');
@@ -121,7 +146,8 @@ export function recordResumeState(name, repo, cli) {
   const planFile = join(root, 'resume.json');
   const planHash = hash(JSON.stringify(plan, null, 2) + '\n');
   verifyResumeState({ report, repo, plan, planHash, manifest: { ...manifest, resumePlan: { hash: planHash } },
-    dependencies: plan.dependencies, plugins: plan.plugins, logging: plan.logging, frontendBuild: plan.frontendBuild, sessionSecretFile: plan.sessionSecretFile });
+    dependencies: plan.dependencies, plugins: plan.plugins, logging: plan.logging, frontendBuild: plan.frontendBuild,
+    sessionSecretFile: plan.sessionSecretFile, isolatedRedis });
   atomicJson(planFile, plan);
   manifest.resumePlan = { hash: hash(readFileSync(planFile)) };
   atomicJson(file, manifest);
@@ -140,7 +166,8 @@ export function loadResumeState(name, repo, cli) {
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
     plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')),
     logging: loggingInput(report, name), frontendBuild: plan.frontendBuild ? fingerprintDirectory(join(repo, 'web-admin/build')) : null,
-    sessionSecretFile: plan.sessionSecretFile ? fingerprintDirectory(plan.sessionSecretFile.root) : null });
+    sessionSecretFile: plan.sessionSecretFile ? fingerprintDirectory(plan.sessionSecretFile.root) : null,
+    isolatedRedis: readPrivateRedisConfig(report, repo) });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
@@ -152,6 +179,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     } else if (action === 'load') {
       const state = loadResumeState(name, repo, cli);
       console.log(state.backend); console.log(state.llmStubMode); console.log(state.loggingConfig || ''); console.log(state.redisHost);
+      console.log(state.redisPort); console.log(state.isolatedRedisPort ?? '');
     } else throw new Error('Unknown resume action');
   } catch { console.error('Retained golden launch identity refused; no database initialization performed'); process.exitCode = 1; }
 }

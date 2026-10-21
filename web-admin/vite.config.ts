@@ -274,6 +274,7 @@ export default defineConfig({
       // why the chat-bi golden could never see its canvas). Pre-bundling removes
       // the mid-session re-optimization entirely.
       'echarts',
+      'echarts-wordcloud',
       'echarts-for-react',
       'zustand',
       'zustand/middleware',
@@ -303,6 +304,13 @@ export default defineConfig({
       '@tiptap/react',
       '@tiptap/starter-kit',
       '@heroicons/react/24/outline',
+      '@heroicons/react/24/solid',
+      // Lazy editor and Markdown routes must retain stable vendor URLs after startup.
+      '@monaco-editor/react',
+      'monaco-editor/esm/vs/editor/editor.api.js',
+      'monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js',
+      'react-markdown',
+      'remark-gfm',
       '@messageformat/core',
       'dayjs/plugin/relativeTime',
       'dayjs/plugin/timezone',

@@ -3506,9 +3506,15 @@ async function dragCanvasBlockBefore(page: Page, sourceBlockId: string, targetBl
   await expect(sourceHandle).toBeVisible();
   await expect(targetBlock).toBeVisible();
 
-  const src = await sourceHandle.boundingBox();
-  const dst = await targetBlock.boundingBox();
-  expect(src && dst).toBeTruthy();
+  const bounds: Record<'src' | 'dst', Awaited<ReturnType<typeof sourceHandle.boundingBox>>> = {
+    src: null, dst: null,
+  };
+  await expect.poll(async () => {
+    bounds.src = await sourceHandle.boundingBox();
+    bounds.dst = await targetBlock.boundingBox();
+    return bounds.src !== null && bounds.dst !== null;
+  }).toBe(true);
+  const { src, dst } = bounds;
   await page.mouse.move(src!.x + src!.width / 2, src!.y + src!.height / 2);
   await page.mouse.down();
   await page.mouse.move(src!.x + src!.width / 2 + 12, src!.y + src!.height / 2 + 12, { steps: 6 });
@@ -3523,9 +3529,15 @@ async function dragCanvasBlockBeforeHeader(page: Page, sourceBlockId: string, ta
   await expect(sourceHandle).toBeVisible();
   await expect(targetBlock).toBeVisible();
 
-  const src = await sourceHandle.boundingBox();
-  const dst = await targetBlock.boundingBox();
-  expect(src && dst).toBeTruthy();
+  const bounds: Record<'src' | 'dst', Awaited<ReturnType<typeof sourceHandle.boundingBox>>> = {
+    src: null, dst: null,
+  };
+  await expect.poll(async () => {
+    bounds.src = await sourceHandle.boundingBox();
+    bounds.dst = await targetBlock.boundingBox();
+    return bounds.src !== null && bounds.dst !== null;
+  }).toBe(true);
+  const { src, dst } = bounds;
   const targetX = dst!.x + dst!.width / 2;
   const targetY = dst!.y + Math.min(20, Math.max(12, dst!.height * 0.18));
   await page.mouse.move(src!.x + src!.width / 2, src!.y + src!.height / 2);
@@ -3564,9 +3576,15 @@ async function dragCanvasBlockInto(page: Page, sourceBlockId: string, parentBloc
   await expect(sourceHandle).toBeVisible();
   await expect(targetBlock).toBeVisible();
 
-  const src = await sourceHandle.boundingBox();
-  const dst = await targetBlock.boundingBox();
-  expect(src && dst).toBeTruthy();
+  const bounds: Record<'src' | 'dst', Awaited<ReturnType<typeof sourceHandle.boundingBox>>> = {
+    src: null, dst: null,
+  };
+  await expect.poll(async () => {
+    bounds.src = await sourceHandle.boundingBox();
+    bounds.dst = await targetBlock.boundingBox();
+    return bounds.src !== null && bounds.dst !== null;
+  }).toBe(true);
+  const { src, dst } = bounds;
   await page.mouse.move(src!.x + src!.width / 2, src!.y + src!.height / 2);
   await page.mouse.down();
   await page.mouse.move(src!.x + src!.width / 2 + 12, src!.y + src!.height / 2 + 12, { steps: 6 });

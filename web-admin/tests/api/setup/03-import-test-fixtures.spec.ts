@@ -186,35 +186,9 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
   // Import and role writes require an explicitly selected business session.
   const token = await loginAdmin(request);
 
-  const existingCommandsRes = await request.get(
-    `${BACKEND_URL}/api/meta/commands?modelCode=e2et_order`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
-  if (existingCommandsRes.ok()) {
-    const existingCommandsBody = (await existingCommandsRes.json()) as {
-      data?: Array<{ code?: string }>;
-    };
-    const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
-    const roleCodes = await loadRoleCodes(request, token, ['e2et_viewer']);
-    if (
-      commands.some((command) => command?.code === 'e2et:create_order') &&
-      roleCodes.has('e2et_viewer')
-    ) {
-      const modelRes = await request.get(`${BACKEND_URL}/api/meta/models/code/e2et_order`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const modelBody = modelRes.ok() ? await modelRes.json() : {};
-      if (modelBody?.data?.extension?.importPolicy?.enabled === true) {
-        await ensureFixtureUserRoles(request, token);
-        return;
-      }
-    }
-  }
-
+  // Import the current fixture source even on a previously used database.
+  // The presence of an older command/model does not prove its field metadata
+  // matches this checkout; OVERWRITE is the explicit initialization boundary.
   const importRes = await request.post(`${BACKEND_URL}/api/plugins/import/import-directory-sync`, {
     data: {
       path: BACKEND_PLUGIN_DIR,

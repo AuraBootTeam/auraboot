@@ -16,6 +16,7 @@
 
 import { test, expect } from '../../fixtures';
 import { Client } from 'pg';
+import { resolve } from 'node:path';
 import { PG_CONN } from '../../helpers/environments';
 import {
   navigateToDynamicPage,
@@ -161,18 +162,18 @@ test.describe('Plugin Lifecycle', () => {
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
     await syncE2etOrderSequence();
     const sentinelTitle = `PL05 Reimport Sentinel ${uniqueId()}`;
-    // The order references its customer by name; the referenced row must exist
-    // before the order command (runtime reference existence validation).
-    await executeCommandViaApi(page, 'e2et:create_customer', {
+    // Persist the actual public reference rather than its display label.
+    const customer = await executeCommandViaApi(page, 'e2et:create_customer', {
       e2et_cust_code: `PL05-CUST-${uniqueId()}`,
       e2et_cust_name: 'PL05 Customer',
       e2et_cust_region: 'south',
       e2et_cust_active: true,
-    }, undefined, 'create').catch(() => null);
+    }, undefined, 'create');
+    expect(customer.recordId).toMatch(/^[0-9A-Z]{26}$/);
     const created = await executeCommandViaApi(page, 'e2et:create_order', {
       e2et_order_title: sentinelTitle,
       e2et_order_type: 'normal',
-      e2et_order_customer: 'PL05 Customer',
+      e2et_order_customer: customer.recordId,
       e2et_order_urgent: false,
     });
     expect(created.recordId).toBeTruthy();
@@ -180,13 +181,27 @@ test.describe('Plugin Lifecycle', () => {
     try {
       // Step 2: Reimport the test-fixtures plugin
       const importResp = await page.request.post('/api/plugins/import/import-directory-sync', {
-        data: { directory: 'plugins/test-fixtures' },
+        data: {
+          path: resolve(process.env.OSS_PLUGIN_ROOT ?? process.env.BACKEND_PLUGIN_ROOT ?? resolve(process.cwd(), '../plugins'), 'test-fixtures'),
+          conflictStrategy: 'OVERWRITE',
+          validateReferences: true,
+          autoPublishModels: true,
+          autoPublishFields: true,
+          autoPublishCommands: true,
+          autoPublishPages: true,
+        },
         headers: { 'Content-Type': 'application/json' },
+        timeout: 120_000,
         failOnStatusCode: false,
       });
 
-      // Import should succeed or at least not crash
-      expect(importResp.status()).not.toBe(500);
+      expect(importResp.status()).toBe(200);
+      const imported = await importResp.json();
+      expect(imported.success).toBe(true);
+      expect(imported.status).toBe('SUCCESS');
+      expect(imported.pluginId).toBe('com.auraboot.test-fixtures');
+      expect(imported.resourceCounts.MODEL.UPDATE).toBeGreaterThan(0);
+      expect(imported.resourceCounts.COMMAND.UPDATE).toBeGreaterThan(0);
 
       // Step 3: Navigate again and verify the sentinel record still exists
       const listResponsePromise = page

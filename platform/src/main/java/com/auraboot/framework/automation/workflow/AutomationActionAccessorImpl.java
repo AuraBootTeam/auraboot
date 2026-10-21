@@ -6,7 +6,6 @@ import com.auraboot.framework.automation.entity.AutomationLog.ActionResult;
 import com.auraboot.framework.automation.entity.AutomationNodeExecution;
 import com.auraboot.framework.automation.executor.ActionExecutionException;
 import com.auraboot.framework.automation.executor.ActionExecutor;
-import com.auraboot.framework.automation.mapper.AutomationNodeExecutionMapper;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.plugin.extension.AutomationActionAccessor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +39,8 @@ import java.util.Set;
  * entry (status=running) and updates it on exit (status=completed / failed). On
  * failure the row is updated <strong>before</strong> the original exception is rethrown
  * — exception propagation drives SmartEngine's failure semantics; the row is a
- * pure observability artefact (red line §8 — no swallow, no fallback).
+ * pure observability artefact (red line §8 — no swallow, no fallback). A separate
+ * recorder commits these facts independently of the action transaction.
  */
 @Slf4j
 @Component
@@ -78,21 +78,21 @@ public class AutomationActionAccessorImpl implements AutomationActionAccessor {
 
     private final ActionExecutor actionExecutor;
 
-    // Optional — null in slim contexts that don't load the mapper bean; in that case
+    // Optional — null in slim contexts that don't load the recorder bean; in that case
     // recording is silently disabled, the executor still runs.
-    private final AutomationNodeExecutionMapper nodeExecutionMapper;
+    private final AutomationNodeExecutionRecorder nodeExecutionRecorder;
 
     @Autowired
     public AutomationActionAccessorImpl(
             @Qualifier("compositeActionExecutor") ActionExecutor actionExecutor,
-            @Autowired(required = false) AutomationNodeExecutionMapper nodeExecutionMapper) {
+            @Autowired(required = false) AutomationNodeExecutionRecorder nodeExecutionRecorder) {
         this.actionExecutor = actionExecutor;
-        this.nodeExecutionMapper = nodeExecutionMapper;
+        this.nodeExecutionRecorder = nodeExecutionRecorder;
     }
 
     /**
-     * Back-compat ctor for unit tests that predate the G5 mapper dependency.
-     * Recording is disabled (mapper=null) — these tests only verify the executor
+     * Back-compat ctor for unit tests that predate the G5 recorder dependency.
+     * Recording is disabled (recorder=null) — these tests only verify the executor
      * delegation behaviour. Not used by Spring (no {@code @Autowired}).
      */
     public AutomationActionAccessorImpl(ActionExecutor actionExecutor) {
@@ -320,7 +320,7 @@ public class AutomationActionAccessorImpl implements AutomationActionAccessor {
     /**
      * Insert a {@code status='running'} row for this node entry and return its id, or
      * {@code null} when recording is disabled (no log id in scope, no tenant id, or
-     * no mapper bean).
+     * no recorder bean).
      *
      * <p>The recording branch must not impair the action — if the insert itself fails
      * we log and continue. Losing observability is strictly better than losing the
@@ -329,7 +329,7 @@ public class AutomationActionAccessorImpl implements AutomationActionAccessor {
      */
     private Long beginNodeExecution(Map<String, Object> processVars, String nodeId,
                                     String processInstanceId) {
-        if (nodeExecutionMapper == null) {
+        if (nodeExecutionRecorder == null) {
             return null;
         }
         Object logIdObj = processVars.get(LOG_ID_VAR);
@@ -353,17 +353,16 @@ public class AutomationActionAccessorImpl implements AutomationActionAccessor {
         row.setStartedAt(Instant.now());
         row.setCreatedAt(Instant.now());
         try {
-            nodeExecutionMapper.insert(row);
-            return row.getId();
+            return nodeExecutionRecorder.start(row);
         } catch (Exception e) {
             log.warn("G5 node-status recording failed (insert) for node={}: {}",
-                    nodeId, e.getMessage());
+                    nodeId, e.getMessage(), e);
             return null;
         }
     }
 
     private void completeNodeExecution(Long rowId, String status, String errorMessage) {
-        if (rowId == null || nodeExecutionMapper == null) {
+        if (rowId == null || nodeExecutionRecorder == null) {
             return;
         }
         try {
@@ -372,10 +371,10 @@ public class AutomationActionAccessorImpl implements AutomationActionAccessor {
             update.setStatus(status);
             update.setCompletedAt(Instant.now());
             update.setErrorMessage(errorMessage);
-            nodeExecutionMapper.updateById(update);
+            nodeExecutionRecorder.complete(update);
         } catch (Exception e) {
             log.warn("G5 node-status recording failed (update) rowId={}: {}",
-                    rowId, e.getMessage());
+                    rowId, e.getMessage(), e);
         }
     }
 

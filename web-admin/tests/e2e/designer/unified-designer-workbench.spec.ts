@@ -6,10 +6,12 @@
  */
 
 import { expect, test } from '../../fixtures';
-import type { Locator, Page, Request } from '@playwright/test';
+import type { Locator, Page, Request, TestInfo } from '@playwright/test';
 import { grantRolePermissionByCode, createAuthenticatedRoleContext, collectPermissionCodes } from '../../helpers/designer-role-fixtures';
 import { migratePageSchemaV2ToV3 } from '../../../app/plugins/core-designer/components/unified-designer/migration/migrateToV3';
 import { uniqueId } from '../helpers';
+
+test.use({ locale: 'zh-CN' });
 
 // Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let React
 // flush the document update + canvas re-render before the next interaction.
@@ -156,6 +158,45 @@ async function applyJsonField(page: Page, applyTestId: string): Promise<void> {
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   );
   await page.getByTestId(applyTestId).click();
+}
+
+async function assertStaticWidgetPreview(
+  page: Page,
+  info: TestInfo,
+  scenario: 'UDW-013' | 'UDW-016',
+  queryPath: string,
+): Promise<void> {
+  await page.getByTestId('designer-mode-edit').click();
+  await page.getByTestId('outline-item-widget_pipeline').click();
+  const authoredValue = `${scenario} authored preview`;
+  await page.getByTestId('inspector-field-props.columns').fill(JSON.stringify(['Preview value']));
+  await applyJsonField(page, 'inspector-json-field-apply-props.columns');
+  await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify([[authoredValue]]));
+  await applyJsonField(page, 'inspector-json-field-apply-props.rows');
+  await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('preview');
+  const queryRequests: string[] = [];
+  const observe = (request: Request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === queryPath) {
+      queryRequests.push(request.url());
+    }
+  };
+  page.on('request', observe);
+  try {
+    await page.getByTestId('designer-mode-preview').click();
+    const table = page.getByTestId('runtime-widget-table-widget_pipeline');
+    await expect(table).toContainText('Preview value');
+    await expect(table).toContainText(authoredValue);
+    await expect(page.getByTestId('runtime-widget-error-widget_pipeline')).toHaveCount(0);
+    await page.getByTestId('runtime-widget-widget_pipeline').screenshot({
+      path: info.outputPath(`${scenario}-widget-static.png`),
+    });
+    expect(queryRequests, 'explicit static preview must not invoke its configured query').toEqual([]);
+    if (scenario === 'UDW-013') {
+      await page.screenshot({ path: info.outputPath('UDW-013-widget-context.png') });
+    }
+  } finally {
+    page.off('request', observe);
+  }
 }
 
 /**
@@ -465,6 +506,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: liveNamedQueryTitle,
       description: 'Auto-generated for Unified Designer named query widget E2E',
       fromSql: 'ab_page_schema p',
+      baseWhere: [{
+        field: 'page_key', operator: 'in',
+        value: [formPageKey, listPageKey, detailPageKey, dashboardPageKey],
+      }],
     });
 
     for (const field of [
@@ -495,6 +540,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: liveHelperNamedQueryTitle,
       description: 'Auto-generated for Unified Designer helper block live data E2E',
       fromSql: 'ab_page_schema p',
+      baseWhere: [{
+        field: 'page_key', operator: 'in',
+        value: [formPageKey, listPageKey, detailPageKey, dashboardPageKey],
+      }],
     });
 
     for (const field of [
@@ -1644,7 +1693,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-013: executes dashboard widget query JSON through query-builder in runtime preview', async ({
     page,
-  }) => {
+  }, info) => {
     expect(dashboardPagePid).toBeTruthy();
 
     const query = {
@@ -1693,6 +1742,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.locator('[data-testid="runtime-widget-table-widget_pipeline"] tbody tr'),
     ).toHaveCount(3);
+    await assertStaticWidgetPreview(page, info, 'UDW-013', '/api/query-builder/execute');
 
   });
 
@@ -1952,7 +2002,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-016: executes dashboard widget named query through runtime preview', async ({
     page,
-  }) => {
+  }, info) => {
     expect(dashboardPagePid).toBeTruthy();
     expect(liveNamedQueryCode).toBeTruthy();
 
@@ -2002,6 +2052,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       .locator('[data-testid="runtime-widget-table-widget_pipeline"] tbody tr')
       .count();
     expect(rowCount).toBeGreaterThan(0);
+    await assertStaticWidgetPreview(page, info, 'UDW-016', `/api/meta/named-queries/${liveNamedQueryCode}/execute`);
 
   });
 
@@ -3267,7 +3318,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-023: adds a form sub-table, configures columns, and renders preview rows', async ({
     page,
-  }) => {
+  }, info) => {
     expect(pagePid).toBeTruthy();
     expect(fieldCode).toBeTruthy();
 
@@ -3305,13 +3356,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     // (sections only carry field entries); the save must refuse loudly instead
     // of silently dropping the sub-table subtree.
     await page.getByTestId('designer-save').click();
-    await expect(page.getByTestId('designer-save-error')).toContainText(
-      'sub_table_new_sub_table',
-      { timeout: 10000 },
-    );
-    await expect(page.getByTestId('designer-save-error')).toContainText(
-      'flat v4 runtime dialect',
-    );
+    await expect(page.getByTestId('designer-save-error')).toContainText('sub_table_new_sub_table', {
+      timeout: 10000,
+    });
+    await expect(page.getByTestId('designer-save-error')).toContainText('flat v4 runtime dialect');
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
@@ -3321,6 +3369,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-table-cell-sub_table_new_sub_table-0-${fieldCode}`),
     ).toHaveText(subTablePreviewValue);
+
+    await page.screenshot({ path: info.outputPath('UDW-023-preview.png'), fullPage: true });
 
     // Nothing was persisted (save refused): the stored page has no sub-table.
     const persisted = await readPage(page, pagePid);
@@ -4058,14 +4108,19 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const pickerOptionsBody = await pickerOptionsResp.json();
     expect(pickerOptionsBody.code).toBe('0');
     const pickerRows = (pickerOptionsBody.data?.records ?? []) as Array<Record<string, unknown>>;
-    const namedQueryPickerRow = pickerRows.find((row) => typeof row.page_key === 'string');
+    const namedQueryPickerRow = pickerRows.find((row) => row.page_key === formPageKey);
     expect(namedQueryPickerRow).toBeTruthy();
     const expectedPickerValue = String(namedQueryPickerRow?.page_key);
     const expectedPickerLabel = String(namedQueryPickerRow?.name ?? expectedPickerValue);
 
     const picker = page.getByTestId('runtime-picker-field_seed_secondary');
     await expect(picker).toBeVisible();
-    await expect(picker.locator('option', { hasText: expectedPickerLabel })).toHaveCount(1);
+    await expect.poll(() => picker.locator('option').evaluateAll(
+      (options, value) => options
+        .filter(option => (option as HTMLOptionElement).value === value)
+        .map(option => option.textContent?.trim()),
+      expectedPickerValue,
+    )).toEqual([expectedPickerLabel]);
     await expect(page.getByTestId('runtime-picker-meta-field_seed_secondary')).toContainText(
       `named-query / ${liveNamedQueryCode} / name / page_key`,
     );
@@ -4361,7 +4416,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-034: configures action permission code and blocks preview execution when missing', async ({
     page,
-  }) => {
+    browser,
+    baseURL,
+  }, info) => {
     expect(listPagePid).toBeTruthy();
 
     const permissionActionLabel = `Permission blocked action ${uid}`;
@@ -4377,7 +4434,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
+    await page
+      .getByTestId('inspector-field-props.permissionCode-manual')
+      .fill(missingPermissionCode);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
@@ -4391,14 +4450,57 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
-    const action = page.getByTestId('runtime-action-action_seed_export');
-    await expect(action).toBeDisabled();
-    await expect(action).toHaveAttribute('data-permission-code', missingPermissionCode);
-    await expect(action).toHaveAttribute('data-permission-allowed', 'false');
-    await expect(page.getByTestId('runtime-action-permission-action_seed_export')).toContainText(
-      `Requires permission: ${missingPermissionCode}`,
+    const adminResponse = await page.request.get('/api/auth/me');
+    expect(adminResponse.status()).toBe(200);
+    const admin = await adminResponse.json();
+    expect(String(admin.code)).toBe('0');
+    expect(collectPermissionCodes(admin.data.permissions)).toContain('*');
+    await expect(page.getByTestId('runtime-action-action_seed_export')).toBeEnabled();
+    await expect(page.getByTestId('runtime-action-action_seed_export')).toHaveAttribute(
+      'data-permission-allowed',
+      'true',
     );
-    await expect(page.getByTestId('runtime-action-error-action_seed_export')).toHaveCount(0);
+    for (const permission of ['meta.designer.read', 'page.page.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const roleContext = await createAuthenticatedRoleContext(
+      browser,
+      baseURL ?? new URL(page.url()).origin,
+      'viewer',
+    );
+    try {
+      const rolePage = await roleContext.newPage();
+      const identityResponse = await rolePage.request.get('/api/auth/me');
+      expect(identityResponse.status()).toBe(200);
+      const identity = await identityResponse.json();
+      expect(String(identity.code)).toBe('0');
+      const codes = collectPermissionCodes(identity.data.permissions);
+      expect(codes).not.toContain('*');
+      expect(codes).not.toContain(missingPermissionCode);
+      await rolePage.goto(`/unified-designer?pageId=${listPagePid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(rolePage.getByTestId('unified-designer-workbench')).toBeVisible({
+        timeout: 15000,
+      });
+      await rolePage.getByTestId('designer-mode-preview').click();
+      await expect(rolePage.getByTestId('unified-runtime-preview')).toBeVisible();
+      const action = rolePage.getByTestId('runtime-action-action_seed_export');
+      await expect(action).toBeDisabled();
+      await expect(action).toHaveAttribute('data-permission-code', missingPermissionCode);
+      await expect(action).toHaveAttribute('data-permission-allowed', 'false');
+      await expect(
+        rolePage.getByTestId('runtime-action-permission-action_seed_export'),
+      ).toContainText(`Requires permission: ${missingPermissionCode}`);
+      await expect(rolePage.getByTestId('runtime-action-error-action_seed_export')).toHaveCount(0);
+
+      await rolePage.screenshot({
+        path: info.outputPath('UDW-034-scoped-denied.png'),
+        fullPage: true,
+      });
+    } finally {
+      await roleContext.close();
+    }
 
     const persisted = await readPage(page, listPagePid);
     const persistedCommand = findBlockById(persisted.blocks ?? [], 'action_seed_export');
@@ -4877,7 +4979,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-040: authors form tabs from palette blocks and renders them after save', async ({
     page,
-  }) => {
+  }, info) => {
     expect(pagePid).toBeTruthy();
 
     const tabsId = 'tabs_new_tabs';
@@ -4963,15 +5065,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persistedFreeField = findBlockById(persisted.blocks ?? [], freeFieldId);
     expect(persistedTabs).toMatchObject({
       blockType: 'tabs',
-      title: tabsTitle,
+      title: expect.objectContaining({ 'zh-CN': tabsTitle }),
     });
     expect(persistedTab).toMatchObject({
       blockType: 'tab',
-      title: tabTitle,
+      title: expect.objectContaining({ 'zh-CN': tabTitle }),
     });
     expect(persistedSection).toMatchObject({
       blockType: 'form-section',
-      title: sectionTitle,
+      title: expect.objectContaining({ 'zh-CN': sectionTitle }),
     });
     expect(persistedFreeField).toMatchObject({
       blockType: 'field',
@@ -4984,6 +5086,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`runtime-block-${tabsId}`)).toContainText(tabsTitle);
     await expect(page.getByTestId(`runtime-block-${tabId}`)).toContainText(tabTitle);
     await expect(page.getByTestId(`runtime-field-${freeFieldId}`)).toContainText(freeFieldLabel);
+    await page.getByTestId(`runtime-block-${tabsId}`).screenshot({
+      path: info.outputPath('UDW-040-localized-tabs.png'),
+    });
   });
 
   // FIXME(designer-v4): this journey authors blocks that have no flat v4
@@ -5702,7 +5807,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-047: authors detail tabs with helper blocks and persists runtime panels', async ({
     page,
-  }) => {
+  }, info) => {
     const detailTabsPageKey = `udw_v3_detail_tabs_${uid}`;
     const detailTabsPid = await createPageResource(page, {
       name: `UDW V3 Detail Tabs ${uid}`,
@@ -5790,7 +5895,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const helperBlocks = [
       { paletteId: 'palette-add-ai-fill-banner', blockType: 'ai-fill-banner', title: aiTitle },
-      { paletteId: 'palette-add-bpm-panel', blockType: 'bpm-panel', title: bpmTitle },
+      { paletteId: 'palette-add-workflow-panel', blockType: 'workflow-panel', title: bpmTitle },
       {
         paletteId: 'palette-add-activity-timeline',
         blockType: 'activity-timeline',
@@ -5835,7 +5940,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
           .fill(JSON.stringify(aiSuggestedFields));
         await applyJsonField(page, 'inspector-json-field-apply-props.suggestedFields');
       }
-      if (helper.blockType === 'bpm-panel') {
+      if (helper.blockType === 'workflow-panel') {
         await page.getByTestId('inspector-field-props.description').fill(bpmDescription);
         await page.getByTestId('inspector-field-props.status').selectOption('pending');
         await page.getByTestId('inspector-field-props.assignee').fill(bpmAssignee);
@@ -5878,15 +5983,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persisted = await readPage(page, detailTabsPid);
     expect(findBlockById(persisted.blocks ?? [], tabsId)).toMatchObject({
       blockType: 'tabs',
-      title: tabsTitle,
+      title: expect.objectContaining({ 'zh-CN': tabsTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], tabId)).toMatchObject({
       blockType: 'tab',
-      title: tabTitle,
+      title: expect.objectContaining({ 'zh-CN': tabTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], sectionId)).toMatchObject({
       blockType: 'detail-section',
-      title: sectionTitle,
+      title: expect.objectContaining({ 'zh-CN': sectionTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], fieldId)).toMatchObject({
       blockType: 'field',
@@ -5896,7 +6001,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     helperBlocks.forEach((helper, index) => {
       expect(findBlockById(persisted.blocks ?? [], helperIds[index])).toMatchObject({
         blockType: helper.blockType,
-        title: helper.title,
+        title: expect.objectContaining({ 'zh-CN': helper.title }),
         dataSource: expect.objectContaining({
           type: 'namedQuery',
           executionMode: 'preview',
@@ -5912,7 +6017,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         suggestedFields: aiSuggestedFields,
       }),
     });
-    expect(findBlockById(persisted.blocks ?? [], helperIdsByType['bpm-panel'])).toMatchObject({
+    expect(findBlockById(persisted.blocks ?? [], helperIdsByType['workflow-panel'])).toMatchObject({
       props: expect.objectContaining({
         description: bpmDescription,
         status: 'pending',
@@ -5930,6 +6035,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       props: expect.objectContaining({ entries: historyEntries }),
     });
 
+    const staticQueryRequests: string[] = [];
+    const observeStaticQuery = (request: Request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname.startsWith('/api/meta/named-queries/udw_')) {
+        staticQueryRequests.push(request.url());
+      }
+    };
+    page.on('request', observeStaticQuery);
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
     await expect(page.getByTestId(`runtime-tab-trigger-${tabId}`)).toContainText(tabTitle);
@@ -5945,14 +6057,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-ai-fill-status-${helperIdsByType['ai-fill-banner']}`),
     ).toContainText(aiFeedback);
-    await expect(page.getByTestId(`runtime-bpm-status-${helperIdsByType['bpm-panel']}`)).toHaveText(
+    await expect(page.getByTestId(`runtime-bpm-status-${helperIdsByType['workflow-panel']}`)).toHaveText(
       'pending',
     );
     await expect(
-      page.getByTestId(`runtime-bpm-assignee-${helperIdsByType['bpm-panel']}`),
+      page.getByTestId(`runtime-bpm-assignee-${helperIdsByType['workflow-panel']}`),
     ).toContainText(bpmAssignee);
     await expect(
-      page.getByTestId(`runtime-bpm-action-${helperIdsByType['bpm-panel']}-0`),
+      page.getByTestId(`runtime-bpm-action-${helperIdsByType['workflow-panel']}-0`),
     ).toContainText(`Approve ${uid}`);
     await expect(
       page.getByTestId(`runtime-activity-item-${helperIdsByType['activity-timeline']}-0`),
@@ -5960,6 +6072,22 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-field-history-entry-${helperIdsByType['field-history']}-0`),
     ).toContainText(`review ${uid}`);
+    const staticCaptures = [
+      ['ai-fill-banner', 'runtime-ai-fill-banner'],
+      ['workflow-panel', 'runtime-workflow-panel'],
+      ['activity-timeline', 'runtime-activity-timeline'],
+      ['field-history', 'runtime-field-history'],
+    ] as const;
+    for (const [blockType, prefix] of staticCaptures) {
+      await page.getByTestId(`${prefix}-${helperIdsByType[blockType]}`).screenshot({
+        path: info.outputPath(`UDW-047-${blockType}-static.png`),
+      });
+    }
+    expect(staticQueryRequests, 'static helpers must not execute unavailable configured queries').toEqual([]);
+    page.off('request', observeStaticQuery);
+    await page.getByTestId(`runtime-ai-fill-banner-${helperIdsByType['ai-fill-banner']}`).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('UDW-047-helper-context.png') });
+
   });
 
   // FIXME(designer-v4): dashboard-kind pages refuse flat-v4 persistence by
@@ -6072,7 +6200,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
             },
             {
               id: 'bpm_live_helper',
-              blockType: 'bpm-panel',
+              blockType: 'workflow-panel',
               title: `Live BPM helper ${uid}`,
               dataSource: helperDataSource,
               props: {
@@ -6331,7 +6459,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
             },
             {
               id: 'bpm_empty_helper',
-              blockType: 'bpm-panel',
+              blockType: 'workflow-panel',
               title: `Empty BPM ${uid}`,
               dataSource: {
                 type: 'namedQuery',
@@ -6451,10 +6579,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
   });
 
   test('UDW-052: configures helper permission code and gates live helper data loading', async ({
-    page,
+    page, browser, baseURL,
   }) => {
     expect(liveHelperNamedQueryCode).toBeTruthy();
-    const allowedPermissionCode = await pickCurrentPermissionCode(page);
+    const allowedPermissionCode = 'e2et.order.read';
+    const admin = await page.request.get('/api/auth/me');
+    expect(admin.status()).toBe(200);
+    expect(collectPermissionCodes((await admin.json()).data.permissions)).toContain('*');
     const missingPermissionCode = `meta.unified-designer.helper-missing.${uid}`;
     const blockedQueryCode = `missing_helper_permission_blocked_${uid}`;
     const helperPermissionPid = await createPageResource(page, {
@@ -6470,39 +6601,45 @@ test.describe.serial('Unified Designer Workbench V3', () => {
           blockType: 'detail',
           title: 'Helper permission detail',
           dataSource: { model: modelCode },
-          blocks: [
-            {
-              id: 'ai_permission_denied_helper',
-              blockType: 'ai-fill-banner',
-              title: `Permission denied AI ${uid}`,
-              dataSource: {
-                type: 'namedQuery',
-                executionMode: 'live',
-                queryCode: blockedQueryCode,
-                page: 1,
-                size: 3,
-              },
-              props: {
-                emptyText: `Permission denied helper stays private ${uid}`,
-              },
-            },
-            {
-              id: 'ai_permission_allowed_helper',
-              blockType: 'ai-fill-banner',
-              title: `Permission allowed AI ${uid}`,
-              dataSource: {
-                type: 'namedQuery',
-                executionMode: 'live',
-                queryCode: liveHelperNamedQueryCode,
-                page: 1,
-                size: 3,
-              },
-              props: {
-                permissionCode: allowedPermissionCode,
-                emptyText: `Allowed helper fallback ${uid}`,
-              },
-            },
-          ],
+          blocks: [{
+            id: 'helper_permission_tabs', blockType: 'tabs',
+            blocks: [{
+              id: 'helper_permission_tab', blockType: 'tab', title: 'Helper permissions',
+              blocks: [
+                  {
+                    id: 'ai_permission_denied_helper',
+                    blockType: 'ai-fill-banner',
+                    title: `Permission denied AI ${uid}`,
+                    dataSource: {
+                      type: 'namedQuery',
+                      executionMode: 'live',
+                      queryCode: blockedQueryCode,
+                      page: 1,
+                      size: 3,
+                    },
+                    props: {
+                      emptyText: `Permission denied helper stays private ${uid}`,
+                    },
+                  },
+                  {
+                    id: 'ai_permission_allowed_helper',
+                    blockType: 'ai-fill-banner',
+                    title: `Permission allowed AI ${uid}`,
+                    dataSource: {
+                      type: 'namedQuery',
+                      executionMode: 'live',
+                      queryCode: liveHelperNamedQueryCode,
+                      page: 1,
+                      size: 3,
+                    },
+                    props: {
+                      permissionCode: allowedPermissionCode,
+                      emptyText: `Allowed helper fallback ${uid}`,
+                    },
+                  },
+              ],
+            }],
+          }],
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-workbench-v3-helper-permission' },
@@ -6524,56 +6661,81 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       allowedPermissionCode,
     );
 
-    const blockedRequests: string[] = [];
-    const blockedRequestListener = (request: Request) => {
-      if (request.url().includes(`/api/meta/named-queries/${blockedQueryCode}/execute`)) {
-        blockedRequests.push(request.url());
-      }
-    };
-    page.on('request', blockedRequestListener);
-    const allowedRespPromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/meta/named-queries/${liveHelperNamedQueryCode}/execute`) &&
-        response.request().method() === 'POST',
-      { timeout: 15000 },
+    await expect(page.getByTestId('designer-save')).toBeEnabled();
+    await saveDesignerPage(page, helperPermissionPid);
+    for (const permission of ['meta.designer.read', 'page.page.read', 'meta.query.read', 'model.page_schema.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const roleContext = await createAuthenticatedRoleContext(
+      browser, baseURL ?? new URL(page.url()).origin, 'viewer',
     );
-    await page.getByTestId('designer-mode-preview').click();
-    const allowedResp = await allowedRespPromise;
-    expect(allowedResp.status()).toBe(200);
-    page.off('request', blockedRequestListener);
+    try {
+      const rolePage = await roleContext.newPage();
+      const identity = await rolePage.request.get('/api/auth/me');
+      expect(identity.status()).toBe(200);
+      const codes = collectPermissionCodes((await identity.json()).data.permissions);
+      expect(codes).not.toContain('*');
+      expect(codes).not.toContain(missingPermissionCode);
+      expect(codes).toContain(allowedPermissionCode);
+      expect(codes).toContain('meta.query.read');
+      expect(codes).toContain('model.page_schema.read');
+      await rolePage.goto(`/unified-designer?pageId=${helperPermissionPid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(rolePage.getByTestId('unified-designer-workbench')).toBeVisible();
+      const blockedRequests: string[] = [];
+      const blockedRequestListener = (request: Request) => {
+        if (request.url().includes(`/api/meta/named-queries/${blockedQueryCode}/execute`)) {
+          blockedRequests.push(request.url());
+        }
+      };
+      rolePage.on('request', blockedRequestListener);
+      const allowedRespPromise = rolePage.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/meta/named-queries/${liveHelperNamedQueryCode}/execute`) &&
+          response.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      await rolePage.getByTestId('designer-mode-preview').click();
+      const allowedResp = await allowedRespPromise;
+      expect(allowedResp.status()).toBe(200);
 
-    const deniedPermission = page.getByTestId(
-      'runtime-helper-permission-ai_permission_denied_helper',
-    );
-    await expect(deniedPermission).toContainText(`Requires permission: ${missingPermissionCode}`);
-    await expect(deniedPermission).toHaveAttribute('data-permission-code', missingPermissionCode);
-    await expect(deniedPermission).toHaveAttribute('data-permission-allowed', 'false');
-    await expect(page.getByTestId('runtime-helper-source-ai_permission_denied_helper')).toHaveCount(
-      0,
-    );
-    await expect(page.getByTestId('runtime-helper-error-ai_permission_denied_helper')).toHaveCount(
-      0,
-    );
-    await expect(
-      page.getByTestId('runtime-ai-fill-field-ai_permission_denied_helper-0'),
-    ).toHaveCount(0);
-    await expect(
-      page.getByTestId('runtime-ai-fill-empty-ai_permission_denied_helper'),
-    ).toContainText(`Permission denied helper stays private ${uid}`);
+      const deniedPermission = rolePage.getByTestId(
+        'runtime-helper-permission-ai_permission_denied_helper',
+      );
+      await expect(deniedPermission).toContainText(`Requires permission: ${missingPermissionCode}`);
+      await expect(deniedPermission).toHaveAttribute('data-permission-code', missingPermissionCode);
+      await expect(deniedPermission).toHaveAttribute('data-permission-allowed', 'false');
+      await expect(rolePage.getByTestId('runtime-helper-source-ai_permission_denied_helper')).toHaveCount(
+        0,
+      );
+      await expect(rolePage.getByTestId('runtime-helper-error-ai_permission_denied_helper')).toHaveCount(
+        0,
+      );
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-field-ai_permission_denied_helper-0'),
+      ).toHaveCount(0);
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-empty-ai_permission_denied_helper'),
+      ).toContainText(`Permission denied helper stays private ${uid}`);
 
-    const allowedPermission = page.getByTestId(
-      'runtime-helper-permission-ai_permission_allowed_helper',
-    );
-    await expect(allowedPermission).toContainText(`Permission: ${allowedPermissionCode}`);
-    await expect(allowedPermission).toHaveAttribute('data-permission-code', allowedPermissionCode);
-    await expect(allowedPermission).toHaveAttribute('data-permission-allowed', 'true');
-    await expect(page.getByTestId('runtime-helper-source-ai_permission_allowed_helper')).toHaveText(
-      'named-query',
-    );
-    await expect(
-      page.getByTestId('runtime-ai-fill-field-ai_permission_allowed_helper-0'),
-    ).toBeVisible();
-    expect(blockedRequests).toEqual([]);
+      const allowedPermission = rolePage.getByTestId(
+        'runtime-helper-permission-ai_permission_allowed_helper',
+      );
+      await expect(allowedPermission).toContainText(`Permission: ${allowedPermissionCode}`);
+      await expect(allowedPermission).toHaveAttribute('data-permission-code', allowedPermissionCode);
+      await expect(allowedPermission).toHaveAttribute('data-permission-allowed', 'true');
+      await expect(rolePage.getByTestId('runtime-helper-source-ai_permission_allowed_helper')).toHaveText(
+        'named-query',
+      );
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-field-ai_permission_allowed_helper-0'),
+      ).toBeVisible();
+      expect(blockedRequests).toEqual([]);
+      rolePage.off('request', blockedRequestListener);
+    } finally {
+      await roleContext.close();
+    }
   });
 
   test('UDW-062: reorders blocks by dragging outline rows through the shared dnd kernel', async ({
@@ -6859,6 +7021,7 @@ async function ensureNamedQuery(
     title: string;
     description: string;
     fromSql: string;
+    baseWhere?: Array<{ field: string; operator: string; value: string[] }>;
   },
 ): Promise<void> {
   const createResp = await page.request.post('/api/meta/named-queries', { data: request });

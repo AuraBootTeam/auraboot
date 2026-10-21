@@ -9,6 +9,7 @@
   },
   "feature": {
     "searchable": true,
-    "sortable": true
+    "sortable": true,
+    "filterable": true
   }
 }

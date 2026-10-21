@@ -34,7 +34,7 @@ async function createRole(page: Page) {
 async function selectRoleFromMenu(page: Page, role: { pid: string; code: string }) {
   await page.goto('/home');
   await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
-  await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+  await page.getByTestId('sidebar').getByRole('link', { name: /角色|Roles/, exact: true }).click();
   await expect(page.getByTestId('permission-page')).toBeVisible();
   await page.getByTestId('role-search-input').fill(role.code);
   await page.getByTestId(`role-item-${role.code}`).click();

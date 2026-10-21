@@ -50,10 +50,8 @@ export function RecursiveBlockRenderer({
   const { locale } = useI18n();
   const evaluatePermission = permissionEvaluator ?? hasPermission;
   const modelFieldList = modelFields ?? EMPTY_MODEL_FIELDS;
-  // WYSIWYG is active only when model metadata is supplied (workbench preview). In that
-  // mode the real platform controls (SmartSelect/pickers) call useFieldDataSource, which
-  // hard-requires a DataSourceManager in context — so we provide a lightweight one.
-  const wysiwygActive = modelFieldList.length > 0;
+  // Explicit component configurations also render platform controls without model
+  // metadata. Every preview therefore needs the same data-source context.
   const dataSourceManager = React.useMemo(
     () => new DataSourceManager(createExpressionContext({ locale })),
     [locale],
@@ -102,11 +100,7 @@ export function RecursiveBlockRenderer({
     </RuntimeLocaleContext.Provider>
   );
 
-  return wysiwygActive ? (
-    <DataSourceProvider manager={dataSourceManager}>{tree}</DataSourceProvider>
-  ) : (
-    tree
-  );
+  return <DataSourceProvider manager={dataSourceManager}>{tree}</DataSourceProvider>;
 }
 
 const RuntimeLocaleContext = React.createContext<string>('zh-CN');
@@ -393,6 +387,7 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
 }
 
 function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const locale = React.useContext(RuntimeLocaleContext);
   const t = useRuntimeText();
   const tabs = block.blocks?.filter((child) => child.blockType === 'tab') ?? [];
   const [activeTabId, setActiveTabId] = React.useState(() => tabs[0]?.id ?? null);
@@ -427,7 +422,7 @@ function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: Runtime
                   : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
               }`}
             >
-              {getBlockLabel(tab)}
+              {getBlockLabel(tab, locale)}
             </button>
           );
         })}
@@ -4075,7 +4070,7 @@ function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: Runtim
     <div className="rounded-md border border-slate-200" data-testid={`runtime-block-${block.id}`}>
       {block.title ? (
         <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">
-          {getBlockLabel(block)}
+          {getBlockLabel(block, locale)}
         </div>
       ) : null}
       <div className="grid grid-cols-2 border-b border-slate-200 bg-slate-50">
@@ -5228,7 +5223,8 @@ function shouldExecuteLiveAction(block: DslBlockV3): boolean {
 
 function hasExecutableWidgetDataSource(block: DslBlockV3): boolean {
   const dataSource = block.dataSource;
-  if (!dataSource) return false;
+  // An explicit static preview must not execute even a configured named query.
+  if (!dataSource || dataSource.executionMode === 'preview') return false;
   const type = getStringProp(dataSource.type) || getStringProp(dataSource.mode);
   const live = dataSource.executionMode === 'live' || dataSource.executeLive === true;
   const hasQueryBuilderQuery = isRecord(dataSource.query);
@@ -5243,7 +5239,8 @@ function hasExecutableWidgetDataSource(block: DslBlockV3): boolean {
 
 function hasExecutableHelperDataSource(block: DslBlockV3): boolean {
   const dataSource = block.dataSource;
-  if (!dataSource) return false;
+  // An explicit static preview must not execute even a configured named query.
+  if (!dataSource || dataSource.executionMode === 'preview') return false;
   const type = getStringProp(dataSource.type) || getStringProp(dataSource.mode);
   const live = dataSource.executionMode === 'live' || dataSource.executeLive === true;
   const hasQueryBuilderQuery = isRecord(dataSource.query);

@@ -2973,3 +2973,5 @@ session_security:
 "permission.capability.preset.editor": "编辑者"
 
 "permission.capability.preset.admin": "管理员"
+
+"about.menuLabel": "关于 {productName}"

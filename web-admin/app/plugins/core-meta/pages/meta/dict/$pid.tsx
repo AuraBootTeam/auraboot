@@ -118,7 +118,8 @@ export default function DictDetailPage() {
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { timezone: userTimezone, formats } = useTimezone();
 
-  const [activeTab, setActiveTab] = useState<TabType>(() => parseTabFromHash(location.hash));
+  // The server cannot see URL fragments; restore the tab in the existing effect after hydration.
+  const [activeTab, setActiveTab] = useState<TabType>('basic');
   const [dict, setDict] = useState<DictDTO>(initialDict);
   const [versions] = useState<DictDTO[]>(initialVersions || []);
   const [items, setItems] = useState<DictItemData[]>(initialData?.items || []);
