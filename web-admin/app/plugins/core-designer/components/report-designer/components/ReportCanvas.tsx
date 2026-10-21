@@ -34,11 +34,19 @@ export const ReportCanvas: React.FC = () => {
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Keep the selected component and its property editor visible together.
   useEffect(() => {
     if (!selectedBlockId) return;
-    blockRefs.current.get(selectedBlockId)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    const block = blockRefs.current.get(selectedBlockId);
+    const canvas = canvasRef.current;
+    if (!block || !canvas) return;
+    const bounds = block.getBoundingClientRect();
+    const viewport = canvas.getBoundingClientRect();
+    if (bounds.top < viewport.top || bounds.bottom > viewport.bottom) {
+      block.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+    }
   }, [selectedBlockId]);
 
   const handleDragStart = useCallback((e: React.DragEvent, blockId: string) => {
@@ -99,6 +107,7 @@ export const ReportCanvas: React.FC = () => {
 
   return (
     <div
+      ref={canvasRef}
       data-testid="report-canvas"
       className="flex-1 overflow-auto bg-gray-100 p-8 [background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1px)] [background-size:18px_18px]"
       onClick={(e) => {
