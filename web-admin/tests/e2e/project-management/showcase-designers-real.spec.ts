@@ -184,6 +184,19 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   const chartSurface = chart.locator(':scope > div').first();
   await expect(chartSurface).toHaveCSS('border-radius', '16px');
   await expect(chartSurface).toHaveCSS('background-color', 'rgb(238, 242, 255)');
+  // Select the table header so authoring does not trigger the existing row drilldown.
+  const actionWidget=canvas.locator('[data-widget-id="delivery-actions"]').first();
+  await actionWidget.getByText('交付行动清单 · 点击行定位验收单',{exact:true}).click();
+  const drill=panel.getByTestId('schema-config-field-drillDown');
+  await expect(drill.getByRole('checkbox',{name:'启用点击钻取'})).toBeChecked();
+  await drill.getByPlaceholder('选择页面...').click();
+  await drill.getByRole('button').filter({hasText:'/p/tpm_project'}).first().click();
+  await drill.getByPlaceholder('选择页面...').click();
+  await drill.getByRole('button').filter({hasText:'/p/tpm_acceptance'}).first().click();
+  await drill.getByTestId('dashboard-drilldown-mapping-add').click();
+  await drill.getByTestId('dashboard-drilldown-mapping-key').fill('acceptance_pid');
+  await drill.getByTestId('dashboard-drilldown-mapping-value').fill('pid');
+  await shot(page,'DS03-structured-drilldown');
   const saved = page.waitForResponse(
     (r) => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST',
   );
@@ -221,6 +234,9 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   expect(geometry.x).toBeGreaterThan(0);
   await expect.poll(async () => (await readBox()).width).toBeCloseTo(resizedBox.width, 0);
   const config = persisted.widgets.find((w: any) => w.id === 'acceptance-distribution').config;
+  const tableConfig=persisted.widgets.find((w:any)=>w.id==='delivery-actions').config;
+  expect(tableConfig.drillDown).toMatchObject({enabled:true,action:'navigate',targetPage:'/p/tpm_acceptance',paramMapping:{acceptance_pid:'pid'}});
+  expect(tableConfig.drillDown.filters).toEqual([{sourceField:'acceptance_pid',targetField:'pid',operator:'eq'}]);
   expect(config.visualization.donut).toBe(true);
   expect(config.visualization.showLabels).toBe(false);
   expect(config.title['zh-CN'] || config.title.zh).toBe(title);
@@ -253,6 +269,13 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   ).toBeVisible();
   await shot(page, 'SC10-dashboard-published');
   await page.keyboard.press('Escape');
+  const clickedRow=actionWidget.getByRole('row').nth(1);await expect(clickedRow).toBeVisible();
+  const clickedName=(await clickedRow.locator('td').first().innerText()).trim();
+  const clickedRecord=source.records.find((row:any)=>row.tpm_ac_name===clickedName);expect(clickedRecord).toBeTruthy();
+  await clickedRow.click();await expect(page).toHaveURL(url=>url.pathname==='/p/tpm_acceptance'&&url.searchParams.has('filters'));
+  const target=page.getByRole('row').filter({hasText:clickedName});await expect(target).toHaveCount(1);
+  await target.getByRole('button',{name:/查看|详情/}).click();await expect(page).toHaveURL(new RegExp(`/p/tpm_acceptance/view/${clickedRecord.pid}$`));
+  await expect(page.getByRole('main')).toContainText(clickedName);await shot(page,'DS03-configured-drilldown-result');
   await writeFile(
     join(evidence!, 'SC10-dashboard-receipt.json'),
     JSON.stringify({ pid: board.pid, counts: Object.fromEntries(counts), config, output }, null, 2),
@@ -337,6 +360,21 @@ test('SC10 report template → reviewed text edit → save/reload → three real
   await page.getByTestId('drag-handle-summary').locator('..').click();
   await page.getByTestId('schema-config-field-title').getByRole('textbox').fill('当前交付经营摘要');
   await shot(page, 'DS04-table-schema-properties');
+  await page.getByTestId('drag-handle-acceptance').locator('..').click();
+  const tableColumns=page.getByTestId('schema-config-field-columns');
+  const originalColumnCount=await tableColumns.getByRole('group').count();
+  const originalFields=template.dsl.body.find((block:any)=>block.id==='acceptance').columns.map((column:any)=>column.field);
+  await tableColumns.getByRole('group').nth(1).getByRole('button',{name:'上移',exact:true}).click();
+  await page.getByTestId('report-designer-toolbar-btn-undo').click();
+  await expect(tableColumns.getByRole('group').first().getByRole('textbox',{name:'字段名称*',exact:true})).toHaveValue(originalFields[0]);
+  await page.getByTestId('report-designer-toolbar-btn-redo').click();
+  await expect(tableColumns.getByRole('group').first().getByRole('textbox',{name:'字段名称*',exact:true})).toHaveValue(originalFields[1]);
+  await tableColumns.getByRole('group').first().getByRole('spinbutton',{name:'列宽',exact:true}).fill('240');
+  await tableColumns.getByRole('button',{name:'+ 添加',exact:true}).click();
+  await expect(tableColumns.getByRole('group')).toHaveCount(originalColumnCount+1);
+  await tableColumns.getByRole('group').last().getByRole('button',{name:'remove',exact:true}).click();
+  await expect(tableColumns.getByRole('group')).toHaveCount(originalColumnCount);
+  await shot(page,'DS04-reordered-columns');
   const addedTitles: Record<string, string> = {
     'grouped-table': '按客户项目分组',
     'stat-card': '当前明细金额合计',
@@ -379,6 +417,14 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       await shot(page, 'DS04-numeric-range');
       await width.fill('120');
       await expect(columns.getByRole('alert')).toHaveCount(0);
+      for(const key of ['groupSubtotal','grandTotal']) {
+        await panel.getByTestId(`schema-config-field-${key}.enabled`).getByRole('switch').check();
+        const summary=panel.getByTestId(`schema-config-field-${key}.columns`);
+        await summary.getByRole('button',{name:'+ 添加',exact:true}).click();
+        await summary.getByRole('textbox',{name:'字段名称*',exact:true}).fill('amount');
+        await summary.getByRole('combobox',{name:'聚合方式',exact:true}).selectOption('sum');
+      }
+
     }
     if (['stat-card', 'cross-tab', 'chart'].includes(type))
       await textField('valueField').fill('amount');
@@ -426,6 +472,13 @@ test('SC10 report template → reviewed text edit → save/reload → three real
       expect(block.dataSource).toBe('delivery');
   }
   expect(persisted.dsl.body.find((b: any) => b.id === 'scope').style.fontSize).toBe(18);
+  const storedColumns=persisted.dsl.body.find((block:any)=>block.id==='acceptance').columns;
+  expect(storedColumns.map((column:any)=>column.field)).toEqual([originalFields[1],originalFields[0],...originalFields.slice(2)]);
+  expect(storedColumns[0].width).toBe(240);
+  const grouped=persisted.dsl.body.find((block:any)=>block.blockType==='grouped-table');
+  expect(grouped.groupSubtotal).toMatchObject({enabled:true,columns:[{field:'amount',aggregation:'sum'}]});
+  expect(grouped.grandTotal).toMatchObject({enabled:true,columns:[{field:'amount',aggregation:'sum'}]});
+
   expect(
     persisted.dsl.body.find((b: any) => b.blockType === 'grouped-table').columns[0].width,
   ).toBe(120);
