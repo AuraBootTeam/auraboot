@@ -1,4 +1,4 @@
-import {test, expect, type Page, type Response, type APIResponse} from '@playwright/test';
+import {test, expect, type Page, type Locator, type Response, type APIResponse} from '@playwright/test';
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
@@ -16,6 +16,19 @@ async function menu(page:Page,name:string) {
 async function open(page:Page,menuName:string,name:string) {
   await menu(page,menuName);const row=page.getByRole('row').filter({hasText:name});await expect(row).toHaveCount(1);
   await row.getByRole('button',{name:/查看|详情/}).click();await expect(page.getByRole('main')).toContainText(name);
+}
+async function dashboardRow(block:Locator,name:string) {
+  // Follow the actual configured pagination; unrelated retained deliveries may precede this batch.
+  for(let visited=0;visited<100;visited++) {
+    await expect(block.getByRole('cell').first()).toBeVisible();
+    const row=block.getByRole('row').filter({hasText:name});
+    if(await row.count()) {await expect(row).toHaveCount(1);return row;}
+    const next=block.getByRole('button',{name:'下一页',exact:true});
+    await expect(next).toBeEnabled();
+    const before=await block.innerText();await next.click();
+    await expect.poll(()=>block.innerText()).not.toBe(before);
+  }
+  throw Error(`Delivery was not found within 100 dashboard pages: ${name}`);
 }
 async function shot(page:Page,id:string) {
   await mkdir(join(evidence,'screenshots'),{recursive:true});
@@ -127,7 +140,7 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     await command(owner,'tpm:update_acceptance',()=>owner.getByRole('button',{name:'保存验收草稿',exact:true}).click());
     const stale=await fact(owner,pid);expect(stale.verification_result).toBe('资料已更新 · 需复核');
     await menu(owner,'交付经营看板');
-    const staleRow=owner.getByTestId('dashboard-block-verification-results').getByRole('row').filter({hasText:name});
+    const staleRow=await dashboardRow(owner.getByTestId('dashboard-block-verification-results'),name);
     await expect(staleRow).toContainText('资料已更新 · 需复核');await staleRow.scrollIntoViewIfNeeded();await shot(owner,'MR04-stale-materials');
     const secondCheck=await verify();expect(Date.parse(secondCheck.tdv_ck_checked_at)).toBeGreaterThan(Date.parse(firstCheck.tdv_ck_checked_at));
     expect((await fact(owner,pid)).verification_result).toBe('核验通过');await shot(verifier,'MR05-reverified');
@@ -139,7 +152,7 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     await reviewer.reload();await reviewer.getByRole('tab',{name:'审批记录',exact:true}).click();await expect(reviewer.getByTestId('bpm-history-container')).toContainText('周宁');await shot(reviewer,'MR06-approved-history');
     // Approval and registration update the source record, so refresh the advisory snapshot explicitly.
     await verify();const finalFact=await fact(owner,pid);expect(finalFact).toMatchObject({reviewer_name:'周宁',acceptance_label:'已通过',approval_result:'同意',verification_result:'核验通过'});
-    await menu(owner,'交付经营看板');await expect(owner.getByTestId('dashboard-block-delivery-actions')).toContainText(name);await expect(owner.getByTestId('dashboard-block-delivery-actions')).toContainText('周宁');await shot(owner,'MR07-business-result');
+    await menu(owner,'交付经营看板');const finalRow=await dashboardRow(owner.getByTestId('dashboard-block-delivery-actions'),name);await expect(finalRow).toContainText('周宁');await expect(finalRow).toContainText('已通过');await finalRow.scrollIntoViewIfNeeded();await shot(owner,'MR07-business-result');
     await menu(reviewer,'开始体验');await reviewer.getByRole('main').getByRole('button',{name:'打开复盘报告',exact:true}).click();
     await reviewer.getByRole('row').filter({hasText:'客户交付经营复盘'}).getByRole('button',{name:/打开|Open/}).click();
     const toolbar=reviewer.getByTestId('report-reader-toolbar');await expect(toolbar).toBeVisible();
