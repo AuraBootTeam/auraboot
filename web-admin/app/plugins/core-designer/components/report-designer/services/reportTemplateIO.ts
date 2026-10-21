@@ -91,6 +91,7 @@ const block = z.discriminatedUnion('blockType', [
       valueField: nonempty,
       aggregation,
       format: z.string().optional(),
+      totalLabel: z.string().max(120).optional(),
       showRowTotal: z.boolean().optional(),
       showColumnTotal: z.boolean().optional(),
     })

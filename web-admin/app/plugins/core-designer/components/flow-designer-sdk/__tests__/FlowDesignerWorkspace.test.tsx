@@ -169,3 +169,34 @@ describe('FlowDesignerWorkspace — responsive shell', () => {
     expect(screen.getByTestId('flow-palette-shell')).toHaveAttribute('data-open', 'false');
   });
 });
+
+
+describe('shared Report/Dashboard workspace contract', () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
+
+  it.each([620, 768])('retains property drafts while drawers close at %ipx', (width) => {
+    mockMatchMedia(false);
+    mockResizeObserver(width);
+    const view = renderWorkspace({ compactWidth: 900, testIdPrefix: 'report', propertyPanel: <input aria-label="Draft title" defaultValue="Original" /> });
+    expect(screen.getByTestId('report-designer-workspace')).toHaveAttribute('data-layout', 'compact');
+    expect(screen.getByTestId('report-palette-shell')).toHaveAttribute('data-open', 'false');
+    fireEvent.click(screen.getByTestId('report-toggle-inspector'));
+    const input = screen.getByRole('textbox', { name: 'Draft title' });
+    fireEvent.change(input, { target: { value: 'Edited, not saved' } });
+    expect(screen.getByTestId('report-inspector-shell')).toHaveAttribute('data-presentation', 'overlay');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByTestId('report-inspector-shell')).toHaveAttribute('data-open', 'false');
+    fireEvent.click(screen.getByTestId('report-toggle-inspector'));
+    expect(screen.getByRole('textbox', { name: 'Draft title' })).toHaveValue('Edited, not saved');
+    view.unmount();
+  });
+
+  it('keeps useful desktop Report/Dashboard panels docked without importing Flow state', () => {
+    mockMatchMedia(true);
+    mockResizeObserver(1184);
+    renderWorkspace({ compactWidth: 900, testIdPrefix: 'dashboard' });
+    expect(screen.getByTestId('dashboard-designer-workspace')).toHaveAttribute('data-layout', 'wide');
+    expect(screen.getByTestId('dashboard-inspector-shell')).toHaveAttribute('data-open', 'true');
+    expect(screen.getByTestId('dashboard-palette-shell')).toHaveAttribute('data-open', 'true');
+  });
+});

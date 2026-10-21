@@ -103,7 +103,7 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
               </th>
               {block.showRowTotal && (
                 <th className="border border-gray-300 bg-gray-100 px-2 py-1">
-                  {text({ zh: '合计', en: 'Total' })}
+                  {block.totalLabel || text({ zh: '合计', en: 'Total' })}
                 </th>
               )}
             </tr>
@@ -136,7 +136,7 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
             {block.showColumnTotal && (
               <tr>
                 <td className="border border-gray-300 bg-gray-100 px-2 py-1 font-bold">
-                  {text({ zh: '合计', en: 'Total' })}
+                  {block.totalLabel || text({ zh: '合计', en: 'Total' })}
                 </td>
                 <td className="border border-gray-300 bg-gray-100 px-2 py-1 text-right font-bold text-gray-600">
                   912
@@ -207,7 +207,7 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
             ))}
             {block.showRowTotal && (
               <th className="border border-gray-300 bg-gray-100 px-3 py-2 text-right font-bold">
-                {text({ zh: '合计', en: 'Total' })}
+                {block.totalLabel || text({ zh: '合计', en: 'Total' })}
               </th>
             )}
           </tr>
@@ -231,7 +231,7 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
           {block.showColumnTotal && (
             <tr>
               <td className="border border-gray-300 bg-gray-100 px-3 py-2 font-bold">
-                {text({ zh: '合计', en: 'Total' })}
+                {block.totalLabel || text({ zh: '合计', en: 'Total' })}
               </td>
               {colKeys.map((ck) => (
                 <td

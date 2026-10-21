@@ -1,3 +1,4 @@
+import { DesignerWorkspace } from '~/shared/designer/DesignerWorkspace';
 import { useSmartText } from '~/utils/i18n';
 import { useToastContext } from '~/contexts/ToastContext';
 import { usePermission } from '~/contexts/AuthContext';
@@ -63,7 +64,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   const canManage = usePermission('report.definition.manage');
   const canExport = usePermission('report.export.execute');
   const [loadFailed, setLoadFailed] = React.useState(false);
-  const { report, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
+  const { report, selectedBlockId, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
   const {
     isSaving,
     isLoading,
@@ -516,11 +517,19 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         versionCount={versioning.versions.length}
       />
       <ReportTemplateActions disabled={!canManage || isSaving || isLoading} />
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <BlockPalette />
-        <ReportCanvas />
-        <BlockPropertyPanel />
-      </div>
+      <DesignerWorkspace
+        compactWidth={900}
+        testIdPrefix="report"
+        palette={<BlockPalette />}
+        canvas={<ReportCanvas />}
+        propertyPanel={<BlockPropertyPanel />}
+        inspectorFocusKey={selectedBlockId}
+        labels={{
+          components: text({ zh: '组件库', en: 'Components' }),
+          properties: text({ zh: '属性', en: 'Properties' }),
+          close: text({ zh: '关闭面板', en: 'Close panel' }),
+        }}
+      />
 
       {/* Version History Panel */}
       {historyPanel}

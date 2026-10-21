@@ -172,6 +172,8 @@ export interface CrossTabBlock {
   valueField: string;
   aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
   format?: string;
+  /** Optional business-language label used by preview and exports. */
+  totalLabel?: string;
   showRowTotal?: boolean;
   showColumnTotal?: boolean;
 }

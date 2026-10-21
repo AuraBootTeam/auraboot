@@ -145,6 +145,7 @@ export function reportAuthoringSchemas(
       field('valueField', '数值字段', 'Value field', 'text', { required: true }),
       agg,
       select('format', '格式', 'Format', formats),
+      field('totalLabel', '合计标题', 'Total label', 'text'),
       field('showRowTotal', '显示行合计', 'Show row total', 'boolean', { defaultValue: true }),
       field('showColumnTotal', '显示列合计', 'Show column total', 'boolean', {
         defaultValue: true,
