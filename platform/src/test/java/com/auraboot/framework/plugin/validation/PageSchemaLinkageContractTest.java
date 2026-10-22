@@ -46,7 +46,7 @@ class PageSchemaLinkageContractTest {
         PageSchemaDTO page = importedPage();
         page.setExtension(Map.of("recordSource", Map.of("endpoint", "/api/locations/{recordPid}")));
         PluginResourceImporterImpl importer = mock(PluginResourceImporterImpl.class, CALLS_REAL_METHODS);
-        Map<String, Object> extension = ReflectionTestUtils.invokeMethod(importer, "mergePageExtension", page);
+        Map<String, Object> extension = ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "pageNavigationResources"), "mergePageExtension", page);
         assertThat(extension).containsEntry("linkageRules", rules)
                 .containsEntry("recordSource", Map.of("endpoint", "/api/locations/{recordPid}"));
     }

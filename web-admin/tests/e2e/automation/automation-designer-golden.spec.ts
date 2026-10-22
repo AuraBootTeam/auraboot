@@ -28,12 +28,14 @@
  * @since Phase 1 (Layer A)
  */
 import http from 'node:http';
+import { provisionRestrictedCommandActor } from './_restricted-command-actor';
 import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { Client } from 'pg';
 import { executeCommandViaApi, uniqueId } from '../helpers';
 import { BACKEND_URL, BASE_URL, PG_CONN } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { AutomationListPage } from '../../pages/AutomationListPage';
 import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import {
   dragNodeToCanvas,
@@ -54,12 +56,16 @@ const MODEL_CODE = 'e2et_order';
 const MODEL_LABEL = '测试订单'; // e2et_order displayName — model-select options render by label.
 const CREATE_COMMAND = 'e2eto:create_e2et_order';
 
-async function loginAsAdmin(page: Page, baseURL: string): Promise<void> {
+async function loginAsAdmin(
+  page: Page,
+  baseURL: string,
+  account: { email: string; password: string } = DEFAULT_TEST_ACCOUNT,
+): Promise<void> {
   const response = await page.request.post(`${baseURL}/login`, {
     form: {
       channelCode: 'email_password',
-      identifier: DEFAULT_TEST_ACCOUNT.email,
-      password: DEFAULT_TEST_ACCOUNT.password,
+      identifier: account.email,
+      password: account.password,
       remember: 'on',
       redirectTo: '/',
     },
@@ -456,6 +462,35 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
 
   test.beforeEach(async ({ page, baseURL }) => {
     await loginAsAdmin(page, baseURL ?? 'http://127.0.0.1:5194');
+  });
+
+  const isolatedPids = new Set<string>();
+  let sharedH1Complete = false;
+  test.afterEach(async ({ page }, info) => {
+    // E5 is the last consumer of H1's enabled rule. Keep that shared journey intact,
+    // then retire every completed rule so later creates cannot trigger stale writes.
+    if (info.title.startsWith('E5:')) sharedH1Complete = true;
+    for (const pid of createdPids) {
+      if (isolatedPids.has(pid) || (pid === h1.pid && !sharedH1Complete)) continue;
+      const response = await page.request.get(`/api/automations/${pid}`);
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(String(body.code)).toBe('0');
+      expect(typeof body.data.enabled).toBe('boolean');
+      if (body.data.enabled) {
+        const list = new AutomationListPage(page);
+        await list.goto();
+        await list.toggle(pid);
+        await expect.poll(async () => {
+          const detail = await page.request.get(`/api/automations/${pid}`);
+          expect(detail.status()).toBe(200);
+          const value = await detail.json();
+          expect(String(value.code)).toBe('0');
+          return value.data.enabled;
+        }).toBe(false);
+      }
+      isolatedPids.add(pid);
+    }
   });
 
   test.afterAll(async ({ browser }) => {
@@ -957,35 +992,33 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   test('N-CALL-API: drag trigger-record-create→action-call-api, configure url+method via panel, save, enable, fire → node completes (real outbound GET) @golden', async ({
     page,
   }) => {
-    // host-env: SSRF guard blocks loopback; this real-outbound happy path needs a
-    // reachable non-loopback endpoint (docker CI-parity / E2E_CALLAPI_OK_URL).
-    test.skip(
-      /127\.0\.0\.1|localhost/.test(CALLAPI_OK_URL),
-      'call_api outbound happy-path needs a reachable non-loopback endpoint (SSRF guard blocks loopback on host-first); set E2E_CALLAPI_OK_URL or run in docker CI-parity.',
-    );
-    await openNewDesigner(page);
-    await setAutomationName(page, `N-CALL-API ${uniqueId()}`);
+    const receiver = await startWebhookReceiver();
+    try {
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-CALL-API ${uniqueId()}`);
 
-    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
-    const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
-    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
-    await connectEdge(page, trigger, action);
-    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
-    // url (expression) → the backend's own actuator/health via the test-allowlisted
-    // host.docker.internal; method (select) → GET. (call_api fix = FINDING-6.)
-    await fillNodeConfig(page, action, {
-      url: CALLAPI_OK_URL,
-      method: 'GET',
-    });
-    const { pid } = await saveAutomation(page);
-    createdPids.push(pid);
-    await enableViaListToggle(page, pid);
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-call-api', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      await fillNodeConfig(page, action, {
+        url: `http://${OUTBOUND_HOST}:${receiver.port}/call-api`,
+        method: 'GET',
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      await enableViaListToggle(page, pid);
 
-    const firedAt = Date.now();
-    await fireCreate(page, 100, `N-CALL-API-order ${uniqueId()}`);
-    const log = await pollLogTerminal(page, pid, firedAt);
-    expect(String(log!.status).toLowerCase(), `N-CALL-API run: ${JSON.stringify(log)}`).toBe('success');
-    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
+      const firedAt = Date.now();
+      await fireCreate(page, 100, `N-CALL-API-order ${uniqueId()}`);
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(String(log!.status).toLowerCase(), `N-CALL-API run: ${JSON.stringify(log)}`).toBe('success');
+      expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'call-api node completed (real outbound GET <400)').toBe(true);
+      expect(receiver.received).toEqual([{ method: 'GET', path: '/call-api', body: '' }]);
+    } finally {
+      await receiver.close();
+    }
   });
 
   // ── send-webhook REAL OUTBOUND (GAP-F): the node POSTs the payload directly to the ──
@@ -1341,10 +1374,11 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       e2et_cust_active: true,
     }, undefined, 'create');
     expect(seedCustomer.code).toBe('0');
+    expect(seedCustomer.recordId).toMatch(/^[0-9A-Z]{26}$/);
     const seedOrder = await executeCommandViaApi(page, 'e2et:create_order', {
       e2et_order_title: `NBE order ${tag}`,
       e2et_order_type: 'normal',
-      e2et_order_customer: `NBE Customer ${tag}`,
+      e2et_order_customer: seedCustomer.recordId,
       e2et_order_urgent: false,
     }, undefined, 'create');
     expect(seedOrder.code).toBe('0');
@@ -2342,11 +2376,9 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
     await connectEdge(page, trigger, action);
     await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
-    // commandCode via the real command-select picker — filter by the unique command code
-    // (BaseResourceSelect filters by label OR value). e2et:touch_order_noperm is a
-    // permission-free update (test-fixtures) the restricted automation principal CAN run.
+    // Select the fixture's visible label; the saved code below remains authoritative.
     await fillNodeConfig(page, action, {
-      commandCode: 'e2et:touch_order_noperm',
+      commandCode: '标注订单备注(免权限)',
       params: `{"e2et_order_remark":"${marker}"}`,
     });
     const { pid } = await saveAutomation(page);
@@ -2370,36 +2402,92 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   });
 
   test('N-EXECUTE-COMMAND-SAD: pick a permission-gated command via the picker; under the restricted automation principal the run FAILS with a clear permission-denied reason and the side effect does not happen (sad) @golden', async ({
-    page,
-  }) => {
-    await openNewDesigner(page);
-    await setAutomationName(page, `N-EXECUTE-COMMAND-SAD ${uniqueId()}`);
-
-    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
-    const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
-    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
-    await connectEdge(page, trigger, action);
-    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
-    // e2et:update_order requires E2ET.order.manage → the automation principal lacks it (FINDING-3).
-    await fillNodeConfig(page, action, {
-      commandCode: 'e2et:update_order',
-      params: '{"e2et_order_title":"EXEC_SHOULD_BE_DENIED"}',
+    page: admin,
+    browser,
+    baseURL,
+  }, testInfo) => {
+    const account = await provisionRestrictedCommandActor(admin);
+    const context = await browser.newContext({
+      baseURL,
+      storageState: { cookies: [], origins: [] },
     });
-    const { pid } = await saveAutomation(page);
-    createdPids.push(pid);
-    await enableViaListToggle(page, pid);
+    const page = await context.newPage();
+    try {
+      await loginAsAdmin(page, baseURL!, account);
+      const me = await page.request.get('/api/auth/me');
+      expect(me.status()).toBe(200);
+      const identity = await me.json();
+      expect(identity.code).toBe('0');
+      const codes: string[] = identity.data.permissions.permissionCodes;
+      expect(codes).toContain('model.e2et_order.create');
+      expect(codes).toContain('automation.update');
+      expect(codes).not.toContain('e2et.order.manage');
+      expect(
+        identity.data.permissions.roles.map((role: { code: string }) => role.code),
+      ).not.toContain('tenant_admin');
+      await testInfo.attach('restricted-command-principal', {
+        body: JSON.stringify({ userPid: identity.data.user.pid, permissionCodes: codes }),
+        contentType: 'application/json',
+      });
+      await openNewDesigner(page);
+      await setAutomationName(page, `N-EXECUTE-COMMAND-SAD ${uniqueId()}`);
 
-    const firedAt = Date.now();
-    const recordId = await fireCreate(page, 100, `EXEC-SAD-order ${uniqueId()}`);
-    const log = await pollLogTerminal(page, pid, firedAt);
-    expect(['failed', 'partial_success'], `N-EXECUTE-COMMAND-SAD must fail (denied): ${JSON.stringify(log)}`).toContain(String(log!.status).toLowerCase());
-    const statuses = await pollNodeStatuses(page, log!.id, 30_000);
-    const node = statuses.find((s) => s.nodeId === action);
-    expect(node?.status, `execute-command node should be failed: ${JSON.stringify(statuses)}`).toBe('failed');
-    expect(node?.errorMessage ?? '', 'denial must name the required permission (clear reason)').toMatch(/permission denied|E2ET\.order\.manage/i);
-    // The denied command did NOT change the record title.
-    const record = await getOrderRecord(page, recordId);
-    expect(record.e2et_order_title, 'denied command must not have run').not.toBe('EXEC_SHOULD_BE_DENIED');
+      const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+      const action = await dragNodeToCanvas(page, 'action-execute-command', { x: 150, y: 240 });
+      await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+      await connectEdge(page, trigger, action);
+      await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+      // The authenticated author and trigger actor both lack the command permission.
+      await fillNodeConfig(page, action, {
+        commandCode: '编辑订单',
+        params: '{"e2et_order_title":"EXEC_SHOULD_BE_DENIED"}',
+      });
+      const { pid } = await saveAutomation(page);
+      createdPids.push(pid);
+      const saved = await readFlowConfig(page, pid);
+      const pickedNode = saved.flowConfig.nodes.find((n: any) => n.id === action);
+      expect(pickedNode.data.config.commandCode, 'localized command selection preserves the gated command').toBe('e2et:update_order');
+      await enableViaListToggle(page, pid);
+
+      const firedAt = Date.now();
+      const originalTitle = `EXEC-SAD-order ${uniqueId()}`;
+      const created = await page.request.post('/api/dynamic/e2et_order', {
+        data: {
+          e2et_order_title: originalTitle,
+          e2et_order_type: 'normal',
+          e2et_order_status: 'draft',
+        },
+      });
+      expect(created.status()).toBe(200);
+      const createdBody = await created.json();
+      expect(createdBody.code, JSON.stringify(createdBody)).toBe('0');
+      const recordId = createdBody.data.pid;
+      expect(recordId).toEqual(expect.any(String));
+      const log = await pollLogTerminal(page, pid, firedAt);
+      expect(
+        ['failed', 'partial_success'],
+        `N-EXECUTE-COMMAND-SAD must fail (denied): ${JSON.stringify(log)}`,
+      ).toContain(String(log!.status).toLowerCase());
+      const statuses = await pollNodeStatuses(page, log!.id, 30_000);
+      const node = statuses.find((s) => s.nodeId === action);
+      expect(
+        node?.status,
+        `execute-command node should be failed: ${JSON.stringify(statuses)}`,
+      ).toBe('failed');
+      expect(
+        node?.errorMessage ?? '',
+        'denial must name the required permission (clear reason)',
+      ).toMatch(/permission denied|E2ET\.order\.manage/i);
+      // The denied command did NOT change the record title.
+      const record = await getOrderRecord(page, recordId);
+      expect(record.e2et_order_title, 'denied command must not have changed the owned record').toBe(
+        originalTitle,
+      );
+      expect(record.e2et_order_status).toBe('draft');
+      await page.screenshot({ path: testInfo.outputPath('restricted-command-denial.png') });
+    } finally {
+      await context.close();
+    }
   });
 
   // ── control-loop: real designer, collection-carrying webhook fixture ─────────────

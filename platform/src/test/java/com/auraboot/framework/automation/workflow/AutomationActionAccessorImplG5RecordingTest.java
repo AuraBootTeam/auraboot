@@ -67,7 +67,7 @@ class AutomationActionAccessorImplG5RecordingTest {
         });
 
         AutomationActionAccessorImpl delegate =
-                new AutomationActionAccessorImpl(executor, mapper);
+                new AutomationActionAccessorImpl(executor, new AutomationNodeExecutionRecorder(mapper));
 
         delegate.execute("a1", null, processVars("a1", 42L, 7L));
 
@@ -104,7 +104,7 @@ class AutomationActionAccessorImplG5RecordingTest {
                 .thenThrow(new RuntimeException("downstream blew up"));
 
         AutomationActionAccessorImpl delegate =
-                new AutomationActionAccessorImpl(executor, mapper);
+                new AutomationActionAccessorImpl(executor, new AutomationNodeExecutionRecorder(mapper));
 
         assertThatThrownBy(() -> delegate.execute("a1", null, processVars("a1", 42L, 7L)))
                 .isInstanceOf(RuntimeException.class)
@@ -136,7 +136,7 @@ class AutomationActionAccessorImplG5RecordingTest {
                         new IllegalStateException("No real SMS sender available")));
 
         AutomationActionAccessorImpl delegate =
-                new AutomationActionAccessorImpl(executor, mapper);
+                new AutomationActionAccessorImpl(executor, new AutomationNodeExecutionRecorder(mapper));
         Map<String, Object> vars = processVars("a1", 42L, 7L);
         vars.put(AutomationActionAccessorImpl.ACTION_RESULTS_VAR, new ArrayList<ActionResult>());
 
@@ -166,7 +166,7 @@ class AutomationActionAccessorImplG5RecordingTest {
         AutomationNodeExecutionMapper mapper = mock(AutomationNodeExecutionMapper.class);
 
         AutomationActionAccessorImpl delegate =
-                new AutomationActionAccessorImpl(executor, mapper);
+                new AutomationActionAccessorImpl(executor, new AutomationNodeExecutionRecorder(mapper));
 
         // tenant id present, log id absent → recording disabled, action still runs.
         delegate.execute("a1", null, processVars("a1", null, 7L));
@@ -183,7 +183,7 @@ class AutomationActionAccessorImplG5RecordingTest {
         AutomationNodeExecutionMapper mapper = mock(AutomationNodeExecutionMapper.class);
 
         AutomationActionAccessorImpl delegate =
-                new AutomationActionAccessorImpl(executor, mapper);
+                new AutomationActionAccessorImpl(executor, new AutomationNodeExecutionRecorder(mapper));
 
         delegate.execute("a1", null, processVars("a1", 42L, null));
 

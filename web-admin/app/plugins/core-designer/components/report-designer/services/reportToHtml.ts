@@ -69,7 +69,7 @@ function formatCellValue(value: unknown, format?: string): string {
     return value.toLocaleString();
   }
   if (format === 'currency' && typeof value === 'number') {
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (format === 'percent' && typeof value === 'number') {
     return `${(value * 100).toFixed(1)}%`;
@@ -217,8 +217,9 @@ function renderGroupedTable(block: GroupedTableBlock, data: Record<string, unkno
   }
 
   html += '<tbody>';
+  const groupLabel=block.columns.find(column => column.field === block.groupByField && column.label && column.label !== column.field)?.label;
   for (const [groupKey, rows] of groups.entries()) {
-    html += `<tr><td colspan="${block.columns.length}" style="${cellBorder} padding: 6px 8px; background: #dbeafe; font-weight: bold; color: #1e40af;">${escapeHtml(block.groupByField)}: ${escapeHtml(groupKey)} (${rows.length})</td></tr>`;
+    html += `<tr><td colspan="${block.columns.length}" style="${cellBorder} padding: 6px 8px; background: #dbeafe; font-weight: bold; color: #1e40af;">${groupLabel ? escapeHtml(groupLabel) + ': ' : ''}${escapeHtml(groupKey)} (${rows.length})</td></tr>`;
 
     for (const row of rows) {
       html += '<tr>';
@@ -272,8 +273,9 @@ function renderStatCard(block: StatCardBlock, data: Record<string, unknown>[]): 
   const formatted = formatCellValue(value, block.format);
 
   return `
+    ${block.title && block.label && block.title !== block.label ? `<h3>${escapeHtml(block.title)}</h3>` : ''}
     <div style="display: inline-block; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 20px; margin: 4px 8px 4px 0; min-width: 120px; background: #f9fafb;">
-      <div style="font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${escapeHtml(block.label || 'Metric')}</div>
+      <div style="font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${escapeHtml(block.label || block.title || 'Metric')}</div>
       <div style="font-size: 18pt; font-weight: bold; color: ${block.color || '#1d4ed8'};">${formatted}</div>
     </div>
   `;
@@ -323,11 +325,11 @@ function renderCrossTab(block: CrossTabBlock, data: Record<string, unknown>[]): 
     html += `<caption style="text-align: left; font-weight: bold; font-size: 12pt; margin-bottom: 8px; caption-side: top;">${escapeHtml(block.title)}</caption>`;
 
   // Header
-  html += `<thead><tr><th style="border: 1px solid #ddd; padding: 6px 8px; background: #e5e7eb;">${escapeHtml(block.rowField)} \\ ${escapeHtml(block.columnField)}</th>`;
+  html += `<thead><tr><th style="border: 1px solid #ddd; padding: 6px 8px; background: #e5e7eb;">${escapeHtml(block.rowLabel || block.rowField)} \\ ${escapeHtml(block.columnLabel || block.columnField)}</th>`;
   for (const ck of cols)
     html += `<th style="border: 1px solid #ddd; padding: 6px 8px; background: #dbeafe; text-align: right;">${escapeHtml(ck)}</th>`;
   if (block.showRowTotal)
-    html += `<th style="border: 1px solid #ddd; padding: 6px 8px; background: #f3f4f6; text-align: right; font-weight: bold;">Total</th>`;
+    html += `<th style="border: 1px solid #ddd; padding: 6px 8px; background: #f3f4f6; text-align: right; font-weight: bold;">${escapeHtml(block.totalLabel || 'Total')}</th>`;
   html += '</tr></thead><tbody>';
 
   for (const rk of rows) {
@@ -340,7 +342,7 @@ function renderCrossTab(block: CrossTabBlock, data: Record<string, unknown>[]): 
   }
 
   if (block.showColumnTotal) {
-    html += `<tr><td style="border: 1px solid #ddd; padding: 6px 8px; background: #d1d5db; font-weight: bold;">Total</td>`;
+    html += `<tr><td style="border: 1px solid #ddd; padding: 6px 8px; background: #d1d5db; font-weight: bold;">${escapeHtml(block.totalLabel || 'Total')}</td>`;
     for (const ck of cols)
       html += `<td style="border: 1px solid #ddd; padding: 6px 8px; text-align: right; background: #d1d5db; font-weight: bold;">${formatCellValue(getColTotal(ck), block.format)}</td>`;
     if (block.showRowTotal)

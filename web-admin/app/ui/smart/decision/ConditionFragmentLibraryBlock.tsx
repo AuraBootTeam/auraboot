@@ -617,6 +617,9 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   const [scopeType, setScopeType] = useState('');
   const [fragments, setFragments] = useState<ConditionFragment[]>([]);
   const [fieldCatalog, setFieldCatalog] = useState<FieldOption[]>([]);
+  const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [catalogRevision, setCatalogRevision] = useState(0);
+  const canEditConditions = canManage && catalogState === 'ready';
   const [decisionDefinitions, setDecisionDefinitions] = useState<DecisionDefinitionOption[]>([]);
   const [decisionDefinitionError, setDecisionDefinitionError] = useState('');
   const [decisionBindingCandidate, setDecisionBindingCandidate] = useState('');
@@ -715,6 +718,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
 
   useEffect(() => {
     let cancelled = false;
+    setCatalogState('loading');
     const loadFactCatalog = async () => {
       if (typeof api.getFactCatalog === 'function') {
         const catalogFields = factCatalogToFieldOptions(await api.getFactCatalog());
@@ -724,15 +728,21 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
     };
     loadFactCatalog()
       .then((fields) => {
-        if (!cancelled) setFieldCatalog(fields);
+        if (!cancelled) {
+          setFieldCatalog(fields);
+          setCatalogState('ready');
+        }
       })
       .catch(() => {
-        if (!cancelled) setFieldCatalog([]);
+        if (!cancelled) {
+          setFieldCatalog([]);
+          setCatalogState('error');
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [api]);
+  }, [api, catalogRevision]);
 
   useEffect(() => {
     let cancelled = false;
@@ -863,7 +873,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const openCreate = () => {
-    if (!canManage) return;
+    if (!canEditConditions) return;
     setEditorMode('create');
     setDraft(emptyDraft(defaultScopeType));
     setMessage('');
@@ -871,7 +881,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const openVersion = () => {
-    if (!canManage) return;
+    if (!canEditConditions) return;
     if (!selectedFragment) return;
     if (!canCreateNewVersion(selectedFragment)) {
       setError('只有已发布、已废弃或已停用版本可以编辑为新版本');
@@ -884,7 +894,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const openDraft = () => {
-    if (!canManage) return;
+    if (!canEditConditions) return;
     if (!selectedFragment?.pid || !['DRAFT', 'VALIDATED'].includes(String(selectedFragment.status)))
       return;
     setEditorMode('edit');
@@ -899,7 +909,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const saveFragment = async () => {
-    if (!canManage) return;
+    if (!canEditConditions) return;
     setError('');
     setMessage('');
     try {
@@ -1042,15 +1052,28 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
             </option>
           ))}
         </select>
-        <button type="button" onClick={() => void loadFragments()} data-testid="cfl-refresh">
+        <button
+          type="button"
+          onClick={() => {
+            void loadFragments();
+            setCatalogRevision((value) => value + 1);
+          }}
+          data-testid="cfl-refresh"
+        >
           刷新
         </button>
         <button
           type="button"
           className="decisionops-primary-button"
           onClick={openCreate}
-          disabled={!canManage}
-          title={!canManage ? conditionText('readOnlyCondition') : undefined}
+          disabled={!canEditConditions}
+          title={
+            !canManage
+              ? conditionText('readOnlyCondition')
+              : catalogState !== 'ready'
+                ? conditionText('catalogLoading')
+                : undefined
+          }
           data-testid="cfl-open-create"
         >
           新建片段
@@ -1060,6 +1083,15 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
         </span>
       </div>
 
+      {catalogState !== 'ready' && (
+        <div
+          role={catalogState === 'error' ? 'alert' : 'status'}
+          data-testid="cfl-catalog-state"
+          className="decisionops-state"
+        >
+          {conditionText(catalogState === 'error' ? 'catalogUnavailable' : 'catalogLoading')}
+        </div>
+      )}
       {editorMode && (
         <div className="decisionops-editor-panel cfl-editor" data-testid="cfl-editor">
           <input
@@ -1188,7 +1220,12 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
             </div>
           </div>
           <div className="decisionops-row-actions">
-            <button type="button" data-testid="cfl-save-fragment" onClick={saveFragment}>
+            <button
+              type="button"
+              data-testid="cfl-save-fragment"
+              onClick={saveFragment}
+              disabled={!canEditConditions}
+            >
               {editorMode === 'version' ? '保存新版本' : '保存片段'}
             </button>
             <button type="button" onClick={closeEditor}>
@@ -1209,7 +1246,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
         </div>
       )}
 
-      <div className={`cfl-grid${canManage ? '' : ' cfl-grid--readonly'}`}>
+      <div className={`cfl-grid${canManage ? '' : 'cfl-grid--readonly'}`}>
         <div className="decisionops-table-frame cfl-table-frame">
           <table className="decisionops-table cfl-table">
             <thead>
@@ -1277,14 +1314,19 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
               </div>
               <div className="cfl-actions">
                 {canManage && ['DRAFT', 'VALIDATED'].includes(String(selectedFragment.status)) && (
-                  <button type="button" onClick={openDraft} data-testid="cfl-open-edit">
+                  <button
+                    type="button"
+                    onClick={openDraft}
+                    data-testid="cfl-open-edit"
+                    disabled={!canEditConditions}
+                  >
                     {conditionText('editDraft')}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={openVersion}
-                  disabled={!canManage || !canCreateNewVersion(selectedFragment)}
+                  disabled={!canEditConditions || !canCreateNewVersion(selectedFragment)}
                   title={newVersionDisabledReason || '编辑为新版本'}
                   data-testid="cfl-open-version"
                 >

@@ -76,3 +76,34 @@ test('production proof requires both live frontend listeners to run in productio
   f.environments.bff.NODE_ENV = 'development';
   assert.throws(() => verifyGoldenProduct(f), /mode drift/);
 });
+
+function isolatedRedisFixture() {
+  const f = fixture();
+  Object.assign(f.environments.backend, {
+    SPRING_DATA_REDIS_HOST: '127.0.0.1', SPRING_DATA_REDIS_PORT: '16317',
+  });
+  f.report.processes.push({ key: 'redis-owned', status: 'ok',
+    expected: { pid: 104, cwd: '/state/redis/owned' } });
+  f.redisEndpoint = { isolated: true, host: '127.0.0.1', port: 16317,
+    database: '12', pid: 104, dataDirectory: '/state/redis/owned' };
+  return f;
+}
+
+test('records the verified private Redis endpoint separately from its database number', () => {
+  const f = isolatedRedisFixture();
+  assert.deepEqual(verifyGoldenProduct(f).redisEndpoint, f.redisEndpoint);
+});
+
+for (const [label, mutate] of Object.entries({
+  'Redis endpoint drift with the same database': f => { f.environments.backend.SPRING_DATA_REDIS_PORT = '16311'; },
+  'Redis host drift': f => { f.environments.backend.SPRING_DATA_REDIS_HOST = 'foreign'; },
+  'a shared Redis port labelled isolated': f => {
+    f.redisEndpoint.port = 6379; f.environments.backend.SPRING_DATA_REDIS_PORT = '6379';
+  },
+  'an unverified Redis process': f => { f.report.processes.at(-1).status = 'drift'; },
+  'Redis endpoint database drift': f => { f.redisEndpoint.database = '0'; },
+  'a missing private endpoint proof': f => { delete f.redisEndpoint; },
+})) test(`rejects ${label} before publishing evidence`, () => {
+  const f = isolatedRedisFixture(); mutate(f);
+  assert.throws(() => verifyGoldenProduct(f));
+});

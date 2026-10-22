@@ -141,3 +141,23 @@ export class FixtureCleanupJournal {
     if (failures.length) throw new Error(`Fixture cleanup failed for ${failures.join(', ')}`);
   }
 }
+
+/** Explicit test-fixture purge; never an application deletion capability. */
+export function immutableQuoteArtifactCleanup(database: string, quoteId: string, artifactIds: string[]) {
+  if (!/^(enterprise|quote_bom|auraboot)_\d+$/.test(database)) {
+    throw new Error('Immutable fixture purge requires an isolated numbered test database');
+  }
+  const validPid = (pid: string) => /^[A-Za-z0-9_-]{1,128}$/.test(pid);
+  if (!validPid(quoteId) || !artifactIds.length || artifactIds.length > 256
+      || artifactIds.some(pid => !validPid(pid)) || new Set(artifactIds).size !== artifactIds.length) {
+    throw new Error('Immutable fixture purge requires exact unique artifact and source identities');
+  }
+  return {
+    text: `DELETE FROM mt_ab_document_artifact artifact USING mt_qo_quote_common quote
+      WHERE quote.pid = $1 AND artifact.tenant_id = quote.tenant_id
+      AND artifact.ab_da_source_record_pid = quote.pid
+      AND artifact.ab_da_source_model = 'qo_quote_common'
+      AND artifact.pid = ANY($2::varchar[]) RETURNING artifact.pid`,
+    values: [quoteId, artifactIds],
+  };
+}

@@ -148,5 +148,75 @@
     "resource": "/automations",
     "action": "read",
     "resourceType": "menu"
+  },
+  {
+    "code": "model.tenant_member.approve",
+    "name:zh-CN": "通过",
+    "name:en": "Approve",
+    "description": "Authorize the native tenant member approve command",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "approve"
+  },
+  {
+    "code": "model.tenant_member.reject",
+    "name:zh-CN": "拒绝",
+    "name:en": "Reject",
+    "description": "Authorize the native tenant member reject command",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "reject"
+  },
+  {
+    "code": "model.tenant_member.suspend",
+    "name:zh-CN": "暂停",
+    "name:en": "Suspend",
+    "description": "Authorize the native tenant member suspend command",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "suspend"
+  },
+  {
+    "code": "model.tenant_member.restore",
+    "name:zh-CN": "恢复",
+    "name:en": "Restore",
+    "description": "Authorize the native tenant member restore command",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "restore"
+  },
+  {
+    "code": "model.tenant_member.leave",
+    "name:zh-CN": "离职",
+    "name:en": "Leave",
+    "description": "Authorize the native tenant member leave command",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "leave"
+  },
+  {
+    "code": "model.tenant_member.delete",
+    "name:zh-CN": "移除成员",
+    "name:en": "Remove Member",
+    "description": "Authorize the native tenant member delete command",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "delete"
+  },
+  {
+    "code": "model.tenant_member.reset_member_password",
+    "name:zh-CN": "重置密码",
+    "name:en": "Reset Password",
+    "description": "Authorize the native tenant member reset_member_password command",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "reset_member_password"
   }
 ]

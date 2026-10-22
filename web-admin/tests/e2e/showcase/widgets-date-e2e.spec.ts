@@ -692,6 +692,9 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
     // Give the form a moment to hydrate — we wait for the form tag, not
     // networkidle (SSE keeps network busy indefinitely).
     await expect(page.locator('form').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('details[data-testid^="form-section-"]').first()).toBeVisible({
+      timeout: 5_000,
+    });
     await expandFormSections(page);
     // Then wait for at least one date/time input to mount — the form's
     // smart components hydrate after the form tag itself, and the inputs we

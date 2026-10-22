@@ -8,6 +8,7 @@
 import { useSearchParams } from 'react-router';
 import { useMemo, useCallback } from 'react';
 import type { SortConfig, ViewFilterConfig } from '~/framework/smart/types/savedView';
+import { normalizeSavedViewFilterRange } from '~/framework/smart/utils/savedViewFilterRange';
 
 // ---------------------------------------------------------------------------
 // Pure encoding / decoding helpers (exported for unit testing)
@@ -115,7 +116,7 @@ export function decodeFilters(raw: string | null | undefined): ViewFilterConfig[
     const json = atob(raw);
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed)) return [];
-    return parsed as ViewFilterConfig[];
+    return (parsed as ViewFilterConfig[]).map(normalizeSavedViewFilterRange);
   } catch {
     return [];
   }

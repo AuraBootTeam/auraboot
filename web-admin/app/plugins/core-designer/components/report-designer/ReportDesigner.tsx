@@ -1,3 +1,5 @@
+import { ReportBandBlock } from './blocks/ReportBandBlock';
+import { DesignerWorkspace } from '~/shared/designer/DesignerWorkspace';
 import { useSmartText } from '~/utils/i18n';
 import { useToastContext } from '~/contexts/ToastContext';
 import { usePermission } from '~/contexts/AuthContext';
@@ -63,7 +65,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   const canManage = usePermission('report.definition.manage');
   const canExport = usePermission('report.export.execute');
   const [loadFailed, setLoadFailed] = React.useState(false);
-  const { report, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
+  const { report, selectedBlockId, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
   const {
     isSaving,
     isLoading,
@@ -437,7 +439,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     const historical = versioning.viewingSnapshot?.dsl as ReportDsl | undefined;
     const normalizedHistorical = historical ? ensurePageConfig(historical) : undefined;
     return (
-      <div className="flex h-screen flex-col bg-gray-50" data-testid="report-version-preview">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50" data-testid="report-version-preview">
         <div className="border-b border-amber-200 bg-amber-50 p-4 pr-80">
           <h2 className="font-semibold">{historical?.title}</h2>
           <p className="mt-1 text-sm">
@@ -477,7 +479,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   // Preview mode: render as runtime
   if (viewing && report) {
     return (
-      <div className="flex h-screen flex-col bg-gray-50">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
         <ReportToolbar
           readOnly={!canManage}
           exportAllowed={canExport}
@@ -501,7 +503,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
       <ReportToolbar
         readOnly={!canManage}
         exportAllowed={canExport}
@@ -516,11 +518,19 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         versionCount={versioning.versions.length}
       />
       <ReportTemplateActions disabled={!canManage || isSaving || isLoading} />
-      <div className="flex flex-1 overflow-hidden">
-        <BlockPalette />
-        <ReportCanvas />
-        <BlockPropertyPanel />
-      </div>
+      <DesignerWorkspace
+        compactWidth={900}
+        testIdPrefix="report"
+        palette={<BlockPalette />}
+        canvas={<ReportCanvas />}
+        propertyPanel={<BlockPropertyPanel />}
+        inspectorFocusKey={selectedBlockId}
+        labels={{
+          components: text({ zh: '组件库', en: 'Components' }),
+          properties: text({ zh: '属性', en: 'Properties' }),
+          close: text({ zh: '关闭面板', en: 'Close panel' }),
+        }}
+      />
 
       {/* Version History Panel */}
       {historyPanel}
@@ -550,14 +560,14 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
 
   if (query.failed && !query.hasResult) {
     return (
-      <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+      <div data-testid="report-runtime-paper" className="relative isolate mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
         <ReportQueryControls report={report} query={query} />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+    <div data-testid="report-runtime-paper" className="relative isolate mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
       <ReportQueryControls report={report} query={query} />
       {Object.values(report.dataSources).some((source) => source.type === 'aggregate') && (
         <p className="mb-4 text-sm text-gray-500" data-testid="report-aggregate-limit-hint">
@@ -579,26 +589,7 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
       )}
       {report.header && (
         <>
-          <div className="mb-4">
-            {report.header.elements.map((el, i) => (
-              <div
-                key={i}
-                style={{
-                  textAlign: el.align || 'left',
-                  fontSize: el.style?.fontSize ? `${el.style.fontSize}pt` : undefined,
-                  fontWeight: el.style?.fontWeight,
-                }}
-              >
-                {el.type === 'text'
-                  ? el.content
-                  : el.type === 'date'
-                    ? new Date().toLocaleDateString()
-                    : el.type === 'page-number'
-                      ? 'Page 1'
-                      : ''}
-              </div>
-            ))}
-          </div>
+          <ReportBandBlock band={report.header} mode="runtime" position="header" />
           <hr className="mb-4" />
         </>
       )}
@@ -655,25 +646,7 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
       {report.footer && (
         <>
           <hr className="mt-4 mb-4" />
-          <div>
-            {report.footer.elements.map((el, i) => (
-              <div
-                key={i}
-                style={{
-                  textAlign: el.align || 'left',
-                  fontSize: el.style?.fontSize ? `${el.style.fontSize}pt` : undefined,
-                }}
-              >
-                {el.type === 'text'
-                  ? el.content
-                  : el.type === 'date'
-                    ? new Date().toLocaleDateString()
-                    : el.type === 'page-number'
-                      ? 'Page 1'
-                      : ''}
-              </div>
-            ))}
-          </div>
+          <ReportBandBlock band={report.footer} mode="runtime" position="footer" />
         </>
       )}
     </div>

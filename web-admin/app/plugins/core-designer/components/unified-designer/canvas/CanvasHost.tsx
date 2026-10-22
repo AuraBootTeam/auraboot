@@ -234,6 +234,7 @@ function useMarqueeSelect(
     // interactive control / drag handle. Anything inside a canvas block keeps
     // its existing selection / drag behaviour.
     if (isOnBlockOrInteractive(event.target)) return;
+    event.preventDefault();
 
     const startClientX = event.clientX;
     const startClientY = event.clientY;
@@ -247,6 +248,8 @@ function useMarqueeSelect(
       };
     };
 
+    const startContent = toContentPoint(startClientX, startClientY);
+
     const handleMove = (moveEvent: PointerEvent) => {
       const dx = Math.abs(moveEvent.clientX - startClientX);
       const dy = Math.abs(moveEvent.clientY - startClientY);
@@ -254,7 +257,7 @@ function useMarqueeSelect(
         return;
       }
       started = true;
-      const start = toContentPoint(startClientX, startClientY);
+      const start = startContent;
       const current = toContentPoint(moveEvent.clientX, moveEvent.clientY);
       setRect({
         left: Math.min(start.x, current.x),
@@ -273,8 +276,12 @@ function useMarqueeSelect(
 
       // Resolve hits in viewport-pixel space (matches getBoundingClientRect),
       // so the marquee and block rects share one coordinate frame.
+      const hostRect = host.getBoundingClientRect();
       const marqueeRect: PixelRect = rectFromPoints(
-        { x: startClientX, y: startClientY },
+        {
+          x: startContent.x + hostRect.left - host.scrollLeft,
+          y: startContent.y + hostRect.top - host.scrollTop,
+        },
         { x: endEvent.clientX, y: endEvent.clientY },
       );
       const blockRects = collectCanvasBlockRects(host);
@@ -425,6 +432,7 @@ function BlockFrame(props: BlockFrameProps) {
     canDeleteBlock,
     onDeleteBlock,
   } = props;
+  const frameModelFields = React.useContext(DesignerModelFieldsContext);
   const selected = selectedBlockId === block.id;
   const multiSelected = multiSelectedIds?.has(block.id) ?? false;
   const reorderAllowed = canReorderBlock
@@ -553,7 +561,7 @@ function BlockFrame(props: BlockFrameProps) {
             {!isDashboardWidget && reorderAllowed ? (
               <button
                 type="button"
-                aria-label={t('designer.dragBlock', { label: getBlockLabel(block, locale, t) })}
+                aria-label={t('designer.dragBlock', { label: getBlockLabel(block, locale, t, frameModelFields) })}
                 data-testid={`block-drag-handle-${block.id}`}
                 data-no-block-drag="true"
                 className="mt-0.5 shrink-0 cursor-grab touch-none text-slate-300 hover:text-blue-500 active:cursor-grabbing"
@@ -567,7 +575,7 @@ function BlockFrame(props: BlockFrameProps) {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-semibold text-slate-900">
-                  {getBlockLabel(block, locale, t)}
+                  {getBlockLabel(block, locale, t, frameModelFields)}
                 </span>
                 {(block.props as { aiLocked?: unknown } | undefined)?.aiLocked === true ? (
                   <span
@@ -602,7 +610,7 @@ function BlockFrame(props: BlockFrameProps) {
       {canDeleteBlock(block.id) ? (
         <button
           type="button"
-          aria-label={`${resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)} ${getBlockLabel(block, locale, t)}`}
+          aria-label={`${resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)} ${getBlockLabel(block, locale, t, frameModelFields)}`}
           title={resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)}
           data-testid={`block-delete-${block.id}`}
           data-no-block-drag="true"
@@ -640,8 +648,8 @@ function BlockFrame(props: BlockFrameProps) {
       {mode === 'layout' && isDashboardWidget && !structuralReadOnly ? (
         <button
           type="button"
-          aria-label={t('designer.resizeBlock', { label: getBlockLabel(block, locale, t) })}
-          title={t('designer.resizeBlock', { label: getBlockLabel(block, locale, t) })}
+          aria-label={t('designer.resizeBlock', { label: getBlockLabel(block, locale, t, frameModelFields) })}
+          title={t('designer.resizeBlock', { label: getBlockLabel(block, locale, t, frameModelFields) })}
           data-testid={`widget-resize-${block.id}`}
           data-no-block-drag="true"
           onPointerDown={(event) => {

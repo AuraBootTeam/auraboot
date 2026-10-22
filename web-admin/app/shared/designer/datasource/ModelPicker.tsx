@@ -24,16 +24,18 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   className,
 }) => {
   const { models, isLoading } = useMetaModels();
+  const selectId = React.useId();
 
   return (
     <div className={className}>
       {label && (
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor={selectId} className="mb-1 block text-sm font-medium text-gray-700">
           {label}
           {required && <span className="text-red-500"> *</span>}
         </label>
       )}
       <select
+        id={selectId}
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         disabled={isLoading}

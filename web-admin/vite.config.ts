@@ -33,6 +33,15 @@ const chartRequire = createRequire(path.join(coreWebAdminRoot, 'package.json'));
 const zrenderRoot = fs.realpathSync(path.dirname(chartRequire.resolve('zrender/package.json', {
   paths: [path.dirname(chartRequire.resolve('echarts/package.json'))],
 })));
+// DnD providers and sortable consumers must share one physical module instance.
+// Thin compositions otherwise preserve pnpm symlink paths as separate contexts.
+const dndSingletonAliases = ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'].map((id) => {
+  const manifest = fs.realpathSync(chartRequire.resolve(`${id}/package.json`));
+  const metadata = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+  return { find: new RegExp(`^${id}$`), replacement: normalizePath(
+    fs.realpathSync(path.resolve(path.dirname(manifest), metadata.module)),
+  ) };
+});
 const WEB_CONTRIBUTIONS_MODULE = 'virtual:auraboot-web-contributions';
 const RESOLVED_WEB_CONTRIBUTIONS_MODULE = `\0${WEB_CONTRIBUTIONS_MODULE}`;
 const contributionRoots = (process.env.AURA_WEB_CONTRIBUTION_ROOTS || '')
@@ -134,6 +143,8 @@ if (webCompositionKey !== undefined && !/^sha256:[0-9a-f]{64}$/.test(webComposit
 
 export default defineConfig({
   define: {
+    // react-draggable reads this optional Node debug flag during pointer gestures.
+    'process.env.DRAGGABLE_DEBUG': false,
     __AURA_WEB_COMPOSITION_KEY__: JSON.stringify(webCompositionKey ?? null),
   },
   // node_modules is shared across AuraBoot worktrees, so keeping Vite's
@@ -147,8 +158,8 @@ export default defineConfig({
     tsconfigPaths(),
   ].filter((plugin): plugin is Plugin => Boolean(plugin)),
   resolve: {
-    dedupe: ['react', 'react-dom'],
-    alias: [{ find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }],
+    dedupe: ['react', 'react-dom', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+    alias: [{ find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }, ...dndSingletonAliases],
   },
   server: {
     host: process.env.VITE_HOST || '0.0.0.0',
@@ -272,6 +283,7 @@ export default defineConfig({
       // why the chat-bi golden could never see its canvas). Pre-bundling removes
       // the mid-session re-optimization entirely.
       'echarts',
+      'echarts-wordcloud',
       'echarts-for-react',
       'zustand',
       'zustand/middleware',
@@ -301,6 +313,13 @@ export default defineConfig({
       '@tiptap/react',
       '@tiptap/starter-kit',
       '@heroicons/react/24/outline',
+      '@heroicons/react/24/solid',
+      // Lazy editor and Markdown routes must retain stable vendor URLs after startup.
+      '@monaco-editor/react',
+      'monaco-editor/esm/vs/editor/editor.api.js',
+      'monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js',
+      'react-markdown',
+      'remark-gfm',
       '@messageformat/core',
       'dayjs/plugin/relativeTime',
       'dayjs/plugin/timezone',

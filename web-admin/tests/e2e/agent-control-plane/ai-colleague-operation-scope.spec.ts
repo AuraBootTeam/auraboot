@@ -23,8 +23,8 @@ import { test, expect, type Page } from '@playwright/test';
 
 const UNIQUE = `scope${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Scoped ${UNIQUE}`;
-const ACCOUNT_NAME = `E2E Account ${UNIQUE}`;
-const SHOTS = 'test-results/digital-employee';
+const CUSTOMER_NAME = `E2E Customer ${UNIQUE}`;
+const SHOTS = process.env.AURA_EVIDENCE_DIR || 'test-results/digital-employee';
 const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 async function createColleague(page: Page) {
@@ -63,18 +63,22 @@ test.describe('Digital employee — allowed operations', () => {
     page,
   }) => {
     // --- something for it to try to delete --------------------------------
-    const created = await page.request.post('/api/dynamic/crm_account_common/create', {
-      data: { crm_acc_name: ACCOUNT_NAME, crm_acc_code: `e2eacc${UNIQUE}` },
+    const created = await page.request.post('/api/dynamic/e2et_customer/create', {
+      data: { e2et_cust_name: CUSTOMER_NAME, e2et_cust_code: `e2eacc${UNIQUE}`, e2et_cust_region: 'north', e2et_cust_active: true },
     });
-    expect(created.status(), 'seeding the target record must succeed').toBeLessThan(400);
+    expect(created.status(), await created.text()).toBe(200);
+    const createdBody = await created.json();
+    expect(String(createdBody.code)).toBe('0');
+    const customerPid = createdBody.data?.pid;
+    expect(customerPid).toBeTruthy();
 
     const stillThere = async () => {
-      const res = await page.request.get('/api/dynamic/crm_account_common/list', {
-        params: { pageNum: 1, pageSize: 50, keyword: ACCOUNT_NAME },
-      });
+      const res = await page.request.get(`/api/dynamic/e2et_customer/${customerPid}`);
+      if (res.status() === 404) return false;
+      expect(res.status()).toBe(200);
       const body = await res.json();
-      const rows = body?.data?.records ?? [];
-      return rows.some((r: Record<string, unknown>) => r.crm_acc_name === ACCOUNT_NAME);
+      expect(String(body.code)).toBe('0');
+      return body.data?.pid === customerPid && body.data?.e2et_cust_name === CUSTOMER_NAME;
     };
     expect(await stillThere(), 'the record must exist before we ask for its removal').toBe(true);
 
@@ -150,7 +154,7 @@ test.describe('Digital employee — allowed operations', () => {
     const chat = page.locator('[data-testid="agent-chat-page"]');
     await expect(chat).toBeVisible({ timeout: 20_000 });
 
-    await chat.locator('[data-testid="aurabot-input"]').fill(`请删除客户「${ACCOUNT_NAME}」`);
+    await chat.locator('[data-testid="aurabot-input"]').fill(`请删除客户「${CUSTOMER_NAME}」`);
     await chat.locator('[data-testid="aurabot-send"]').click();
 
     // The turn must genuinely have run. Without this the survival assertion

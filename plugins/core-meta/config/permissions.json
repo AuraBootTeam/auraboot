@@ -166,5 +166,19 @@
     "resourceCode": "governance",
     "category": "governance",
     "action": "review"
+  },
+  {
+    "code": "meta.semantic.use",
+    "name": "语义层查询",
+    "description": "查询治理指标、读取语义目录与血缘、校验/编译语义模型",
+    "type": "function",
+    "module": "meta",
+    "resource": "meta:semantic",
+    "action": "use",
+    "resourceType": "function",
+    "name:zh-CN": "语义层查询",
+    "name:en": "Use Semantic Layer",
+    "description:zh-CN": "查询治理指标、读取语义目录与血缘、校验/编译语义模型",
+    "description:en": "Query governed metrics, read semantic catalog and lineage, and validate or compile semantic models."
   }
 ]

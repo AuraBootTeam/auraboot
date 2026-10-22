@@ -5,16 +5,10 @@
 import React from 'react';
 import { useSmartText } from '~/utils/i18n';
 import { useReportDocument } from '../state/ReportDocumentProvider';
-import { DataTableBlockEditor } from './DataTableBlockEditor';
-import { GroupedTableBlockEditor } from './GroupedTableBlockEditor';
-import { StatCardBlockEditor } from './StatCardBlockEditor';
-import { RichTextBlockEditor } from './RichTextBlockEditor';
-import { CrossTabBlockEditor } from './CrossTabBlockEditor';
-import { ChartBlockEditor } from './ChartBlockEditor';
-import { BarcodeBlockEditor } from './BarcodeBlockEditor';
-import { WatermarkBlockEditor } from './WatermarkBlockEditor';
 import { ParameterEditor } from './ParameterEditor';
 import { BandEditor } from './BandEditor';
+import { SchemaBlockConfigPanel } from '~/shared/designer/SchemaBlockConfigPanel';
+import { reportAuthoringSchemas } from '../registry/reportAuthoringSchemas';
 
 /** Trash icon SVG path */
 const TrashIcon: React.FC = () => (
@@ -157,99 +151,12 @@ export const BlockPropertyPanel: React.FC = () => {
       />
     );
 
-    if (block.blockType === 'table') {
-      return (
-        <PanelShell title={text({ zh: '数据表格', en: 'Data Table' })} actions={actionBar}>
-          <DataTableBlockEditor
-            block={block}
-            dataSources={report.dataSources}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
-
-    if (block.blockType === 'grouped-table') {
-      return (
-        <PanelShell title={text({ zh: '分组表格', en: 'Grouped Table' })} actions={actionBar}>
-          <GroupedTableBlockEditor
-            block={block}
-            dataSources={report.dataSources}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
-
-    if (block.blockType === 'stat-card') {
-      return (
-        <PanelShell title={text({ zh: '指标卡片', en: 'Stat Card' })} actions={actionBar}>
-          <StatCardBlockEditor
-            block={block}
-            dataSources={report.dataSources}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
-
-    if (block.blockType === 'rich-text') {
-      return (
-        <PanelShell title={text({ zh: '富文本', en: 'Rich Text' })} actions={actionBar}>
-          <RichTextBlockEditor
-            block={block}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
-
-    if (block.blockType === 'cross-tab') {
-      return (
-        <PanelShell title={text({ zh: '交叉表', en: 'Cross Tab' })} actions={actionBar}>
-          <CrossTabBlockEditor
-            block={block}
-            dataSources={report.dataSources}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
-
-    if (block.blockType === 'chart') {
-      return (
-        <PanelShell title={text({ zh: '图表', en: 'Chart' })} actions={actionBar}>
-          <ChartBlockEditor
-            block={block}
-            dataSources={report.dataSources}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
-
-    if (block.blockType === 'barcode') {
-      return (
-        <PanelShell title={text({ zh: '条码', en: 'Barcode' })} actions={actionBar}>
-          <BarcodeBlockEditor
-            block={block}
-            dataSources={report.dataSources}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
-
-    if (block.blockType === 'watermark') {
-      return (
-        <PanelShell title={text({ zh: '水印', en: 'Watermark' })} actions={actionBar}>
-          <WatermarkBlockEditor
-            block={block}
-            onChange={(updates) => updateBlock(block.id, updates)}
-          />
-        </PanelShell>
-      );
-    }
+    return <PanelShell title={text({ zh: '组件属性', en: 'Component properties' })} actions={actionBar}>
+      <SchemaBlockConfigPanel key={block.id} density="compact" pathMode="nested" persistDefaults
+        schemas={reportAuthoringSchemas(block.blockType, text)}
+        value={block as unknown as Record<string, unknown>}
+        onChange={(next) => updateBlock(block.id, next)} />
+    </PanelShell>;
   }
 
   // No selection — show report-level properties + parameter editor

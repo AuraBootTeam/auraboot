@@ -257,7 +257,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
   await page.getByTestId('datasource-mode-semantic').click();
   await expect(modelSelect).toHaveValue('');
   await expect(modelSelect.locator('option').first()).toHaveText('请选择语义模型');
-  await expect(page.getByTestId('widget-prop-dataSource-modelCode')).toHaveCount(0);
+  await expect(dp.propertyPanel.getByLabel('数据模型')).toHaveCount(0);
   await expect(metricPicker).toHaveCount(0);
   await expect(dimensionPicker).toHaveCount(0);
   await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/bi-ui-ds-mode-semantic-switch.png` });
@@ -331,7 +331,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
   await expect(modelSelect).toHaveCount(0);
   await expect(metricPicker).toHaveCount(0);
   await expect(dimensionPicker).toHaveCount(0);
-  await page.getByTestId('widget-prop-dataSource-modelCode').fill('e2et_order');
+  await dp.propertyPanel.getByLabel('数据模型').selectOption('e2et_order');
   const rawDimensions = dp.propertyPanel.locator('label', { hasText: /^分组维度$/ }).locator('..');
   const rawResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/meta/chart-data'
     && r.request().method() === 'POST' && !r.request().postDataJSON()?.semanticModelCode
@@ -397,19 +397,19 @@ function assertBinding(source: Record<string, any>, index: number) {
 async function bindAggregate(page: import('@playwright/test').Page, index: number, grouped: boolean,
   assertRows: (rows: Record<string, unknown>[], metric: string) => void) {
   await dp.widgets.nth(index).click();
-  await page.getByTestId('widget-prop-dataSource-modelCode').fill('e2et_order');
+  await dp.propertyPanel.getByLabel('数据模型').selectOption('e2et_order');
   if (grouped) {
     const dimensions = dp.propertyPanel.locator('label', { hasText: /^分组维度$/ }).locator('..');
     await dimensions.locator('label').filter({ hasText: '(e2et_order_status)' }).getByRole('checkbox').check();
   }
-  const filters = dp.propertyPanel.locator('label', { hasText: /^筛选条件$/ }).locator('..').locator('..');
-  await filters.getByRole('button', { name: 'Add', exact: true }).click();
-  await filters.locator('select').nth(0).selectOption('e2et_order_title');
-  await filters.locator('select').nth(1).selectOption('like');
+  const filters = dp.propertyPanel.getByTestId('designer-filter-builder');
+  await filters.getByRole('button', { name: '添加条件', exact: true }).click();
+  await filters.getByRole('combobox', { name: '字段', exact: true }).selectOption('e2et_order_title');
+  await filters.getByRole('combobox', { name: '运算符', exact: true }).selectOption('like');
   const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/meta/chart-data')
     && r.request().method() === 'POST'
     && r.request().postDataJSON()?.filters?.some((f: { value: string }) => f.value === `HiFi看板-${dashRun}-`));
-  await filters.getByPlaceholder('Value', { exact: true }).fill(`HiFi看板-${dashRun}-`);
+  await filters.getByRole('textbox', { name: '值', exact: true }).fill(`HiFi看板-${dashRun}-`);
   const response = await responsePromise;
   assertBinding(response.request().postDataJSON(), index);
   const body = await response.json();

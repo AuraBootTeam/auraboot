@@ -1,3 +1,4 @@
+import { DesignerWorkspace } from '~/shared/designer/DesignerWorkspace';
 /**
  * Dashboard Designer Main Component
  *
@@ -67,6 +68,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   const hydrated = useHydrated();
   const {
     dashboard,
+    selectedWidgetId,
     isDirty,
     isLoading,
     isSaving,
@@ -82,7 +84,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   } = useDashboardStore();
 
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToast();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const effectiveTitle = initialTitle || t('dashboard.designer.defaultTitle');
 
@@ -349,7 +351,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
       {/* Toolbar */}
       <DesignerToolbar
         onSave={handleSave}
@@ -363,18 +365,15 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
       />
 
       {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Widget palette */}
-        <WidgetPalette onWidgetClick={handleWidgetClick} />
-
-        {/* Canvas */}
-        <div ref={canvasRef} className="flex min-w-0 flex-1 flex-col">
-          <DesignerCanvas />
-        </div>
-
-        {/* Property panel */}
-        <WidgetPropertyPanel />
-      </div>
+      <DesignerWorkspace
+        compactWidth={900}
+        testIdPrefix="dashboard"
+        palette={<WidgetPalette onWidgetClick={handleWidgetClick} />}
+        canvas={<div ref={canvasRef} className="flex min-w-0 flex-1 flex-col"><DesignerCanvas /></div>}
+        propertyPanel={<WidgetPropertyPanel />}
+        inspectorFocusKey={selectedWidgetId}
+        labels={{ components: t('designer.palette.title', undefined, locale === 'zh-CN' ? '组件库' : 'Components'), properties: t('designer.properties.title', undefined, locale === 'zh-CN' ? '属性' : 'Properties'), close: t('common.close') }}
+      />
 
       {/* Version History Panel */}
       <VersionHistoryPanel

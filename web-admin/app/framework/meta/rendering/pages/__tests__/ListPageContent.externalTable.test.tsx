@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileProvider } from '@auraboot/runtime-kernel';
@@ -223,5 +223,95 @@ describe('Actual ListPageContent→BlockRenderer external custom-only table', ()
       collectListMiscBlocks({ ...schema, blocks: [{ ...table, dataSource: undefined }] }, true),
     ).toEqual([]);
     expect(collectListMiscBlocks(schema, true)).toEqual([table]);
+  });
+});
+
+function mountQueryContract(source?: Record<string, unknown>, failFirst = false) {
+  prepareRuntime();
+  const dynamicSchema = {
+    ...schema,
+    pageKey: 'owned_rows_list',
+    modelCode: 'owned_rows',
+    dataSource: source,
+    extension: { ...schema.extension, customOnly: false, skipListData: false },
+    dataSources: {},
+    blocks: [{ ...table, dataSource: undefined }],
+  };
+  owned.runtime.getSchema = () => dynamicSchema;
+  const success = {
+    code: '0',
+    data: { records: [{ pid: 'owned-row', title: 'Owned row' }], total: 1 },
+  };
+  owned.transport.mockResolvedValue(success);
+  if (failFirst)
+    owned.transport.mockResolvedValueOnce({ code: '35000', message: 'Read rejected', data: null });
+  render(
+    <MemoryRouter initialEntries={['/p/owned_rows']}>
+      <ProfileProvider value={adminProfile}>
+        <ListPageContent schema={dynamicSchema} tableName="owned_rows" token="fixture" />
+      </ProfileProvider>
+    </MemoryRouter>,
+  );
+}
+
+async function submitOwnedKeyword() {
+  await waitFor(() =>
+    expect(screen.getByTestId('dynamic-list')).toHaveAttribute('data-ready', 'true'),
+  );
+  const input = screen.getByTestId('list-search-input');
+  fireEvent.change(input, { target: { value: 'needle' } });
+  fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+}
+
+describe('Actual ListPageContent ordinary query and retry contract', () => {
+  it('forwards the submitted keyword on an ordinary dynamic list request', async () => {
+    mountQueryContract();
+    await submitOwnedKeyword();
+    await waitFor(() =>
+      expect(owned.transport).toHaveBeenCalledWith(
+        '/api/dynamic/owned_rows/list',
+        expect.objectContaining({ params: expect.objectContaining({ keyword: 'needle' }) }),
+      ),
+    );
+  });
+  it('forwards the named query code and submitted keyword together', async () => {
+    mountQueryContract({ type: 'namedQuery', queryCode: 'owned_query' });
+    await submitOwnedKeyword();
+    await waitFor(() =>
+      expect(owned.transport).toHaveBeenCalledWith(
+        '/api/dynamic/owned_rows/list',
+        expect.objectContaining({
+          params: expect.objectContaining({ queryCode: 'owned_query', keyword: 'needle' }),
+        }),
+      ),
+    );
+  });
+  it('forwards submitted keyword with API page and size', async () => {
+    mountQueryContract({ type: 'api', endpoint: '/api/owned-list', method: 'get' });
+    await submitOwnedKeyword();
+    await waitFor(() =>
+      expect(owned.transport).toHaveBeenCalledWith(
+        '/api/owned-list',
+        expect.objectContaining({
+          params: expect.objectContaining({ keyword: 'needle', page: 0, size: 20 }),
+        }),
+      ),
+    );
+  });
+  it('replays the exact failed API parameters through the real error-state button', async () => {
+    mountQueryContract({ type: 'api', endpoint: '/api/owned-list', method: 'get' });
+    await waitFor(() =>
+      expect(screen.getByTestId('dynamic-list')).toHaveAttribute('data-ready', 'true'),
+    );
+    owned.transport.mockResolvedValueOnce({ code: '35000', message: 'Read rejected', data: null });
+    await submitOwnedKeyword();
+    const retry = await screen.findByRole('button', { name: 'Retry', exact: true });
+    const reads = () =>
+      owned.transport.mock.calls.filter(([endpoint]) => endpoint === '/api/owned-list');
+    const first = structuredClone(reads().at(-1));
+    const prior = reads().length;
+    fireEvent.click(retry);
+    await waitFor(() => expect(reads()).toHaveLength(prior + 1));
+    expect(reads().at(-1)).toEqual(first);
   });
 });

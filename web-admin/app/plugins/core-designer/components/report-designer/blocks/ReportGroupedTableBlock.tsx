@@ -37,7 +37,7 @@ function formatValue(value: unknown, format?: string): string {
   if (!format) return String(value);
   if (format === 'number' && typeof value === 'number') return value.toLocaleString();
   if (format === 'currency' && typeof value === 'number')
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (format === 'percent' && typeof value === 'number') return `${(value * 100).toFixed(1)}%`;
   return String(value);
 }
@@ -69,6 +69,7 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
   const text = useSmartText();
   const columns = block.columns;
   const hasColumns = columns.length > 0;
+  const groupLabel=columns.find(column=>column.field===block.groupByField && column.label && column.label!==column.field)?.label;
   const cellBorder = block.border !== false ? 'border border-gray-300' : '';
 
   // Design mode placeholder
@@ -120,7 +121,7 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
                     colSpan={columns.length}
                     className={`bg-blue-50 px-2 py-1.5 font-semibold text-blue-800 ${cellBorder}`}
                   >
-                    {block.groupByField}: {text(g.group)}
+                    {groupLabel ? `${groupLabel}: ` : ''}{text(g.group)}
                   </td>
                 </tr>
                 {g.rows.map((_, rowIdx) => (
@@ -202,7 +203,7 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
                   colSpan={columns.length}
                   className={`bg-blue-50 px-3 py-2 font-semibold text-blue-800 ${cellBorder}`}
                 >
-                  {block.groupByField}: {groupKey} ({rows.length})
+                  {groupLabel ? `${groupLabel}: ` : ''}{groupKey} ({rows.length})
                 </td>
               </tr>
               {rows.map((row, rowIdx) => (

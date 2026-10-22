@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from pathlib import Path
 from datetime import date,timedelta
 core=Path(__file__).resolve().parents[3]
+resources=Path(os.environ.get('DELIVERY_RESOURCE_ROOT',Path(__file__).parents[1])).resolve()
 base=os.environ['DELIVERY_BACKEND_URL'].rstrip('/')
 assert urlparse(base).hostname in ['localhost','127.0.0.1'],'Local owned runtime only'
 s=importlib.util.spec_from_file_location('session',core/'scripts/application/core-admin-session.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
@@ -11,7 +12,7 @@ def req(path,method='GET',body=None,headers=None):
  h=dict(headers or {});data=None
  if body is not None:h['Content-Type']='application/json';data=json.dumps(body).encode()
  with urllib.request.urlopen(urllib.request.Request(base+path,data=data,method=method,headers=h),timeout=120) as r:return json.load(r)
-token=m.business_session(req,os.environ['ADMIN_EMAIL'],os.environ['ADMIN_PASSWORD']);h={'Authorization':'Bearer '+token};out=Path(os.environ['DELIVERY_EVIDENCE_ROOT']);out.mkdir(parents=True,exist_ok=True)
+token=os.environ.get('DELIVERY_ACCESS_TOKEN') or m.business_session(req,os.environ['ADMIN_EMAIL'],os.environ['ADMIN_PASSWORD'],os.environ.get('AURA_ADMIN_TENANT_ID'));h={'Authorization':'Bearer '+token};out=Path(os.environ['DELIVERY_EVIDENCE_ROOT']);out.mkdir(parents=True,exist_ok=True)
 receipts=[]
 def cmd(code,payload=None,pid=None):
  b={'payload':payload or {},'operationType':'update' if pid else 'create'}
@@ -26,27 +27,28 @@ def pid(v):
  raise Exception('Missing record identity: '+str(v))
 existing=req('/api/dynamic/tpm_project/list','GET',headers=h)['data']['records']
 assert len(existing)==0,'Refuse to seed an already populated project fixture'
-audit_config=json.loads((Path(__file__).parent/'field-audit-config.json').read_text())
+audit_config=json.loads((resources/'scripts/field-audit-config.json').read_text())
 audit_result=req('/api/audit/field-config/bulk','POST',audit_config,h)
 assert str(audit_result['code'])=='0',audit_result
 receipts.append(audit_result)
-context=json.loads((Path(__file__).parent/'delivery-project-context.json').read_text())['customers']
+context=json.loads((resources/'scripts/delivery-project-context.json').read_text())['customers']
 customers={}
-references=json.loads((Path(__file__).parent/'reference-projects.json').read_text())
+references=json.loads((resources/'scripts/reference-projects.json').read_text())
 for row in references:
  customer=row[1]
  customers[customer]=pid(cmd('tpm:create_customer',{'tpm_cu_name':customer,'tpm_cu_contact':context[customer]['contact']}))
-owners=[]
+owners=[];participants=[]
 for login,name in [('delivery-lin','林晓'),('delivery-zhou','周宁'),('delivery-chen','陈晨'),('delivery-wang','王越')]:
  v=req('/api/admin/users','POST',{'userName':login,'displayName':name,'initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_manager'],'sendInviteEmail':False},h)
  assert str(v['code'])=='0',v
  owners.append(v['data']['userPid'])
+ participants.append({'login':login,'displayName':name,'userPid':v['data']['userPid'],'memberPid':v['data']['memberPid']})
 viewer_email='delivery-viewer@example.test'
 v=req('/api/admin/users','POST',{'email':viewer_email,'displayName':'交付观察员','initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_viewer'],'sendInviteEmail':False},h)
 assert str(v['code'])=='0',v
 owner=owners[0]
 projects=[]
-references=json.loads((Path(__file__).parent/'reference-projects.json').read_text())
+references=json.loads((resources/'scripts/reference-projects.json').read_text())
 states={'需求确认':'planning','实施中':'active','待验收':'acceptance','已交付':'completed'}
 owner_names=['林晓','周宁','陈晨','王越']
 for index,row in enumerate(references):
@@ -96,13 +98,13 @@ cmd('tpm:update_project',{'tpm_pj_files':files},projects[0]['pid'])
 relation=req('/api/file/relation','POST',{'entityType':'tpm_project','entityId':projects[0]['pid'],'fieldName':'tpm_pj_files','fileIds':[f['fileId'] for f in files]},h)
 assert str(relation['code'])=='0',relation
 receipts.append(relation)
-report_template=json.loads((Path(__file__).parents[1]/'examples/customer-delivery-brief.report-template.json').read_text())
+report_template=json.loads((resources/'examples/customer-delivery-brief.report-template.json').read_text())
 report=req('/api/report-definitions','POST',{'code':'customer_delivery_brief','title':report_template['dsl']['title'],'dsl':report_template['dsl']},h)
 assert str(report['code'])=='0',report
-board_template=json.loads((Path(__file__).parents[1]/'examples/dashboard-customer-delivery.json').read_text())
+board_template=json.loads((resources/'examples/dashboard-customer-delivery.json').read_text())
 board=req('/api/dashboards','POST',board_template['dashboard'],h)
 assert str(board['code'])=='0',board
 published=req('/api/dashboards/'+board['data']['pid']+'/publish','POST',{},h)
 assert str(published['code'])=='0',published
 (out/'delivery-assets.json').write_text(json.dumps({'reportPid':report['data']['pid'],'dashboardPid':board['data']['pid']},ensure_ascii=False,indent=2))
-(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'viewerEmail':viewer_email,'customers':customers,'projects':projects},ensure_ascii=False,indent=2));print('Created the 8 reference customers/projects, 24 tasks and 32 milestones through commands')
+(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'participants':participants,'viewerEmail':viewer_email,'customers':customers,'projects':projects},ensure_ascii=False,indent=2));print('Created the 8 reference customers/projects, 24 tasks and 32 milestones through commands')

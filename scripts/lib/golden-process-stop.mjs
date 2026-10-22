@@ -5,6 +5,7 @@ import { existsSync, readFileSync, realpathSync, unlinkSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
+import { readPrivateRedisConfig } from './golden-private-redis.mjs';
 
 const need = (condition, message) => {
   if (!condition) {
@@ -67,7 +68,7 @@ function processMetadata(pid) {
 }
 
 /** No port-based kill targets: every target needs an owned root or an owned ancestry. */
-export function planGoldenStop({ runtime, repo, token, roots, snapshots, listeners }) {
+export function planGoldenStop({ runtime, repo, token, roots, snapshots, listeners, ownedRedis = null }) {
   need(typeof token === 'string' && token.length > 0, 'Missing runtime ownership token');
   need(roots.every(pid => Number.isSafeInteger(pid) && pid > 1), 'Invalid owned root PID');
   const byPid = new Map(snapshots.map(item => [item.pid, item]));
@@ -84,7 +85,6 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
       && item.token === undefined && !roots.includes(item.pid) && !listeners.includes(item.pid);
     need(owned || shellBridge, 'Foreign process runtime ownership');
     if (shellBridge) inheritedOwnership.add(item.pid);
-    need([join(repo, 'platform'), join(repo, 'web-admin')].includes(item.cwd), 'Foreign process cwd');
     need(Boolean(item.startedAt) && Boolean(item.commandHash), 'Missing process generation identity');
     let current = item.pid;
     const seen = new Set();
@@ -93,6 +93,8 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
       const entry = byPid.get(current);
       need(entry && byPid.has(entry.parent), 'Process has no owned ancestry'); current = entry.parent;
     }
+    need([join(repo, 'platform'), join(repo, 'web-admin')].includes(item.cwd) ||
+      (ownedRedis && current === ownedRedis.pid && item.cwd === ownedRedis.cwd), 'Foreign process cwd');
   }
   for (const pid of listeners) need(byPid.has(pid), 'Unknown listener: refusing stop');
   // Supervisors first prevents concurrently from respawning children during shutdown.
@@ -201,7 +203,11 @@ export function stopGoldenProcesses(name, repo, cli) {
     }
     return pids;
   });
-  const plan = planGoldenStop({ runtime: name, repo, token, roots, snapshots, listeners: listenerPids() });
+  const redis = readPrivateRedisConfig(report, repo, { allowSourceDrift: true });
+  const redisProcess = report.processes.find(item => item.key === 'redis-owned');
+  need(!redisProcess || redis, 'Private Redis stop descriptor missing');
+  const ownedRedis = redisProcess ? { pid: redisProcess.expected.pid, cwd: redis.config.dataDirectory } : null;
+  const plan = planGoldenStop({ runtime: name, repo, token, roots, snapshots, listeners: listenerPids(), ownedRedis });
   executeGoldenStop(plan, pid => {
     const current = snapshot(pid);
     const expected = plan.find(item => item.pid === pid);

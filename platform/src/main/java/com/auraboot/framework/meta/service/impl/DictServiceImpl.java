@@ -300,6 +300,15 @@ public class DictServiceImpl implements DictService {
     }
 
     @Override
+    public DictDataResult loadSelectedDictData(String pid) {
+        // PID reads belong to the permission-gated editor, not the current-version runtime lookup.
+        Dict dict = findEntityByPid(pid);
+        DictDataResult result = dictVersionService.loadUnifiedDictData(dict);
+        result.setVersionStrategy("latest");
+        return result;
+    }
+
+    @Override
     public DictDTO findByPid(String pid) {
         if (!StringUtils.hasText(pid)) {
             return null;
@@ -488,6 +497,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public DictDTO publish(String pid, String versionNote) {
         log.info("发布字典: {}", logSafe(pid));
 
@@ -523,6 +533,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public DictDTO unpublish(String pid) {
         log.info("取消发布字典: {}", logSafe(pid));
 

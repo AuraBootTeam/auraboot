@@ -246,27 +246,29 @@ public class ReportExportServiceImpl implements ReportExportService {
                         if (StringUtils.hasText(groupField)) {
                             for (var group : groupRows(rows, groupField).entrySet()) {
                                 appendMarkdownHeading(out, group.getKey(), 3);
-                                appendMarkdownDataTable(out, columns, group.getValue(), block);
+                                appendMarkdownDataTable(out, columns, group.getValue(), block, "groupSubtotal");
                             }
-                        } else appendMarkdownDataTable(out, columns, rows, block);
+                            List<String> total = reportSummaryValues(block.get("grandTotal"), columns, rows);
+                            if (!total.isEmpty()) appendMarkdownTable(out, columns.stream().map(ReportColumn::label).toList(), List.of(total));
+                        } else appendMarkdownDataTable(out, columns, rows, block, "summary");
                     }
                     case "cross-tab" -> {
                         appendMarkdownHeading(out, heading, 2);
                         CrossTabProjection projection = crossTabProjection(block, rowsForBlock(block, dataSets));
-                        List<String> header = new ArrayList<>(List.of("Category"));
+                        List<String> header = new ArrayList<>(List.of(reportAxisLabel(block)));
                         header.addAll(projection.columns());
-                        if (projection.showRowTotal()) header.add("Total");
+                        if (projection.showRowTotal()) header.add(stringValue(block.get("totalLabel"), "Total"));
                         List<List<String>> values = new ArrayList<>();
                         for (String row : projection.rows()) {
                             List<String> cells = new ArrayList<>(List.of(row));
-                            for (String column : projection.columns()) cells.add(formatExportValue(projection.value(row, column)));
-                            if (projection.showRowTotal()) cells.add(formatExportValue(projection.rowTotal(row)));
+                            for (String column : projection.columns()) cells.add(formatConfiguredNumber(projection.value(row, column), block.get("format")));
+                            if (projection.showRowTotal()) cells.add(formatConfiguredNumber(projection.rowTotal(row), block.get("format")));
                             values.add(cells);
                         }
                         if (projection.showColumnTotal()) {
-                            List<String> cells = new ArrayList<>(List.of("Total"));
-                            for (String column : projection.columns()) cells.add(formatExportValue(projection.columnTotal(column)));
-                            if (projection.showRowTotal()) cells.add(formatExportValue(projection.grandTotal()));
+                            List<String> cells = new ArrayList<>(List.of(stringValue(block.get("totalLabel"), "Total")));
+                            for (String column : projection.columns()) cells.add(formatConfiguredNumber(projection.columnTotal(column), block.get("format")));
+                            if (projection.showRowTotal()) cells.add(formatConfiguredNumber(projection.grandTotal(), block.get("format")));
                             values.add(cells);
                         }
                         appendMarkdownTable(out, header, values);
@@ -281,7 +283,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                         appendMarkdownHeading(out, heading, 2);
                         String label = stringValue(block.get("label"), "");
                         if (StringUtils.hasText(label)) out.append(escapeMarkdown(label)).append(": ");
-                        out.append(escapeMarkdown(formatExportValue(aggregateStat(block, rowsForBlock(block, dataSets)))))
+                        out.append(escapeMarkdown(formatConfiguredNumber(((Number)aggregateStat(block, rowsForBlock(block, dataSets))).doubleValue(), block.get("format"))))
                                 .append("\n\n");
                     }
                     case "barcode", "watermark", "page-header", "page-footer" -> {
@@ -304,11 +306,71 @@ public class ReportExportServiceImpl implements ReportExportService {
     }
 
     private void appendMarkdownDataTable(StringBuilder out, List<ReportColumn> columns,
-                                         List<Map<String, Object>> rows, Map<String, Object> block) {
+                                         List<Map<String, Object>> rows, Map<String, Object> block, String summaryKey) {
         List<String> headers = columns.stream().map(column -> Boolean.FALSE.equals(block.get("showHeader"))
                 ? "" : column.label()).toList();
-        appendMarkdownTable(out, headers, rows.stream().map(row -> columns.stream()
-                .map(column -> formatExportValue(row.get(column.field()))).toList()).toList());
+        List<List<String>> values = new ArrayList<>(rows.stream().map(row -> columns.stream()
+                .map(column -> formatColumnValue(row.get(column.field()), column)).toList()).toList());
+        List<String> summary = reportSummaryValues(block.get(summaryKey), columns, rows);
+        if (!summary.isEmpty()) values.add(summary);
+        appendMarkdownTable(out, headers, values);
+    }
+
+    /** Summary rows retain the configured field, aggregation, label and value format in text exports. */
+    private List<String> reportSummaryValues(Object value, List<ReportColumn> columns,
+                                            List<Map<String, Object>> rows) {
+        if (!(value instanceof Map<?, ?> summary) || !Boolean.TRUE.equals(summary.get("enabled")) || columns.isEmpty()) return List.of();
+        List<?> configured = summary.get("columns") instanceof List<?> list ? list : List.of();
+        List<String> result = new ArrayList<>();
+        for (int index = 0; index < columns.size(); index++) {
+            ReportColumn column = columns.get(index);
+            Map<?, ?> selected = configured.stream().filter(Map.class::isInstance).map(Map.class::cast)
+                    .filter(item -> column.field().equals(item.get("field"))).findFirst().orElse(null);
+            if (selected == null) {
+                result.add(index == 0 ? stringValue(summary.get("label"), "Total") : "");
+                continue;
+            }
+            List<Double> numbers = rows.stream().map(row -> summaryNumber(row.get(column.field()))).toList();
+            double aggregate = switch (stringValue(selected.get("aggregation"), "sum")) {
+                case "sum" -> numbers.stream().mapToDouble(Double::doubleValue).sum();
+                case "avg" -> numbers.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+                case "count" -> rows.size();
+                case "min" -> numbers.stream().mapToDouble(Double::doubleValue).min().orElse(0);
+                case "max" -> numbers.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+                default -> 0;
+            };
+            result.add(formatConfiguredNumber(aggregate, stringValue(selected.get("format"), column.format())));
+        }
+        return result;
+    }
+
+    private double summaryNumber(Object value) {
+        if (value instanceof Number number) return Double.isFinite(number.doubleValue()) ? number.doubleValue() : 0;
+        try {
+            double parsed = Double.parseDouble(stringValue(value, "0"));
+            return Double.isFinite(parsed) ? parsed : 0;
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private String formatColumnValue(Object value, ReportColumn column) {
+        return value instanceof Number number ? formatConfiguredNumber(number.doubleValue(), column.format()) : formatExportValue(value);
+    }
+
+    private String reportAxisLabel(Map<String, Object> block) {
+        String row = stringValue(block.get("rowLabel"), "");
+        String column = stringValue(block.get("columnLabel"), "");
+        return !row.isEmpty() && !column.isEmpty() ? row + " / " + column : !row.isEmpty() ? row : !column.isEmpty() ? column : "Category";
+    }
+
+    private String formatConfiguredNumber(double value, Object format) {
+        return switch (stringValue(format, "")) {
+            case "currency" -> String.format(Locale.US, "¥%,.2f", value);
+            case "percent" -> String.format(Locale.US, "%.1f%%", value * 100);
+            case "number" -> java.text.NumberFormat.getNumberInstance(Locale.US).format(value);
+            default -> formatExportValue(value);
+        };
     }
 
     private void appendMarkdownTable(StringBuilder out, List<String> headers, List<List<String>> rows) {
@@ -351,7 +413,8 @@ public class ReportExportServiceImpl implements ReportExportService {
                 return rendered;
             }
         } catch (ReportRenderException e) {
-            log.warn("WYSIWYG report renderer failed; falling back to PDFBox text export: {}", e.getMessage());
+            log.error("Configured report renderer failed; refusing a layout-degraded export", e);
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report renderer failed; PDF was not generated");
         }
         return renderPdfWithPdfBox(reportDsl, dataSets, title);
     }
@@ -561,7 +624,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                 case "stat-card" -> {
                     lines.add(PdfLine.subheading(blockTitle));
                     lines.add(PdfLine.text(stringValue(block.get("label"), blockTitle) + ": "
-                            + formatExportValue(aggregateStat(block, rowsForBlock(block, dataSets)))));
+                            + formatConfiguredNumber(((Number)aggregateStat(block, rowsForBlock(block, dataSets))).doubleValue(), block.get("format"))));
                     renderedBlocks++;
                 }
                 case "rich-text" -> {
@@ -613,10 +676,12 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
         for (Map<String, Object> row : rows) {
             List<String> values = columns.stream()
-                    .map(column -> formatExportValue(row.get(column.field())))
+                    .map(column -> formatColumnValue(row.get(column.field()), column))
                     .toList();
             lines.add(PdfLine.text(values));
         }
+        List<String> summary = reportSummaryValues(block.get("summary"), columns, rows);
+        if (!summary.isEmpty()) lines.add(PdfLine.text(summary));
     }
 
     private void appendGroupedTablePdfLines(List<PdfLine> lines,
@@ -641,14 +706,18 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
 
         for (Map.Entry<String, List<Map<String, Object>>> group : groupRows(rows, groupByField).entrySet()) {
-            lines.add(PdfLine.text(groupByField + ": " + group.getKey() + " (" + group.getValue().size() + ")"));
+            lines.add(PdfLine.text(reportGroupLabel(columns, groupByField, group.getKey(), group.getValue().size())));
             for (Map<String, Object> row : group.getValue()) {
                 List<String> values = columns.stream()
-                        .map(column -> formatExportValue(row.get(column.field())))
+                        .map(column -> formatColumnValue(row.get(column.field()), column))
                         .toList();
                 lines.add(PdfLine.text(values));
             }
+            List<String> subtotal = reportSummaryValues(block.get("groupSubtotal"), columns, group.getValue());
+            if (!subtotal.isEmpty()) lines.add(PdfLine.text(subtotal));
         }
+        List<String> total = reportSummaryValues(block.get("grandTotal"), columns, rows);
+        if (!total.isEmpty()) lines.add(PdfLine.text(total));
     }
 
     private void appendCrossTabPdfLines(List<PdfLine> lines,
@@ -663,10 +732,10 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
 
         List<String> header = new ArrayList<>();
-        header.add(projection.rowField() + " \\ " + projection.columnField());
+        header.add(block.containsKey("rowLabel") || block.containsKey("columnLabel") ? reportAxisLabel(block) : projection.rowField() + " \\ " + projection.columnField());
         header.addAll(projection.columns());
         if (projection.showRowTotal()) {
-            header.add("Total");
+            header.add(stringValue(block.get("totalLabel"), "Total"));
         }
         lines.add(PdfLine.text(header));
 
@@ -674,22 +743,22 @@ public class ReportExportServiceImpl implements ReportExportService {
             List<String> values = new ArrayList<>();
             values.add(rowKey);
             for (String columnKey : projection.columns()) {
-                values.add(formatExportValue(projection.value(rowKey, columnKey)));
+                values.add(formatConfiguredNumber(projection.value(rowKey, columnKey), block.get("format")));
             }
             if (projection.showRowTotal()) {
-                values.add(formatExportValue(projection.rowTotal(rowKey)));
+                values.add(formatConfiguredNumber(projection.rowTotal(rowKey), block.get("format")));
             }
             lines.add(PdfLine.text(values));
         }
 
         if (projection.showColumnTotal()) {
             List<String> values = new ArrayList<>();
-            values.add("Total");
+            values.add(stringValue(block.get("totalLabel"), "Total"));
             for (String columnKey : projection.columns()) {
-                values.add(formatExportValue(projection.columnTotal(columnKey)));
+                values.add(formatConfiguredNumber(projection.columnTotal(columnKey), block.get("format")));
             }
             if (projection.showRowTotal()) {
-                values.add(formatExportValue(projection.grandTotal()));
+                values.add(formatConfiguredNumber(projection.grandTotal(), block.get("format")));
             }
             lines.add(PdfLine.text(values));
         }
@@ -1274,7 +1343,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             for (Map.Entry<String, List<Map<String, Object>>> group : groupRows(rows, groupByField).entrySet()) {
                 Row groupRow = sheet.createRow(rowIndex++);
                 Cell groupCell = groupRow.createCell(0);
-                groupCell.setCellValue(groupByField + ": " + group.getKey() + " (" + group.getValue().size() + ")");
+                groupCell.setCellValue(reportGroupLabel(columns, groupByField, group.getKey(), group.getValue().size()));
                 groupCell.setCellStyle(headerStyle);
 
                 for (Map<String, Object> rowData : group.getValue()) {
@@ -1524,7 +1593,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                     Map<String, Object> column = (Map<String, Object>) rawColumn;
                     String field = stringValue(column.get("field"), "");
                     if (StringUtils.hasText(field)) {
-                        columns.add(new ReportColumn(field, stringValue(column.get("label"), field)));
+                        columns.add(new ReportColumn(field, stringValue(column.get("label"), field), stringValue(column.get("format"), "")));
                     }
                 }
             }
@@ -1536,9 +1605,15 @@ public class ReportExportServiceImpl implements ReportExportService {
 
         Set<String> fields = new LinkedHashSet<>(rows.get(0).keySet());
         for (String field : fields) {
-            columns.add(new ReportColumn(field, field));
+            columns.add(new ReportColumn(field, field, ""));
         }
         return columns;
+    }
+
+    private String reportGroupLabel(List<ReportColumn> columns, String field, String key, int count) {
+        String label = columns.stream().filter(column -> column.field().equals(field) && !column.label().equals(field))
+                .map(ReportColumn::label).findFirst().orElse("");
+        return (label.isEmpty() ? "" : label + ": ") + key + " (" + count + ")";
     }
 
     private Map<String, List<Map<String, Object>>> groupRows(List<Map<String, Object>> rows, String groupByField) {
@@ -1795,7 +1870,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         return candidate.isEmpty() ? "report" : candidate;
     }
 
-    private record ReportColumn(String field, String label) {
+    private record ReportColumn(String field, String label, String format) {
     }
 
     private record ReportMetric(String label, double value) {

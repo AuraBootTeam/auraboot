@@ -1,0 +1,22 @@
+plugins {
+    id 'java-library'
+    id 'io.spring.dependency-management'
+}
+
+group = 'com.auraboot'
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+}
+
+apply from: rootProject.file('gradle/platform-quality.gradle')
+
+apply from: rootProject.file('gradle/platform-dependency-management.gradle')
+
+// S2.1 establishes the dependency direction. AI implementation remains in root until S2.2.
+// Do not publish this preparation artifact as an extracted agent implementation.
+dependencies {
+    implementation project(':')
+    implementation project(':platform-plugin-api')
+}

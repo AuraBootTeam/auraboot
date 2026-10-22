@@ -49,7 +49,7 @@ test.describe('PCBA quote supplier inquiry golden', () => {
           qo_srl_status: 'draft',
           qo_srl_currency: 'CNY',
           qo_srl_supplier: 'E2E Supplier',
-          qo_srl_quote_id: String(quoteLine.pid),
+          qo_srl_quote_id: String(quoteLine.qo_ql_quote_id),
           qo_srl_quote_line_id: String(quoteLine.pid),
           qo_srl_supplier_rfq_id: headPid,
           qo_srl_supplier_rfq_code: marker,

@@ -1,0 +1,382 @@
+.decision-action-plan-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  padding: 16px;
+}
+
+.decision-action-plan-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+}
+
+.decision-action-kicker {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.decision-action-plan-head h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 760;
+}
+
+.decision-action-plan-head p {
+  margin: 4px 0 0;
+  color: var(--color-text-2);
+  font-size: 13px;
+}
+
+.decision-action-plan-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.decision-action-plan-tools button,
+.decision-action-card button {
+  min-height: 32px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-subtle);
+  padding: 0 12px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.decision-action-effect {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 2fr) auto;
+  gap: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  padding: 10px 12px;
+  color: #1e3a8a;
+}
+
+.decision-action-effect strong,
+.decision-action-effect span,
+.decision-action-effect code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.decision-action-strategy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 8px 10px;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.decision-action-strategy span {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.decision-action-strategy strong {
+  color: var(--color-text);
+  font-weight: 760;
+}
+
+.decision-action-strategy select {
+  min-width: 160px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  padding: 6px 8px;
+}
+
+.decision-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.decision-action-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 12px;
+}
+
+.decision-action-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.decision-action-card-title strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.decision-action-card-title span {
+  border-radius: 999px;
+  background: var(--color-border);
+  padding: 2px 8px;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.decision-action-card-title .decision-action-availability-badge {
+  margin-left: auto;
+  border: 1px solid rgba(217, 119, 6, 0.32);
+  background: rgba(251, 191, 36, 0.16);
+  color: #92400e;
+  font-weight: 780;
+}
+
+.decision-action-availability {
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.12);
+  padding: 8px 10px;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
+.decision-action-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.decision-action-fields label,
+.decision-action-payload-summary,
+.decision-action-payload-advanced {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.decision-action-fields input,
+.decision-action-fields select,
+.decision-action-schema-field input,
+.decision-action-schema-field textarea,
+.decision-action-payload-advanced textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-panel);
+  padding: 8px 10px;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.decision-action-schema-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.decision-action-schema-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.decision-action-schema-field span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.decision-action-schema-field textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.decision-action-schema-field textarea[aria-label*='payload'],
+.decision-action-payload-advanced textarea {
+  font-family: var(--font-mono);
+}
+
+.decision-action-payload-summary {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  padding: 9px;
+}
+
+.decision-action-payload-summary strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.decision-action-payload-advanced summary {
+  color: var(--color-accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.decision-action-payload-advanced textarea {
+  min-height: 92px;
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+
+.decision-action-readonly {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.decision-action-readonly div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.decision-action-readonly dt {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.decision-action-readonly dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.decision-action-remove {
+  align-self: flex-start;
+}
+
+@container (max-width: 760px) {
+  .decision-rule-section-tabs {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .decision-rule-section-tabs button {
+    display: grid;
+    justify-items: start;
+    gap: 3px;
+    min-height: 48px;
+    min-width: 0;
+    border-color: var(--color-border);
+    background: var(--color-panel);
+    text-align: left;
+  }
+
+  .decision-rule-section-tabs button[aria-pressed='true'] {
+    border-color: #60a5fa;
+    background: #eff6ff;
+    color: #1d4ed8;
+  }
+
+  .decision-rule-section-tabs span {
+    color: inherit;
+    font-size: 13px;
+    font-weight: 850;
+  }
+
+  .decision-rule-section-tabs strong {
+    overflow: hidden;
+    color: var(--color-text-2);
+    font-size: 11px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  .decision-rule-section-tabs button[aria-pressed='true'] strong {
+    color: #1e40af;
+  }
+
+  .cb-field-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-rule-section-panel[data-active='false'] {
+    display: none;
+  }
+
+  .decision-rule-binding-section,
+  .decision-rule-binding-summary {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .decision-rule-binding-grid,
+  .decision-rule-summary-grid,
+  .decision-rule-summary-columns,
+  .decision-rule-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-rule-mapping-row,
+  .decision-rule-mapping-row:has([aria-label^='output-mapping-kind']) {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-rule-summary-head,
+  .decision-rule-review-head,
+  .decision-rule-binding-heading,
+  .decision-rule-mapping-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .decision-rule-summary-badges {
+    justify-content: flex-start;
+  }
+
+  .decision-action-plan-head,
+  .decision-action-effect {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .decision-action-plan-tools {
+    justify-content: flex-start;
+  }
+}
+

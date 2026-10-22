@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-class MetaApplicationModeTest {
+class PlatformApplicationModeTest {
 
     @AfterEach
     void clearMode() {
@@ -14,18 +14,18 @@ class MetaApplicationModeTest {
 
     @Test
     void defaultsToCompatibilityApplication() {
-        assertThat(MetaApplication.applicationSource(new String[0])).isEqualTo(MetaApplication.class);
+        assertThat(PlatformApplication.applicationSource(new String[0])).isEqualTo(MetaApplication.class);
     }
 
     @Test
     void selectsCoreOnlySourceFromSystemProperty() {
         System.setProperty("aura.application.mode", "core-only");
-        assertThat(MetaApplication.applicationSource(new String[0])).isEqualTo(CoreOnlyApplication.class);
+        assertThat(PlatformApplication.applicationSource(new String[0])).isEqualTo(CoreOnlyApplication.class);
     }
 
     @Test
     void selectsCoreOnlySourceFromCommandLine() {
-        assertThat(MetaApplication.applicationSource(new String[] {"--aura.application.mode=core-only"}))
+        assertThat(PlatformApplication.applicationSource(new String[] {"--aura.application.mode=core-only"}))
             .isEqualTo(CoreOnlyApplication.class);
     }
 }

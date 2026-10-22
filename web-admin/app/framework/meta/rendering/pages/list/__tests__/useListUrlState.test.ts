@@ -178,6 +178,17 @@ describe('encodeFilters', () => {
 });
 
 describe('decodeFilters', () => {
+  it('reads a legacy shared URL range without exposing an object-valued chip', () => {
+    const legacy: ViewFilterConfig[] = [{
+      fieldCode: 'updated_at', operator: 'between',
+      value: { start: '2026-10-14', end: '2026-10-21T23:59:59' },
+    }];
+    expect(decodeFilters(encodeFilters(legacy))).toEqual([{
+      fieldCode: 'updated_at', operator: 'between',
+      value: ['2026-10-14', '2026-10-21T23:59:59'],
+    }]);
+  });
+
   it('decodes base64 string to ViewFilterConfig array', () => {
     const original: ViewFilterConfig[] = [
       { fieldCode: 'status', operator: 'eq', value: 'draft' },

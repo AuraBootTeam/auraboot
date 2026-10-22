@@ -55,8 +55,8 @@ class ValidationServiceReferenceValidationTest {
         field.getRefTarget().setTargetTable("mt_submission");
         field.getRefTarget().setValueField("pid");
         when(dynamicDataMapper.selectByQuery(anyString(),any())).thenThrow(new IllegalStateException("Database unavailable"));
-        var result=service.validateField(field,"01OFFER",ValidationContext.CREATE);
-        assertFalse(result.isValid());assertTrue(result.getErrors().getFirst().contains("could not be verified"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.validateField(field,"01OFFER",ValidationContext.CREATE));
     }
 
     @Mock
@@ -203,5 +203,109 @@ class ValidationServiceReferenceValidationTest {
 
         assertTrue(result.isValid());
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), any());
+    }
+    private FieldDefinition internalIdReference() {
+        FieldDefinition field = referenceField("parent_ref", "parent");
+        field.getRefTarget().setTargetTable("mt_parent");
+        // Legacy declarations omit valueField and permit both internal ID and PID.
+        field.getRefTarget().setTargetField("id");
+        return field;
+    }
+
+    @Test
+    void businessPidDoesNotBindTextToInternalNumericId() {
+        mockCount(1);
+        var result = service.validateField(internalIdReference(), "01BUSINESSPID", ValidationContext.CREATE);
+        assertTrue(result.isValid());
+        var sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        var params = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectByQuery(sql.capture(), params.capture());
+        assertTrue(sql.getValue().contains("WHERE (pid = #{params.refValue})"));
+        assertEquals("01BUSINESSPID", params.getValue().get("refValue"));
+        assertEquals(100L, params.getValue().get("tenantId"));
+        assertFalse(params.getValue().containsKey("refValueId"));
+    }
+
+    @Test
+    void numericReferenceUsesSeparateLongAndTextBindings() {
+        mockCount(1);
+        assertTrue(service.validateField(internalIdReference(), "42", ValidationContext.CREATE).isValid());
+        var sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        var params = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectByQuery(sql.capture(), params.capture());
+        assertTrue(sql.getValue().contains("id = #{params.refValueId}"));
+        assertTrue(sql.getValue().contains("pid = #{params.refValue}"));
+        assertEquals(42L, params.getValue().get("refValueId"));
+        assertEquals("42", params.getValue().get("refValue"));
+    }
+
+    @Test
+    void oversizedNumericBusinessPidRemainsText() {
+        mockCount(1);
+        String pid = "9223372036854775808";
+        assertTrue(service.validateField(internalIdReference(), pid, ValidationContext.CREATE).isValid());
+        var params = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectByQuery(anyString(), params.capture());
+        assertEquals(pid, params.getValue().get("refValue"));
+        assertFalse(params.getValue().containsKey("refValueId"));
+    }
+
+    @Test
+    void referenceQueryFailurePropagatesWithoutAcceptingTheReference() {
+        RuntimeException failure = new org.springframework.dao.DataAccessResourceFailureException("database unavailable");
+        when(dynamicDataMapper.selectByQuery(anyString(), any())).thenThrow(failure);
+        RuntimeException observed = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> service.validateField(internalIdReference(), "01BUSINESSPID", ValidationContext.CREATE));
+        org.junit.jupiter.api.Assertions.assertSame(failure, observed);
+    }
+
+    @Test
+    void batchReferencesKeepTheSamePidAndInternalIdSemantics() {
+        var model = com.auraboot.framework.meta.dto.ModelDefinition.builder().code("detail")
+                .fields(List.of(internalIdReference())).build();
+        when(dynamicDataMapper.selectByQuery(anyString(), any()))
+                .thenReturn(List.of(Map.of("cnt0", 1L, "cnt1", 1L)));
+        service.validateBatchAndThrow(model, List.of(Map.of("parent_ref", "01BUSINESSPID"),
+                Map.of("parent_ref", "42")), ValidationContext.CREATE);
+        var sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        var params = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectByQuery(sql.capture(), params.capture());
+        assertTrue(sql.getValue().contains("WHERE (pid = #{params.ref0})"));
+        assertTrue(sql.getValue().contains("id = #{params.ref1Id}"));
+        assertTrue(sql.getValue().contains("tenant_id = #{params.tenantId}"));
+        assertFalse(params.getValue().containsKey("ref0Id"));
+        assertEquals(42L, params.getValue().get("ref1Id"));
+        assertEquals(100L, params.getValue().get("tenantId"));
+    }
+
+
+    @Test
+    void explicitNumericIdentityRejectsBusinessPidWithoutAnAlternateLookup() {
+        FieldDefinition field = internalIdReference();
+        field.getRefTarget().setValueField("id");
+        when(dynamicDataMapper.selectByQuery(anyString(), any())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            assertTrue(sql.contains("WHERE (1 = 0)"));
+            assertFalse(sql.contains(" OR "));
+            return List.of(Map.of("cnt", 0L));
+        });
+        assertFalse(service.validateField(field, "01BUSINESSPID", ValidationContext.CREATE).isValid());
+    }
+
+    @Test
+    void batchExplicitPidIdentityDoesNotQueryANumericDisplayColumn() {
+        FieldDefinition field = referenceField("submitted_offer", "submission");
+        field.getRefTarget().setTargetTable("mt_submission");
+        field.getRefTarget().setValueField("pid");
+        field.getRefTarget().setTargetField("sequence");
+        var model = com.auraboot.framework.meta.dto.ModelDefinition.builder().code("detail")
+                .fields(List.of(field)).build();
+        when(dynamicDataMapper.selectByQuery(anyString(), any())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            assertFalse(sql.contains("sequence"));
+            assertFalse(sql.contains(" OR "));
+            return List.of(Map.of("cnt0", 1L));
+        });
+        service.validateBatchAndThrow(model, List.of(Map.of("submitted_offer", "01OFFER")), ValidationContext.CREATE);
     }
 }

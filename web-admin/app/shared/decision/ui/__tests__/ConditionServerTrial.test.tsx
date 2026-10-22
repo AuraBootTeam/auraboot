@@ -52,7 +52,7 @@ it('posts typed inputs and current DSL to the engine and displays returned evide
     context: { record: { data: { amount: 128000 } } },
     explain: true,
   });
-  expect(screen.getByText('128000 → 100000')).toBeInTheDocument();
+  expect(screen.getByText('128000 大于等于 100000')).toBeInTheDocument();
   expect(trace).toHaveBeenLastCalledWith(response.data.conditionTrace);
   fireEvent.change(screen.getByLabelText('trial-record:data.amount'), {
     target: { value: '68000' },

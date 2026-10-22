@@ -846,5 +846,17 @@
   "panel.copySuffix": {
     "zh-CN": "副本",
     "en-US": "Copy"
+  },
+  "registry.numericValue": {
+    "zh-CN": "数字",
+    "en-US": "Number"
+  },
+  "registry.currencyValue": {
+    "zh-CN": "金额",
+    "en-US": "Currency"
+  },
+  "registry.decimalPlaces": {
+    "zh-CN": "小数位数",
+    "en-US": "Decimal places"
   }
 }

@@ -43,6 +43,8 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('model-type-physical').click();
   await page.getByTestId('model-code-input').fill(code);
   await page.getByTestId('model-display-name-input').fill('交付客户跟进');
+  await expect(page.getByTestId('model-create-submit')).toBeEnabled();
+  await screenshot(page, info, 'SC02-model-create-filled');
   const create = page.waitForResponse(
     (r) => r.url().endsWith('/api/meta/models') && r.request().method() === 'POST',
   );
@@ -69,6 +71,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
       .fill(suffix === 'customer_name' ? '客户名称' : '商机金额');
     await dialog.getByPlaceholder('例如: user_name, email, age').fill(`${code}_${suffix}`);
     await dialog.locator('select').first().selectOption(type);
+    if (suffix === 'customer_name') await screenshot(page, info, 'SC02-field-create-filled');
     const bind = page.waitForResponse(
       (r) =>
         r.url().endsWith(`/api/meta/models/${pid}/fields/bind`) && r.request().method() === 'POST',
@@ -120,7 +123,11 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   ).then((response) => ({
     status: response.status(), url: response.url(), payload: response.request().postDataJSON(),
   }));
-  await page.getByTestId('model-publish-confirm').click();
+  await Promise.all([
+    page.waitForEvent('domcontentloaded'),
+    page.getByTestId('model-publish-confirm').click(),
+  ]);
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
   // The successful UI action hard-reloads, invalidating the old CDP response body.
   const published = await publish;
   expect(published.status).toBe(200);

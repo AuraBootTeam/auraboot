@@ -5,11 +5,14 @@
  * load V3 page -> add model field -> edit inspector -> save -> reopen.
  */
 
+import { inspectorJsonField } from '../../helpers/designer-inspector';
 import { expect, test } from '../../fixtures';
-import type { Locator, Page, Request } from '@playwright/test';
+import type { Locator, Page, Request, TestInfo } from '@playwright/test';
 import { grantRolePermissionByCode, createAuthenticatedRoleContext, collectPermissionCodes } from '../../helpers/designer-role-fixtures';
 import { migratePageSchemaV2ToV3 } from '../../../app/plugins/core-designer/components/unified-designer/migration/migrateToV3';
 import { uniqueId } from '../helpers';
+
+test.use({ locale: 'zh-CN' });
 
 // Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let React
 // flush the document update + canvas re-render before the next interaction.
@@ -156,6 +159,45 @@ async function applyJsonField(page: Page, applyTestId: string): Promise<void> {
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   );
   await page.getByTestId(applyTestId).click();
+}
+
+async function assertStaticWidgetPreview(
+  page: Page,
+  info: TestInfo,
+  scenario: 'UDW-013' | 'UDW-016',
+  queryPath: string,
+): Promise<void> {
+  await page.getByTestId('designer-mode-edit').click();
+  await page.getByTestId('outline-item-widget_pipeline').click();
+  const authoredValue = `${scenario} authored preview`;
+  await (await inspectorJsonField(page, 'props.columns')).fill(JSON.stringify(['Preview value']));
+  await applyJsonField(page, 'inspector-json-field-apply-props.columns');
+  await (await inspectorJsonField(page, 'props.rows')).fill(JSON.stringify([[authoredValue]]));
+  await applyJsonField(page, 'inspector-json-field-apply-props.rows');
+  await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('preview');
+  const queryRequests: string[] = [];
+  const observe = (request: Request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === queryPath) {
+      queryRequests.push(request.url());
+    }
+  };
+  page.on('request', observe);
+  try {
+    await page.getByTestId('designer-mode-preview').click();
+    const table = page.getByTestId('runtime-widget-table-widget_pipeline');
+    await expect(table).toContainText('Preview value');
+    await expect(table).toContainText(authoredValue);
+    await expect(page.getByTestId('runtime-widget-error-widget_pipeline')).toHaveCount(0);
+    await page.getByTestId('runtime-widget-widget_pipeline').screenshot({
+      path: info.outputPath(`${scenario}-widget-static.png`),
+    });
+    expect(queryRequests, 'explicit static preview must not invoke its configured query').toEqual([]);
+    if (scenario === 'UDW-013') {
+      await page.screenshot({ path: info.outputPath('UDW-013-widget-context.png') });
+    }
+  } finally {
+    page.off('request', observe);
+  }
 }
 
 /**
@@ -465,6 +507,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: liveNamedQueryTitle,
       description: 'Auto-generated for Unified Designer named query widget E2E',
       fromSql: 'ab_page_schema p',
+      baseWhere: [{
+        field: 'page_key', operator: 'in',
+        value: [formPageKey, listPageKey, detailPageKey, dashboardPageKey],
+      }],
     });
 
     for (const field of [
@@ -495,6 +541,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: liveHelperNamedQueryTitle,
       description: 'Auto-generated for Unified Designer helper block live data E2E',
       fromSql: 'ab_page_schema p',
+      baseWhere: [{
+        field: 'page_key', operator: 'in',
+        value: [formPageKey, listPageKey, detailPageKey, dashboardPageKey],
+      }],
     });
 
     for (const field of [
@@ -1367,7 +1417,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-title').fill(nestedSectionTitle);
     await page.getByTestId('inspector-field-props.description').fill(nestedSectionDescription);
     await setCheckbox(page, 'inspector-field-props.collapsible', true);
-    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     await switchResourceTab(page, 'outline');
@@ -1375,12 +1425,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.placeholder').fill(complexPlaceholder);
     await page.getByTestId('inspector-field-props.helpText').fill(complexHelpText);
     await setCheckbox(page, 'inspector-field-props.readOnly', true);
-    await page
-      .getByTestId('inspector-field-props.visibleWhen')
+    await (await inspectorJsonField(page, 'props.visibleWhen'))
       .fill(JSON.stringify(fieldVisibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await page
-      .getByTestId('inspector-field-props.validationRules')
+    await (await inspectorJsonField(page, 'props.validationRules'))
       .fill(JSON.stringify(validationRules));
     await applyJsonField(page, 'inspector-json-field-apply-props.validationRules');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -1413,10 +1461,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       title: { en: 'New section', 'zh-CN': nestedSectionTitle },
       // Section flags persist as flat top-level keys (v4 section convention).
       collapsible: true,
-      props: expect.objectContaining({
-        description: nestedSectionDescription,
-        visibleWhen,
-      }),
+      description: nestedSectionDescription,
+      props: expect.objectContaining({ visibleWhen }),
     });
     expect(persistedField).toMatchObject({
       blockType: 'field',
@@ -1458,13 +1504,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     // also avoids racing the async model-options load.
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.metric').fill(advancedWidgetMetric);
-    await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
+    await (await inspectorJsonField(page, 'dataSource.query')).fill(JSON.stringify(query));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
     await page.getByTestId('inspector-field-props.value').fill(advancedWidgetValue);
     await page.getByTestId('inspector-field-props.format').selectOption('number');
     await page.getByTestId('inspector-field-props.emptyText').fill(advancedWidgetEmptyText);
     await page.getByTestId('inspector-field-props.drillDownTo').fill(advancedWidgetDrilldown);
-    await page.getByTestId('inspector-field-props.thresholds').fill(JSON.stringify(thresholds));
+    await (await inspectorJsonField(page, 'props.thresholds')).fill(JSON.stringify(thresholds));
     await applyJsonField(page, 'inspector-json-field-apply-props.thresholds');
     await page.getByTestId('inspector-field-props.refreshInterval').fill('60');
 
@@ -1521,7 +1567,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-widgetType').selectOption('bar-chart');
     await page.getByTestId('inspector-field-props.title').fill(chartWidgetTitle);
     await page.getByTestId('inspector-field-props.emptyText').fill('');
-    await page.getByTestId('inspector-field-props.series').fill(JSON.stringify(chartSeries));
+    await (await inspectorJsonField(page, 'props.series')).fill(JSON.stringify(chartSeries));
     await applyJsonField(page, 'inspector-json-field-apply-props.series');
 
     await page.getByTestId('outline-item-widget_pipeline').click();
@@ -1644,7 +1690,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-013: executes dashboard widget query JSON through query-builder in runtime preview', async ({
     page,
-  }) => {
+  }, info) => {
     expect(dashboardPagePid).toBeTruthy();
 
     const query = {
@@ -1664,7 +1710,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.title').fill(liveWidgetTitle);
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
+    await (await inspectorJsonField(page, 'dataSource.query')).fill(JSON.stringify(query));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
     await page.getByTestId('inspector-field-props.value').fill('');
     await page.getByTestId('inspector-field-props.emptyText').fill('');
@@ -1693,6 +1739,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.locator('[data-testid="runtime-widget-table-widget_pipeline"] tbody tr'),
     ).toHaveCount(3);
+    await assertStaticWidgetPreview(page, info, 'UDW-013', '/api/query-builder/execute');
 
   });
 
@@ -1710,7 +1757,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(
+    await (await inspectorJsonField(page, 'props.payload')).fill(
       JSON.stringify({
         source: 'unified-designer-workbench',
         uid,
@@ -1853,7 +1900,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveWorkflowLabel);
     await page.getByTestId('inspector-field-props.workflowKey').fill(liveWorkflowKey);
     await page.getByTestId('inspector-field-props.businessKey').fill(workflowBusinessKeyTemplate);
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.feedback').fill('');
@@ -1952,7 +1999,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-016: executes dashboard widget named query through runtime preview', async ({
     page,
-  }) => {
+  }, info) => {
     expect(dashboardPagePid).toBeTruthy();
     expect(liveNamedQueryCode).toBeTruthy();
 
@@ -1968,7 +2015,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.type').selectOption('namedQuery');
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-dataSource.queryCode-manual').fill(liveNamedQueryCode);
-    await page.getByTestId('inspector-field-dataSource.parameters').fill(JSON.stringify({}));
+    await (await inspectorJsonField(page, 'dataSource.parameters')).fill(JSON.stringify({}));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.parameters');
     await page.getByTestId('inspector-field-dataSource.page').fill('1');
     await page.getByTestId('inspector-field-dataSource.size').fill('20');
@@ -2002,6 +2049,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       .locator('[data-testid="runtime-widget-table-widget_pipeline"] tbody tr')
       .count();
     expect(rowCount).toBeGreaterThan(0);
+    await assertStaticWidgetPreview(page, info, 'UDW-016', `/api/meta/named-queries/${liveNamedQueryCode}/execute`);
 
   });
 
@@ -2030,7 +2078,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     if (await readOnlyInput.isChecked()) {
       await readOnlyInput.uncheck();
     }
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     const addedFieldOutlineItem = page.getByTestId(`outline-item-${fieldBlockId}`);
@@ -2047,7 +2095,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveFormCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveFormCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -2164,7 +2212,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveBulkCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveBulkCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -2266,7 +2314,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(liveRowCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(liveRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -2382,7 +2430,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(paletteRowActionLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(paletteRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
@@ -2545,17 +2593,16 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.pickerSource').fill('user');
     await page.getByTestId('inspector-field-props.valueField').fill('id');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(pickerOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(pickerOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(componentRichTextLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('rich-text');
-    await expect(page.getByTestId('inspector-field-props.richTextToolbar')).toBeVisible();
+    await expect(await inspectorJsonField(page, 'props.richTextToolbar')).toBeVisible();
     await expect(page.getByTestId('inspector-field-props.pickerSource')).toHaveCount(0);
     await page.getByTestId('inspector-field-props.placeholder').fill(componentRichTextPlaceholder);
-    await page
-      .getByTestId('inspector-field-props.richTextToolbar')
+    await (await inspectorJsonField(page, 'props.richTextToolbar'))
       .fill(JSON.stringify(['bold', 'italic', 'link']));
     await applyJsonField(page, 'inspector-json-field-apply-props.richTextToolbar');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -2703,8 +2750,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-field-props.displayField')).toHaveValue('displayName');
 
     await page.getByTestId('inspector-field-props.pickerDataSource').selectOption('static');
-    await page
-      .getByTestId('inspector-field-props.options')
+    await (await inspectorJsonField(page, 'props.options'))
       .fill(JSON.stringify([{ label: formTitle, value: formPageKey }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
@@ -2797,8 +2843,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
 
     await page.getByTestId('outline-item-table_customers').click();
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ title: visibleTitle, status: secretStatus }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -2905,11 +2950,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_row_open').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
-    await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await expect(await inspectorJsonField(page, 'props.visibleWhen')).toBeVisible();
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
+    await expect(await inspectorJsonField(page, 'props.disabledWhen')).toBeVisible();
+    await (await inspectorJsonField(page, 'props.disabledWhen')).fill(JSON.stringify(disabledWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -2965,11 +3010,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
-    await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await expect(await inspectorJsonField(page, 'props.visibleWhen')).toBeVisible();
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill(JSON.stringify(visibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
-    await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
+    await expect(await inspectorJsonField(page, 'props.disabledWhen')).toBeVisible();
+    await (await inspectorJsonField(page, 'props.disabledWhen')).fill(JSON.stringify(disabledWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -3038,8 +3083,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     if (!(await requiredInput.isChecked())) {
       await requiredInput.check();
     }
-    await page
-      .getByTestId('inspector-field-props.validationRules')
+    await (await inspectorJsonField(page, 'props.validationRules'))
       .fill(JSON.stringify(validationRules));
     await applyJsonField(page, 'inspector-json-field-apply-props.validationRules');
 
@@ -3048,11 +3092,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(validationCommandLabel);
     await page.getByTestId('inspector-field-props.command-manual').fill(validationCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
-    await page.getByTestId('inspector-field-props.disabledWhen').fill('');
+    await (await inspectorJsonField(page, 'props.disabledWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
@@ -3267,7 +3311,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-023: adds a form sub-table, configures columns, and renders preview rows', async ({
     page,
-  }) => {
+  }, info) => {
     expect(pagePid).toBeTruthy();
     expect(fieldCode).toBeTruthy();
 
@@ -3292,7 +3336,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.parentField').fill(subTableParentField);
     await page.getByTestId('inspector-field-dataSource.childField').fill(subTableChildField);
-    await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify(subTableRows));
+    await (await inspectorJsonField(page, 'props.rows')).fill(JSON.stringify(subTableRows));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
     await switchResourceTab(page, 'fields');
@@ -3305,13 +3349,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     // (sections only carry field entries); the save must refuse loudly instead
     // of silently dropping the sub-table subtree.
     await page.getByTestId('designer-save').click();
-    await expect(page.getByTestId('designer-save-error')).toContainText(
-      'sub_table_new_sub_table',
-      { timeout: 10000 },
-    );
-    await expect(page.getByTestId('designer-save-error')).toContainText(
-      'flat v4 runtime dialect',
-    );
+    await expect(page.getByTestId('designer-save-error')).toContainText('sub_table_new_sub_table', {
+      timeout: 10000,
+    });
+    await expect(page.getByTestId('designer-save-error')).toContainText('flat v4 runtime dialect');
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
@@ -3321,6 +3362,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-table-cell-sub_table_new_sub_table-0-${fieldCode}`),
     ).toHaveText(subTablePreviewValue);
+
+    await page.screenshot({ path: info.outputPath('UDW-023-preview.png'), fullPage: true });
 
     // Nothing was persisted (save refused): the stored page has no sub-table.
     const persisted = await readPage(page, pagePid);
@@ -3346,7 +3389,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.component').selectOption('select');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(selectOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(selectOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     const requiredInput = page.getByTestId('inspector-field-props.required');
     if (await requiredInput.isChecked()) {
@@ -3419,7 +3462,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3831,14 +3874,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(controllerLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('select');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(controllerOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(controllerOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(dependentLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('input');
-    await page
-      .getByTestId('inspector-field-props.visibleWhen')
+    await (await inspectorJsonField(page, 'props.visibleWhen'))
       .fill(JSON.stringify(dependentVisibleWhen));
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -3913,7 +3955,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.valueField').fill('page_key');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4009,11 +4051,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.valueField').fill('page_key');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.pickerParameters').fill(JSON.stringify({}));
+    await (await inspectorJsonField(page, 'props.pickerParameters')).fill(JSON.stringify({}));
     await applyJsonField(page, 'inspector-json-field-apply-props.pickerParameters');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
-    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await (await inspectorJsonField(page, 'props.visibleWhen')).fill('');
     await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4058,14 +4100,19 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const pickerOptionsBody = await pickerOptionsResp.json();
     expect(pickerOptionsBody.code).toBe('0');
     const pickerRows = (pickerOptionsBody.data?.records ?? []) as Array<Record<string, unknown>>;
-    const namedQueryPickerRow = pickerRows.find((row) => typeof row.page_key === 'string');
+    const namedQueryPickerRow = pickerRows.find((row) => row.page_key === formPageKey);
     expect(namedQueryPickerRow).toBeTruthy();
     const expectedPickerValue = String(namedQueryPickerRow?.page_key);
     const expectedPickerLabel = String(namedQueryPickerRow?.name ?? expectedPickerValue);
 
     const picker = page.getByTestId('runtime-picker-field_seed_secondary');
     await expect(picker).toBeVisible();
-    await expect(picker.locator('option', { hasText: expectedPickerLabel })).toHaveCount(1);
+    await expect.poll(() => picker.locator('option').evaluateAll(
+      (options, value) => options
+        .filter(option => (option as HTMLOptionElement).value === value)
+        .map(option => option.textContent?.trim()),
+      expectedPickerValue,
+    )).toEqual([expectedPickerLabel]);
     await expect(page.getByTestId('runtime-picker-meta-field_seed_secondary')).toContainText(
       `named-query / ${liveNamedQueryCode} / name / page_key`,
     );
@@ -4123,7 +4170,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.searchField').fill('page_key');
     await page.getByTestId('inspector-field-props.searchParameter').fill('keyword');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4254,9 +4301,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.searchField').fill('page_key');
     await page.getByTestId('inspector-field-props.searchParameter').fill('keyword');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
-    await page.getByTestId('inspector-field-props.pickerParameters').fill(JSON.stringify({}));
+    await (await inspectorJsonField(page, 'props.pickerParameters')).fill(JSON.stringify({}));
     await applyJsonField(page, 'inspector-json-field-apply-props.pickerParameters');
-    await page.getByTestId('inspector-field-props.options').fill('[]');
+    await (await inspectorJsonField(page, 'props.options')).fill('[]');
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -4361,7 +4408,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-034: configures action permission code and blocks preview execution when missing', async ({
     page,
-  }) => {
+    browser,
+    baseURL,
+  }, info) => {
     expect(listPagePid).toBeTruthy();
 
     const permissionActionLabel = `Permission blocked action ${uid}`;
@@ -4377,7 +4426,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
+    await page
+      .getByTestId('inspector-field-props.permissionCode-manual')
+      .fill(missingPermissionCode);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
@@ -4391,14 +4442,57 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
-    const action = page.getByTestId('runtime-action-action_seed_export');
-    await expect(action).toBeDisabled();
-    await expect(action).toHaveAttribute('data-permission-code', missingPermissionCode);
-    await expect(action).toHaveAttribute('data-permission-allowed', 'false');
-    await expect(page.getByTestId('runtime-action-permission-action_seed_export')).toContainText(
-      `Requires permission: ${missingPermissionCode}`,
+    const adminResponse = await page.request.get('/api/auth/me');
+    expect(adminResponse.status()).toBe(200);
+    const admin = await adminResponse.json();
+    expect(String(admin.code)).toBe('0');
+    expect(collectPermissionCodes(admin.data.permissions)).toContain('*');
+    await expect(page.getByTestId('runtime-action-action_seed_export')).toBeEnabled();
+    await expect(page.getByTestId('runtime-action-action_seed_export')).toHaveAttribute(
+      'data-permission-allowed',
+      'true',
     );
-    await expect(page.getByTestId('runtime-action-error-action_seed_export')).toHaveCount(0);
+    for (const permission of ['meta.designer.read', 'page.page.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const roleContext = await createAuthenticatedRoleContext(
+      browser,
+      baseURL ?? new URL(page.url()).origin,
+      'viewer',
+    );
+    try {
+      const rolePage = await roleContext.newPage();
+      const identityResponse = await rolePage.request.get('/api/auth/me');
+      expect(identityResponse.status()).toBe(200);
+      const identity = await identityResponse.json();
+      expect(String(identity.code)).toBe('0');
+      const codes = collectPermissionCodes(identity.data.permissions);
+      expect(codes).not.toContain('*');
+      expect(codes).not.toContain(missingPermissionCode);
+      await rolePage.goto(`/unified-designer?pageId=${listPagePid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(rolePage.getByTestId('unified-designer-workbench')).toBeVisible({
+        timeout: 15000,
+      });
+      await rolePage.getByTestId('designer-mode-preview').click();
+      await expect(rolePage.getByTestId('unified-runtime-preview')).toBeVisible();
+      const action = rolePage.getByTestId('runtime-action-action_seed_export');
+      await expect(action).toBeDisabled();
+      await expect(action).toHaveAttribute('data-permission-code', missingPermissionCode);
+      await expect(action).toHaveAttribute('data-permission-allowed', 'false');
+      await expect(
+        rolePage.getByTestId('runtime-action-permission-action_seed_export'),
+      ).toContainText(`Requires permission: ${missingPermissionCode}`);
+      await expect(rolePage.getByTestId('runtime-action-error-action_seed_export')).toHaveCount(0);
+
+      await rolePage.screenshot({
+        path: info.outputPath('UDW-034-scoped-denied.png'),
+        fullPage: true,
+      });
+    } finally {
+      await roleContext.close();
+    }
 
     const persisted = await readPage(page, listPagePid);
     const persistedCommand = findBlockById(persisted.blocks ?? [], 'action_seed_export');
@@ -4579,7 +4673,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(radioLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('radio');
-    await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(radioOptions));
+    await (await inspectorJsonField(page, 'props.options')).fill(JSON.stringify(radioOptions));
     await applyJsonField(page, 'inspector-json-field-apply-props.options');
     const requiredInput = page.getByTestId('inspector-field-props.required');
     if (await requiredInput.isChecked()) {
@@ -4620,10 +4714,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): repeater/subform blocks have no flat v4 representation,
-  // so persisting them fails fast by design. These journeys need either a v4
-  // repeater/subform block contract or a designer placement restriction.
-  test.fixme('UDW-038: drags a repeater into a form and submits edited rows from runtime preview', async ({
+  test('UDW-038: drags a repeater into a form and submits edited rows from runtime preview', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -4658,8 +4749,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(repeaterId);
     await page.getByTestId('inspector-field-title').fill(repeaterTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: initialLineValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -4677,7 +4767,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command-manual').fill(repeaterCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await setCheckbox(page, 'inspector-field-props.validateForm', false);
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(repeaterPayload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(repeaterPayload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
@@ -4732,7 +4822,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persistedRepeater = findBlockById(persisted.blocks ?? [], repeaterId);
     expect(persistedRepeater).toMatchObject({
       blockType: 'repeater',
-      title: repeaterTitle,
+      title: expect.objectContaining({ 'zh-CN': repeaterTitle }),
       props: expect.objectContaining({
         rows: [{ [fieldCode]: initialLineValue }],
       }),
@@ -4746,10 +4836,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): repeater/subform blocks have no flat v4 representation,
-  // so persisting them fails fast by design. These journeys need either a v4
-  // repeater/subform block contract or a designer placement restriction.
-  test.fixme('UDW-039: drags a nested subform into a form and submits row editor values', async ({
+  test('UDW-039: drags a nested subform into a form and submits row editor values', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -4784,8 +4871,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(subformId);
     await page.getByTestId('inspector-field-title').fill(subformTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: initialMemberValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -4806,7 +4892,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     if (await validateFormInput.isChecked()) {
       await validateFormInput.uncheck();
     }
-    await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(subformPayload));
+    await (await inspectorJsonField(page, 'props.payload')).fill(JSON.stringify(subformPayload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
@@ -4861,7 +4947,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persistedSubform = findBlockById(persisted.blocks ?? [], subformId);
     expect(persistedSubform).toMatchObject({
       blockType: 'subform',
-      title: subformTitle,
+      title: expect.objectContaining({ 'zh-CN': subformTitle }),
       props: expect.objectContaining({
         rows: [{ [fieldCode]: initialMemberValue }],
       }),
@@ -4877,7 +4963,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-040: authors form tabs from palette blocks and renders them after save', async ({
     page,
-  }) => {
+  }, info) => {
     expect(pagePid).toBeTruthy();
 
     const tabsId = 'tabs_new_tabs';
@@ -4963,15 +5049,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persistedFreeField = findBlockById(persisted.blocks ?? [], freeFieldId);
     expect(persistedTabs).toMatchObject({
       blockType: 'tabs',
-      title: tabsTitle,
+      title: expect.objectContaining({ 'zh-CN': tabsTitle }),
     });
     expect(persistedTab).toMatchObject({
       blockType: 'tab',
-      title: tabTitle,
+      title: expect.objectContaining({ 'zh-CN': tabTitle }),
     });
     expect(persistedSection).toMatchObject({
       blockType: 'form-section',
-      title: sectionTitle,
+      title: expect.objectContaining({ 'zh-CN': sectionTitle }),
     });
     expect(persistedFreeField).toMatchObject({
       blockType: 'field',
@@ -4984,13 +5070,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`runtime-block-${tabsId}`)).toContainText(tabsTitle);
     await expect(page.getByTestId(`runtime-block-${tabId}`)).toContainText(tabTitle);
     await expect(page.getByTestId(`runtime-field-${freeFieldId}`)).toContainText(freeFieldLabel);
+    await page.getByTestId(`runtime-block-${tabsId}`).screenshot({
+      path: info.outputPath('UDW-040-localized-tabs.png'),
+    });
   });
 
-  // FIXME(designer-v4): this journey authors blocks that have no flat v4
-  // representation in their current placement, so persistence now fails fast
-  // by design (see flatPageSerializer.ts). Needs a product decision: extend
-  // the v4 dialect or restrict the designer placement.
-  test.fixme('UDW-042: designs detail complex blocks and verifies saved runtime output', async ({
+  test('UDW-042: designs detail complex blocks and verifies saved runtime output', async ({
     page,
   }) => {
     expect(detailPagePid).toBeTruthy();
@@ -5064,8 +5149,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`canvas-block-${subTableId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailSubTableTitle);
     await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: subTablePreviewValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5087,8 +5171,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
     await expect(page.getByTestId(`canvas-block-${repeaterId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailRepeaterTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: repeaterPreviewValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5109,8 +5192,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await dndDragTo(page, subformPaletteItem, page.getByTestId('canvas-block-detail_section_summary'));
     await expect(page.getByTestId(`canvas-block-${subformId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailSubformTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: subformPreviewValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5142,30 +5224,27 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persisted = await readPage(page, detailPagePid);
     expect(findBlockById(persisted.blocks ?? [], subTableId)).toMatchObject({
       blockType: 'sub-table',
-      title: detailSubTableTitle,
+      title: expect.objectContaining({ 'zh-CN': detailSubTableTitle }),
       props: expect.objectContaining({ rows: [{ [fieldCode]: subTablePreviewValue }] }),
     });
     expect(findBlockById(persisted.blocks ?? [], repeaterId)).toMatchObject({
       blockType: 'repeater',
-      title: detailRepeaterTitle,
+      title: expect.objectContaining({ 'zh-CN': detailRepeaterTitle }),
       props: expect.objectContaining({ rows: [{ [fieldCode]: repeaterPreviewValue }] }),
     });
     expect(findBlockById(persisted.blocks ?? [], subformId)).toMatchObject({
       blockType: 'subform',
-      title: detailSubformTitle,
+      title: expect.objectContaining({ 'zh-CN': detailSubformTitle }),
       props: expect.objectContaining({ rows: [{ [fieldCode]: subformPreviewValue }] }),
     });
-    expect(findBlockById(persisted.blocks ?? [], actionId)).toMatchObject({
-      blockType: 'action',
-      actionType: 'command',
-      props: expect.objectContaining({
-        label: detailActionLabel,
-        command: detailCommandCode,
-      }),
+    expect(findBlockById(persisted.blocks ?? [], actionBarId)).toMatchObject({
+      blockType: 'form-buttons',
+      buttons: expect.arrayContaining([expect.objectContaining({
+        label: detailActionLabel, command: detailCommandCode,
+      })]),
     });
     expect(findBlockById(persisted.blocks ?? [], widgetId)).toMatchObject({
-      blockType: 'widget',
-      widgetType: 'number-card',
+      blockType: 'stat-card',
       props: expect.objectContaining({
         title: detailWidgetTitle,
         value: detailWidgetValue,
@@ -5216,20 +5295,22 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): this journey authors blocks that have no flat v4
-  // representation in their current placement, so persistence now fails fast
-  // by design (see flatPageSerializer.ts). Needs a product decision: extend
-  // the v4 dialect or restrict the designer placement.
-  test.fixme('UDW-043: drags a new widget onto a dashboard and persists runtime rendering', async ({
+  test('UDW-043: drags a new widget onto a dashboard and persists runtime rendering', async ({
     page,
   }) => {
     expect(dashboardPagePid).toBeTruthy();
 
+    const original = await readPage(page, dashboardPagePid);
+    const positiveDashboardPid = await createPageResource(page, {
+      name: `UDW dashboard positive ${uid}`, pageKey: `udw_dashboard_positive_${uid}`,
+      title: 'Dashboard widget authoring', kind: 'dashboard', modelCode, schemaVersion: 3,
+      blocks: original.blocks,
+    });
     const newWidgetId = 'widget_new_widget';
     const newWidgetTitle = `Palette widget ${uid}`;
     const newWidgetMarkdown = `Dashboard palette widget ${uid}`;
 
-    await page.goto(`/unified-designer?pageId=${dashboardPagePid}`, {
+    await page.goto(`/unified-designer?pageId=${positiveDashboardPid}`, {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
@@ -5254,7 +5335,16 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-layout.h').fill('2');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
-    await expectDashboardSaveRefused(page, dashboardPagePid);
+    await saveDesignerPage(page, positiveDashboardPid);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+    await page.getByTestId(`outline-item-${newWidgetId}`).click();
+    await expect(page.getByTestId('inspector-field-props.markdown')).toHaveValue(newWidgetMarkdown);
+    const persisted = await readPage(page, positiveDashboardPid);
+    expect(findBlockById(persisted.blocks ?? [], newWidgetId)).toMatchObject({
+      blockType: 'widget', widgetType: 'markdown',
+      props: expect.objectContaining({ title: newWidgetTitle, markdown: newWidgetMarkdown }),
+    });
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
@@ -5337,8 +5427,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const tableId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(tableId).toMatch(/^table_new_table(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(tableTitle);
-    await page
-      .getByTestId('inspector-field-props.rows')
+    await (await inspectorJsonField(page, 'props.rows'))
       .fill(JSON.stringify([{ [fieldCode]: matchingValue }, { [fieldCode]: hiddenValue }]));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
@@ -5411,16 +5500,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`runtime-action-overlay-${actionId}`)).toContainText(actionTitle);
   });
 
-  // FIXME(designer-v4): dashboard-kind pages refuse flat-v4 persistence by
-  // design (dashboards live in ab_dashboard), so saved-grid assertions cannot
-  // pass until the dashboard persistence story lands.
-  test.fixme('UDW-044: moves dashboard widgets by browser drag and rejects overlap', async ({ page }) => {
+  test('UDW-044: moves dashboard widgets by browser drag and rejects overlap', async ({ page }) => {
     const movePageKey = `udw_v3_dashboard_move_${uid}`;
     const moveDashboardPid = await createPageResource(page, {
       name: `UDW V3 Dashboard Move ${uid}`,
       pageKey: movePageKey,
       title: `UDW V3 Dashboard Move ${uid}`,
-      kind: 'detail',
+      kind: 'dashboard',
       modelCode,
       schemaVersion: 3,
       blocks: [
@@ -5486,11 +5572,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): the runtime renders datetime-local from the model
-  // field metadata even when the authored component is `date` (stored entry
-  // keeps component=date + dataType=datetime faithfully). Triage whether this
-  // metadata-precedence behaviour predates the v4 persistence change.
-  test.fixme('UDW-045: configures date, number, and switch form controls in browser preview', async ({
+  test('UDW-045: configures date, number, and switch form controls in browser preview', async ({
     page,
   }) => {
     const componentPageKey = `udw_v3_form_components_${uid}`;
@@ -5499,14 +5581,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       pageKey: componentPageKey,
       title: `UDW V3 Form Components ${uid}`,
       kind: 'form',
-      modelCode,
+      modelCode: 'showcase_all_fields',
       schemaVersion: 3,
       blocks: [
         {
           id: 'form_root',
           blockType: 'form',
           title: 'Component Form',
-          dataSource: { model: modelCode },
+          dataSource: { model: 'showcase_all_fields' },
           layout: { span: 12 },
           blocks: [
             {
@@ -5534,7 +5616,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('field-palette-add-field').click();
     const dateFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
-    await page.getByTestId('inspector-field-field').selectOption('created_at');
+    await page.getByTestId('inspector-field-field').selectOption('sc_start_date');
     await page.getByTestId('inspector-field-props.label').fill(dateLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('date');
     await page.getByTestId('inspector-field-props.placeholder').fill('YYYY-MM-DD');
@@ -5545,7 +5627,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('field-palette-add-field').click();
     const numberFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
-    await page.getByTestId('inspector-field-field').selectOption('page_key');
+    await page.getByTestId('inspector-field-field').selectOption('sc_quantity');
     await page.getByTestId('inspector-field-props.label').fill(numberLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('number');
     await page.getByTestId('inspector-field-props.helpText').fill(`Number help ${uid}`);
@@ -5556,7 +5638,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('field-palette-add-field').click();
     const switchFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
-    await page.getByTestId('inspector-field-field').selectOption('name');
+    await page.getByTestId('inspector-field-field').selectOption('sc_is_active');
     await page.getByTestId('inspector-field-props.label').fill(switchLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('switch');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
@@ -5574,15 +5656,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const persisted = await readPage(page, componentFormPid);
     expect(findBlockById(persisted.blocks ?? [], dateFieldId)).toMatchObject({
-      field: 'created_at',
+      field: 'sc_start_date',
       props: expect.objectContaining({ label: dateLabel, component: 'date' }),
     });
     expect(findBlockById(persisted.blocks ?? [], numberFieldId)).toMatchObject({
-      field: 'page_key',
+      field: 'sc_quantity',
       props: expect.objectContaining({ label: numberLabel, component: 'number' }),
     });
     expect(findBlockById(persisted.blocks ?? [], switchFieldId)).toMatchObject({
-      field: 'name',
+      field: 'sc_is_active',
       props: expect.objectContaining({ label: switchLabel, component: 'switch' }),
     });
 
@@ -5600,7 +5682,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const dateControl = runtimePreviewControl(page, dateFieldId);
     await expect(dateControl).toBeVisible();
     await expect(dateControl).toHaveAttribute('type', 'date');
-    await expect(dateControl).toHaveAttribute('data-testid', 'date-picker-input-created_at');
+    await expect(dateControl).toHaveAttribute('data-testid', 'date-picker-input-sc_start_date');
     await expect(dateControl).toBeEditable();
     await dateControl.fill('2026-03-18');
     await expect(dateControl).toHaveValue('2026-03-18');
@@ -5661,11 +5743,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-widgetType').selectOption('table');
     await page.getByTestId('inspector-field-props.title').fill(listWidgetTitle);
     await page.getByTestId('inspector-field-props.subtitle').fill(listWidgetSubtitle);
-    await page
-      .getByTestId('inspector-field-props.columns')
+    await (await inspectorJsonField(page, 'props.columns'))
       .fill(JSON.stringify(['Status', 'Count']));
     await applyJsonField(page, 'inspector-json-field-apply-props.columns');
-    await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify(listWidgetRows));
+    await (await inspectorJsonField(page, 'props.rows')).fill(JSON.stringify(listWidgetRows));
     await applyJsonField(page, 'inspector-json-field-apply-props.rows');
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -5702,7 +5783,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
   test('UDW-047: authors detail tabs with helper blocks and persists runtime panels', async ({
     page,
-  }) => {
+  }, info) => {
     const detailTabsPageKey = `udw_v3_detail_tabs_${uid}`;
     const detailTabsPid = await createPageResource(page, {
       name: `UDW V3 Detail Tabs ${uid}`,
@@ -5790,7 +5871,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const helperBlocks = [
       { paletteId: 'palette-add-ai-fill-banner', blockType: 'ai-fill-banner', title: aiTitle },
-      { paletteId: 'palette-add-bpm-panel', blockType: 'bpm-panel', title: bpmTitle },
+      { paletteId: 'palette-add-workflow-panel', blockType: 'workflow-panel', title: bpmTitle },
       {
         paletteId: 'palette-add-activity-timeline',
         blockType: 'activity-timeline',
@@ -5823,33 +5904,30 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await page
         .getByTestId('inspector-field-dataSource.queryCode-manual')
         .fill(`udw_${helper.blockType.replaceAll('-', '_')}_${uid}`);
-      await page
-        .getByTestId('inspector-field-dataSource.parameters')
+      await (await inspectorJsonField(page, 'dataSource.parameters'))
         .fill(JSON.stringify({ ...helperDataSourceParams, helper: helper.blockType }));
       await applyJsonField(page, 'inspector-json-field-apply-dataSource.parameters');
       if (helper.blockType === 'ai-fill-banner') {
         await page.getByTestId('inspector-field-props.description').fill(aiDescription);
         await page.getByTestId('inspector-field-props.feedback').fill(aiFeedback);
-        await page
-          .getByTestId('inspector-field-props.suggestedFields')
+        await (await inspectorJsonField(page, 'props.suggestedFields'))
           .fill(JSON.stringify(aiSuggestedFields));
         await applyJsonField(page, 'inspector-json-field-apply-props.suggestedFields');
       }
-      if (helper.blockType === 'bpm-panel') {
+      if (helper.blockType === 'workflow-panel') {
         await page.getByTestId('inspector-field-props.description').fill(bpmDescription);
         await page.getByTestId('inspector-field-props.status').selectOption('pending');
         await page.getByTestId('inspector-field-props.assignee').fill(bpmAssignee);
         await page.getByTestId('inspector-field-props.dueAt').fill(bpmDueAt);
-        await page.getByTestId('inspector-field-props.actions').fill(JSON.stringify(bpmActions));
+        await (await inspectorJsonField(page, 'props.actions')).fill(JSON.stringify(bpmActions));
         await applyJsonField(page, 'inspector-json-field-apply-props.actions');
       }
       if (helper.blockType === 'activity-timeline') {
-        await page.getByTestId('inspector-field-props.items').fill(JSON.stringify(timelineItems));
+        await (await inspectorJsonField(page, 'props.items')).fill(JSON.stringify(timelineItems));
         await applyJsonField(page, 'inspector-json-field-apply-props.items');
       }
       if (helper.blockType === 'field-history') {
-        await page
-          .getByTestId('inspector-field-props.entries')
+        await (await inspectorJsonField(page, 'props.entries'))
           .fill(JSON.stringify(historyEntries));
         await applyJsonField(page, 'inspector-json-field-apply-props.entries');
       }
@@ -5878,15 +5956,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persisted = await readPage(page, detailTabsPid);
     expect(findBlockById(persisted.blocks ?? [], tabsId)).toMatchObject({
       blockType: 'tabs',
-      title: tabsTitle,
+      title: expect.objectContaining({ 'zh-CN': tabsTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], tabId)).toMatchObject({
       blockType: 'tab',
-      title: tabTitle,
+      title: expect.objectContaining({ 'zh-CN': tabTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], sectionId)).toMatchObject({
       blockType: 'detail-section',
-      title: sectionTitle,
+      title: expect.objectContaining({ 'zh-CN': sectionTitle }),
     });
     expect(findBlockById(persisted.blocks ?? [], fieldId)).toMatchObject({
       blockType: 'field',
@@ -5896,7 +5974,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     helperBlocks.forEach((helper, index) => {
       expect(findBlockById(persisted.blocks ?? [], helperIds[index])).toMatchObject({
         blockType: helper.blockType,
-        title: helper.title,
+        title: expect.objectContaining({ 'zh-CN': helper.title }),
         dataSource: expect.objectContaining({
           type: 'namedQuery',
           executionMode: 'preview',
@@ -5912,7 +5990,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         suggestedFields: aiSuggestedFields,
       }),
     });
-    expect(findBlockById(persisted.blocks ?? [], helperIdsByType['bpm-panel'])).toMatchObject({
+    expect(findBlockById(persisted.blocks ?? [], helperIdsByType['workflow-panel'])).toMatchObject({
       props: expect.objectContaining({
         description: bpmDescription,
         status: 'pending',
@@ -5930,6 +6008,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       props: expect.objectContaining({ entries: historyEntries }),
     });
 
+    const staticQueryRequests: string[] = [];
+    const observeStaticQuery = (request: Request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname.startsWith('/api/meta/named-queries/udw_')) {
+        staticQueryRequests.push(request.url());
+      }
+    };
+    page.on('request', observeStaticQuery);
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
     await expect(page.getByTestId(`runtime-tab-trigger-${tabId}`)).toContainText(tabTitle);
@@ -5945,14 +6030,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-ai-fill-status-${helperIdsByType['ai-fill-banner']}`),
     ).toContainText(aiFeedback);
-    await expect(page.getByTestId(`runtime-bpm-status-${helperIdsByType['bpm-panel']}`)).toHaveText(
+    await expect(page.getByTestId(`runtime-bpm-status-${helperIdsByType['workflow-panel']}`)).toHaveText(
       'pending',
     );
     await expect(
-      page.getByTestId(`runtime-bpm-assignee-${helperIdsByType['bpm-panel']}`),
+      page.getByTestId(`runtime-bpm-assignee-${helperIdsByType['workflow-panel']}`),
     ).toContainText(bpmAssignee);
     await expect(
-      page.getByTestId(`runtime-bpm-action-${helperIdsByType['bpm-panel']}-0`),
+      page.getByTestId(`runtime-bpm-action-${helperIdsByType['workflow-panel']}-0`),
     ).toContainText(`Approve ${uid}`);
     await expect(
       page.getByTestId(`runtime-activity-item-${helperIdsByType['activity-timeline']}-0`),
@@ -5960,12 +6045,25 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(
       page.getByTestId(`runtime-field-history-entry-${helperIdsByType['field-history']}-0`),
     ).toContainText(`review ${uid}`);
+    const staticCaptures = [
+      ['ai-fill-banner', 'runtime-ai-fill-banner'],
+      ['workflow-panel', 'runtime-workflow-panel'],
+      ['activity-timeline', 'runtime-activity-timeline'],
+      ['field-history', 'runtime-field-history'],
+    ] as const;
+    for (const [blockType, prefix] of staticCaptures) {
+      await page.getByTestId(`${prefix}-${helperIdsByType[blockType]}`).screenshot({
+        path: info.outputPath(`UDW-047-${blockType}-static.png`),
+      });
+    }
+    expect(staticQueryRequests, 'static helpers must not execute unavailable configured queries').toEqual([]);
+    page.off('request', observeStaticQuery);
+    await page.getByTestId(`runtime-ai-fill-banner-${helperIdsByType['ai-fill-banner']}`).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('UDW-047-helper-context.png') });
+
   });
 
-  // FIXME(designer-v4): dashboard-kind pages refuse flat-v4 persistence by
-  // design (dashboards live in ab_dashboard), so saved-grid assertions cannot
-  // pass until the dashboard persistence story lands.
-  test.fixme('UDW-048: edits dashboard root grid properties and renders persisted grid styles', async ({
+  test('UDW-048: edits dashboard root grid properties and renders persisted grid styles', async ({
     page,
   }) => {
     const gridPageKey = `udw_v3_dashboard_grid_${uid}`;
@@ -5973,7 +6071,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       name: `UDW V3 Dashboard Grid ${uid}`,
       pageKey: gridPageKey,
       title: `UDW V3 Dashboard Grid ${uid}`,
-      kind: 'detail',
+      kind: 'dashboard',
       modelCode,
       schemaVersion: 3,
       blocks: [
@@ -6017,8 +6115,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-field-layout.gap')).toHaveValue('24');
 
     const persisted = await readPage(page, gridDashboardPid);
-    expect(findBlockById(persisted.blocks ?? [], 'dashboard_root')).toMatchObject({
-      blockType: 'dashboard',
+    expect(persisted).toMatchObject({ schemaVersion: 4, kind: 'dashboard',
       layout: expect.objectContaining({ cols: 6, rowHeight: 96, gap: 24 }),
     });
 
@@ -6072,7 +6169,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
             },
             {
               id: 'bpm_live_helper',
-              blockType: 'bpm-panel',
+              blockType: 'workflow-panel',
               title: `Live BPM helper ${uid}`,
               dataSource: helperDataSource,
               props: {
@@ -6331,7 +6428,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
             },
             {
               id: 'bpm_empty_helper',
-              blockType: 'bpm-panel',
+              blockType: 'workflow-panel',
               title: `Empty BPM ${uid}`,
               dataSource: {
                 type: 'namedQuery',
@@ -6451,10 +6548,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
   });
 
   test('UDW-052: configures helper permission code and gates live helper data loading', async ({
-    page,
+    page, browser, baseURL,
   }) => {
     expect(liveHelperNamedQueryCode).toBeTruthy();
-    const allowedPermissionCode = await pickCurrentPermissionCode(page);
+    const allowedPermissionCode = 'e2et.order.read';
+    const admin = await page.request.get('/api/auth/me');
+    expect(admin.status()).toBe(200);
+    expect(collectPermissionCodes((await admin.json()).data.permissions)).toContain('*');
     const missingPermissionCode = `meta.unified-designer.helper-missing.${uid}`;
     const blockedQueryCode = `missing_helper_permission_blocked_${uid}`;
     const helperPermissionPid = await createPageResource(page, {
@@ -6470,39 +6570,45 @@ test.describe.serial('Unified Designer Workbench V3', () => {
           blockType: 'detail',
           title: 'Helper permission detail',
           dataSource: { model: modelCode },
-          blocks: [
-            {
-              id: 'ai_permission_denied_helper',
-              blockType: 'ai-fill-banner',
-              title: `Permission denied AI ${uid}`,
-              dataSource: {
-                type: 'namedQuery',
-                executionMode: 'live',
-                queryCode: blockedQueryCode,
-                page: 1,
-                size: 3,
-              },
-              props: {
-                emptyText: `Permission denied helper stays private ${uid}`,
-              },
-            },
-            {
-              id: 'ai_permission_allowed_helper',
-              blockType: 'ai-fill-banner',
-              title: `Permission allowed AI ${uid}`,
-              dataSource: {
-                type: 'namedQuery',
-                executionMode: 'live',
-                queryCode: liveHelperNamedQueryCode,
-                page: 1,
-                size: 3,
-              },
-              props: {
-                permissionCode: allowedPermissionCode,
-                emptyText: `Allowed helper fallback ${uid}`,
-              },
-            },
-          ],
+          blocks: [{
+            id: 'helper_permission_tabs', blockType: 'tabs',
+            blocks: [{
+              id: 'helper_permission_tab', blockType: 'tab', title: 'Helper permissions',
+              blocks: [
+                  {
+                    id: 'ai_permission_denied_helper',
+                    blockType: 'ai-fill-banner',
+                    title: `Permission denied AI ${uid}`,
+                    dataSource: {
+                      type: 'namedQuery',
+                      executionMode: 'live',
+                      queryCode: blockedQueryCode,
+                      page: 1,
+                      size: 3,
+                    },
+                    props: {
+                      emptyText: `Permission denied helper stays private ${uid}`,
+                    },
+                  },
+                  {
+                    id: 'ai_permission_allowed_helper',
+                    blockType: 'ai-fill-banner',
+                    title: `Permission allowed AI ${uid}`,
+                    dataSource: {
+                      type: 'namedQuery',
+                      executionMode: 'live',
+                      queryCode: liveHelperNamedQueryCode,
+                      page: 1,
+                      size: 3,
+                    },
+                    props: {
+                      permissionCode: allowedPermissionCode,
+                      emptyText: `Allowed helper fallback ${uid}`,
+                    },
+                  },
+              ],
+            }],
+          }],
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-workbench-v3-helper-permission' },
@@ -6524,56 +6630,81 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       allowedPermissionCode,
     );
 
-    const blockedRequests: string[] = [];
-    const blockedRequestListener = (request: Request) => {
-      if (request.url().includes(`/api/meta/named-queries/${blockedQueryCode}/execute`)) {
-        blockedRequests.push(request.url());
-      }
-    };
-    page.on('request', blockedRequestListener);
-    const allowedRespPromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/meta/named-queries/${liveHelperNamedQueryCode}/execute`) &&
-        response.request().method() === 'POST',
-      { timeout: 15000 },
+    await expect(page.getByTestId('designer-save')).toBeEnabled();
+    await saveDesignerPage(page, helperPermissionPid);
+    for (const permission of ['meta.designer.read', 'page.page.read', 'meta.query.read', 'model.page_schema.read']) {
+      await grantRolePermissionByCode(page, 'e2et_viewer', permission);
+    }
+    const roleContext = await createAuthenticatedRoleContext(
+      browser, baseURL ?? new URL(page.url()).origin, 'viewer',
     );
-    await page.getByTestId('designer-mode-preview').click();
-    const allowedResp = await allowedRespPromise;
-    expect(allowedResp.status()).toBe(200);
-    page.off('request', blockedRequestListener);
+    try {
+      const rolePage = await roleContext.newPage();
+      const identity = await rolePage.request.get('/api/auth/me');
+      expect(identity.status()).toBe(200);
+      const codes = collectPermissionCodes((await identity.json()).data.permissions);
+      expect(codes).not.toContain('*');
+      expect(codes).not.toContain(missingPermissionCode);
+      expect(codes).toContain(allowedPermissionCode);
+      expect(codes).toContain('meta.query.read');
+      expect(codes).toContain('model.page_schema.read');
+      await rolePage.goto(`/unified-designer?pageId=${helperPermissionPid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(rolePage.getByTestId('unified-designer-workbench')).toBeVisible();
+      const blockedRequests: string[] = [];
+      const blockedRequestListener = (request: Request) => {
+        if (request.url().includes(`/api/meta/named-queries/${blockedQueryCode}/execute`)) {
+          blockedRequests.push(request.url());
+        }
+      };
+      rolePage.on('request', blockedRequestListener);
+      const allowedRespPromise = rolePage.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/meta/named-queries/${liveHelperNamedQueryCode}/execute`) &&
+          response.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      await rolePage.getByTestId('designer-mode-preview').click();
+      const allowedResp = await allowedRespPromise;
+      expect(allowedResp.status()).toBe(200);
 
-    const deniedPermission = page.getByTestId(
-      'runtime-helper-permission-ai_permission_denied_helper',
-    );
-    await expect(deniedPermission).toContainText(`Requires permission: ${missingPermissionCode}`);
-    await expect(deniedPermission).toHaveAttribute('data-permission-code', missingPermissionCode);
-    await expect(deniedPermission).toHaveAttribute('data-permission-allowed', 'false');
-    await expect(page.getByTestId('runtime-helper-source-ai_permission_denied_helper')).toHaveCount(
-      0,
-    );
-    await expect(page.getByTestId('runtime-helper-error-ai_permission_denied_helper')).toHaveCount(
-      0,
-    );
-    await expect(
-      page.getByTestId('runtime-ai-fill-field-ai_permission_denied_helper-0'),
-    ).toHaveCount(0);
-    await expect(
-      page.getByTestId('runtime-ai-fill-empty-ai_permission_denied_helper'),
-    ).toContainText(`Permission denied helper stays private ${uid}`);
+      const deniedPermission = rolePage.getByTestId(
+        'runtime-helper-permission-ai_permission_denied_helper',
+      );
+      await expect(deniedPermission).toContainText(`Requires permission: ${missingPermissionCode}`);
+      await expect(deniedPermission).toHaveAttribute('data-permission-code', missingPermissionCode);
+      await expect(deniedPermission).toHaveAttribute('data-permission-allowed', 'false');
+      await expect(rolePage.getByTestId('runtime-helper-source-ai_permission_denied_helper')).toHaveCount(
+        0,
+      );
+      await expect(rolePage.getByTestId('runtime-helper-error-ai_permission_denied_helper')).toHaveCount(
+        0,
+      );
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-field-ai_permission_denied_helper-0'),
+      ).toHaveCount(0);
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-empty-ai_permission_denied_helper'),
+      ).toContainText(`Permission denied helper stays private ${uid}`);
 
-    const allowedPermission = page.getByTestId(
-      'runtime-helper-permission-ai_permission_allowed_helper',
-    );
-    await expect(allowedPermission).toContainText(`Permission: ${allowedPermissionCode}`);
-    await expect(allowedPermission).toHaveAttribute('data-permission-code', allowedPermissionCode);
-    await expect(allowedPermission).toHaveAttribute('data-permission-allowed', 'true');
-    await expect(page.getByTestId('runtime-helper-source-ai_permission_allowed_helper')).toHaveText(
-      'named-query',
-    );
-    await expect(
-      page.getByTestId('runtime-ai-fill-field-ai_permission_allowed_helper-0'),
-    ).toBeVisible();
-    expect(blockedRequests).toEqual([]);
+      const allowedPermission = rolePage.getByTestId(
+        'runtime-helper-permission-ai_permission_allowed_helper',
+      );
+      await expect(allowedPermission).toContainText(`Permission: ${allowedPermissionCode}`);
+      await expect(allowedPermission).toHaveAttribute('data-permission-code', allowedPermissionCode);
+      await expect(allowedPermission).toHaveAttribute('data-permission-allowed', 'true');
+      await expect(rolePage.getByTestId('runtime-helper-source-ai_permission_allowed_helper')).toHaveText(
+        'named-query',
+      );
+      await expect(
+        rolePage.getByTestId('runtime-ai-fill-field-ai_permission_allowed_helper-0'),
+      ).toBeVisible();
+      expect(blockedRequests).toEqual([]);
+      rolePage.off('request', blockedRequestListener);
+    } finally {
+      await roleContext.close();
+    }
   });
 
   test('UDW-062: reorders blocks by dragging outline rows through the shared dnd kernel', async ({
@@ -6859,6 +6990,7 @@ async function ensureNamedQuery(
     title: string;
     description: string;
     fromSql: string;
+    baseWhere?: Array<{ field: string; operator: string; value: string[] }>;
   },
 ): Promise<void> {
   const createResp = await page.request.post('/api/meta/named-queries', { data: request });

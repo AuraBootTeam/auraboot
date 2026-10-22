@@ -121,11 +121,13 @@ class AutomationServiceImplTenantIsolationTest {
                 .isInstanceOf(ValidationException.class);
 
         verify(automationTriggerService, never()).executeAutomation(any(), anyString(), any());
+        verify(automationProcessRuntime, never()).deploy(any());
     }
 
     @Test
     void triggerManually_sameTenantAutomationPassesSampleContextToExecutor() {
         Automation automation = automationOwnedBy(CURRENT_TENANT);
+        automation.setEnabled(false);
         when(automationMapper.findByPid("auto-x")).thenReturn(automation);
 
         service.triggerManually("auto-x", "REQ-LONG-LEAVE-SAMPLE", Map.of(
@@ -141,6 +143,11 @@ class AutomationServiceImplTenantIsolationTest {
         assertThat(payloadCaptor.getValue()).containsEntry("source", "ui-test-run");
         assertThat(payloadCaptor.getValue()).containsEntry("manualTrigger", true);
         assertThat(payloadCaptor.getValue()).containsEntry("record", Map.of("wd_req_days", 5));
+        var executionOrder = org.mockito.Mockito.inOrder(automationProcessRuntime, automationTriggerService);
+        executionOrder.verify(automationProcessRuntime).deploy(automation);
+        executionOrder.verify(automationTriggerService).executeAutomation(eq(automation), eq("REQ-LONG-LEAVE-SAMPLE"), any());
+        assertThat(automation.getEnabled()).isFalse();
+        verify(automationMapper, never()).updateEnabled(anyString(), eq(true), anyString());
     }
 
     @Test

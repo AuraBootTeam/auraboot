@@ -287,6 +287,8 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
   assert.match(golden, /platform-plugin-api\/build\/libs\/platform-plugin-api-1\.0\.0\.jar/);
   assert.match(golden, /"-PplatformPluginApiJar=\$platform_plugin_api_jar"/);
+  assert.match(golden, /"-PplatformRuntimeJar=\$REPO_ROOT\/platform\/build\/libs\/AuraBoot-1\.0\.0-boot\.jar"/,
+    'external hybrid plugins require the exact Core runtime artifact as well as the plugin API');
   assert.ok(
     golden.indexOf('platform_plugin_api_jar=') <
       golden.indexOf('"-PplatformPluginApiJar=$platform_plugin_api_jar"'),
@@ -335,19 +337,27 @@ test('OSS golden stack applies explicit product migrations only to a fresh datab
     { fresh: '0', absent: '1', products: '1', allowed: true },
     { fresh: '1', absent: '1', products: '1', allowed: false },
     { fresh: '1', absent: '1', products: '0', allowed: false },
+    { fresh: '0', absent: '0', products: '0', port: '16317', allowed: true },
+    { fresh: '1', absent: '0', products: '1', port: '16317', allowed: true },
+    { fresh: '0', absent: '1', products: '1', port: '16317', allowed: true },
+    { fresh: '0', absent: '0', products: '0', port: '6379', allowed: false },
+    { fresh: '1', absent: '0', products: '1', port: '16317', host: '', allowed: false },
   ];
   for (const row of cases) {
     const result = spawnSync('bash', ['-c', `
       set -euo pipefail
       die() { printf '%s\\n' "$*" >&2; exit 1; }
       fresh_db="$1"; require_new_db="$2"
+      isolated_redis_port="$4"; redis_host="$5"; redis_port=6379; SCRIPT_DIR="$PWD/scripts"
       product_migration_roots=()
       [ "$3" = "0" ] || product_migration_roots+=(/fixture/product-migrations)
       ${guard}
-    `, 'freshness-contract', row.fresh, row.absent, row.products], { encoding: 'utf8' });
+      printf '%s\\n' "$redis_port"
+    `, 'freshness-contract', row.fresh, row.absent, row.products, row.port ?? '', row.host ?? '127.0.0.1'], { encoding: 'utf8' });
     assert.equal(result.error, undefined);
     assert.equal(result.status, row.allowed ? 0 : 1, JSON.stringify(row));
-    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires/);
+    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires|conflicts|invalid/);
+    else assert.equal(result.stdout.trim(), row.port || '6379');
   }
 
   assert.match(stack, /--product-migration-root requires a fresh database flag/);
@@ -717,4 +727,23 @@ test('default mapping admission is safe under the supported macOS bash nounset s
   const result=spawnSync('/bin/bash',['-c',shell],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
   assert.deepEqual(JSON.parse(result.stdout),{global:'',plugins:{},selected:{}});
+});
+
+test('backend image includes every configured Gradle project and its locked inputs', () => {
+  const dockerfile = read('platform/Dockerfile');
+  const modules = [...read('platform/settings.gradle').matchAll(/^include '([^']+)'/gm)]
+    .map(match => match[1]);
+  assert.ok(modules.length > 0, 'settings must expose the platform project denominator');
+  assert.ok(dockerfile.includes('COPY platform/gradle.lockfile ./'), 'root lock missing from builder');
+  assert.ok(dockerfile.includes('COPY platform/gradle gradle'), 'shared build conventions missing');
+  for (const module of modules) {
+    for (const input of ['build.gradle', 'gradle.lockfile', 'src']) {
+      const source = `platform/${module}/${input}`;
+      if (!existsSync(source)) continue;
+      assert.ok(
+        dockerfile.includes(`COPY ${source} ${module}/${input}`),
+        `Docker builder omits configured project input ${source}`,
+      );
+    }
+  }
 });

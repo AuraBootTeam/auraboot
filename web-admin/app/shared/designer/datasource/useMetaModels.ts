@@ -46,22 +46,32 @@ export function useMetaModels() {
     let mounted = true;
     setIsLoading(true);
 
-    fetch('/api/meta/models')
-      .then((res) => res.json())
-      .then((result) => {
-        if (!mounted) return;
-        if (ResultHelper.isSuccess(result) && result.data) {
-          const records = Array.isArray(result.data) ? result.data : result.data.records || [];
-          setModels(
-            records.map(
-              (m: { pid: string; code: string; displayName?: string; name?: string }) => ({
-                pid: m.pid,
-                code: m.code,
-                name: m.displayName || m.name || m.code,
-              }),
-            ),
-          );
+    const loadCatalog = async () => {
+      const records: Array<{ pid: string; code: string; displayName?: string; name?: string }> = [];
+      for (let page = 1; mounted; page++) {
+        const response = await fetch(`/api/meta/models?page=${page}&size=200&sortField=code&sortOrder=asc`);
+        if (!response.ok) throw new Error(`Model catalog returned HTTP ${response.status}`);
+        const result = await response.json();
+        if (!ResultHelper.isSuccess(result) || !result.data) {
+          throw new Error('Model catalog could not be loaded');
         }
+        const rows = Array.isArray(result.data) ? result.data : result.data.records;
+        if (!Array.isArray(rows)) throw new Error('Malformed model catalog');
+        records.push(...rows);
+        const total = Number(result.data.total);
+        if (Array.isArray(result.data) || !Number.isFinite(total) || records.length >= total) {
+          return records;
+        }
+        if (rows.length === 0) throw new Error('Incomplete model catalog');
+      }
+      return [];
+    };
+    void loadCatalog()
+      .then((records) => {
+        if (!mounted) return;
+        setModels(records.map(m => ({
+          pid: m.pid, code: m.code, name: m.displayName || m.name || m.code,
+        })));
       })
       .catch((error) => console.error('Failed to fetch models:', error))
       .finally(() => {

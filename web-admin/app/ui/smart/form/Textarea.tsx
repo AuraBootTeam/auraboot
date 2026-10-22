@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useLayoutEffect, useRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 import type { TextareaProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
@@ -116,12 +116,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     const errorText = meta.meta.error ? st(meta.meta.error) : undefined;
 
     // 字符计数
-    const [currentLength, setCurrentLength] = useState((field.value || '').toString().length);
+    const currentLength = (field.value || '').toString().length;
 
     // 处理值变化
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
-      setCurrentLength(newValue.length);
       field.setValue(newValue);
     };
 
