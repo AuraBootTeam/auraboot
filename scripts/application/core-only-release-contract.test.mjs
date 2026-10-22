@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {exportProductImage} from './export-product-image.mjs';
+import {exportProductImage,unpackOciArchive} from './export-product-image.mjs';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -280,4 +280,20 @@ test('public exporter runs real tar without a container dependency',t=>{
   const good=spawnSync(process.execPath,[cli,f.layout,f.receiptFile],{encoding:'utf8'});
   assert.equal(good.status,0,good.stderr);assert.equal(JSON.parse(readFileSync(f.receiptFile)).transport.mode,'ci-oci-archive');
   assert.equal(spawnSync(process.execPath,[cli,f.layout,f.receiptFile,'--overwrite'],{encoding:'utf8'}).status,2);
+});
+test('OCI archive consumption binds external archive and image digests before accepting bytes',async t=>{
+  const f=ociFixture(t),receipt=await exportProductImage(f),archive=path.join(f.root,'image.oci.tar');
+  const args={archive,destination:path.join(f.root,'selected'),archiveSha256:receipt.artifacts.imageArchive.digest.slice(7),
+    manifestDigest:f.receipt.ociLayoutDigest,imageId:f.receipt.loadedImageId};
+  await unpackOciArchive(args);
+  assert.equal(readFileSync(path.join(args.destination,'index.json'),'utf8'),readFileSync(path.join(f.layout,'index.json'),'utf8'));
+  await assert.rejects(unpackOciArchive({...args,destination:path.join(f.root,'wrong'),archiveSha256:'f'.repeat(64)}),/checksum differs/);
+  assert.equal(existsSync(path.join(f.root,'wrong')),false);
+  await assert.rejects(unpackOciArchive(args));
+  const bad=ociFixture(t),outside=path.join(bad.layout,'outside');writeFileSync(outside,'unindexed');
+  const malicious=path.join(bad.root,'extra.tar');execFileSync('tar',['-C',bad.layout,'-cf',malicious,'.']);
+  const digest=createHash('sha256').update(readFileSync(malicious)).digest('hex');
+  const target=path.join(bad.root,'rejected');
+  await assert.rejects(unpackOciArchive({...args,archive:malicious,destination:target,archiveSha256:digest}));
+  assert.equal(existsSync(target),false);
 });

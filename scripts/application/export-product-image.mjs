@@ -53,7 +53,7 @@ export async function exportProductImage({layout,receiptFile}) {
   const root=path.dirname(receiptFile),temporary=await mkdtemp(path.join(root,'.oci-export-'));
   const archive=path.join(temporary,'image.oci.tar'),destination=path.join(root,'image.oci.tar');
   try {
-    execFileSync('tar',['-C',layout,'-cf',archive,'.'],{stdio:['ignore','pipe','pipe']});
+    execFileSync('tar',['-C',layout,'-cf',archive,'.'],{stdio:['ignore','pipe','pipe'],env:{...process.env,COPYFILE_DISABLE:'1'}});
     // Recheck after the archiver read: concurrent source drift cannot produce a
     // transport receipt for another image. Native source roots are frozen by CI.
     await verifyOciLayout(layout,receipt.ociLayoutDigest,receipt.loadedImageId);
@@ -64,7 +64,46 @@ export async function exportProductImage({layout,receiptFile}) {
     await rename(output,receiptFile);return result;
   }finally{await rm(temporary,{recursive:true,force:true});}
 }
+export async function unpackOciArchive({archive,destination,archiveSha256,manifestDigest,imageId}) {
+  requireThat(path.isAbsolute(archive)&&path.isAbsolute(destination),'explicit absolute OCI archive paths required');
+  requireThat(/^[a-f0-9]{64}$/.test(archiveSha256)&&await sha(await regular(archive))==='sha256:'+archiveSha256,
+    'selected OCI archive checksum differs');
+  const program=`import pathlib,shutil,sys,tarfile
+archive,destination=sys.argv[1:]
+root=pathlib.Path(destination)
+assert not root.exists() and not root.is_symlink(), 'OCI destination must be fresh'
+with tarfile.open(archive,'r:*') as source:
+ members=source.getmembers(); names=set()
+ assert 0<len(members)<=10000 and sum(m.size for m in members)<=16*1024**3, 'invalid OCI archive denominator'
+ for member in members:
+  p=pathlib.PurePosixPath(member.name); name=str(p)
+  assert not p.is_absolute() and '..' not in p.parts and '\\\\' not in member.name, 'unsafe OCI archive path'
+  assert name not in names, 'duplicate OCI archive member'
+  names.add(name)
+  if member.isdir(): assert name in ('.','blobs','blobs/sha256'), 'unindexed OCI directory'
+  else:
+   assert member.isfile(), 'OCI links or special members rejected'
+   assert name in ('index.json','oci-layout') or (len(p.parts)==3 and p.parts[:2]==('blobs','sha256') and len(p.parts[2])==64 and all(c in '0123456789abcdef' for c in p.parts[2])), 'unindexed OCI file'
+ root.mkdir()
+ for member in members:
+  target=root/str(pathlib.PurePosixPath(member.name))
+  if member.isdir(): target.mkdir(parents=True,exist_ok=True)
+  else:
+   target.parent.mkdir(parents=True,exist_ok=True)
+   with source.extractfile(member) as stream, target.open('xb') as output: shutil.copyfileobj(stream,output)
+`;
+  execFileSync('python3',['-c',program,archive,destination],{stdio:['ignore','pipe','pipe']});
+  await verifyOciLayout(destination,manifestDigest,imageId);
+  return {archiveSha256,manifestDigest,imageId};
+}
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  try{const [layout,receiptFile,...extra]=process.argv.slice(2);requireThat(layout&&receiptFile&&extra.length===0,'usage: export-product-image.mjs <OCI-layout> <native-receipt>');await exportProductImage({layout,receiptFile});}
+  try{
+    const args=process.argv.slice(2);
+    if(args[0]==='unpack') {
+      requireThat(args.length===6,'usage: export-product-image.mjs unpack <archive> <destination> <archive-sha256> <manifest-digest> <image-id>');
+      const [,archive,destination,archiveSha256,manifestDigest,imageId]=args;
+      await unpackOciArchive({archive,destination,archiveSha256,manifestDigest,imageId});
+    }else {const [layout,receiptFile,...extra]=args;requireThat(layout&&receiptFile&&extra.length===0,'usage: export-product-image.mjs <OCI-layout> <native-receipt>');await exportProductImage({layout,receiptFile});}
+  }
   catch(error){console.error(error.message);process.exitCode=2;}
 }
