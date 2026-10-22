@@ -366,3 +366,5 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
 | `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |
 | `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |
+
+The independent published-library consumer in [fixtures/agent-artifact-consumer](fixtures/agent-artifact-consumer/README.md) validates core/agent/app and opt-in fixtures through actual Maven POM and Gradle metadata, without producer project substitution.

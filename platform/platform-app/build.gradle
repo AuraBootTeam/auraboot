@@ -3,7 +3,8 @@ import java.util.jar.Manifest
 import java.util.zip.ZipFile
 
 plugins {
-    id 'java'
+    id 'java-library'
+    id 'maven-publish'
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
 }
@@ -73,8 +74,23 @@ dependencies {
 springBoot {
     mainClass = 'com.auraboot.framework.application.PlatformApplication'
 }
+// Downstream products consume these composition classes without nesting an executable jar.
+java { withSourcesJar() }
 jar {
-    enabled = false
+    enabled = true
+    archiveClassifier = ''
+}
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'auraboot-app'
+            versionMapping {
+                usage('java-api') { fromResolutionOf('runtimeClasspath') }
+                usage('java-runtime') { fromResolutionResult() }
+            }
+        }
+    }
 }
 bootJar {
     archiveFileName = "AuraBoot-${project.version}-boot.jar"
