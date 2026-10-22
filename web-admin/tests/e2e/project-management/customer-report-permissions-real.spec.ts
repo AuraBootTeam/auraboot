@@ -171,7 +171,9 @@ test('SC06-PERMISSIONS report artifact grants do not bypass customer source read
         expect(queryResponse.status()).toBe(200);
         expect((await queryResponse.json()).data.records.map((row: { pid: string }) => row.pid).sort()).toEqual(customers.map(row => row.pid).sort());
         await expect(actor.getByRole('cell', { name: target!.tpm_cu_name, exact: true })).toBeVisible();
-        await expect(actor.getByRole('cell', { name: target!.tpm_cu_contact!, exact: true })).toBeVisible();
+        const targetRow = actor.getByRole('row').filter({ has: actor.getByRole('cell', { name: target!.tpm_cu_name, exact: true }) });
+        await expect(targetRow).toHaveCount(1);
+        await expect(targetRow.getByRole('cell', { name: target!.tpm_cu_contact!, exact: true })).toBeVisible();
         for (const format of ['markdown', 'html', 'pdf'] as const) {
           const label = { markdown: 'Markdown', html: 'HTML', pdf: 'PDF' }[format];
           const extension = { markdown: 'md', html: 'html', pdf: 'pdf' }[format];

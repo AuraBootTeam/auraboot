@@ -65,3 +65,17 @@ describe('SmartTextarea autoResize', () => {
     expect(screen.getByRole('textbox').style.height).toBe('');
   });
 });
+
+it('updates the character count when a controlled draft is filled or undone', () => {
+  function Harness() {
+    const [value, setValue] = React.useState('');
+    return <><button onClick={() => setValue('Reviewed draft')}>Fill draft</button><button onClick={() => setValue('')}>Undo draft</button><Textarea name="notes" label="Notes" value={value} maxLength={100} /></>;
+  }
+  mount(<Harness />);
+  expect(screen.getByText('0/100')).toBeVisible();
+  act(() => screen.getByRole('button', { name: 'Fill draft' }).click());
+  expect(screen.getByRole('textbox')).toHaveValue('Reviewed draft');
+  expect(screen.getByText('14/100')).toBeVisible();
+  act(() => screen.getByRole('button', { name: 'Undo draft' }).click());
+  expect(screen.getByText('0/100')).toBeVisible();
+});

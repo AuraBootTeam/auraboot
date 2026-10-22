@@ -1,3 +1,4 @@
+import { liveShowcaseLogin } from '../../helpers/live-showcase-login';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { navigateToMenuByClick } from '../helpers';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
@@ -102,12 +103,7 @@ test('SC06: live customer notes → reviewed draft → undo → manual correctio
   const name = `华辰制造${Date.now().toString(36)}有限公司`;
   const source = `今天客户会议纪要比较零散：先核对公司名称，正式客户名称是“${name}”。对接人为采购部张经理。请只整理明确的客户名称和客户联系人，不要推测其他资料。`;
   page.setDefaultTimeout(20000);
-  await page.goto('/login');
-  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
-  await page.locator('#identifier').fill(DEFAULT_TEST_ACCOUNT.email);
-  await page.locator('#password').fill(DEFAULT_TEST_ACCOUNT.password);
-  await page.locator('form button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.includes('/login'));
+  await liveShowcaseLogin(page);
   const identity = await (await page.request.get('/api/auth/me')).json();
   expect(String(identity.code)).toBe('0');
   expect(String(identity.data.user.tenantId)).toBe(process.env.AURA_ADMIN_TENANT_ID);

@@ -14,6 +14,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
+import { useSmartText } from '~/utils/i18n';
+import { contextLabel } from './contextLabel';
 
 interface AgentOption {
   agent_code: string;
@@ -46,10 +48,19 @@ export function normalizeAgentOptions(records: AgentDefinitionRecord[]): AgentOp
 }
 
 export function AuraBotPanel() {
-  const { state, sessions, closePanel, sendMessage, setSelectedAgent, newSession, selectSession, deleteSession } =
-    useAuraBot();
+  const {
+    state,
+    sessions,
+    closePanel,
+    sendMessage,
+    setSelectedAgent,
+    newSession,
+    selectSession,
+    deleteSession,
+  } = useAuraBot();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const text = useSmartText();
   const [agents, setAgents] = useState<AgentOption[]>([AURABOT_DEFAULT]);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -202,9 +213,7 @@ export function AuraBotPanel() {
                     <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                       历史对话
                     </div>
-                    <div className="text-[11px] text-gray-400">
-                      历史会话已持久化到数据库
-                    </div>
+                    <div className="text-[11px] text-gray-400">历史会话已持久化到数据库</div>
                   </div>
                   <button
                     onClick={() => {
@@ -263,7 +272,7 @@ export function AuraBotPanel() {
                               e.stopPropagation();
                               deleteSession(session.sessionId);
                             }}
-                            className="rounded p-1 text-gray-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-900/20"
+                            className="rounded p-1 text-gray-300 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
                             title="Delete Session"
                           >
                             <TrashIcon className="h-3.5 w-3.5" />
@@ -307,9 +316,17 @@ export function AuraBotPanel() {
       {/* Context badge */}
       {state.pageContext?.modelCode && (
         <div className="truncate border-b border-gray-100 bg-gray-50 px-4 py-1.5 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
-          {state.pageContext.breadcrumb?.join(' \u2192 ') || state.pageContext.modelCode}
+          <span data-testid="aurabot-context-label">
+            {contextLabel(
+              state.pageContext,
+              t,
+              text({ 'zh-CN': '当前业务页面', 'en-US': 'Current business page' }),
+            )}
+          </span>
           {state.pageContext.pageType === 'detail' && state.pageContext.recordPid && (
-            <span className="ml-1 text-blue-500">&bull; Record</span>
+            <span className="ml-1 text-blue-500">
+              &bull; {text({ 'zh-CN': '当前记录', 'en-US': 'Current record' })}
+            </span>
           )}
         </div>
       )}
