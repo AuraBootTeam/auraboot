@@ -9,6 +9,18 @@ const MARKER = ".aura-mini-project.json";
 function contained(parent, child) {
   return child === parent || child.startsWith(parent + path.sep);
 }
+function validateProjectTarget(config, mode) {
+  if (config.deviceHealthBootstrap === true) {
+    if (mode !== "real-stack" || config.target !== "device" || config.deviceHealthVerified !== false)
+      throw new Error("Explicit unverified real-stack device bootstrap required");
+    // Packaging permits only a probe-first device build. Business target(config)
+    // remains blocked until an actual phone connectivity receipt is accepted.
+    const origin = target({ ...config, deviceHealthVerified: true });
+    if (!origin.startsWith("https://")) throw new Error("Device bootstrap requires HTTPS");
+    return;
+  }
+  target(config);
+}
 function prepareProject({
   source,
   out,
@@ -30,7 +42,7 @@ function prepareProject({
     throw new Error("Project output must be separate from source");
   if (!identity || !["fixture", "real-stack"].includes(mode))
     throw new Error("Explicit source identity and data mode required");
-  target(config);
+  validateProjectTarget(config, mode);
   if (!config.version || !config.runtimeName)
     throw new Error("Version and runtime identity required");
   if (
@@ -257,7 +269,7 @@ function readProject(project, { expected = {}, mode } = {}) {
     if (value !== undefined && manifest.config[key] !== value)
       throw new Error(`Project configuration mismatch: ${key}`);
   }
-  target(manifest.config);
+  validateProjectTarget(manifest.config, manifest.mode);
   return manifest;
 }
 function portBusy(port) {

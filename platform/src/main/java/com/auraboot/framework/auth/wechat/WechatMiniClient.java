@@ -154,9 +154,11 @@ public class WechatMiniClient {
 
     private JsonNode phonePost(String uri, Map<String, Object> payload) {
         try {
+            // Preserve a fixed byte length: WeChat rejects chunked JSON requests.
+            byte[] encoded = json().writeValueAsBytes(payload);
             String raw = PHONE_CLIENT.post()
                     .uri(URI.create(uri)).contentType(MediaType.APPLICATION_JSON)
-                    .body(payload).retrieve().body(String.class);
+                    .contentLength(encoded.length).body(encoded).retrieve().body(String.class);
             if (isBlank(raw)) {
                 throw phoneFailure("WeChat phone verification returned an empty response");
             }

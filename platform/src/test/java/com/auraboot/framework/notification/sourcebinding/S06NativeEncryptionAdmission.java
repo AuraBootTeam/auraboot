@@ -22,13 +22,13 @@ import java.util.Map;
 public final class S06NativeEncryptionAdmission {
     static final String KEY = "S06_NATIVE_FIELD_ENCRYPTION_KEY";
     private static Path privateProperties() { return NativeProcurementWorkspace.root()
-            .resolve(".workspace/private/procurement-web-stack-20261010/field-encryption.properties"); }
+            .resolve(".workspace/private").resolve(RUNTIME).resolve("field-encryption.properties"); }
     private static final Set<String> OVERRIDES = Set.of("jvmFieldEncryptionKey", "commandLineFieldEncryptionKey",
             "springApplicationJson", "profileSpecificFieldEncryptionKey", "environmentConfigLocation");
     private static final Set<String> PRIVATE_SOURCE_FIELDS = Set.of("schemaVersion", "kind", "runtime", "backendPid",
             "environmentKeyState", "effectiveKeyState", "additionalLocationCount", "additionalLocation",
             "propertiesPath", "propertiesSha256", "overridesAbsent");
-    private static final String RUNTIME = "procurement-web-stack-20261010";
+    private static final String RUNTIME = NativeProcurementWorkspace.runtime();
 
     private S06NativeEncryptionAdmission() {}
 

@@ -6356,5 +6356,10 @@
     "key": "command.target_version_policy.invalid",
     "zh-CN": "命令版本策略配置无效，请联系管理员。",
     "en-US": "The command version policy is invalid. Contact an administrator."
+  },
+  {
+    "key": "auth.phone_enrollment.rejected",
+    "zh-CN": "手机号授权登录未完成，请联系管理员核对入驻信息。",
+    "en-US": "Phone authorization login could not complete. Ask the administrator to check your enrollment details."
   }
 ]

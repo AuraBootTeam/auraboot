@@ -21,7 +21,7 @@ final class ProductQuoteNativePluginDirectory {
         try {
             require(hash(input).equals(inputSha), "PRODUCT_PLUGIN_INPUT_DRIFT");
             JsonNode value = new ObjectMapper().readTree(input.toFile());
-            require("procurement-web-stack-20261010".equals(value.path("runtime").asText()), "PRODUCT_PLUGIN_RUNTIME_MISMATCH");
+            require(NativeProcurementWorkspace.runtime().equals(value.path("runtime").asText()), "PRODUCT_PLUGIN_RUNTIME_MISMATCH");
             Path jar = Path.of(value.path("productJarPath").asText()).toRealPath();
             Path directory = supplied.toRealPath();
             require(directory.startsWith(ownedRuntime.toRealPath()) && Files.isDirectory(directory)

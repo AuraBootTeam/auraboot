@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -14,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Listens for CommandCompletedEvent and records field-level changes
@@ -42,6 +44,7 @@ public class FieldChangeEventListener {
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommandCompleted(CommandCompletedEvent event) {
+        MetaContext.Snapshot previous = MetaContext.snapshot();
         try {
             String modelCode = event.getModelCode();
             if (!StringUtils.hasText(modelCode)) {
@@ -59,6 +62,15 @@ public class FieldChangeEventListener {
             // Extract actor info
             Long actorId = extractLong(metadata, "actorId");
             String actorName = extractString(metadata, "actorName");
+            // AFTER_COMMIT can run after the originating request or installed
+            // integration has cleared its context. Only the event owns this identity.
+            if (tenantId == null || tenantId <= 0) {
+                throw new IllegalArgumentException("Field change event requires a positive tenantId");
+            }
+            MetaContext.restore(new MetaContext.Snapshot(
+                    tenantId, actorId != null ? actorId : 0L,
+                    extractString(metadata, "actorPid"), actorName,
+                    Set.of(), null, null, null, null));
 
             // Extract before-snapshot from event metadata (populated by CommandExecutorImpl)
             @SuppressWarnings("unchecked")
@@ -94,6 +106,9 @@ public class FieldChangeEventListener {
             log.error("Failed to record field changes for command={}, model={}, record={}: {}",
                     event.getCommandCode(), event.getModelCode(),
                     event.getRecordId(), e.getMessage(), e);
+        } finally {
+            MetaContext.clear();
+            if (previous != null) MetaContext.restore(previous);
         }
     }
 

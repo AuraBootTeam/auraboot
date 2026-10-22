@@ -13,6 +13,7 @@ const owned = vi.hoisted(() => ({
   runtime: null as any,
   manager: null as any,
   transport: vi.fn(),
+  pageLoader: null as null | ((params?: any) => Promise<void>),
 }));
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: any[]) => owned.transport(...args),
@@ -39,13 +40,16 @@ vi.mock('~/contexts/TimezoneContext', () => ({
 }));
 vi.mock('../hooks/usePageRuntime', async () => ({
   ...(await vi.importActual<any>('../hooks/usePageRuntime')),
-  usePageRuntime: () => ({
-    runtime: owned.runtime,
-    dataSourceManager: owned.manager,
-    t: (key: string) => key,
-    locale: 'en',
-    navigate: vi.fn(),
-  }),
+  usePageRuntime: (_schema: any, options: any) => {
+    owned.pageLoader = options?.loadData;
+    return {
+      runtime: owned.runtime,
+      dataSourceManager: owned.manager,
+      t: (key: string) => key,
+      locale: 'en',
+      navigate: vi.fn(),
+    };
+  },
 }));
 vi.mock('~/framework/smart/hooks/useSavedViews', () => ({
   useSavedViews: () => ({
@@ -133,16 +137,45 @@ function prepareRuntime() {
   };
   return manager;
 }
-function mount() {
+function mount(pageSchema: any = schema) {
   return render(
     <MemoryRouter>
       <ProfileProvider value={adminProfile}>
-        <ListPageContent schema={schema} tableName="owned" token="fixture" />
+        <ListPageContent schema={pageSchema} tableName="owned" token="fixture" />
       </ProfileProvider>
     </MemoryRouter>,
   );
 }
 describe('Actual ListPageContent→BlockRenderer external custom-only table', () => {
+  it('provides the latest page-owned list loader to runtime flow refresh actions', async () => {
+    prepareRuntime();
+    let title = 'Initial contact phone';
+    owned.transport.mockImplementation(async () => ({
+      code: '0',
+      data: { records: [{ pid: 'owned-123', title }], total: 1, current: 1, size: 20 },
+    }));
+    const normal = {
+      ...schema,
+      dataSources: {},
+      blocks: [{ ...table, dataSource: undefined }],
+      extension: {
+        ...schema.extension,
+        customOnly: false,
+        skipListData: false,
+        dataSource: { type: 'api', method: 'get', endpoint: '/api/example/contacts' },
+      },
+    };
+    mount(normal);
+    expect(await screen.findByText('Initial contact phone')).toBeVisible();
+    expect(owned.pageLoader).toBeTypeOf('function');
+    title = 'Persisted updated contact phone';
+    await act(async () => {
+      await owned.pageLoader!();
+    });
+    expect(await screen.findByText('Persisted updated contact phone')).toBeVisible();
+    expect(screen.queryByText('Initial contact phone')).not.toBeInTheDocument();
+  });
+
   it('renders exact owned rows once, without native model/field reads or duplicate toolbar', async () => {
     const manager = prepareRuntime();
     await manager.reload('ownedRows');
