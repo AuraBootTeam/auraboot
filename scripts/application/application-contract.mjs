@@ -242,12 +242,16 @@ function assertWebGraphIntegrity(contributions) {
   for (const code of byCode.keys()) visit(code);
 }
 
+function backendRuntimeId(manifest) {
+  return manifest.backend.agent === 'base' ? 'com.auraboot:runtime-base' : 'com.auraboot:runtime';
+}
+
 export function buildApplicationGraph(manifestInput, webContributionInputs = [], { requireContributions = false, skipImage = false } = {}) {
   const manifest = validateManifest(manifestInput);
   const webContributions = orderedWebContributions(manifest, webContributionInputs, requireContributions);
   assertWebGraphIntegrity(webContributions);
   const nodes = [
-    { kind: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { kind: 'runtime', id: backendRuntimeId(manifest), version: manifest.platform.runtime },
     ...(skipImage ? [] : [{ kind: 'image', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version }]),
     { kind: 'api', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { kind: 'web', id: '@auraboot/web-shell', version: manifest.platform.webShell },
@@ -424,7 +428,7 @@ export function assertNoMigrationCollisions(artifacts, { artifactRoot }) {
 
 function requirements(manifest, { skipImage = false } = {}) {
   return [
-    { type: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { type: 'runtime', id: backendRuntimeId(manifest), version: manifest.platform.runtime },
     ...(skipImage ? [] : [{ type: 'oci', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version }]),
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version: manifest.platform.webShell },

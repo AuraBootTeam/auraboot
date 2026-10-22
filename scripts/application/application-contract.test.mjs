@@ -418,3 +418,40 @@ describe('AuraBoot application contract', () => {
     );
   });
 });
+
+
+describe('optional agent runtime selection', () => {
+  it('keeps the complete AI runtime when agent selection is omitted or explicit, independently of core-only', () => {
+    for (const mode of ['application', 'core-only']) {
+      for (const agent of [undefined, 'with-agent']) {
+        const input = manifest();
+        input.backend.mode = mode;
+        if (agent !== undefined) input.backend.agent = agent;
+        assert.equal(buildApplicationGraph(input).nodes.find((node) => node.kind === 'runtime').id, 'com.auraboot:runtime');
+      }
+    }
+  });
+
+  it('resolves and locks a separately identified base runtime rather than accepting the full artifact', () => {
+    const input = manifest();
+    input.backend.agent = 'base';
+    assert.throws(() => resolveApplication(input, catalog()), /runtime-base.*resolved to 0/);
+    const artifacts = catalog();
+    const full = artifacts.artifacts.find((item) => item.type === 'runtime');
+    artifacts.artifacts.push({ ...full, id: 'com.auraboot:runtime-base',
+      uri: 'artifact:com.auraboot:runtime-base@1.3.0', digest: digest('d') });
+    const lock = resolveApplication(input, artifacts, { webContributions: [webContribution()] });
+    assert.deepEqual(lock.artifacts.filter((item) => item.type === 'runtime').map((item) => item.id),
+      ['com.auraboot:runtime-base']);
+    assert.equal(lock.composition.nodes.find((node) => node.kind === 'runtime').id, 'com.auraboot:runtime-base');
+    assert.throws(() => validateLockForManifest(lock, manifest()), /manifest|composition/i);
+  });
+
+  it('rejects unknown or misspelled agent selections instead of defaulting to full', () => {
+    for (const agent of ['none', 'disabled', '', false]) {
+      const input = manifest();
+      input.backend.agent = agent;
+      assert.throws(() => validateManifest(input), /agent/);
+    }
+  });
+});

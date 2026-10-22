@@ -1,7 +1,6 @@
 package com.auraboot.framework.application;
 
 import org.mybatis.spring.annotation.MapperScan;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
@@ -35,7 +34,7 @@ public class MetaApplication {
 	//todo profile 设置,docker 集成,https
 	public static void main(String[] args) {
 		Class<?> source = applicationSource(args);
-		SpringApplication.run(source, args);
+		PlatformApplication.launch(source, AgentAssembly.WITH_AGENT, args);
 	}
 
 	static Class<?> applicationSource(String[] args) {
