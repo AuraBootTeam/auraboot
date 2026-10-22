@@ -202,7 +202,7 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   await shot(page,'DS03-structured-drilldown');
   await canvas.locator('[data-widget-id="pending_count"]').first().click();
   const precision = panel.getByTestId('schema-config-field-precision').getByRole('spinbutton');
-  await expect(precision).toHaveValue(0);
+  await expect(precision).toHaveValue('0');
   await precision.fill('2');
   await panel.getByTestId('schema-config-field-format').getByRole('combobox').click();
   await page.getByRole('option', { name: '数字', exact: true }).click();
