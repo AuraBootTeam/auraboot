@@ -1,0 +1,26 @@
+apply plugin: 'checkstyle'
+apply plugin: 'pmd'
+
+// ========== Checkstyle (warn-only) ==========
+checkstyle {
+    toolVersion = '10.21.4'
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+    ignoreFailures = true
+    maxWarnings = Integer.MAX_VALUE
+}
+
+// ========== PMD (warn-only) ==========
+pmd {
+    toolVersion = '7.10.0'
+    consoleOutput = true
+    ignoreFailures = true
+    ruleSetFiles = files("${rootDir}/config/pmd/pmd-rules.xml")
+    ruleSets = [] // use only our custom ruleset
+}
+
+tasks.withType(Pmd).configureEach {
+    // Analyze only main source, not test
+    if (name.contains('Test')) {
+        enabled = false
+    }
+}

@@ -82,6 +82,11 @@ jobs:
         working-directory: platform
         run: ./gradlew --no-daemon compileJava compileTestJava
 
+      - name: Verify full application assembly and launcher modes
+        if: steps.changes.outputs.run == 'true'
+        working-directory: platform
+        run: ./gradlew --no-daemon :platform-app:test :platform-app:verifyApplicationAssembly
+
       - name: Verify core agent implementation boundary
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
