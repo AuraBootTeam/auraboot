@@ -371,7 +371,7 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
   }
 
   return (
-    <div className={cn('rounded-lg border border-gray-200 bg-white p-4', className)} style={style}>
+    <div className={cn('rounded-lg border border-gray-200 bg-white p-4', className)} style={style} role={title ? 'img' : undefined} aria-label={title}>
       <ReactECharts
         option={options}
         style={{ height: '100%', minHeight: 0 }}

@@ -39,7 +39,8 @@ describe('pie chart legends in designer canvases', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
   it('wraps a small distribution and preserves every actual label and value', () => {
-    render(<SmartPieChart dataSource={source} ring />);
+    render(<SmartPieChart dataSource={source} ring title="Delivery acceptance status" />);
+    expect(screen.getByRole('img', { name: 'Delivery acceptance status' })).toBeVisible();
     const config = options();
     expect(config.legend.type).toBe('plain');
     expect(config.legend.width).toBe('90%');

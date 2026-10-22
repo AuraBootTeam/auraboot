@@ -16,6 +16,7 @@ import { DesignerToolbar } from '~/shared/designer/DesignerToolbar';
 import type { ActionResult, AutomationLog } from '../services/automationService';
 import { ACTION_TYPE_I18N_KEYS } from './automationTypeLabels';
 import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
+import { useAutomationNodeStatuses } from './useAutomationNodeStatuses';
 import { getApiService } from '~/shared/services/ApiService';
 import {
   createDecisionApi,
@@ -418,6 +419,9 @@ export function AutomationEditor({
   const [flowData, setFlowData] = useState<FlowData | undefined>(initialData?.flowData);
   const [testRunning, setTestRunning] = useState(false);
   const [lastTestRunLog, setLastTestRunLog] = useState<AutomationLog | null>(initialRunLog ?? null);
+  // The result panel and canvas must describe the same execution, including
+  // when a new test run replaces the historical log selected in the URL.
+  const { statuses: selectedRunNodeStatuses } = useAutomationNodeStatuses(lastTestRunLog?.id);
   const [resultPanelOpen, setResultPanelOpen] = useState(Boolean(initialRunLog));
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -714,7 +718,7 @@ export function AutomationEditor({
             onSave={undefined}
             onChange={handleChange}
             readOnly={readOnly}
-            nodeStatuses={nodeStatuses}
+            nodeStatuses={lastTestRunLog ? selectedRunNodeStatuses : nodeStatuses}
           />
         </div>
 

@@ -24,8 +24,12 @@ test('SC03 live delivery notes → typed budget/date draft → preserved manual 
   await page.getByTestId(`user-select-option-tpm_pj_owner_user-${me.user.pid}`).click();
   const manual = '下周二由负责人核对验收清单（人工确认）';
   await page.locator('#tpm_pj_next_action').fill(manual);
-  const suffix = Date.now().toString(36),
-    name = `华辰制造 · 供应商对账升级 ${suffix}`;
+  const existing = await page.request.get('/api/dynamic/tpm_project/list?pageSize=1');
+  expect(existing.ok()).toBe(true);
+  const projectList = await existing.json();
+  expect(String(projectList.code)).toBe('0');
+  expect(Number.isInteger(projectList.data.total)).toBe(true);
+  const name = `华辰制造 · 第${projectList.data.total + 1}期供应商对账升级`;
   const source = `以下是虚构客户会议纪要：正式项目名称为“${name}”。本期范围为供应商台账导入、对账联调和交付培训。项目预算128000.50元人民币，交付日期为2026-11-20；开始日期尚未确定，不能推测。风险：客户测试环境未开放，联调可能延期。下一步拟先安排接口联调。客户与负责人已经人工选好，不要更改。请只整理明确资料，保留未说明字段为空。`;
   const writes: string[] = [];
   page.on('request', (r) => {
