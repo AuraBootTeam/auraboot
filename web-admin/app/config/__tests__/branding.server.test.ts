@@ -10,7 +10,7 @@ import {
 const tempDirectories: string[] = [];
 const licenseFixtureRoot = resolve(
   process.cwd(),
-  '../platform/src/test/resources/branding/commercial-license',
+  '../platform/src/testFixtures/resources/branding/commercial-license',
 );
 
 function signedEnvironment(configPath: string) {
