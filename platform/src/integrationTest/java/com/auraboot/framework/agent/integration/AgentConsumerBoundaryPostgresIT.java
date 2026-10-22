@@ -38,6 +38,8 @@ class AgentConsumerBoundaryPostgresIT {
     private AgentDefinitionResourceLifecycle resources;
     private PluginResourceMapper ledger;
     private AgentImDirectory directory;
+    private com.auraboot.framework.im.service.impl.ImConversationServiceImpl conversations;
+    private com.auraboot.framework.im.mapper.ImConversationMemberMapper membership;
     private SqlSessionTemplate sql;
     private long tenant;
 
@@ -56,7 +58,7 @@ class AgentConsumerBoundaryPostgresIT {
         factory.setTransactionFactory(new SpringManagedTransactionFactory());
         var sessions = factory.getObject();
         for (var mapper : List.of(AgentDefinitionMapper.class, AgentEvalCaseMapper.class,
-                PluginResourceMapper.class, AgentImMemberInfoMapper.class)) {
+                PluginResourceMapper.class, AgentImMemberInfoMapper.class, com.auraboot.framework.im.mapper.ImConversationMemberMapper.class)) {
             sessions.getConfiguration().addMapper(mapper);
         }
         var template = new SqlSessionTemplate(sessions);
@@ -66,6 +68,8 @@ class AgentConsumerBoundaryPostgresIT {
         resources = new AgentDefinitionResourceAdapter(agents, template.getMapper(AgentEvalCaseMapper.class),
                 ledger, jdbc, new ObjectMapper());
         directory = new AgentImDirectory(agents, template.getMapper(AgentImMemberInfoMapper.class));
+        membership = template.getMapper(com.auraboot.framework.im.mapper.ImConversationMemberMapper.class);
+        conversations = new com.auraboot.framework.im.service.impl.ImConversationServiceImpl(null, membership, null, null, directory);
         tenant = ThreadLocalRandom.current().nextLong(100_000_000L, 900_000_000L);
     }
 
@@ -134,19 +138,46 @@ class AgentConsumerBoundaryPostgresIT {
                     conversation, human, tenant);
             jdbc.update("INSERT INTO ab_im_conversation_member(conversation_id,member_type,member_id,tenant_id) VALUES (?,'agent',?,?)",
                     conversation, created.getResourceId(), tenant);
-            var members = directory.findMembersWithInfo(conversation, tenant);
+            var members = conversations.getMembers(conversation, tenant);
             assertThat(members).extracting(m -> m.getDisplayName()).containsExactly("Human colleague", "Agent colleague");
             assertThat(members.get(1).getAgentCode()).isEqualTo(created.getResourceCode());
-            assertThat(directory.findMembersWithInfo(conversation, tenant + 1)).isEmpty();
+            assertThat(conversations.getMembers(conversation, tenant + 1)).isEmpty();
             resources.rollback(created);
             sql.clearCache();
-            var archived = directory.findMembersWithInfo(conversation, tenant);
+            var archived = conversations.getMembers(conversation, tenant);
             assertThat(archived).hasSize(2);
             assertThat(archived.get(0).getDisplayName()).isEqualTo("Human colleague");
             assertThat(archived.get(1).getDisplayName()).isNull();
             resources.restore(created);
             sql.clearCache();
-            assertThat(directory.findMembersWithInfo(conversation, tenant).get(1).getDisplayName()).isEqualTo("Agent colleague");
+            assertThat(conversations.getMembers(conversation, tenant).get(1).getDisplayName()).isEqualTo("Agent colleague");
+            tx.setRollbackOnly();
+        });
+    }
+
+    @Test
+    void coreMembershipWorksInSchemaWithNoAgentTableOrAdapter() {
+        transactions.executeWithoutResult(tx -> {
+            jdbc.execute("CREATE TEMP TABLE ab_user (LIKE public.ab_user INCLUDING DEFAULTS) ON COMMIT DROP");
+            jdbc.execute("CREATE TEMP TABLE ab_im_conversation_member (LIKE public.ab_im_conversation_member INCLUDING DEFAULTS) ON COMMIT DROP");
+            jdbc.execute("SET LOCAL search_path TO pg_temp");
+            assertThat(jdbc.queryForObject("SELECT to_regclass('ab_agent_definition') IS NULL", Boolean.class)).isTrue();
+            jdbc.update("INSERT INTO ab_user(id,pid,user_name,nick_name) VALUES (?,?,?,?)",
+                    tenant + 1, UlidGenerator.generate(), "login", "Human without AI");
+            jdbc.update("INSERT INTO ab_im_conversation_member(conversation_id,member_type,member_id,tenant_id,role,joined_at) VALUES (?,'human',?,?,'owner',NOW()-INTERVAL '1 minute')",
+                    tenant + 2, tenant + 1, tenant);
+            jdbc.update("INSERT INTO ab_im_conversation_member(conversation_id,member_type,member_id,tenant_id) VALUES (?,'agent',?,?)",
+                    tenant + 2, tenant + 3, tenant);
+            var base = new com.auraboot.framework.im.service.impl.ImConversationServiceImpl(null, membership, null, null, null);
+            var members = base.getMembers(tenant + 2, tenant);
+            assertThat(members).extracting(m -> m.getMemberId()).containsExactly(tenant + 1, tenant + 3);
+            assertThat(members.getFirst().getDisplayName()).isEqualTo("Human without AI");
+            assertThat(members.getFirst().getUserId()).isEqualTo(tenant + 1);
+            assertThat(members.getFirst().getRole()).isEqualTo("owner");
+            assertThat(members.getFirst().getAgentAvailable()).isNull();
+            assertThat(members.get(1).getMemberType()).isEqualTo("agent");
+            assertThat(members.get(1).getAgentAvailable()).isFalse();
+            assertThat(base.getMembers(tenant + 2, tenant + 99)).isEmpty();
             tx.setRollbackOnly();
         });
     }

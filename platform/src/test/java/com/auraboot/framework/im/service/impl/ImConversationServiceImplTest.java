@@ -572,7 +572,7 @@ class ImConversationServiceImplTest {
         when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_GROUP, OTHER_ID));
         when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
                 .thenReturn(new ImConversationMember());
-        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
+        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
                 ConversationMemberInfo.builder()
                         .memberType(ImConstants.MEMBER_TYPE_HUMAN)
                         .memberId(USER_ID)
@@ -594,7 +594,7 @@ class ImConversationServiceImplTest {
         when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_GROUP, OTHER_ID));
         when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
                 .thenReturn(new ImConversationMember());
-        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of());
+        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of());
         when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID))
                 .thenReturn(List.of(OTHER_ID));
 
@@ -640,7 +640,7 @@ class ImConversationServiceImplTest {
         when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_GROUP, USER_ID));
         when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
                 .thenReturn(new ImConversationMember());
-        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
+        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(
                 ConversationMemberInfo.builder()
                         .memberType(ImConstants.MEMBER_TYPE_HUMAN)
                         .memberId(USER_ID)
@@ -676,11 +676,106 @@ class ImConversationServiceImplTest {
     }
 
     @Test
+    void optionalDirectoryHasRealSpringZeroOneAndDuplicateSemantics() {
+        try (var context = membershipContext(0)) {
+            assertThat(context.getBean(ImConversationServiceImpl.class)).isNotNull();
+        }
+        try (var context = membershipContext(1)) {
+            assertThat(context.getBean(ImConversationServiceImpl.class)).isNotNull();
+        }
+        try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            registerMembershipBeans(context);
+            context.registerBean("firstAgent", ImAgentDirectory.class, () -> agentDirectory);
+            context.registerBean("secondAgent", ImAgentDirectory.class, () -> org.mockito.Mockito.mock(ImAgentDirectory.class));
+            assertThatThrownBy(context::refresh)
+                    .isInstanceOf(org.springframework.beans.factory.UnsatisfiedDependencyException.class)
+                    .hasRootCauseInstanceOf(org.springframework.beans.factory.NoUniqueBeanDefinitionException.class);
+        }
+    }
+
+    private org.springframework.context.annotation.AnnotationConfigApplicationContext membershipContext(int directories) {
+        var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext();
+        registerMembershipBeans(context);
+        if (directories == 1) {
+            context.registerBean(ImAgentDirectory.class, () -> agentDirectory);
+        }
+        context.refresh();
+        return context;
+    }
+
+    private void registerMembershipBeans(org.springframework.context.annotation.AnnotationConfigApplicationContext context) {
+        context.registerBean(ImConversationMapper.class, () -> conversationMapper);
+        context.registerBean(ImConversationMemberMapper.class, () -> memberMapper);
+        context.registerBean(ImMessageMapper.class, () -> messageMapper);
+        context.registerBean(ImMessageService.class, () -> imMessageService);
+        context.registerBean(ImConversationServiceImpl.class);
+    }
+
+    @Test
+    void withoutAgentModule_preservesHumanAndAgentMembershipWithoutAgentLookups() {
+        service = new ImConversationServiceImpl(conversationMapper, memberMapper, messageMapper, imMessageService, null);
+        var human = ConversationMemberInfo.builder().memberType("human").memberId(USER_ID)
+                .userId(USER_ID).name("Human").displayName("Human").role("owner").build();
+        var agent = ConversationMemberInfo.builder().memberType("agent").memberId(55L).role("member").build();
+        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(List.of(human, agent));
+        assertThat(service.getMembers(CONV_ID, TENANT_ID)).containsExactly(human, agent);
+        assertThat(human.getDisplayName()).isEqualTo("Human");
+        assertThat(human.getAgentAvailable()).isNull();
+        assertThat(agent.getAgentAvailable()).isFalse();
+        assertThat(agent.getMemberId()).isEqualTo(55L);
+        org.mockito.Mockito.verifyNoInteractions(agentDirectory, conversationMapper, messageMapper, imMessageService);
+    }
+
+    @Test
+    void withoutAgentModule_rejectsAgentCreationBeforeAnyMembershipOrConversationWrite() {
+        service = new ImConversationServiceImpl(conversationMapper, memberMapper, messageMapper, imMessageService, null);
+        var request = req(ImConstants.TYPE_GROUP);
+        request.setMemberIds(List.of(OTHER_ID));
+        request.setAgentIds(List.of(55L));
+        assertThatThrownBy(() -> service.create(request, USER_ID, TENANT_ID))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not installed");
+        assertThatThrownBy(() -> service.addAgentMembers(CONV_ID, List.of(55L), TENANT_ID))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not installed");
+        org.mockito.Mockito.verifyNoInteractions(memberMapper, conversationMapper, messageMapper, imMessageService);
+    }
+
+    @Test
+    void withoutAgentModule_humanGroupCreationStillWritesConversationAndMembers() {
+        service = new ImConversationServiceImpl(conversationMapper, memberMapper, messageMapper, imMessageService, null);
+        var request = req(ImConstants.TYPE_GROUP);
+        request.setMemberIds(List.of(OTHER_ID));
+        doAnswer(invocation -> {
+            ((ImConversation) invocation.getArgument(0)).setId(CONV_ID);
+            return 1;
+        }).when(conversationMapper).insert(any(ImConversation.class));
+        assertThat(service.create(request, USER_ID, TENANT_ID).getId()).isEqualTo(CONV_ID);
+        var members = ArgumentCaptor.forClass(ImConversationMember.class);
+        verify(memberMapper, times(2)).insert(members.capture());
+        assertThat(members.getAllValues()).extracting(ImConversationMember::getMemberId).containsExactly(USER_ID, OTHER_ID);
+        assertThat(members.getAllValues()).extracting(ImConversationMember::getMemberType).containsOnly("human");
+        org.mockito.Mockito.verifyNoInteractions(agentDirectory, imMessageService);
+    }
+
+    @Test
+    void withAgentModule_enrichesCoreMembershipWithoutReplacingTheProjection() {
+        var membership = new ArrayList<ConversationMemberInfo>();
+        membership.add(ConversationMemberInfo.builder().memberType("agent").memberId(55L).build());
+        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID)).thenReturn(membership);
+        doAnswer(invocation -> {
+            membership.getFirst().setDisplayName("Agent colleague");
+            return null;
+        }).when(agentDirectory).enrichMembers(membership, TENANT_ID);
+        assertThat(service.getMembers(CONV_ID, TENANT_ID)).isSameAs(membership);
+        assertThat(membership.getFirst().getDisplayName()).isEqualTo("Agent colleague");
+        assertThat(membership.getFirst().getAgentAvailable()).isNull();
+    }
+
+    @Test
     void getMembers_delegatesToMapper() {
-        when(agentDirectory.findMembersWithInfo(CONV_ID, TENANT_ID))
+        when(memberMapper.findMembersWithInfo(CONV_ID, TENANT_ID))
                 .thenReturn(new ArrayList<>());
         service.getMembers(CONV_ID, TENANT_ID);
-        verify(agentDirectory).findMembersWithInfo(CONV_ID, TENANT_ID);
+        verify(memberMapper).findMembersWithInfo(CONV_ID, TENANT_ID);
     }
 
     @Test

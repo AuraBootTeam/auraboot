@@ -1,8 +1,11 @@
 package com.auraboot.framework.im.service;
 
-/** Agent display identity needed for IM membership greetings. */
+import com.auraboot.framework.im.dto.ConversationMemberInfo;
+import java.util.List;
+
+/** Optional agent display details; IM owns membership and human identity. */
 public interface ImAgentDirectory {
     Profile findById(Long agentId);
-    java.util.List<com.auraboot.framework.im.dto.ConversationMemberInfo> findMembersWithInfo(Long conversationId, Long tenantId);
+    void enrichMembers(List<ConversationMemberInfo> members, Long tenantId);
     record Profile(String name, Long employeeId) {}
 }
