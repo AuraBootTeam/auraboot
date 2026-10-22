@@ -1015,7 +1015,9 @@ test('rule center primary and professional views remain reachable through their 
 
 test('SLA business summary exposes loading errors and empty reads and recovers explicitly @critical', async ({page}) => {
   const user=await login(page);
-  const name='交付验收 · 时限读取与恢复验证';
+  const prefix='交付验收 · 时限读取与恢复验证';
+  const previous=(await dynamicRecords(page,'tpm_acceptance')).records.filter((record:any)=>record.tpm_ac_name.startsWith(prefix));
+  const name=`${prefix} · 第${previous.length+1}次`;
   const pid=await create(page,user,name,1000,'普通',true);
   const sla=await submit(page,pid,480,'tpm_standard_review');
   const endpoint=`**/api/bpm/monitor/instances/${sla.processInstanceId}/sla`;
