@@ -170,6 +170,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `application/schema-ownership-audit.mjs` | 0 | 2026-09-25 | Audit declared migration ownership without rewriting released SQL. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
+| `application/export-product-image.mjs` | 1 | 2026-10-22 | Export the tested OCI graph before native gate cleanup; immutable transport only. |
 
 ## pipeline/lib (12)
 
@@ -365,3 +366,16 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
 | `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |
 | `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |
+
+### Product image transport
+
+The existing Linux product image gate accepts `AURA_RELEASE_EXPORT_PACKAGE=1` to retain the
+tested OCI graph as `image.oci.tar` in its evidence directory before work-root cleanup.
+The default remains `0`. Export runs after native acceptance and records the actual archive
+digest in the original receipt; it neither builds another image nor grants deployment authority.
+Missing/corrupt OCI blobs, a different loaded image, partial native acceptance, external
+descriptors and existing output are rejected. Export failure fails the original gate.
+The original qualification profile and source/builder identity must include this transport mode
+before a publisher can consume it; historical receipts without an archive cannot acquire one
+by merely editing JSON. Local file/CLI self-tests use synthetic OCI bytes without Docker and
+do not represent Linux image qualification.

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import path, { join, resolve } from 'node:path';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {exportProductImage} from './export-product-image.mjs';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -225,4 +228,56 @@ test('corpus preflight rejects retries, missing results and fabricated summary c
   for (const mutate of mutations) {
     const value = report(); mutate(value); assert.notEqual(check(value), 0);
   }
+});
+
+function ociFixture(t) {
+  const root=mkdtempSync(path.join(tmpdir(),'native-oci-export-')),layout=path.join(root,'layout');
+  t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(path.join(layout,'blobs','sha256'),{recursive:true});
+  const blob=(value,mediaType)=>{const bytes=typeof value==='string'?value:JSON.stringify(value);
+    const digest='sha256:'+createHash('sha256').update(bytes).digest('hex');
+    writeFileSync(path.join(layout,'blobs','sha256',digest.slice(7)),bytes);return {digest,size:Buffer.byteLength(bytes),mediaType};};
+  const config=blob({architecture:'amd64',os:'linux'},'application/vnd.oci.image.config.v1+json');
+  const layer=blob('fixture layer bytes','application/vnd.oci.image.layer.v1.tar');
+  const manifest=blob({schemaVersion:2,config,layers:[layer]},'application/vnd.oci.image.manifest.v1+json');
+  writeFileSync(path.join(layout,'index.json'),JSON.stringify({schemaVersion:2,manifests:[manifest]}));
+  writeFileSync(path.join(layout,'oci-layout'),' {"imageLayoutVersion":"1.0.0"}');
+  const receiptFile=path.join(root,'release-image-receipt.json');
+  const receipt={schemaVersion:1,status:'PASS',product:'fixture',freshDatabase:'PASS',readiness:'PASS',payload:'PASS',browserJourney:'PASS',ociLayoutDigest:manifest.digest,loadedImageId:config.digest,artifacts:{}};
+  writeFileSync(receiptFile,JSON.stringify(receipt));return {root,layout,receiptFile,receipt,config,layer};
+}
+test('native OCI export retains verified bytes and updates only transport fields',async t=>{
+  const f=ociFixture(t),result=await exportProductImage(f);
+  assert.equal(result.transport.mode,'ci-oci-archive');assert.equal(result.loadedImageId,f.receipt.loadedImageId);
+  const archive=path.join(f.root,'image.oci.tar');
+  assert.equal(result.artifacts.imageArchive.digest,'sha256:'+createHash('sha256').update(readFileSync(archive)).digest('hex'));
+  const extracted=execFileSync('tar',['-xOf',archive,'./index.json'],{encoding:'utf8'});
+  assert.equal(JSON.parse(extracted).manifests[0].digest,result.ociLayoutDigest);
+  await assert.rejects(exportProductImage(f),/already selected/);
+});
+test('wrong OCI digest, tested image, corrupt blobs and extra files cannot export',async t=>{
+  for(const mutation of ['digest','image','blob','extra','symlink']) {
+    const f=ociFixture(t);
+    if(mutation==='digest')f.receipt.ociLayoutDigest='sha256:'+'f'.repeat(64);
+    if(mutation==='image')f.receipt.loadedImageId='sha256:'+'f'.repeat(64);
+    if(mutation==='blob')writeFileSync(path.join(f.layout,'blobs','sha256',f.layer.digest.slice(7)),'corrupt');
+    if(mutation==='extra')writeFileSync(path.join(f.layout,'unindexed'),'extra');
+    if(mutation==='symlink'){const target=path.join(f.layout,'blobs','sha256',f.layer.digest.slice(7));rmSync(target);symlinkSync('../../index.json',target);}
+    writeFileSync(f.receiptFile,JSON.stringify(f.receipt));await assert.rejects(exportProductImage(f));
+    assert.equal(existsSync(path.join(f.root,'image.oci.tar')),false);
+    assert.equal(JSON.parse(readFileSync(f.receiptFile)).transport,undefined);
+  }
+});
+test('partial native acceptance and an existing archive fail closed',async t=>{
+  const f=ociFixture(t);f.receipt.readiness='FAIL';writeFileSync(f.receiptFile,JSON.stringify(f.receipt));
+  await assert.rejects(exportProductImage(f),/completed native/);
+  f.receipt.readiness='PASS';writeFileSync(f.receiptFile,JSON.stringify(f.receipt));
+  writeFileSync(path.join(f.root,'image.oci.tar'),'preserved prior attempt');
+  await assert.rejects(exportProductImage(f),/EEXIST/);
+  assert.equal(readFileSync(path.join(f.root,'image.oci.tar'),'utf8'),'preserved prior attempt');
+});
+test('public exporter runs real tar without a container dependency',t=>{
+  const f=ociFixture(t),cli=fileURLToPath(new URL('./export-product-image.mjs',import.meta.url));
+  const good=spawnSync(process.execPath,[cli,f.layout,f.receiptFile],{encoding:'utf8'});
+  assert.equal(good.status,0,good.stderr);assert.equal(JSON.parse(readFileSync(f.receiptFile)).transport.mode,'ci-oci-archive');
+  assert.equal(spawnSync(process.execPath,[cli,f.layout,f.receiptFile,'--overwrite'],{encoding:'utf8'}).status,2);
 });

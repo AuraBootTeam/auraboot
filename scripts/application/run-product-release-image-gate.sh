@@ -86,6 +86,10 @@ for command_name in cmp curl diff docker git node openssl pnpm python3 sha256sum
 [[ "$(uname -m)" == x86_64 ]] || fatal 'release image builder must be x86_64'
 [[ "${AURA_OCI_BUILDER:-docker}" == docker ]] || fatal 'AURA_OCI_BUILDER must be docker; local container fallbacks are prohibited'
 MUTATION="${AURA_RELEASE_MUTATION:-}"
+case "${AURA_RELEASE_EXPORT_PACKAGE:-0}" in
+  0|1) ;;
+  *) fatal 'AURA_RELEASE_EXPORT_PACKAGE must be 0 or 1' ;;
+esac
 case "$MUTATION" in
   ''|locked-plugin-byte) ;;
   *) fatal "unsupported release mutation: $MUTATION" ;;
@@ -719,4 +723,9 @@ if fixture_path:
                                     "includedInReleaseImage": False}
 json.dump(receipt, open(path, "w"), indent=2, sort_keys=True)
 PY
+if [[ "${AURA_RELEASE_EXPORT_PACKAGE:-0}" == 1 ]]; then
+  node "$CORE_ROOT/scripts/application/export-product-image.mjs" \
+    "$PRODUCT_RELEASE/$AURA_PRODUCT_IMAGE_LAYOUT" "$ARTIFACTS/release-image-receipt.json" \
+    || fail 'tested OCI artifact export failed'
+fi
 info "$AURA_PRODUCT_ID release image VERIFIED on Linux CI Docker (image=$IMAGE_ID)"
