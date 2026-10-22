@@ -236,6 +236,11 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.getByTestId('drag-handle-analysis').locator('..').click();
   const columns=payload.dsl.body.find((block:any)=>block.id==='analysis').columns;
   const reviewedLabels:Record<string,string>={tpm_pj_name:'项目名称',tpm_pj_status:'项目状态',tpm_pj_budget:'项目预算（元）',tpm_pj_risk_summary:'交付风险',[budgetColumn]:'项目预算（元）'};
+  for (const entry of query.metrics as Metric[]) {
+    if (entry.aggregation === 'count') {
+      reviewedLabels[entry.alias || `${entry.field}_${entry.aggregation}`] = '项目记录数';
+    }
+  }
   const tableProperties=page.getByTestId('block-property-panel').getByTestId('schema-config-field-columns');
   for(let index=0;index<columns.length;index++){
     const column=columns[index];
