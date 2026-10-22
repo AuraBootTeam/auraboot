@@ -56,3 +56,11 @@ Screenshots may contain real product data and require appropriate evidence acces
 Package tests are hermetic behavior tests using independent wx callbacks and filesystem fixtures. Product fixture-native checks are simulator UI checks. Neither proves real WeChat phone authorization, realtime-log ingestion or BFF/backend trace propagation. Verify those boundaries against an isolated, owned runtime and record them separately.
 
 `MiniTraceHttpIT` separately starts an actual Spring servlet/OTel server and invokes this client over HTTP, both directly and through Express with the production BffProxyService. It checks the actual server span, response header, client lifecycle logs and BFF correlation ID. Run it through an owned `aura gradle` runtime after installing the frozen web-admin dependencies; registered SERVER_PORT/BFF_PORT must be free. No database seed is required. This component test does not load product routes, authenticate a user or prove device transport. Its probe outputs are `platform/build/mini-trace-http-probe.json` and `platform/build/mini-trace-bff-probe.log`.
+
+### Probe-first physical-device preview
+
+`deviceHealthBootstrap: true` explicitly allows packaging an **unverified** `real-stack` HTTPS device preview with `deviceHealthVerified: false`. It does not make `target(config)` accept business requests and is not release/device acceptance. Fixture, loopback, HTTP and pre-verified bootstrap combinations are rejected.
+
+`probeDeviceConnectivity({wxApi, config, path, verify, logger})` performs one anonymous GET from a physical phone, requires the matching response `X-Trace-Id`, and calls a product verifier for runtime identity and health. It returns a receipt without mutating config or reading tokens. DevTools and desktop platforms cannot create this receipt. The product may admit business requests only after accepting the receipt for its unchanged target. Failed probes remain blocked; retry must be an explicit user action. Never prefill a verified flag from a Mac request or an old phone/browser check.
+
+Phone platform values follow the [official WeChat API typings](https://github.com/wechat-miniprogram/api-typings/blob/master/types/wx/lib.wx.api.d.ts) (`ios`, `android`, `ohos`; exclude desktop and `devtools`).
