@@ -894,7 +894,10 @@ async function publishAcceptanceDesign(page: Page) {
   expect(original.status).toBe('deployed');
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await page.locator('.react-flow__node[data-id="tpm_enhanced_review"]').click();
-  await page.getByTestId('node-label-input').fill('验收负责人 · 加强审核');
+  const labelInput = page.getByTestId('node-label-input');
+  const reviewLabel = (await labelInput.inputValue()) === '验收负责人 · 加强审核'
+    ? '加强审核 · 验收负责人' : '验收负责人 · 加强审核';
+  await labelInput.fill(reviewLabel);
   if (await page.getByTestId('bpmn-drawer-backdrop').isVisible()) {
     await page.getByTestId('bpmn-close-inspector').click();
   }
@@ -916,7 +919,7 @@ async function publishAcceptanceDesign(page: Page) {
   expect(historical.status).toBe('deployed');
   await page.reload();
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
-  await expect(page.locator('.react-flow__node[data-id="tpm_enhanced_review"]')).toContainText('验收负责人 · 加强审核');
+  await expect(page.locator('.react-flow__node[data-id="tpm_enhanced_review"]')).toContainText(reviewLabel);
   await page.getByRole('button',{name:/fit view/i}).click();
   await shot(page,'BPM01-persisted-design');
   const deployed = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bpm/process-definitions/${definitionPid}/deploy` && r.request().method()==='POST');
