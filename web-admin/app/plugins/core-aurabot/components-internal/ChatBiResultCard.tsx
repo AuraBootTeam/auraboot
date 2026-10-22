@@ -116,7 +116,6 @@ function ChatBiChart({
   dimensions,
   metrics,
   chartConfig,
-  title,
   labels,
 }: {
   chartType: string;
@@ -125,7 +124,6 @@ function ChatBiChart({
   dimensions?: string[];
   metrics?: ChatBiMetric[];
   chartConfig?: Record<string, unknown>;
-  title?: string;
   labels: Record<string, string>;
 }) {
   const dataSource = useMemo<ChartDataSource>(() => {
@@ -159,7 +157,13 @@ function ChatBiChart({
       }
     >
       <ChartComponent
-        title={title}
+        orientation={
+          chartType === 'bar'
+            ? chartConfig?.orientation === 'vertical'
+              ? 'vertical'
+              : 'horizontal'
+            : undefined
+        }
         metricLabels={labels}
         dataSource={dataSource}
         className="h-[280px] w-full"
@@ -178,6 +182,27 @@ function DataTable({
   columns: string[];
   labels?: Record<string, string>;
 }) {
+  const { locale } = useI18n();
+  const numeric = new Set(
+    columns.filter(
+      (column) =>
+        records.some((row) => typeof row[column] === 'number') &&
+        records.every((row) => row[column] == null || typeof row[column] === 'number'),
+    ),
+  );
+  const formats = Object.fromEntries(
+    [...numeric].map((column) => [
+      column,
+      new Intl.NumberFormat(locale, {
+        minimumFractionDigits: records.some(
+          (row) => typeof row[column] === 'number' && !Number.isInteger(row[column]),
+        )
+          ? 2
+          : 0,
+        maximumFractionDigits: 20,
+      }),
+    ]),
+  );
   return (
     <div className="max-h-[300px] overflow-auto">
       <table className="w-full text-xs text-gray-700 dark:text-gray-300">
@@ -186,7 +211,7 @@ function DataTable({
             {columns.map((col) => (
               <th
                 key={col}
-                className="px-2 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400"
+                className={`px-2 py-1.5 font-medium text-gray-500 dark:text-gray-400 ${numeric.has(col) ? 'text-right' : 'text-left'}`}
               >
                 {labels[col] || col}
               </th>
@@ -200,8 +225,13 @@ function DataTable({
               className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
             >
               {columns.map((col) => (
-                <td key={col} className="px-2 py-1.5">
-                  {String(row[col] ?? '')}
+                <td
+                  key={col}
+                  className={`px-2 py-1.5 ${numeric.has(col) ? 'text-right tabular-nums' : ''}`}
+                >
+                  {typeof row[col] === 'number' && formats[col]
+                    ? formats[col].format(row[col])
+                    : String(row[col] ?? '')}
                 </td>
               ))}
             </tr>
@@ -354,6 +384,12 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
             title,
             dataSource,
             metricLabels: columnLabels,
+            ...(chartType === 'bar'
+              ? {
+                  orientation:
+                    result.chartConfig?.orientation === 'vertical' ? 'vertical' : 'horizontal',
+                }
+              : {}),
           },
         },
       ];
@@ -436,7 +472,6 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
               dimensions={dimensions}
               metrics={metrics}
               chartConfig={chartConfig}
-              title={interpretation}
               labels={columnLabels}
             />
           ) : (

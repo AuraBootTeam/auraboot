@@ -20,9 +20,17 @@ vi.mock('~/contexts/I18nContext', () => ({
 }));
 vi.mock('~/framework/smart/charts/SharedChartFactory', () => ({
   normalizeChartType: (type: string) => type,
-  getChartComponent: () => (props: { metricLabels: Record<string, string> }) => (
-    <div data-testid="shared-chart-labels">{JSON.stringify(props.metricLabels)}</div>
-  ),
+  getChartComponent:
+    () =>
+    (props: { metricLabels: Record<string, string>; orientation?: string; title?: string }) => (
+      <div
+        data-testid="shared-chart-labels"
+        data-orientation={props.orientation}
+        data-title={props.title}
+      >
+        {JSON.stringify(props.metricLabels)}
+      </div>
+    ),
 }));
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
   dashboardService: {
@@ -57,13 +65,53 @@ describe('chat chart presentation labels', () => {
       />,
     );
     expect(await screen.findByTestId('shared-chart-labels')).toHaveTextContent('项目预算 · 合计');
+    expect(screen.getByTestId('shared-chart-labels')).toHaveAttribute(
+      'data-orientation',
+      'horizontal',
+    );
+    expect(screen.getByTestId('shared-chart-labels')).not.toHaveAttribute('data-title');
     fireEvent.click(screen.getByTestId('chatbi-save-dashboard'));
     await waitFor(() => expect(dashboardService.create).toHaveBeenCalled());
     const widget = vi.mocked(dashboardService.create).mock.calls[0][0].widgets![0];
     expect(widget.config!.dataSource).toEqual(dataSource);
     expect(widget.config).toMatchObject({
       metricLabels: { tpm_pj_name: '项目名称', budget_total: '项目预算 · 合计' },
+      orientation: 'horizontal',
     });
     expect(vi.mocked(dashboardService.create).mock.calls[0][0].title).not.toContain('tpm_project');
   });
+});
+
+it('keeps numeric columns aligned and grouped without converting record codes to numbers', () => {
+  render(
+    <ChatBiResultCard
+      result={{
+        chartType: 'table',
+        columns: ['code', 'amount'],
+        records: [
+          { code: '00123', amount: 128000 },
+          { code: '00999', amount: 132000.5 },
+        ],
+      }}
+    />,
+  );
+  expect(screen.getByText('00123')).toBeVisible();
+  expect(screen.getByText('128,000.00')).toHaveClass('text-right');
+  expect(screen.getByText('132,000.50')).toHaveClass('tabular-nums');
+});
+it('respects an explicit vertical chart configuration', async () => {
+  render(
+    <ChatBiResultCard
+      result={{
+        chartType: 'bar',
+        chartConfig: { orientation: 'vertical' },
+        columns: ['name', 'amount'],
+        records: [{ name: '项目', amount: 1 }],
+      }}
+    />,
+  );
+  expect(await screen.findByTestId('shared-chart-labels')).toHaveAttribute(
+    'data-orientation',
+    'vertical',
+  );
 });
