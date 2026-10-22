@@ -88,7 +88,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         }
         DynamicQueryRequest request = DynamicQueryRequest.builder()
                 .pageNum(query.page()).pageSize(query.size()).conditions(conditions).sortFields(sorts)
-                .keyword(query.keyword()).build();
+                .keyword(query.keyword().isEmpty() ? null : query.keyword()).build();
         PaginationResult<Map<String, Object>> result = withCommandAuthority(
                 () -> dynamicDataService.list(modelCode, request));
         if (result == null || result.getRecords() == null || result.getTotal() == null) {

@@ -59,8 +59,8 @@ export function resolveCommandErrorMessage(
   // New rejection contract: `context` carries the bare i18n reason key (for
   // example "annual_balance_not_found") instead of the legacy {messageKey,
   // detail} object. Resolve it through the page locale catalog; when no entry
-  // exists the key itself is still more actionable than the generic envelope
-  // message ("Business error") that would otherwise surface.
+  // exists, keep processing the reason through the same wrapper removal and
+  // safe localization path used by object-shaped contexts.
   const contextKey =
     typeof body.context === 'string' && body.context.trim().length > 0
       ? body.context.trim()
@@ -70,10 +70,10 @@ export function resolveCommandErrorMessage(
     if (localized && localized !== contextKey) {
       return localized;
     }
-    return contextKey;
   }
   const resolved =
     firstNonBlankString(
+      contextKey,
       body.context?.detail,
       body.context?.error,
       body.context?.exception,

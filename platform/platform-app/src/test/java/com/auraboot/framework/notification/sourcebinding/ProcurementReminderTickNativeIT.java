@@ -78,14 +78,14 @@ class ProcurementReminderTickNativeIT {
         properties.add("security.field-encryption.key", () -> key);
         ProductQuoteNativePluginDirectory.select(true, Path.of(required("S06_NATIVE_PRODUCT_INPUT")),
                 required("S06_NATIVE_PRODUCT_INPUT_SHA256"), Path.of(required("S06_NATIVE_PRODUCT_PLUGIN_DIR")),
-                NativeProcurementWorkspace.root().resolve(".workspace/runtimes/procurement-web-stack-20261010"))
+                NativeProcurementWorkspace.root().resolve(".workspace/runtimes").resolve(NativeProcurementWorkspace.runtime()))
                 .ifPresent(path -> properties.add("aura.plugins.dir", path::toString));
     }
 
     @Test
     void actualControlledTickQueuesOnceAndDeliversTwoExplicitInAppRecipients() throws Exception {
         Path evidence = Path.of(required("PROCUREMENT_REMINDER_TICK_EVIDENCE_DIR")).toRealPath();
-        assertThat(evidence.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath())).isTrue();
+        assertThat(evidence.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence").resolve(NativeProcurementWorkspace.runtime()).toRealPath())).isTrue();
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();
         assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
@@ -413,7 +413,7 @@ class ProcurementReminderTickNativeIT {
     @Test
     void actualPf4jRegisteredTimerQueuesQuoteAndShipmentAndDeliversOnlySyntheticInApp() throws Exception {
         Path parent = Path.of(required("PROCUREMENT_REMINDER_TICK_EVIDENCE_DIR")).toRealPath();
-        assertThat(parent.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath())).isTrue();
+        assertThat(parent.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence").resolve(NativeProcurementWorkspace.runtime()).toRealPath())).isTrue();
         Path evidence = Files.createDirectory(parent.resolve("pf4j-automatic-native"));
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();
@@ -620,9 +620,28 @@ class ProcurementReminderTickNativeIT {
                 definition -> definition.setRole(org.springframework.beans.factory.config.BeanDefinition.ROLE_INFRASTRUCTURE));
     }
 
+    static com.auraboot.framework.plugin.pf4j.AuraPluginManager registrationSpy(
+            com.auraboot.framework.plugin.pf4j.AuraPluginManager manager) {
+        // Mockito must observe the target, not Spring CGLIB proxy infrastructure.
+        com.auraboot.framework.plugin.pf4j.AuraPluginManager target =
+                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(manager);
+        return org.mockito.Mockito.spy(target);
+    }
+
     void automaticallyQueue(AutomaticBackground frame, Clock fixedClock, Path admittedProductJar) throws Exception {
         var manager = context.getBean(com.auraboot.framework.plugin.pf4j.AuraPluginManager.class);
         String owner = "com.auraboot.quote-engine";
+        // Observe the registry's real PF4J return values. The inventory-only discovery
+        // proof API deliberately does not admit background component types.
+        var discoveredInstances = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+        var registrationManager = registrationSpy(manager);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Object returned = invocation.callRealMethod();
+            assertThat(returned).isInstanceOf(List.class);
+            ((List<?>) returned).forEach(discoveredInstances::add);
+            return returned;
+        }).when(registrationManager).getExtensionsOfType(
+                com.auraboot.framework.plugin.extension.BackgroundComponentExtension.class, owner);
         var captured = new RegisteredAutomaticClock();
         BackgroundDataAccessor bounded = frame.proxy();
         BackgroundTenantAccessor tenantAccessor = () -> List.of(frame.tenant);
@@ -646,7 +665,9 @@ class ProcurementReminderTickNativeIT {
                             if (bean instanceof com.auraboot.framework.plugin.extension.BackgroundComponentExtension) {
                                 assertThat(name).isEqualTo("procurementReminderScheduler");
                                 assertThat(bean.getClass().getName()).isEqualTo("com.auraboot.quote.engine.procurement.ProcurementReminderScheduler");
-                                assertThat(manager.isDiscoveredExtensionInstance(com.auraboot.framework.plugin.extension.BackgroundComponentExtension.class, bean)).isTrue();
+                                assertThat(discoveredInstances.contains(bean)).as("exact object returned by real registry discovery").isTrue();
+                                assertThat(manager.getPlugin(owner).getPluginState()).isEqualTo(org.pf4j.PluginState.STARTED);
+                                assertThat(bean.getClass().getClassLoader()).isSameAs(manager.getPluginClassLoader(owner));
                                 try {
                                     assertThat(Files.isSameFile(admittedProductJar, Path.of(bean.getClass().getProtectionDomain().getCodeSource().getLocation().toURI()))).isTrue();
                                 } catch (java.io.IOException | java.net.URISyntaxException failure) {
@@ -664,9 +685,11 @@ class ProcurementReminderTickNativeIT {
             executor = timer.getScheduledThreadPoolExecutor();
             var processor = child.getBean(ScheduledAnnotationBeanPostProcessor.class);
             assertThat(processor.getScheduledTasks()).isEmpty();
-            var registry = new com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry(child, manager);
+            var registry = new com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry(child, registrationManager);
             try {
                 registry.register(owner);
+                org.mockito.Mockito.verify(registrationManager).getExtensionsOfType(
+                        com.auraboot.framework.plugin.extension.BackgroundComponentExtension.class, owner);
                 assertThat(registry.registeredBeanNames(owner)).containsExactly("procurementReminderScheduler");
                 assertThat(captured.bean.get()).isNotNull();
                 assertThat(child.getBean("procurementReminderScheduler")).isSameAs(captured.bean.get());

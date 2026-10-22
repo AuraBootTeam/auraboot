@@ -530,7 +530,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         sql.append(")");
         appendAggregateBindingGuard(sql, params, model);
         RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
-        appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update");
+        dynamicScopedWriteSupport().appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update", params);
         int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
         if (affected != updates.size()) {
             throw new MetaServiceException("CAS batch conflict: no partial batch may commit");

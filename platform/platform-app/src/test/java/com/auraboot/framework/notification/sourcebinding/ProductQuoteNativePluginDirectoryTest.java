@@ -39,12 +39,22 @@ class ProductQuoteNativePluginDirectoryTest {
         assertThatThrownBy(() -> ProductQuoteNativePluginDirectory.select(true, f.input, hash(f.input), f.directory, root))
                 .hasMessage("PRODUCT_PLUGIN_ARTIFACT_DRIFT");
     }
+    @Test void aSealedArtifactForTheOtherAllowedRuntimeIsStillRejected() throws Exception {
+        Fixture f = fixture();
+        var json = new ObjectMapper();
+        var input = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(f.input.toFile());
+        input.put("runtime", NativeProcurementWorkspace.runtime().equals("procurement-main-validation")
+                ? "procurement-web-stack-20261010" : "procurement-main-validation");
+        json.writeValue(f.input.toFile(), input);
+        assertThatThrownBy(() -> ProductQuoteNativePluginDirectory.select(true, f.input, hash(f.input), f.directory, root))
+                .hasMessage("PRODUCT_PLUGIN_RUNTIME_MISMATCH");
+    }
     private Fixture fixture() throws Exception {
         Path directory = Files.createDirectory(root.resolve("plugins"));
         Path jar = directory.resolve("quote-engine-plugin-0.1.0.jar");
         Files.writeString(jar, "hermetic admission bytes only");
         Path input = root.resolve("input.json");
-        new ObjectMapper().writeValue(input.toFile(), Map.of("runtime", "procurement-web-stack-20261010",
+        new ObjectMapper().writeValue(input.toFile(), Map.of("runtime", NativeProcurementWorkspace.runtime(),
                 "productJarPath", jar.toString(), "productJarSha256", hash(jar)));
         return new Fixture(directory, jar, input);
     }

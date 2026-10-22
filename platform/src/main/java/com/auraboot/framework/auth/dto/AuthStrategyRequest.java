@@ -35,6 +35,13 @@ public class AuthStrategyRequest {
     @ToString.Exclude
     private String code;
 
+    /** Product admission policy selected from server-side configuration. */
+    private String enrollmentCode;
+
+    /** One-use WeChat phone authorization code; never a client-supplied phone number. */
+    @ToString.Exclude
+    private String phoneCode;
+
     /** Login channel identifier: EMAIL_PASSWORD | SMS | EMAIL_CODE */
     private String channelCode;
 

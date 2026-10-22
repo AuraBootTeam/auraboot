@@ -322,7 +322,21 @@ export function comparisonStatusForField(candidate: any, field: any): unknown {
   return match ? normalizeComparisonRecord(match).status : undefined;
 }
 
-export function comparisonStatusFieldClass(status: unknown): string {
+export function comparisonStatusFieldClass(status: unknown, field?: any): string {
+  if (field?.comparisonPalette === 'semantic') {
+    const base = 'rounded-md border px-2 py-1';
+    switch (String(status || '')) {
+      case 'matched': return `${base} border-emerald-200 bg-emerald-50/70`;
+      case 'mismatch': return `${base} border-red-200 bg-red-50/80`;
+      case 'missing':
+      case 'missing_source':
+      case 'missing_candidate':
+      case 'missing_both': return `${base} border-gray-200 bg-gray-50/80`;
+      case 'unknown':
+      case 'source_conflict': return `${base} border-amber-200 bg-amber-50/80`;
+      default: return '';
+    }
+  }
   switch (String(status || '')) {
     case 'matched':
       return 'rounded-md border border-emerald-200 bg-emerald-50/70 px-2 py-1';

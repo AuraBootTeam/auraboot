@@ -20,4 +20,16 @@ class NativeProcurementWorkspaceTest {
         assertThat(NativeProcurementWorkspace.root(Map.of("AURA_WORKSPACE_ROOT", "/fixture/child/../workspace")))
                 .isEqualTo(Path.of("/fixture/workspace"));
     }
+    @Test void explicitRuntimeCannotSelectAnUnownedEnvironmentOrEscapeItsDirectory() {
+        for (String runtime : java.util.List.of("production", "../other", "procurement-main-validation/child", " ")) {
+            assertThatThrownBy(() -> NativeProcurementWorkspace.root(Map.of(
+                    "AURA_WORKSPACE_ROOT", "/fixture/workspace", "PROCUREMENT_NATIVE_RUNTIME", runtime)))
+                    .hasMessage("PROCUREMENT_NATIVE_RUNTIME_NOT_OWNED");
+        }
+    }
+    @Test void runtimeChoiceIsExplicitAndLegacyRemainsTheDefault() {
+        assertThat(NativeProcurementWorkspace.runtime(Map.of())).isEqualTo("procurement-web-stack-20261010");
+        assertThat(NativeProcurementWorkspace.runtime(Map.of("PROCUREMENT_NATIVE_RUNTIME", "procurement-main-validation")))
+                .isEqualTo("procurement-main-validation");
+    }
 }

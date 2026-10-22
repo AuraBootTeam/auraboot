@@ -644,7 +644,9 @@ public class HandlerPhase implements CommandPhase {
             com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
                     pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
             pluginSettings.put("__dataAccessor",
-                    new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
+                    com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                        ? new com.auraboot.framework.openplatform.service.InstalledMachineDataAccessor(dynamicDataService)
+                        : new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
                 // Q03-04: nested follow-up commands dispatch through the real
                 // pipeline (validated, invariant-checked, evented, audited)

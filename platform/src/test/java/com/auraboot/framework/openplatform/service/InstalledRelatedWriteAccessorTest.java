@@ -19,14 +19,15 @@ class InstalledRelatedWriteAccessorTest {
     final CommandHandlerExtension handler=mock(CommandHandlerExtension.class);
     final InstalledIntegrationBinding binding=new InstalledIntegrationBinding(1L,"app","inst","source","event","durable",1,Map.of());
     Map<String,Object> settings;
+    String sourceConfig="config";
 
     void process(Consumer<DataAccessor> work) { process(false,"root",handler,true,work); }
     void process(boolean query,String target,CommandHandlerExtension selected,boolean policy,Consumer<DataAccessor> work) {
         MetaContext.setContext(1L,0L,"installation:inst","Integration");
         when(reads.getById("ledger","root")).thenReturn(row("root",1L,7L));
         when(reads.getById("child","line")).thenReturn(row("line",1L,3L));
-        InstalledIntegrationExecution.run(command,"config",binding,query,handler,target,()->{
-            InstalledIntegrationExecution.verify(command,1L,"config",Map.of("installedIntegration",Map.of()));
+        InstalledIntegrationExecution.run(command,sourceConfig,binding,query,handler,target,()->{
+            InstalledIntegrationExecution.verify(command,1L,sourceConfig,Map.of("installedIntegration",Map.of()));
             InstalledIntegrationExecution.verifyHandler(command,selected,List.of());
             return MetaContext.runWithCommandPermitPlan("ALL",7L,"ledger",target,()->
                 MetaContext.runWithAuthorizedCommandCode(command,()->{
@@ -86,7 +87,7 @@ class InstalledRelatedWriteAccessorTest {
         });} catch(Exception impossible) {throw new AssertionError(impossible);}
         MetaContext.setContext(1L,0L,"installation:inst","Integration");
         InstalledIntegrationExecution.run(command,"config",binding,false,handler,"root",()->{
-            InstalledIntegrationExecution.verify(command,1L,"config",Map.of("installedIntegration",Map.of()));
+            InstalledIntegrationExecution.verify(command,1L,sourceConfig,Map.of("installedIntegration",Map.of()));
             MetaContext.runWithCommandPermitPlan("ALL",7L,"ledger","root",()->
                 MetaContext.runWithAuthorizedCommandCode(command,()->phase.execute(ctx)));
             return null;
@@ -211,4 +212,51 @@ class InstalledRelatedWriteAccessorTest {
         process(data->assertThatThrownBy(()->data.update("child","line",Map.of("x",1))).isInstanceOf(SecurityException.class));
         verifyNoInteractions(nativeData);
     }
+    @Test void relatedMachineWriteKeepsLineageAndNativeVersionChecks() {
+        sourceConfig="""
+            {"handlerParams":{"installedMachineData":{
+              "ledger":{"read":["pid","name"]},
+              "child":{"read":["pid","name"],"create":["name"],"update":["name"]}}}}
+            """;
+        allow();
+        when(nativeData.update(eq("child"),eq("line"),anyMap())).thenAnswer(call->{
+            childScope();
+            var grant=com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision("child");
+            assertThat(grant.actions()).containsExactly("update");
+            assertThat(grant.constraints()).containsExactly(new com.auraboot.framework.application.security.MachineDataAccessContext.Constraint("pid","pid",List.of("line")));
+            assertThat(com.auraboot.framework.application.security.MachineDataAccessContext.expectedVersion("child","line")).isEqualTo(3L);
+            return row("line",1L,4L);
+        });
+        when(nativeData.create(eq("child"),anyMap())).thenAnswer(call->{
+            assertThat(com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision("child").actions()).containsExactly("create");
+            return row("created",1L,1L);
+        });
+        var principal=new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(1L,"inst","Integration",Set.of(),"app","inst",null,null);
+        try(var machine=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+            process(data->{
+                data.create("child",Map.of("name","new"));
+                data.update("child","line",Map.of("name","new"));
+                assertThat(com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision("child").actions()).containsExactly("read");
+                when(handler.authorizeInstalledRelatedWrite(any())).thenReturn(false);
+                assertThatThrownBy(()->data.update("child","line",Map.of("name","denied"))).isInstanceOf(SecurityException.class);
+            });
+        }
+        verify(nativeData,times(1)).update(anyString(),anyString(),anyMap());
+    }
+
+    @Test void repeatedRootWritesReloadThePhysicalVersionAndRejectAnotherRoot() {
+        when(nativeData.update(eq("ledger"),eq("root"),anyMap())).thenAnswer(call->{
+            assertThat(MetaContext.getCommandExpectedVersion("ledger","root")).isEqualTo(8L);
+            return row("root",1L,9L);
+        });
+        process(data->{
+            when(reads.getById("ledger","root")).thenReturn(row("root",1L,8L));
+            data.update("ledger","root",Map.of("name","second operation"));
+            assertThatThrownBy(()->data.update("ledger","other-root",Map.of("name","denied"))).isInstanceOf(SecurityException.class);
+            assertThatThrownBy(()->data.update("ledger","root",Map.of("name","stale","_expectedVersion",7L)))
+                .isInstanceOf(com.auraboot.framework.meta.exception.RecordVersionConflictException.class);
+        });
+        verify(nativeData,times(1)).update(anyString(),anyString(),anyMap());
+    }
+
 }

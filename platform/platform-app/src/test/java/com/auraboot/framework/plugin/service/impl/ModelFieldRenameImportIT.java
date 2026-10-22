@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Real PostgreSQL + formal import transactions; no test-level transaction or cleanup. */
 @SpringBootTest(classes=ModelFieldRenameImportIT.Application.class,properties={
-    "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=13",
+    "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
     "spring.kafka.listener.auto-startup=false","spring.main.allow-bean-definition-overriding=false"})
 @ActiveProfiles("integration-test")
 @EnabledIfEnvironmentVariable(named="FIELD_RENAME_IMPORT_IT",matches="true")
@@ -95,7 +95,11 @@ class ModelFieldRenameImportIT {
 
     @Test void committedImportPreservesTenantDataAndReplayEditsWithAtomicFailure() throws Exception {
         assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
-        try(var connection=jdbc.getDataSource().getConnection()) {assertEquals("enterprise_22",connection.getCatalog());}
+        String expectedDatabase=Objects.requireNonNull(System.getenv("FIELD_RENAME_IT_DATABASE"),"Explicit owned database is required");
+        assertTrue(expectedDatabase.matches("enterprise_[0-9]+"),"Owned Enterprise runtime database is required");
+        try(var connection=jdbc.getDataSource().getConnection()) {
+            assertEquals(expectedDatabase,connection.getCatalog(),"Refuse a different database before fixture writes");
+        }
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_plugin_field_rename WHERE model_code LIKE ?",Integer.class,nonce+"%"));
         evidence=Path.of(Objects.requireNonNull(System.getenv("FIELD_RENAME_IT_EVIDENCE_DIR"))).toAbsolutePath().resolve(nonce);
         Files.createDirectories(evidence);
@@ -186,7 +190,7 @@ class ModelFieldRenameImportIT {
                 assertEquals(guardedBefore,state(guarded));
             }
             steps.add(Map.of("stage","metadata-and-physical-dependencies-denied","verdict","pass"));
-            seal("completed",Map.of("stages",steps,"database","enterprise_22","namespace",nonce,"actualBusinessImportCommits",true,"testLevelTransaction",false));
+            seal("completed",Map.of("stages",steps,"database",expectedDatabase,"namespace",nonce,"actualBusinessImportCommits",true,"testLevelTransaction",false));
         } finally {seal("steps-retained",steps);MetaContext.clear();}
     }
 
