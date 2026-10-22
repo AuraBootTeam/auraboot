@@ -1,5 +1,5 @@
 /** Real UI edits of reusable delivery designs; no injected designer state. */
-import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
+import { test, expect, type Page, type Locator, type APIResponse, type Response } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -35,6 +35,25 @@ async function shot(page: Page, name: string) {
   );
   if (await toolbar.isVisible()) await toolbar.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(evidence!, `${name}.png`), fullPage: false });
+}
+
+async function showDeliveryResult(widget: Locator, page: Page, acceptanceName: string) {
+  // Follow configured pagination; retained exception cases can precede this delivery.
+  for (let visited = 0; visited < 100; visited++) {
+    await expect(widget.getByRole('cell').first()).toBeVisible();
+    const row = widget.getByRole('row').filter({ has: page.getByRole('cell', { name: acceptanceName, exact: true }) });
+    if (await row.count()) {
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText('周宁');
+      return;
+    }
+    const next = widget.getByRole('button', { name: '下一页', exact: true });
+    await expect(next).toBeEnabled();
+    const before = await widget.innerText();
+    await next.click();
+    await expect.poll(() => widget.innerText()).not.toBe(before);
+  }
+  throw new Error(`Completed delivery was not found in the configured pages: ${acceptanceName}`);
 }
 
 test('DS05 executive templates retain a finished layout after Schema edits and real exports', async ({ page }) => {
@@ -80,12 +99,13 @@ test('DS05 executive templates retain a finished layout after Schema edits and r
   await chart.click();
   await expect(panel.getByTestId('widget-prop-title-zh')).toHaveValue('交付验收状态 · 本次周会');
   await expect(chart.locator('[data-chart-ready="true"]')).toBeVisible();
-  await expect(canvas.locator('[data-widget-id="delivery-actions"]')).toContainText('周宁');
+  await showDeliveryResult(canvas.locator('[data-widget-id="delivery-actions"]'), page, completed.acceptance_name);
   await shot(page, 'DS05-dashboard-reopened');
   await page.getByTestId('toolbar-btn-presentation').click();
   const presentation = page.getByTestId('big-screen-mode');
   await expect(presentation.locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]')).toBeVisible();
   await expect(presentation.getByRole('img', { name: '交付验收状态 · 本次周会', exact: true })).toBeVisible();
+  await showDeliveryResult(presentation.locator('[data-widget-id="delivery-actions"]'), page, completed.acceptance_name);
   await shot(page, 'DS05-dashboard-finished');
   await page.keyboard.press('Escape');
 
