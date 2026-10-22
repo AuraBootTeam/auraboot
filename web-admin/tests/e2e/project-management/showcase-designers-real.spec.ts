@@ -82,7 +82,7 @@ test('DS05 executive templates retain a finished layout after Schema edits and r
   await page.getByTestId('toolbar-btn-presentation').click();
   const presentation = page.getByTestId('big-screen-mode');
   await expect(presentation.locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]')).toBeVisible();
-  await expect(presentation).toContainText('交付验收状态 · 本次周会');
+  await expect(presentation.getByRole('img', { name: '交付验收状态 · 本次周会', exact: true })).toBeVisible();
   await shot(page, 'DS05-dashboard-finished');
   await page.keyboard.press('Escape');
 
