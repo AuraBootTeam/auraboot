@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -381,6 +381,21 @@ describe('AuraBoot application contract', () => {
 
     writeFileSync(join(nested, 'b.txt'), 'mutated');
     assert.notEqual(sha256Path(artifactRoot), first);
+  });
+
+  it('rejects symbolic links for both file and nested artifact digests', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aura-artifact-symlink-'));
+    try {
+      const file = join(root, 'content');
+      writeFileSync(file, 'retained artifact');
+      const link = join(root, 'link');
+      symlinkSync(file, link);
+      assert.throws(() => sha256Path(link), /symbolic links/);
+      assert.throws(() => sha256Path(root), /symbolic links/);
+      assert.equal(sha256Path(file), sha256('retained artifact'));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('fails closed on duplicate route paths in the composed web graph', () => {
