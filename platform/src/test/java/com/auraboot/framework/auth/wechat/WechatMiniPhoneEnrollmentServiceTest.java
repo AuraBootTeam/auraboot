@@ -39,6 +39,7 @@ class WechatMiniPhoneEnrollmentServiceTest {
         request.setCode("login-code");request.setPhoneCode("phone-code");request.setEnrollmentCode("supplier-srm");
         user.setId(7L);user.setPid("user-pid");member.setPid("member-pid");member.setStatus("active");
         when(plugins.getExtensions(MiniPhoneEnrollmentExtension.class)).thenReturn(List.of(extension));
+        when(extension.displayName(anyString(),any())).thenReturn("Directory Contact");
         when(extension.getEnrollmentCode()).thenReturn("supplier-srm");when(extension.getWriterCommandCode()).thenReturn("membership:bind");
         when(client.code2Session("login-code")).thenReturn(session);
         when(client.verifyPhoneGrant("phone-code","verified-openid")).thenReturn(new WechatMiniClient.VerifiedPhone("test-app","verified-openid","86","13700004884",1L));
@@ -46,7 +47,7 @@ class WechatMiniPhoneEnrollmentServiceTest {
     @AfterEach void clear(){MetaContext.clear();}
     void memberAndRole(){when(members.findByTenantIdAndUserId(22L,7L)).thenReturn(member);when(roles.assignRolesToMemberByRoleCodes("member-pid",List.of("supplier"),22L,7L)).thenReturn(true);}
     @Test void firstLoginCreatesAccountMemberAndSupplierBeforeIssuingToken(){
-        when(users.signUp(anyString(),anyString(),eq("微信用户"),isNull())).thenReturn(user);
+        when(users.signUp(anyString(),anyString(),eq("Directory Contact"),isNull())).thenReturn(user);
         when(members.addMember(7L,22L,"active")).thenReturn(member);
         when(roles.assignRolesToMemberByRoleCodes("member-pid",List.of("supplier"),22L,7L)).thenReturn(true);
         var expected=new AuthenticationResponse("jwt",7L,"user-pid","supplier",22L,"member");
@@ -55,7 +56,7 @@ class WechatMiniPhoneEnrollmentServiceTest {
         var order=inOrder(extension,users,identities,members,roles,completion);
         order.verify(extension).validate(eq("+8613700004884"),any(DataAccessor.class));
         order.verify(identities).resolveLoginUserBySession(session);
-        order.verify(users).signUp(anyString(),anyString(),eq("微信用户"),isNull());
+        order.verify(users).signUp(anyString(),anyString(),eq("Directory Contact"),isNull());
         order.verify(identities).attachIdentity(7L,session);
         order.verify(members).findByTenantIdAndUserId(22L,7L);
         order.verify(members).addMember(7L,22L,"active");

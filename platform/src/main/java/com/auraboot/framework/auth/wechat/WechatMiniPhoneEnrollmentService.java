@@ -36,6 +36,8 @@ public class WechatMiniPhoneEnrollmentService {
     @Value("${aura.wechat.mini.enrollment.tenant-id:0}") private long tenantId;
     @Value("${aura.wechat.mini.enrollment.role-code:}") private String roleCode;
 
+    public boolean isConfigured() { return enrollmentCode!=null && !enrollmentCode.isBlank(); }
+
     @Transactional
     public AuthenticationResponse login(AuthStrategyRequest request) {
         if(enrollmentCode==null || enrollmentCode.isBlank() || !enrollmentCode.equals(request.getEnrollmentCode())
@@ -61,7 +63,9 @@ public class WechatMiniPhoneEnrollmentService {
                 extension.validate(phone,data);
                 var user=identities.resolveLoginUserBySession(session);
                 if(user==null) {
-                    user=users.signUp("wx-"+UUID.randomUUID()+"@wx.wechat","Wx!8a"+UUID.randomUUID(),"微信用户",null);
+                    String name=extension.displayName(phone,data);
+                    if(name==null || name.isBlank() || name.length()>128) throw rejected();
+                    user=users.signUp("wx-"+UUID.randomUUID()+"@wx.wechat","Wx!8a"+UUID.randomUUID(),name.trim(),null);
                     identities.attachIdentity(user.getId(),session);
                 }
                 if(!user.isEnabled() || !user.isAccountNonLocked()) throw rejected();
