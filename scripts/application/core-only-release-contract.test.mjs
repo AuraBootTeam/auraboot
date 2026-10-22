@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { closeSync, fstatSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -38,10 +38,15 @@ test('image verification creates a private per-attempt encryption key and refuse
   for (const file of files) {
     const result = create(file); assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, '', 'the generated key is never printed');
-    assert.equal(statSync(file).mode & 0o777, 0o600);
-    const value = readFileSync(file, 'utf8').trim().split('=');
-    assert.equal(value[0], 'FIELD_ENCRYPTION_KEY');
-    assert.equal(Buffer.from(value.slice(1).join('='), 'base64').length, 32);
+    const descriptor = openSync(file, 'r');
+    try {
+      assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
+      const value = readFileSync(descriptor, 'utf8').trim().split('=');
+      assert.equal(value[0], 'FIELD_ENCRYPTION_KEY');
+      assert.equal(Buffer.from(value.slice(1).join('='), 'base64').length, 32);
+    } finally {
+      closeSync(descriptor);
+    }
   }
   assert.notEqual(readFileSync(files[0], 'utf8'), readFileSync(files[1], 'utf8'));
   const original = readFileSync(files[0]); assert.notEqual(create(files[0]).status, 0);

@@ -523,15 +523,6 @@ tasks.register('stageCompatibilityBootJar') {
     }
 }
 
-// Existing launchers retain :bootRun while application runtime selection belongs to app.
-gradle.projectsEvaluated {
-    tasks.named('bootRun') {
-        dependsOn ':platform-app:classes'
-        classpath = project(':platform-app').sourceSets.main.runtimeClasspath
-        mainClass = 'com.auraboot.framework.application.PlatformApplication'
-    }
-}
-
 bootRun {
     // -Djdk.httpclient.allowRestrictedHeaders=host unlocks the Host header for
     // java.net.http.HttpClient so PinnedHttpRequests can pin the IP at connect
@@ -1255,3 +1246,21 @@ tasks.named('test', Test) {
 }
 
 java { withSourcesJar() }
+
+// Resolve compatibility bridges before task-graph construction, including configuration-on-demand.
+// These are task bridges, not core library or core-unit-test dependencies on app.
+evaluationDependsOn(':platform-app')
+def applicationProject = project(':platform-app')
+tasks.named('bootRun') {
+    dependsOn applicationProject.tasks.named('classes')
+    classpath = applicationProject.sourceSets.main.runtimeClasspath
+    mainClass = 'com.auraboot.framework.application.PlatformApplication'
+}
+tasks.named('compileIntegrationTestJava') {
+    dependsOn applicationProject.tasks.named('compileIntegrationTestJava')
+}
+tasks.named('integrationTest', Test) {
+    dependsOn applicationProject.tasks.named('integrationTestClasses')
+    testClassesDirs = applicationProject.sourceSets.integrationTest.output.classesDirs
+    classpath = applicationProject.sourceSets.integrationTest.runtimeClasspath
+}
