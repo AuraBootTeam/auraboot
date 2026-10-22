@@ -27,6 +27,7 @@ public class WechatMiniAuthStrategy implements AuthStrategy {
 
     private final WechatMiniIdentityService wechatMiniIdentityService;
     private final LoginCompletionHelper loginCompletionHelper;
+    private final com.auraboot.framework.auth.wechat.WechatMiniPhoneEnrollmentService phoneEnrollment;
 
     @Override
     public String getChannelCode() {
@@ -35,6 +36,7 @@ public class WechatMiniAuthStrategy implements AuthStrategy {
 
     @Override
     public AuthenticationResponse authenticate(AuthStrategyRequest request) {
+        if(request.getEnrollmentCode()!=null || request.getPhoneCode()!=null) return phoneEnrollment.login(request);
         String code = request.getCode();
         if (code == null || code.isBlank()) {
             throw new BusinessException(ResponseCode.CommonValidationFailed, "wx.login code is required");

@@ -15,6 +15,7 @@ class SensitiveRequestToStringTest {
         AuthStrategyRequest strategy = new AuthStrategyRequest();
         strategy.setPassword("strategy-secret");
         strategy.setCode("otp-secret");
+        strategy.setPhoneCode("phone-grant-secret");
 
         RegisterRequest register = new RegisterRequest();
         register.setPassword("register-secret");
@@ -28,7 +29,7 @@ class SensitiveRequestToStringTest {
 
         assertThat(login.toString()).doesNotContain("login-secret");
         assertThat(strategy.toString())
-                .doesNotContain("strategy-secret", "otp-secret");
+                .doesNotContain("strategy-secret", "otp-secret", "phone-grant-secret");
         assertThat(register.toString()).doesNotContain("register-secret");
         assertThat(reset.toString())
                 .doesNotContain("reset-token-secret", "reset-password-secret");
