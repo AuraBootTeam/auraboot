@@ -464,7 +464,7 @@ class AuraBotChatServiceGroundingTest {
                 .name("nq:crm_customer_stats")
                 .description("Customer stats")
                 .inputSchema(Map.of("type", "object"))
-                .toolType("built_in")
+                .toolType("dsl_query")
                 .sourceCode("nq:crm_customer_stats")
                 .riskLevel("L0")
                 .build();

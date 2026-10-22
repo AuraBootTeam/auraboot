@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 2c07f437edb77a7954e4825a9391aef1255f9233f2e07e80a539c74befe8ec77
+ * Contract SHA-256: 6f71a84423ea264b49f0f99259c5dabd67cc883b6417dcbd8eadbf0e5b77c1ea
  */
 export interface paths {
     "/api/activities": {
@@ -29289,6 +29289,7 @@ export interface components {
             unreadCount?: number;
         };
         ConversationMemberInfo: {
+            agentAvailable?: boolean;
             agentCode?: string;
             avatarUrl?: string;
             displayName?: string;
