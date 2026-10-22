@@ -181,11 +181,11 @@ public class McpServerConfigService {
                         + "WHERE tenant_id = ? AND pid = ?",
                 tenantId, pid);
         if (updated == 0) {
-            log.warn("deactivateServer: no server found for tenant={} pid={}", tenantId, pid);
+            log.warn("deactivateServer: no server found for tenant={}", tenantId);
             return;
         }
         eventPublisher.publishEvent(new McpServerConfigChangedEvent(tenantId, pid, "deactivated"));
-        log.info("Deactivated MCP server: tenant={}, pid={}", tenantId, pid);
+        log.info("Deactivated MCP server: tenant={}", tenantId);
     }
 
     /** Record a successful live tools/list result. */

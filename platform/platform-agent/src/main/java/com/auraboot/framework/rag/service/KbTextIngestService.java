@@ -79,7 +79,7 @@ public class KbTextIngestService {
         }
         KnowledgeBase kb = kbService.findKb(tenantId, kbPid);
         if (kb == null || !"active".equals(kb.getStatus())) {
-            log.warn("[kb-ingest] unknown kb {} — skip ingest source={}:{}", kbPid, sourceType, sourceId);
+            log.warn("[kb-ingest] unknown or inactive knowledge base — skipping ingest");
             return null;
         }
         String provider = kb.getEmbeddingProvider();
@@ -140,8 +140,8 @@ public class KbTextIngestService {
                     tenantId, kbPid, docPid, "completed", text.length(),
                     outcome.chunkCount(), null);
             kbService.refreshKbCounters(tenantId, kbPid);
-            log.info("[kb-ingest] ingested {}:{} -> kb {} ({} chunks, {} embedded)",
-                    sourceType, sourceId, kbPid, outcome.chunkCount(), outcome.embeddedCount());
+            log.info("[kb-ingest] ingested document ({} chunks, {} embedded)",
+                    outcome.chunkCount(), outcome.embeddedCount());
             return docPid;
         });
     }

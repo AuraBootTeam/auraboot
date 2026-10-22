@@ -433,7 +433,7 @@ public class ActionRecorder {
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("recordPid", recordPid));
             return rows.isEmpty() ? null : rows.get(0);
         } catch (Exception e) {
-            log.debug("Cannot read record {}.{}: {}", modelCode, recordPid, e.getMessage());
+            log.debug("Cannot read record: model={}, failureType={}", modelCode, e.getClass().getSimpleName());
             return null;
         }
     }

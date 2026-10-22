@@ -140,8 +140,7 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
         patch.put("faq_reviewed_at", Instant.now().toString());
         Map<String, Object> updated = data.update(FaqCandidateService.MODEL, candidatePid, patch);
 
-        log.info("[faq-publish] tenant={} candidate={} -> kb={} doc={}",
-                context.tenantId(), candidatePid, kbPid, docPid);
+        log.info("[faq-publish] published candidate: tenant={}", context.tenantId());
         return updated;
     }
 
@@ -190,8 +189,7 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
         patch.put("faq_kb_document_pid", null);
         Map<String, Object> updated = data.update(FaqCandidateService.MODEL, candidatePid, patch);
 
-        log.info("[faq-unpublish] tenant={} candidate={} kb={} removed={}",
-                context.tenantId(), candidatePid, kbPid, removed);
+        log.info("[faq-unpublish] tenant={} removed={}", context.tenantId(), removed);
         return updated;
     }
 
