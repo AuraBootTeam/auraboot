@@ -453,8 +453,9 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
         .nth(index)
         .fill('340');
   }
-  if (showcaseFixture) {
-    // Review presentation columns without changing the governed query.
+  {
+    // Review the requested name/budget presentation for every live response,
+    // including extra identity dimensions, without changing the governed query.
     for (let index = columns.length - 1; index >= 0; index--) {
       if (!['tpm_pj_name', budgetColumn].includes(columns[index].field)) {
         await tableProperties
@@ -489,8 +490,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
     reviewedAnalysis,
   );
   expect(reviewed.data.title).toBe(`${customer} · 项目预算与交付建议`);
-  if (showcaseFixture)
-    expect(
+  expect(
       reviewed.data.dsl.body
         .find((block: any) => block.id === 'analysis')
         .columns.map((column: any) => column.field),
