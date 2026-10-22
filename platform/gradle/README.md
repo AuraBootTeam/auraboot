@@ -31,3 +31,26 @@ It verifies both default and explicit versions, native POM/Gradle module edges,
 and invalid-input guards. It runs offline with a private Gradle home and never
 publishes to `~/.m2` or a remote repository. Fixture publication is not platform
 application qualification or proof of a remote repository's behavior.
+
+## Independent native library preparation
+
+In the explicit library mode, `prepareLibraryCandidate` selects the root plus
+the current build's projects from Gradle's resolved runtime graph. It publishes
+only that scope through the native Maven tasks to an explicit fresh
+`-Paura.library.output=/absolute/attempt-owned/output` outside the source project.
+Unrelated providers are not implicitly published. Included builds require a
+separate producer. There is no `bootJar`, image build or application assembly.
+
+The create-once `library-publication-inventory.json` records original coordinates,
+compiled JAR hashes, all native attached artifacts, POM/Module hashes and the
+library version source. Every published artifact and metadata file must equal its
+original Gradle output. Missing output, output reuse and metadata tampering fail.
+This remains a candidate file repository, with `remotePublication=did_not_run` and
+`releaseQualification=false`.
+
+The managed Linux entry is `bash scripts/ci/prepare-library-candidate.sh`. It
+requires the original frozen Core/Workspace context, checks source identity before
+and after, copies the existing managed SmartEngine dependency capsule with hashes,
+uses an isolated Maven input directory and invokes the original Workspace Gradle
+runner. It does not invoke `publishToMavenLocal`, remotely publish, or alter other
+products' selected dependencies.

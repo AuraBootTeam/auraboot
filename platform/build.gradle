@@ -235,6 +235,7 @@ repositories {
 // 项目基本信息
 group = 'com.auraboot'
 apply from: 'gradle/library-version.gradle'
+apply from: 'gradle/library-publication.gradle'
 
 // Java工具链配置
 java {
