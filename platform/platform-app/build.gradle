@@ -31,6 +31,10 @@ dependencyManagement {
 dependencies {
     implementation project(':')
     implementation 'org.springframework.boot:spring-boot'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework:spring-tx'
+    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
     runtimeOnly project(':platform-agent')
     runtimeOnly project(':platform-mq-kafka')
     runtimeOnly project(':platform-storage-minio')
@@ -107,9 +111,8 @@ tasks.register('verifyApplicationAssembly') {
             if (zip.getEntry('com/auraboot/framework/application/PlatformApplication.class') != null) {
                 throw new GradleException('Application launcher leaked into core')
             }
-            // S2.1 must preserve AI; the physical extraction is deliberately S2.2.
-            if (zip.getEntry('com/auraboot/framework/agent/provider/LlmProviderFactory.class') == null) {
-                throw new GradleException('Existing AI implementation was lost during preparation')
+            if (zip.getEntry('com/auraboot/framework/agent/provider/LlmProviderFactory.class') != null) {
+                throw new GradleException('Agent implementation leaked into core')
             }
         }
     }
@@ -117,3 +120,93 @@ tasks.register('verifyApplicationAssembly') {
 check {
     dependsOn 'verifyApplicationAssembly'
 }
+
+apply from: rootProject.file('gradle/platform-testing.gradle')
+apply from: rootProject.file('gradle/platform-app-test-dependencies.gradle')
+dependencies {
+    testImplementation project(':platform-agent')
+    testImplementation testFixtures(project(':'))
+    testImplementation testFixtures(project(':platform-agent'))
+    testImplementation project(':platform-plugin-api')
+}
+sourceSets {
+    integrationTest {
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+    }
+}
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+    integrationTestCompileOnly.extendsFrom testCompileOnly
+    integrationTestAnnotationProcessor.extendsFrom testAnnotationProcessor
+}
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    description = 'Run the full-composition integration tests against owned infrastructure.'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    shouldRunAfter test
+}
+
+// Check all physically owned sources and both real library artifacts, not a package sample.
+tasks.register('verifyAgentArtifactOwnership') {
+    group = 'verification'
+    dependsOn 'bootJar', ':jar', ':sourcesJar', ':platform-agent:jar', ':platform-agent:sourcesJar'
+    doLast {
+        def agentProject = project(':platform-agent')
+        def sources = agentProject.fileTree('src/main/java').matching { include '**/*.java' }.files.collect { source ->
+            def packageName = (source.text =~ /(?m)^package\s+([\w.]+);/)[0][1]
+            packageName.replace('.', '/') + '/' + source.name
+        }
+        if (sources.empty) throw new GradleException('Agent source inventory is empty')
+        def classes = sources.collect { it.replaceAll(/\.java$/, '.class') }
+        new ZipFile(agentProject.tasks.named('jar').get().archiveFile.get().asFile).withCloseable { zip ->
+            def entries = zip.entries().collect { it.name }
+            classes.each { name ->
+                if (entries.count { it == name } != 1) throw new GradleException("Agent must uniquely own ${name}")
+            }
+            ['aurabot/synonyms.yml', 'i18n/aurabot-skill_en.properties', 'i18n/aurabot-skill_zh_CN.properties'].each { name ->
+                if (entries.count { it == name } != 1) throw new GradleException("Missing agent resource: ${name}")
+            }
+        }
+        new ZipFile(agentProject.tasks.named('sourcesJar').get().archiveFile.get().asFile).withCloseable { zip ->
+            sources.each { name ->
+                if (zip.getEntry(name) == null) throw new GradleException("Missing agent source: ${name}")
+            }
+        }
+        new ZipFile(rootProject.tasks.named('sourcesJar').get().archiveFile.get().asFile).withCloseable { zip ->
+            sources.each { name ->
+                if (zip.getEntry(name) != null) throw new GradleException("Agent source leaked into core: ${name}")
+            }
+        }
+        new ZipFile(rootProject.tasks.named('jar').get().archiveFile.get().asFile).withCloseable { zip ->
+            classes.each { name ->
+                if (zip.getEntry(name) != null) throw new GradleException("Agent class leaked into core: ${name}")
+            }
+            ['MetaApplication', 'CoreOnlyApplication', 'ApplicationMode'].each { name ->
+                if (zip.getEntry("com/auraboot/framework/application/${name}.class") != null) {
+                    throw new GradleException("Application composition leaked into core: ${name}")
+                }
+            }
+        }
+        def sdkBackEdges = rootProject.configurations.runtimeClasspath.incoming.resolutionResult.allComponents
+                .collect { it.moduleVersion }.findAll { it?.group?.startsWith('io.modelcontextprotocol') }
+        if (!sdkBackEdges.empty) throw new GradleException("Agent SDK leaked into core: ${sdkBackEdges}")
+        new ZipFile(tasks.named('bootJar').get().archiveFile.get().asFile).withCloseable { zip ->
+            def libraries = zip.entries().findAll { it.name.startsWith('BOOT-INF/lib/platform-agent-') }*.name
+            if (libraries.size() != 1) throw new GradleException('Full application must contain one agent library')
+            def nestedEntries = []
+            new java.util.jar.JarInputStream(zip.getInputStream(zip.getEntry(libraries[0]))).withCloseable { nested ->
+                java.util.jar.JarEntry entry
+                while ((entry = nested.nextJarEntry) != null) nestedEntries.add(entry.name)
+            }
+            classes.each { name ->
+                if (nestedEntries.count { it == name } != 1 || zip.getEntry("BOOT-INF/classes/${name}") != null) {
+                    throw new GradleException("Full application agent ownership is invalid: ${name}")
+                }
+            }
+        }
+    }
+}
+tasks.named('verifyApplicationAssembly') { dependsOn 'verifyAgentArtifactOwnership' }
