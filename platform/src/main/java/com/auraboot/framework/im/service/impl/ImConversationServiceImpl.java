@@ -387,7 +387,9 @@ public class ImConversationServiceImpl implements ImConversationService {
 
     private ImAgentDirectory requireAgentDirectory() {
         if (agentDirectory == null) {
-            throw new IllegalArgumentException("Agent capability is not installed");
+            throw new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.UnsupportedFeature,
+                    "Agent capability is not installed");
         }
         return agentDirectory;
     }

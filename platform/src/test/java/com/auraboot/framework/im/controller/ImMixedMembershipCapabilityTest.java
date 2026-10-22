@@ -37,7 +37,7 @@ class ImMixedMembershipCapabilityTest {
         var controller = new ImConversationController(service, websocket, messageService);
         var payload = new ObjectMapper().readTree("{\"memberIds\":[8],\"agentIds\":[9]}");
         assertThatThrownBy(() -> controller.addMembers(100L, payload))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not installed");
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("not installed");
         verify(members).findMember(100L, "human", 7L, 42L);
         verifyNoMoreInteractions(members);
         verifyNoInteractions(conversations, messages, messageService, websocket);
@@ -52,7 +52,7 @@ class ImMixedMembershipCapabilityTest {
         var request = new com.auraboot.framework.im.dto.ConversationCreateRequest();
         request.setType("bot");
         assertThatThrownBy(() -> service.create(request, 7L, 42L))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not installed");
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("not installed");
         verifyNoInteractions(conversations, members, messages);
     }
 

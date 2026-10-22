@@ -733,9 +733,9 @@ class ImConversationServiceImplTest {
         request.setMemberIds(List.of(OTHER_ID));
         request.setAgentIds(List.of(55L));
         assertThatThrownBy(() -> service.create(request, USER_ID, TENANT_ID))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not installed");
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("not installed");
         assertThatThrownBy(() -> service.addAgentMembers(CONV_ID, List.of(55L), TENANT_ID))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not installed");
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("not installed");
         org.mockito.Mockito.verifyNoInteractions(memberMapper, conversationMapper, messageMapper, imMessageService);
     }
 
