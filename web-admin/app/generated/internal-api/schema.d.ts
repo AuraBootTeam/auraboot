@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 2c07f437edb77a7954e4825a9391aef1255f9233f2e07e80a539c74befe8ec77
+ * Contract SHA-256: d3e25ab951c33be09434cb2e725fc2a843637ca6af954347bc7d17383ab3c35e
  */
 export interface paths {
     "/api/activities": {
@@ -27958,10 +27958,12 @@ export interface components {
             channelCode?: string;
             code?: string;
             email?: string;
+            enrollmentCode?: string;
             identifier?: string;
             ipAddress?: string;
             mobile?: string;
             password?: string;
+            phoneCode?: string;
             userAgent?: string;
         };
         AutomationAction: {

@@ -16930,6 +16930,9 @@
           "email": {
             "type": "string"
           },
+          "enrollmentCode": {
+            "type": "string"
+          },
           "identifier": {
             "type": "string"
           },
@@ -16940,6 +16943,9 @@
             "type": "string"
           },
           "password": {
+            "type": "string"
+          },
+          "phoneCode": {
             "type": "string"
           },
           "userAgent": {
