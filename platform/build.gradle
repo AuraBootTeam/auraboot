@@ -238,6 +238,13 @@ allprojects {
     version = rootProject.version
 }
 
+// Preserve project fixture consumers and expose the published artifact capability as well.
+['testFixturesApiElements', 'testFixturesRuntimeElements'].each { name ->
+    configurations.named(name) {
+        outgoing.capability("com.auraboot:auraboot-core-test-fixtures:${project.version}")
+    }
+}
+
 // Java工具链配置
 java {
     toolchain {

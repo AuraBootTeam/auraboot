@@ -78,3 +78,9 @@ publishing {
         }
     }
 }
+
+['testFixturesApiElements', 'testFixturesRuntimeElements'].each { name ->
+    configurations.named(name) {
+        outgoing.capability("com.auraboot:auraboot-agent-test-fixtures:${project.version}")
+    }
+}

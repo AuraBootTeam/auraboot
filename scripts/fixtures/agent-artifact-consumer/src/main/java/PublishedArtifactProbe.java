@@ -21,6 +21,7 @@ public final class PublishedArtifactProbe {
         unique(ROOT + "common.util.UniqueIdGenerator", 1);
         unique(ROOT + "meta.ai.AiFieldGenerator", 1);
         unique(ROOT + "agent.provider.LlmProviderFactory", agent ? 1 : 0);
+        unique("io.modelcontextprotocol.spec.McpSchema", agent ? 1 : 0);
         for (String type : INTENT_TYPES) unique(ROOT + "intent." + type, agent ? 1 : 0);
         unique(ROOT + "application.MetaApplication", mode.equals("full") ? 1 : 0);
         unique(ROOT + "application.PlatformApplication", mode.equals("full") ? 1 : 0);

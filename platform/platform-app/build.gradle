@@ -3,7 +3,7 @@ import java.util.jar.Manifest
 import java.util.zip.ZipFile
 
 plugins {
-    id 'java'
+    id 'java-library'
     id 'maven-publish'
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
