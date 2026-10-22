@@ -234,11 +234,7 @@ repositories {
 
 // 项目基本信息
 group = 'com.auraboot'
-version = file('../VERSION').text.trim()
-
-allprojects {
-    version = rootProject.version
-}
+apply from: 'gradle/library-version.gradle'
 
 // Java工具链配置
 java {
