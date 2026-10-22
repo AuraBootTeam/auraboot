@@ -160,7 +160,8 @@ tasks.register('verifyAgentArtifactOwnership') {
             packageName.replace('.', '/') + '/' + source.name
         }
         if (sources.empty) throw new GradleException('Agent source inventory is empty')
-        def classes = sources.collect { it.replaceAll(/\.java$/, '.class') }
+        def classes = sources.findAll { !it.endsWith('/package-info.java') }
+                .collect { it.replaceAll(/\.java$/, '.class') }
         new ZipFile(agentProject.tasks.named('jar').get().archiveFile.get().asFile).withCloseable { zip ->
             def entries = zip.entries().collect { it.name }
             classes.each { name ->

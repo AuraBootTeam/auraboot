@@ -106,7 +106,7 @@ if [[ -z "$APP_VERSION" && -f "$PRIMARY_ROOT/VERSION" ]]; then
   APP_VERSION="$(tr -d ' \r\n' < "$PRIMARY_ROOT/VERSION")"
 fi
 if [[ -z "$APP_VERSION" ]]; then
-  APP_VERSION="$(grep -A3 '^  platform:' "$AURA_CORE_ROOT/platform/src/main/resources/application.yml" 2>/dev/null \
+  APP_VERSION="$(grep -A3 '^  platform:' "$AURA_CORE_ROOT/platform/platform-app/src/main/resources/application.yml" 2>/dev/null \
     | grep -m1 -E '^[[:space:]]+version:' | sed 's/.*version:[[:space:]]*//' | tr -d ' \r')"
 fi
 [[ -n "$APP_VERSION" ]] || APP_VERSION="$DB_MIGRATION_VERSION"

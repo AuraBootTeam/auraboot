@@ -42,6 +42,8 @@ tasks.withType(Test).configureEach {
     if (project.hasProperty('auraTestMaxMetaspace')) {
         jvmArgs "-XX:MaxMetaspaceSize=${project.property('auraTestMaxMetaspace')}"
     }
+    systemProperty 'allure.results.directory', providers.environmentVariable('AURA_ALLURE_RESULTS')
+            .getOrElse(layout.buildDirectory.dir('allure-results').get().asFile.absolutePath)
     systemProperty 'spring.test.context.cache.maxSize', project.findProperty('springTestContextCacheMaxSize') ?: '8'
     def store = layout.buildDirectory.dir("archunit/${name}").get().asFile
     def baseline = rootProject.file('src/testFixtures/resources/archunit_store')

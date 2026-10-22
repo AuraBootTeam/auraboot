@@ -85,7 +85,10 @@ jobs:
       - name: Verify full application assembly and launcher modes
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
-        run: ./gradlew --no-daemon :platform-app:test :platform-app:verifyApplicationAssembly
+        run: >-
+          ./gradlew --no-daemon :platform-app:test
+          --tests com.auraboot.framework.application.PlatformApplicationModeTest
+          :platform-app:verifyApplicationAssembly
 
       - name: Verify core agent implementation boundary
         if: steps.changes.outputs.run == 'true'
@@ -109,7 +112,7 @@ jobs:
       - name: Compile (integrationTest sources)
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
-        run: ./gradlew --no-daemon compileIntegrationTestJava
+        run: ./gradlew --no-daemon :platform-app:compileIntegrationTestJava
 
       - name: Checkstyle (main)
         if: steps.changes.outputs.run == 'true'

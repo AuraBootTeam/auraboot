@@ -11,16 +11,18 @@ The output is `platform-app/build/libs/AuraBoot-<version>-boot.jar`. The legacy
 launchers and image builders. Both `:bootRun` and `:platform-app:bootRun` select the
 same launcher and retain the established JVM settings.
 
-This preparation slice preserves the full AI implementation in the root library.
-It does not yet provide an AI-free assembly. `core-only` retains its existing
-application-mode meaning and does not mean AI-free. Legacy scan configurations and
-full-context tests remain in root until the implementation extraction.
+Application launchers, scan configurations and application YAML live in this module.
+AI implementation and outbound MCP dependencies live in `platform-agent`; core is
+a plain library. `core-only` retains its existing meaning of excluding CRM/BPM and
+does not mean an AI-free product.
 
 The application selects infrastructure runtime providers. Core publication must
 not depend on app, agent or infrastructure implementations. Explicit scheduler
 opt-in retains the existing `-PwithSchedulerXxl` behavior; the default application
 contains no XXL-JOB runtime.
 
-Launcher-mode tests belong to app. Existing root full-context suites and opt-in
-fixture artifacts keep their current selectors until their extraction is ready;
-the backend workflow explicitly executes app tests and the artifact gate.
+Launcher-mode and full-context tests belong to app. Run cross-module integration
+selectors with `:platform-app:integrationTest`; independent core tests use `:test`
+and hermetic agent tests use `:platform-agent:test`. Shared helpers use explicit
+test-fixtures variants. Root `testApiJar`/`e2eFixtureSupportJar` remain opt-in and
+are excluded from production runtime dependencies.
