@@ -60,6 +60,8 @@ test('SC03 live delivery notes → typed budget/date draft → preserved manual 
   await expect(page.locator('#tpm_pj_end_date')).toHaveValue('2026-11-20');
   await expect(page.locator('#tpm_pj_start_date')).toHaveValue('');
   await expect(page.locator('#tpm_pj_description')).toHaveValue(/对账联调/);
+  const description = page.locator('#tpm_pj_description');
+  await expect(description.locator('..')).toContainText(`${(await description.inputValue()).length}/5000`);
   await expect(page.locator('#tpm_pj_risk_summary')).toHaveValue(/测试环境未开放/);
   await expect(page.locator('#tpm_pj_next_action')).toHaveValue(manual);
   await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
