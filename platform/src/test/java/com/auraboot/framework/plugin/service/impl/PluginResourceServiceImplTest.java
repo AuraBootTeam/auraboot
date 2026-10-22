@@ -53,6 +53,7 @@ class PluginResourceServiceImplTest {
     @Mock private MetaModelFieldBindingMapper bindingMapper;
     @Mock private ObjectMapper objectMapper;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources;
 
     @InjectMocks private PluginResourceServiceImpl service;
 
