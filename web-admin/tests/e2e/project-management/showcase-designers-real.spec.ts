@@ -205,6 +205,8 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   await expect(precision).toHaveValue('0');
   await precision.fill('2');
   await panel.getByTestId('schema-config-field-format').getByRole('combobox').click();
+  await page.getByRole('option', { name: '百分比', exact: true }).click();
+  await panel.getByTestId('schema-config-field-format').getByRole('combobox').click();
   await page.getByRole('option', { name: '数字', exact: true }).click();
   await shot(page, 'DS03-number-precision-schema');
   const saved = page.waitForResponse(

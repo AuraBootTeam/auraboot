@@ -1,9 +1,9 @@
 [
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Dashboard",
     "component": "smart-pie-chart",
     "variant": "native",
@@ -19,9 +19,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Dashboard",
     "component": "smart-table-chart",
     "variant": "native",
@@ -32,9 +32,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "rich-text",
     "variant": "native",
@@ -46,9 +46,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "table",
     "variant": "native",
@@ -62,9 +62,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "grouped-table",
     "variant": "native",
@@ -87,9 +87,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "cross-tab",
     "variant": "native",
@@ -108,9 +108,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "stat-card",
     "variant": "native",
@@ -125,9 +125,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "chart",
     "variant": "native",
@@ -143,9 +143,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "barcode",
     "variant": "native",
@@ -157,9 +157,9 @@
   },
   {
     "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
-    "driverSha256": "5307c20fbb12e2c7ef83e551c76ea45f405cbca45d8eca3c4c2cdfd44962469a",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
     "layer": "browser",
-    "profile": "showcase-designers",
+    "profile": "designer-interactions",
     "surface": "Report",
     "component": "watermark",
     "variant": "native",
@@ -167,5 +167,19 @@
       "text"
     ],
     "testTitle": "SC10 report template → reviewed text edit → save/reload → three real exports retain live facts"
+  },
+  {
+    "driver": "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
+    "driverSha256": "b817ad20561b263155803821e41c292264fcf12dcf4b632895ca831c16aa8852",
+    "layer": "browser",
+    "profile": "designer-interactions",
+    "surface": "Dashboard",
+    "component": "smart-number-card",
+    "variant": "native",
+    "properties": [
+      "format",
+      "precision"
+    ],
+    "testTitle": "SC10 dashboard template → real donut/title edit → save/publish → reload → exported configuration"
   }
 ]
