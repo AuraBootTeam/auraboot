@@ -54,6 +54,10 @@ dependencies {
     }
     testApi "com.auraboot:auraboot-core:${publishedVersion}"
     testApi "com.auraboot:auraboot-core:${publishedVersion}:test-api"
+    // Application consumers import the same published alignment in both metadata modes.
+    modes.each { mode ->
+        add(mode, enforcedPlatform("com.auraboot:auraboot-platform:${publishedVersion}"))
+    }
 }
 
 modes.each { mode ->

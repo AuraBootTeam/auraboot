@@ -16,7 +16,10 @@ From the workspace, invoke the managed wrapper with:
 
 Repeat with `-PpublicationMetadata=pom` to disable Gradle metadata redirection
 and consume the actual Maven POMs. Publish aligned core, agent, app, plugin API
-and app provider artifacts before running. `auraPlatformVersion` selects the
+and app provider artifacts plus `auraboot-platform` before running.
+Application configurations import that published BOM as an enforced platform;
+Maven applications import it in dependencyManagement. The BOM derives its
+complete transitive alignment from the approved app lock, not this test. `auraPlatformVersion` selects the
 producer's explicit preview version; it does not change the default VERSION.
 Never overwrite an existing version or use the global Maven repository.
 
