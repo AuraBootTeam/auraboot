@@ -64,3 +64,43 @@ describe('renderHtmlToPdf', () => {
     expect(browser.closed).toBe(true);
   });
 });
+
+describe('canonical band clearance', () => {
+  it('reserves physical band space without shrinking larger margins', async () => {
+    const browser = new FakeBrowser();
+    await renderHtmlToPdf(
+      {
+        html: '<html></html>',
+        headerTemplate: 'header',
+        footerTemplate: 'footer',
+        headerHeightMm: 15,
+        footerHeightMm: 10,
+      },
+      {
+        launchBrowser: async () => browser,
+        margin: { top: '14mm', bottom: '25mm', left: '15mm', right: '15mm' },
+      },
+    );
+    expect(browser.page.pdfArgs?.margin).toEqual({
+      top: '19mm',
+      bottom: '25mm',
+      left: '15mm',
+      right: '15mm',
+    });
+  });
+});
+
+it('retains inch margins and rejects malformed physical margins with bands', async () => {
+  const browser = new FakeBrowser();
+  await renderHtmlToPdf(
+    { html: '<html></html>', headerTemplate: 'header', headerHeightMm: 15 },
+    { launchBrowser: async () => browser, margin: { top: '1in' } },
+  );
+  expect((browser.page.pdfArgs?.margin as Record<string, string>).top).toBe('1in');
+  await expect(
+    renderHtmlToPdf(
+      { html: '<html></html>', headerTemplate: 'header', headerHeightMm: 15 },
+      { launchBrowser: async () => new FakeBrowser(), margin: { top: 'broken' } },
+    ),
+  ).rejects.toThrow('Invalid report PDF margin');
+});
