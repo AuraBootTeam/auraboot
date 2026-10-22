@@ -126,6 +126,20 @@ function ChatBiChart({
   chartConfig?: Record<string, unknown>;
   labels: Record<string, string>;
 }) {
+  const { locale } = useI18n();
+  const compactAxis = useMemo(() => ({
+    type: 'value' as const,
+    splitNumber: 2,
+    axisLabel: {
+      hideOverlap: true,
+      formatter: (value: number) => new Intl.NumberFormat(locale, {
+        notation: 'compact', maximumSignificantDigits: 3,
+      }).format(value),
+    },
+  }), [locale]);
+  const chartOptions = chartType === 'bar'
+    ? chartConfig?.orientation === 'vertical' ? { yAxis: compactAxis } : { xAxis: compactAxis }
+    : undefined;
   const dataSource = useMemo<ChartDataSource>(() => {
     const { labelField, valueField } = inferFields(records, columns, chartConfig);
     const effectiveDimensions =
@@ -164,6 +178,7 @@ function ChatBiChart({
               : 'horizontal'
             : undefined
         }
+        chartOptions={chartOptions}
         metricLabels={labels}
         dataSource={dataSource}
         className="h-[280px] w-full"

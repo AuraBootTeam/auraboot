@@ -200,6 +200,13 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   const mappingBox=await mappingRow.boundingBox(),removeBox=await drill.getByTestId('dashboard-drilldown-mapping-remove').boundingBox();
   expect(mappingBox).toBeTruthy();expect(removeBox).toBeTruthy();expect(removeBox!.x+removeBox!.width).toBeLessThanOrEqual(mappingBox!.x+mappingBox!.width+1);
   await shot(page,'DS03-structured-drilldown');
+  await canvas.locator('[data-widget-id="pending_count"]').first().click();
+  const precision = panel.getByTestId('schema-config-field-precision').getByRole('spinbutton');
+  await expect(precision).toHaveValue(0);
+  await precision.fill('2');
+  await panel.getByTestId('schema-config-field-format').getByRole('combobox').click();
+  await page.getByRole('option', { name: '数字', exact: true }).click();
+  await shot(page, 'DS03-number-precision-schema');
   const saved = page.waitForResponse(
     (r) => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST',
   );
@@ -232,6 +239,8 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
     expect(Number(row.acceptance_count)).toBe(counts.get(row.status_label));
   const persisted = await data(await page.request.get(`/api/dashboards/${board.pid}`));
   const geometry = persisted.widgets.find((w: any) => w.id === 'pending_count');
+  expect(geometry.config.precision).toBe(2);
+  expect(geometry.config.format).toBe('number');
   expect(geometry.w).toBeGreaterThan(3);
   expect(geometry.h).toBeGreaterThan(2);
   expect(geometry.x).toBeGreaterThan(0);

@@ -22,11 +22,13 @@ vi.mock('~/framework/smart/charts/SharedChartFactory', () => ({
   normalizeChartType: (type: string) => type,
   getChartComponent:
     () =>
-    (props: { metricLabels: Record<string, string>; orientation?: string; title?: string }) => (
+    (props: { metricLabels: Record<string, string>; orientation?: string; title?: string; chartOptions?: any }) => (
       <div
         data-testid="shared-chart-labels"
         data-orientation={props.orientation}
         data-title={props.title}
+        data-axis={JSON.stringify(props.chartOptions)}
+        data-tick={props.chartOptions?.xAxis?.axisLabel.formatter(200000)}
       >
         {JSON.stringify(props.metricLabels)}
       </div>
@@ -70,6 +72,8 @@ describe('chat chart presentation labels', () => {
       'horizontal',
     );
     expect(screen.getByTestId('shared-chart-labels')).not.toHaveAttribute('data-title');
+    expect(screen.getByTestId('shared-chart-labels')).toHaveAttribute('data-tick', '20万');
+    expect(JSON.parse(screen.getByTestId('shared-chart-labels').getAttribute('data-axis')!)).toMatchObject({ xAxis: { splitNumber: 2, axisLabel: { hideOverlap: true } } });
     fireEvent.click(screen.getByTestId('chatbi-save-dashboard'));
     await waitFor(() => expect(dashboardService.create).toHaveBeenCalled());
     const widget = vi.mocked(dashboardService.create).mock.calls[0][0].widgets![0];
