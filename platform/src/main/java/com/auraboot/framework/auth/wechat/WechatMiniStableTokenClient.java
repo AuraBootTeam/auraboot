@@ -37,9 +37,14 @@ public class WechatMiniStableTokenClient {
         URI base = validatedApiBase(properties.getApiBaseUrl());
         String raw;
         try {
+            // WeChat's gateway rejects chunked JSON requests with HTTP 412.
+            byte[] payload = new ObjectMapper().writeValueAsBytes(Map.of(
+                    "grant_type", "client_credential", "appid", properties.getAppId(),
+                    "secret", properties.getAppSecret(), "force_refresh", false));
             raw = client.post().uri(base + "/cgi-bin/stable_token").contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("grant_type","client_credential","appid",properties.getAppId(),
-                            "secret",properties.getAppSecret(),"force_refresh",false)).retrieve().body(String.class);
+                    .contentLength(payload.length).body(payload).retrieve().body(String.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new TokenFailure(Reason.CONFIGURATION);
         } catch (org.springframework.web.client.RestClientException failure) {
             // Provider exceptions can embed credentials; do not retain causes or raw diagnostics.
             throw new TokenFailure(Reason.TRANSPORT);
