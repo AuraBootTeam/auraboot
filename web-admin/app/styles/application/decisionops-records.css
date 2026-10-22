@@ -1,0 +1,168 @@
+.decisionops-main-cell strong {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.epl-table {
+  min-width: 1120px;
+}
+
+.epl-table th:nth-child(1),
+.epl-table td:nth-child(1) {
+  width: 180px;
+}
+
+.epl-table th:nth-child(2),
+.epl-table td:nth-child(2) {
+  width: 170px;
+}
+
+.epl-table th:nth-child(3),
+.epl-table td:nth-child(3) {
+  width: 130px;
+}
+
+.epl-table th:nth-child(4),
+.epl-table td:nth-child(4) {
+  width: 120px;
+}
+
+.epl-table th:nth-child(5),
+.epl-table td:nth-child(5) {
+  width: 64px;
+}
+
+.epl-table th:nth-child(6),
+.epl-table td:nth-child(6) {
+  width: 120px;
+}
+
+.epl-table th:nth-child(7),
+.epl-table td:nth-child(7) {
+  width: 96px;
+}
+
+.epl-table th:nth-child(8),
+.epl-table td:nth-child(8) {
+  width: 150px;
+}
+
+.epl-table th:nth-child(9),
+.epl-table td:nth-child(9) {
+  width: 130px;
+}
+
+.decisionops-code {
+  display: block;
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--color-text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.decisionops-muted-cell {
+  color: var(--color-text-2) !important;
+}
+
+.decisionops-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.decisionops-badge.is-success {
+  border-color: var(--color-status-green);
+  background: var(--color-status-green-bg);
+  color: var(--color-status-green);
+}
+
+.decisionops-badge.is-warning {
+  border-color: var(--color-status-amber);
+  background: var(--color-status-amber-bg);
+  color: var(--color-status-amber);
+}
+
+.decisionops-badge.is-danger {
+  border-color: var(--color-status-red);
+  background: var(--color-status-red-bg);
+  color: var(--color-status-red);
+}
+
+.decisionops-badge.is-neutral {
+  border-color: var(--color-border);
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+}
+
+.decisionops-switch-button {
+  position: relative;
+  min-width: 54px;
+  border-color: var(--color-border-strong) !important;
+  background: var(--color-subtle) !important;
+  color: var(--color-text-2) !important;
+  font-weight: 800;
+  padding-left: 18px !important;
+}
+
+.decisionops-switch-button::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-text-3);
+  transform: translateY(-50%);
+}
+
+.decisionops-switch-button.is-on {
+  border-color: var(--color-status-green) !important;
+  background: var(--color-status-green-bg) !important;
+  color: var(--color-status-green) !important;
+}
+
+.decisionops-switch-button.is-on::before {
+  background: var(--color-status-green);
+}
+
+.decisionops-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: max-content;
+}
+
+.decisionops-empty,
+.decisionops-state {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text-2);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 24px;
+  text-align: center;
+}
+
+.decisionops-state.is-error {
+  border-color: var(--color-status-red);
+  background: var(--color-status-red-bg);
+  color: var(--color-status-red);
+}
+

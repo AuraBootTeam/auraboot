@@ -1,0 +1,223 @@
+@media (max-width: 700px) {
+  .elta-drawer {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(82dvh, 720px);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .elta-drawer[data-mode='detail'] {
+    height: auto;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 900px) {
+  .decisionops-shell {
+    padding: 12px;
+  }
+
+  .decisionops-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .decisionops-header-meta {
+    justify-content: flex-start;
+  }
+
+  .decisionops-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .decisionops-shell .doc-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .decisionops-shell .doc-tabs :is(button, a) {
+    min-width: 0;
+  }
+
+  .decisionops-editor-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .cfl-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cfl-editor textarea[aria-label='fragment-description'],
+  .cfl-condition-editor {
+    grid-column: 1;
+  }
+
+  .cfl-detail {
+    order: -1;
+  }
+
+  .cfl-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .dtw-header,
+  .dtw-identity,
+  .dtw-runtime-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .dtw-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decisionops-shell .dt-column-manager {
+    grid-template-columns: 1fr;
+  }
+
+  .decisionops-shell .dt-column-row,
+  .decisionops-shell .dt-column-row--output,
+  .strategy-table-panel .dt-column-row {
+    grid-template-columns: 1fr 1fr;
+    min-width: 0;
+  }
+
+  .decisionops-shell .dt-column-actions {
+    grid-template-columns: 1fr 1fr 1fr;
+    justify-content: stretch;
+  }
+
+  .decisionops-shell .dt-column-actions button {
+    width: 100%;
+  }
+
+  .decisionops-shell .dt-field-picker-cell {
+    grid-column: 1 / -1;
+  }
+
+  .decisionops-shell .dt-field-picker {
+    width: min(360px, 100%);
+  }
+
+  .decisionops-shell .dt-toolbar,
+  .decisionops-shell .dt-analysis-status,
+  .decisionops-shell .dt-dmn-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decisionops-shell .dt-analysis-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rollout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rollout-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .elta-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .elta-filters button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .decisionops-shell .dt-hitpolicy,
+  .decisionops-shell .dt-column-row,
+  .decisionops-shell .dt-column-row--output,
+  .strategy-table-panel .dt-column-row {
+    grid-template-columns: 1fr;
+  }
+
+  .decisionops-shell .dt-field-picker {
+    width: min(320px, calc(100vw - 32px));
+  }
+}
+
+@media (max-width: 640px) {
+  .decisionops-shell {
+    gap: 8px;
+    padding: 6px 8px 10px;
+  }
+
+  .decisionops-page-header {
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .decisionops-eyebrow {
+    display: none;
+  }
+
+  .decisionops-page-header h1 {
+    font-size: 18px;
+  }
+
+  .decisionops-header-meta {
+    flex: 0 0 auto;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .decisionops-header-meta span {
+    display: none;
+  }
+
+  .decisionops-workbench-jump {
+    min-height: 30px;
+    padding: 4px 9px;
+  }
+
+  .decisionops-shell .doc-tabs {
+    display: flex;
+    gap: 6px;
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding: 6px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .decisionops-shell .doc-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .decisionops-shell .doc-tabs :is(button, a) {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 34px;
+    min-width: 86px;
+    align-content: center;
+    padding: 7px 10px;
+    scroll-snap-align: start;
+  }
+
+  .decisionops-nav-desc {
+    display: none;
+  }
+
+  .decisionops-nav-label {
+    white-space: nowrap;
+  }
+
+  .decisionops-section-head {
+    display: none;
+  }
+
+  .decisionops-shell .doc-panel {
+    padding: 8px;
+  }
+}
+
