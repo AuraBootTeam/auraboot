@@ -79,6 +79,8 @@ test('DS05 executive templates retain a finished layout after Schema edits and r
   for (const widget of storedBoard.widgets.filter((widget: any) => widget.type === 'smart-number-card')) expect(widget.config.precision).toBe(0);
   await chart.click();
   await expect(panel.getByTestId('widget-prop-title-zh')).toHaveValue('交付验收状态 · 本次周会');
+  await expect(chart.locator('[data-chart-ready="true"]')).toBeVisible();
+  await expect(page.getByTestId('dashboard-block-delivery-actions')).toContainText('周宁');
   await shot(page, 'DS05-dashboard-reopened');
   await page.getByTestId('toolbar-btn-presentation').click();
   const presentation = page.getByTestId('big-screen-mode');
