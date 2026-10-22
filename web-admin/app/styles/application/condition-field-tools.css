@@ -1,0 +1,51 @@
+.cb-field-tools {
+  display: grid;
+  align-items: end;
+  gap: 8px;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  min-width: 0;
+}
+
+.cb-field-tools label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cb-field-tools input {
+  min-height: 34px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: 13px;
+  outline: none;
+  padding: 7px 10px;
+}
+
+.cb-field-tools input:focus {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.cb-field-tools span,
+.cb-field-empty {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+
+.cb-field-empty {
+  text-align: center;
+}
+

@@ -1,0 +1,483 @@
+/* 吸附和对齐面板样式 */
+.snap-align-panel {
+  position: fixed;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 280px;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+.snap-align-panel--left {
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.snap-align-panel--right {
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.snap-align-panel--top {
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.snap-align-panel--bottom {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.snap-align-panel.collapsed {
+  max-height: 60px;
+  overflow: hidden;
+}
+
+.snap-align-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-secondary);
+  background: var(--bg-secondary);
+  border-radius: 8px 8px 0 0;
+}
+
+.snap-align-panel__header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.collapse-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.collapse-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.snap-align-panel__content {
+  padding: 16px;
+}
+
+/* 配置区块样式 */
+.snap-config-section,
+.alignment-config-section,
+.priority-config-section {
+  margin-bottom: 24px;
+}
+
+.snap-config-section:last-child,
+.alignment-config-section:last-child,
+.priority-config-section:last-child {
+  margin-bottom: 0;
+}
+
+.config-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.config-section-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.config-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.config-toggle input[type='checkbox'] {
+  margin: 0;
+}
+
+.config-section-content {
+  padding-left: 8px;
+}
+
+.config-group {
+  margin-bottom: 16px;
+}
+
+.config-group:last-child {
+  margin-bottom: 0;
+}
+
+.config-group > label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.config-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin: 0;
+}
+
+.config-row input[type='number'] {
+  width: 60px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.config-row input[type='number']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.config-row select {
+  padding: 4px 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--bg-primary);
+}
+
+.config-row span {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* 对齐类型样式 */
+.alignment-types {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.alignment-type {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.alignment-type:hover {
+  background: var(--bg-hover);
+}
+
+.alignment-type input[type='checkbox'] {
+  margin: 0;
+}
+
+/* 工具栏样式 */
+.snap-align-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-group:not(:last-child) {
+  padding-right: 8px;
+  border-right: 1px solid var(--border-secondary);
+}
+
+.toolbar-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 11px;
+}
+
+.toolbar-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-primary);
+}
+
+.toolbar-button.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.toolbar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-button .icon {
+  font-size: 14px;
+}
+
+.toolbar-select {
+  padding: 4px 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* 吸附引擎样式 */
+.snap-engine-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 999;
+}
+
+.snap-guide-line {
+  position: absolute;
+  background: var(--accent-primary);
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.snap-guide-line--horizontal {
+  height: 1px;
+  left: 0;
+  right: 0;
+}
+
+.snap-guide-line--vertical {
+  width: 1px;
+  top: 0;
+  bottom: 0;
+}
+
+.snap-guide-line--grid {
+  background: var(--border-secondary);
+  opacity: 0.3;
+}
+
+.snap-point {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: var(--accent-primary);
+  border: 1px solid white;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.snap-point--active {
+  width: 8px;
+  height: 8px;
+  opacity: 1;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* 对齐系统样式 */
+.alignment-system-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 998;
+}
+
+.alignment-guide {
+  position: absolute;
+  background: var(--success-primary);
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.alignment-guide--horizontal {
+  height: 1px;
+  left: 0;
+  right: 0;
+}
+
+.alignment-guide--vertical {
+  width: 1px;
+  top: 0;
+  bottom: 0;
+}
+
+.alignment-distance {
+  position: absolute;
+  background: var(--success-primary);
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+.alignment-target {
+  position: absolute;
+  border: 1px dashed var(--success-primary);
+  background: rgba(var(--success-primary-rgb), 0.1);
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.alignment-target--active {
+  opacity: 1;
+  border-style: solid;
+  background: rgba(var(--success-primary-rgb), 0.2);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .snap-align-panel {
+    min-width: 240px;
+    max-width: calc(100vw - 40px);
+  }
+
+  .snap-align-panel--left,
+  .snap-align-panel--right {
+    left: 20px;
+    right: 20px;
+    transform: none;
+  }
+
+  .snap-align-panel--top {
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    transform: none;
+  }
+
+  .snap-align-panel--bottom {
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    transform: none;
+  }
+
+  .alignment-types {
+    grid-template-columns: 1fr;
+  }
+
+  .snap-align-toolbar {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .toolbar-group {
+    gap: 2px;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .snap-guide-line,
+  .alignment-guide {
+    opacity: 1;
+  }
+
+  .snap-point {
+    border-width: 2px;
+  }
+
+  .alignment-target {
+    border-width: 2px;
+  }
+}
+
+/* 减少动画模式 */
+@media (prefers-reduced-motion: reduce) {
+  .snap-guide-line,
+  .alignment-guide,
+  .snap-point,
+  .alignment-target,
+  .toolbar-button,
+  .collapse-button {
+    transition: none;
+  }
+}
+
+/* 暗色模式 */
+
+:where(.dark) .snap-align-panel {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+:where(.dark) .snap-point {
+  border-color: var(--bg-primary);
+}
+
+:where(.dark) .alignment-distance {
+  background: var(--success-primary);
+  color: var(--bg-primary);
+}
+
+/* Print styles */
+@media print {
+  .snap-align-panel,
+  .snap-align-toolbar,
+  .snap-engine-overlay,
+  .alignment-system-overlay {
+    display: none !important;
+  }
+}
+

@@ -1,0 +1,442 @@
+.epd-workflow {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.epd-command-center {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(320px, 1.35fr) minmax(220px, 0.75fr) minmax(220px, 0.75fr);
+}
+
+.epd-command-main,
+.epd-command-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-panel);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+}
+
+.epd-command-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.epd-command-metrics span {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-subtle);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+}
+
+.epd-command-card > span,
+.epd-command-card small {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.epd-command-card strong {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.epd-command-card button {
+  width: max-content;
+  border-color: var(--color-border-strong);
+  background: var(--color-subtle);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.epd-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 6px;
+}
+
+.epd-steps button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-2);
+  font-weight: 700;
+}
+
+.epd-steps button.is-active,
+.epd-steps button[aria-selected='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-weak);
+  color: var(--color-accent);
+}
+
+.epd-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-panel);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+}
+
+.epd-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.epd-panel-heading > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.epd-panel-heading strong {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.epd-context-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.epd-context-meta span {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+}
+
+.epd-eyebrow {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.epd-status,
+.epd-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.epd-status-published {
+  border-color: var(--color-status-green);
+  background: var(--color-status-green-bg);
+  color: var(--color-status-green);
+}
+
+.epd-status-draft,
+.epd-status-validated {
+  border-color: var(--color-status-blue);
+  background: var(--color-status-blue-bg);
+  color: var(--color-status-blue);
+}
+
+.epd-summary-grid,
+.epd-action-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.epd-action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.epd-summary-card,
+.epd-action-card,
+.epd-result,
+.epd-empty,
+.epd-state {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 12px;
+}
+
+.epd-summary-card,
+.epd-result,
+.epd-empty {
+  display: grid;
+  gap: 6px;
+}
+
+.epd-summary-card span,
+.epd-result span,
+.epd-payload-summary span {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.epd-summary-card strong,
+.epd-result strong,
+.epd-payload-summary strong {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.epd-field-row {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.epd-field-row label,
+.epd-field-row > span {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.epd-field-row em,
+.decision-action-schema-field em {
+  margin-left: 6px;
+  color: var(--color-status-red);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.epd-field-row input,
+.epd-field-row select,
+.epd-field-row textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.epd-field-row textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.epd-inline-fields {
+  display: grid;
+  align-items: end;
+  gap: 10px;
+  grid-template-columns: 120px minmax(0, 1fr);
+}
+
+.epd-action-card {
+  display: grid;
+  gap: 12px;
+}
+
+.epd-action-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.epd-action-title strong {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.epd-action-title span {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.epd-action-title .epd-action-availability-badge {
+  margin-left: auto;
+  border: 1px solid rgba(217, 119, 6, 0.32);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  padding: 2px 8px;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.epd-action-availability {
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.12);
+  padding: 8px 10px;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
+.epd-action-result-payload {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.epd-action-result-payload div {
+  min-width: 0;
+}
+
+.epd-action-result-payload dt {
+  color: var(--color-text-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.epd-action-result-payload dd {
+  margin: 2px 0 0;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.epd-payload-summary {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  padding: 9px;
+}
+
+.epd-action-schema {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.epd-action-schema textarea {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+}
+
+.epd-advanced {
+  display: grid;
+  gap: 8px;
+}
+
+.epd-advanced summary {
+  color: var(--color-accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.epd-advanced textarea {
+  min-height: 128px;
+  font-family: var(--font-mono);
+}
+
+.epd-publish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.epd-state.is-error {
+  border-color: var(--color-status-red);
+  background: var(--color-status-red-bg);
+  color: var(--color-status-red);
+}
+
+.epd-state.is-warning {
+  border-color: var(--color-status-amber);
+  background: var(--color-status-amber-bg);
+  color: var(--color-status-amber);
+}
+
+.epd-panel .pre-header,
+.epd-panel .pre-rule-head,
+.epd-panel .cb-controls,
+.epd-panel .cb-row,
+.epd-panel .cb-group-header,
+.epd-panel .cb-not-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.epd-panel .pre-header,
+.epd-panel .pre-rule,
+.epd-panel .cb-group,
+.epd-panel .cb-not {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 10px;
+}
+
+.epd-panel .pre-rule,
+.epd-panel .cb-group,
+.epd-panel .cb-not {
+  display: grid;
+  gap: 10px;
+}
+
+.epd-panel .cb-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.7fr) minmax(160px, 0.8fr) auto;
+}
+
+.epd-panel .cb-preview {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text-2);
+  font-size: 12px;
+  padding: 10px;
+}
+
+@media (max-width: 1180px) {
+  .epd-command-center,
+  .epd-summary-grid,
+  .epd-action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
