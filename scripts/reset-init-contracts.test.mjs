@@ -728,3 +728,22 @@ test('default mapping admission is safe under the supported macOS bash nounset s
   assert.equal(result.status,0,result.stderr);
   assert.deepEqual(JSON.parse(result.stdout),{global:'',plugins:{},selected:{}});
 });
+
+test('backend image includes every configured Gradle project and its locked inputs', () => {
+  const dockerfile = read('platform/Dockerfile');
+  const modules = [...read('platform/settings.gradle').matchAll(/^include '([^']+)'/gm)]
+    .map(match => match[1]);
+  assert.ok(modules.length > 0, 'settings must expose the platform project denominator');
+  assert.ok(dockerfile.includes('COPY platform/gradle.lockfile ./'), 'root lock missing from builder');
+  assert.ok(dockerfile.includes('COPY platform/gradle gradle'), 'shared build conventions missing');
+  for (const module of modules) {
+    for (const input of ['build.gradle', 'gradle.lockfile', 'src']) {
+      const source = `platform/${module}/${input}`;
+      if (!existsSync(source)) continue;
+      assert.ok(
+        dockerfile.includes(`COPY ${source} ${module}/${input}`),
+        `Docker builder omits configured project input ${source}`,
+      );
+    }
+  }
+});
