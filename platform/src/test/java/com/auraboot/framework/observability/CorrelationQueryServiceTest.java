@@ -81,6 +81,21 @@ class CorrelationQueryServiceTest {
     }
 
     @Test
+    void usageSerializationKeepsFullShapeAndOmitsUnqueriedUsageInsteadOfInventingANullArray() {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var full = new CorrelationView();
+        full.setLlmUsage(List.of());
+        var fullJson = mapper.valueToTree(full);
+        assertThat(fullJson.path("llmUsage").isArray()).isTrue();
+        assertThat(fullJson.has("llmUsageAvailable")).isFalse();
+        var absent = new CorrelationView();
+        absent.setLlmUsageAvailable(false);
+        var baseJson = mapper.valueToTree(absent);
+        assertThat(baseJson.path("llmUsageAvailable").booleanValue()).isFalse();
+        assertThat(baseJson.has("llmUsage")).isFalse();
+    }
+
+    @Test
     void missingLlmCapabilityKeepsOrdinaryTraceDomainsAndDistinguishesUnqueriedUsage() {
         var ordinary = new CommandAuditLog();
         ordinary.setCommandCode("ordinary.create");

@@ -21010,6 +21010,9 @@
             },
             "type": "array"
           },
+          "llmUsageAvailable": {
+            "type": "boolean"
+          },
           "permissionDenials": {
             "items": {
               "$ref": "#/components/schemas/PermissionDenialView"

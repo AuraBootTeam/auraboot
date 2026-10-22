@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 6f71a84423ea264b49f0f99259c5dabd67cc883b6417dcbd8eadbf0e5b77c1ea
+ * Contract SHA-256: 4913eca9bbe1ab1cc6cf67114b2ebfb10453e5fdde63cfc5f8d13152ebb97430
  */
 export interface paths {
     "/api/activities": {
@@ -29335,6 +29335,7 @@ export interface components {
             behaviorEvents?: components["schemas"]["BehaviorEvent"][];
             commandAudits?: components["schemas"]["CommandAuditLogDTO"][];
             llmUsage?: components["schemas"]["LlmUsageView"][];
+            llmUsageAvailable?: boolean;
             permissionDenials?: components["schemas"]["PermissionDenialView"][];
             traceId?: string;
         };
