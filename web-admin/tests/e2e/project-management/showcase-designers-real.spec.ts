@@ -65,6 +65,7 @@ test('DS05 executive templates retain a finished layout after Schema edits and r
   const boardSaved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST');
   await page.getByTestId('designer-toolbar-btn-save').click();
   const board = await data(await boardSaved);
+  await expect(page).toHaveURL(new RegExp(`/dashboard-designer/${board.pid}$`));
   const published = page.waitForResponse(r => new URL(r.url()).pathname === `/api/dashboards/${board.pid}/publish` && r.request().method() === 'POST');
   await page.getByTestId('toolbar-btn-publish').click();
   await data(await published);
@@ -102,6 +103,7 @@ test('DS05 executive templates retain a finished layout after Schema edits and r
   const reportSaved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/report-definitions' && r.request().method() === 'POST');
   await page.getByTestId('report-designer-toolbar-btn-save').click();
   const report = await data(await reportSaved);
+  await expect(page).toHaveURL(new RegExp(`/report-designer/${report.pid}$`));
   await page.reload();
   const storedReport = await data(await page.request.get(`/api/report-definitions/${report.pid}`));
   expect(storedReport.dsl.body.find((block: any) => block.id === 'summary').title).toBe('本周交付结果与待办');
