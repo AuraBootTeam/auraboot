@@ -267,8 +267,8 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     ).toHaveLength(2);
     expect(logs.find((l: any) => l.pid === failed.log.pid).status).toBe('failed');
     await menu(actor, '任务');
-    const row = actor.getByRole('row').filter({ hasText: taskName });
-    await row.getByRole('button', { name: /查看|详情/ }).click();
+    // Retained runs may share a business title; verify the exact created record.
+    await actor.goto(`/p/tpm_task/view/${taskPid}`);
     await expect(actor).toHaveURL(new RegExp(`/p/tpm_task/view/${taskPid}$`));
     await actor.reload();
     await expect(actor.getByRole('main')).toContainText(recovered);
