@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {exportProductImage,unpackOciArchive} from './export-product-image.mjs';
+import {exportProductImage,unpackOciArchive,verifyOciLayout} from './export-product-image.mjs';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -253,6 +253,32 @@ test('native OCI export retains verified bytes and updates only transport fields
   const extracted=execFileSync('tar',['-xOf',archive,'./index.json'],{encoding:'utf8'});
   assert.equal(JSON.parse(extracted).manifests[0].digest,result.ociLayoutDigest);
   await assert.rejects(exportProductImage(f),/already selected/);
+});
+
+test('containerd image IDs bind primary image manifests while layers and auxiliary roots stay rejected',async t=>{
+  const f=ociFixture(t),primary=f.receipt.ociLayoutDigest;
+  assert.ok(await verifyOciLayout(f.layout,primary,primary));
+  await assert.rejects(verifyOciLayout(f.layout,primary,f.layer.digest),/tested loaded image/);
+  const index=JSON.parse(readFileSync(path.join(f.layout,'index.json')));
+  const other={...JSON.parse(readFileSync(path.join(f.layout,'blobs','sha256',primary.slice(7)))),annotations:{auxiliary:'other root'}};
+  const bytes=JSON.stringify(other),digest='sha256:'+createHash('sha256').update(bytes).digest('hex');
+  writeFileSync(path.join(f.layout,'blobs','sha256',digest.slice(7)),bytes);
+  index.manifests.push({mediaType:'application/vnd.oci.image.manifest.v1+json',digest,size:Buffer.byteLength(bytes)});
+  writeFileSync(path.join(f.layout,'index.json'),JSON.stringify(index));
+  await assert.rejects(verifyOciLayout(f.layout,primary,digest),/tested loaded image/);
+  assert.ok(await verifyOciLayout(f.layout,primary,primary));
+  f.receipt.loadedImageId=primary;writeFileSync(f.receiptFile,JSON.stringify(f.receipt));
+  assert.equal((await exportProductImage(f)).loadedImageId,primary);
+  const nested=ociFixture(t),imageIndex=JSON.parse(readFileSync(path.join(nested.layout,'index.json')));
+  const nestedBytes=JSON.stringify({schemaVersion:2,manifests:imageIndex.manifests});
+  const nestedDigest='sha256:'+createHash('sha256').update(nestedBytes).digest('hex');
+  writeFileSync(path.join(nested.layout,'blobs','sha256',nestedDigest.slice(7)),nestedBytes);
+  writeFileSync(path.join(nested.layout,'index.json'),JSON.stringify({schemaVersion:2,manifests:[{
+    mediaType:'application/vnd.oci.image.index.v1+json',digest:nestedDigest,size:Buffer.byteLength(nestedBytes),
+  }]}));
+  assert.ok(await verifyOciLayout(nested.layout,nestedDigest,nestedDigest));
+  assert.ok(await verifyOciLayout(nested.layout,nestedDigest,nested.receipt.ociLayoutDigest));
+  await assert.rejects(verifyOciLayout(nested.layout,nestedDigest,nested.layer.digest),/tested loaded image/);
 });
 test('wrong OCI digest, tested image, corrupt blobs and extra files cannot export',async t=>{
   for(const mutation of ['digest','image','blob','extra','symlink']) {

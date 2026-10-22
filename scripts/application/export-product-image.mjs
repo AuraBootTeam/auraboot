@@ -17,7 +17,7 @@ export async function verifyOciLayout(layout,expectedDigest,loadedImageId) {
   requireThat((await read(await regular(path.join(layout,'oci-layout')))).imageLayoutVersion==='1.0.0','unsupported OCI layout');
   const index=await read(await regular(path.join(layout,'index.json')));
   requireThat(Array.isArray(index.manifests)&&index.manifests.length>0&&index.manifests[0].digest===expectedDigest,'tested OCI image differs');
-  const visited=new Set(),configs=new Set();
+  const visited=new Set(),configs=new Set(),primaryImages=new Set();
   const visit=async (descriptor,primary=false)=>{
     requireThat(/^sha256:[a-f0-9]{64}$/.test(descriptor?.digest)&&Number.isSafeInteger(descriptor.size)&&descriptor.size>=0
       &&descriptor.urls===undefined,'invalid or external OCI descriptor');
@@ -29,6 +29,10 @@ export async function verifyOciLayout(layout,expectedDigest,loadedImageId) {
       for(const child of value.manifests)await visit(child,primary);
     }else if(['application/vnd.oci.image.manifest.v1+json','application/vnd.docker.distribution.manifest.v2+json'].includes(descriptor.mediaType)) {
       const value=await read(file);requireThat(value.config&&Array.isArray(value.layers)&&value.layers.length>0,'incomplete OCI image manifest');
+      if(primary&&value.layers.every(layer=>[
+        'application/vnd.oci.image.layer.v1.tar','application/vnd.oci.image.layer.v1.tar+gzip','application/vnd.oci.image.layer.v1.tar+zstd',
+        'application/vnd.docker.image.rootfs.diff.tar.gzip',
+      ].includes(layer.mediaType)))primaryImages.add(descriptor.digest);
       if(primary)configs.add(value.config.digest);await visit(value.config);for(const child of value.layers)await visit(child);
     }else requireThat(['application/vnd.oci.image.config.v1+json','application/vnd.docker.container.image.v1+json',
       'application/vnd.oci.image.layer.v1.tar','application/vnd.oci.image.layer.v1.tar+gzip','application/vnd.oci.image.layer.v1.tar+zstd',
@@ -39,7 +43,11 @@ export async function verifyOciLayout(layout,expectedDigest,loadedImageId) {
   requireThat((await lstat(path.join(layout,'blobs'))).isDirectory()&&(await lstat(path.join(layout,'blobs','sha256'))).isDirectory(),'OCI blob directory cannot be a symlink');
   requireThat((await readdir(path.join(layout,'blobs'))).join(',')==='sha256','unsupported OCI blob algorithm');
   for(const [position,descriptor] of index.manifests.entries())await visit(descriptor,position===0);
-  requireThat(configs.has(loadedImageId),'tested loaded image is absent from OCI layout');
+  // Classic Docker exposes the config digest as Id. Containerd-backed Docker
+  // can expose a primary manifest/index digest instead. Both must belong to the
+  // selected, completely verified image graph; layers and auxiliary roots do not.
+  requireThat(configs.has(loadedImageId)||primaryImages.has(loadedImageId)
+    ||(primaryImages.size>0&&loadedImageId===expectedDigest),'tested loaded image is absent from OCI layout');
   const stored=await readdir(path.join(layout,'blobs','sha256'));
   requireThat(stored.length===visited.size&&stored.every(name=>visited.has('sha256:'+name)),'unindexed OCI blob');
   return visited.size;
