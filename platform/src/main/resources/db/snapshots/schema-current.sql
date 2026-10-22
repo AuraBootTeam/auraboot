@@ -923,7 +923,7 @@ BEGIN
     IF arr IS NULL THEN RETURN TRUE; END IF;
     IF jsonb_typeof(arr) <> 'array' THEN RETURN FALSE; END IF;
     FOR elem IN SELECT jsonb_array_elements_text(arr) LOOP
-        IF NOT valid_effect_class(elem) THEN RETURN FALSE; END IF;
+        IF NOT public.valid_effect_class(elem) THEN RETURN FALSE; END IF;
     END LOOP;
     RETURN TRUE;
 END;
