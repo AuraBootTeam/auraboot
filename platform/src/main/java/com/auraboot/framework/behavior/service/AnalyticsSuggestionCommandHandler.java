@@ -35,6 +35,7 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
     private final ReportAggregateQueryService queries;
     private final BehaviorOutcomePublisher outcomes;
     private final ObjectMapper json;
+    @org.springframework.lang.Nullable
     private final AnalyticsExecutionContext executionContext;
 
     @Override public String getCommandType() { return PROPOSE; }
@@ -97,7 +98,7 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
             }
             version = ((Number) previous.get(PREFIX + "version")).intValue() + 1;
         }
-        String origin = executionContext.principal().map(principal -> {
+        String origin = executionContext == null ? "human_authored" : executionContext.principal().map(principal -> {
             if (principal.sandbox()
                     || principal.tenantId() != MetaContext.getCurrentTenantId()
                     || principal.actorUserId() != MetaContext.getCurrentUserId()) {
@@ -122,7 +123,7 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
 
     private Map<String, Object> adopt(Map<String, Object> payload) {
         allowed(payload, Set.of("versionPid", "requestId"));
-        if (executionContext.isAgentExecution()) throw invalid("Agent execution cannot supply explicit user adoption");
+        if (executionContext != null && executionContext.isAgentExecution()) throw invalid("Agent execution cannot supply explicit user adoption");
         String versionPid = text(payload, "versionPid", 26);
         Map<String, Object> version = ownedVersion(versionPid);
         String analysis = String.valueOf(version.get(PREFIX + "analysis_id"));

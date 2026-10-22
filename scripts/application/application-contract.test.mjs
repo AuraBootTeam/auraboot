@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -383,6 +383,21 @@ describe('AuraBoot application contract', () => {
     assert.notEqual(sha256Path(artifactRoot), first);
   });
 
+  it('rejects symbolic links for both file and nested artifact digests', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aura-artifact-symlink-'));
+    try {
+      const file = join(root, 'content');
+      writeFileSync(file, 'retained artifact');
+      const link = join(root, 'link');
+      symlinkSync(file, link);
+      assert.throws(() => sha256Path(link), /symbolic links/);
+      assert.throws(() => sha256Path(root), /symbolic links/);
+      assert.equal(sha256Path(file), sha256('retained artifact'));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed on duplicate route paths in the composed web graph', () => {
     const duplicate = webContribution();
     duplicate.routes.push({
@@ -416,5 +431,42 @@ describe('AuraBoot application contract', () => {
       ], { artifactRoot }),
       /migration version collision 20260912010000/,
     );
+  });
+});
+
+
+describe('optional agent runtime selection', () => {
+  it('keeps the complete AI runtime when agent selection is omitted or explicit, independently of core-only', () => {
+    for (const mode of ['application', 'core-only']) {
+      for (const agent of [undefined, 'with-agent']) {
+        const input = manifest();
+        input.backend.mode = mode;
+        if (agent !== undefined) input.backend.agent = agent;
+        assert.equal(buildApplicationGraph(input).nodes.find((node) => node.kind === 'runtime').id, 'com.auraboot:runtime');
+      }
+    }
+  });
+
+  it('resolves and locks a separately identified base runtime rather than accepting the full artifact', () => {
+    const input = manifest();
+    input.backend.agent = 'base';
+    assert.throws(() => resolveApplication(input, catalog()), /runtime-base.*resolved to 0/);
+    const artifacts = catalog();
+    const full = artifacts.artifacts.find((item) => item.type === 'runtime');
+    artifacts.artifacts.push({ ...full, id: 'com.auraboot:runtime-base',
+      uri: 'artifact:com.auraboot:runtime-base@1.3.0', digest: digest('d') });
+    const lock = resolveApplication(input, artifacts, { webContributions: [webContribution()] });
+    assert.deepEqual(lock.artifacts.filter((item) => item.type === 'runtime').map((item) => item.id),
+      ['com.auraboot:runtime-base']);
+    assert.equal(lock.composition.nodes.find((node) => node.kind === 'runtime').id, 'com.auraboot:runtime-base');
+    assert.throws(() => validateLockForManifest(lock, manifest()), /manifest|composition/i);
+  });
+
+  it('rejects unknown or misspelled agent selections instead of defaulting to full', () => {
+    for (const agent of ['none', 'disabled', '', false]) {
+      const input = manifest();
+      input.backend.agent = agent;
+      assert.throws(() => validateManifest(input), /agent/);
+    }
   });
 });

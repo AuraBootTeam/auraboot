@@ -18,6 +18,10 @@ import java.util.List;
 public class CorrelationView {
     private String traceId;
     private List<CommandAuditLogDTO> commandAudits; // command pipeline domain (phase timings + error)
+    /** False only when the optional cost query capability is not installed; omitted in the full composition. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private Boolean llmUsageAvailable;
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     private List<LlmUsageView> llmUsage;     // cost domain (A-G6)
     private List<BehaviorEvent> behaviorEvents;  // behavior domain (M1)
     private List<AdminEventLog> auditEvents;      // audit domain (A-G2)

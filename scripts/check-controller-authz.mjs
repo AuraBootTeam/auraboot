@@ -27,10 +27,11 @@
  *   node scripts/check-controller-authz.mjs --json
  */
 import fs from 'node:fs';
+import { javaSourceRoots } from './lib/java-source-roots.mjs';
 import path from 'node:path';
 
 const REPO = process.cwd();
-const SRC = path.join(REPO, 'platform/src/main/java');
+const SOURCES = javaSourceRoots(REPO);
 const BASELINE = path.join(REPO, 'scripts/controller-authz-baseline.json');
 const WRITE = process.argv.includes('--write-baseline');
 const JSON_OUT = process.argv.includes('--json');
@@ -137,7 +138,7 @@ function walk(dir, out = []) {
 }
 
 const unguarded = [];
-for (const file of walk(SRC)) {
+for (const file of SOURCES.flatMap(source => walk(source))) {
   const text = fs.readFileSync(file, 'utf8');
   if (TEST_PROFILE.test(text)) continue; // @Profile("test") — never wired in prod
   if (!hasUndecidedHandler(text)) continue;

@@ -18,6 +18,7 @@
  *       2 = baseline/config IO failure.
  */
 
+import { javaSourceRoots } from './lib/java-source-roots.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -401,7 +402,7 @@ function isTestFile(file) {
 }
 
 function scanJava(findings, root) {
-  const files = walk(path.join(root, 'platform/src/main/java'), (file) => file.endsWith('.java'));
+  const files = javaSourceRoots(root).flatMap(source => walk(source, (file) => file.endsWith('.java')));
   for (const file of files) {
     const text = safeRead(file);
     if (text === null) continue;

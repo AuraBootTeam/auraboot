@@ -26,7 +26,14 @@ PG_USER="${PG_USER:-${USER}}"
 PG_DB="${PG_DB:-aura_boot}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC_DIR="${REPO_ROOT}/platform/src/main/java"
+SRC_ROOTS_JSON="$(node --input-type=module - "$REPO_ROOT" <<'JS'
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+const repo = process.argv[2];
+const { javaSourceRoots } = await import(pathToFileURL(join(repo, 'scripts/lib/java-source-roots.mjs')));
+process.stdout.write(JSON.stringify(javaSourceRoots(repo)));
+JS
+)"
 
 if ! command -v psql >/dev/null 2>&1; then
   echo "⚠️  [jsonb-typehandler] psql not found — skipping (guardrail needs a DB)."; exit 0
@@ -36,14 +43,14 @@ if ! psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc "select 1" 
   echo "    (run after the shared DB is up, or set PG_HOST/PG_PORT/PG_USER/PG_DB)"; exit 0
 fi
 
-echo "==> jsonb-typeHandler check (src: ${SRC_DIR}, db: ${PG_DB})"
+echo "==> jsonb-typeHandler check (production roots: ${SRC_ROOTS_JSON}, db: ${PG_DB})"
 
 # table -> set(jsonb columns)
 JSONB_COLS_TSV="$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAF $'\t' -c \
   "select table_name, column_name from information_schema.columns where data_type='jsonb'")"
 
-JSONB_TSV="$JSONB_COLS_TSV" SRC_DIR="$SRC_DIR" python3 - <<'PY'
-import os, re, glob, sys
+JSONB_TSV="$JSONB_COLS_TSV" SRC_ROOTS_JSON="$SRC_ROOTS_JSON" python3 - <<'PY'
+import os, re, glob, sys, json
 
 jsonb = {}
 for line in os.environ["JSONB_TSV"].splitlines():
@@ -52,15 +59,15 @@ for line in os.environ["JSONB_TSV"].splitlines():
     t, c = line.split("\t")
     jsonb.setdefault(t, set()).add(c)
 
-src = os.environ["SRC_DIR"]
+src_roots = json.loads(os.environ["SRC_ROOTS_JSON"])
 errors, oks = [], 0
 
 # index mapper files by simple name for the ::jsonb cross-check
 mapper_text = {}
-for mf in glob.glob(os.path.join(src, "**", "mapper", "*.java"), recursive=True):
+for mf in [file for src in src_roots for file in glob.glob(os.path.join(src, "**", "mapper", "*.java"), recursive=True)]:
     mapper_text[os.path.basename(mf)[:-5]] = open(mf, encoding="utf-8", errors="ignore").read()
 # also XML mappers if any
-for mx in glob.glob(os.path.join(src, "**", "*.xml"), recursive=True):
+for mx in [file for src in src_roots for file in glob.glob(os.path.join(src, "**", "*.xml"), recursive=True)]:
     name = os.path.basename(mx)[:-4]
     mapper_text.setdefault(name, "")
     mapper_text[name] += open(mx, encoding="utf-8", errors="ignore").read()
@@ -69,7 +76,7 @@ field_re = re.compile(
     r'@TableField\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*private\s+String\s+(\w+)\s*;')
 colname_re = re.compile(r'"([a-z0-9_]+)"')
 
-for ef in glob.glob(os.path.join(src, "**", "*.java"), recursive=True):
+for ef in [file for src in src_roots for file in glob.glob(os.path.join(src, "**", "*.java"), recursive=True)]:
     if "/entity/" not in ef and "/dao/entity/" not in ef:
         continue
     txt = open(ef, encoding="utf-8", errors="ignore").read()

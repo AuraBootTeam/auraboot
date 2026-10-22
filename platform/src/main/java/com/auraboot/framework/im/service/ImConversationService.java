@@ -25,9 +25,10 @@ public interface ImConversationService {
 
     void addMembers(Long conversationId, List<Long> memberIds, Long tenantId);
 
-    /**
-     * Add agent members to a conversation.
-     */
+    /** Reject a mixed membership operation before its human or agent writes begin. */
+    void assertAgentMembersAvailable(List<Long> agentIds);
+
+    /** Add agent members to a conversation. */
     void addAgentMembers(Long conversationId, List<Long> agentIds, Long tenantId);
 
     void removeMember(Long conversationId, String memberType, Long memberId, Long tenantId);

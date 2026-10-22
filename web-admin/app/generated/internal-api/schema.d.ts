@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: d3e25ab951c33be09434cb2e725fc2a843637ca6af954347bc7d17383ab3c35e
+ * Contract SHA-256: 874ab7fc3d48cbe8f8a25ddc97cc905d6ebc50daee2ef912a81e62e0216d7576
  */
 export interface paths {
     "/api/activities": {
@@ -29291,6 +29291,7 @@ export interface components {
             unreadCount?: number;
         };
         ConversationMemberInfo: {
+            agentAvailable?: boolean;
             agentCode?: string;
             avatarUrl?: string;
             displayName?: string;
@@ -29336,6 +29337,7 @@ export interface components {
             behaviorEvents?: components["schemas"]["BehaviorEvent"][];
             commandAudits?: components["schemas"]["CommandAuditLogDTO"][];
             llmUsage?: components["schemas"]["LlmUsageView"][];
+            llmUsageAvailable?: boolean;
             permissionDenials?: components["schemas"]["PermissionDenialView"][];
             traceId?: string;
         };

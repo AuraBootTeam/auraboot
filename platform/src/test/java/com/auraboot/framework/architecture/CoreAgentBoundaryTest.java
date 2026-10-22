@@ -1,42 +1,54 @@
 package com.auraboot.framework.architecture;
 
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.jar.JarFile;
+import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import org.junit.jupiter.api.io.TempDir;
 
-/** Consumer contracts stay in core; AI implementations depend on these contracts. */
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** Checks every actual core class, independent of agent/app compilation and test outputs. */
 class CoreAgentBoundaryTest {
+    @TempDir
+    Path directory;
     @Test
-    void platformConsumersDoNotDependOnAgentImplementations() {
-        var classes = new ClassFileImporter()
-                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-                .importPackages("com.auraboot.framework.meta", "com.auraboot.framework.event",
-                        "com.auraboot.framework.application", "com.auraboot.framework.observability",
-                        "com.auraboot.framework.plugin", "com.auraboot.framework.im",
-                        "com.auraboot.framework.automation", "com.auraboot.framework.behavior",
-                        "com.auraboot.framework.i18n", "com.auraboot.framework.faq", "com.auraboot.framework.tenant");
-        boundary().check(classes);
+    void platformConsumersDoNotDependOnAgentImplementations() throws Exception {
+        try (var jar = new JarFile(System.getProperty("auraboot.core.jar"))) {
+            var classes = new ClassFileImporter().importJar(jar);
+            assertThat(classes).isNotEmpty();
+            boundary().check(classes);
+        }
     }
 
     private static com.tngtech.archunit.lang.ArchRule boundary() {
-        return noClasses().that().resideInAnyPackage(
-                        "com.auraboot.framework.meta..", "com.auraboot.framework.event..",
-                        "com.auraboot.framework.application..", "com.auraboot.framework.observability..",
-                        "com.auraboot.framework.plugin..", "com.auraboot.framework.im..",
-                        "com.auraboot.framework.automation..", "com.auraboot.framework.behavior..",
-                        "com.auraboot.framework.i18n..", "com.auraboot.framework.faq..", "com.auraboot.framework.tenant..")
-                .should().dependOnClassesThat().resideInAnyPackage("com.auraboot.framework.agent..", "com.auraboot.framework.agentchat..",
-                        "com.auraboot.framework.conversation..", "com.auraboot.framework.aurabot..",
-                        "com.auraboot.framework.rag..", "com.auraboot.framework.intent..", "com.auraboot.framework.aisearch..")
-                .because("platform consumers own contracts and agent adapters implement them")
-                ;
+        return noClasses().should().dependOnClassesThat().resideInAnyPackage(
+                "com.auraboot.framework.agent..", "com.auraboot.framework.agentchat..",
+                "com.auraboot.framework.conversation..", "com.auraboot.framework.aurabot..",
+                "com.auraboot.framework.rag..", "com.auraboot.framework.intent..", "com.auraboot.framework.aisearch..")
+                .because("all core classes own contracts and optional agent adapters implement them");
     }
 
     @Test
-    void boundaryRejectsAnImplementationTypeInAFieldSignature() {
-        var fixture = new ClassFileImporter().importClasses(
-                com.auraboot.framework.meta.ai.AgentBoundaryMutationFixture.class);
-        org.assertj.core.api.Assertions.assertThat(boundary().evaluate(fixture).hasViolation()).isTrue();
+    void boundaryRejectsAnImplementationTypeInAFieldSignature() throws Exception {
+        // Compile a deliberately invalid bytecode dependency without putting agent on core's classpath.
+        Path provider = directory.resolve("LlmProvider.java");
+        Path consumer = directory.resolve("AgentBoundaryMutationFixture.java");
+        Files.writeString(provider, "package com.auraboot.framework.agent.provider; public interface LlmProvider {}");
+        Files.writeString(consumer, """
+                package com.auraboot.framework.meta.ai;
+                public class AgentBoundaryMutationFixture {
+                    public com.auraboot.framework.agent.provider.LlmProvider provider;
+                }
+                """);
+        var compiler = ToolProvider.getSystemJavaCompiler();
+        assertThat(compiler).isNotNull();
+        assertThat(compiler.run(null, null, null, "-d", directory.toString(),
+                provider.toString(), consumer.toString())).isZero();
+        var fixture = new ClassFileImporter().importPath(directory);
+        assertThat(boundary().evaluate(fixture).hasViolation()).isTrue();
     }
 }

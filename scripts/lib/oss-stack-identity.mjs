@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync, realpathSync, writeFileSync, renameSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 const hashFile = file => digest(readFileSync(file));
+
+export function backendSourceArtifact(core, staged) {
+  const version = readFileSync(join(core, 'VERSION'), 'utf8').trim();
+  const name = basename(staged);
+  assert.ok([`AuraBoot-${version}-boot.jar`, `AuraBoot-${version}-base-boot.jar`].includes(name),
+    'unexpected selected backend artifact');
+  return join(core, 'platform/platform-app/build/libs', name);
+}
 
 export function verifyArtifact(row, sources) {
   assert.match(row.sha256, /^[a-f0-9]{64}$/, 'invalid artifact digest');
@@ -50,7 +58,7 @@ export function verifyLiveStack(workspace, core, runtime, state) {
   for (const finding of info.findings || []) assert.ok(allowed.has(finding.code), `public identity finding: ${finding.code}`);
   const boot = info.artifacts.find(item => item.key === 'backend')?.path;
   assert.ok(boot, 'registered backend artifact missing');
-  const artifacts = [verifyArtifact({ key: 'core', source: join(core, 'platform/build/libs/AuraBoot-1.0.0-boot.jar'), staged: boot, sha256: hashFile(boot) }, info.sources)];
+  const artifacts = [verifyArtifact({ key: 'core', source: backendSourceArtifact(core, boot), staged: boot, sha256: hashFile(boot) }, info.sources)];
   const receipt = readFileSync(join(state, 'pf4j-staging.tsv'), 'utf8').trim().split('\n');
   assert.equal(receipt.shift(), 'plugin\tplugin_dir\tsource_jar\tstaged_jar\tsha256', 'invalid PF4J staging receipt');
   for (const line of receipt) {

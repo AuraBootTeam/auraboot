@@ -71,6 +71,63 @@ class AutomationTriggerServiceImplTest {
     }
 
     @Test
+    void triggerDiagnosticsDoNotExposeRecordOrStateValues() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(
+                AutomationTriggerServiceImpl.class);
+        var previousLevel = logger.getLevel();
+        var events = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        events.start();
+        logger.addAppender(events);
+        logger.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        try {
+            service.onRecordUpdate("safe_model", "record-secret-canary", Map.of(), Map.of());
+            service.onStateChange("safe_model", "record-secret-canary", "state-secret-canary", "next-secret-canary");
+            assertThat(events.list).hasSize(2);
+            assertThat(events.list).allSatisfy(event -> {
+                assertThat(event.getFormattedMessage()).contains("safe_model").doesNotContain("secret-canary");
+                assertThat(event.getThrowableProxy()).isNull();
+            });
+            verify(automationMapper).findEnabledByModelCodeAndTriggerType("safe_model", "on_record_update");
+            verify(automationMapper).findEnabledByModelCodeAndTriggerType("safe_model", "on_state_change");
+        } finally {
+            logger.detachAppender(events);
+            logger.setLevel(previousLevel);
+            events.stop();
+        }
+    }
+
+    @Test
+    void infrastructureDiagnosticsOmitFailurePayloadAndStillReleaseConcurrencyPermit() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(
+                AutomationTriggerServiceImpl.class);
+        var events = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        events.start();
+        logger.addAppender(events);
+        Automation automation = new Automation();
+        automation.setPid("safe-automation");
+        doThrow(new IllegalStateException("exception-secret-canary"))
+                .when(automationLogMapper).insertLog(any());
+        try {
+            for (int i = 0; i < 8; i++) {
+                ReflectionTestUtils.invokeMethod(service, "executeAutomationAsync", automation,
+                        "record-secret-canary", Map.of());
+            }
+            var failures = events.list.stream()
+                    .filter(event -> event.getFormattedMessage().contains("infrastructure failure")).toList();
+            assertThat(failures).hasSize(8);
+            assertThat(failures).allSatisfy(event -> {
+                assertThat(event.getFormattedMessage()).contains("IllegalStateException")
+                        .doesNotContain("secret-canary");
+                assertThat(event.getThrowableProxy()).isNull();
+            });
+            verify(automationLogMapper, times(8)).insertLog(any());
+        } finally {
+            logger.detachAppender(events);
+            events.stop();
+        }
+    }
+
+    @Test
     void executeAutomation_stampsTrustedTraceAndRejectsCallerSuppliedTrace() {
         com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "operator", "operator");
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);

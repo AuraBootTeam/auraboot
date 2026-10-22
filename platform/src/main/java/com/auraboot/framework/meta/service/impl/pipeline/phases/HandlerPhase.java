@@ -102,6 +102,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private AiProviderAccessorFactory aiProviderAccessorFactory;
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor knowledgeBaseAccessor;
+
 
     @Autowired(required = false)
     private FileService fileService;
@@ -328,7 +331,7 @@ public class HandlerPhase implements CommandPhase {
         } else {
             dynamicDataMapper.updateWithJsonb(tableName, persistable, conditions, jsonbColumns);
         }
-        log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
+        log.debug("HANDLER: wrote {} fields to {}", persistable.size(), tableName);
     }
 
     /**
@@ -563,6 +566,15 @@ public class HandlerPhase implements CommandPhase {
         // The primary may be absent when a command is otherwise declarative (e.g. a pure
         // state-transition) but a downstream plugin chains a secondary onto it.
         CommandHandlerExtension handler = pluginHandler.orElse(null);
+
+        if (handler != null) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
+        for (var secondary : secondaryHandlers) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    secondary, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
 
         Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
 
@@ -901,8 +913,8 @@ public class HandlerPhase implements CommandPhase {
         }
 
         try {
-            log.info("BPM trigger: starting process={} for command={}, businessKey={}",
-                    processKey, command.getCode(), businessKey);
+            log.info("BPM trigger: starting process={} for command={}",
+                    processKey, command.getCode());
             Map<String, Object> started = workflowCapabilities.execute("start",
                     new WorkflowCapability.WorkflowRequest(
                             MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,

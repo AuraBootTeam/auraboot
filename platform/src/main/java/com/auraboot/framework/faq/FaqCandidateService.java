@@ -60,6 +60,7 @@ public class FaqCandidateService {
     public List<Map<String, Object>> extractFromConversation(Long tenantId,
                                                              String conversationPid,
                                                              String targetKbPid) throws Exception {
+        extractionService.requireAvailable();
         ImConversation conversation = conversationMapper.findByPid(conversationPid, tenantId);
         if (conversation == null) {
             throw new BusinessException(ResponseCode.NOT_FOUND, "Conversation not found: " + conversationPid);

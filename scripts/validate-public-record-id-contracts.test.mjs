@@ -173,3 +173,19 @@ test('inventories frontend public config defaults that expose recordIdVar', () =
   assert.equal(findings.length, 1);
   assert.equal(findings[0].field, 'recordIdVar');
 });
+
+test('optional Gradle module public record boundaries remain in the inventory', () => {
+  const root = makeRepo();
+  for (const module of ['platform-agent', 'platform-app']) {
+    write(root, `platform/${module}/build.gradle`, "plugins { id 'java' }");
+    write(root, `platform/${module}/src/main/java/com/acme/ModuleController.java`, `
+      @RestController class ModuleController {
+        @GetMapping("/{recordId}") Object get(@PathVariable Long recordId) { return null; }
+      }
+    `);
+  }
+  const result = auditRepo(root, { ossOnly: true, baselinePath: null });
+  for (const module of ['platform-agent', 'platform-app']) {
+    assert.ok(result.findings.some(f => f.code === 'S-PUBLIC-RECORD-JAVA-CONTROLLER-LEGACY' && f.file.includes(module)), module);
+  }
+});

@@ -8,13 +8,15 @@ import { fileURLToPath } from 'node:url';
 
 const scanner = fileURLToPath(new URL('./check-controller-authz.mjs', import.meta.url));
 
-function inspect(source) {
+function inspect(source, module = '') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'controller-authz-'));
   try {
     fs.mkdirSync(path.join(root, 'scripts'));
-    fs.mkdirSync(path.join(root, 'platform/src/main/java'), { recursive: true });
+    const sourceRoot = path.join(root, 'platform', module, 'src/main/java');
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    if (module) fs.writeFileSync(path.join(root, 'platform', module, 'build.gradle'), "plugins { id 'java' }\n");
     fs.writeFileSync(path.join(root, 'scripts/controller-authz-baseline.json'), '[]');
-    fs.writeFileSync(path.join(root, 'platform/src/main/java/FixtureController.java'), source);
+    fs.writeFileSync(path.join(sourceRoot, 'FixtureController.java'), source);
     return spawnSync(process.execPath, [scanner], { cwd: root, encoding: 'utf8' });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -63,4 +65,16 @@ public class FixtureController {
   public Object read() { return null; }
 }`;
   assert.equal(inspect(source).status, 1);
+});
+
+test('optional agent and application controllers retain authorization enforcement', () => {
+  const source = `@RestController
+public class FixtureController {
+  @GetMapping("/items")
+  public Object read() { return null; }
+}`;
+  for (const module of ['platform-agent', 'platform-app']) {
+    assert.equal(inspect(source, module).status, 1, module);
+    assert.equal(inspect(source.replace('@RestController', '@RestController\n@AuthenticatedAccess("tenant scope")'), module).status, 0);
+  }
 });

@@ -2,6 +2,7 @@
 /** batch4 structural gates: large-file ratchet (E7) + i18n CJK ratchet (E8). */
 import fs from 'node:fs';
 import path from 'node:path';
+import { javaSourceRoots } from './lib/java-source-roots.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 let failures = 0;
@@ -22,7 +23,7 @@ function walk(dir, cb) {
 const lf = JSON.parse(fs.readFileSync(path.join(root, 'scripts/baseline-large-files.json'), 'utf8'));
 const grandfathered = new Map(lf.grandfathered.map((g) => [g.path, g.lines]));
 const seen = new Set();
-walk(path.join(root, 'platform/src/main/java'), (p) => {
+for (const sourceRoot of javaSourceRoots(root)) walk(sourceRoot, (p) => {
     if (!p.endsWith('.java')) return;
     const rel = path.relative(root, p);
     const n = fs.readFileSync(p, 'utf8').split('\n').length;

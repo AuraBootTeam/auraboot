@@ -1,0 +1,54 @@
+// Full-composition tests exercise the public APIs of the core and its providers.
+// These explicit test-only dependencies do not change either production runtime graph.
+dependencies {
+    testImplementation "org.springframework.kafka:spring-kafka:${springKafkaVersion}"
+    testImplementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
+    testImplementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
+    testImplementation 'com.taosdata.jdbc:taos-jdbcdriver:3.9.2'
+    testImplementation 'io.micrometer:micrometer-registry-prometheus'
+    testImplementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    testImplementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    testImplementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
+    testImplementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webflux'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security'
+    testImplementation 'org.springframework.boot:spring-boot-starter-aop'
+    testImplementation 'org.springframework.boot:spring-boot-starter-actuator'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    testImplementation 'com.github.ben-manes.caffeine:caffeine:3.3.0'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    testImplementation 'org.springframework.boot:spring-boot-starter-mail'
+    testImplementation 'org.springframework.boot:spring-boot-starter-websocket'
+    testImplementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    testImplementation "com.baomidou:mybatis-plus-jsqlparser"
+    testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    testImplementation 'com.fasterxml.jackson.core:jackson-core'
+    testImplementation 'io.jsonwebtoken:jjwt-api'
+    testImplementation 'io.sentry:sentry-spring-boot-starter-jakarta'
+    testImplementation "com.esotericsoftware:reflectasm:${reflectasmVersion}:shaded"
+    testImplementation 'org.postgresql:postgresql:42.7.13'
+    testImplementation 'org.apache.poi:poi:5.5.1'
+    testImplementation 'org.apache.poi:poi-ooxml:5.5.1'
+    testImplementation 'org.apache.pdfbox:pdfbox:2.0.37'
+    testImplementation 'org.apache.poi:poi-scratchpad:5.5.1'
+    testImplementation 'org.jsoup:jsoup:1.23.2'
+    testImplementation 'com.google.firebase:firebase-admin:9.11.0'
+    testImplementation 'org.eclipse.jgit:org.eclipse.jgit:6.10.1.202505221210-r'
+    testImplementation 'org.jetbrains:annotations:26.1.0'
+    testImplementation 'org.springframework.boot:spring-boot'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation'
+    testImplementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
+    testImplementation 'jakarta.annotation:jakarta.annotation-api'
+    testImplementation 'org.mapstruct:mapstruct:1.6.3'
+    testImplementation 'io.github.java-diff-utils:java-diff-utils:4.17'
+    testImplementation 'com.networknt:json-schema-validator:1.5.9'
+    testImplementation "org.pf4j:pf4j:${pf4jVersion}"
+    testImplementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
+    testImplementation 'com.google.api-client:google-api-client:2.9.1'
+    testImplementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
+    testImplementation 'com.google.http-client:google-http-client-jackson2:1.47.1'
+    testImplementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
+    testImplementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}") {
+        exclude group: 'com.networknt', module: 'json-schema-validator'
+    }
+}

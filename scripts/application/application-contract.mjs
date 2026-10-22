@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 import {
+  closeSync,
+  constants,
   cpSync,
+  fstatSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   renameSync,
@@ -42,10 +46,20 @@ export function sha256(value) {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
 }
 
+function sha256RegularFile(path) {
+  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    if (!fstatSync(descriptor).isFile()) throw new Error(`unsupported staged artifact type: ${path}`);
+    return sha256(readFileSync(descriptor));
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
 export function sha256Path(path) {
   const stat = lstatSync(path);
   if (stat.isSymbolicLink()) throw new Error(`symbolic links are not valid staged artifacts: ${path}`);
-  if (stat.isFile()) return sha256(readFileSync(path));
+  if (stat.isFile()) return sha256RegularFile(path);
   if (!stat.isDirectory()) throw new Error(`unsupported staged artifact type: ${path}`);
   const entries = [];
   const walk = (directory, prefix = '') => {
@@ -55,7 +69,7 @@ export function sha256Path(path) {
       const childStat = lstatSync(child);
       if (childStat.isSymbolicLink()) throw new Error(`symbolic links are not valid staged artifacts: ${child}`);
       if (childStat.isDirectory()) walk(child, childRelative);
-      else if (childStat.isFile()) entries.push(`${childRelative}\0${sha256(readFileSync(child))}`);
+      else if (childStat.isFile()) entries.push(`${childRelative}\0${sha256RegularFile(child)}`);
       else throw new Error(`unsupported staged artifact type: ${child}`);
     }
   };
@@ -242,12 +256,16 @@ function assertWebGraphIntegrity(contributions) {
   for (const code of byCode.keys()) visit(code);
 }
 
+function backendRuntimeId(manifest) {
+  return manifest.backend.agent === 'base' ? 'com.auraboot:runtime-base' : 'com.auraboot:runtime';
+}
+
 export function buildApplicationGraph(manifestInput, webContributionInputs = [], { requireContributions = false, skipImage = false } = {}) {
   const manifest = validateManifest(manifestInput);
   const webContributions = orderedWebContributions(manifest, webContributionInputs, requireContributions);
   assertWebGraphIntegrity(webContributions);
   const nodes = [
-    { kind: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { kind: 'runtime', id: backendRuntimeId(manifest), version: manifest.platform.runtime },
     ...(skipImage ? [] : [{ kind: 'image', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version }]),
     { kind: 'api', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { kind: 'web', id: '@auraboot/web-shell', version: manifest.platform.webShell },
@@ -424,7 +442,7 @@ export function assertNoMigrationCollisions(artifacts, { artifactRoot }) {
 
 function requirements(manifest, { skipImage = false } = {}) {
   return [
-    { type: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { type: 'runtime', id: backendRuntimeId(manifest), version: manifest.platform.runtime },
     ...(skipImage ? [] : [{ type: 'oci', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version }]),
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version: manifest.platform.webShell },

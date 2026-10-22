@@ -8,6 +8,8 @@ on:
     branches: [main]
     paths:
       - 'platform/src/main/java/**/*Controller.java'
+      - 'platform/platform-agent/src/main/java/**/*Controller.java'
+      - 'platform/platform-app/src/main/java/**/*Controller.java'
       - 'scripts/check-controller-authz.mjs'
       - 'scripts/check-controller-authz.test.mjs'
       - 'scripts/controller-authz-baseline.json'
@@ -16,6 +18,8 @@ on:
     branches: [main]
     paths:
       - 'platform/src/main/java/**/*Controller.java'
+      - 'platform/platform-agent/src/main/java/**/*Controller.java'
+      - 'platform/platform-app/src/main/java/**/*Controller.java'
       - 'scripts/check-controller-authz.mjs'
       - 'scripts/check-controller-authz.test.mjs'
       - 'scripts/controller-authz-baseline.json'

@@ -21,6 +21,8 @@ application-local.yml
 monitoring/.env
 *.pem
 !**/license/public.pem
+# Shared license verification fixture contains a public key only.
+!platform/src/testFixtures/resources/branding/commercial-license/public.pem
 
 # Editor directories and files
 .vscode/*

@@ -20866,6 +20866,9 @@
       },
       "ConversationMemberInfo": {
         "properties": {
+          "agentAvailable": {
+            "type": "boolean"
+          },
           "agentCode": {
             "type": "string"
           },
@@ -21012,6 +21015,9 @@
               "$ref": "#/components/schemas/LlmUsageView"
             },
             "type": "array"
+          },
+          "llmUsageAvailable": {
+            "type": "boolean"
           },
           "permissionDenials": {
             "items": {

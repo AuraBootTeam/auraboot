@@ -48,7 +48,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                                       ImConversationMemberMapper memberMapper,
                                       ImMessageMapper messageMapper,
                                       @Lazy ImMessageService imMessageService,
-                                      ImAgentDirectory agentDirectory) {
+                                      @org.springframework.lang.Nullable ImAgentDirectory agentDirectory) {
         this.conversationMapper = conversationMapper;
         this.memberMapper = memberMapper;
         this.messageMapper = messageMapper;
@@ -59,6 +59,10 @@ public class ImConversationServiceImpl implements ImConversationService {
     @Override
     @Transactional
     public ImConversation create(ConversationCreateRequest request, Long userId, Long tenantId) {
+        if (ImConstants.TYPE_BOT.equals(request.getType())
+                || (request.getAgentIds() != null && !request.getAgentIds().isEmpty())) {
+            requireAgentDirectory();
+        }
         List<Long> memberIds = request.getMemberIds() != null ? request.getMemberIds() : List.of();
 
         // For PRIVATE conversations, check if one already exists between these two users
@@ -175,7 +179,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                     .boundRecordPid(conv.getBoundRecordPid())
                     .conductorAgentId(conv.getConductorAgentId())
                     .aiContextWindow(conv.getAiContextWindow())
-                    .aiEnabled(conv.getConductorAgentId() != null)
+                    .aiEnabled(agentDirectory != null && conv.getConductorAgentId() != null)
                     .lastMessage(lastMsg)
                     .unreadCount(Math.max(0, unread))
                     .pinned(membership != null ? membership.getPinned() : false)
@@ -220,7 +224,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .boundRecordPid(conv.getBoundRecordPid())
                 .conductorAgentId(conv.getConductorAgentId())
                 .aiContextWindow(conv.getAiContextWindow())
-                .aiEnabled(conv.getConductorAgentId() != null)
+                .aiEnabled(agentDirectory != null && conv.getConductorAgentId() != null)
                 .unreadCount(0L)
                 .pinned(false)
                 .muted(false)
@@ -266,7 +270,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .boundRecordPid(conv.getBoundRecordPid())
                 .conductorAgentId(conv.getConductorAgentId())
                 .aiContextWindow(conv.getAiContextWindow())
-                .aiEnabled(conv.getConductorAgentId() != null)
+                .aiEnabled(agentDirectory != null && conv.getConductorAgentId() != null)
                 .lastMessage(lastMsg)
                 .unreadCount(unread)
                 .pinned(membership != null ? membership.getPinned() : false)
@@ -289,8 +293,14 @@ public class ImConversationServiceImpl implements ImConversationService {
     }
 
     @Override
+    public void assertAgentMembersAvailable(List<Long> agentIds) {
+        if (agentIds != null && !agentIds.isEmpty()) requireAgentDirectory();
+    }
+
+    @Override
     @Transactional
     public void addAgentMembers(Long conversationId, List<Long> agentIds, Long tenantId) {
+        assertAgentMembersAvailable(agentIds);
         for (Long agentId : agentIds) {
             ImConversationMember existing = memberMapper.findMember(
                     conversationId, ImConstants.MEMBER_TYPE_AGENT, agentId, tenantId);
@@ -314,7 +324,14 @@ public class ImConversationServiceImpl implements ImConversationService {
 
     @Override
     public List<ConversationMemberInfo> getMembers(Long conversationId, Long tenantId) {
-        return agentDirectory.findMembersWithInfo(conversationId, tenantId);
+        List<ConversationMemberInfo> members = memberMapper.findMembersWithInfo(conversationId, tenantId);
+        if (agentDirectory != null) {
+            agentDirectory.enrichMembers(members, tenantId);
+        } else {
+            members.stream().filter(member -> ImConstants.MEMBER_TYPE_AGENT.equals(member.getMemberType()))
+                    .forEach(member -> member.setAgentAvailable(false));
+        }
+        return members;
     }
 
     @Override
@@ -357,7 +374,7 @@ public class ImConversationServiceImpl implements ImConversationService {
     }
 
     private void sendAgentWelcomeMessage(Long conversationId, Long agentId, Long tenantId) {
-        ImAgentDirectory.Profile agent = agentDirectory.findById(agentId);
+        ImAgentDirectory.Profile agent = requireAgentDirectory().findById(agentId);
         if (agent != null) {
             String role = agent.employeeId() != null ? "AI Employee" : "AI Assistant";
             String welcome = String.format("I'm %s, %s. @me to start collaborating.", agent.name(), role);
@@ -366,6 +383,15 @@ public class ImConversationServiceImpl implements ImConversationService {
                     "system", welcome, null,
                     "agent-welcome-" + agentId + "-" + System.currentTimeMillis());
         }
+    }
+
+    private ImAgentDirectory requireAgentDirectory() {
+        if (agentDirectory == null) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.UnsupportedFeature,
+                    "Agent capability is not installed");
+        }
+        return agentDirectory;
     }
 
     private void addHumanMemberInternal(Long conversationId, Long userId, Long tenantId, String role) {
@@ -484,6 +510,10 @@ public class ImConversationServiceImpl implements ImConversationService {
             throw new IllegalArgumentException("Only group conversations support AI agent settings");
         }
 
+        if (Boolean.TRUE.equals(request.getAiEnabled())
+                || (!Boolean.FALSE.equals(request.getAiEnabled()) && request.getConductorAgentId() != null)) {
+            requireAgentDirectory();
+        }
         if (request.getAiContextWindow() != null) {
             int window = request.getAiContextWindow();
             if (window < 1 || window > 200) {
@@ -614,7 +644,7 @@ public class ImConversationServiceImpl implements ImConversationService {
      * Look up a user's display name from conversation members (must be called before removal).
      */
     private String lookupMemberNameFromConversation(Long conversationId, Long userId, Long tenantId) {
-        List<ConversationMemberInfo> members = agentDirectory.findMembersWithInfo(conversationId, tenantId);
+        List<ConversationMemberInfo> members = getMembers(conversationId, tenantId);
         return members.stream()
                 .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType())
                         && userId.equals(m.getMemberId()))

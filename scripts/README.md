@@ -320,6 +320,7 @@ T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/pat
 | `dev/oss-gate-results.mjs` | 0 | 2026-10-10 | Reject missing, failed, skipped or retried browser gate results. |
 | `dev/oss-runtime-contract.mjs` | 0 | 2026-10-10 | Bind and validate the OSS runtime source and artifact contract. |
 | `lib/oss-stack-identity.mjs` | 0 | 2026-10-10 | Verify runtime artifacts and listener ownership for the OSS stack. |
+| `lib/java-source-roots.mjs` | 6 | 2026-10-22 | Enumerate owned Java source roots across Gradle modules for shared scanners. |
 | `lib/oss-stack-lifecycle.mjs` | 0 | 2026-10-10 | Manage registered OSS source mappings and stack lifecycle. |
 | `lib/web-admin-lock-contract.mjs` | 0 | 2026-10-10 | Compare installed Web dependency locks with the frozen source lock. |
 | `oss-e2e-fixture-backend.sh` | 0 | 2026-10-10 | Launch the unchanged backend with separately hashed E2E fixture artifacts. |

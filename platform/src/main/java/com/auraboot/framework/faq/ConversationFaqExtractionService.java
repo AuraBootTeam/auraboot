@@ -14,13 +14,21 @@ import java.util.*;
 public class ConversationFaqExtractionService {
     static final String TOOL_NAME = "submit_faqs";
     static final int MAX_TRANSCRIPT_CHARS = 24_000;
+    @org.springframework.lang.Nullable
     private final FaqCandidateExtractor candidateExtractor;
+
+    public void requireAvailable() {
+        if (candidateExtractor == null) {
+            throw new BusinessException(ResponseCode.UnsupportedFeature, "FAQ extraction is not installed");
+        }
+    }
 
     /**
      * @param transcript the rendered conversation, one turn per line
      * @return the pairs the model found, possibly empty — never null
      */
     public List<ExtractedFaq> extract(Long tenantId, String transcript) throws Exception {
+        requireAvailable();
         if (transcript == null || transcript.isBlank()) {
             return List.of();
         }

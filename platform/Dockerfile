@@ -80,6 +80,7 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
 # Copy source code
 COPY platform/src ./src
 COPY platform/platform-app/src platform-app/src
+COPY platform/platform-agent/src platform-agent/src
 COPY platform/platform-plugin-api/src platform-plugin-api/src
 COPY platform/platform-storage-minio/src platform-storage-minio/src
 COPY platform/platform-storage-s3/src platform-storage-s3/src
