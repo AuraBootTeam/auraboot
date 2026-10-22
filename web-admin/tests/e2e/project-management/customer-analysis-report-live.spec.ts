@@ -236,11 +236,11 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.getByTestId('drag-handle-analysis').locator('..').click();
   const columns=payload.dsl.body.find((block:any)=>block.id==='analysis').columns;
   const reviewedLabels:Record<string,string>={tpm_pj_name:'项目名称',tpm_pj_status:'项目状态',tpm_pj_budget:'项目预算（元）',tpm_pj_risk_summary:'交付风险',[budgetColumn]:'项目预算（元）'};
-  const tableProperties=page.getByTestId('block-property-panel');
+  const tableProperties=page.getByTestId('block-property-panel').getByTestId('schema-config-field-columns');
   for(let index=0;index<columns.length;index++){
     const column=columns[index];
-    await expect(tableProperties.getByPlaceholder('字段名称',{exact:true}).nth(index)).toHaveValue(column.field);
-    if(reviewedLabels[column.field])await tableProperties.getByPlaceholder('显示名称',{exact:true}).nth(index).fill(reviewedLabels[column.field]);
+    await expect(tableProperties.getByRole('textbox',{name:'字段名称*',exact:true}).nth(index)).toHaveValue(column.field);
+    if(reviewedLabels[column.field])await tableProperties.getByRole('textbox',{name:'显示名称',exact:true}).nth(index).fill(reviewedLabels[column.field]);
   }
   await page.getByTestId('drag-handle-analysis-summary').locator('..').click();
   await page.getByTestId('block-property-panel').getByPlaceholder('输入文本内容…').fill(reviewedAnalysis);
