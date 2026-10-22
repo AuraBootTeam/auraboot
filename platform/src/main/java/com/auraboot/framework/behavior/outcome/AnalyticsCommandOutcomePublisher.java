@@ -25,15 +25,23 @@ public class AnalyticsCommandOutcomePublisher {
     private final ObjectMapper json;
     private final BehaviorOutcomePublisher outcomes;
     private final RecordSnapshotReader snapshots;
+    @org.springframework.lang.Nullable
     private final AnalyticsExecutionContext executionContext;
+    @org.springframework.lang.Nullable
     private final AnalyticsCommandOriginLookup origins;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(CommandPipelineContext ctx) {
+        if (executionContext == null) return;
         String runPid = executionContext.runPid();
         if (runPid == null || ctx.getRequest().isDryRun()) return;
         Object operation = ctx.getExecConfig().get("type");
         if (!Set.of("create", "update", "delete").contains(operation == null ? "" : operation)) return;
+        if (origins == null) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.UnsupportedFeature,
+                    "Analytics agent execution provenance is not installed");
+        }
         var rows = origins.find(ctx.getTenantId(), runPid);
         if (rows.isEmpty()) return;
         if (rows.size() != 1) throw new IllegalStateException("Ambiguous analytics command origin");
