@@ -154,7 +154,7 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     await verify();const finalFact=await fact(owner,pid);expect(finalFact).toMatchObject({reviewer_name:'周宁',acceptance_label:'已通过',approval_result:'同意',verification_result:'核验通过'});
     await menu(owner,'交付经营看板');const finalRow=await dashboardRow(owner.getByTestId('dashboard-block-delivery-actions'),name);await expect(finalRow).toContainText('周宁');await expect(finalRow).toContainText('已通过');await finalRow.scrollIntoViewIfNeeded();await shot(owner,'MR07-business-result');
     await menu(reviewer,'开始体验');await reviewer.getByRole('main').getByRole('button',{name:'打开复盘报告',exact:true}).click();
-    await reviewer.getByRole('row').filter({has:reviewer.getByRole('cell',{name:'客户交付经营复盘',exact:true})}).getByRole('button',{name:/打开|Open/}).click();
+    await reviewer.getByRole('row').filter({has:reviewer.getByRole('cell',{name:'客户交付经营复盘 · 周会',exact:true})}).getByRole('button',{name:/打开|Open/}).click();
     const toolbar=reviewer.getByTestId('report-reader-toolbar');await expect(toolbar).toBeVisible();
     await expect(toolbar.getByRole('button',{name:'预览',exact:true})).toHaveCount(0);
     await expect(reviewer.getByTestId('report-designer-toolbar-btn-save')).toHaveCount(0);
