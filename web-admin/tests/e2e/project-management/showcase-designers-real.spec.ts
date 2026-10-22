@@ -58,7 +58,9 @@ test('DS05 executive templates retain a finished layout after Schema edits and r
   await expect(panel.getByTestId('widget-prop-title-zh')).toHaveValue('验收状态构成');
   await shot(page, 'DS05-dashboard-before');
   await panel.getByTestId('widget-prop-title-zh').fill('交付验收状态 · 本次周会');
-  await panel.getByTestId('schema-config-field-style.showLegend').getByRole('switch').check();
+  const legend = panel.getByTestId('schema-config-field-style.showLegend').getByRole('switch');
+  await legend.uncheck();
+  await legend.check();
   await shot(page, 'DS05-dashboard-schema-edit');
   const boardSaved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST');
   await page.getByTestId('designer-toolbar-btn-save').click();
