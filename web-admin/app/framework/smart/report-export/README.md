@@ -21,7 +21,7 @@ Architecture decision: `auraboot-enterprise` →
 
 The Java side (`com.auraboot.framework.bi.service.impl.ReportRenderClient`) spawns
 the CLI as a subprocess; `ReportExportServiceImpl.exportPdf` tries it first and
-falls back to the legacy PDFBox text export when it is not configured or fails.
+uses the legacy PDFBox text export only when the renderer is not configured. A configured renderer failure rejects the export; it must not silently produce a layout-degraded file.
 
 ## Enabling in a deployment
 
@@ -156,3 +156,25 @@ SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/aura_boot_rsit?charSet=U
   ./gradlew -p platform :test --tests "com.auraboot.framework.bi.ReportExportServiceReadSwitchIT"
 dropdb aura_boot_rsit
 ```
+
+## Canonical designer layout
+
+The renderer reads the existing report DSL `body`, `columns[].width` (CSS pixels),
+`columns[].align` and top-level `header`/`footer` bands. Header, detail and summary
+cells use the same declared alignment. Canonical bands take precedence over legacy
+`page-header`/`page-footer` blocks; those blocks remain supported for existing reports.
+
+Band text, date and `page-number` elements retain alignment/font styling. Page
+numbers use Chromium's running `pageNumber` token, not a saved literal `Page 1`.
+HTML shows a single screen band; PDF repeats its running template on every page.
+PDF margins retain the configured values unless a band needs more clearance:
+top/bottom are at least the respective band height plus 4 mm. Larger margins are
+never reduced; CSS pixel widths and physical millimetre margins are not interchangeable.
+
+Text is escaped and CSS values are typed/validated. Band images must be embedded
+raster data URIs; arbitrary remote URLs are not fetched by the isolated renderer.
+
+The registered Enterprise `report-print-parity` profile verifies browser-driven
+import, Schema edits, persistence, actual HTML/PDF downloads, physical PDF table
+geometry, exact formatted amount right edges and sequential multi-page numbers.
+The fixture adopts previously verified AI text; this profile makes no new LLM call.

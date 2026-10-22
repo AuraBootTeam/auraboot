@@ -413,7 +413,8 @@ public class ReportExportServiceImpl implements ReportExportService {
                 return rendered;
             }
         } catch (ReportRenderException e) {
-            log.warn("WYSIWYG report renderer failed; falling back to PDFBox text export: {}", e.getMessage());
+            log.error("Configured report renderer failed; refusing a layout-degraded export", e);
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report renderer failed; PDF was not generated");
         }
         return renderPdfWithPdfBox(reportDsl, dataSets, title);
     }

@@ -1,3 +1,4 @@
+import { ReportBandBlock } from './blocks/ReportBandBlock';
 import { DesignerWorkspace } from '~/shared/designer/DesignerWorkspace';
 import { useSmartText } from '~/utils/i18n';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -588,26 +589,7 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
       )}
       {report.header && (
         <>
-          <div className="mb-4">
-            {report.header.elements.map((el, i) => (
-              <div
-                key={i}
-                style={{
-                  textAlign: el.align || 'left',
-                  fontSize: el.style?.fontSize ? `${el.style.fontSize}pt` : undefined,
-                  fontWeight: el.style?.fontWeight,
-                }}
-              >
-                {el.type === 'text'
-                  ? el.content
-                  : el.type === 'date'
-                    ? new Date().toLocaleDateString()
-                    : el.type === 'page-number'
-                      ? 'Page 1'
-                      : ''}
-              </div>
-            ))}
-          </div>
+          <ReportBandBlock band={report.header} mode="runtime" position="header" />
           <hr className="mb-4" />
         </>
       )}
@@ -664,25 +646,7 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
       {report.footer && (
         <>
           <hr className="mt-4 mb-4" />
-          <div>
-            {report.footer.elements.map((el, i) => (
-              <div
-                key={i}
-                style={{
-                  textAlign: el.align || 'left',
-                  fontSize: el.style?.fontSize ? `${el.style.fontSize}pt` : undefined,
-                }}
-              >
-                {el.type === 'text'
-                  ? el.content
-                  : el.type === 'date'
-                    ? new Date().toLocaleDateString()
-                    : el.type === 'page-number'
-                      ? 'Page 1'
-                      : ''}
-              </div>
-            ))}
-          </div>
+          <ReportBandBlock band={report.footer} mode="runtime" position="footer" />
         </>
       )}
     </div>
