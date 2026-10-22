@@ -72,6 +72,8 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
             artifactId = 'auraboot-core'
+            // Fixture endpoints remain an explicit classifier, never a production dependency.
+            artifact tasks.named('testApiJar')
             // Consumers must receive the versions selected by the producer's BOMs.
             versionMapping {
                 usage('java-api') { fromResolutionOf('runtimeClasspath') }
@@ -225,7 +227,12 @@ repositories {
 
 // 项目基本信息
 group = 'com.auraboot'
-version = file('../VERSION').text.trim()
+// Explicit isolated-consumer builds can select one aligned, immutable preview version.
+// The default product version continues to come from the canonical VERSION file.
+version = providers.gradleProperty('auraPlatformVersion').getOrElse(file('../VERSION').text.trim())
+if (!(version ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+    throw new GradleException('auraPlatformVersion must be a non-empty Maven version without path separators')
+}
 
 allprojects {
     version = rootProject.version

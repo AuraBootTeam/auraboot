@@ -1,6 +1,7 @@
 plugins {
     id 'java-library'
     id 'java-test-fixtures'
+    id 'maven-publish'
     id 'io.spring.dependency-management'
 }
 
@@ -63,3 +64,17 @@ dependencies {
 }
 
 java { withSourcesJar() }
+
+// Publish the optional implementation as a library, with actual POM and Gradle variants.
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'auraboot-agent'
+            versionMapping {
+                usage('java-api') { fromResolutionOf('runtimeClasspath') }
+                usage('java-runtime') { fromResolutionResult() }
+            }
+        }
+    }
+}
