@@ -292,11 +292,14 @@ public class ImConversationServiceImpl implements ImConversationService {
     }
 
     @Override
+    public void assertAgentMembersAvailable(List<Long> agentIds) {
+        if (agentIds != null && !agentIds.isEmpty()) requireAgentDirectory();
+    }
+
+    @Override
     @Transactional
     public void addAgentMembers(Long conversationId, List<Long> agentIds, Long tenantId) {
-        if (!agentIds.isEmpty()) {
-            requireAgentDirectory();
-        }
+        assertAgentMembersAvailable(agentIds);
         for (Long agentId : agentIds) {
             ImConversationMember existing = memberMapper.findMember(
                     conversationId, ImConstants.MEMBER_TYPE_AGENT, agentId, tenantId);
