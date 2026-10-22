@@ -7,7 +7,7 @@ import {
   buildCommandTargetParams,
   getCommandResultRecordPid,
 } from '~/framework/meta/utils/publicRecordId';
-import { parseValidationSummaryMessages } from './formValidationValues';
+import { resolveCommandValidationSummary } from './formValidationValues';
 import {
   expandBomUploadReviewPayload,
   buildFormCommandPayload,
@@ -311,7 +311,9 @@ export function useFormSubmission({
               const contextError = (result as any).context?.error;
               if (contextError) {
                 setError(null);
-                setSummaryErrors(parseValidationSummaryMessages(contextError));
+                setSummaryErrors(
+                  resolveCommandValidationSummary(contextError, effectiveCommandCode, t, locale),
+                );
                 return;
               }
               // result.desc / result.message are the generic envelope ("Business error").
