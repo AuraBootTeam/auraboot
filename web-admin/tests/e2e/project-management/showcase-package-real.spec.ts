@@ -14,6 +14,7 @@ async function start(page: Page) {
 }
 async function shot(page: Page, id: string) {
   await mkdir(evidence!, { recursive: true });
+  await expect(page.getByRole('main')).not.toContainText(/加载中|加载活动记录/);
   await page.screenshot({ path: join(evidence!, id + '.png'), fullPage: true });
 }
 
@@ -106,6 +107,9 @@ test('PK complete business entry and secondary professional actions navigate thr
   await start(page);
   await expect(page.getByRole('main')).toContainText('04 AI 整理与经营分析');
   await shot(page, 'PK01');
+  await page.getByRole('main').getByRole('button', { name: '专业配置与诊断', exact: true }).scrollIntoViewIfNeeded();
+  await shot(page, 'PK10');
+  await page.getByRole('main').getByRole('heading', { name: '客户交付 · 从项目到复盘', exact: true }).scrollIntoViewIfNeeded();
   const business: [string, string][] = [
     ['查看项目', '/p/tpm_project'],
     ['查看交付工作台', '/p/c/cde_delivery_workspace'],
@@ -135,6 +139,8 @@ test('PK complete business entry and secondary professional actions navigate thr
       await page.getByRole('button', { name: '编辑项目', exact: true }).click();
       await expect(page.getByRole('textbox', { name: '项目名称', exact: true })).toHaveValue('华辰制造 · 供应链协同平台');
       await expect(page.getByRole('textbox', { name: '项目预算', exact: true })).toHaveValue('128,000.00');
+      await expect(page.getByRole('combobox', { name: '所属客户', exact: true })).toContainText('华辰制造');
+      await expect(page.getByRole('main').getByText('林晓', { exact: true }).first()).toBeVisible();
       await shot(page, 'PK08');
       await page.getByRole('button', { name: '取消', exact: true }).click();
       await expect(page.getByRole('heading', { name: '华辰制造 · 供应链协同平台', exact: true })).toBeVisible();
@@ -147,6 +153,8 @@ test('PK complete business entry and secondary professional actions navigate thr
     if (name === '打开复盘报告')
       await expect(page.getByRole('main')).toContainText('客户交付经营复盘');
     if (name === '整理客户资料' || name === '整理交付需求') {
+      await expect(page.getByTestId('ai-fill-trigger')).toBeVisible();
+      await expect(page.getByRole('textbox', { name: name === '整理客户资料' ? '客户名称' : '项目名称', exact: true })).toBeEditable();
       await expect(page.getByRole('main')).toContainText('核对');
       await expect(page.getByRole('main')).toContainText('保存');
       await shot(page, name === '整理客户资料' ? 'PK06' : 'PK07');
