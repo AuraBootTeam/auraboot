@@ -102,6 +102,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private AiProviderAccessorFactory aiProviderAccessorFactory;
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor knowledgeBaseAccessor;
+
 
     @Autowired(required = false)
     private FileService fileService;
@@ -563,6 +566,15 @@ public class HandlerPhase implements CommandPhase {
         // The primary may be absent when a command is otherwise declarative (e.g. a pure
         // state-transition) but a downstream plugin chains a secondary onto it.
         CommandHandlerExtension handler = pluginHandler.orElse(null);
+
+        if (handler != null) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
+        for (var secondary : secondaryHandlers) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    secondary, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
 
         Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
 

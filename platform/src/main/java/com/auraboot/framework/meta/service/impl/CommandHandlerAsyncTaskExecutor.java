@@ -78,6 +78,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     @Autowired(required = false)
     private AiProviderAccessorFactory aiProviderAccessorFactory;
     @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor knowledgeBaseAccessor;
+
+    @Autowired(required = false)
     private FileService fileService;
     @Autowired(required = false)
     private StorageProvider storageProvider;
@@ -158,6 +161,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             MetaContext.setContext(tenantId, userId, currentUserPid, String.valueOf(userId),
                     roles == null ? java.util.Set.of() : new java.util.HashSet<>(roles));
             MetaContext.setMemberId(member.getId());
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>(handlerParams);
             pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);

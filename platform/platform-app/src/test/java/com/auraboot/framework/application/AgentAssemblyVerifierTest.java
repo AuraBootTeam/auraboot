@@ -42,6 +42,13 @@ class AgentAssemblyVerifierTest {
     }
 
     @Test
+    void contributorCollectionsRetainTheirLegalMultipleRegistrationSemantics() {
+        var beans = full();
+        beans.registerSingleton("anotherAgentContextContributor", mock(AgentThreadContextContributor.class));
+        verifyAssembly(beans);
+    }
+
+    @Test
     void fullRetainsEveryAdapterAndContributor() {
         verifyAssembly(full());
     }

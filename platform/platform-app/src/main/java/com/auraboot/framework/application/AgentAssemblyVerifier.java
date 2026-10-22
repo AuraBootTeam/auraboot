@@ -81,7 +81,7 @@ final class AgentAssemblyVerifier implements SmartInitializingSingleton {
                 for (String name : contributors.split(",")) {
                     Class<?> contributor = Class.forName(name.trim(), false, beans.getBeanClassLoader());
                     int count = beans.getBeanNamesForType(contributor).length;
-                    if (count != 1) throw new IllegalStateException("Agent contributor " + name + " has " + count + " registrations");
+                    if (count == 0) throw new IllegalStateException("Agent contributor " + name + " has no registrations");
                 }
             }
         } catch (IOException | ClassNotFoundException failure) {

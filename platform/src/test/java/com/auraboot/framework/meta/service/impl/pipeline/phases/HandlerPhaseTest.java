@@ -125,7 +125,9 @@ class HandlerPhaseTest {
         var accessor = org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.AiProviderAccessor.class);
         when(factory.create(1L)).thenReturn(accessor);
         ReflectionTestUtils.setField(phase, "aiProviderAccessorFactory", factory);
-        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public boolean requiresAiProvider(String code) { return true; }
+        };
         when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
         when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
 
@@ -798,6 +800,42 @@ class HandlerPhaseTest {
         assertThat(sql.getValue()).contains("managed_flag IS DISTINCT FROM TRUE","NOT EXISTS",
             "record_writer_parent.pid = mt_line.order_pid","record_writer_parent.tenant_id = mt_line.tenant_id");
         verify(dynamicDataMapper,never()).update(any(),any(),any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sync-ai", "async-ai", "sync-knowledge", "async-knowledge"})
+    void requiredOptionalAccessorsRejectBeforeAnyHandlerOrAsyncSubmission(String variant) {
+        boolean ai = variant.endsWith("ai");
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public boolean requiresAiProvider(String code) { return ai; }
+            @Override public boolean requiresKnowledgeBase(String code) { return !ai; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE,
+                "handlerParams", Map.of("async", variant.startsWith("async"))));
+        assertThatThrownBy(() -> phase.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not installed");
+        assertThat(handler.capturedContext.get()).isNull();
+        verify(asyncTaskService, never()).submitTask(any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, dynamicDataMapper);
+    }
+
+    @Test
+    void aSecondaryRequirementRejectsBeforeThePrimaryHandlerRuns() {
+        var primary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        RecordingPluginHandler secondary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public boolean requiresAiProvider(String code) { return true; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(primary));
+        when(extensionRegistry.getSecondaryCommandHandlers(PLUGIN_HANDLER_CODE)).thenReturn(List.of(secondary));
+        var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not installed");
+        assertThat(primary.capturedContext.get()).isNull();
+        assertThat(secondary.capturedContext.get()).isNull();
+        verify(asyncTaskService, never()).submitTask(any(), any(), any());
     }
 
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {

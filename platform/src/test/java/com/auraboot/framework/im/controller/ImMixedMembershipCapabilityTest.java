@@ -44,6 +44,19 @@ class ImMixedMembershipCapabilityTest {
     }
 
     @Test
+    void missingAgentDirectoryRejectsAnExplicitBotConversationBeforeAnyInsert() {
+        var conversations = mock(ImConversationMapper.class);
+        var members = mock(ImConversationMemberMapper.class);
+        var messages = mock(ImMessageMapper.class);
+        var service = new ImConversationServiceImpl(conversations, members, messages, mock(ImMessageService.class), null);
+        var request = new com.auraboot.framework.im.dto.ConversationCreateRequest();
+        request.setType("bot");
+        assertThatThrownBy(() -> service.create(request, 7L, 42L))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not installed");
+        verifyNoInteractions(conversations, members, messages);
+    }
+
+    @Test
     void fullCompositionKeepsTheExistingHumanThenAgentWriteOrder() throws Exception {
         var service = mock(ImConversationService.class);
         var messageService = mock(ImMessageService.class);

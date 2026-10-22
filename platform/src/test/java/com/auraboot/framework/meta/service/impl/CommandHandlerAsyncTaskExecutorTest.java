@@ -72,6 +72,21 @@ class CommandHandlerAsyncTaskExecutorTest {
         return in;
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"ai", "knowledge"})
+    void recoveredTasksRejectMissingRequiredAccessorsWithoutInvokingTheHandler(String capability) throws Exception {
+        var handler = mock(CommandHandlerExtension.class);
+        if ("ai".equals(capability)) when(handler.requiresAiProvider("bom:import_material_library")).thenReturn(true);
+        else when(handler.requiresKnowledgeBase("bom:import_material_library")).thenReturn(true);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        var result = executor.execute(params("bom:import_material_library"), noop);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.isRetryable()).isFalse();
+        assertThat(result.getErrorMessage()).contains("not installed");
+        verify(handler, org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
     @Test
     void resumable_handler_receives_real_checkpoint_transaction_bridge() throws Exception {
         var manager = mock(org.springframework.transaction.PlatformTransactionManager.class);
@@ -217,6 +232,7 @@ class CommandHandlerAsyncTaskExecutorTest {
         RecordShareAccessor recordShareAccessor = mock(RecordShareAccessor.class);
         ReflectionTestUtils.setField(executor, "recordShareAccessor", recordShareAccessor);
         CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.requiresAiProvider("bom:import_material_library")).thenReturn(true);
         when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
             captured.set(inv.getArgument(0));
             return Map.of("success", true);

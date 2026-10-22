@@ -59,7 +59,8 @@ public class ImConversationServiceImpl implements ImConversationService {
     @Override
     @Transactional
     public ImConversation create(ConversationCreateRequest request, Long userId, Long tenantId) {
-        if (request.getAgentIds() != null && !request.getAgentIds().isEmpty()) {
+        if (ImConstants.TYPE_BOT.equals(request.getType())
+                || (request.getAgentIds() != null && !request.getAgentIds().isEmpty())) {
             requireAgentDirectory();
         }
         List<Long> memberIds = request.getMemberIds() != null ? request.getMemberIds() : List.of();

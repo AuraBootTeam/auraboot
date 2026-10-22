@@ -372,6 +372,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             establishAutomationMetaContext(automation, tenantId);
         }
         try {
+            var capabilityPreflight = automationProcessRuntimeProvider.getIfAvailable();
+            if (capabilityPreflight != null) capabilityPreflight.assertCapabilities(automation);
             Map<String, Object> executionPayload = prepareExecutionTriggerPayload(automation, triggerPayload);
 
             // Create log entry
