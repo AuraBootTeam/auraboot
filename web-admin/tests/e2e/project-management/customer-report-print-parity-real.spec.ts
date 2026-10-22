@@ -142,7 +142,11 @@ test('SC06-PRINT canonical designer layout survives real HTML and multi-page PDF
   expect(new URL(response.url()).origin).toBe(origin);
   const saved = (await response.json()).data;
   expect(saved.pid).toBeTruthy();
+  await expect(page).toHaveURL(new RegExp(`/report-designer/${saved.pid}$`));
   await page.reload();
+  await expect(page.getByRole('textbox', { name: '报表标题', exact: true })).toHaveValue(
+    template.dsl.title,
+  );
   const persisted = (await (await page.request.get(`/api/report-definitions/${saved.pid}`)).json())
     .data.dsl;
   expect(persisted.body.find((b: any) => b.id === 'analysis').columns).toEqual(
@@ -151,7 +155,17 @@ test('SC06-PRINT canonical designer layout survives real HTML and multi-page PDF
   expect(persisted.header).toEqual(template.dsl.header);
   expect(persisted.footer).toEqual(template.dsl.footer);
   const toolbar = page.getByTestId('report-designer-toolbar');
+  const previewQuery = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === '/api/reports/query/aggregate' &&
+      r.request().method() === 'POST',
+  );
   await toolbar.getByRole('button', { name: '预览', exact: true }).click();
+  const previewResponse = await previewQuery;
+  expect(previewResponse.status()).toBe(200);
+  expect(previewResponse.request().postDataJSON()).toEqual(
+    template.dsl.dataSources.analysis.aggregateQuery,
+  );
   await expect(page.getByRole('main')).toContainText('¥132,000.50');
   await expect(page.getByRole('main')).toContainText('第 1 页');
   const headers = page.getByRole('main').getByRole('columnheader');
