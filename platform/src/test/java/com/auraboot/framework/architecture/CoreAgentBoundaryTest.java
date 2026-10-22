@@ -11,7 +11,7 @@ class CoreAgentBoundaryTest {
     void platformConsumersDoNotDependOnAgentImplementations() {
         var classes = new ClassFileImporter()
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-                .importPackages("com.auraboot.framework.meta", "com.auraboot.framework.event",
+                .importPackages("com.auraboot.framework.meta", "com.auraboot.framework.event", "com.auraboot.framework.eventpolicy",
                         "com.auraboot.framework.application", "com.auraboot.framework.observability",
                         "com.auraboot.framework.plugin", "com.auraboot.framework.im",
                         "com.auraboot.framework.automation", "com.auraboot.framework.behavior",
@@ -21,7 +21,7 @@ class CoreAgentBoundaryTest {
 
     private static com.tngtech.archunit.lang.ArchRule boundary() {
         return noClasses().that().resideInAnyPackage(
-                        "com.auraboot.framework.meta..", "com.auraboot.framework.event..",
+                        "com.auraboot.framework.meta..", "com.auraboot.framework.event..", "com.auraboot.framework.eventpolicy..",
                         "com.auraboot.framework.application..", "com.auraboot.framework.observability..",
                         "com.auraboot.framework.plugin..", "com.auraboot.framework.im..",
                         "com.auraboot.framework.automation..", "com.auraboot.framework.behavior..",
