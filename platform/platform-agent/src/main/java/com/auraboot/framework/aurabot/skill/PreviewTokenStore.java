@@ -6,9 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -50,8 +48,6 @@ import java.util.UUID;
  * different node and lose the token.
  */
 @Slf4j
-@Component
-@ConditionalOnBean(StringRedisTemplate.class)
 public class PreviewTokenStore {
 
     public static final String KEY_PREFIX = "aurabot:preview:";

@@ -1,9 +1,7 @@
 package com.auraboot.framework.aurabot.skill;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -42,8 +40,6 @@ import java.util.Optional;
  * would mask outages and contradict the catch-exception-pattern v1.1 P2 rule.
  */
 @Slf4j
-@Component
-@ConditionalOnBean(StringRedisTemplate.class)
 public class SkillIdempotencyStore {
 
     /**

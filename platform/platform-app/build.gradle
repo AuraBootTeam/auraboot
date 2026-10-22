@@ -204,7 +204,8 @@ tasks.register('verifyAgentArtifactOwnership') {
             classes.each { name ->
                 if (entries.count { it == name } != 1) throw new GradleException("Agent must uniquely own ${name}")
             }
-            ['aurabot/synonyms.yml', 'i18n/aurabot-skill_en.properties', 'i18n/aurabot-skill_zh_CN.properties'].each { name ->
+            ['aurabot/synonyms.yml', 'i18n/aurabot-skill_en.properties', 'i18n/aurabot-skill_zh_CN.properties',
+             'META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports'].each { name ->
                 if (entries.count { it == name } != 1) throw new GradleException("Missing agent resource: ${name}")
             }
         }
@@ -271,7 +272,8 @@ tasks.register('verifyBaseApplicationAssembly') {
                 }.toSet()
         if (ownedClasses.empty) throw new GradleException('AI ownership inventory is empty')
         def exclusiveResources = ['aurabot/synonyms.yml', 'i18n/aurabot-skill_en.properties',
-                                  'i18n/aurabot-skill_zh_CN.properties'].toSet()
+                                  'i18n/aurabot-skill_zh_CN.properties',
+                                  'META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports'].toSet()
         new ZipFile(base).withCloseable { zip ->
             def manifest = new Manifest(zip.getInputStream(zip.getEntry('META-INF/MANIFEST.MF')))
             if (manifest.mainAttributes.getValue('Start-Class') != 'com.auraboot.framework.application.BasePlatformApplication') {
