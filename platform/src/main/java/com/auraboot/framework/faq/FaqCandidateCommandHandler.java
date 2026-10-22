@@ -50,7 +50,7 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
     private final FaqKnowledgePublisher kbTextIngestService;
     private final FaqCandidateService faqCandidateService;
 
-    public FaqCandidateCommandHandler(FaqKnowledgePublisher kbTextIngestService,
+    public FaqCandidateCommandHandler(@org.springframework.lang.Nullable FaqKnowledgePublisher kbTextIngestService,
                                       FaqCandidateService faqCandidateService) {
         this.kbTextIngestService = kbTextIngestService;
         this.faqCandidateService = faqCandidateService;
@@ -90,6 +90,7 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
             throw new BusinessException(ResponseCode.BadParam,
                     "Unsupported FAQ command: " + context.commandType());
         }
+        requirePublisher();
         DataAccessor data = context.dataAccessor();
         if (data == null) {
             throw new BusinessException(ResponseCode.SystemError, "DataAccessor unavailable for faq:publish");
@@ -153,7 +154,14 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
      * the ingest source id, so {@code remove} drops exactly the document {@code publish} created (or
      * a re-publish would have replaced), by the same key.
      */
+    private void requirePublisher() {
+        if (kbTextIngestService == null) {
+            throw new BusinessException(ResponseCode.UnsupportedFeature, "FAQ knowledge publication is not installed");
+        }
+    }
+
     private Map<String, Object> unpublish(CommandContext context) {
+        requirePublisher();
         DataAccessor data = context.dataAccessor();
         if (data == null) {
             throw new BusinessException(ResponseCode.SystemError, "DataAccessor unavailable for faq:unpublish");

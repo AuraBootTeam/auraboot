@@ -36,17 +36,20 @@ public class ImMessageServiceImpl implements ImMessageService {
     private final ImMessageMapper messageMapper;
     private final ImConversationService conversationService;
     private final ObjectMapper objectMapper;
+    private final org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.im.service.ImAiResponder> aiResponder;
 
     public ImMessageServiceImpl(ImConversationMapper conversationMapper,
                                  ImConversationMemberMapper memberMapper,
                                  ImMessageMapper messageMapper,
                                  @org.springframework.context.annotation.Lazy ImConversationService conversationService,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.im.service.ImAiResponder> aiResponder) {
         this.conversationMapper = conversationMapper;
         this.memberMapper = memberMapper;
         this.messageMapper = messageMapper;
         this.conversationService = conversationService;
         this.objectMapper = objectMapper;
+        this.aiResponder = aiResponder;
     }
 
     @Override
@@ -57,6 +60,14 @@ public class ImMessageServiceImpl implements ImMessageService {
         // Check membership
         if (!conversationService.isMember(conversationId, senderId, tenantId)) {
             throw new IllegalArgumentException("Not a member of this conversation");
+        }
+
+        boolean targetsAi = request.effectiveMentions().stream().filter(java.util.Objects::nonNull)
+                .anyMatch(token -> "ai".equalsIgnoreCase(token) || token.regionMatches(true, 0, "agent:", 0, 6));
+        if (targetsAi && aiResponder.getIfAvailable() == null) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.UnsupportedFeature,
+                    "AI messaging is not installed");
         }
 
         // Dedup: if clientMsgId already exists, return existing message
