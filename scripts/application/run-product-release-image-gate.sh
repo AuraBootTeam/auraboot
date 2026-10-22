@@ -86,6 +86,19 @@ for command_name in cmp curl diff docker git node openssl pnpm python3 sha256sum
 [[ "$(uname -m)" == x86_64 ]] || fatal 'release image builder must be x86_64'
 [[ "${AURA_OCI_BUILDER:-docker}" == docker ]] || fatal 'AURA_OCI_BUILDER must be docker; local container fallbacks are prohibited'
 MUTATION="${AURA_RELEASE_MUTATION:-}"
+case "${AURA_RELEASE_EXPORT_PACKAGE:-0}" in
+  0|1) ;;
+  *) fatal 'AURA_RELEASE_EXPORT_PACKAGE must be 0 or 1' ;;
+esac
+case "${AURA_RELEASE_EXPORT_PLATFORM_PACKAGE:-0}" in
+  0|1) ;;
+  *) fatal 'AURA_RELEASE_EXPORT_PLATFORM_PACKAGE must be 0 or 1' ;;
+esac
+PLATFORM_ARCHIVE="${AURA_PRODUCT_PLATFORM_ARCHIVE:-}"
+if [[ -n "$PLATFORM_ARCHIVE" ]]; then
+  [[ "$PLATFORM_ARCHIVE" == /* ]] || fatal 'absolute frozen platform archive required'
+  : "${AURA_CI_DATASET_INPUTS:?original dataset receipt required for platform reuse}"
+fi
 case "$MUTATION" in
   ''|locked-plugin-byte) ;;
   *) fatal "unsupported release mutation: $MUTATION" ;;
@@ -265,14 +278,22 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-info "building AuraBoot artifacts core=$CORE_SHA"
 CI=1 pnpm --dir "$CORE_ROOT" install --frozen-lockfile --ignore-scripts \
   >"$ARTIFACTS/logs/core-pnpm-install.log" 2>&1 \
   || fatal 'AuraBoot artifact build dependencies unavailable'
-NPM_CONFIG_REGISTRY=https://registry.npmjs.org AURA_OCI_BUILDER=docker \
+if [[ -n "$PLATFORM_ARCHIVE" ]]; then
+  info "consuming selected AuraBoot artifacts core=$CORE_SHA (no Core compilation)"
+  node "$CORE_ROOT/scripts/application/platform-artifact-package.mjs" consume \
+    "$PLATFORM_ARCHIVE" "$AURA_CI_DATASET_INPUTS" "$CORE_RELEASE" "$CORE_SHA" \
+    >"$ARTIFACTS/platform-consumption-receipt.json" 2>"$ARTIFACTS/logs/core-artifacts.log" \
+    || fail 'selected AuraBoot artifacts rejected; no source-build fallback'
+else
+  info "building AuraBoot artifacts core=$CORE_SHA"
+  NPM_CONFIG_REGISTRY=https://registry.npmjs.org AURA_OCI_BUILDER=docker \
   node "$CORE_ROOT/scripts/application/stage-core-only-artifacts.mjs" \
   --repo-root "$CORE_ROOT" --output "$CORE_RELEASE" >"$ARTIFACTS/logs/core-artifacts.log" 2>&1 \
   || fail 'AuraBoot artifact build failed; see logs/core-artifacts.log'
+fi
 
 info "building $AURA_PRODUCT_ID artifacts product=$PRODUCT_SHA"
 env CI=1 "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts \
@@ -719,4 +740,15 @@ if fixture_path:
                                     "includedInReleaseImage": False}
 json.dump(receipt, open(path, "w"), indent=2, sort_keys=True)
 PY
+if [[ "${AURA_RELEASE_EXPORT_PACKAGE:-0}" == 1 ]]; then
+  node "$CORE_ROOT/scripts/application/export-product-image.mjs" \
+    "$PRODUCT_RELEASE/$AURA_PRODUCT_IMAGE_LAYOUT" "$ARTIFACTS/release-image-receipt.json" \
+    || fail 'tested OCI artifact export failed'
+fi
+if [[ "${AURA_RELEASE_EXPORT_PLATFORM_PACKAGE:-0}" == 1 ]]; then
+  node "$CORE_ROOT/scripts/application/platform-artifact-package.mjs" export \
+    "$CORE_RELEASE" "$CORE_SHA" "$ARTIFACTS/platform-artifacts.tar" \
+    >"$ARTIFACTS/platform-package-receipt.json" \
+    || fail 'verified platform artifact export failed'
+fi
 info "$AURA_PRODUCT_ID release image VERIFIED on Linux CI Docker (image=$IMAGE_ID)"

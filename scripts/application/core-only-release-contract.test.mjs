@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import path, { join, resolve } from 'node:path';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {exportProductImage,unpackOciArchive,verifyOciLayout} from './export-product-image.mjs';
+import {exportPlatformArtifacts,unpackPlatformArtifacts,verifyPlatformArtifacts,consumePlatformArtifacts} from './platform-artifact-package.mjs';
+import {readStructuredFile,resolveApplication,sha256Path} from './application-contract.mjs';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -224,5 +229,199 @@ test('corpus preflight rejects retries, missing results and fabricated summary c
   ];
   for (const mutate of mutations) {
     const value = report(); mutate(value); assert.notEqual(check(value), 0);
+  }
+});
+
+function ociFixture(t) {
+  const root=mkdtempSync(path.join(tmpdir(),'native-oci-export-')),layout=path.join(root,'layout');
+  t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(path.join(layout,'blobs','sha256'),{recursive:true});
+  const blob=(value,mediaType)=>{const bytes=typeof value==='string'?value:JSON.stringify(value);
+    const digest='sha256:'+createHash('sha256').update(bytes).digest('hex');
+    writeFileSync(path.join(layout,'blobs','sha256',digest.slice(7)),bytes);return {digest,size:Buffer.byteLength(bytes),mediaType};};
+  const config=blob({architecture:'amd64',os:'linux'},'application/vnd.oci.image.config.v1+json');
+  const layer=blob('fixture layer bytes','application/vnd.oci.image.layer.v1.tar');
+  const manifest=blob({schemaVersion:2,config,layers:[layer]},'application/vnd.oci.image.manifest.v1+json');
+  writeFileSync(path.join(layout,'index.json'),JSON.stringify({schemaVersion:2,manifests:[manifest]}));
+  writeFileSync(path.join(layout,'oci-layout'),' {"imageLayoutVersion":"1.0.0"}');
+  const receiptFile=path.join(root,'release-image-receipt.json');
+  const receipt={schemaVersion:1,status:'PASS',product:'fixture',freshDatabase:'PASS',readiness:'PASS',payload:'PASS',browserJourney:'PASS',ociLayoutDigest:manifest.digest,loadedImageId:config.digest,artifacts:{}};
+  writeFileSync(receiptFile,JSON.stringify(receipt));return {root,layout,receiptFile,receipt,config,layer};
+}
+test('native OCI export retains verified bytes and updates only transport fields',async t=>{
+  const f=ociFixture(t),result=await exportProductImage(f);
+  assert.equal(result.transport.mode,'ci-oci-archive');assert.equal(result.loadedImageId,f.receipt.loadedImageId);
+  const archive=path.join(f.root,'image.oci.tar');
+  assert.equal(result.artifacts.imageArchive.digest,'sha256:'+createHash('sha256').update(readFileSync(archive)).digest('hex'));
+  const extracted=execFileSync('tar',['-xOf',archive,'./index.json'],{encoding:'utf8'});
+  assert.equal(JSON.parse(extracted).manifests[0].digest,result.ociLayoutDigest);
+  await assert.rejects(exportProductImage(f),/already selected/);
+});
+
+test('containerd image IDs bind primary image manifests while layers and auxiliary roots stay rejected',async t=>{
+  const f=ociFixture(t),primary=f.receipt.ociLayoutDigest;
+  assert.ok(await verifyOciLayout(f.layout,primary,primary));
+  await assert.rejects(verifyOciLayout(f.layout,primary,f.layer.digest),/tested loaded image/);
+  const index=JSON.parse(readFileSync(path.join(f.layout,'index.json')));
+  const other={...JSON.parse(readFileSync(path.join(f.layout,'blobs','sha256',primary.slice(7)))),annotations:{auxiliary:'other root'}};
+  const bytes=JSON.stringify(other),digest='sha256:'+createHash('sha256').update(bytes).digest('hex');
+  writeFileSync(path.join(f.layout,'blobs','sha256',digest.slice(7)),bytes);
+  index.manifests.push({mediaType:'application/vnd.oci.image.manifest.v1+json',digest,size:Buffer.byteLength(bytes)});
+  writeFileSync(path.join(f.layout,'index.json'),JSON.stringify(index));
+  await assert.rejects(verifyOciLayout(f.layout,primary,digest),/tested loaded image/);
+  assert.ok(await verifyOciLayout(f.layout,primary,primary));
+  f.receipt.loadedImageId=primary;writeFileSync(f.receiptFile,JSON.stringify(f.receipt));
+  assert.equal((await exportProductImage(f)).loadedImageId,primary);
+  const nested=ociFixture(t),imageIndex=JSON.parse(readFileSync(path.join(nested.layout,'index.json')));
+  const nestedBytes=JSON.stringify({schemaVersion:2,manifests:imageIndex.manifests});
+  const nestedDigest='sha256:'+createHash('sha256').update(nestedBytes).digest('hex');
+  writeFileSync(path.join(nested.layout,'blobs','sha256',nestedDigest.slice(7)),nestedBytes);
+  writeFileSync(path.join(nested.layout,'index.json'),JSON.stringify({schemaVersion:2,manifests:[{
+    mediaType:'application/vnd.oci.image.index.v1+json',digest:nestedDigest,size:Buffer.byteLength(nestedBytes),
+  }]}));
+  assert.ok(await verifyOciLayout(nested.layout,nestedDigest,nestedDigest));
+  assert.ok(await verifyOciLayout(nested.layout,nestedDigest,nested.receipt.ociLayoutDigest));
+  await assert.rejects(verifyOciLayout(nested.layout,nestedDigest,nested.layer.digest),/tested loaded image/);
+});
+test('wrong OCI digest, tested image, corrupt blobs and extra files cannot export',async t=>{
+  for(const mutation of ['digest','image','blob','extra','symlink']) {
+    const f=ociFixture(t);
+    if(mutation==='digest')f.receipt.ociLayoutDigest='sha256:'+'f'.repeat(64);
+    if(mutation==='image')f.receipt.loadedImageId='sha256:'+'f'.repeat(64);
+    if(mutation==='blob')writeFileSync(path.join(f.layout,'blobs','sha256',f.layer.digest.slice(7)),'corrupt');
+    if(mutation==='extra')writeFileSync(path.join(f.layout,'unindexed'),'extra');
+    if(mutation==='symlink'){const target=path.join(f.layout,'blobs','sha256',f.layer.digest.slice(7));rmSync(target);symlinkSync('../../index.json',target);}
+    writeFileSync(f.receiptFile,JSON.stringify(f.receipt));await assert.rejects(exportProductImage(f));
+    assert.equal(existsSync(path.join(f.root,'image.oci.tar')),false);
+    assert.equal(JSON.parse(readFileSync(f.receiptFile)).transport,undefined);
+  }
+});
+test('partial native acceptance and an existing archive fail closed',async t=>{
+  const f=ociFixture(t);f.receipt.readiness='FAIL';writeFileSync(f.receiptFile,JSON.stringify(f.receipt));
+  await assert.rejects(exportProductImage(f),/completed native/);
+  f.receipt.readiness='PASS';writeFileSync(f.receiptFile,JSON.stringify(f.receipt));
+  writeFileSync(path.join(f.root,'image.oci.tar'),'preserved prior attempt');
+  await assert.rejects(exportProductImage(f),/EEXIST/);
+  assert.equal(readFileSync(path.join(f.root,'image.oci.tar'),'utf8'),'preserved prior attempt');
+});
+test('public exporter runs real tar without a container dependency',t=>{
+  const f=ociFixture(t),cli=fileURLToPath(new URL('./export-product-image.mjs',import.meta.url));
+  const good=spawnSync(process.execPath,[cli,f.layout,f.receiptFile],{encoding:'utf8'});
+  assert.equal(good.status,0,good.stderr);assert.equal(JSON.parse(readFileSync(f.receiptFile)).transport.mode,'ci-oci-archive');
+  assert.equal(spawnSync(process.execPath,[cli,f.layout,f.receiptFile,'--overwrite'],{encoding:'utf8'}).status,2);
+});
+test('OCI archive consumption binds external archive and image digests before accepting bytes',async t=>{
+  const f=ociFixture(t),receipt=await exportProductImage(f),archive=path.join(f.root,'image.oci.tar');
+  const args={archive,destination:path.join(f.root,'selected'),archiveSha256:receipt.artifacts.imageArchive.digest.slice(7),
+    manifestDigest:f.receipt.ociLayoutDigest,imageId:f.receipt.loadedImageId};
+  await unpackOciArchive(args);
+  assert.equal(readFileSync(path.join(args.destination,'index.json'),'utf8'),readFileSync(path.join(f.layout,'index.json'),'utf8'));
+  await assert.rejects(unpackOciArchive({...args,destination:path.join(f.root,'wrong'),archiveSha256:'f'.repeat(64)}),/checksum differs/);
+  assert.equal(existsSync(path.join(f.root,'wrong')),false);
+  await assert.rejects(unpackOciArchive(args));
+  const bad=ociFixture(t),outside=path.join(bad.layout,'outside');writeFileSync(outside,'unindexed');
+  const malicious=path.join(bad.root,'extra.tar');execFileSync('tar',['-C',bad.layout,'-cf',malicious,'.']);
+  const digest=createHash('sha256').update(readFileSync(malicious)).digest('hex');
+  const target=path.join(bad.root,'rejected');
+  await assert.rejects(unpackOciArchive({...args,archive:malicious,destination:target,archiveSha256:digest}));
+  assert.equal(existsSync(target),false);
+});
+
+function platformFixture(t) {
+  const directory=mkdtempSync(join(tmpdir(),'platform-package-'));
+  t.after(()=>rmSync(directory,{recursive:true,force:true}));
+  const staged=join(directory,'native');mkdirSync(staged);
+  const manifest=readStructuredFile(join(root,'distribution/application/examples/core-only/app.yaml'));
+  const source={repository:'git@github.com:AuraBootTeam/auraboot.git',commit:'a'.repeat(40)};
+  const image=ociFixture(t);cpSync(image.layout,join(staged,'oci'),{recursive:true});
+  const coordinates=[['runtime','com.auraboot:runtime',manifest.platform.runtime],
+    ['oci',manifest.platform.baseImage.id,manifest.platform.baseImage.version],
+    ['maven','com.auraboot:platform-plugin-api',manifest.platform.pluginApi],
+    ['npm','@auraboot/web-shell',manifest.platform.webShell],
+    ['npm','@auraboot/plugin-sdk',manifest.platform.pluginSdk],
+    ...manifest.platform.webPackages.map(a=>['npm',a.package,a.version]),
+    ...manifest.backend.migrationSets.map(id=>['migration',id,'1.0.0']),
+    ...manifest.config.importOrder.map(id=>['config',id,'1.0.0'])];
+  const artifacts=coordinates.map(([type,id,version],i)=>{
+    const localPath=type==='oci'?'oci':`payload-${i}`;
+    if(type!=='oci')writeFileSync(join(staged,localPath),id+'\n');
+    return {type,id,version,source,localPath,uri:`artifact:${localPath}`,digest:sha256Path(join(staged,localPath))};
+  });
+  const lock=resolveApplication(manifest,{schemaVersion:1,artifacts});
+  const write=(name,value)=>writeFileSync(join(staged,name),JSON.stringify(value,null,2)+'\n');
+  write('artifact-catalog.json',{schemaVersion:1,artifacts});write('application.lock',lock);
+  for(const name of ['web','sbom','driver'])writeFileSync(join(staged,name),name);
+  const receipt={schemaVersion:1,application:lock.application,source,lockIdentity:lock.identity,
+    manifestDigest:lock.manifestDigest,graphDigest:lock.composition.graphDigest,
+    verification:{result:'PASS',resolver:'application-contract-v1',checksum:'sha256'},
+    image:{id:'auraboot-runtime',layout:'oci',digest:image.receipt.ociLayoutDigest},
+    artifacts:lock.artifacts.map(({type,id,version,digest,localPath})=>({type,id,version,digest,localPath})),
+    web:{path:'web',digest:sha256Path(join(staged,'web'))},
+    sbom:{path:'sbom',digest:sha256Path(join(staged,'sbom'))},
+    deploymentScript:{path:'driver',digest:sha256Path(join(staged,'driver'))}};
+  write('release-receipt.json',receipt);
+  mkdirSync(join(staged,'empty-directory'));
+  return {root:staged,coreCommit:source.commit,archive:join(directory,'platform.tar'),directory,receipt,write};
+}
+
+test('native platform package preserves original catalog, lock and full files without recompilation',async t=>{
+  const f=platformFixture(t),before=await verifyPlatformArtifacts(f),selected=await exportPlatformArtifacts(f);
+  const destination=join(f.directory,'consumer');
+  const consumed=await unpackPlatformArtifacts({...f,destination,archiveSha256:selected.archive.sha256});
+  assert.equal(consumed.lockIdentity,selected.lockIdentity);assert.equal(consumed.releaseQualification,false);
+  assert.deepEqual((await verifyPlatformArtifacts({...f,root:destination})).entries,before.entries);
+  const original=readFileSync(f.archive);await assert.rejects(exportPlatformArtifacts(f),/EEXIST/);
+  assert.deepEqual(readFileSync(f.archive),original);
+  await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256:selected.archive.sha256}),/fresh/);
+});
+
+test('platform reuse rejects stale selection, source, catalog, lock, receipt and auxiliary bytes',async t=>{
+  for(const mode of ['source','catalog','lock','receipt','auxiliary','link']) {
+    const f=platformFixture(t);
+    if(mode==='source')f.coreCommit='b'.repeat(40);
+    if(mode==='catalog') {
+      const catalog=JSON.parse(readFileSync(join(f.root,'artifact-catalog.json')));
+      catalog.artifacts[0].source.commit='b'.repeat(40);f.write('artifact-catalog.json',catalog);
+    }
+    if(mode==='lock') {
+      const lock=JSON.parse(readFileSync(join(f.root,'application.lock')));
+      lock.artifacts[0].digest=`sha256:${'f'.repeat(64)}`;f.write('application.lock',lock);
+    }
+    if(mode==='receipt'){f.receipt.artifacts.pop();f.write('release-receipt.json',f.receipt);}
+    if(mode==='auxiliary')writeFileSync(join(f.root,'driver'),'changed');
+    if(mode==='link')symlinkSync('/tmp',join(f.root,'linked-directory'));
+    await assert.rejects(exportPlatformArtifacts(f));assert.equal(existsSync(f.archive),false,mode);
+  }
+  const f=platformFixture(t),selected=await exportPlatformArtifacts(f),destination=join(f.directory,'wrong');
+  await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256:'f'.repeat(64)}),/checksum differs/);
+  assert.equal(existsSync(destination),false);
+  await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256:selected.archive.sha256,coreCommit:'b'.repeat(40)}),/matching native Core/);
+});
+
+test('platform unpack refuses escaping, duplicate and linked members before writing a destination',async t=>{
+  for(const mode of ['escape','duplicate','link']) {
+    const f=platformFixture(t);
+    execFileSync('python3',['-c',`import io,sys,tarfile
+archive,mode=sys.argv[1:]
+with tarfile.open(archive,'w') as t:
+ m=tarfile.TarInfo('../outside' if mode=='escape' else 'file');m.size=1;t.addfile(m,io.BytesIO(b'x'))
+ if mode=='duplicate': t.addfile(m,io.BytesIO(b'x'))
+ if mode=='link':
+  m=tarfile.TarInfo('linked');m.type=tarfile.SYMTYPE;m.linkname='/tmp';t.addfile(m)
+`,f.archive,mode]);
+    const destination=join(f.directory,'consumer'),archiveSha256=createHash('sha256').update(readFileSync(f.archive)).digest('hex');
+    await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256}));
+    assert.equal(existsSync(destination),false,mode);assert.equal(existsSync(join(f.directory,'outside')),false);
+  }
+});
+
+test('platform consumer uses the original frozen dataset selection and never reselects a changed archive',async t=>{
+  const f=platformFixture(t),selected=await exportPlatformArtifacts(f),inputs=join(f.directory,'dataset-inputs.json');
+  const record={file:f.archive,sha256:selected.archive.sha256};
+  writeFileSync(inputs,JSON.stringify({files:[record]}));
+  const result=await consumePlatformArtifacts({...f,inputs,destination:join(f.directory,'consumer')});
+  assert.equal(result.archive.sha256,record.sha256);
+  for(const [name,files] of [['missing',[]],['duplicate',[record,record]],['changed',[{...record,sha256:'f'.repeat(64)}]]]) {
+    writeFileSync(inputs,JSON.stringify({files}));const destination=join(f.directory,name);
+    await assert.rejects(consumePlatformArtifacts({...f,inputs,destination}));assert.equal(existsSync(destination),false);
   }
 });

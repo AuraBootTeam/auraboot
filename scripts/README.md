@@ -127,6 +127,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `aurabot-scenario-golden-run.sh` | 0 | 2026-07-23 | aurabot-scenario-golden-run.sh — self-contained scenario golden for the |
 | `backlog-stats.sh` | 0 | 2026-03-26 | Backlog dashboard stats — counts GAP statuses across all backlog files |
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
+| `ci/prepare-library-candidate.sh` | 1 | 2026-10-23 | Prepare native runtime-library candidates under a frozen Jenkins context without application assembly or remote publication. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
@@ -170,6 +171,8 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `application/schema-ownership-audit.mjs` | 0 | 2026-09-25 | Audit declared migration ownership without rewriting released SQL. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
+| `application/export-product-image.mjs` | 1 | 2026-10-22 | Export the tested OCI graph before native gate cleanup; checksum-bound strict archive consumption; immutable transport only. |
+| `application/platform-artifact-package.mjs` | 1 | 2026-10-23 | Export/consume an explicitly selected native Core artifact package; original catalog/lock/source/OCI checks, no compilation or qualification. |
 
 ## pipeline/lib (12)
 
@@ -240,6 +243,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `dev/stop-isolated.sh` | 10 | 2026-05-12 | Stop a per-worktree Docker dev stack. |
 | `dev/test-dev-env-scripts.sh` | 1 | 2026-05-22 | Smoke tests for scripts/dev environment helpers. |
 | `dev/test-gradle-guard.sh` | 1 | 2026-05-12 | Smoke test for platform/build.gradle multi-worktree Maven publish guard. |
+| `dev/test-library-version.mjs` | 1 | 2026-10-23 | Run offline real-Gradle version/publication contracts and explicit mutation guards in fresh managed evidence. |
 | `dev/verify-quickstart.sh` | 1 | 2026-05-17 | verify-quickstart.sh — pre-launch sanity check for the README quickstart. |
 | `docker-ga-e2e-bootstrap.sh` | 6 | 2026-05-20 | Bootstrap the GA-E2E docker stack for OSS Playwright runs. |
 | `docker-ga-e2e-down.sh` | 2 | 2026-05-26 | GA Follow-up E2E stack teardown — thin wrapper over stop-isolated. |
@@ -365,3 +369,16 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
 | `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |
 | `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |
+
+### Product image transport
+
+The existing Linux product image gate accepts `AURA_RELEASE_EXPORT_PACKAGE=1` to retain the
+tested OCI graph as `image.oci.tar` in its evidence directory before work-root cleanup.
+The default remains `0`. Export runs after native acceptance and records the actual archive
+digest in the original receipt; it neither builds another image nor grants deployment authority.
+Missing/corrupt OCI blobs, a different loaded image, partial native acceptance, external
+descriptors and existing output are rejected. Export failure fails the original gate.
+The original qualification profile and source/builder identity must include this transport mode
+before a publisher can consume it; historical receipts without an archive cannot acquire one
+by merely editing JSON. Local file/CLI self-tests use synthetic OCI bytes without Docker and
+do not represent Linux image qualification.
