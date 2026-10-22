@@ -377,6 +377,20 @@ test.describe('Page Designer workbench block runtime', () => {
 
     await capture('rd-open');
     const drawer = page.getByTestId('review-drawer');
+    const readLayout = () =>
+      drawer.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return Object.fromEntries(
+          ['left', 'top', 'width', 'height', 'min-width', 'max-width', 'max-height'].map(
+            (property) => [property, style.getPropertyValue(property)],
+          ),
+        );
+      });
+    const expectLayout = async (layout: Record<string, string>) => {
+      for (const [property, value] of Object.entries(layout)) {
+        await expect(drawer).toHaveCSS(property, value);
+      }
+    };
     await drawer.getByTestId('review-drawer-candidate-C-100').click();
     await expect(drawer.getByTestId('review-drawer-candidate-C-100')).toHaveClass(/bg-accent-weak/);
     await expect(drawer.getByTestId('review-drawer-candidate-C-200')).not.toHaveClass(
@@ -385,7 +399,7 @@ test.describe('Page Designer workbench block runtime', () => {
     await expect(drawer).toContainText('Review C-100 · Pending review');
     await capture('rd-selected');
 
-    const originalLayout = await drawer.getAttribute('style');
+    const originalLayout = await readLayout();
     const maximize = drawer.getByRole('button', { name: /Toggle maximize|切换最大化/ });
     await maximize.click();
     await expect(drawer).toHaveCSS('left', '16px');
@@ -393,7 +407,7 @@ test.describe('Page Designer workbench block runtime', () => {
     await expect(drawer.getByTestId('review-drawer-candidate-C-100')).toHaveClass(/bg-accent-weak/);
     await capture('rd-maximized');
     await maximize.click();
-    await expect(drawer).toHaveAttribute('style', originalLayout!);
+    await expectLayout(originalLayout);
     await capture('rd-restored');
 
     const beforeDrag = await drawer.boundingBox();
@@ -427,11 +441,11 @@ test.describe('Page Designer workbench block runtime', () => {
     await expect(drawer).toHaveCSS('width', `${beforeResize!.width + 60}px`);
     await expect(drawer).toHaveCSS('height', `${beforeResize!.height + 40}px`);
     await capture('rd-resized');
-    const storedLayout = await drawer.getAttribute('style');
+    const storedLayout = await readLayout();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('review-drawer-empty')).toContainText('Select a row');
     await page.getByTestId('candidate-list-item-C-100').click();
-    await expect(drawer).toHaveAttribute('style', storedLayout!);
+    await expectLayout(storedLayout);
     await capture('rd-persisted');
 
     const renderedTypes = await page.getByTestId('list-misc-blocks').evaluate((root) =>
