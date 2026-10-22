@@ -1,0 +1,69 @@
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ChartDataSource } from '~/framework/smart/types/chart';
+vi.mock('~/contexts/AuthContext', () => ({ usePermission: () => false }));
+vi.mock('../../components-shell/AuraBotProvider', () => ({
+  useAuraBot: () => ({ state: { isLoading: false }, sendMessage: vi.fn() }),
+}));
+vi.mock('~/contexts/I18nContext', () => ({
+  useI18n: () => ({
+    locale: 'zh-CN',
+    t: (key: string, _?: unknown, fallback?: string) =>
+      ({
+        'model.tpm_project.tpm_pj_budget.label': '项目预算',
+        'model.tpm_project.tpm_pj_name.label': '项目名称',
+      })[key] ||
+      fallback ||
+      key,
+  }),
+}));
+vi.mock('~/framework/smart/charts/SharedChartFactory', () => ({
+  normalizeChartType: (type: string) => type,
+  getChartComponent: () => (props: { metricLabels: Record<string, string> }) => (
+    <div data-testid="shared-chart-labels">{JSON.stringify(props.metricLabels)}</div>
+  ),
+}));
+vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
+  dashboardService: {
+    create: vi.fn().mockResolvedValue({ pid: 'saved-dashboard', code: 'saved-dashboard' }),
+  },
+}));
+vi.mock(
+  '~/plugins/core-designer/components/report-designer/services/reportDesignerService',
+  () => ({ reportDesignerService: { save: vi.fn() } }),
+);
+import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
+import { ChatBiResultCard } from '../ChatBiResultCard';
+describe('chat chart presentation labels', () => {
+  it('passes translated metric names into the existing chart renderer and persisted widget', async () => {
+    const dataSource: ChartDataSource = {
+      type: 'aggregate',
+      modelCode: 'tpm_project',
+      dimensions: ['tpm_pj_name'],
+      metrics: [{ field: 'tpm_pj_budget', aggregation: 'sum', alias: 'budget_total' }],
+    };
+    render(
+      <ChatBiResultCard
+        result={{
+          chartType: 'bar',
+          modelCode: 'tpm_project',
+          columns: ['tpm_pj_name', 'budget_total'],
+          records: [{ tpm_pj_name: '供应链平台', budget_total: 128000 }],
+          dataSource,
+          metrics: dataSource.metrics,
+          dimensions: dataSource.dimensions,
+        }}
+      />,
+    );
+    expect(await screen.findByTestId('shared-chart-labels')).toHaveTextContent('项目预算 · 合计');
+    fireEvent.click(screen.getByTestId('chatbi-save-dashboard'));
+    await waitFor(() => expect(dashboardService.create).toHaveBeenCalled());
+    const widget = vi.mocked(dashboardService.create).mock.calls[0][0].widgets![0];
+    expect(widget.config!.dataSource).toEqual(dataSource);
+    expect(widget.config).toMatchObject({
+      metricLabels: { tpm_pj_name: '项目名称', budget_total: '项目预算 · 合计' },
+    });
+    expect(vi.mocked(dashboardService.create).mock.calls[0][0].title).not.toContain('tpm_project');
+  });
+});

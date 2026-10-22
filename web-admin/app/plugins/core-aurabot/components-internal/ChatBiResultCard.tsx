@@ -117,6 +117,7 @@ function ChatBiChart({
   metrics,
   chartConfig,
   title,
+  labels,
 }: {
   chartType: string;
   records: Record<string, unknown>[];
@@ -125,6 +126,7 @@ function ChatBiChart({
   metrics?: ChatBiMetric[];
   chartConfig?: Record<string, unknown>;
   title?: string;
+  labels: Record<string, string>;
 }) {
   const dataSource = useMemo<ChartDataSource>(() => {
     const { labelField, valueField } = inferFields(records, columns, chartConfig);
@@ -145,7 +147,7 @@ function ChatBiChart({
   const widgetType = normalizeChartType(CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart');
   const ChartComponent = getChartComponent(widgetType);
   if (!ChartComponent) {
-    return <DataTable records={records} columns={columns} />;
+    return <DataTable records={records} columns={columns} labels={labels} />;
   }
 
   return (
@@ -158,6 +160,7 @@ function ChatBiChart({
     >
       <ChartComponent
         title={title}
+        metricLabels={labels}
         dataSource={dataSource}
         className="h-[280px] w-full"
         style={{ height: 280 }}
@@ -251,7 +254,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
       : t('aurabot.chatbi.records', undefined, '条记录');
 
   // ── Ad-hoc → persisted bridge: save this chart as a dashboard widget ──
-  const { modelCode, dimensions = [], metrics = [] } = result;
+  const { dimensions = [], metrics = [] } = result;
   const [saving, setSaving] = useState(false);
   const [savedPid, setSavedPid] = useState<string | null>(null);
   const [savedCode, setSavedCode] = useState<string | null>(null);
@@ -291,9 +294,10 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
     setSavingReport(true);
     try {
       const report = createEmptyReport(
-        String(
-          interpretation || modelCode || text({ 'zh-CN': '分析报表', 'en-US': 'Analysis report' }),
-        ).slice(0, 200),
+        String(interpretation || text({ 'zh-CN': '分析报表', 'en-US': 'Analysis report' })).slice(
+          0,
+          200,
+        ),
       );
       report.dataSources = {
         analysis: { type: 'aggregate', aggregateQuery: { ...dataSource, type: 'aggregate' } },
@@ -333,7 +337,9 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      const title = String(interpretation || modelCode || 'Chart').slice(0, 200);
+      const title = String(
+        interpretation || text({ 'zh-CN': '分析看板', 'en-US': 'Analysis dashboard' }),
+      ).slice(0, 200);
       const widgetType = CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart';
       const widgets = [
         {
@@ -347,6 +353,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           config: {
             title,
             dataSource,
+            metricLabels: columnLabels,
           },
         },
       ];
@@ -430,6 +437,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
               metrics={metrics}
               chartConfig={chartConfig}
               title={interpretation}
+              labels={columnLabels}
             />
           ) : (
             <DataTable records={records} columns={effectiveColumns} labels={columnLabels} />

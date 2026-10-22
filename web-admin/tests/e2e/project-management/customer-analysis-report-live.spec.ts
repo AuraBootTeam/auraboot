@@ -1,3 +1,5 @@
+import { navigateToMenuByClick } from '../helpers';
+import { liveShowcaseLogin } from '../../helpers/live-showcase-login';
 import { requireRuntimeUrl } from '../../helpers/environments';
 /** Real-provider customer analysis. Missing external prerequisites fail; this suite never substitutes a model. */
 import { test, expect } from '@playwright/test';
@@ -49,11 +51,8 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
     (showcaseFixture ? '华辰制造（经营分析案例）' : '华辰制造');
 
   page.setDefaultTimeout(20000);
-  await page.goto('/login');
-  await page.locator('input#identifier, input#email').fill(DEFAULT_TEST_ACCOUNT.email);
-  await page.locator('input#password').fill(DEFAULT_TEST_ACCOUNT.password);
-  await page.getByRole('button', { name: '立即登录', exact: true }).click();
-  await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
+  await liveShowcaseLogin(page);
+  await navigateToMenuByClick(page, ['项目交付', '项目']);
   await expect(page).toHaveURL(/\/p\/tpm_project$/);
   const identity = await (await page.request.get('/api/auth/me')).json();
   expect(String(identity.code)).toBe('0');
@@ -173,6 +172,8 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.getByTestId('ai-panel-toggle').click();
   const panel = page.getByTestId('aurabot-panel');
   await expect(panel).toBeVisible();
+  await expect(panel.getByTestId('aurabot-context-label')).toContainText('项目');
+  await expect(panel.getByTestId('aurabot-context-label')).not.toContainText('tpm_project');
   const historyBounds = await panel.getByTestId('aurabot-history-trigger').boundingBox();
   expect(historyBounds?.y).toBeGreaterThanOrEqual(56);
   await panel.getByTestId('aurabot-history-trigger').click();
@@ -429,7 +430,10 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
     // Review presentation columns without changing the governed query.
     for (let index = columns.length - 1; index >= 0; index--) {
       if (!['tpm_pj_name', budgetColumn].includes(columns[index].field)) {
-        await tableProperties.getByRole('button', { name: '删除', exact: true }).nth(index).click();
+        await tableProperties
+          .getByRole('button', { name: 'remove', exact: true })
+          .nth(index)
+          .click();
       }
     }
     const retained = columns.filter((column: any) =>
