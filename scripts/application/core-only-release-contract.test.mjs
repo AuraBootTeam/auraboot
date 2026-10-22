@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {exportProductImage,unpackOciArchive,verifyOciLayout} from './export-product-image.mjs';
+import {exportPlatformArtifacts,unpackPlatformArtifacts,verifyPlatformArtifacts,consumePlatformArtifacts} from './platform-artifact-package.mjs';
+import {readStructuredFile,resolveApplication,sha256Path} from './application-contract.mjs';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -322,4 +324,104 @@ test('OCI archive consumption binds external archive and image digests before ac
   const target=path.join(bad.root,'rejected');
   await assert.rejects(unpackOciArchive({...args,archive:malicious,destination:target,archiveSha256:digest}));
   assert.equal(existsSync(target),false);
+});
+
+function platformFixture(t) {
+  const directory=mkdtempSync(join(tmpdir(),'platform-package-'));
+  t.after(()=>rmSync(directory,{recursive:true,force:true}));
+  const staged=join(directory,'native');mkdirSync(staged);
+  const manifest=readStructuredFile(join(root,'distribution/application/examples/core-only/app.yaml'));
+  const source={repository:'git@github.com:AuraBootTeam/auraboot.git',commit:'a'.repeat(40)};
+  const image=ociFixture(t);cpSync(image.layout,join(staged,'oci'),{recursive:true});
+  const coordinates=[['runtime','com.auraboot:runtime',manifest.platform.runtime],
+    ['oci',manifest.platform.baseImage.id,manifest.platform.baseImage.version],
+    ['maven','com.auraboot:platform-plugin-api',manifest.platform.pluginApi],
+    ['npm','@auraboot/web-shell',manifest.platform.webShell],
+    ['npm','@auraboot/plugin-sdk',manifest.platform.pluginSdk],
+    ...manifest.platform.webPackages.map(a=>['npm',a.package,a.version]),
+    ...manifest.backend.migrationSets.map(id=>['migration',id,'1.0.0']),
+    ...manifest.config.importOrder.map(id=>['config',id,'1.0.0'])];
+  const artifacts=coordinates.map(([type,id,version],i)=>{
+    const localPath=type==='oci'?'oci':`payload-${i}`;
+    if(type!=='oci')writeFileSync(join(staged,localPath),id+'\n');
+    return {type,id,version,source,localPath,uri:`artifact:${localPath}`,digest:sha256Path(join(staged,localPath))};
+  });
+  const lock=resolveApplication(manifest,{schemaVersion:1,artifacts});
+  const write=(name,value)=>writeFileSync(join(staged,name),JSON.stringify(value,null,2)+'\n');
+  write('artifact-catalog.json',{schemaVersion:1,artifacts});write('application.lock',lock);
+  for(const name of ['web','sbom','driver'])writeFileSync(join(staged,name),name);
+  const receipt={schemaVersion:1,application:lock.application,source,lockIdentity:lock.identity,
+    manifestDigest:lock.manifestDigest,graphDigest:lock.composition.graphDigest,
+    verification:{result:'PASS',resolver:'application-contract-v1',checksum:'sha256'},
+    image:{id:'auraboot-runtime',layout:'oci',digest:image.receipt.ociLayoutDigest},
+    artifacts:lock.artifacts.map(({type,id,version,digest,localPath})=>({type,id,version,digest,localPath})),
+    web:{path:'web',digest:sha256Path(join(staged,'web'))},
+    sbom:{path:'sbom',digest:sha256Path(join(staged,'sbom'))},
+    deploymentScript:{path:'driver',digest:sha256Path(join(staged,'driver'))}};
+  write('release-receipt.json',receipt);
+  mkdirSync(join(staged,'empty-directory'));
+  return {root:staged,coreCommit:source.commit,archive:join(directory,'platform.tar'),directory,receipt,write};
+}
+
+test('native platform package preserves original catalog, lock and full files without recompilation',async t=>{
+  const f=platformFixture(t),before=await verifyPlatformArtifacts(f),selected=await exportPlatformArtifacts(f);
+  const destination=join(f.directory,'consumer');
+  const consumed=await unpackPlatformArtifacts({...f,destination,archiveSha256:selected.archive.sha256});
+  assert.equal(consumed.lockIdentity,selected.lockIdentity);assert.equal(consumed.releaseQualification,false);
+  assert.deepEqual((await verifyPlatformArtifacts({...f,root:destination})).entries,before.entries);
+  const original=readFileSync(f.archive);await assert.rejects(exportPlatformArtifacts(f),/EEXIST/);
+  assert.deepEqual(readFileSync(f.archive),original);
+  await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256:selected.archive.sha256}),/fresh/);
+});
+
+test('platform reuse rejects stale selection, source, catalog, lock, receipt and auxiliary bytes',async t=>{
+  for(const mode of ['source','catalog','lock','receipt','auxiliary','link']) {
+    const f=platformFixture(t);
+    if(mode==='source')f.coreCommit='b'.repeat(40);
+    if(mode==='catalog') {
+      const catalog=JSON.parse(readFileSync(join(f.root,'artifact-catalog.json')));
+      catalog.artifacts[0].source.commit='b'.repeat(40);f.write('artifact-catalog.json',catalog);
+    }
+    if(mode==='lock') {
+      const lock=JSON.parse(readFileSync(join(f.root,'application.lock')));
+      lock.artifacts[0].digest=`sha256:${'f'.repeat(64)}`;f.write('application.lock',lock);
+    }
+    if(mode==='receipt'){f.receipt.artifacts.pop();f.write('release-receipt.json',f.receipt);}
+    if(mode==='auxiliary')writeFileSync(join(f.root,'driver'),'changed');
+    if(mode==='link')symlinkSync('/tmp',join(f.root,'linked-directory'));
+    await assert.rejects(exportPlatformArtifacts(f));assert.equal(existsSync(f.archive),false,mode);
+  }
+  const f=platformFixture(t),selected=await exportPlatformArtifacts(f),destination=join(f.directory,'wrong');
+  await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256:'f'.repeat(64)}),/checksum differs/);
+  assert.equal(existsSync(destination),false);
+  await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256:selected.archive.sha256,coreCommit:'b'.repeat(40)}),/matching native Core/);
+});
+
+test('platform unpack refuses escaping, duplicate and linked members before writing a destination',async t=>{
+  for(const mode of ['escape','duplicate','link']) {
+    const f=platformFixture(t);
+    execFileSync('python3',['-c',`import io,sys,tarfile
+archive,mode=sys.argv[1:]
+with tarfile.open(archive,'w') as t:
+ m=tarfile.TarInfo('../outside' if mode=='escape' else 'file');m.size=1;t.addfile(m,io.BytesIO(b'x'))
+ if mode=='duplicate': t.addfile(m,io.BytesIO(b'x'))
+ if mode=='link':
+  m=tarfile.TarInfo('linked');m.type=tarfile.SYMTYPE;m.linkname='/tmp';t.addfile(m)
+`,f.archive,mode]);
+    const destination=join(f.directory,'consumer'),archiveSha256=createHash('sha256').update(readFileSync(f.archive)).digest('hex');
+    await assert.rejects(unpackPlatformArtifacts({...f,destination,archiveSha256}));
+    assert.equal(existsSync(destination),false,mode);assert.equal(existsSync(join(f.directory,'outside')),false);
+  }
+});
+
+test('platform consumer uses the original frozen dataset selection and never reselects a changed archive',async t=>{
+  const f=platformFixture(t),selected=await exportPlatformArtifacts(f),inputs=join(f.directory,'dataset-inputs.json');
+  const record={file:f.archive,sha256:selected.archive.sha256};
+  writeFileSync(inputs,JSON.stringify({files:[record]}));
+  const result=await consumePlatformArtifacts({...f,inputs,destination:join(f.directory,'consumer')});
+  assert.equal(result.archive.sha256,record.sha256);
+  for(const [name,files] of [['missing',[]],['duplicate',[record,record]],['changed',[{...record,sha256:'f'.repeat(64)}]]]) {
+    writeFileSync(inputs,JSON.stringify({files}));const destination=join(f.directory,name);
+    await assert.rejects(consumePlatformArtifacts({...f,inputs,destination}));assert.equal(existsSync(destination),false);
+  }
 });
