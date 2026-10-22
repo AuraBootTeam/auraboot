@@ -29,10 +29,21 @@ test('SC06-PRINT canonical designer layout survives real HTML and multi-page PDF
   const origin = new URL(requireRuntimeUrl('base')).origin;
   expect(['localhost', '127.0.0.1']).toContain(new URL(origin).hostname);
   await page.goto('/login');
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
   await page.locator('input#identifier, input#email').fill(DEFAULT_TEST_ACCOUNT.email);
   await page.locator('#password').fill(DEFAULT_TEST_ACCOUNT.password);
   await page.getByRole('button', { name: '立即登录', exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.includes('/login'));
+  const tenant = process.env.AURA_ADMIN_TENANT_ID!;
+  if (new URL(page.url()).pathname === '/tenant-selection')
+    await page.getByTestId(`space-business-${tenant}`).click();
   await expect(page.getByTestId('sidebar')).toBeVisible();
+  const current = (await (await page.request.get('/api/auth/me')).json()).data;
+  if (String(current.user.tenantId) !== tenant) {
+    await page.getByTestId('user-menu').getByRole('button').first().click();
+    await page.getByTestId(`tenant-switch-${tenant}`).click();
+    await page.waitForLoadState('load');
+  }
   const identity = await (await page.request.get('/api/auth/me')).json();
   expect(String(identity.code)).toBe('0');
   expect(String(identity.data.user.tenantId)).toBe(process.env.AURA_ADMIN_TENANT_ID);
