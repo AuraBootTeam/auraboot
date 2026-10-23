@@ -71,6 +71,7 @@ fs.writeFileSync(process.argv[2] + '/run-context.json', JSON.stringify({
   credential: process.env.AURA_LIVE_LLM_API_KEY_ENV && process.env[process.env.AURA_LIVE_LLM_API_KEY_ENV] ? 'SET' : 'UNSET',
 }, null, 2) + '\n');
 JS
+export AURA_EVAL_REDIS_PORT="${AURA_EVAL_REDIS_PORT:-$((16400 + SLOT))}"
 rc=0
 for module in platform-app platform-agent; do
   selectors=()
@@ -90,7 +91,7 @@ JS
   )
   [ "${#selectors[@]}" -gt 0 ] || continue
   "$WORKSPACE_ROOT/aura" run "$RUNTIME" --workdir "$REPO_ROOT/platform" -- bash -c \
-    'export TEST_DATABASE_URL="$DATABASE_URL" TEST_DATABASE_USERNAME="$DATABASE_USERNAME" TEST_DATABASE_PASSWORD="${DATABASE_PASSWORD-}"; exec "$@"' \
+    'export TEST_DATABASE_URL="$DATABASE_URL" TEST_DATABASE_USERNAME="$DATABASE_USERNAME" TEST_DATABASE_PASSWORD="${DATABASE_PASSWORD-}" SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT="$AURA_EVAL_REDIS_PORT" SPRING_DATA_REDIS_DATABASE="$REDIS_DATABASE"; exec "$@"' \
     _ "$WORKSPACE_ROOT/aura" gradle "$RUNTIME" --project "$REPO_ROOT/platform" -- ":$module:test" --rerun -PincludeLiveEvals "${selectors[@]}" --no-daemon >>"$LOG" 2>&1 || rc=1
   node --input-type=module - "$REPO_ROOT" "$PROFILE" "$module" "$RUN_DIR" <<'JS'
 import fs from 'node:fs';
