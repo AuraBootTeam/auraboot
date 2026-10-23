@@ -720,6 +720,7 @@ class RegisteredSourceBindingPostgresIT {
         assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
         List<IntegrationEventEnvelope> original = events();
         Map<String, Object> before = businessSnapshot();
+        List<String> sourceBusiness = sourceBusinessSnapshot();
         String recipients = first.getId() + "," + second.getId();
 
         update("source", sourcePid, Map.of(field("state"), "cancelled"));
@@ -753,7 +754,11 @@ class RegisteredSourceBindingPostgresIT {
         assertThat(events()).isEqualTo(original);
         assertThat(counts()).isEqualTo(Map.of("outbox", 2, "receipt", 0, "inbox", 0));
         templates.update(templatePid, templateRequest("Synthetic registered source body"));
-        assertThat(businessSnapshot()).isEqualTo(before);
+        Map<String, Object> restored = businessSnapshot();
+        before.forEach((kind, rows) -> {
+            if (!"source".equals(kind)) assertThat(restored.get(kind)).isEqualTo(rows);
+        });
+        assertThat(sourceBusinessSnapshot()).isEqualTo(sourceBusiness);
 
         for (var event : original) executor.deliver(event, host, UniqueIdGenerator.generate());
         assertThat(counts()).isEqualTo(Map.of("outbox", 2, "receipt", 2, "inbox", 2));
@@ -765,11 +770,18 @@ class RegisteredSourceBindingPostgresIT {
         assertThat(jdbc.queryForList("SELECT to_jsonb(n)::text FROM ab_notification n WHERE tenant_id=? ORDER BY id", String.class, tenant.getId())).isEqualTo(inbox);
         assertThat(jdbc.queryForList("SELECT to_jsonb(r)::text FROM ab_integration_receipt r WHERE tenant_id=? ORDER BY id", String.class, tenant.getId())).isEqualTo(receipts);
         assertThat(events()).isEqualTo(original);
-        assertThat(businessSnapshot()).isEqualTo(before);
+        assertThat(businessSnapshot()).isEqualTo(restored);
         trace.put("lifecycle", Map.of("disabledFacets", List.of("source", "rule", "template"),
                 "restoredDeliveryCount", 2, "duplicateEffectCount", 0, "configurationConflictRejected", true,
-                "originalEnvelopesUnchanged", true, "businessSnapshotUnchanged", true));
+                "originalEnvelopesUnchanged", true, "nonSourceBusinessRowsUnchanged", true,
+                "sourceBusinessFieldsRestored", true, "sourceAuditMetadataChangeExpected", true));
         proved("changed configuration cannot rewrite queued immutable events; restoring exact semantics delivers once per explicit recipient; duplicate consume changes no inbox or receipt");
+    }
+
+    private List<String> sourceBusinessSnapshot() {
+        // Intentional cancellation/restoration updates audit metadata; business facts must still restore exactly.
+        return jdbc.queryForList("SELECT (to_jsonb(s) - 'row_version' - 'updated_at' - 'updated_by')::text FROM \""
+                + tables.get("source") + "\" s WHERE tenant_id=? ORDER BY pid", String.class, tenant.getId());
     }
 
     private void rejectQueued(List<IntegrationEventEnvelope> original) {
