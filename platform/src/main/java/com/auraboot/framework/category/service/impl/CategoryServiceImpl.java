@@ -265,7 +265,8 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
 
         category.setUpdatedAt(Instant.now());
         boolean moved = categoryMapper.updatePlacement(category.getId(), category.getParentId(),
-                category.getLevel(), category.getMaterializedPath(), category.getUpdatedAt()) > 0;
+                category.getLevel(), category.getMaterializedPath(), category.getUpdatedAt(),
+                com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId()) > 0;
         if (moved) {
             refreshDescendantMetadata(category);
         }

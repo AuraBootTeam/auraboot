@@ -112,11 +112,11 @@ public interface CategoryMapper extends BaseMapper<Category> {
     /** Placement writes include an explicit SQL NULL when promoting a node to a root. */
     @Update("""
             UPDATE ab_category SET parent_id = #{parentId}, level = #{level},
-              materialized_path = #{path}, updated_at = #{updatedAt}
+              materialized_path = #{path}, updated_at = #{updatedAt}, updated_by = #{updatedBy}
             WHERE id = #{categoryId} AND deleted_flag = false
             """)
     int updatePlacement(@Param("categoryId") Long categoryId, @Param("parentId") Long parentId,
             @Param("level") Integer level, @Param("path") String path,
-            @Param("updatedAt") java.time.Instant updatedAt);
+            @Param("updatedAt") java.time.Instant updatedAt, @Param("updatedBy") Long updatedBy);
 
 }
