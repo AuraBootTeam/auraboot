@@ -54,7 +54,7 @@ class ApplicationCapabilitiesControllerTest {
 
     @Test
     void openApiVersionRemainsNumericAndInstallationFieldsAreRequired() {
-        var model = ModelConverters.getInstance().resolveAsResolvedSchema(
+        var model = new ModelConverters(false).resolveAsResolvedSchema(
                 new AnnotatedType(ApplicationCapabilitiesController.ApplicationCapabilities.class));
         io.swagger.v3.oas.models.media.Schema<?> capabilities = model.schema;
         assertThat(capabilities.getRequired()).containsExactlyInAnyOrder("agent", "schemaVersion");
