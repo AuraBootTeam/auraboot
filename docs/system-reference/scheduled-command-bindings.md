@@ -12,6 +12,8 @@ The existing database scheduler owns cron/timezone registration, manual triggers
 
 `aura.scheduler.commands.enabled` defaults to false. Deployment-only `bindings` contain `code`, `taskPid`, `tenantId`, `actorUserPid`, `commandCode`, `modelCode` and `targetRecordPid`. At most 128 bindings are accepted; binding codes and task PIDs must be unique. No business identity, command, target or payload is selected from task JSON or from an inherited scheduler thread context.
 
+Task creation persists the authenticated tenant from `MetaContext`; absent or nonpositive tenant context is rejected before persistence or scheduling. The request cannot supply tenant identity. Historical unscoped tasks are not silently assigned to a tenant.
+
 Create a disabled task through the existing scheduled-task management API, then explicitly configure its exact PID in deployment settings. Task JSON is exactly `{"bindingCode":"<registered-code>"}`. The handler bean is `scheduledTaskCommandHandler`, method `execute`; automatic retries must be zero. Existing scheduler permissions still govern task management. A copied task, another tenant, extra JSON fields, unknown binding or disabled registration fails before identity/data reads. This adds no public business API and does not create tasks on application startup.
 
 ## Command execution

@@ -1,11 +1,13 @@
 package com.auraboot.framework.scheduler.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.scheduler.dto.ScheduledTaskCreateRequest;
 import com.auraboot.framework.scheduler.entity.ScheduledTask;
 import com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper;
 import com.auraboot.framework.scheduler.service.SchedulerEngine;
 import com.auraboot.framework.scheduler.service.TaskExecutor;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,6 +32,35 @@ class ScheduledTaskServiceImplTest {
 
     @InjectMocks
     private ScheduledTaskServiceImpl service;
+
+    @BeforeEach
+    void tenantContext() { MetaContext.setContext(71L, null, null, "test"); }
+
+    @AfterEach
+    void clearTenantContext() { MetaContext.clear(); }
+
+    @Test
+    void create_persistsAuthenticatedTenant() {
+        ScheduledTask task = service.create(baseRequest());
+        assertThat(task.getTenantId()).isEqualTo(71L);
+        verify(taskMapper).insert(argThat((ScheduledTask row) -> Long.valueOf(71L).equals(row.getTenantId())));
+    }
+
+    @Test
+    void create_withoutTenant_rejectsBeforePersistenceOrScheduling() {
+        MetaContext.setContext(null, null, null, "test");
+        assertThatThrownBy(() -> service.create(baseRequest()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("tenant");
+        verifyNoInteractions(taskMapper, schedulerEngine);
+    }
+
+    @Test
+    void create_withoutContext_rejectsBeforePersistenceOrScheduling() {
+        MetaContext.clear();
+        assertThatThrownBy(() -> service.create(baseRequest()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MetaContext");
+        verifyNoInteractions(taskMapper, schedulerEngine);
+    }
 
     private ScheduledTaskCreateRequest baseRequest() {
         ScheduledTaskCreateRequest r = new ScheduledTaskCreateRequest();
