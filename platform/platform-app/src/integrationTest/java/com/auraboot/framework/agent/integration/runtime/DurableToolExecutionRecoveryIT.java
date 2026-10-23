@@ -105,7 +105,13 @@ class DurableToolExecutionRecoveryIT {
         ledger.fail(stale.request(), stale.executionKey(), "{}", "second timeout");
         assertThat(ledger.claimRetry(stale)).isFalse();
         assertThat(ledger.claimRetry(current())).isFalse();
-        jdbc.update("UPDATE ab_idempotency_record SET outcome=jsonb_set(jsonb_set(outcome, '{attemptCount}', '3'), '{nextRetryAt}', '0') WHERE tenant_id=? AND client_request_id=?",
+        jdbc.update("UPDATE ab_idempotency_record SET outcome=jsonb_set(outcome, '{nextRetryAt}', '0') WHERE tenant_id=? AND client_request_id=?",
+                tenant, stale.executionKey());
+        var dueAgain = current();
+        assertThat(ledger.claimRetry(stale)).as("even a due row rejects an earlier attempt snapshot").isFalse();
+        assertThat(ledger.claimRetry(dueAgain)).isTrue();
+        ledger.fail(stale.request(), stale.executionKey(), "{}", "final provider timeout");
+        jdbc.update("UPDATE ab_idempotency_record SET status='FAILED', outcome=jsonb_set(jsonb_set(jsonb_set(outcome, '{status}', '\"FAILED\"'), '{attemptCount}', '3'), '{nextRetryAt}', '0') WHERE tenant_id=? AND client_request_id=?",
                 tenant, stale.executionKey());
         assertThat(ledger.claimRetry(current())).isFalse();
     }
