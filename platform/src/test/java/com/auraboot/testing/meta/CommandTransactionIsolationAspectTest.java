@@ -36,10 +36,10 @@ class CommandTransactionIsolationAspectTest {
         var command=new CommandDefinition();command.setCode(CODE);command.setExecutionConfig(config);
         when(context.getBean(CommandMetadataCacheService.class).findCurrentCommandByCode(CODE)).thenReturn(command);
     }
-    @Test void probeConfigurationIsOutsideTheActualApplicationComponentScan() {
-        var scan=com.auraboot.framework.application.TestApplication.class
-                .getAnnotation(org.springframework.context.annotation.ComponentScan.class);
-        for(String prefix:scan.basePackages())assertFalse(Config.class.getName().startsWith(prefix+"."));
+    @Test void probeConfigurationCannotEnterTheFrameworkComponentScan() {
+        // The framework test launcher belongs to the application module on newer baselines.
+        // This library fixture must remain outside the framework scan without linking that launcher.
+        assertFalse(Config.class.getName().startsWith("com.auraboot.framework."));
         assertTrue(Config.class.isAnnotationPresent(org.springframework.boot.test.context.TestConfiguration.class));
         assertArrayEquals(new String[]{"command-transaction-probe"},Config.class.getAnnotation(Profile.class).value());
     }
