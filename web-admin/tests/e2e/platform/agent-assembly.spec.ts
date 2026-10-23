@@ -134,7 +134,8 @@ test.describe('optional application assembly', () => {
     await page.getByTestId('list-search-input').press('Enter');
     const row = page.getByRole('row').filter({ hasText: 'auth_appearance' });
     await expect(row).toHaveCount(1);
-    await row.getByText('旧页面设计器', { exact: true }).click();
+    await row.getByRole('button', { name: '更多操作', exact: true }).click();
+    await page.getByTestId('row-action-dropdown').getByText('旧页面设计器', { exact: true }).click();
     await expect(page.getByTestId('toolbar-save')).toBeVisible();
     const ai = page.getByTestId('toolbar-ai-generate');
     if (expected === 'installed') {
@@ -170,7 +171,7 @@ test.describe('optional application assembly', () => {
       await expectAssemblyToggle(member);
       await expect(member.getByTestId('add-provider-btn')).toHaveCount(0);
       if (expected === 'installed') {
-        await expect(member.getByText('Access denied: LLM provider settings require permission ai_center', { exact: true })).toBeVisible();
+        await expect(member.getByText('你没有管理模型服务的权限，请联系管理员。', { exact: true })).toBeVisible();
         const response = await member.request.get('/api/llm-config?level=tenant');
         expect(response.status()).toBe(403);
       } else await expect(member.getByTestId('agent-availability')).toHaveAttribute('data-state', 'not_installed');

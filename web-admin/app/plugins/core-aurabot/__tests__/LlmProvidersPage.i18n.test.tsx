@@ -7,6 +7,7 @@ import LlmProvidersPage from '../pages/aurabot/providers';
 
 const state = vi.hoisted(() => ({
   platformAdmin: true,
+  canManage: true,
   post: vi.fn(),
   successToast: vi.fn(),
   errorToast: vi.fn(),
@@ -42,7 +43,7 @@ vi.mock('~/contexts/AuthContext', async (importOriginal) => {
       preferences: null,
       token: null,
       isAuthenticated: true,
-      hasPermission: () => true,
+      hasPermission: () => state.canManage,
       hasRole: () => state.platformAdmin,
       hasAnyPermission: () => true,
       hasAllPermissions: () => true,
@@ -79,6 +80,7 @@ afterEach(() => {
   state.errorToast.mockReset();
   state.toggleEnabled.mockReset();
   state.platformAdmin = true;
+  state.canManage = true;
   state.configs = [];
   state.save.mockReset().mockResolvedValue(true);
   state.useCloudConfigs.mockClear();
@@ -87,6 +89,18 @@ afterEach(() => {
 });
 
 describe('LlmProvidersPage i18n', () => {
+  it.each([
+    ['zh-CN', '无权访问', '你没有管理模型服务的权限，请联系管理员。'],
+    ['en-US', 'Access denied', 'You do not have permission to manage model services. Contact your administrator.'],
+  ])('shows a readable %s permission refusal without internal codes', (locale, title, message) => {
+    state.canManage = false;
+    render(<I18nProvider initialLocale={locale} initialData={{ application: { agent: { permissionTitle: title, providerPermission: message } } }}><LlmProvidersPage /></I18nProvider>);
+    expect(screen.getByRole('heading', { name: title })).toBeVisible();
+    expect(screen.getByText(message)).toBeVisible();
+    expect(document.body).not.toHaveTextContent('ai_center');
+    expect(screen.queryByTestId('add-provider-btn')).not.toBeInTheDocument();
+  });
+
   it('renders zh-CN provider management copy from i18n resources', () => {
     render(
       <I18nProvider
