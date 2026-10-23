@@ -18,7 +18,7 @@ export function ApplicationCapabilitiesProvider({ children }: { children: ReactN
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    setSnapshot({ session, agent: 'unknown', loading: true });
+    setSnapshot(current => ({ session, agent: current.session === session ? current.agent : 'unknown', loading: true }));
     if (!isAuthenticated) {
       setSnapshot({ session, agent: 'unknown', loading: false });
       return () => controller.abort();
@@ -45,7 +45,13 @@ export function AgentRouteBoundary({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const { agent, loading, refresh } = useApplicationCapabilities();
   const { t } = useI18n();
-  if (!requiresAgentPath(pathname) || agent === 'installed') return children;
+  if (!requiresAgentPath(pathname)) return children;
+  if (agent === 'installed') return <div className="relative" aria-busy={loading}>
+    <div inert={loading || undefined}>{children}</div>
+    {loading && <div role="status" data-testid="agent-rediscovery" className="absolute inset-0 z-50 flex items-start justify-center bg-white/70 pt-8 dark:bg-gray-900/70">
+      <p className="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-800">{t('application.agent.loading')}</p>
+    </div>}
+  </div>;
   const key = loading ? 'loading' : agent;
   return <section role="status" data-testid="agent-availability" data-state={key} className="mx-auto my-12 max-w-lg rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
     <h1 className="mb-3 text-xl font-semibold">{t(`application.agent.${key}`)}</h1>

@@ -269,7 +269,7 @@ export function UnifiedDesignerWorkbench({
     selectFromMarquee: handleMarqueeSelect,
     clearMultiSelection,
   } = useDesignerSelection();
-  const { agent } = useApplicationCapabilities();
+  const { agent, loading: agentLoading } = useApplicationCapabilities();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const contextualRestricted = contextualEditablePropertyPaths !== undefined;
@@ -1425,7 +1425,7 @@ export function UnifiedDesignerWorkbench({
   const governedAiCopilotEnabled = Boolean(
     governedAiCopilot && contextualRestricted && !contextualReadOnly,
   );
-  const aiCopilotEnabled = agent === 'installed' && (legacyAiCopilotEnabled || governedAiCopilotEnabled);
+  const aiCopilotEnabled = agent === 'installed' && !agentLoading && (legacyAiCopilotEnabled || governedAiCopilotEnabled);
   const aiDomainGuidance =
     typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
   const aiKindPolicy = getKindPolicy(document.kind);

@@ -41222,6 +41222,12 @@
             },
             "type": "array"
           },
+          "applicationModules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "author": {
             "type": "string"
           },

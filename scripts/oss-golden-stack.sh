@@ -785,7 +785,7 @@ XML
         CI=true NPM_CONFIG_REGISTRY="$npm_registry" \
           COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
           "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
-            pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
+            pnpm --filter 'auraboot-app...' install --frozen-lockfile --reporter=append-only \
             >"$sd/logs/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/logs/frontend-dependencies.log"
         web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT" \

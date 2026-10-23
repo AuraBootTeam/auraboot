@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 4f08beb5151a38f3653effdd43b85ca1640545d0fad6d4a0e21c97178870ef8b
+ * Contract SHA-256: cde653e0dd2b9dab792aa47679f79f132a7ed5aef5521124b7289e9e47dbf811
  */
 export interface paths {
     "/api/activities": {
@@ -36587,6 +36587,7 @@ export interface components {
         };
         PluginManifestExtended: {
             agentDefinitions?: components["schemas"]["AgentDefinitionDTO"][];
+            applicationModules?: string[];
             author?: string;
             automations?: components["schemas"]["AutomationDefinitionDTO"][];
             bindingRules?: components["schemas"]["BindingRuleDTO"][];

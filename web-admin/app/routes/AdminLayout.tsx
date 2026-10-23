@@ -40,7 +40,7 @@ function AdminLayoutContent() {
   const workspace = usePagePresentation()?.mode === 'workspace';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { state } = useAuraBot();
-  const { agent } = useApplicationCapabilities();
+  const { agent, loading: agentLoading } = useApplicationCapabilities();
   const aiPanelOpen = agent === 'installed' && state.panelState === 'expanded';
   const location = useLocation();
 
@@ -82,7 +82,7 @@ function AdminLayoutContent() {
           <PageContent />
         </div>
 
-        <div className={aiPanelOpen ? `flex min-h-0 shrink-0 ${workspace ? 'pt-14' : ''}` : 'hidden'} data-testid="ai-panel-dock">
+        <div className={aiPanelOpen ? `flex min-h-0 shrink-0 ${workspace ? 'pt-14' : ''}` : 'hidden'} data-testid="ai-panel-dock" inert={agentLoading || undefined}>
           {agent === 'installed' && <AuraBotPanel />}
         </div>
       </div>

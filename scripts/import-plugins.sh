@@ -379,6 +379,10 @@ for plugin in "${PLUGINS[@]}"; do
         assembly_selected_plugins+=("$plugin")
     fi
 done
+if [ "${#assembly_selected_plugins[@]}" -eq 0 ]; then
+    echo "Plugin import complete: every optional profile entry was omitted for this assembly."
+    exit 0
+fi
 PLUGINS=("${assembly_selected_plugins[@]}")
 
 import_plugin_once() {

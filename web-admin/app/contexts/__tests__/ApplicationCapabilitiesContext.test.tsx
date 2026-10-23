@@ -54,6 +54,24 @@ describe('session scoped application discovery', () => {
     await act(async () => { resolveOld(response('installed')); });
     expect(screen.getByTestId('snapshot').textContent).toBe('not_installed');
   });
+  it('preserves a mounted AI draft but makes it inert during same-session rediscovery', async () => {
+    let resolveRefresh!: (value: Response) => void;
+    const fetcher = vi.fn().mockResolvedValueOnce(response('installed'))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { resolveRefresh = resolve; }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<MemoryRouter initialEntries={['/aurabot/providers']}><ApplicationCapabilitiesProvider><AgentRouteBoundary><input aria-label="provider draft" defaultValue="" /></AgentRouteBoundary></ApplicationCapabilitiesProvider></MemoryRouter>);
+    const input = await screen.findByRole('textbox', { name: 'provider draft' });
+    fireEvent.change(input, { target: { value: 'Unsaved provider draft' } });
+    fireEvent(window, new Event('focus'));
+    await screen.findByTestId('agent-rediscovery');
+    expect(screen.getByRole('textbox', { name: 'provider draft', hidden: true })).toBe(input);
+    expect((input as HTMLInputElement).value).toBe('Unsaved provider draft');
+    expect(input.closest('[inert]')).not.toBeNull();
+    await act(async () => { resolveRefresh(response('installed')); });
+    expect(screen.getByRole('textbox', { name: 'provider draft' })).toBe(input);
+    expect((input as HTMLInputElement).value).toBe('Unsaved provider draft');
+    expect(input.closest('[inert]')).toBeNull();
+  });
   it('rediscovers on reconnect rather than retaining an old installation fact', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response('installed')).mockResolvedValueOnce(response('not_installed')));
     render(view());

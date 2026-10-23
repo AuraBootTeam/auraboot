@@ -369,3 +369,6 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |
 
 The independent published-library consumer in [fixtures/agent-artifact-consumer](fixtures/agent-artifact-consumer/README.md) validates core/agent/app and opt-in fixtures through actual Maven POM and Gradle metadata, without producer project substitution.
+
+| `application/verify-agent-cli-mcp.mjs` | Real-backend CLI/MCP acceptance: explicit CLI root, origin, installed/not_installed expectation, fresh evidence directory and bootstrap credentials. Runs status plus stdio and Streamable HTTP profile discovery and ordinary model queries; base also refuses direct AI actions. Registered/executed counts must match. |
+| `dev/plugin-assembly.mjs` | Shared plugin profile assembly decision: accept only verified v1 agent installation, omit declared optional AI resources from base profiles, and reject explicit/unknown required-module imports before any selected plugin writes. |
