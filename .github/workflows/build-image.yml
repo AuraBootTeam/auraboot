@@ -2,7 +2,6 @@ name: Build & Publish OSS Image
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
     paths-ignore:
       - '**/*.md'
@@ -12,6 +11,12 @@ on:
       - '.github/FUNDING.yml'
       - '.github/release-notes-template.md'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish images to GHCR (requires release authorization)'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -25,7 +30,10 @@ env:
 # (pnpm/Vite) on arm64 via QEMU used to exceed GitHub's 6h job cap (issue #1270);
 # native runners keep every build under ~15 min.
 jobs:
+  # Main merges are verified by Backend CI and Docker Quickstart, not published.
+  # Publishing requires an explicit version tag or an opted-in manual release.
   build:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' && inputs.publish == true
     name: Build ${{ matrix.image }} (${{ matrix.arch }})
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 45
@@ -85,6 +93,7 @@ jobs:
           retention-days: 1
 
   merge:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' && inputs.publish == true
     name: Merge & tag ${{ matrix.image }}
     runs-on: ubuntu-latest
     needs: build
