@@ -1,3 +1,4 @@
+vi.mock('~/contexts/ApplicationCapabilitiesContext', () => ({ useApplicationCapabilities: () => ({ agent: 'installed', loading: false }) }));
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useSearchParams } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1134,7 +1135,9 @@ describe('UnifiedDesignerPage', () => {
     });
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
+      vi.fn().mockImplementation(async (input: string) => input === '/api/application/capabilities'
+        ? new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } }))
+        : {
         ok: true,
         json: async () => ({
           content:

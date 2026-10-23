@@ -948,6 +948,21 @@
         },
         "type": "object"
       },
+      "AgentCapability": {
+        "properties": {
+          "state": {
+            "enum": [
+              "installed",
+              "not_installed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
       "AgentConversationMessageItem": {
         "properties": {
           "cardPayload": {
@@ -16320,6 +16335,24 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "ApplicationCapabilities": {
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentCapability"
+          },
+          "schemaVersion": {
+            "format": "int32",
+            "maximum": 1,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent",
+          "schemaVersion"
+        ],
         "type": "object"
       },
       "ApplicationIdentity": {
@@ -41189,6 +41222,12 @@
             },
             "type": "array"
           },
+          "applicationModules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "author": {
             "type": "string"
           },
@@ -60184,6 +60223,37 @@
         },
         "tags": [
           "Announcements"
+        ]
+      }
+    },
+    "/api/application/capabilities": {
+      "get": {
+        "description": "Installation facts only; does not report provider configuration, entitlement or execution permission. Responses must not be cached.",
+        "operationId": "capabilities_1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationCapabilities"
+                }
+              }
+            },
+            "description": "Verified installation facts"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Authentication context rejected"
+          },
+          "503": {
+            "description": "Assembly not yet verified; retry later"
+          }
+        },
+        "summary": "Discover verified application composition",
+        "tags": [
+          "application-capabilities-controller"
         ]
       }
     },

@@ -1,3 +1,4 @@
+import { requireAgent } from '../../../client/agent-capabilities.js';
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
 import type { Tool } from '../../registry.js';
@@ -18,6 +19,7 @@ export function askAuraBotTool(client: ApiClient): Tool<Params> {
     annotations: { readOnlyHint: true, openWorldHint: true },
     handler: async (params) => {
       try {
+        await requireAgent(client);
         const resp = await client.post('/api/ai/aurabot/chat/stream', {
           messages: [{ role: 'user', content: params.question }],
         });

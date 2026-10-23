@@ -1,3 +1,4 @@
+import { agentFetch } from '~/shared/services/application-capabilities';
 /**
  * AiDesignDialog — natural-language → unified-designer V3 blocks.
  *
@@ -47,7 +48,7 @@ export const AiDesignDialog: React.FC<AiDesignDialogProps> = ({
     setPreview('');
     setError(null);
     try {
-      const resp = await fetch('/api/agent/nl-modeling/generate-page', {
+      const resp = await agentFetch('/api/agent/nl-modeling/generate-page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ systemPrompt, message: description.trim() }),

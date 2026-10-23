@@ -1,3 +1,4 @@
+import { agentFetch } from '~/shared/services/application-capabilities';
 /**
  * AiPagePanel — Multi-turn conversational AI panel for page generation
  *
@@ -157,7 +158,7 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
         setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? { ...m, ...patch } : m)));
 
       try {
-        const resp = await fetch('/api/agent/nl-modeling/generate-page', {
+        const resp = await agentFetch('/api/agent/nl-modeling/generate-page', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ systemPrompt, message: text.trim() }),

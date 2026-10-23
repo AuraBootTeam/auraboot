@@ -46,6 +46,7 @@ COPY VERSION /VERSION
 COPY scripts/ci/gradle-repositories.init.gradle /opt/aura-ci/gradle-repositories.init.gradle
 
 # Copy subproject build files for dependency resolution
+COPY platform/platform-bom/build.gradle platform-bom/build.gradle
 COPY platform/platform-app/build.gradle platform-app/build.gradle
 COPY platform/platform-agent/build.gradle platform-agent/build.gradle
 COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle

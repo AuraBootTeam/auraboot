@@ -64,17 +64,20 @@ let bootedOnce = false
  *                   enabled" if omitted (suitable for OSS dev). The App
  *                   shell should pass an EntitlementContext-backed check.
  */
-export async function bootCorePlugins(opts: { hasFeature?: (key: string) => boolean; force?: boolean } = {}): Promise<readonly string[]> {
+export async function bootCorePlugins(opts: { hasFeature?: (key: string) => boolean; force?: boolean; agentState?: 'installed' | 'not_installed' | 'unknown' } = {}): Promise<readonly string[]> {
   const existingKernel = getKernel()
   if (opts.hasFeature && !opts.force) {
     existingKernel.pluginLoader.setFeatureGate(opts.hasFeature)
   }
   if (bootedOnce && !opts.force) {
+    existingKernel.pluginLoader.setApplicationModuleGate(module => module === 'agent' && opts.agentState === 'installed')
+    await existingKernel.pluginLoader.activateAll()
     return existingKernel.pluginLoader.list().filter(r => r.state === 'active').map(r => r.definition.manifest.code)
   }
   if (opts.force) resetKernel({ hasFeature: opts.hasFeature })
 
   const kernel = getKernel()
+  kernel.pluginLoader.setApplicationModuleGate(module => module === 'agent' && opts.agentState === 'installed')
   const ALL_PLUGINS = [...CORE_PLUGINS, ...ENTERPRISE_PLUGINS]
   for (const plugin of ALL_PLUGINS) {
     try {

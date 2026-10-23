@@ -330,7 +330,7 @@ export default function LlmProvidersPage() {
 
   if (!canManageProviders) {
     return (
-      <RouteAccessDenied message="Access denied: LLM provider settings require permission ai_center" />
+      <RouteAccessDenied title={t('application.agent.permissionTitle')} message={t('application.agent.providerPermission')} />
     );
   }
 

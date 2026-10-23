@@ -21,6 +21,7 @@ ENTERPRISE_PLUGIN_ROOT="${ENTERPRISE_PLUGIN_ROOT:-${ENTERPRISE_PLUGINS_DIR:-}}"
 EXTRA_PLUGIN_ROOTS_RAW="${EXTRA_PLUGIN_ROOTS:-${EXTRA_PLUGINS_DIRS:-}}"
 EXTRA_PLUGIN_ROOTS=()
 PLUGINS=()
+PLUGINS_FROM_PROFILE=0
 IDENTIFIER_MAPPING_PATH="${IDENTIFIER_MAPPING_PATH:-}"
 PLUGIN_IDENTIFIER_MAPPINGS=()
 MAPPING_TOOL="$SCRIPT_DIR/dev/plugin-identifier-mapping.py"
@@ -166,6 +167,7 @@ PY
 }
 
 if [ "${#PLUGINS[@]}" -eq 0 ]; then
+    PLUGINS_FROM_PROFILE=1
     while IFS= read -r plugin; do
         PLUGINS+=("$plugin")
     done < <(load_profile_plugins "$PROFILE")
@@ -345,6 +347,43 @@ for item in json.load(sys.stdin).get('data',[]):
         exit 1
     fi
 fi
+
+# Select optional profile resources using the authenticated verified assembly.
+# Preflight the entire selection before the first resource write. Existing installed
+# resources/history are retained when the backend is switched to base.
+application_capabilities="$(NO_PROXY=localhost curl -fs --max-time 5 "$BACKEND_URL/api/application/capabilities" \
+    -H "Authorization: Bearer $jwt" -H "Accept: application/json" || true)"
+if ! printf '%s' "$application_capabilities" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+    application_capabilities='{}'
+fi
+assembly_selected_plugins=()
+for plugin in "${PLUGINS[@]}"; do
+    path="$(container_plugin_path "$plugin")" || { echo "ERROR: plugin path not found: $plugin" >&2; exit 2; }
+    if [ -n "$BACKEND_CONTAINER" ]; then
+        manifest_json="$(docker exec "$BACKEND_CONTAINER" cat "$path/plugin.json")"
+    else
+        manifest_path="$path/plugin.json"
+        if [ ! -f "$manifest_path" ]; then
+            case "$path" in
+                /app/plugins/*) manifest_path="$PROJECT_ROOT/plugins/${path#/app/plugins/}/plugin.json" ;;
+                /app/plugins-enterprise/*) manifest_path="${AURA_ENTERPRISE_ROOT:?}/plugins/${path#/app/plugins-enterprise/}/plugin.json" ;;
+            esac
+        fi
+        manifest_json="$(cat "$manifest_path")"
+    fi
+    decision="$(node "$SCRIPT_DIR/dev/plugin-assembly.mjs" "$manifest_json" "$application_capabilities" "$PLUGINS_FROM_PROFILE")" \
+        || { echo "ERROR: assembly preflight failed for $plugin; no plugins imported" >&2; exit 2; }
+    if [ "$decision" = omit ]; then
+        echo "  OMIT $plugin: optional agent module is not installed (profile selection)"
+    else
+        assembly_selected_plugins+=("$plugin")
+    fi
+done
+if [ "${#assembly_selected_plugins[@]}" -eq 0 ]; then
+    echo "Plugin import complete: every optional profile entry was omitted for this assembly."
+    exit 0
+fi
+PLUGINS=("${assembly_selected_plugins[@]}")
 
 import_plugin_once() {
     local path="$1"

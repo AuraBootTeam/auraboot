@@ -31,7 +31,7 @@ class AgentAssemblyVerifierTest {
         var beans = new DefaultListableBeanFactory();
         beans.setBeanClassLoader(descriptors(false, false));
         beans.registerSingleton("selection", AgentAssembly.BASE);
-        verifyAssembly(beans);
+        assertThat(verifyAssembly(beans).verifiedAssembly()).contains(AgentAssembly.BASE);
     }
 
     @Test
@@ -50,7 +50,19 @@ class AgentAssemblyVerifierTest {
 
     @Test
     void fullRetainsEveryAdapterAndContributor() {
-        verifyAssembly(full());
+        assertThat(verifyAssembly(full()).verifiedAssembly()).contains(AgentAssembly.WITH_AGENT);
+    }
+
+    @Test
+    void discoveryIsUnavailableBeforeVerificationAndAfterAnyFailedRevalidation() {
+        var beans = full();
+        var verifier = new AgentAssemblyVerifier(beans, beans.getBeanProvider(AgentAssembly.class));
+        assertThat(verifier.verifiedAssembly()).isEmpty();
+        verifier.afterSingletonsInstantiated();
+        assertThat(verifier.verifiedAssembly()).contains(AgentAssembly.WITH_AGENT);
+        beans.destroySingleton("llm");
+        assertThatThrownBy(verifier::afterSingletonsInstantiated).hasMessageContaining("0 LLM action executors");
+        assertThat(verifier.verifiedAssembly()).isEmpty();
     }
 
     @Test
@@ -132,8 +144,10 @@ class AgentAssemblyVerifierTest {
         return executor;
     }
 
-    private void verifyAssembly(DefaultListableBeanFactory beans) {
-        new AgentAssemblyVerifier(beans, beans.getBeanProvider(AgentAssembly.class)).afterSingletonsInstantiated();
+    private AgentAssemblyVerifier verifyAssembly(DefaultListableBeanFactory beans) {
+        var verifier = new AgentAssemblyVerifier(beans, beans.getBeanProvider(AgentAssembly.class));
+        verifier.afterSingletonsInstantiated();
+        return verifier;
     }
 
     private ClassLoader descriptors(boolean installed, boolean duplicate) {

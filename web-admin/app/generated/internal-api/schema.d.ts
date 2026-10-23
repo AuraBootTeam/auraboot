@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 874ab7fc3d48cbe8f8a25ddc97cc905d6ebc50daee2ef912a81e62e0216d7576
+ * Contract SHA-256: cde653e0dd2b9dab792aa47679f79f132a7ed5aef5521124b7289e9e47dbf811
  */
 export interface paths {
     "/api/activities": {
@@ -3615,6 +3615,26 @@ export interface paths {
         put: operations["update_22"];
         post?: never;
         delete: operations["delete_23"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/application/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover verified application composition
+         * @description Installation facts only; does not report provider configuration, entitlement or execution permission. Responses must not be cached.
+         */
+        get: operations["capabilities_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -22780,6 +22800,10 @@ export interface components {
             pid?: string;
             primaryObject?: string;
         };
+        AgentCapability: {
+            /** @enum {string} */
+            state: "installed" | "not_installed";
+        };
         AgentConversationMessageItem: {
             cardPayload?: string;
             clientMsgId?: string;
@@ -27707,6 +27731,11 @@ export interface components {
             /** Format: int64 */
             id?: number;
             name?: string;
+        };
+        ApplicationCapabilities: {
+            agent: components["schemas"]["AgentCapability"];
+            /** Format: int32 */
+            schemaVersion: number;
         };
         ApplicationIdentity: {
             applicationId?: string;
@@ -36558,6 +36587,7 @@ export interface components {
         };
         PluginManifestExtended: {
             agentDefinitions?: components["schemas"]["AgentDefinitionDTO"][];
+            applicationModules?: string[];
             author?: string;
             automations?: components["schemas"]["AutomationDefinitionDTO"][];
             bindingRules?: components["schemas"]["BindingRuleDTO"][];
@@ -45982,6 +46012,47 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
                 };
+            };
+        };
+    };
+    capabilities_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified installation facts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationCapabilities"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication context rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assembly not yet verified; retry later */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

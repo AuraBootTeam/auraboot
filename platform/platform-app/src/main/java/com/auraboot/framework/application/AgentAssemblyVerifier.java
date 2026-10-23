@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.Optional;
 
 /** Rejects missing or duplicated installed adapters before listeners and schedulers start. */
 @Component
@@ -38,6 +39,7 @@ final class AgentAssemblyVerifier implements SmartInitializingSingleton {
 
     private final ConfigurableListableBeanFactory beans;
     private final ObjectProvider<AgentAssembly> selection;
+    private volatile AgentAssembly verifiedAssembly;
 
     AgentAssemblyVerifier(ConfigurableListableBeanFactory beans, ObjectProvider<AgentAssembly> selection) {
         this.beans = beans;
@@ -46,6 +48,7 @@ final class AgentAssemblyVerifier implements SmartInitializingSingleton {
 
     @Override
     public void afterSingletonsInstantiated() {
+        verifiedAssembly = null;
         AgentAssembly assembly = selection.getIfAvailable(() -> AgentAssembly.WITH_AGENT);
         boolean installed = assembly == AgentAssembly.WITH_AGENT;
         try {
@@ -87,5 +90,11 @@ final class AgentAssemblyVerifier implements SmartInitializingSingleton {
         } catch (IOException | ClassNotFoundException failure) {
             throw new IllegalStateException("Cannot verify the selected agent assembly", failure);
         }
+        verifiedAssembly = assembly;
+    }
+
+    /** Empty until the entire installation and adapter closure has passed validation. */
+    Optional<AgentAssembly> verifiedAssembly() {
+        return Optional.ofNullable(verifiedAssembly);
     }
 }

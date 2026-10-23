@@ -1,3 +1,4 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 /**
  * QuickStartCards — Always-visible quick-start shortcuts on the dashboard.
  */
@@ -45,6 +46,7 @@ const CARDS = [
 
 export function QuickStartCards() {
   const { openPanel } = useAuraBot();
+  const { agent, loading: agentLoading } = useApplicationCapabilities();
 
   return (
     <div className="mb-6">
@@ -73,6 +75,7 @@ export function QuickStartCards() {
         {/* AI Assistant — button, not a link */}
         <button
           onClick={openPanel}
+          disabled={agent !== 'installed' || agentLoading}
           className="group flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
         >
           <div className="rounded-lg bg-violet-50 p-2 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">

@@ -1,3 +1,4 @@
+import { requireAgent } from '../client/agent-capabilities.js';
 import chalk from 'chalk';
 import type { ApiClient } from '../client/api-client.js';
 import { queryDynamicList, queryNamedQuery, type FilterItem } from '../client/dynamic-query.js';
@@ -156,6 +157,7 @@ export class WorkflowEngine {
    * Execute an analyze step — send data to AuraBot LLM with a prompt.
    */
   private async executeAnalyze(step: AnalyzeStep): Promise<unknown> {
+    await requireAgent(this.client);
     const inputData = this.variables[step.input];
     if (inputData === undefined) {
       throw new Error(`Variable "${step.input}" not found`);

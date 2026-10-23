@@ -1,3 +1,4 @@
+import { requireAgent } from '../../client/agent-capabilities.js';
 import chalk from 'chalk';
 import { ApiClient, EXIT } from '../../client/api-client.js';
 import { resolveOutputOptions, printOutput, type ColumnDef } from '../../output/formatter.js';
@@ -27,6 +28,7 @@ const APPROVAL_COLUMNS: ColumnDef[] = [
 export async function approvalListCommand(options: ApprovalOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const opts = resolveOutputOptions(options);
 
@@ -44,6 +46,7 @@ export async function approvalListCommand(options: ApprovalOptions): Promise<voi
 export async function approvalApproveCommand(pid: string, options: ApprovalOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const resp = await client.post(`/api/agent/approval/${pid}/approve`, {});
 
@@ -58,6 +61,7 @@ export async function approvalApproveCommand(pid: string, options: ApprovalOptio
 export async function approvalRejectCommand(pid: string, reason: string, options: ApprovalOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const resp = await client.post(`/api/agent/approval/${pid}/reject`, { reason });
 

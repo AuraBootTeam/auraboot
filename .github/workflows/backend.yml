@@ -82,13 +82,15 @@ jobs:
         working-directory: platform
         run: ./gradlew --no-daemon compileJava compileTestJava
 
-      - name: Verify full application assembly and launcher modes
+      - name: Verify application assemblies, discovery and launcher modes
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: >-
           ./gradlew --no-daemon :platform-app:test
           --tests com.auraboot.framework.application.PlatformApplicationModeTest
-          :platform-app:verifyApplicationAssembly
+          --tests com.auraboot.framework.application.AgentAssemblyVerifierTest
+          --tests com.auraboot.framework.application.ApplicationCapabilitiesControllerTest
+          :platform-app:verifyBaseApplicationAssembly
 
       - name: Verify core agent implementation boundary
         if: steps.changes.outputs.run == 'true'
@@ -96,6 +98,7 @@ jobs:
         run: >-
           ./gradlew --no-daemon :test
           --tests com.auraboot.framework.architecture.CoreAgentBoundaryTest
+          --tests com.auraboot.framework.plugin.service.impl.PluginOptionalAgentCapabilityTest
           --max-workers=2 -PauraTestMaxHeap=2g -PauraTestMinHeap=256m
 
       - name: Upload core agent boundary results

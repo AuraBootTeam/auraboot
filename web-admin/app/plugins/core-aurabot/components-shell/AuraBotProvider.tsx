@@ -1,3 +1,5 @@
+import { agentFetch } from '~/shared/services/application-capabilities';
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 /**
  * AuraBotProvider
  *
@@ -561,6 +563,7 @@ export interface AuraBotProviderProps {
 
 export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const { locale } = useI18n();
+  const { agent } = useApplicationCapabilities();
   const [state, dispatch] = useReducer(auraBotReducer, initialState);
   const [sessions, setSessions] = React.useState<AuraBotSessionSummary[]>([]);
   const location = useLocation();
@@ -623,9 +626,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   }, [state.messages.length]);
 
   useEffect(() => {
-    if (state.panelState !== 'expanded') return;
+    if (agent !== 'installed' || state.panelState !== 'expanded') return;
     refreshConversations();
-  }, [state.panelState, refreshConversations]);
+  }, [state.panelState, refreshConversations, agent]);
 
   useEffect(() => {
     if (state.currentConversationId !== null) rememberConversationId(state.currentConversationId);
@@ -639,16 +642,18 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
   // Panel actions
   const openPanel = useCallback(() => {
+    if (agent !== 'installed') return;
     dispatch({ type: 'set_panel_state', payload: 'expanded' });
-  }, []);
+  }, [agent]);
 
   const closePanel = useCallback(() => {
     dispatch({ type: 'set_panel_state', payload: 'collapsed' });
   }, []);
 
   const togglePanel = useCallback(() => {
+    if (agent !== 'installed') return;
     dispatch({ type: 'toggle_panel' });
-  }, []);
+  }, [agent]);
 
   // Message actions
   const clearMessages = useCallback(() => {
@@ -708,10 +713,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
   // Load knowledge bases when panel expands
   useEffect(() => {
-    if (state.panelState !== 'expanded') return;
+    if (agent !== 'installed' || state.panelState !== 'expanded') return;
     const loadKbs = async () => {
       try {
-        const res = await fetch('/api/ai/knowledge', { credentials: 'include' });
+        const res = await agentFetch('/api/ai/knowledge', { credentials: 'include' });
         if (!res.ok) return;
         const json = await res.json();
         const kbs: KnowledgeBaseInfo[] = (json?.data || [])
@@ -728,7 +733,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       }
     };
     loadKbs();
-  }, [state.panelState]);
+  }, [state.panelState, agent]);
 
   // PageContext (manual override)
   const setPageContext = useCallback(

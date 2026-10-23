@@ -1,3 +1,4 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { useSSE } from '~/hooks/useSSE';
 import { Link } from 'react-router';
@@ -41,6 +42,7 @@ export default function Header({
   showLanguageSwitch = true,
   simplified = false,
 }: HeaderProps) {
+  const { agent, loading: agentLoading } = useApplicationCapabilities();
   const presentation = usePagePresentation();
   const { sidebarWidth } = usePresentationNavigation();
   const workspace = presentation?.mode === 'workspace';
@@ -226,13 +228,14 @@ export default function Header({
             {!simplified && (
               <button
                 onClick={toggleAI}
+                disabled={agent !== 'installed' || agentLoading}
                 data-testid="ai-panel-toggle"
                 className={`hidden h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md sm:flex ${
                   aiState.panelState === 'expanded'
                     ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
                 }`}
-                title="AuraBot (⌘J)"
+                title={!agentLoading && agent === 'installed' ? 'AuraBot (⌘J)' : t(`application.agent.${agentLoading ? 'loading' : agent}`)}
               >
                 <SparklesIcon className="h-5 w-5" />
               </button>

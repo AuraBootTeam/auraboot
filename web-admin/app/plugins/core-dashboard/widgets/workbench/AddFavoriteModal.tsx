@@ -1,3 +1,5 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
+import { filterAgentMenus } from '~/shared/services/agent-surfaces';
 /**
  * AddFavoriteModal — Modal for selecting menu items to add as favorites.
  *
@@ -102,6 +104,7 @@ function buildFavoriteLookup(favorites: UserEngagement[]): Map<string, UserEngag
 }
 
 export function AddFavoriteModal({ open, onClose, onChanged }: AddFavoriteModalProps) {
+  const { agent } = useApplicationCapabilities();
   const { t, locale } = useI18n();
   const [menuItems, setMenuItems] = useState<LeafMenuItem[]>([]);
   const [favorites, setFavorites] = useState<Map<string, UserEngagement>>(new Map());
@@ -143,7 +146,7 @@ export function AddFavoriteModal({ open, onClose, onChanged }: AddFavoriteModalP
           ? menuResult.data
           : [];
 
-        setMenuItems(extractLeafItems(menus));
+        setMenuItems(extractLeafItems(filterAgentMenus(menus, agent === 'installed')));
         setFavorites(buildFavoriteLookup(favs));
       } finally {
         if (!cancelled) setLoading(false);
@@ -152,7 +155,7 @@ export function AddFavoriteModal({ open, onClose, onChanged }: AddFavoriteModalP
 
     loadData();
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, agent]);
 
   // Reset search on open
   useEffect(() => {

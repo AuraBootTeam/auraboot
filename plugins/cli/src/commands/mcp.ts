@@ -1,3 +1,4 @@
+import { requireAgent } from '../client/agent-capabilities.js';
 import chalk from 'chalk';
 import {
   loadMcpConfig,
@@ -160,6 +161,7 @@ export async function mcpPushCommand(
   const local = loadMcpConfig();
   const servers = selectMcpServersForPush(local, name);
   await client.requireAuth();
+  await requireAgent(client);
   const response = await client.post<{
     dryRun: boolean;
     changes: Array<{ name: string; action: string; transport: string }>;
@@ -184,6 +186,7 @@ export async function mcpPullCommand(
   client: ApiClient = new ApiClient(options),
 ): Promise<void> {
   await client.requireAuth();
+  await requireAgent(client);
   const response = await client.get<{
     servers: Record<string, import('../mcp/client.js').PortableMcpServerConfig>;
   }>('/api/agent/mcp-servers/export');

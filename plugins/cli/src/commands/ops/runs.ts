@@ -1,3 +1,4 @@
+import { requireAgent } from '../../client/agent-capabilities.js';
 import chalk from 'chalk';
 import { ApiClient, EXIT } from '../../client/api-client.js';
 import { resolveOutputOptions, printOutput, printDetail, type ColumnDef } from '../../output/formatter.js';
@@ -23,6 +24,7 @@ const RUN_COLUMNS: ColumnDef[] = [
 export async function runsListCommand(options: RunsOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const opts = resolveOutputOptions(options);
 
@@ -44,6 +46,7 @@ export async function runsListCommand(options: RunsOptions): Promise<void> {
 export async function runsShowCommand(runPid: string, options: RunsOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const opts = resolveOutputOptions(options);
 
